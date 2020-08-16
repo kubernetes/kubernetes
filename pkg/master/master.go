@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -27,7 +28,6 @@ import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
-	auditregistrationv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	authorizationapiv1 "k8s.io/api/authorization/v1"
@@ -38,11 +38,13 @@ import (
 	batchapiv1 "k8s.io/api/batch/v1"
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	batchapiv2alpha1 "k8s.io/api/batch/v2alpha1"
+	certificatesapiv1 "k8s.io/api/certificates/v1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationapiv1 "k8s.io/api/coordination/v1"
 	coordinationapiv1beta1 "k8s.io/api/coordination/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	eventsv1 "k8s.io/api/events/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
@@ -87,12 +89,11 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	// RESTStorage installers
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
 	appsrest "k8s.io/kubernetes/pkg/registry/apps/rest"
-	auditregistrationrest "k8s.io/kubernetes/pkg/registry/auditregistration/rest"
 	authenticationrest "k8s.io/kubernetes/pkg/registry/authentication/rest"
 	authorizationrest "k8s.io/kubernetes/pkg/registry/authorization/rest"
 	autoscalingrest "k8s.io/kubernetes/pkg/registry/autoscaling/rest"
@@ -189,6 +190,12 @@ type ExtraConfig struct {
 
 	ServiceAccountIssuer        serviceaccount.TokenGenerator
 	ServiceAccountMaxExpiration time.Duration
+	ExtendExpiration            bool
+
+	// ServiceAccountIssuerDiscovery
+	ServiceAccountIssuerURL  string
+	ServiceAccountJWKSURI    string
+	ServiceAccountPublicKeys []interface{}
 
 	VersionedInformers informers.SharedInformerFactory
 }
@@ -341,6 +348,39 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		routes.Logs{}.Install(s.Handler.GoRestfulContainer)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
+		// Metadata and keys are expected to only change across restarts at present,
+		// so we just marshal immediately and serve the cached JSON bytes.
+		md, err := serviceaccount.NewOpenIDMetadata(
+			c.ExtraConfig.ServiceAccountIssuerURL,
+			c.ExtraConfig.ServiceAccountJWKSURI,
+			c.GenericConfig.ExternalAddress,
+			c.ExtraConfig.ServiceAccountPublicKeys,
+		)
+		if err != nil {
+			// If there was an error, skip installing the endpoints and log the
+			// error, but continue on. We don't return the error because the
+			// metadata responses require additional, backwards incompatible
+			// validation of command-line options.
+			msg := fmt.Sprintf("Could not construct pre-rendered responses for"+
+				" ServiceAccountIssuerDiscovery endpoints. Endpoints will not be"+
+				" enabled. Error: %v", err)
+			if c.ExtraConfig.ServiceAccountIssuerURL != "" {
+				// The user likely expects this feature to be enabled if issuer URL is
+				// set and the feature gate is enabled. In the future, if there is no
+				// longer a feature gate and issuer URL is not set, the user may not
+				// expect this feature to be enabled. We log the former case as an Error
+				// and the latter case as an Info.
+				klog.Error(msg)
+			} else {
+				klog.Info(msg)
+			}
+		} else {
+			routes.NewOpenIDMetadataServer(md.ConfigJSON, md.PublicKeysetJSON).
+				Install(s.Handler.GoRestfulContainer)
+		}
+	}
+
 	m := &Master{
 		GenericAPIServer:          s,
 		ClusterAuthenticationInfo: c.ExtraConfig.ClusterAuthenticationInfo,
@@ -358,6 +398,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			ServiceNodePortRange:        c.ExtraConfig.ServiceNodePortRange,
 			LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
 			ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
+			ExtendExpiration:            c.ExtraConfig.ExtendExpiration,
 			ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
 			APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
 		}
@@ -374,7 +415,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
 	// handlers that we have.
 	restStorageProviders := []RESTStorageProvider{
-		auditregistrationrest.RESTStorageProvider{},
 		authenticationrest.RESTStorageProvider{Authenticator: c.GenericConfig.Authentication.Authenticator, APIAudiences: c.GenericConfig.Authentication.APIAudiences},
 		authorizationrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer, RuleResolver: c.GenericConfig.RuleResolver},
 		autoscalingrest.RESTStorageProvider{},
@@ -393,7 +433,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		flowcontrolrest.RESTStorageProvider{},
 		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.
 		// See https://github.com/kubernetes/kubernetes/issues/42392
-		appsrest.RESTStorageProvider{},
+		appsrest.StorageProvider{},
 		admissionregistrationrest.RESTStorageProvider{},
 		eventsrest.RESTStorageProvider{TTL: c.ExtraConfig.EventTTL},
 	}
@@ -523,7 +563,7 @@ func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 	preferredAddressTypes := []apiv1.NodeAddressType{
 		apiv1.NodeExternalIP,
 	}
-	nodes, err := n.nodeClient.List(metav1.ListOptions{})
+	nodes, err := n.nodeClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -568,10 +608,12 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		autoscalingapiv2beta2.SchemeGroupVersion,
 		batchapiv1.SchemeGroupVersion,
 		batchapiv1beta1.SchemeGroupVersion,
+		certificatesapiv1.SchemeGroupVersion,
 		certificatesapiv1beta1.SchemeGroupVersion,
 		coordinationapiv1.SchemeGroupVersion,
 		coordinationapiv1beta1.SchemeGroupVersion,
 		discoveryv1beta1.SchemeGroupVersion,
+		eventsv1.SchemeGroupVersion,
 		eventsv1beta1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
 		networkingapiv1.SchemeGroupVersion,
@@ -591,7 +633,6 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	)
 	// disable alpha versions explicitly so we have a full list of what's possible to serve
 	ret.DisableVersions(
-		auditregistrationv1alpha1.SchemeGroupVersion,
 		batchapiv2alpha1.SchemeGroupVersion,
 		nodev1alpha1.SchemeGroupVersion,
 		rbacv1alpha1.SchemeGroupVersion,

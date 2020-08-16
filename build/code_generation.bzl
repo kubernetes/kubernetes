@@ -15,6 +15,7 @@
 load("//build:kazel_generated.bzl", "go_prefix", "tags_values_pkgs")
 load("//build:openapi.bzl", "openapi_vendor_prefix")
 load("@io_k8s_repo_infra//defs:go.bzl", "go_genrule")
+load("@bazel_skylib//lib:paths.bzl", "paths")
 
 def bazel_go_library(pkg):
     """Returns the Bazel label for the Go library for the provided package.
@@ -41,8 +42,10 @@ def go_pkg(pkg):
         ...
     )
     """
-    count = 1
-    return go_prefix + "/" + pkg.replace("staging/src/", "vendor/", count)
+    for prefix in ["staging/src", "vendor"]:
+        if pkg.startswith(prefix):
+            return paths.relativize(pkg, prefix)
+    return paths.join(go_prefix, pkg)
 
 def openapi_deps():
     deps = [
@@ -73,18 +76,18 @@ def gen_openapi(outs, output_pkg, include_pkgs = [], exclude_pkgs = []):
         # the generator must run from the repo root inside the generated GOPATH.
         # All of bazel's $(location)s are relative to the original working directory, however.
         cmd = " ".join([
-            "cd $$GOPATH/src/" + go_prefix + ";",
-            "$$GO_GENRULE_EXECROOT/$(location //vendor/k8s.io/kube-openapi/cmd/openapi-gen)",
+            "$(location //vendor/k8s.io/kube-openapi/cmd/openapi-gen)",
             "--v 1",
             "--logtostderr",
-            "--go-header-file $$GO_GENRULE_EXECROOT/$(location //" + openapi_vendor_prefix + "hack/boilerplate:boilerplate.generatego.txt)",
+            "--go-header-file $(location //" + openapi_vendor_prefix + "hack/boilerplate:boilerplate.generatego.txt)",
             "--output-file-base zz_generated.openapi",
             "--output-package " + output_pkg,
             "--report-filename tmp_api_violations.report",
             "--input-dirs " + ",".join([go_pkg(pkg) for pkg in tags_values_pkgs["openapi-gen"]["true"] if applies(pkg, include_pkgs, True) and not applies(pkg, exclude_pkgs, False)]),
-            "&& cp $$GOPATH/src/" + output_pkg + "/zz_generated.openapi.go $$GO_GENRULE_EXECROOT/$(location :zz_generated.openapi.go)",
+            "&& cp $$GOPATH/src/" + output_pkg + "/zz_generated.openapi.go $(location :zz_generated.openapi.go)",
             "&& rm tmp_api_violations.report",
         ]),
         go_deps = openapi_deps(),
         tools = ["//vendor/k8s.io/kube-openapi/cmd/openapi-gen"],
+        message = "GenOpenAPI",
     )

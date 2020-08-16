@@ -18,6 +18,7 @@ go_library(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
@@ -28,7 +29,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

@@ -17,16 +17,16 @@ limitations under the License.
 package framework
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
 	"runtime/debug"
-	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
-	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
+	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 )
 
 func nowStamp() string {
@@ -53,7 +53,7 @@ func FailfWithOffset(offset int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	skip := offset + 1
 	log("FAIL", "%s\n\nFull Stack Trace\n%s", msg, PrunedStack(skip))
-	ginkgowrapper.Fail(nowStamp()+": "+msg, skip)
+	e2eginkgowrapper.Fail(nowStamp()+": "+msg, skip)
 }
 
 // Fail is a replacement for ginkgo.Fail which logs the problem as it occurs
@@ -64,7 +64,7 @@ func Fail(msg string, callerSkip ...int) {
 		skip += callerSkip[0]
 	}
 	log("FAIL", "%s\n\nFull Stack Trace\n%s", msg, PrunedStack(skip))
-	ginkgowrapper.Fail(nowStamp()+": "+msg, skip)
+	e2eginkgowrapper.Fail(nowStamp()+": "+msg, skip)
 }
 
 var codeFilterRE = regexp.MustCompile(`/github.com/onsi/ginkgo/`)
@@ -78,12 +78,14 @@ var codeFilterRE = regexp.MustCompile(`/github.com/onsi/ginkgo/`)
 // This is a modified copy of PruneStack in https://github.com/onsi/ginkgo/blob/f90f37d87fa6b1dd9625e2b1e83c23ffae3de228/internal/codelocation/code_location.go#L25:
 // - simplified API and thus renamed (calls debug.Stack() instead of taking a parameter)
 // - source code filtering updated to be specific to Kubernetes
-func PrunedStack(skip int) string {
-	fullStackTrace := string(debug.Stack())
-	stack := strings.Split(fullStackTrace, "\n")
+// - optimized to use bytes and in-place slice filtering from
+//   https://github.com/golang/go/wiki/SliceTricks#filter-in-place
+func PrunedStack(skip int) []byte {
+	fullStackTrace := debug.Stack()
+	stack := bytes.Split(fullStackTrace, []byte("\n"))
 	// Ensure that the even entries are the method names and the
 	// the odd entries the source code information.
-	if len(stack) > 0 && strings.HasPrefix(stack[0], "goroutine ") {
+	if len(stack) > 0 && bytes.HasPrefix(stack[0], []byte("goroutine ")) {
 		// Ignore "goroutine 29 [running]:" line.
 		stack = stack[1:]
 	}
@@ -94,13 +96,16 @@ func PrunedStack(skip int) string {
 	if len(stack) > 2*skip {
 		stack = stack[2*skip:]
 	}
-	prunedStack := []string{}
+	n := 0
 	for i := 0; i < len(stack)/2; i++ {
 		// We filter out based on the source code file name.
 		if !codeFilterRE.Match([]byte(stack[i*2+1])) {
-			prunedStack = append(prunedStack, stack[i*2])
-			prunedStack = append(prunedStack, stack[i*2+1])
+			stack[n] = stack[i*2]
+			stack[n+1] = stack[i*2+1]
+			n += 2
 		}
 	}
-	return strings.Join(prunedStack, "\n")
+	stack = stack[:n]
+
+	return bytes.Join(stack, []byte("\n"))
 }

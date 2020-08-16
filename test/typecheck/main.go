@@ -20,11 +20,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"go/ast"
-	"go/build"
-	"go/parser"
-	"go/token"
-	"go/types"
 	"io"
 	"log"
 	"os"
@@ -32,12 +27,9 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
-	"golang.org/x/crypto/ssh/terminal"
-
-	srcimporter "k8s.io/kubernetes/third_party/go-srcimporter"
+	"golang.org/x/tools/go/packages"
 )
 
 var (
@@ -46,13 +38,11 @@ var (
 	platforms  = flag.String("platform", "", "comma-separated list of platforms to typecheck")
 	timings    = flag.Bool("time", false, "output times taken for each phase")
 	defuses    = flag.Bool("defuse", false, "output defs/uses")
-	serial     = flag.Bool("serial", false, "don't type check platforms in parallel")
+	serial     = flag.Bool("serial", false, "don't type check platforms in parallel (equivalent to --parallel=1)")
+	parallel   = flag.Int("parallel", 3, "limits how many platforms can be checked in parallel. 0 means no limit.")
 	skipTest   = flag.Bool("skip-test", false, "don't type check test code")
 	tags       = flag.String("tags", "", "comma-separated list of build tags to apply in addition to go's defaults")
 	ignoreDirs = flag.String("ignore-dirs", "", "comma-separated list of directories to ignore in addition to the default hardcoded list including staging, vendor, and hidden dirs")
-
-	isTerminal = terminal.IsTerminal(int(os.Stdout.Fd()))
-	logPrefix  = ""
 
 	// When processed in order, windows and darwin are early to make
 	// interesting OS-based errors happen earlier.
@@ -61,10 +51,8 @@ var (
 		"darwin/amd64", "linux/arm",
 		"linux/386", "windows/amd64",
 		"linux/arm64", "linux/ppc64le",
-		"linux/s390x", "darwin/386",
+		"linux/s390x",
 	}
-	darwinPlatString  = "darwin/386,darwin/amd64"
-	windowsPlatString = "windows/386,windows/amd64"
 
 	// directories we always ignore
 	standardIgnoreDirs = []string{
@@ -82,176 +70,61 @@ var (
 		// edit/record.go doesn't compile without gopkg.in/yaml.v2
 		// in $GOSRC/$GOROOT (both typecheck and the shell script).
 		"pkg/kubectl/cmd/testdata/edit",
+		// Tools we use for maintaining the code base but not necessarily
+		// ship as part of the release
+		"hack/tools",
 	}
 )
 
-type analyzer struct {
-	fset      *token.FileSet // positions are relative to fset
-	conf      types.Config
-	ctx       build.Context
-	failed    bool
-	platform  string
-	donePaths map[string]interface{}
-	errors    []string
-}
-
-func newAnalyzer(platform string) *analyzer {
-	ctx := build.Default
+func newConfig(platform string) *packages.Config {
 	platSplit := strings.Split(platform, "/")
-	ctx.GOOS, ctx.GOARCH = platSplit[0], platSplit[1]
-	ctx.CgoEnabled = true
-	if *tags != "" {
-		tagsSplit := strings.Split(*tags, ",")
-		ctx.BuildTags = append(ctx.BuildTags, tagsSplit...)
-	}
-
-	// add selinux tag explicitly
-	ctx.BuildTags = append(ctx.BuildTags, "selinux")
-
-	a := &analyzer{
-		platform:  platform,
-		fset:      token.NewFileSet(),
-		ctx:       ctx,
-		donePaths: make(map[string]interface{}),
-	}
-	a.conf = types.Config{
-		FakeImportC: true,
-		Error:       a.handleError,
-		Sizes:       types.SizesFor("gc", a.ctx.GOARCH),
-	}
-
-	a.conf.Importer = srcimporter.New(
-		&a.ctx, a.fset, make(map[string]*types.Package))
-
-	if *verbose {
-		fmt.Printf("context: %#v\n", ctx)
-	}
-
-	return a
-}
-
-func (a *analyzer) handleError(err error) {
-	a.errors = append(a.errors, err.Error())
-	if *serial {
-		fmt.Fprintf(os.Stderr, "%sERROR(%s) %s\n", logPrefix, a.platform, err)
-	}
-	a.failed = true
-}
-
-func (a *analyzer) dumpAndResetErrors() []string {
-	es := a.errors
-	a.errors = nil
-	return es
-}
-
-// collect extracts test metadata from a file.
-func (a *analyzer) collect(dir string) {
-	if _, ok := a.donePaths[dir]; ok {
-		return
-	}
-	a.donePaths[dir] = nil
-
-	// Create the AST by parsing src.
-	fs, err := parser.ParseDir(a.fset, dir, nil, parser.AllErrors)
-
-	if err != nil {
-		fmt.Println(logPrefix+"ERROR(syntax)", err)
-		a.failed = true
-		return
-	}
-
-	if len(fs) > 1 && *verbose {
-		fmt.Println("multiple packages in dir:", dir)
-	}
-
-	for _, p := range fs {
-		// returns first error, but a.handleError deals with it
-		files := a.filterFiles(p.Files)
-		if *verbose {
-			fmt.Printf("path: %s package: %s files: ", dir, p.Name)
-			for _, f := range files {
-				fname := filepath.Base(a.fset.File(f.Pos()).Name())
-				fmt.Printf("%s ", fname)
-			}
-			fmt.Printf("\n")
-		}
-		a.typeCheck(dir, files)
-	}
-}
-
-// filterFiles restricts a list of files to only those that should be built by
-// the current platform. This includes both build suffixes (_windows.go) and build
-// tags ("// +build !linux" at the beginning).
-func (a *analyzer) filterFiles(fs map[string]*ast.File) []*ast.File {
-	files := []*ast.File{}
-	for _, f := range fs {
-		fpath := a.fset.File(f.Pos()).Name()
-		if *skipTest && strings.HasSuffix(fpath, "_test.go") {
-			continue
-		}
-		dir, name := filepath.Split(fpath)
-		matches, err := a.ctx.MatchFile(dir, name)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%sERROR reading %s: %s\n", logPrefix, fpath, err)
-			a.failed = true
-			continue
-		}
-		if matches {
-			files = append(files, f)
-		}
-	}
-	return files
-}
-
-func (a *analyzer) typeCheck(dir string, files []*ast.File) error {
-	info := types.Info{
-		Defs: make(map[*ast.Ident]types.Object),
-		Uses: make(map[*ast.Ident]types.Object),
-	}
-
-	// NOTE: this type check does a *recursive* import, but srcimporter
-	// doesn't do a full type check (ignores function bodies)-- this has
-	// some additional overhead.
-	//
-	// This means that we need to ensure that typeCheck runs on all
-	// code we will be compiling.
-	//
-	// TODO(rmmh): Customize our forked srcimporter to do this better.
-	pkg, err := a.conf.Check(dir, a.fset, files, &info)
-	if err != nil {
-		return err // type error
-	}
-
-	// A significant fraction of vendored code only compiles on Linux,
-	// but it's only imported by code that has build-guards for Linux.
-	// Track vendored code to type-check it in a second pass.
-	for _, imp := range pkg.Imports() {
-		if strings.HasPrefix(imp.Path(), "k8s.io/kubernetes/vendor/") {
-			vendorPath := imp.Path()[len("k8s.io/kubernetes/"):]
-			if *verbose {
-				fmt.Println("recursively checking vendor path:", vendorPath)
-			}
-			a.collect(vendorPath)
-		}
-	}
-
+	goos, goarch := platSplit[0], platSplit[1]
+	mode := packages.NeedName | packages.NeedFiles | packages.NeedTypes | packages.NeedSyntax | packages.NeedDeps | packages.NeedImports
 	if *defuses {
-		for id, obj := range info.Defs {
-			fmt.Printf("%s: %q defines %v\n",
-				a.fset.Position(id.Pos()), id.Name, obj)
-		}
-		for id, obj := range info.Uses {
-			fmt.Printf("%s: %q uses %v\n",
-				a.fset.Position(id.Pos()), id.Name, obj)
-		}
+		mode = mode | packages.NeedTypesInfo
 	}
+	env := append(os.Environ(),
+		"CGO_ENABLED=1",
+		fmt.Sprintf("GOOS=%s", goos),
+		fmt.Sprintf("GOARCH=%s", goarch))
+	tagstr := "selinux"
+	if *tags != "" {
+		tagstr = tagstr + "," + *tags
+	}
+	flags := []string{"-tags", tagstr}
 
-	return nil
+	return &packages.Config{
+		Mode:       mode,
+		Env:        env,
+		BuildFlags: flags,
+		Tests:      !(*skipTest),
+	}
 }
 
 type collector struct {
 	dirs       []string
 	ignoreDirs []string
+}
+
+func newCollector(ignoreDirs string) collector {
+	c := collector{
+		ignoreDirs: append([]string(nil), standardIgnoreDirs...),
+	}
+	if ignoreDirs != "" {
+		c.ignoreDirs = append(c.ignoreDirs, strings.Split(ignoreDirs, ",")...)
+	}
+	return c
+}
+
+func (c *collector) walk(roots []string) error {
+	for _, root := range roots {
+		err := filepath.Walk(root, c.handlePath)
+		if err != nil {
+			return err
+		}
+	}
+	sort.Strings(c.dirs)
+	return nil
 }
 
 // handlePath walks the filesystem recursively, collecting directories,
@@ -262,63 +135,115 @@ func (c *collector) handlePath(path string, info os.FileInfo, err error) error {
 		return err
 	}
 	if info.IsDir() {
+		name := info.Name()
 		// Ignore hidden directories (.git, .cache, etc)
-		if len(path) > 1 && path[0] == '.' {
+		if (len(name) > 1 && (name[0] == '.' || name[0] == '_')) || name == "testdata" {
+			if *verbose {
+				fmt.Printf("DBG: skipping dir %s\n", path)
+			}
 			return filepath.SkipDir
 		}
 		for _, dir := range c.ignoreDirs {
 			if path == dir {
+				if *verbose {
+					fmt.Printf("DBG: ignoring dir %s\n", path)
+				}
 				return filepath.SkipDir
 			}
 		}
-		c.dirs = append(c.dirs, path)
+		// Make dirs into relative pkg names.
+		// NOTE: can't use filepath.Join because it elides the leading "./"
+		pkg := path
+		if !strings.HasPrefix(pkg, "./") {
+			pkg = "./" + pkg
+		}
+		c.dirs = append(c.dirs, pkg)
+		if *verbose {
+			fmt.Printf("DBG: added dir %s\n", path)
+		}
 	}
 	return nil
 }
 
-type analyzerResult struct {
-	platform string
-	dir      string
-	errors   []string
+func (c *collector) verify(plat string) ([]string, error) {
+	errors := []packages.Error{}
+	start := time.Now()
+	config := newConfig(plat)
+
+	rootPkgs, err := packages.Load(config, c.dirs...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Recursively import all deps and flatten to one list.
+	allMap := map[string]*packages.Package{}
+	for _, pkg := range rootPkgs {
+		if *verbose {
+			serialFprintf(os.Stdout, "pkg %q has %d GoFiles\n", pkg.PkgPath, len(pkg.GoFiles))
+		}
+		allMap[pkg.PkgPath] = pkg
+		if len(pkg.Imports) > 0 {
+			for _, imp := range pkg.Imports {
+				if *verbose {
+					serialFprintf(os.Stdout, "pkg %q imports %q\n", pkg.PkgPath, imp.PkgPath)
+				}
+				allMap[imp.PkgPath] = imp
+			}
+		}
+	}
+	keys := make([]string, 0, len(allMap))
+	for k := range allMap {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	allList := make([]*packages.Package, 0, len(keys))
+	for _, k := range keys {
+		allList = append(allList, allMap[k])
+	}
+
+	for _, pkg := range allList {
+		if len(pkg.GoFiles) > 0 {
+			if len(pkg.Errors) > 0 {
+				errors = append(errors, pkg.Errors...)
+			}
+		}
+		if *defuses {
+			for id, obj := range pkg.TypesInfo.Defs {
+				serialFprintf(os.Stdout, "%s: %q defines %v\n",
+					pkg.Fset.Position(id.Pos()), id.Name, obj)
+			}
+			for id, obj := range pkg.TypesInfo.Uses {
+				serialFprintf(os.Stdout, "%s: %q uses %v\n",
+					pkg.Fset.Position(id.Pos()), id.Name, obj)
+			}
+		}
+	}
+	if *timings {
+		serialFprintf(os.Stdout, "%s took %.1fs\n", plat, time.Since(start).Seconds())
+	}
+	return dedup(errors), nil
 }
 
-func dedupeErrors(out io.Writer, results chan analyzerResult, nDirs, nPlatforms int) {
-	pkgRes := make(map[string][]analyzerResult)
-	for done := 0; done < nDirs; {
-		res := <-results
-		pkgRes[res.dir] = append(pkgRes[res.dir], res)
-		if len(pkgRes[res.dir]) != nPlatforms {
-			continue // expect more results for dir
+func dedup(errors []packages.Error) []string {
+	ret := []string{}
+
+	m := map[string]bool{}
+	for _, e := range errors {
+		es := e.Error()
+		if !m[es] {
+			ret = append(ret, es)
+			m[es] = true
 		}
-		done++
-		// Collect list of platforms for each error
-		errPlats := map[string][]string{}
-		for _, res := range pkgRes[res.dir] {
-			for _, err := range res.errors {
-				errPlats[err] = append(errPlats[err], res.platform)
-			}
-		}
-		// Print each error (in the same order!) once.
-		for _, res := range pkgRes[res.dir] {
-			for _, err := range res.errors {
-				if errPlats[err] == nil {
-					continue // already printed
-				}
-				sort.Strings(errPlats[err])
-				plats := strings.Join(errPlats[err], ",")
-				if len(errPlats[err]) == len(crossPlatforms) {
-					plats = "all"
-				} else if plats == darwinPlatString {
-					plats = "darwin"
-				} else if plats == windowsPlatString {
-					plats = "windows"
-				}
-				fmt.Fprintf(out, "%sERROR(%s) %s\n", logPrefix, plats, err)
-				delete(errPlats, err)
-			}
-		}
-		delete(pkgRes, res.dir)
 	}
+	return ret
+}
+
+var outMu sync.Mutex
+
+func serialFprintf(w io.Writer, format string, a ...interface{}) (n int, err error) {
+	outMu.Lock()
+	defer outMu.Unlock()
+	return fmt.Fprintf(w, format, a...)
 }
 
 func main() {
@@ -333,97 +258,64 @@ func main() {
 		args = append(args, ".")
 	}
 
-	c := collector{
-		ignoreDirs: append([]string(nil), standardIgnoreDirs...),
-	}
-	if *ignoreDirs != "" {
-		c.ignoreDirs = append(c.ignoreDirs, strings.Split(*ignoreDirs, ",")...)
+	c := newCollector(*ignoreDirs)
+
+	if err := c.walk(args); err != nil {
+		log.Fatalf("Error walking: %v", err)
 	}
 
-	for _, arg := range args {
-		err := filepath.Walk(arg, c.handlePath)
-		if err != nil {
-			log.Fatalf("Error walking: %v", err)
-		}
-	}
-	sort.Strings(c.dirs)
-
-	ps := crossPlatforms[:]
+	plats := crossPlatforms[:]
 	if *platforms != "" {
-		ps = strings.Split(*platforms, ",")
+		plats = strings.Split(*platforms, ",")
 	} else if !*cross {
-		ps = ps[:1]
+		plats = plats[:1]
 	}
-
-	fmt.Println("type-checking: ", strings.Join(ps, ", "))
 
 	var wg sync.WaitGroup
-	var processedDirs int64
-	var currentWork int64 // (dir_index << 8) | platform_index
-	statuses := make([]int, len(ps))
-	var results chan analyzerResult
-	if !*serial {
-		results = make(chan analyzerResult)
-		wg.Add(1)
-		go func() {
-			dedupeErrors(os.Stderr, results, len(c.dirs), len(ps))
-			wg.Done()
-		}()
+	var failMu sync.Mutex
+	failed := false
+
+	if *serial {
+		*parallel = 1
+	} else if *parallel == 0 {
+		*parallel = len(plats)
 	}
-	for i, p := range ps {
+	throttle := make(chan int, *parallel)
+
+	for _, plat := range plats {
 		wg.Add(1)
-		fn := func(i int, p string) {
-			start := time.Now()
-			a := newAnalyzer(p)
-			for n, dir := range c.dirs {
-				a.collect(dir)
-				atomic.AddInt64(&processedDirs, 1)
-				atomic.StoreInt64(&currentWork, int64(n<<8|i))
-				if results != nil {
-					results <- analyzerResult{p, dir, a.dumpAndResetErrors()}
+		go func(plat string) {
+			// block until there's room for this task
+			throttle <- 1
+			defer func() {
+				// indicate this task is done
+				<-throttle
+			}()
+
+			f := false
+			serialFprintf(os.Stdout, "type-checking %s\n", plat)
+			errors, err := c.verify(plat)
+			if err != nil {
+				serialFprintf(os.Stderr, "ERROR(%s): failed to verify: %v\n", plat, err)
+				f = true
+			} else if len(errors) > 0 {
+				for _, e := range errors {
+					// Special case CGo errors which may depend on headers we
+					// don't have.
+					if !strings.HasSuffix(e, "could not import C (no metadata for C)") {
+						f = true
+						serialFprintf(os.Stderr, "ERROR(%s): %s\n", plat, e)
+					}
 				}
 			}
-			if a.failed {
-				statuses[i] = 1
-			}
-			if *timings {
-				fmt.Printf("%s took %.1fs\n", p, time.Since(start).Seconds())
-			}
+			failMu.Lock()
+			failed = failed || f
+			failMu.Unlock()
 			wg.Done()
-		}
-		if *serial {
-			fn(i, p)
-		} else {
-			go fn(i, p)
-		}
-	}
-	if isTerminal {
-		logPrefix = "\r" // clear status bar when printing
-		// Display a status bar so devs can estimate completion times.
-		wg.Add(1)
-		go func() {
-			total := len(ps) * len(c.dirs)
-			for proc := 0; ; proc = int(atomic.LoadInt64(&processedDirs)) {
-				work := atomic.LoadInt64(&currentWork)
-				dir := c.dirs[work>>8]
-				platform := ps[work&0xFF]
-				if len(dir) > 80 {
-					dir = dir[:80]
-				}
-				fmt.Printf("\r%d/%d \033[2m%-13s\033[0m %-80s", proc, total, platform, dir)
-				if proc == total {
-					fmt.Println()
-					break
-				}
-				time.Sleep(50 * time.Millisecond)
-			}
-			wg.Done()
-		}()
+		}(plat)
 	}
 	wg.Wait()
-	for _, status := range statuses {
-		if status != 0 {
-			os.Exit(status)
-		}
+	if failed {
+		os.Exit(1)
 	}
 }

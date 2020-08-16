@@ -17,14 +17,14 @@ limitations under the License.
 package framework
 
 import (
+	"context"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	"k8s.io/klog/v2"
 	testutils "k8s.io/kubernetes/test/utils"
-
-	"k8s.io/klog"
 )
 
 const (
@@ -89,7 +89,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 	for i := 0; i < numNodes; i++ {
 		var err error
 		for retry := 0; retry < retries; retry++ {
-			_, err = p.client.CoreV1().Nodes().Create(baseNode)
+			_, err = p.client.CoreV1().Nodes().Create(context.TODO(), baseNode, metav1.CreateOptions{})
 			if err == nil || !testutils.IsRetryableAPIError(err) {
 				break
 			}
@@ -99,7 +99,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 		}
 	}
 
-	nodes, err := e2enode.GetReadySchedulableNodes(p.client)
+	nodes, err := GetReadySchedulableNodes(p.client)
 	if err != nil {
 		klog.Fatalf("Error listing nodes: %v", err)
 	}
@@ -119,12 +119,12 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 
 // CleanupNodes deletes existing test nodes.
 func (p *IntegrationTestNodePreparer) CleanupNodes() error {
-	nodes, err := e2enode.GetReadySchedulableNodes(p.client)
+	nodes, err := GetReadySchedulableNodes(p.client)
 	if err != nil {
 		klog.Fatalf("Error listing nodes: %v", err)
 	}
 	for i := range nodes.Items {
-		if err := p.client.CoreV1().Nodes().Delete(nodes.Items[i].Name, &metav1.DeleteOptions{}); err != nil {
+		if err := p.client.CoreV1().Nodes().Delete(context.TODO(), nodes.Items[i].Name, metav1.DeleteOptions{}); err != nil {
 			klog.Errorf("Error while deleting Node: %v", err)
 		}
 	}

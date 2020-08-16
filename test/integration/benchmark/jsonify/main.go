@@ -24,8 +24,35 @@ import (
 	"os"
 
 	benchparse "golang.org/x/tools/benchmark/parse"
-	"k8s.io/kubernetes/test/e2e/perftype"
 )
+
+// TODO(random-liu): Replace this with prometheus' data model.
+
+// The following performance data structures are generalized and well-formatted.
+// They can be pretty printed in json format and be analyzed by other performance
+// analyzing tools, such as Perfdash (k8s.io/contrib/perfdash).
+
+// DataItem is the data point.
+type DataItem struct {
+	// Data is a map from bucket to real data point (e.g. "Perc90" -> 23.5). Notice
+	// that all data items with the same label combination should have the same buckets.
+	Data map[string]float64 `json:"data"`
+	// Unit is the data unit. Notice that all data items with the same label combination
+	// should have the same unit.
+	Unit string `json:"unit"`
+	// Labels is the labels of the data item.
+	Labels map[string]string `json:"labels,omitempty"`
+}
+
+// PerfData contains all data items generated in current test.
+type PerfData struct {
+	// Version is the version of the metrics. The metrics consumer could use the version
+	// to detect metrics version change and decide what version to support.
+	Version   string     `json:"version"`
+	DataItems []DataItem `json:"dataItems"`
+	// Labels is the labels of the dataset.
+	Labels map[string]string `json:"labels,omitempty"`
+}
 
 func main() {
 	err := run()
@@ -42,7 +69,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	data := perftype.PerfData{Version: "v1"}
+	data := PerfData{Version: "v1"}
 	for _, benchMarks := range benchmarkSet {
 		for _, benchMark := range benchMarks {
 			data.DataItems = appendIfMeasured(data.DataItems, benchMark, benchparse.NsPerOp, "time", "μs", benchMark.NsPerOp/1000.0)
@@ -63,11 +90,11 @@ func run() error {
 	return ioutil.WriteFile(os.Args[1], formatted.Bytes(), 0664)
 }
 
-func appendIfMeasured(items []perftype.DataItem, benchmark *benchparse.Benchmark, metricType int, metricName string, unit string, value float64) []perftype.DataItem {
+func appendIfMeasured(items []DataItem, benchmark *benchparse.Benchmark, metricType int, metricName string, unit string, value float64) []DataItem {
 	if metricType != 0 && (benchmark.Measured&metricType) == 0 {
 		return items
 	}
-	return append(items, perftype.DataItem{
+	return append(items, DataItem{
 		Unit: unit,
 		Labels: map[string]string{
 			"benchmark":  benchmark.Name,

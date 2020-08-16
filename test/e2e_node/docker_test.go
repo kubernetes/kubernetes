@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -34,7 +36,7 @@ var _ = framework.KubeDescribe("Docker features [Feature:Docker][Legacy:Docker]"
 	f := framework.NewDefaultFramework("docker-feature-test")
 
 	ginkgo.BeforeEach(func() {
-		framework.RunIfContainerRuntimeIs("docker")
+		e2eskipper.RunIfContainerRuntimeIs("docker")
 	})
 
 	ginkgo.Context("when live-restore is enabled [Serial] [Slow] [Disruptive]", func() {
@@ -47,12 +49,12 @@ var _ = framework.KubeDescribe("Docker features [Feature:Docker][Legacy:Docker]"
 			isSupported, err := isDockerLiveRestoreSupported()
 			framework.ExpectNoError(err)
 			if !isSupported {
-				framework.Skipf("Docker live-restore is not supported.")
+				e2eskipper.Skipf("Docker live-restore is not supported.")
 			}
 			isEnabled, err := isDockerLiveRestoreEnabled()
 			framework.ExpectNoError(err)
 			if !isEnabled {
-				framework.Skipf("Docker live-restore is not enabled.")
+				e2eskipper.Skipf("Docker live-restore is not enabled.")
 			}
 
 			ginkgo.By("Create the test pod.")
@@ -121,7 +123,7 @@ func isContainerRunning(podIP string) bool {
 // getContainerStartTime returns the start time of the container with the
 // containerName of the pod having the podName.
 func getContainerStartTime(f *framework.Framework, podName, containerName string) (time.Time, error) {
-	pod, err := f.PodClient().Get(podName, metav1.GetOptions{})
+	pod, err := f.PodClient().Get(context.TODO(), podName, metav1.GetOptions{})
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to get pod %q: %v", podName, err)
 	}

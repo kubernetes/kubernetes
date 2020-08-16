@@ -20,6 +20,7 @@ limitations under the License.
 package mount
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,12 +31,21 @@ import (
 const (
 	// Default mount command if mounter path is not specified.
 	defaultMountCommand = "mount"
+	// Log message where sensitive mount options were removed
+	sensitiveOptionsRemoved = "<masked>"
 )
 
 // Interface defines the set of methods to allow for mount operations on a system.
 type Interface interface {
 	// Mount mounts source to target as fstype with given options.
+	// options MUST not contain sensitive material (like passwords).
 	Mount(source string, target string, fstype string, options []string) error
+	// MountSensitive is the same as Mount() but this method allows
+	// sensitiveOptions to be passed in a separate parameter from the normal
+	// mount options and ensures the sensitiveOptions are never logged. This
+	// method should be used by callers that pass sensitive material (like
+	// passwords) as mount options.
+	MountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error
 	// Unmount unmounts given target.
 	Unmount(target string) error
 	// List returns a list of all mounted filesystems.  This can be large.
@@ -67,13 +77,45 @@ type Interface interface {
 var _ Interface = &Mounter{}
 
 // MountPoint represents a single line in /proc/mounts or /etc/fstab.
-type MountPoint struct {
+type MountPoint struct { // nolint: golint
 	Device string
 	Path   string
 	Type   string
-	Opts   []string
+	Opts   []string // Opts may contain sensitive mount options (like passwords) and MUST be treated as such (e.g. not logged).
 	Freq   int
 	Pass   int
+}
+
+type MountErrorType string // nolint: golint
+
+const (
+	FilesystemMismatch  MountErrorType = "FilesystemMismatch"
+	HasFilesystemErrors MountErrorType = "HasFilesystemErrors"
+	UnformattedReadOnly MountErrorType = "UnformattedReadOnly"
+	FormatFailed        MountErrorType = "FormatFailed"
+	GetDiskFormatFailed MountErrorType = "GetDiskFormatFailed"
+	UnknownMountError   MountErrorType = "UnknownMountError"
+)
+
+type MountError struct { // nolint: golint
+	Type    MountErrorType
+	Message string
+}
+
+func (mountError MountError) String() string {
+	return mountError.Message
+}
+
+func (mountError MountError) Error() string {
+	return mountError.Message
+}
+
+func NewMountError(mountErrorValue MountErrorType, format string, args ...interface{}) error {
+	mountError := MountError{
+		Type:    mountErrorValue,
+		Message: fmt.Sprintf(format, args...),
+	}
+	return mountError
 }
 
 // SafeFormatAndMount probes a device to see if it is formatted.
@@ -89,8 +131,18 @@ type SafeFormatAndMount struct {
 // read-only it will format it first then mount it. Otherwise, if the
 // disk is already formatted or it is being mounted as read-only, it
 // will be mounted without formatting.
+// options MUST not contain sensitive material (like passwords).
 func (mounter *SafeFormatAndMount) FormatAndMount(source string, target string, fstype string, options []string) error {
-	return mounter.formatAndMount(source, target, fstype, options)
+	return mounter.FormatAndMountSensitive(source, target, fstype, options, nil /* sensitiveOptions */)
+}
+
+// FormatAndMountSensitive is the same as FormatAndMount but this method allows
+// sensitiveOptions to be passed in a separate parameter from the normal mount
+// options and ensures the sensitiveOptions are never logged. This method should
+// be used by callers that pass sensitive material (like passwords) as mount
+// options.
+func (mounter *SafeFormatAndMount) FormatAndMountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
+	return mounter.formatAndMountSensitive(source, target, fstype, options, sensitiveOptions)
 }
 
 // getMountRefsByDev finds all references to the device provided
@@ -207,6 +259,16 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 // The list equals:
 //   options - 'bind' + 'remount' (no duplicate)
 func MakeBindOpts(options []string) (bool, []string, []string) {
+	bind, bindOpts, bindRemountOpts, _ := MakeBindOptsSensitive(options, nil /* sensitiveOptions */)
+	return bind, bindOpts, bindRemountOpts
+}
+
+// MakeBindOptsSensitive is the same as MakeBindOpts but this method allows
+// sensitiveOptions to be passed in a separate parameter from the normal mount
+// options and ensures the sensitiveOptions are never logged. This method should
+// be used by callers that pass sensitive material (like passwords) as mount
+// options.
+func MakeBindOptsSensitive(options []string, sensitiveOptions []string) (bool, []string, []string, []string) {
 	// Because we have an FD opened on the subpath bind mount, the "bind" option
 	// needs to be included, otherwise the mount target will error as busy if you
 	// remount as readonly.
@@ -214,12 +276,13 @@ func MakeBindOpts(options []string) (bool, []string, []string) {
 	// As a consequence, all read only bind mounts will no longer change the underlying
 	// volume mount to be read only.
 	bindRemountOpts := []string{"bind", "remount"}
+	bindRemountSensitiveOpts := []string{}
 	bind := false
 	bindOpts := []string{"bind"}
 
 	// _netdev is a userspace mount option and does not automatically get added when
 	// bind mount is created and hence we must carry it over.
-	if checkForNetDev(options) {
+	if checkForNetDev(options, sensitiveOptions) {
 		bindOpts = append(bindOpts, "_netdev")
 	}
 
@@ -235,12 +298,29 @@ func MakeBindOpts(options []string) (bool, []string, []string) {
 		}
 	}
 
-	return bind, bindOpts, bindRemountOpts
+	for _, sensitiveOption := range sensitiveOptions {
+		switch sensitiveOption {
+		case "bind":
+			bind = true
+			break
+		case "remount":
+			break
+		default:
+			bindRemountSensitiveOpts = append(bindRemountSensitiveOpts, sensitiveOption)
+		}
+	}
+
+	return bind, bindOpts, bindRemountOpts, bindRemountSensitiveOpts
 }
 
-func checkForNetDev(options []string) bool {
+func checkForNetDev(options []string, sensitiveOptions []string) bool {
 	for _, option := range options {
 		if option == "_netdev" {
+			return true
+		}
+	}
+	for _, sensitiveOption := range sensitiveOptions {
+		if sensitiveOption == "_netdev" {
 			return true
 		}
 	}
@@ -264,4 +344,27 @@ func PathWithinBase(fullPath, basePath string) bool {
 func StartsWithBackstep(rel string) bool {
 	// normalize to / and check for ../
 	return rel == ".." || strings.HasPrefix(filepath.ToSlash(rel), "../")
+}
+
+// sanitizedOptionsForLogging will return a comma separated string containing
+// options and sensitiveOptions. Each entry in sensitiveOptions will be
+// replaced with the string sensitiveOptionsRemoved
+// e.g. o1,o2,<masked>,<masked>
+func sanitizedOptionsForLogging(options []string, sensitiveOptions []string) string {
+	separator := ""
+	if len(options) > 0 && len(sensitiveOptions) > 0 {
+		separator = ","
+	}
+
+	sensitiveOptionsStart := ""
+	sensitiveOptionsEnd := ""
+	if len(sensitiveOptions) > 0 {
+		sensitiveOptionsStart = strings.Repeat(sensitiveOptionsRemoved+",", len(sensitiveOptions)-1)
+		sensitiveOptionsEnd = sensitiveOptionsRemoved
+	}
+
+	return strings.Join(options, ",") +
+		separator +
+		sensitiveOptionsStart +
+		sensitiveOptionsEnd
 }

@@ -44,11 +44,11 @@ func (w npbISWorkload) PodSpec() v1.PodSpec {
 		Image: "gcr.io/kubernetes-e2e-test-images/node-perf/npb-is:1.0",
 		Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("16000m"),
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("15000m"),
 				v1.ResourceName(v1.ResourceMemory): resource.MustParse("48Gi"),
 			},
 			Limits: v1.ResourceList{
-				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("16000m"),
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("15000m"),
 				v1.ResourceName(v1.ResourceMemory): resource.MustParse("48Gi"),
 			},
 		},

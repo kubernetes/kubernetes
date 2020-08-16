@@ -867,7 +867,7 @@ func TestDrain(t *testing.T) {
 				switch {
 				case recovered != nil && !sawFatal:
 					t.Fatalf("got panic: %v", recovered)
-				case test.expectDelete && test.expectFatal && !sawFatal:
+				case test.expectFatal && !sawFatal:
 					t.Fatalf("%s: unexpected non-error when using %s", test.description, currMethod)
 				case !test.expectFatal && sawFatal:
 					t.Fatalf("%s: unexpected error when using %s: %s", test.description, currMethod, fatalMsg)
@@ -903,7 +903,7 @@ func TestDrain(t *testing.T) {
 					t.Fatalf("%s: same pod deleted %d times and evicted %d times", test.description, deletions, evictions)
 				}
 
-				if test.expectDelete && len(test.expectWarning) > 0 {
+				if len(test.expectWarning) > 0 {
 					if len(errBuf.String()) == 0 {
 						t.Fatalf("%s: expected warning, but found no stderr output", test.description)
 					}

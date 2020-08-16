@@ -30,15 +30,20 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/client_golang/prometheus",
     importpath = "github.com/prometheus/client_golang/prometheus",
-    visibility = ["//staging/src/k8s.io/component-base/metrics:prometheus_import_allow_list"],
+    visibility = ["//build/visible_to:vendor_githubcom_prometheus_CONSUMERS"],
     deps = [
         "//vendor/github.com/beorn7/perks/quantile:go_default_library",
+        "//vendor/github.com/cespare/xxhash/v2:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
+        "//vendor/github.com/golang/protobuf/ptypes:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus/internal:go_default_library",
         "//vendor/github.com/prometheus/client_model/go:go_default_library",
         "//vendor/github.com/prometheus/common/expfmt:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/github.com/prometheus/procfs:go_default_library",
         ],
@@ -51,7 +56,13 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/github.com/prometheus/procfs:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
             "//vendor/github.com/prometheus/procfs:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [

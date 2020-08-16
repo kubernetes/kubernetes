@@ -17,6 +17,7 @@ limitations under the License.
 package resourcelock
 
 import (
+	"context"
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,13 +74,13 @@ type ResourceLockConfig struct {
 // by the leaderelection code.
 type Interface interface {
 	// Get returns the LeaderElectionRecord
-	Get() (*LeaderElectionRecord, []byte, error)
+	Get(ctx context.Context) (*LeaderElectionRecord, []byte, error)
 
 	// Create attempts to create a LeaderElectionRecord
-	Create(ler LeaderElectionRecord) error
+	Create(ctx context.Context, ler LeaderElectionRecord) error
 
 	// Update will update and existing LeaderElectionRecord
-	Update(ler LeaderElectionRecord) error
+	Update(ctx context.Context, ler LeaderElectionRecord) error
 
 	// RecordEvent is used to record events
 	RecordEvent(string)

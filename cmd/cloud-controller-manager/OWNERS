@@ -3,18 +3,17 @@
 approvers:
 - thockin
 - luxas
-- wlan0
 - andrewsykim
 - sttts
 reviewers:
 - thockin
 - luxas
-- wlan0
 - andrewsykim
 - cheftako
 - stewart-yu
 - sttts
-- mcrute
+emeritus_approvers:
+- wlan0
 labels:
 - sig/api-machinery
 - sig/cloud-provider

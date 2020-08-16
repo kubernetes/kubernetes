@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/api/admission/v1"
 	"k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	// TODO: try this library to see if it generates correct json patch
 	// https://github.com/mattbaird/jsonpatch
 )

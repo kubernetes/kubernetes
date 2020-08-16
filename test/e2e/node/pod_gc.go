@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -44,7 +45,7 @@ var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]"
 			}
 			pod.ResourceVersion = ""
 			pod.Status.Phase = v1.PodFailed
-			_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).UpdateStatus(pod)
+			_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 			if err != nil {
 				framework.Failf("err failing pod: %v", err)
 			}
@@ -66,7 +67,7 @@ var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]"
 
 		ginkgo.By(fmt.Sprintf("Waiting for gc controller to gc all but %d pods", gcThreshold))
 		pollErr := wait.Poll(1*time.Minute, timeout, func() (bool, error) {
-			pods, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+			pods, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				framework.Logf("Failed to list pod %v", err)
 				return false, nil
@@ -99,5 +100,5 @@ func createTerminatingPod(f *framework.Framework) (*v1.Pod, error) {
 			SchedulerName: "please don't schedule my pods",
 		},
 	}
-	return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+	return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 }

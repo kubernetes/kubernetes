@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -226,6 +226,11 @@ func clearQuotaOnDir(m mount.Interface, path string) error {
 	// we explicitly have to check in this case.
 	klog.V(4).Infof("clearQuotaOnDir %s", path)
 	supportsQuotas, err := SupportsQuotas(m, path)
+	if err != nil {
+		// Log-and-continue instead of returning an error for now
+		// due to unspecified backwards compatibility concerns (a subject to revise)
+		klog.V(3).Infof("Attempt to check for quota support failed: %v", err)
+	}
 	if !supportsQuotas {
 		return nil
 	}
@@ -298,6 +303,7 @@ func SupportsQuotas(m mount.Interface, path string) (bool, error) {
 // AssignQuota chooses the quota ID based on the pod UID and path.
 // If the pod UID is identical to another one known, it may (but presently
 // doesn't) choose the same quota ID as other volumes in the pod.
+//lint:ignore SA4009 poduid is overwritten by design, see comment below
 func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resource.Quantity) error {
 	if bytes == nil {
 		return fmt.Errorf("Attempting to assign null quota to %s", path)
@@ -311,7 +317,7 @@ func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resour
 	// Current policy is to set individual quotas on each volumes.
 	// If we decide later that we want to assign one quota for all
 	// volumes in a pod, we can simply remove this line of code.
-	// If and when we decide permanently that we're going to adop
+	// If and when we decide permanently that we're going to adopt
 	// one quota per volume, we can rip all of the pod code out.
 	poduid = types.UID(uuid.NewUUID())
 	if pod, ok := dirPodMap[path]; ok && pod != poduid {
@@ -409,8 +415,12 @@ func ClearQuota(m mount.Interface, path string) error {
 	if !ok {
 		return fmt.Errorf("ClearQuota: No quota available for %s", path)
 	}
-	var err error
 	projid, err := getQuotaOnDir(m, path)
+	if err != nil {
+		// Log-and-continue instead of returning an error for now
+		// due to unspecified backwards compatibility concerns (a subject to revise)
+		klog.V(3).Infof("Attempt to check quota ID %v on dir %s failed: %v", dirQuotaMap[path], path, err)
+	}
 	if projid != dirQuotaMap[path] {
 		return fmt.Errorf("Expected quota ID %v on dir %s does not match actual %v", dirQuotaMap[path], path, projid)
 	}

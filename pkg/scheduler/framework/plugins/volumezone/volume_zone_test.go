@@ -25,8 +25,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/fake"
 )
 
 func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
@@ -48,19 +47,25 @@ func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
 }
 
 func TestSingleZone(t *testing.T) {
-	pvLister := fakelisters.PersistentVolumeLister{
+	pvLister := fakeframework.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{v1.LabelZoneRegion: "us-west1-b", "uselessLabel": "none"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{v1.LabelZoneRegion: "us-west1", "uselessLabel": "none"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{v1.LabelZoneRegion: "us-west1-c"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{v1.LabelZoneRegion: "us-west1"}},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_Stable_1", Labels: map[string]string{v1.LabelZoneFailureDomainStable: "us-west1-a"}},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_Stable_2", Labels: map[string]string{v1.LabelZoneRegionStable: "us-west1", "uselessLabel": "none"}},
 		},
 	}
 
-	pvcLister := fakelisters.PersistentVolumeClaimLister{
+	pvcLister := fakeframework.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -76,6 +81,14 @@ func TestSingleZone(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_4", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_not_exist"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_Stable_1", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_Stable_1"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_Stable_2", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_Stable_2"},
 		},
 	}
 
@@ -107,7 +120,7 @@ func TestSingleZone(t *testing.T) {
 			},
 		},
 		{
-			name: "label zone failure domain matched",
+			name: "beta zone label matched",
 			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_1"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -117,28 +130,28 @@ func TestSingleZone(t *testing.T) {
 			},
 		},
 		{
-			name: "label zone region matched",
+			name: "beta region label matched",
 			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_2"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{v1.LabelZoneRegion: "us-west1-b", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelZoneRegion: "us-west1", "uselessLabel": "none"},
 				},
 			},
 		},
 		{
-			name: "label zone region failed match",
+			name: "beta region label doesn't match",
 			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_2"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{v1.LabelZoneRegion: "no_us-west1-b", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelZoneRegion: "no_us-west1", "uselessLabel": "none"},
 				},
 			},
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
-			name: "label zone failure domain failed match",
+			name: "beta zone label doesn't match",
 			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_1"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -148,11 +161,53 @@ func TestSingleZone(t *testing.T) {
 			},
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
+		{
+			name: "zone label matched",
+			Pod:  createPodWithVolume("pod_1", "Vol_Stable_1", "PVC_Stable_1"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelZoneFailureDomainStable: "us-west1-a", "uselessLabel": "none"},
+				},
+			},
+		},
+		{
+			name: "region label matched",
+			Pod:  createPodWithVolume("pod_1", "Vol_Stable_2", "PVC_Stable_2"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelZoneRegionStable: "us-west1", "uselessLabel": "none"},
+				},
+			},
+		},
+		{
+			name: "region label doesn't match",
+			Pod:  createPodWithVolume("pod_1", "Vol_Stable_2", "PVC_Stable_2"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelZoneRegionStable: "no_us-west1", "uselessLabel": "none"},
+				},
+			},
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+		},
+		{
+			name: "zone label doesn't match",
+			Pod:  createPodWithVolume("pod_1", "Vol_Stable_1", "PVC_Stable_1"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelZoneFailureDomainStable: "no_us-west1-a", "uselessLabel": "none"},
+				},
+			},
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			node := &schedulernodeinfo.NodeInfo{}
+			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
 				pvLister,
@@ -168,7 +223,7 @@ func TestSingleZone(t *testing.T) {
 }
 
 func TestMultiZone(t *testing.T) {
-	pvLister := fakelisters.PersistentVolumeLister{
+	pvLister := fakeframework.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
@@ -178,9 +233,15 @@ func TestMultiZone(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-c__us-west1-a"}},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_Stable_1", Labels: map[string]string{v1.LabelZoneFailureDomainStable: "us-west1-a"}},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_Stable_2", Labels: map[string]string{v1.LabelZoneFailureDomainStable: "us-west1-c__us-west1-a"}},
+		},
 	}
 
-	pvcLister := fakelisters.PersistentVolumeClaimLister{
+	pvcLister := fakeframework.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -196,6 +257,14 @@ func TestMultiZone(t *testing.T) {
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_4", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_not_exist"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_Stable_1", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_Stable_1"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_Stable_2", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_Stable_2"},
 		},
 	}
 
@@ -215,7 +284,7 @@ func TestMultiZone(t *testing.T) {
 			},
 		},
 		{
-			name: "label zone failure domain matched",
+			name: "beta zone label matched",
 			Pod:  createPodWithVolume("pod_1", "Vol_3", "PVC_3"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -225,7 +294,7 @@ func TestMultiZone(t *testing.T) {
 			},
 		},
 		{
-			name: "label zone failure domain failed match",
+			name: "beta zone label doesn't match",
 			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_1"),
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -235,11 +304,32 @@ func TestMultiZone(t *testing.T) {
 			},
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
+		{
+			name: "zone label matched",
+			Pod:  createPodWithVolume("pod_1", "Vol_Stable_2", "PVC_Stable_2"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelZoneFailureDomainStable: "us-west1-a", "uselessLabel": "none"},
+				},
+			},
+		},
+		{
+			name: "zone label doesn't match",
+			Pod:  createPodWithVolume("pod_1", "Vol_Stable_1", "PVC_Stable_1"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{v1.LabelZoneFailureDomainStable: "us-west1-b", "uselessLabel": "none"},
+				},
+			},
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			node := &schedulernodeinfo.NodeInfo{}
+			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
 				pvLister,
@@ -263,7 +353,7 @@ func TestWithBinding(t *testing.T) {
 		classImmediate = "Class_Immediate"
 	)
 
-	scLister := fakelisters.StorageClassLister{
+	scLister := fakeframework.StorageClassLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: classImmediate},
 		},
@@ -273,13 +363,13 @@ func TestWithBinding(t *testing.T) {
 		},
 	}
 
-	pvLister := fakelisters.PersistentVolumeLister{
+	pvLister := fakeframework.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
 	}
 
-	pvcLister := fakelisters.PersistentVolumeClaimLister{
+	pvcLister := fakeframework.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -348,7 +438,7 @@ func TestWithBinding(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			node := &schedulernodeinfo.NodeInfo{}
+			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
 				pvLister,

@@ -18,6 +18,7 @@ package gcp
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -301,7 +303,7 @@ var _ = SIGDescribe("Addon update", func() {
 		// Delete the "ensure exist class" addon at the end.
 		defer func() {
 			framework.Logf("Cleaning up ensure exist class addon.")
-			err := f.ClientSet.CoreV1().Services(addonNsName).Delete("addon-ensure-exists-test", nil)
+			err := f.ClientSet.CoreV1().Services(addonNsName).Delete(context.TODO(), "addon-ensure-exists-test", metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 		}()
 
@@ -335,7 +337,7 @@ var _ = SIGDescribe("Addon update", func() {
 		waitForServiceInAddonTest(f.ClientSet, addonNsName, "addon-ensure-exists-test", true)
 
 		ginkgo.By("verify invalid addons weren't created")
-		_, err = f.ClientSet.CoreV1().ReplicationControllers(addonNsName).Get("invalid-addon-test", metav1.GetOptions{})
+		_, err = f.ClientSet.CoreV1().ReplicationControllers(addonNsName).Get(context.TODO(), "invalid-addon-test", metav1.GetOptions{})
 		framework.ExpectError(err)
 
 		// Invalid addon manifests and the "ensure exist class" addon will be deleted by the deferred function.
@@ -343,7 +345,7 @@ var _ = SIGDescribe("Addon update", func() {
 })
 
 func waitForServiceInAddonTest(c clientset.Interface, addonNamespace, name string, exist bool) {
-	framework.ExpectNoError(framework.WaitForService(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
+	framework.ExpectNoError(e2enetwork.WaitForService(c, addonNamespace, name, exist, addonTestPollInterval, addonTestPollTimeout))
 }
 
 func waitForReplicationControllerInAddonTest(c clientset.Interface, addonNamespace, name string, exist bool) {
@@ -362,7 +364,7 @@ func waitForReplicationControllerwithSelectorInAddonTest(c clientset.Interface, 
 // waitForReplicationController waits until the RC appears (exist == true), or disappears (exist == false)
 func waitForReplicationController(c clientset.Interface, namespace, name string, exist bool, interval, timeout time.Duration) error {
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		_, err := c.CoreV1().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
+		_, err := c.CoreV1().ReplicationControllers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
 			return !exist, nil
@@ -381,7 +383,7 @@ func waitForReplicationController(c clientset.Interface, namespace, name string,
 func waitForServiceWithSelector(c clientset.Interface, namespace string, selector labels.Selector, exist bool, interval,
 	timeout time.Duration) error {
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		services, err := c.CoreV1().Services(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		services, err := c.CoreV1().Services(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 		switch {
 		case len(services.Items) != 0:
 			framework.Logf("Service with %s in namespace %s found.", selector.String(), namespace)
@@ -408,7 +410,7 @@ func waitForServiceWithSelector(c clientset.Interface, namespace string, selecto
 func waitForReplicationControllerWithSelector(c clientset.Interface, namespace string, selector labels.Selector, exist bool, interval,
 	timeout time.Duration) error {
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		rcs, err := c.CoreV1().ReplicationControllers(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+		rcs, err := c.CoreV1().ReplicationControllers(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 		switch {
 		case len(rcs.Items) != 0:
 			framework.Logf("ReplicationController with %s in namespace %s found.", selector.String(), namespace)

@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -26,6 +27,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -56,7 +58,7 @@ var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive]", func() {
 		})
 
 		/*
-			Release : v1.16
+			Release: v1.16
 			Testname: Pod startup probe restart
 			Description: A Pod is created with a failing startup probe. The Pod MUST be killed and restarted incrementing restart count to 1, even if liveness would succeed.
 		*/
@@ -85,7 +87,7 @@ var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive]", func() {
 		})
 
 		/*
-			Release : v1.16
+			Release: v1.16
 			Testname: Pod liveness probe delayed (long) by startup probe
 			Description: A Pod is created with failing liveness and startup probes. Liveness probe MUST NOT fail until startup probe expires.
 		*/
@@ -114,9 +116,9 @@ var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive]", func() {
 		})
 
 		/*
-			Release : v1.16
+			Release: v1.16
 			Testname: Pod liveness probe fails after startup success
-			Description: A Pod is created with failing liveness probe and delayed startup probe that uses ‘exec’ command to cat /temp/health file. The Container is started by creating /tmp/startup after 10 seconds, triggering liveness probe to fail. The Pod MUST now be killed and restarted incrementing restart count to 1.
+			Description: A Pod is created with failing liveness probe and delayed startup probe that uses 'exec' command to cat /temp/health file. The Container is started by creating /tmp/startup after 10 seconds, triggering liveness probe to fail. The Pod MUST now be killed and restarted incrementing restart count to 1.
 		*/
 		ginkgo.It("should be restarted by liveness probe after startup probe enables it", func() {
 			cmd := []string{"/bin/sh", "-c", "sleep 10; echo ok >/tmp/startup; sleep 600"}
@@ -143,7 +145,7 @@ var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive]", func() {
 		})
 
 		/*
-			Release : v1.16
+			Release: v1.16
 			Testname: Pod readiness probe, delayed by startup probe
 			Description: A Pod is created with startup and readiness probes. The Container is started by creating /tmp/startup after 45 seconds, delaying the ready state by this amount of time. This is similar to the "Pod readiness probe, with initial delay" test.
 		*/
@@ -168,12 +170,12 @@ var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive]", func() {
 			}
 			p := podClient.Create(startupPodSpec(startupProbe, readinessProbe, nil, cmd))
 
-			p, err := podClient.Get(p.Name, metav1.GetOptions{})
+			p, err := podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
-			f.WaitForPodReady(p.Name)
+			e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
 
-			p, err = podClient.Get(p.Name, metav1.GetOptions{})
+			p, err = podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			isReady, err := testutils.PodRunningReady(p)

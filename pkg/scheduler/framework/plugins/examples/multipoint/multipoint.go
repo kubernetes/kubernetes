@@ -50,7 +50,7 @@ func (s *stateData) Clone() framework.StateData {
 	return copy
 }
 
-// Reserve is the functions invoked by the framework at "reserve" extension point.
+// Reserve is the function invoked by the framework at "reserve" extension point.
 func (mc CommunicatingPlugin) Reserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
 		return framework.NewStatus(framework.Error, "pod cannot be nil")
@@ -63,7 +63,20 @@ func (mc CommunicatingPlugin) Reserve(ctx context.Context, state *framework.Cycl
 	return nil
 }
 
-// PreBind is the functions invoked by the framework at "prebind" extension point.
+// Unreserve is the function invoked by the framework when any error happens
+// during "reserve" extension point or later.
+func (mc CommunicatingPlugin) Unreserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
+	if pod.Name == "my-test-pod" {
+		state.Lock()
+		// The pod is at the end of its lifecycle -- let's clean up the allocated
+		// resources. In this case, our clean up is simply deleting the key written
+		// in the Reserve operation.
+		state.Delete(framework.StateKey(pod.Name))
+		state.Unlock()
+	}
+}
+
+// PreBind is the function invoked by the framework at "prebind" extension point.
 func (mc CommunicatingPlugin) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
 		return framework.NewStatus(framework.Error, "pod cannot be nil")

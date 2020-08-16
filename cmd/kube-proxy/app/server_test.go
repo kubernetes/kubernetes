@@ -28,42 +28,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/stretchr/testify/assert"
 
 	utilpointer "k8s.io/utils/pointer"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	componentbaseconfig "k8s.io/component-base/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	"k8s.io/kubernetes/pkg/util/configz"
 )
-
-// This test verifies that NewProxyServer does not crash when CleanupAndExit is true.
-func TestProxyServerWithCleanupAndExit(t *testing.T) {
-	// Each bind address below is a separate test case
-	bindAddresses := []string{
-		"0.0.0.0",
-		"::",
-	}
-	for _, addr := range bindAddresses {
-		options := NewOptions()
-
-		options.config = &kubeproxyconfig.KubeProxyConfiguration{
-			BindAddress: addr,
-		}
-		options.CleanupAndExit = true
-
-		proxyserver, err := NewProxyServer(options)
-
-		assert.Nil(t, err, "unexpected error in NewProxyServer, addr: %s", addr)
-		assert.NotNil(t, proxyserver, "nil proxy server obj, addr: %s", addr)
-		assert.NotNil(t, proxyserver.IptInterface, "nil iptables intf, addr: %s", addr)
-
-		// Clean up config for next test case
-		configz.Delete(kubeproxyconfig.GroupName)
-	}
-}
 
 func TestGetConntrackMax(t *testing.T) {
 	ncores := runtime.NumCPU()
@@ -148,6 +122,7 @@ mode: "%s"
 oomScoreAdj: 17
 portRange: "2-7"
 udpIdleTimeout: 123ms
+detectLocalMode: "ClusterCIDR"
 nodePortAddresses:
   - "10.20.30.40/16"
   - "fd00:1::0/64"
@@ -288,6 +263,7 @@ nodePortAddresses:
 			PortRange:          "2-7",
 			UDPIdleTimeout:     metav1.Duration{Duration: 123 * time.Millisecond},
 			NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
+			DetectLocalMode:    kubeproxyconfig.LocalModeClusterCIDR,
 		}
 
 		options := NewOptions()
@@ -304,7 +280,7 @@ nodePortAddresses:
 		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
 
 		if !reflect.DeepEqual(expected, config) {
-			t.Fatalf("unexpected config for %s, diff = %s", tc.name, diff.ObjectDiff(config, expected))
+			t.Fatalf("unexpected config for %s, diff = %s", tc.name, cmp.Diff(config, expected))
 		}
 	}
 }
@@ -442,6 +418,7 @@ func TestConfigChange(t *testing.T) {
 
 		_, err = file.WriteString(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
 bindAddress: 0.0.0.0
+bindAddressHardFail: false
 clientConnection:
   acceptContentTypes: ""
   burst: 10
@@ -474,6 +451,7 @@ mode: ""
 nodePortAddresses: null
 oomScoreAdj: -999
 portRange: ""
+detectLocalMode: "ClusterCIDR"
 udpIdleTimeout: 250ms`)
 		if err != nil {
 			return nil, "", fmt.Errorf("unexpected error when writing content to temp kube-proxy config file: %v", err)

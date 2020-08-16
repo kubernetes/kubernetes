@@ -17,8 +17,9 @@ limitations under the License.
 package events
 
 import (
-	"k8s.io/api/events/v1beta1"
+	eventsv1 "k8s.io/api/events/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 )
 
 // EventRecorder knows how to record events on behalf of an EventSource.
@@ -64,7 +65,26 @@ type EventBroadcaster interface {
 // It is assumed that EventSink will return the same sorts of errors as
 // client-go's REST client.
 type EventSink interface {
-	Create(event *v1beta1.Event) (*v1beta1.Event, error)
-	Update(event *v1beta1.Event) (*v1beta1.Event, error)
-	Patch(oldEvent *v1beta1.Event, data []byte) (*v1beta1.Event, error)
+	Create(event *eventsv1.Event) (*eventsv1.Event, error)
+	Update(event *eventsv1.Event) (*eventsv1.Event, error)
+	Patch(oldEvent *eventsv1.Event, data []byte) (*eventsv1.Event, error)
+}
+
+// EventBroadcasterAdapter is a auxiliary interface to simplify migration to
+// the new events API. It is a wrapper around new and legacy broadcasters
+// that smartly chooses which one to use.
+//
+// Deprecated: This interface will be removed once migration is completed.
+type EventBroadcasterAdapter interface {
+	// StartRecordingToSink starts sending events received from the specified eventBroadcaster.
+	StartRecordingToSink(stopCh <-chan struct{})
+
+	// NewRecorder creates a new Event Recorder with specified name.
+	NewRecorder(name string) EventRecorder
+
+	// DeprecatedNewLegacyRecorder creates a legacy Event Recorder with specific name.
+	DeprecatedNewLegacyRecorder(name string) record.EventRecorder
+
+	// Shutdown shuts down the broadcaster.
+	Shutdown()
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -76,7 +77,7 @@ func TestForProperValidationErrors(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		_, err := noxuResourceClient.Create(tc.instanceFn(), metav1.CreateOptions{})
+		_, err := noxuResourceClient.Create(context.TODO(), tc.instanceFn(), metav1.CreateOptions{})
 		if err == nil {
 			t.Errorf("%v: expected %v", tc.name, tc.expectedError)
 			continue
@@ -245,7 +246,7 @@ func TestCustomResourceValidation(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unable to create noxu instance: %v", err)
 			}
-			noxuResourceClient.Delete("foo", &metav1.DeleteOptions{})
+			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 		}
 		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
@@ -325,7 +326,7 @@ func TestCustomResourceItemsValidation(t *testing.T) {
 			},
 		},
 	}}
-	_, err = client.Resource(gvr).Create(&u, metav1.CreateOptions{})
+	_, err = client.Resource(gvr).Create(context.TODO(), &u, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -451,7 +452,7 @@ func TestCustomResourceUpdateValidation(t *testing.T) {
 				t.Fatalf("unable to create noxu instance: %v", err)
 			}
 
-			gottenNoxuInstance, err := noxuResourceClient.Get("foo", metav1.GetOptions{})
+			gottenNoxuInstance, err := noxuResourceClient.Get(context.TODO(), "foo", metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -468,11 +469,11 @@ func TestCustomResourceUpdateValidation(t *testing.T) {
 				"delta": "hello",
 			}
 
-			_, err = noxuResourceClient.Update(gottenNoxuInstance, metav1.UpdateOptions{})
+			_, err = noxuResourceClient.Update(context.TODO(), gottenNoxuInstance, metav1.UpdateOptions{})
 			if err == nil {
 				t.Fatalf("unexpected non-error: alpha and beta should be present while updating %v", gottenNoxuInstance)
 			}
-			noxuResourceClient.Delete("foo", &metav1.DeleteOptions{})
+			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 		}
 		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
@@ -565,7 +566,7 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 				noxuResourceClient := newNamespacedCustomResourceVersionedClient(ns, dynamicClient, noxuDefinition, v.Name)
 				instanceToCreate := tc.instanceFn()
 				instanceToCreate.Object["apiVersion"] = fmt.Sprintf("%s/%s", noxuDefinition.Spec.Group, v.Name)
-				_, err := noxuResourceClient.Create(instanceToCreate, metav1.CreateOptions{})
+				_, err := noxuResourceClient.Create(context.TODO(), instanceToCreate, metav1.CreateOptions{})
 				if err == nil {
 					t.Errorf("%v: expected %v", tc.name, tc.expectedErrors)
 					continue
@@ -633,7 +634,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 
 			// CR is now accepted
 			err = wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-				_, err := noxuResourceClient.Create(instanceToCreate, metav1.CreateOptions{})
+				_, err := noxuResourceClient.Create(context.TODO(), instanceToCreate, metav1.CreateOptions{})
 				if _, isStatus := err.(*apierrors.StatusError); isStatus {
 					if apierrors.IsInvalid(err) {
 						return false, nil
@@ -647,7 +648,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			noxuResourceClient.Delete("foo", &metav1.DeleteOptions{})
+			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 			if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 				t.Fatal(err)
 			}
@@ -758,7 +759,7 @@ spec:
 
 	// create CRDs
 	t.Logf("Creating CRD %s", crd.Name)
-	if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd); err != nil {
+	if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("unexpected create error: %v", err)
 	}
 
@@ -766,7 +767,7 @@ spec:
 	t.Log("Waiting for NonStructuralSchema condition")
 	var cond *apiextensionsv1beta1.CustomResourceDefinitionCondition
 	err = wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -783,12 +784,12 @@ spec:
 	// remove schema
 	t.Log("Remove schema")
 	for retry := 0; retry < 5; retry++ {
-		crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("unexpected get error: %v", err)
 		}
 		crd.Spec.Validation = nil
-		if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd); apierrors.IsConflict(err) {
+		if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{}); apierrors.IsConflict(err) {
 			continue
 		}
 		if err != nil {
@@ -802,7 +803,7 @@ spec:
 	// wait for condition to go away
 	t.Log("Wait for condition to disappear")
 	err = wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -816,12 +817,12 @@ spec:
 	// readd schema
 	t.Log("Readd schema")
 	for retry := 0; retry < 5; retry++ {
-		crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("unexpected get error: %v", err)
 		}
 		crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{OpenAPIV3Schema: origSchema}
-		if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd); apierrors.IsConflict(err) {
+		if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{}); apierrors.IsConflict(err) {
 			continue
 		}
 		if err != nil {
@@ -835,7 +836,7 @@ spec:
 	// wait for condition with violations
 	t.Log("Wait for condition to reappear")
 	err = wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
-		obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -1608,7 +1609,7 @@ properties:
 			crd.Name = fmt.Sprintf("foos.%s", crd.Spec.Group)
 
 			// create CRDs
-			crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+			crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{})
 			if len(tst.expectedCreateErrors) > 0 && err == nil {
 				t.Fatalf("expected create errors, got none")
 			} else if len(tst.expectedCreateErrors) == 0 && err != nil {
@@ -1633,7 +1634,7 @@ properties:
 				// wait for condition to not appear
 				var cond *apiextensionsv1beta1.CustomResourceDefinitionCondition
 				err := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
-					obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+					obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
 					if err != nil {
 						return false, err
 					}
@@ -1652,7 +1653,7 @@ properties:
 			// wait for condition to appear with the given violations
 			var cond *apiextensionsv1beta1.CustomResourceDefinitionCondition
 			err = wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-				obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+				obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
 				}

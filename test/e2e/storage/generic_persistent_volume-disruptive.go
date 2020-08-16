@@ -17,9 +17,12 @@ limitations under the License.
 package storage
 
 import (
+	"context"
+
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -96,7 +99,7 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 		ClaimSize:  test.ClaimSize,
 		VolumeMode: &test.VolumeMode,
 	}, ns)
-	pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+	pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Error creating pvc")
 	pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 	pvs, err := e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
@@ -104,9 +107,12 @@ func createPodPVCFromSC(f *framework.Framework, c clientset.Interface, ns string
 	framework.ExpectEqual(len(pvs), 1)
 
 	ginkgo.By("Creating a pod with dynamically provisioned volume")
-	pod, err := e2epod.CreateSecPod(c, ns, pvcClaims, nil,
-		false, "", false, false, e2epv.SELinuxLabel,
-		nil, framework.PodStartTimeout)
+	podConfig := e2epod.Config{
+		NS:           ns,
+		PVCs:         pvcClaims,
+		SeLinuxLabel: e2epv.SELinuxLabel,
+	}
+	pod, err := e2epod.CreateSecPod(c, &podConfig, framework.PodStartTimeout)
 	framework.ExpectNoError(err, "While creating pods for kubelet restart test")
 	return pod, pvc, pvs[0]
 }

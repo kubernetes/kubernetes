@@ -23,6 +23,8 @@ import (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.16
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // EndpointSlice represents a subset of the endpoints that implement a service.
 // For a given service there may be multiple EndpointSlice objects, selected by
@@ -143,12 +145,15 @@ type EndpointPort struct {
 	// This field follows standard Kubernetes label syntax.
 	// Un-prefixed names are reserved for IANA standard service names (as per
 	// RFC-6335 and http://www.iana.org/assignments/service-names).
-	// Non-standard protocols should use prefixed names.
-	// Default is empty string.
+	// Non-standard protocols should use prefixed names such as
+	// mycompany.com/my-custom-protocol.
+	// +optional
 	AppProtocol *string `json:"appProtocol,omitempty" protobuf:"bytes,4,name=appProtocol"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.16
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // EndpointSliceList represents a list of endpoint slices
 type EndpointSliceList struct {
@@ -157,6 +162,5 @@ type EndpointSliceList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// List of endpoint slices
-	// +listType=set
 	Items []EndpointSlice `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

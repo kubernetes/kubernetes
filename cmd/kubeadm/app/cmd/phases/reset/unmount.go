@@ -19,7 +19,7 @@ limitations under the License.
 package phases
 
 import (
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // unmountKubeletDirectory is a NOOP on all but linux.

@@ -54,6 +54,33 @@ stuff: 1
 	}
 }
 
+func TestBigYAML(t *testing.T) {
+	d := `
+stuff: 1
+`
+	maxLen := 5 * 1024 * 1024
+	bufferLen := 4 * 1024
+	//  maxLen 5 M
+	dd := strings.Repeat(d, 512*1024)
+	r := NewDocumentDecoder(ioutil.NopCloser(bytes.NewReader([]byte(dd[:maxLen-1]))))
+	b := make([]byte, bufferLen)
+	n, err := r.Read(b)
+	if err != io.ErrShortBuffer {
+		t.Fatalf("expected ErrShortBuffer: %d / %v", n, err)
+	}
+	b = make([]byte, maxLen)
+	n, err = r.Read(b)
+	if err != nil {
+		t.Fatalf("expected nil: %d / %v", n, err)
+	}
+	r = NewDocumentDecoder(ioutil.NopCloser(bytes.NewReader([]byte(dd))))
+	b = make([]byte, maxLen)
+	n, err = r.Read(b)
+	if err != bufio.ErrTooLong {
+		t.Fatalf("bufio.Scanner: token too long: %d / %v", n, err)
+	}
+}
+
 func TestYAMLDecoderCallsAfterErrShortBufferRestOfFrame(t *testing.T) {
 	d := `---
 stuff: 1

@@ -243,6 +243,7 @@ func DoRetryForAttempts(attempts int, backoff time.Duration) SendDecorator {
 				if err != nil {
 					return resp, err
 				}
+				DrainResponseBody(resp)
 				resp, err = s.Do(rr.Request())
 				if err == nil {
 					return resp, err
@@ -283,23 +284,26 @@ func DoRetryForStatusCodesWithCap(attempts int, backoff, cap time.Duration, code
 func doRetryForStatusCodesImpl(s Sender, r *http.Request, count429 bool, attempts int, backoff, cap time.Duration, codes ...int) (resp *http.Response, err error) {
 	rr := NewRetriableRequest(r)
 	// Increment to add the first call (attempts denotes number of retries)
-	for attempt := 0; attempt < attempts+1; {
+	for attempt, delayCount := 0, 0; attempt < attempts+1; {
 		err = rr.Prepare()
 		if err != nil {
 			return
 		}
+		DrainResponseBody(resp)
 		resp, err = s.Do(rr.Request())
-		// if the error isn't temporary don't bother retrying
-		if err != nil && !IsTemporaryNetworkError(err) {
-			return
-		}
 		// we want to retry if err is not nil (e.g. transient network failure).  note that for failed authentication
 		// resp and err will both have a value, so in this case we don't want to retry as it will never succeed.
 		if err == nil && !ResponseHasStatusCode(resp, codes...) || IsTokenRefreshError(err) {
 			return resp, err
 		}
 		delayed := DelayWithRetryAfter(resp, r.Context().Done())
-		if !delayed && !DelayForBackoffWithCap(backoff, cap, attempt, r.Context().Done()) {
+		// enforce a 2 minute cap between requests when 429 status codes are
+		// not going to be counted as an attempt and when the cap is 0.
+		// this should only happen in the absence of a retry-after header.
+		if !count429 && cap == 0 {
+			cap = 2 * time.Minute
+		}
+		if !delayed && !DelayForBackoffWithCap(backoff, cap, delayCount, r.Context().Done()) {
 			return resp, r.Context().Err()
 		}
 		// when count429 == false don't count a 429 against the number
@@ -307,6 +311,9 @@ func doRetryForStatusCodesImpl(s Sender, r *http.Request, count429 bool, attempt
 		if count429 || (resp == nil || resp.StatusCode != http.StatusTooManyRequests) {
 			attempt++
 		}
+		// delay count is tracked separately from attempts to
+		// ensure that 429 participates in exponential back-off
+		delayCount++
 	}
 	return resp, err
 }
@@ -351,6 +358,7 @@ func DoRetryForDuration(d time.Duration, backoff time.Duration) SendDecorator {
 				if err != nil {
 					return resp, err
 				}
+				DrainResponseBody(resp)
 				resp, err = s.Do(rr.Request())
 				if err == nil {
 					return resp, err

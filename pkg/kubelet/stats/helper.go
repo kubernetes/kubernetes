@@ -23,7 +23,7 @@ import (
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
@@ -40,10 +40,12 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 	}
 	var cpuStats *statsapi.CPUStats
 	var memoryStats *statsapi.MemoryStats
+	cpuStats = &statsapi.CPUStats{
+		Time:                 metav1.NewTime(cstat.Timestamp),
+		UsageNanoCores:       uint64Ptr(0),
+		UsageCoreNanoSeconds: uint64Ptr(0),
+	}
 	if info.Spec.HasCpu {
-		cpuStats = &statsapi.CPUStats{
-			Time: metav1.NewTime(cstat.Timestamp),
-		}
 		if cstat.CpuInst != nil {
 			cpuStats.UsageNanoCores = &cstat.CpuInst.Usage.Total
 		}
@@ -66,6 +68,11 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 		if !isMemoryUnlimited(info.Spec.Memory.Limit) {
 			availableBytes := info.Spec.Memory.Limit - cstat.Memory.WorkingSet
 			memoryStats.AvailableBytes = &availableBytes
+		}
+	} else {
+		memoryStats = &statsapi.MemoryStats{
+			Time:            metav1.NewTime(cstat.Timestamp),
+			WorkingSetBytes: uint64Ptr(0),
 		}
 	}
 	return cpuStats, memoryStats
@@ -146,9 +153,18 @@ func cadvisorInfoToContainerCPUAndMemoryStats(name string, info *cadvisorapiv2.C
 	return result
 }
 
+func cadvisorInfoToProcessStats(info *cadvisorapiv2.ContainerInfo) *statsapi.ProcessStats {
+	cstat, found := latestContainerStats(info)
+	if !found || cstat.Processes == nil {
+		return nil
+	}
+	num := cstat.Processes.ProcessCount
+	return &statsapi.ProcessStats{ProcessCount: uint64Ptr(num)}
+}
+
 // cadvisorInfoToNetworkStats returns the statsapi.NetworkStats converted from
 // the container info from cadvisor.
-func cadvisorInfoToNetworkStats(name string, info *cadvisorapiv2.ContainerInfo) *statsapi.NetworkStats {
+func cadvisorInfoToNetworkStats(info *cadvisorapiv2.ContainerInfo) *statsapi.NetworkStats {
 	if !info.Spec.HasNetwork {
 		return nil
 	}

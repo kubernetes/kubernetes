@@ -57,11 +57,17 @@ type Rule map[string]string
 type FakeIPTables struct {
 	hasRandomFully bool
 	Lines          []byte
+	protocol       iptables.Protocol
 }
 
 // NewFake returns a no-op iptables.Interface
 func NewFake() *FakeIPTables {
-	return &FakeIPTables{}
+	return &FakeIPTables{protocol: iptables.ProtocolIPv4}
+}
+
+// NewIPv6Fake returns a no-op iptables.Interface with IsIPv6() == true
+func NewIPv6Fake() *FakeIPTables {
+	return &FakeIPTables{protocol: iptables.ProtocolIPv6}
 }
 
 // SetHasRandomFully is part of iptables.Interface
@@ -95,9 +101,14 @@ func (*FakeIPTables) DeleteRule(table iptables.Table, chain iptables.Chain, args
 	return nil
 }
 
-// IsIpv6 is part of iptables.Interface
-func (*FakeIPTables) IsIpv6() bool {
-	return false
+// IsIPv6 is part of iptables.Interface
+func (f *FakeIPTables) IsIPv6() bool {
+	return f.protocol == iptables.ProtocolIPv6
+}
+
+// Protocol is part of iptables.Interface
+func (f *FakeIPTables) Protocol() iptables.Protocol {
+	return f.protocol
 }
 
 // Save is part of iptables.Interface

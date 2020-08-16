@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -60,17 +61,19 @@ func networkingIPerfTest(isIPv6 bool) {
 		// for a single service, we expect to divide bandwidth between the network.  Very crude estimate.
 		expectedBandwidth := int(float64(maxBandwidthBits) / float64(totalPods))
 		appName := "iperf-e2e"
-		_, err = f.CreateServiceForSimpleAppWithPods(
+		_, err = e2eservice.CreateServiceForSimpleAppWithPods(
+			f.ClientSet,
 			8001,
 			8002,
+			f.Namespace.Name,
 			appName,
 			func(n v1.Node) v1.PodSpec {
 				return v1.PodSpec{
 					Containers: []v1.Container{{
-						Name:  "iperf-server",
-						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Name:    "iperf-server",
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+						Command: []string{"/bin/sh"},
 						Args: []string{
-							"/bin/sh",
 							"-c",
 							"/usr/local/bin/iperf " + familyStr + "-s -p 8001 ",
 						},
@@ -89,16 +92,18 @@ func networkingIPerfTest(isIPv6 bool) {
 			framework.Failf("Fatal error waiting for iperf server endpoint : %v", err)
 		}
 
-		iperfClientPodLabels := f.CreatePodsPerNodeForSimpleApp(
+		iperfClientPodLabels := e2enode.CreatePodsPerNodeForSimpleApp(
+			f.ClientSet,
+			f.Namespace.Name,
 			"iperf-e2e-cli",
 			func(n v1.Node) v1.PodSpec {
 				return v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "iperf-client",
-							Image: imageutils.GetE2EImage(imageutils.Agnhost),
+							Name:    "iperf-client",
+							Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+							Command: []string{"/bin/sh"},
 							Args: []string{
-								"/bin/sh",
 								"-c",
 								"/usr/local/bin/iperf " + familyStr + "-c service-for-" + appName + " -p 8002 --reportstyle C && sleep 5",
 							},

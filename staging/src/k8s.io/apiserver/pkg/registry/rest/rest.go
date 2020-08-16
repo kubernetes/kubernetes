@@ -161,6 +161,11 @@ type GracefulDeleter interface {
 	Delete(ctx context.Context, name string, deleteValidation ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error)
 }
 
+// MayReturnFullObjectDeleter may return deleted object (instead of a simple status) on deletion.
+type MayReturnFullObjectDeleter interface {
+	DeleteReturnsDeletedObject() bool
+}
+
 // CollectionDeleter is an object that can delete a collection
 // of RESTful resources.
 type CollectionDeleter interface {

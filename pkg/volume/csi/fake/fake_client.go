@@ -19,6 +19,9 @@ package fake
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
 	"strings"
 
 	csipb "github.com/container-storage-interface/spec/lib/go/csi"
@@ -28,8 +31,9 @@ import (
 )
 
 const (
-	// NodePublishTimeout_VolumeID is volume id that will result in NodePublish operation to timeout
+	// NodePublishTimeOut_VolumeID is volume id that will result in NodePublish operation to timeout
 	NodePublishTimeOut_VolumeID = "node-publish-timeout"
+
 	// NodeStageTimeOut_VolumeID is a volume id that will result in NodeStage operation to timeout
 	NodeStageTimeOut_VolumeID = "node-stage-timeout"
 )
@@ -75,14 +79,15 @@ type CSIVolume struct {
 
 // NodeClient returns CSI node client
 type NodeClient struct {
-	nodePublishedVolumes map[string]CSIVolume
-	nodeStagedVolumes    map[string]CSIVolume
-	stageUnstageSet      bool
-	expansionSet         bool
-	volumeStatsSet       bool
-	nodeGetInfoResp      *csipb.NodeGetInfoResponse
-	nodeVolumeStatsResp  *csipb.NodeGetVolumeStatsResponse
-	nextErr              error
+	nodePublishedVolumes     map[string]CSIVolume
+	nodeStagedVolumes        map[string]CSIVolume
+	stageUnstageSet          bool
+	expansionSet             bool
+	volumeStatsSet           bool
+	nodeGetInfoResp          *csipb.NodeGetInfoResponse
+	nodeVolumeStatsResp      *csipb.NodeGetVolumeStatsResponse
+	FakeNodeExpansionRequest *csipb.NodeExpandVolumeRequest
+	nextErr                  error
 }
 
 // NewNodeClient returns fake node client
@@ -172,14 +177,29 @@ func (f *NodeClient) NodePublishVolume(ctx context.Context, req *csipb.NodePubli
 		return nil, timeoutErr
 	}
 
-	f.nodePublishedVolumes[req.GetVolumeId()] = CSIVolume{
+	// "Creation of target_path is the responsibility of the SP."
+	// Our plugin depends on it.
+	if req.VolumeCapability.GetBlock() != nil {
+		if err := ioutil.WriteFile(req.TargetPath, []byte{}, 0644); err != nil {
+			return nil, fmt.Errorf("cannot create target path %s for block file: %s", req.TargetPath, err)
+		}
+	} else {
+		if err := os.MkdirAll(req.TargetPath, 0755); err != nil {
+			return nil, fmt.Errorf("cannot create target directory %s for mount: %s", req.TargetPath, err)
+		}
+	}
+
+	publishedVolume := CSIVolume{
 		VolumeHandle:    req.GetVolumeId(),
 		Path:            req.GetTargetPath(),
 		DeviceMountPath: req.GetStagingTargetPath(),
 		VolumeContext:   req.GetVolumeContext(),
-		FSType:          req.GetVolumeCapability().GetMount().GetFsType(),
-		MountFlags:      req.GetVolumeCapability().GetMount().MountFlags,
 	}
+	if req.GetVolumeCapability().GetMount() != nil {
+		publishedVolume.FSType = req.GetVolumeCapability().GetMount().FsType
+		publishedVolume.MountFlags = req.GetVolumeCapability().GetMount().MountFlags
+	}
+	f.nodePublishedVolumes[req.GetVolumeId()] = publishedVolume
 	return &csipb.NodePublishVolumeResponse{}, nil
 }
 
@@ -196,6 +216,12 @@ func (f *NodeClient) NodeUnpublishVolume(ctx context.Context, req *csipb.NodeUnp
 		return nil, errors.New("missing target path")
 	}
 	delete(f.nodePublishedVolumes, req.GetVolumeId())
+
+	// "The SP MUST delete the file or directory it created at this path."
+	if err := os.Remove(req.TargetPath); err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("failed to remove publish path %s: %s", req.TargetPath, err)
+	}
+
 	return &csipb.NodeUnpublishVolumeResponse{}, nil
 }
 
@@ -270,6 +296,8 @@ func (f *NodeClient) NodeExpandVolume(ctx context.Context, req *csipb.NodeExpand
 	if req.GetCapacityRange().RequiredBytes <= 0 {
 		return nil, errors.New("required bytes should be greater than 0")
 	}
+
+	f.FakeNodeExpansionRequest = req
 
 	resp := &csipb.NodeExpandVolumeResponse{
 		CapacityBytes: req.GetCapacityRange().RequiredBytes,

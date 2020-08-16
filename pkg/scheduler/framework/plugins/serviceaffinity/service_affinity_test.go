@@ -24,10 +24,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/fake"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
-	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 func TestServiceAffinity(t *testing.T) {
@@ -164,8 +164,8 @@ func TestServiceAffinity(t *testing.T) {
 
 			p := &ServiceAffinity{
 				sharedLister:  snapshot,
-				serviceLister: fakelisters.ServiceLister(test.services),
-				args: Args{
+				serviceLister: fakeframework.ServiceLister(test.services),
+				args: config.ServiceAffinityArgs{
 					AffinityLabels: test.labels,
 				},
 			}
@@ -384,12 +384,12 @@ func TestServiceAffinityScore(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeLabeledNodeList(test.nodes)
 			snapshot := cache.NewSnapshot(test.pods, nodes)
-			serviceLister := fakelisters.ServiceLister(test.services)
+			serviceLister := fakeframework.ServiceLister(test.services)
 
 			p := &ServiceAffinity{
 				sharedLister:  snapshot,
 				serviceLister: serviceLister,
-				args: Args{
+				args: config.ServiceAffinityArgs{
 					AntiAffinityLabelsPreference: test.labels,
 				},
 			}
@@ -499,7 +499,10 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 
 				p := &ServiceAffinity{
 					sharedLister:  snapshot,
-					serviceLister: fakelisters.ServiceLister(test.services),
+					serviceLister: fakeframework.ServiceLister(test.services),
+					args: config.ServiceAffinityArgs{
+						AffinityLabels: []string{"region", "zone"},
+					},
 				}
 				cycleState := framework.NewCycleState()
 				preFilterStatus := p.PreFilter(context.Background(), cycleState, test.pendingPod)
@@ -591,11 +594,29 @@ func sortNodeScoreList(out framework.NodeScoreList) {
 	})
 }
 
-func mustGetNodeInfo(t *testing.T, snapshot *cache.Snapshot, name string) *nodeinfo.NodeInfo {
+func mustGetNodeInfo(t *testing.T, snapshot *cache.Snapshot, name string) *framework.NodeInfo {
 	t.Helper()
 	nodeInfo, err := snapshot.NodeInfos().Get(name)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return nodeInfo
+}
+
+func TestPreFilterDisabled(t *testing.T) {
+	pod := &v1.Pod{}
+	nodeInfo := framework.NewNodeInfo()
+	node := v1.Node{}
+	nodeInfo.SetNode(&node)
+	p := &ServiceAffinity{
+		args: config.ServiceAffinityArgs{
+			AffinityLabels: []string{"region"},
+		},
+	}
+	cycleState := framework.NewCycleState()
+	gotStatus := p.Filter(context.Background(), cycleState, pod, nodeInfo)
+	wantStatus := framework.NewStatus(framework.Error, `error reading "PreFilterServiceAffinity" from cycleState: not found`)
+	if !reflect.DeepEqual(gotStatus, wantStatus) {
+		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
+	}
 }

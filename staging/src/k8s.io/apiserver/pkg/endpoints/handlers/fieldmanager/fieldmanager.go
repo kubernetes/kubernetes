@@ -18,14 +18,18 @@ package fieldmanager
 
 import (
 	"fmt"
+	"reflect"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	"k8s.io/klog/v2"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/merge"
 )
 
 // DefaultMaxUpdateManagers defines the default maximum retained number of managedFields entries from updates
@@ -35,7 +39,9 @@ const DefaultMaxUpdateManagers int = 10
 
 // DefaultTrackOnCreateProbability defines the default probability that the field management of an object
 // starts being tracked from the object's creation, instead of from the first time the object is applied to.
-const DefaultTrackOnCreateProbability float32 = 0.5
+const DefaultTrackOnCreateProbability float32 = 1
+
+var atMostEverySecond = internal.NewAtMostEvery(time.Second)
 
 // Managed groups a fieldpath.ManagedFields together with the timestamps associated with each operation.
 type Managed interface {
@@ -73,30 +79,46 @@ func NewFieldManager(f Manager) *FieldManager {
 // NewDefaultFieldManager creates a new FieldManager that merges apply requests
 // and update managed fields for other types of requests.
 func NewDefaultFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion) (*FieldManager, error) {
-	f, err := NewStructuredMergeManager(models, objectConverter, objectDefaulter, kind.GroupVersion(), hub)
+	typeConverter, err := internal.NewTypeConverter(models, false)
+	if err != nil {
+		return nil, err
+	}
+
+	f, err := NewStructuredMergeManager(typeConverter, objectConverter, objectDefaulter, kind.GroupVersion(), hub)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field manager: %v", err)
 	}
-	return newDefaultFieldManager(f, objectCreater, kind), nil
+	return newDefaultFieldManager(f, typeConverter, objectConverter, objectCreater, kind), nil
 }
 
 // NewDefaultCRDFieldManager creates a new FieldManager specifically for
 // CRDs. This allows for the possibility of fields which are not defined
 // in models, as well as having no models defined at all.
 func NewDefaultCRDFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, preserveUnknownFields bool) (_ *FieldManager, err error) {
-	f, err := NewCRDStructuredMergeManager(models, objectConverter, objectDefaulter, kind.GroupVersion(), hub, preserveUnknownFields)
+	var typeConverter internal.TypeConverter = internal.DeducedTypeConverter{}
+	if models != nil {
+		typeConverter, err = internal.NewTypeConverter(models, preserveUnknownFields)
+		if err != nil {
+			return nil, err
+		}
+	}
+	f, err := NewCRDStructuredMergeManager(typeConverter, objectConverter, objectDefaulter, kind.GroupVersion(), hub, preserveUnknownFields)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field manager: %v", err)
 	}
-	return newDefaultFieldManager(f, objectCreater, kind), nil
+	return newDefaultFieldManager(f, typeConverter, objectConverter, objectCreater, kind), nil
 }
 
 // newDefaultFieldManager is a helper function which wraps a Manager with certain default logic.
-func newDefaultFieldManager(f Manager, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind) *FieldManager {
+func newDefaultFieldManager(f Manager, typeConverter internal.TypeConverter, objectConverter runtime.ObjectConvertor, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind) *FieldManager {
 	f = NewStripMetaManager(f)
+	f = NewManagedFieldsUpdater(f)
 	f = NewBuildManagerInfoManager(f, kind.GroupVersion())
 	f = NewCapManagersManager(f, DefaultMaxUpdateManagers)
 	f = NewProbabilisticSkipNonAppliedManager(f, objectCreater, kind, DefaultTrackOnCreateProbability)
+	f = NewLastAppliedManager(f, typeConverter, objectConverter, kind.GroupVersion())
+	f = NewLastAppliedUpdater(f)
+
 	return NewFieldManager(f)
 }
 
@@ -106,20 +128,26 @@ func newDefaultFieldManager(f Manager, objectCreater runtime.ObjectCreater, kind
 func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (object runtime.Object, err error) {
 	// If the object doesn't have metadata, we should just return without trying to
 	// set the managedFields at all, so creates/updates/patches will work normally.
-	if _, err = meta.Accessor(newObj); err != nil {
+	newAccessor, err := meta.Accessor(newObj)
+	if err != nil {
 		return newObj, nil
 	}
 
 	// First try to decode the managed fields provided in the update,
 	// This is necessary to allow directly updating managed fields.
 	var managed Managed
-	if managed, err = internal.DecodeObjectManagedFields(newObj); err != nil || len(managed.Fields()) == 0 {
+	if isResetManagedFields(newAccessor.GetManagedFields()) {
+		managed = internal.NewEmptyManaged()
+	} else if managed, err = internal.DecodeObjectManagedFields(newAccessor.GetManagedFields()); err != nil || len(managed.Fields()) == 0 {
+		liveAccessor, err := meta.Accessor(liveObj)
+		if err != nil {
+			return newObj, nil
+		}
 		// If the managed field is empty or we failed to decode it,
 		// let's try the live object. This is to prevent clients who
 		// don't understand managedFields from deleting it accidentally.
-		managed, err = internal.DecodeObjectManagedFields(liveObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode managed fields: %v", err)
+		if managed, err = internal.DecodeObjectManagedFields(liveAccessor.GetManagedFields()); err != nil {
+			managed = internal.NewEmptyManaged()
 		}
 	}
 
@@ -137,23 +165,62 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (o
 	return object, nil
 }
 
+// UpdateNoErrors is the same as Update, but it will not return
+// errors. If an error happens, the object is returned with
+// managedFields cleared.
+func (f *FieldManager) UpdateNoErrors(liveObj, newObj runtime.Object, manager string) runtime.Object {
+	obj, err := f.Update(liveObj, newObj, manager)
+	if err != nil {
+		atMostEverySecond.Do(func() {
+			klog.Errorf("[SHOULD NOT HAPPEN] failed to update managedFields for %v: %v",
+				newObj.GetObjectKind().GroupVersionKind(),
+				err)
+		})
+		// Explicitly remove managedFields on failure, so that
+		// we can't have garbage in it.
+		internal.RemoveObjectManagedFields(newObj)
+		return newObj
+	}
+	return obj
+}
+
+// Returns true if the managedFields indicate that the user is trying to
+// reset the managedFields, i.e. if the list is non-nil but empty, or if
+// the list has one empty item.
+func isResetManagedFields(managedFields []metav1.ManagedFieldsEntry) bool {
+	if len(managedFields) == 0 {
+		return managedFields != nil
+	}
+
+	if len(managedFields) == 1 {
+		return reflect.DeepEqual(managedFields[0], metav1.ManagedFieldsEntry{})
+	}
+
+	return false
+}
+
 // Apply is used when server-side apply is called, as it merges the
 // object and updates the managed fields.
 func (f *FieldManager) Apply(liveObj, appliedObj runtime.Object, manager string, force bool) (object runtime.Object, err error) {
 	// If the object doesn't have metadata, apply isn't allowed.
-	if _, err = meta.Accessor(liveObj); err != nil {
+	accessor, err := meta.Accessor(liveObj)
+	if err != nil {
 		return nil, fmt.Errorf("couldn't get accessor: %v", err)
 	}
 
 	// Decode the managed fields in the live object, since it isn't allowed in the patch.
-	var managed Managed
-	if managed, err = internal.DecodeObjectManagedFields(liveObj); err != nil {
+	managed, err := internal.DecodeObjectManagedFields(accessor.GetManagedFields())
+	if err != nil {
 		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 	}
 
 	internal.RemoveObjectManagedFields(liveObj)
 
-	if object, managed, err = f.fieldManager.Apply(liveObj, appliedObj, managed, manager, force); err != nil {
+	object, managed, err = f.fieldManager.Apply(liveObj, appliedObj, managed, manager, force)
+	if err != nil {
+		if conflicts, ok := err.(merge.Conflicts); ok {
+			return nil, internal.NewConflictError(conflicts)
+		}
 		return nil, err
 	}
 

@@ -123,7 +123,7 @@ func TestSubjectAccessReview(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		response, err := clientset.AuthorizationV1().SubjectAccessReviews().Create(test.sar)
+		response, err := clientset.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), test.sar, metav1.CreateOptions{})
 		switch {
 		case err == nil && len(test.expectedError) == 0:
 
@@ -207,7 +207,7 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 	for _, test := range tests {
 		username = test.username
 
-		response, err := clientset.AuthorizationV1().SelfSubjectAccessReviews().Create(test.sar)
+		response, err := clientset.AuthorizationV1().SelfSubjectAccessReviews().Create(context.TODO(), test.sar, metav1.CreateOptions{})
 		switch {
 		case err == nil && len(test.expectedError) == 0:
 
@@ -325,7 +325,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		response, err := clientset.AuthorizationV1().LocalSubjectAccessReviews(test.namespace).Create(test.sar)
+		response, err := clientset.AuthorizationV1().LocalSubjectAccessReviews(test.namespace).Create(context.TODO(), test.sar, metav1.CreateOptions{})
 		switch {
 		case err == nil && len(test.expectedError) == 0:
 

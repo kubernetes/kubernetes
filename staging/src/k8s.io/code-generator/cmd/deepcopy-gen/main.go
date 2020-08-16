@@ -49,7 +49,7 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/examples/deepcopy-gen/generators"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	generatorargs "k8s.io/code-generator/cmd/deepcopy-gen/args"
 	"k8s.io/code-generator/pkg/util"

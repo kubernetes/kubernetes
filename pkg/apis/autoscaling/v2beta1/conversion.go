@@ -264,18 +264,22 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v2beta1_HorizontalPodAutosca
 	if err := autoConvert_autoscaling_HorizontalPodAutoscaler_To_v2beta1_HorizontalPodAutoscaler(in, out, s); err != nil {
 		return err
 	}
-	if in.Spec.Behavior != nil {
-		old := out.Annotations
-		out.Annotations = make(map[string]string, len(old)+1)
-		for k, v := range old {
-			out.Annotations[k] = v
-		}
 
+	// clear any pre-existing round-trip annotations to make sure the only ones set are ones we produced during conversion
+	annotations, copiedAnnotations := autoscaling.DropRoundTripHorizontalPodAutoscalerAnnotations(out.Annotations)
+	out.Annotations = annotations
+
+	if in.Spec.Behavior != nil {
+		// TODO: this is marshaling an internal type. Fix this without breaking backwards compatibility with n-1 API servers.
 		behaviorEnc, err := json.Marshal(in.Spec.Behavior)
 		if err != nil {
 			return err
 		}
-		// Even if the annotation for behavior exists, we will just overwrite it
+		// copy before mutating
+		if !copiedAnnotations {
+			copiedAnnotations = true
+			out.Annotations = autoscaling.DeepCopyStringMap(out.Annotations)
+		}
 		out.Annotations[autoscaling.BehaviorSpecsAnnotation] = string(behaviorEnc)
 	}
 
@@ -288,13 +292,17 @@ func Convert_v2beta1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutosca
 	}
 
 	if behaviorEnc, hasBehaviors := out.Annotations[autoscaling.BehaviorSpecsAnnotation]; hasBehaviors {
+		// TODO: this is unmarshaling an internal type. Fix this without breaking backwards compatibility with n-1 API servers.
 		var behavior autoscaling.HorizontalPodAutoscalerBehavior
-		if err := json.Unmarshal([]byte(behaviorEnc), &behavior); err != nil {
-			return err
+		if err := json.Unmarshal([]byte(behaviorEnc), &behavior); err == nil && behavior != (autoscaling.HorizontalPodAutoscalerBehavior{}) {
+			// only move well-formed data from annotations to fields
+			out.Spec.Behavior = &behavior
 		}
-		out.Spec.Behavior = &behavior
-		delete(out.Annotations, autoscaling.BehaviorSpecsAnnotation)
 	}
+
+	// drop round-tripping annotations after converting to internal
+	out.Annotations, _ = autoscaling.DropRoundTripHorizontalPodAutoscalerAnnotations(out.Annotations)
+
 	return nil
 }
 

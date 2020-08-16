@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,7 +39,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointslicemetrics "k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
@@ -47,13 +49,24 @@ const (
 	// maxRetries is the number of times a service will be retried before it is
 	// dropped out of the queue. Any sync error, such as a failure to create or
 	// update an EndpointSlice could trigger a retry. With the current
-	// rate-limiter in use (5ms*2^(maxRetries-1)) the following numbers
-	// represent the sequence of delays between successive queuings of a
-	// service.
+	// rate-limiter in use (1s*2^(numRetries-1)) the following numbers represent
+	// the sequence of delays between successive queuings of a service.
 	//
-	// 5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1.3s, 2.6s, 5.1s,
-	// 10.2s, 20.4s, 41s, 82s
+	// 1s, 2s, 4s, 8s, 16s, 32s, 64s, 128s, 256s, 512s, 1000s (max)
 	maxRetries = 15
+
+	// endpointSliceChangeMinSyncDelay indicates the mininum delay before
+	// queuing a syncService call after an EndpointSlice changes. If
+	// endpointUpdatesBatchPeriod is greater than this value, it will be used
+	// instead. This helps batch processing of changes to multiple
+	// EndpointSlices.
+	endpointSliceChangeMinSyncDelay = 1 * time.Second
+
+	// defaultSyncBackOff is the default backoff period for syncService calls.
+	defaultSyncBackOff = 1 * time.Second
+	// maxSyncBackOff is the max backoff period for syncService calls.
+	maxSyncBackOff = 100 * time.Second
+
 	// controllerName is a unique value used with LabelManagedBy to indicated
 	// the component managing an EndpointSlice.
 	controllerName = "endpointslice-controller.k8s.io"
@@ -66,9 +79,10 @@ func NewController(podInformer coreinformers.PodInformer,
 	endpointSliceInformer discoveryinformers.EndpointSliceInformer,
 	maxEndpointsPerSlice int32,
 	client clientset.Interface,
+	endpointUpdatesBatchPeriod time.Duration,
 ) *Controller {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartLogging(klog.Infof)
+	broadcaster.StartStructuredLogging(0)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-slice-controller"})
 
@@ -79,8 +93,19 @@ func NewController(podInformer coreinformers.PodInformer,
 	endpointslicemetrics.RegisterMetrics()
 
 	c := &Controller{
-		client:           client,
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "endpoint_slice"),
+		client: client,
+		// This is similar to the DefaultControllerRateLimiter, just with a
+		// significantly higher default backoff (1s vs 5ms). This controller
+		// processes events that can require significant EndpointSlice changes,
+		// such as an update to a Service or Deployment. A more significant
+		// rate limit back off here helps ensure that the Controller does not
+		// overwhelm the API Server.
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.NewMaxOfRateLimiter(
+			workqueue.NewItemExponentialFailureRateLimiter(defaultSyncBackOff, maxSyncBackOff),
+			// 10 qps, 100 bucket size. This is only for retry speed and its
+			// only the overall factor (not per item).
+			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+		), "endpoint_slice"),
 		workerLoopPeriod: time.Second,
 	}
 
@@ -129,6 +154,7 @@ func NewController(podInformer coreinformers.PodInformer,
 	c.eventBroadcaster = broadcaster
 	c.eventRecorder = recorder
 
+	c.endpointUpdatesBatchPeriod = endpointUpdatesBatchPeriod
 	c.serviceSelectorCache = endpointutil.NewServiceSelectorCache()
 
 	return c
@@ -193,6 +219,10 @@ type Controller struct {
 	// workerLoopPeriod is the time between worker runs. The workers
 	// process the queue of service and pod changes
 	workerLoopPeriod time.Duration
+
+	// endpointUpdatesBatchPeriod is an artificial delay added to all service syncs triggered by pod changes.
+	// This can be used to reduce overall number of all endpoint slice updates.
+	endpointUpdatesBatchPeriod time.Duration
 
 	// serviceSelectorCache is a cache of service selectors to avoid high CPU consumption caused by frequent calls
 	// to AsSelectorPreValidated (see #73527)
@@ -277,6 +307,7 @@ func (c *Controller) syncService(key string) error {
 		if apierrors.IsNotFound(err) {
 			c.triggerTimeTracker.DeleteService(namespace, name)
 			c.reconciler.deleteService(namespace, name)
+			c.endpointSliceTracker.DeleteService(namespace, name)
 			// The service has been deleted, return nil so that it won't be retried.
 			return nil
 		}
@@ -374,7 +405,7 @@ func (c *Controller) onEndpointSliceAdd(obj interface{}) {
 // endpointSliceTracker or the managed-by value of the EndpointSlice has changed
 // from or to this controller.
 func (c *Controller) onEndpointSliceUpdate(prevObj, obj interface{}) {
-	prevEndpointSlice := obj.(*discovery.EndpointSlice)
+	prevEndpointSlice := prevObj.(*discovery.EndpointSlice)
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	if endpointSlice == nil || prevEndpointSlice == nil {
 		utilruntime.HandleError(fmt.Errorf("Invalid EndpointSlice provided to onEndpointSliceUpdate()"))
@@ -403,7 +434,14 @@ func (c *Controller) queueServiceForEndpointSlice(endpointSlice *discovery.Endpo
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for EndpointSlice %+v: %v", endpointSlice, err))
 		return
 	}
-	c.queue.Add(key)
+
+	// queue after the max of endpointSliceChangeMinSyncDelay and
+	// endpointUpdatesBatchPeriod.
+	delay := endpointSliceChangeMinSyncDelay
+	if c.endpointUpdatesBatchPeriod > delay {
+		delay = c.endpointUpdatesBatchPeriod
+	}
+	c.queue.AddAfter(key, delay)
 }
 
 func (c *Controller) addPod(obj interface{}) {
@@ -414,14 +452,14 @@ func (c *Controller) addPod(obj interface{}) {
 		return
 	}
 	for key := range services {
-		c.queue.Add(key)
+		c.queue.AddAfter(key, c.endpointUpdatesBatchPeriod)
 	}
 }
 
 func (c *Controller) updatePod(old, cur interface{}) {
-	services := endpointutil.GetServicesToUpdateOnPodChange(c.serviceLister, c.serviceSelectorCache, old, cur, podEndpointChanged)
+	services := endpointutil.GetServicesToUpdateOnPodChange(c.serviceLister, c.serviceSelectorCache, old, cur)
 	for key := range services {
-		c.queue.Add(key)
+		c.queue.AddAfter(key, c.endpointUpdatesBatchPeriod)
 	}
 }
 

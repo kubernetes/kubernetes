@@ -34,6 +34,7 @@ import (
 	deploymentconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/deployment/config/v1alpha1"
 	endpointconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpoint/config/v1alpha1"
 	endpointsliceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslice/config/v1alpha1"
+	endpointslicemirroringconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config/v1alpha1"
 	garbagecollectorconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/garbagecollector/config/v1alpha1"
 	jobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/job/config/v1alpha1"
 	namespaceconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/namespace/config/v1alpha1"
@@ -297,6 +298,9 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 	if err := endpointsliceconfigv1alpha1.Convert_v1alpha1_EndpointSliceControllerConfiguration_To_config_EndpointSliceControllerConfiguration(&in.EndpointSliceController, &out.EndpointSliceController, s); err != nil {
 		return err
 	}
+	if err := endpointslicemirroringconfigv1alpha1.Convert_v1alpha1_EndpointSliceMirroringControllerConfiguration_To_config_EndpointSliceMirroringControllerConfiguration(&in.EndpointSliceMirroringController, &out.EndpointSliceMirroringController, s); err != nil {
+		return err
+	}
 	if err := garbagecollectorconfigv1alpha1.Convert_v1alpha1_GarbageCollectorControllerConfiguration_To_config_GarbageCollectorControllerConfiguration(&in.GarbageCollectorController, &out.GarbageCollectorController, s); err != nil {
 		return err
 	}
@@ -376,6 +380,9 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 		return err
 	}
 	if err := endpointsliceconfigv1alpha1.Convert_config_EndpointSliceControllerConfiguration_To_v1alpha1_EndpointSliceControllerConfiguration(&in.EndpointSliceController, &out.EndpointSliceController, s); err != nil {
+		return err
+	}
+	if err := endpointslicemirroringconfigv1alpha1.Convert_config_EndpointSliceMirroringControllerConfiguration_To_v1alpha1_EndpointSliceMirroringControllerConfiguration(&in.EndpointSliceMirroringController, &out.EndpointSliceMirroringController, s); err != nil {
 		return err
 	}
 	if err := garbagecollectorconfigv1alpha1.Convert_config_GarbageCollectorControllerConfiguration_To_v1alpha1_GarbageCollectorControllerConfiguration(&in.GarbageCollectorController, &out.GarbageCollectorController, s); err != nil {

@@ -38,7 +38,10 @@ var (
 		Provides utilities for interacting with plugins.
 
 		Plugins provide extended functionality that is not part of the major command-line distribution.
-		Please refer to the documentation and examples for more information about how write your own plugins.`)
+		Please refer to the documentation and examples for more information about how write your own plugins.
+
+		The easiest way to discover and install plugins is via the kubernetes sub-project krew.
+		To install krew, visit [krew.dev](https://github.com/kubernetes-sigs/krew/#installation)`)
 
 	pluginListLong = templates.LongDesc(`
 		List all available plugin files on a user's PATH.
@@ -113,10 +116,14 @@ func (o *PluginListOptions) Run() error {
 	pluginWarnings := 0
 
 	for _, dir := range uniquePathsList(o.PluginPaths) {
+		if len(strings.TrimSpace(dir)) == 0 {
+			continue
+		}
+
 		files, err := ioutil.ReadDir(dir)
 		if err != nil {
 			if _, ok := err.(*os.PathError); ok {
-				fmt.Fprintf(o.ErrOut, "Unable read directory %q from your PATH: %v. Skipping...", dir, err)
+				fmt.Fprintf(o.ErrOut, "Unable read directory %q from your PATH: %v. Skipping...\n", dir, err)
 				continue
 			}
 
@@ -133,7 +140,7 @@ func (o *PluginListOptions) Run() error {
 			}
 
 			if isFirstFile {
-				fmt.Fprintf(o.ErrOut, "The following compatible plugins are available:\n\n")
+				fmt.Fprintf(o.Out, "The following compatible plugins are available:\n\n")
 				pluginsFound = true
 				isFirstFile = false
 			}
@@ -165,7 +172,6 @@ func (o *PluginListOptions) Run() error {
 		}
 	}
 	if len(pluginErrors) > 0 {
-		fmt.Fprintln(o.ErrOut)
 		errs := bytes.NewBuffer(nil)
 		for _, e := range pluginErrors {
 			fmt.Fprintln(errs, e)

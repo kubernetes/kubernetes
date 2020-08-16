@@ -143,6 +143,7 @@ func autoConvert_v1_AdmissionResponse_To_admission_AdmissionResponse(in *v1.Admi
 	out.Patch = *(*[]byte)(unsafe.Pointer(&in.Patch))
 	out.PatchType = (*admission.PatchType)(unsafe.Pointer(in.PatchType))
 	out.AuditAnnotations = *(*map[string]string)(unsafe.Pointer(&in.AuditAnnotations))
+	out.Warnings = *(*[]string)(unsafe.Pointer(&in.Warnings))
 	return nil
 }
 
@@ -158,6 +159,7 @@ func autoConvert_admission_AdmissionResponse_To_v1_AdmissionResponse(in *admissi
 	out.Patch = *(*[]byte)(unsafe.Pointer(&in.Patch))
 	out.PatchType = (*v1.PatchType)(unsafe.Pointer(in.PatchType))
 	out.AuditAnnotations = *(*map[string]string)(unsafe.Pointer(&in.AuditAnnotations))
+	out.Warnings = *(*[]string)(unsafe.Pointer(&in.Warnings))
 	return nil
 }
 

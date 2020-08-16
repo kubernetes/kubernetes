@@ -251,7 +251,7 @@ func TestStaticPodNameGenerate(t *testing.T) {
 		if c.overwrite != "" {
 			pod.Name = c.overwrite
 		}
-		errs := validation.ValidatePod(pod)
+		errs := validation.ValidatePodCreate(pod, validation.PodValidationOptions{})
 		if c.shouldErr {
 			specNameErrored := false
 			for _, err := range errs {

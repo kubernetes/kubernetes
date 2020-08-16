@@ -31,11 +31,11 @@ import (
 	"golang.org/x/oauth2"
 	"k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
-	cfgIssuerUrl                = "idp-issuer-url"
+	cfgIssuerURL                = "idp-issuer-url"
 	cfgClientID                 = "client-id"
 	cfgClientSecret             = "client-secret"
 	cfgCertificateAuthority     = "idp-certificate-authority"
@@ -109,9 +109,9 @@ func (c *clientCache) setClient(clusterAddress, issuer, clientID string, client 
 }
 
 func newOIDCAuthProvider(clusterAddress string, cfg map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
-	issuer := cfg[cfgIssuerUrl]
+	issuer := cfg[cfgIssuerURL]
 	if issuer == "" {
-		return nil, fmt.Errorf("Must provide %s", cfgIssuerUrl)
+		return nil, fmt.Errorf("Must provide %s", cfgIssuerURL)
 	}
 
 	clientID := cfg[cfgClientID]
@@ -216,7 +216,7 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return r.wrapped.RoundTrip(r2)
 }
 
-func (t *roundTripper) WrappedRoundTripper() http.RoundTripper { return t.wrapped }
+func (r *roundTripper) WrappedRoundTripper() http.RoundTripper { return r.wrapped }
 
 func (p *oidcAuthProvider) idToken() (string, error) {
 	p.mu.Lock()
@@ -240,7 +240,7 @@ func (p *oidcAuthProvider) idToken() (string, error) {
 	}
 
 	// Determine provider's OAuth2 token endpoint.
-	tokenURL, err := tokenEndpoint(p.client, p.cfg[cfgIssuerUrl])
+	tokenURL, err := tokenEndpoint(p.client, p.cfg[cfgIssuerURL])
 	if err != nil {
 		return "", err
 	}
@@ -263,7 +263,7 @@ func (p *oidcAuthProvider) idToken() (string, error) {
 		// providers (Okta) don't return this value.
 		//
 		// See https://github.com/kubernetes/kubernetes/issues/36847
-		return "", fmt.Errorf("token response did not contain an id_token, either the scope \"openid\" wasn't requested upon login, or the provider doesn't support id_tokens as part of the refresh response.")
+		return "", fmt.Errorf("token response did not contain an id_token, either the scope \"openid\" wasn't requested upon login, or the provider doesn't support id_tokens as part of the refresh response")
 	}
 
 	// Create a new config to persist.

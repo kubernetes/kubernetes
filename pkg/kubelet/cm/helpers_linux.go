@@ -19,9 +19,11 @@ package cm
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
@@ -32,11 +34,15 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm/util"
 )
 
 const (
-	// Taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
-	MinShares     = 2
+	// These limits are defined in the kernel:
+	// https://github.com/torvalds/linux/blob/0bddd227f3dc55975e2b8dfa7fc6f959b062a2c7/kernel/sched/sched.h#L427-L428
+	MinShares = 2
+	MaxShares = 262144
+
 	SharesPerCPU  = 1024
 	MilliCPUToCPU = 1000
 
@@ -84,6 +90,9 @@ func MilliCPUToShares(milliCPU int64) uint64 {
 	shares := (milliCPU * SharesPerCPU) / MilliCPUToCPU
 	if shares < MinShares {
 		return MinShares
+	}
+	if shares > MaxShares {
+		return MaxShares
 	}
 	return uint64(shares)
 }
@@ -181,8 +190,8 @@ func ResourceConfigForPod(pod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64) 
 	return result
 }
 
-// GetCgroupSubsystems returns information about the mounted cgroup subsystems
-func GetCgroupSubsystems() (*CgroupSubsystems, error) {
+// getCgroupSubsystemsV1 returns information about the mounted cgroup v1 subsystems
+func getCgroupSubsystemsV1() (*CgroupSubsystems, error) {
 	// get all cgroup mounts.
 	allCgroups, err := libcontainercgroups.GetCgroupMounts(true)
 	if err != nil {
@@ -201,6 +210,41 @@ func GetCgroupSubsystems() (*CgroupSubsystems, error) {
 		Mounts:      allCgroups,
 		MountPoints: mountPoints,
 	}, nil
+}
+
+// getCgroupSubsystemsV2 returns information about the enabled cgroup v2 subsystems
+func getCgroupSubsystemsV2() (*CgroupSubsystems, error) {
+	content, err := ioutil.ReadFile(filepath.Join(util.CgroupRoot, "cgroup.controllers"))
+	if err != nil {
+		return nil, err
+	}
+
+	mounts := []libcontainercgroups.Mount{}
+	controllers := strings.Fields(string(content))
+	mountPoints := make(map[string]string, len(controllers))
+	for _, controller := range controllers {
+		mountPoints[controller] = util.CgroupRoot
+		m := libcontainercgroups.Mount{
+			Mountpoint: util.CgroupRoot,
+			Root:       util.CgroupRoot,
+			Subsystems: []string{controller},
+		}
+		mounts = append(mounts, m)
+	}
+
+	return &CgroupSubsystems{
+		Mounts:      mounts,
+		MountPoints: mountPoints,
+	}, nil
+}
+
+// GetCgroupSubsystems returns information about the mounted cgroup subsystems
+func GetCgroupSubsystems() (*CgroupSubsystems, error) {
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		return getCgroupSubsystemsV2()
+	}
+
+	return getCgroupSubsystemsV1()
 }
 
 // getCgroupProcs takes a cgroup directory name as an argument
@@ -238,9 +282,11 @@ func GetPodCgroupNameSuffix(podUID types.UID) string {
 }
 
 // NodeAllocatableRoot returns the literal cgroup path for the node allocatable cgroup
-func NodeAllocatableRoot(cgroupRoot, cgroupDriver string) string {
-	root := ParseCgroupfsToCgroupName(cgroupRoot)
-	nodeAllocatableRoot := NewCgroupName(root, defaultNodeAllocatableCgroupName)
+func NodeAllocatableRoot(cgroupRoot string, cgroupsPerQOS bool, cgroupDriver string) string {
+	nodeAllocatableRoot := ParseCgroupfsToCgroupName(cgroupRoot)
+	if cgroupsPerQOS {
+		nodeAllocatableRoot = NewCgroupName(nodeAllocatableRoot, defaultNodeAllocatableCgroupName)
+	}
 	if libcontainerCgroupManagerType(cgroupDriver) == libcontainerSystemd {
 		return nodeAllocatableRoot.ToSystemd()
 	}

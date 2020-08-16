@@ -57,7 +57,7 @@ func TestEtcdStoragePath(t *testing.T) {
 
 	client := &allClient{dynamicClient: master.Dynamic}
 
-	if _, err := master.Client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
+	if _, err := master.Client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -276,7 +276,7 @@ func (c *allClient) create(stub, ns string, mapping *meta.RESTMapping, all *[]cl
 		return err
 	}
 
-	actual, err := resourceClient.Create(obj, metav1.CreateOptions{})
+	actual, err := resourceClient.Create(context.TODO(), obj, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -291,7 +291,7 @@ func (c *allClient) cleanup(all *[]cleanupData) error {
 		obj := (*all)[i].obj
 		gvr := (*all)[i].resource
 
-		if err := c.dynamicClient.Resource(gvr).Namespace(obj.GetNamespace()).Delete(obj.GetName(), nil); err != nil {
+		if err := c.dynamicClient.Resource(gvr).Namespace(obj.GetNamespace()).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{}); err != nil {
 			return err
 		}
 	}

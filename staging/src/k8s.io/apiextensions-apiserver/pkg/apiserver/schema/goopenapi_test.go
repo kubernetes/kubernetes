@@ -38,9 +38,9 @@ func TestStructuralRoundtrip(t *testing.T) {
 	f.RandSource(rand.New(rand.NewSource(seed)))
 	f.Funcs(
 		func(s *JSON, c fuzz.Continue) {
-			switch c.Intn(6) {
+			switch c.Intn(7) {
 			case 0:
-				s.Object = float64(42.0)
+				s.Object = float64(42.2)
 			case 1:
 				s.Object = map[string]interface{}{"foo": "bar"}
 			case 2:
@@ -51,6 +51,8 @@ func TestStructuralRoundtrip(t *testing.T) {
 				s.Object = map[string]interface{}{}
 			case 5:
 				s.Object = nil
+			case 6:
+				s.Object = int64(42)
 			}
 		},
 	)

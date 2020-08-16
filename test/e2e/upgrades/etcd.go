@@ -17,6 +17,7 @@ limitations under the License.
 package upgrades
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -31,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
 const manifestPath = "test/e2e/testing-manifests/statefulset/etcd"
@@ -58,7 +59,11 @@ func (EtcdUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 }
 
 func kubectlCreate(ns, file string) {
-	input := string(testfiles.ReadOrDie(filepath.Join(manifestPath, file)))
+	data, err := e2etestfiles.Read(filepath.Join(manifestPath, file))
+	if err != nil {
+		framework.Fail(err.Error())
+	}
+	input := string(data)
 	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
 }
 
@@ -72,7 +77,7 @@ func (t *EtcdUpgradeTest) Setup(f *framework.Framework) {
 	kubectlCreate(ns, "pdb.yaml")
 
 	ginkgo.By("Creating an etcd StatefulSet")
-	e2esset.CreateStatefulSet(f.ClientSet, manifestPath, ns)
+	e2estatefulset.CreateStatefulSet(f.ClientSet, manifestPath, ns)
 
 	ginkgo.By("Creating an etcd--test-server deployment")
 	kubectlCreate(ns, "tester.yaml")
@@ -142,7 +147,7 @@ func (t *EtcdUpgradeTest) addUser(name string) error {
 }
 
 func (t *EtcdUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {
-	svc, err := f.ClientSet.CoreV1().Services(ns).Get(svcName, metav1.GetOptions{})
+	svc, err := f.ClientSet.CoreV1().Services(ns).Get(context.TODO(), svcName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	ingress := svc.Status.LoadBalancer.Ingress
 	if len(ingress) == 0 {

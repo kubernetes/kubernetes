@@ -68,6 +68,10 @@ func TestGetMaxDataDiskCount(t *testing.T) {
 			expectResult: 8,
 		},
 		{
+			instanceType: "Standard_DS14_V2",
+			expectResult: 64,
+		},
+		{
 			instanceType: "NOT_EXISTING",
 			expectResult: defaultAzureVolumeLimit,
 		},

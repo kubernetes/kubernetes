@@ -17,12 +17,13 @@ limitations under the License.
 package client
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
@@ -64,13 +65,13 @@ func TestDynamicClient(t *testing.T) {
 		},
 	}
 
-	actual, err := client.CoreV1().Pods("default").Create(pod)
+	actual, err := client.CoreV1().Pods("default").Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error when creating pod: %v", err)
 	}
 
 	// check dynamic list
-	unstructuredList, err := dynamicClient.Resource(resource).Namespace("default").List(metav1.ListOptions{})
+	unstructuredList, err := dynamicClient.Resource(resource).Namespace("default").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error when listing pods: %v", err)
 	}
@@ -89,7 +90,7 @@ func TestDynamicClient(t *testing.T) {
 	}
 
 	// check dynamic get
-	unstruct, err := dynamicClient.Resource(resource).Namespace("default").Get(actual.Name, metav1.GetOptions{})
+	unstruct, err := dynamicClient.Resource(resource).Namespace("default").Get(context.TODO(), actual.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error when getting pod %q: %v", actual.Name, err)
 	}
@@ -104,12 +105,12 @@ func TestDynamicClient(t *testing.T) {
 	}
 
 	// delete the pod dynamically
-	err = dynamicClient.Resource(resource).Namespace("default").Delete(actual.Name, nil)
+	err = dynamicClient.Resource(resource).Namespace("default").Delete(context.TODO(), actual.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error when deleting pod: %v", err)
 	}
 
-	list, err := client.CoreV1().Pods("default").List(metav1.ListOptions{})
+	list, err := client.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error when listing pods: %v", err)
 	}
@@ -149,7 +150,7 @@ func TestDynamicClientWatch(t *testing.T) {
 	rv1 := ""
 	for i := 0; i < 10; i++ {
 		event := mkEvent(i)
-		got, err := client.CoreV1().Events("default").Create(event)
+		got, err := client.CoreV1().Events("default").Create(context.TODO(), event, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed creating event %#q: %v", event, err)
 		}
@@ -162,7 +163,7 @@ func TestDynamicClientWatch(t *testing.T) {
 		t.Logf("Created event %#v", got.ObjectMeta)
 	}
 
-	w, err := dynamicClient.Resource(resource).Namespace("default").Watch(metav1.ListOptions{
+	w, err := dynamicClient.Resource(resource).Namespace("default").Watch(context.TODO(), metav1.ListOptions{
 		ResourceVersion: rv1,
 		Watch:           true,
 		FieldSelector:   fields.OneTermEqualSelector("metadata.name", "event-9").String(),

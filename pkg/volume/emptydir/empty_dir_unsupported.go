@@ -19,6 +19,7 @@ limitations under the License.
 package emptydir
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,6 +30,6 @@ type realMountDetector struct {
 	mounter mount.Interface
 }
 
-func (m *realMountDetector) GetMountMedium(path string) (v1.StorageMedium, bool, error) {
-	return v1.StorageMediumDefault, false, nil
+func (m *realMountDetector) GetMountMedium(path string, requestedMedium v1.StorageMedium) (v1.StorageMedium, bool, *resource.Quantity, error) {
+	return v1.StorageMediumDefault, false, nil, nil
 }

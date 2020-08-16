@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"fmt"
 	"net/http/httptest"
 	"sync"
@@ -25,7 +26,6 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -101,47 +101,6 @@ func newDeployment(name, ns string, replicas int32) *apps.Deployment {
 	}
 }
 
-func newReplicaSet(name, ns string, replicas int32) *apps.ReplicaSet {
-	return &apps.ReplicaSet{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ReplicaSet",
-			APIVersion: "apps/v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ns,
-			Name:      name,
-			Labels:    testLabels(),
-		},
-		Spec: apps.ReplicaSetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: testLabels(),
-			},
-			Replicas: &replicas,
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: testLabels(),
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  fakeContainerName,
-							Image: fakeImage,
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func newDeploymentRollback(name string, annotations map[string]string, revision int64) *extensions.DeploymentRollback {
-	return &extensions.DeploymentRollback{
-		Name:               name,
-		UpdatedAnnotations: annotations,
-		RollbackTo:         extensions.RollbackConfig{Revision: revision},
-	}
-}
-
 // dcSetup sets up necessities for Deployment integration test, including master, apiserver, informers, and clientset
 func dcSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
@@ -210,7 +169,7 @@ func (d *deploymentTester) waitForDeploymentRevisionAndImage(revision, image str
 
 func markPodReady(c clientset.Interface, ns string, pod *v1.Pod) error {
 	addPodConditionReady(pod, metav1.Now())
-	_, err := c.CoreV1().Pods(ns).UpdateStatus(pod)
+	_, err := c.CoreV1().Pods(ns).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 	return err
 }
 
@@ -251,12 +210,12 @@ func (d *deploymentTester) markUpdatedPodsReady(wg *sync.WaitGroup) {
 		return false, nil
 	})
 	if err != nil {
-		d.t.Fatalf("failed to mark updated Deployment pods to ready: %v", err)
+		d.t.Errorf("failed to mark updated Deployment pods to ready: %v", err)
 	}
 }
 
 func (d *deploymentTester) deploymentComplete() (bool, error) {
-	latest, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(d.deployment.Name, metav1.GetOptions{})
+	latest, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -330,7 +289,7 @@ func (d *deploymentTester) waitForObservedDeployment(desiredGeneration int64) er
 }
 
 func (d *deploymentTester) getNewReplicaSet() (*apps.ReplicaSet, error) {
-	deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(d.deployment.Name, metav1.GetOptions{})
+	deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving deployment %s: %v", d.deployment.Name, err)
 	}
@@ -367,20 +326,6 @@ func (d *deploymentTester) updateReplicaSet(name string, applyUpdate testutil.Up
 	return testutil.UpdateReplicaSetWithRetries(d.c, d.deployment.Namespace, name, applyUpdate, d.t.Logf, pollInterval, pollTimeout)
 }
 
-func (d *deploymentTester) updateReplicaSetStatus(name string, applyStatusUpdate testutil.UpdateReplicaSetFunc) (*apps.ReplicaSet, error) {
-	return testutil.UpdateReplicaSetStatusWithRetries(d.c, d.deployment.Namespace, name, applyStatusUpdate, d.t.Logf, pollInterval, pollTimeout)
-}
-
-// waitForDeploymentRollbackCleared waits for deployment either started rolling back or doesn't need to rollback.
-func (d *deploymentTester) waitForDeploymentRollbackCleared() error {
-	return testutil.WaitForDeploymentRollbackCleared(d.c, d.deployment.Namespace, d.deployment.Name, pollInterval, pollTimeout)
-}
-
-// checkDeploymentRevisionAndImage checks if the input deployment's and its new replica set's revision and image are as expected.
-func (d *deploymentTester) checkDeploymentRevisionAndImage(revision, image string) error {
-	return testutil.CheckDeploymentRevisionAndImage(d.c, d.deployment.Namespace, d.deployment.Name, revision, image)
-}
-
 func (d *deploymentTester) waitForDeploymentUpdatedReplicasGTE(minUpdatedReplicas int32) error {
 	return testutil.WaitForDeploymentUpdatedReplicasGTE(d.c, d.deployment.Namespace, d.deployment.Name, minUpdatedReplicas, d.deployment.Generation, pollInterval, pollTimeout)
 }
@@ -394,7 +339,7 @@ func (d *deploymentTester) listUpdatedPods() ([]v1.Pod, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse deployment selector: %v", err)
 	}
-	pods, err := d.c.CoreV1().Pods(d.deployment.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	pods, err := d.c.CoreV1().Pods(d.deployment.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list deployment pods, will retry later: %v", err)
 	}
@@ -446,7 +391,7 @@ func (d *deploymentTester) scaleDeployment(newReplicas int32) error {
 // waitForReadyReplicas waits for number of ready replicas to equal number of replicas.
 func (d *deploymentTester) waitForReadyReplicas() error {
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(d.deployment.Name, metav1.GetOptions{})
+		deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("failed to get deployment %q: %v", d.deployment.Name, err)
 		}
@@ -484,7 +429,7 @@ func (d *deploymentTester) markUpdatedPodsReadyWithoutComplete() error {
 // Verify all replicas fields of DeploymentStatus have desired count.
 // Immediately return an error when found a non-matching replicas field.
 func (d *deploymentTester) checkDeploymentStatusReplicasFields(replicas, updatedReplicas, readyReplicas, availableReplicas, unavailableReplicas int32) error {
-	deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(d.deployment.Name, metav1.GetOptions{})
+	deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get deployment %q: %v", d.deployment.Name, err)
 	}

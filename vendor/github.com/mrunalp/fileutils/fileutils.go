@@ -22,9 +22,10 @@ func CopyFile(source string, dest string) error {
 
 	uid := int(st.Uid)
 	gid := int(st.Gid)
+	modeType := si.Mode()&os.ModeType
 
 	// Handle symlinks
-	if si.Mode()&os.ModeSymlink != 0 {
+	if modeType == os.ModeSymlink {
 		target, err := os.Readlink(source)
 		if err != nil {
 			return err
@@ -35,15 +36,14 @@ func CopyFile(source string, dest string) error {
 	}
 
 	// Handle device files
-	if st.Mode&syscall.S_IFMT == syscall.S_IFBLK || st.Mode&syscall.S_IFMT == syscall.S_IFCHR {
+	if modeType == os.ModeDevice {
 		devMajor := int64(major(uint64(st.Rdev)))
 		devMinor := int64(minor(uint64(st.Rdev)))
-		mode := uint32(si.Mode() & 07777)
-		if st.Mode&syscall.S_IFMT == syscall.S_IFBLK {
-			mode |= syscall.S_IFBLK
-		}
-		if st.Mode&syscall.S_IFMT == syscall.S_IFCHR {
+		mode := uint32(si.Mode() & os.ModePerm)
+		if si.Mode()&os.ModeCharDevice != 0 {
 			mode |= syscall.S_IFCHR
+		} else {
+			mode |= syscall.S_IFBLK
 		}
 		if err := syscall.Mknod(dest, mode, int(mkdev(devMajor, devMinor))); err != nil {
 			return err
@@ -76,7 +76,7 @@ func CopyFile(source string, dest string) error {
 	}
 
 	// Chmod the file
-	if !(si.Mode()&os.ModeSymlink == os.ModeSymlink) {
+	if !(modeType == os.ModeSymlink) {
 		if err := os.Chmod(dest, si.Mode()); err != nil {
 			return err
 		}

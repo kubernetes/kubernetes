@@ -17,6 +17,7 @@ limitations under the License.
 package vsphere
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -25,6 +26,7 @@ import (
 	"github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -81,7 +83,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 			e2epv.DeletePersistentVolumeClaim(client, claim.Name, namespace)
 		}
 		ginkgo.By("Deleting StorageClass")
-		err = client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+		err = client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 	})
 
@@ -90,7 +92,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		ginkgo.By("Creating Storage Class")
 		scParameters := make(map[string]string)
 		scParameters["diskformat"] = "thin"
-		storageclass, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("thinsc", scParameters, nil, ""))
+		storageclass, err = client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("thinsc", scParameters, nil, ""), metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating PVCs using the Storage Class")

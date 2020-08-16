@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -67,8 +67,8 @@ type event struct {
 	gvk    schema.GroupVersionKind
 }
 
-// GraphBuilder: based on the events supplied by the informers, GraphBuilder updates
-// uidToNode, a graph that caches the dependencies as we know, and enqueues
+// GraphBuilder processes events supplied by the informers, updates uidToNode,
+// a graph that caches the dependencies as we know, and enqueues
 // items to the attemptToDelete and attemptToOrphan.
 type GraphBuilder struct {
 	restMapper meta.RESTMapper

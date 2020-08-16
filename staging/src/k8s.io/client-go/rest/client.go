@@ -94,6 +94,10 @@ type RESTClient struct {
 	// overridden.
 	rateLimiter flowcontrol.RateLimiter
 
+	// warningHandler is shared among all requests created by this client.
+	// If not set, defaultWarningHandler is used.
+	warningHandler WarningHandler
+
 	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
 	Client *http.Client
 }

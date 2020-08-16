@@ -20,18 +20,21 @@ package kuberuntime
 
 import (
 	"fmt"
-	"github.com/docker/docker/pkg/sysinfo"
+	"runtime"
 
 	"k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/securitycontext"
+
+	"k8s.io/klog/v2"
 )
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
-func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string) error {
+func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, _ *kubecontainer.ContainerID) error {
 	windowsConfig, err := m.generateWindowsContainerConfig(container, pod, uid, username)
 	if err != nil {
 		return err
@@ -49,7 +52,6 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 		SecurityContext: &runtimeapi.WindowsContainerSecurityContext{},
 	}
 
-	cpuRequest := container.Resources.Requests.Cpu()
 	cpuLimit := container.Resources.Limits.Cpu()
 	isolatedByHyperv := kubeletapis.ShouldIsolatedByHyperV(pod.Annotations)
 	if !cpuLimit.IsZero() {
@@ -57,7 +59,35 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 		// as only 64 processors are available for execution by a given process. This causes
 		// some oddities on systems with more than 64 processors.
 		// Refer https://msdn.microsoft.com/en-us/library/windows/desktop/dd405503(v=vs.85).aspx.
-		cpuMaximum := 10000 * cpuLimit.MilliValue() / int64(sysinfo.NumCPU()) / 1000
+
+		// Since Kubernetes doesn't have any notion of weight in the Pod/Container API, only limits/reserves, then applying CpuMaximum only
+		// will better follow the intent of the user. At one point CpuWeights were set, but this prevented limits from having any effect.
+
+		// There are 3 parts to how this works:
+		// Part one - Windows kernel
+		//   cpuMaximum is documented at https://docs.microsoft.com/en-us/virtualization/windowscontainers/manage-containers/resource-controls
+		//   the range and how it relates to number of CPUs is at https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_cpu_rate_control_information
+		//   For process isolation, these are applied to the job object setting JOB_OBJECT_CPU_RATE_CONTROL_ENABLE, which can be set to either
+		//   JOB_OBJECT_CPU_RATE_CONTROL_WEIGHT_BASED or JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP. This is why the settings are mutually exclusive.
+		// Part two - Docker (doc: https://docs.docker.com/engine/api/v1.30)
+		//   If both CpuWeight and CpuMaximum are passed to Docker, then it sets
+		//   JOB_OBJECT_CPU_RATE_CONTROL_ENABLE = JOB_OBJECT_CPU_RATE_CONTROL_WEIGHT_BASED ignoring CpuMaximum.
+		//   Option a: Set HostConfig.CpuPercent. The units are whole percent of the total CPU capacity of the system, meaning the resolution
+		//      is different based on the number of cores.
+		//   Option b: Set HostConfig.NanoCpus integer <int64> - CPU quota in units of 10e-9 CPUs. Moby scales this to the Windows job object
+		//      resolution of 1-10000, so it's higher resolution than option a.
+		//      src: https://github.com/moby/moby/blob/10866714412aea1bb587d1ad14b2ce1ba4cf4308/daemon/oci_windows.go#L426
+		// Part three - CRI & ContainerD's implementation
+		//   The kubelet sets these directly on CGroups in Linux, but needs to pass them across CRI on Windows.
+		//   There is an existing cpu_maximum field, with a range of percent * 100, so 1-10000. This is different from Docker, but consistent with OCI
+		//   https://github.com/kubernetes/kubernetes/blob/56d1c3b96d0a544130a82caad33dd57629b8a7f8/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2/api.proto#L681-L682
+		//   https://github.com/opencontainers/runtime-spec/blob/ad53dcdc39f1f7f7472b10aa0a45648fe4865496/config-windows.md#cpu
+		//   If both CpuWeight and CpuMaximum are set - ContainerD catches this invalid case and returns an error instead.
+
+		cpuMaximum := 10000 * cpuLimit.MilliValue() / int64(runtime.NumCPU()) / 1000
+
+		// TODO: This should be reviewed or removed once Hyper-V support is implemented with CRI-ContainerD
+		//       in a future release. cpuCount may or may not be required if cpuMaximum is set.
 		if isolatedByHyperv {
 			cpuCount := int64(cpuLimit.MilliValue()+999) / 1000
 			wc.Resources.CpuCount = cpuCount
@@ -76,11 +106,17 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 		wc.Resources.CpuMaximum = cpuMaximum
 	}
 
-	cpuShares := milliCPUToShares(cpuLimit.MilliValue(), isolatedByHyperv)
-	if cpuShares == 0 {
-		cpuShares = milliCPUToShares(cpuRequest.MilliValue(), isolatedByHyperv)
+	if !isolatedByHyperv {
+		// The processor resource controls are mutually exclusive on
+		// Windows Server Containers, the order of precedence is
+		// CPUCount first, then CPUMaximum.
+		if wc.Resources.CpuCount > 0 {
+			if wc.Resources.CpuMaximum > 0 {
+				wc.Resources.CpuMaximum = 0
+				klog.Warningf("Mutually exclusive options: CPUCount priority > CPUMaximum priority on Windows Server Containers. CPUMaximum should be ignored")
+			}
+		}
 	}
-	wc.Resources.CpuShares = cpuShares
 
 	memoryLimit := container.Resources.Limits.Memory().Value()
 	if memoryLimit != 0 {

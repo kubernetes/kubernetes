@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -76,7 +77,7 @@ func UpdatePVSize(
 		return fmt.Errorf("error Creating two way merge patch for PV %q with error : %v", pvClone.Name, err)
 	}
 
-	_, err = kubeClient.CoreV1().PersistentVolumes().Patch(pvClone.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = kubeClient.CoreV1().PersistentVolumes().Patch(context.TODO(), pvClone.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return fmt.Errorf("error Patching PV %q with error : %v", pvClone.Name, err)
 	}
@@ -171,7 +172,7 @@ func PatchPVCStatus(
 	}
 
 	updatedClaim, updateErr := kubeClient.CoreV1().PersistentVolumeClaims(oldPVC.Namespace).
-		Patch(oldPVC.Name, types.StrategicMergePatchType, patchBytes, "status")
+		Patch(context.TODO(), oldPVC.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	if updateErr != nil {
 		return nil, fmt.Errorf("patchPVCStatus failed to patch PVC %q: %v", oldPVC.Name, updateErr)
 	}

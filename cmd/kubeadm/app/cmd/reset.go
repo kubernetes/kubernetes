@@ -25,7 +25,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
@@ -94,7 +94,7 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 	client, err := getClientset(options.kubeconfigPath, false)
 	if err == nil {
 		klog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", options.kubeconfigPath)
-		cfg, err = configutil.FetchInitConfigurationFromCluster(client, out, "reset", false)
+		cfg, err = configutil.FetchInitConfigurationFromCluster(client, out, "reset", false, false)
 		if err != nil {
 			klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
 		}

@@ -18,17 +18,17 @@ package images
 
 import (
 	"fmt"
+	"time"
 
 	dockerref "github.com/docker/distribution/reference"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 // imageManager provides the functionalities for image pulling.
@@ -87,7 +87,7 @@ func (m *imageManager) logIt(ref *v1.ObjectReference, eventtype, event, prefix, 
 // EnsureImageExists pulls the image for the specified pod and container, and returns
 // (imageRef, error message, error).
 func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, string, error) {
-	logPrefix := fmt.Sprintf("%s/%s", pod.Name, container.Image)
+	logPrefix := fmt.Sprintf("%s/%s/%s", pod.Namespace, pod.Name, container.Image)
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		klog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
@@ -101,7 +101,18 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 		return "", msg, ErrInvalidImageName
 	}
 
-	spec := kubecontainer.ImageSpec{Image: image}
+	var podAnnotations []kubecontainer.Annotation
+	for k, v := range pod.GetAnnotations() {
+		podAnnotations = append(podAnnotations, kubecontainer.Annotation{
+			Name:  k,
+			Value: v,
+		})
+	}
+
+	spec := kubecontainer.ImageSpec{
+		Image:       image,
+		Annotations: podAnnotations,
+	}
 	imageRef, err := m.imageService.GetImageRef(spec)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)
@@ -128,6 +139,7 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 		return "", msg, ErrImagePullBackOff
 	}
 	m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q", container.Image), klog.Info)
+	startTime := time.Now()
 	pullChan := make(chan pullResult)
 	m.puller.pullImage(spec, pullSecrets, pullChan, podSandboxConfig)
 	imagePullResult := <-pullChan
@@ -141,7 +153,7 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 
 		return "", imagePullResult.err.Error(), ErrImagePull
 	}
-	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), klog.Info)
+	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q in %v", container.Image, time.Since(startTime)), klog.Info)
 	m.backOff.GC()
 	return imagePullResult.imageRef, "", nil
 }
@@ -161,7 +173,7 @@ func applyDefaultImageTag(image string) (string, error) {
 		// image to be fully qualified as docker.io/$name if it's a short name
 		// (e.g. just busybox). We don't want that to happen to keep the CRI
 		// agnostic wrt image names and default hostnames.
-		image = image + ":" + parsers.DefaultImageTag
+		image = image + ":latest"
 	}
 	return image, nil
 }

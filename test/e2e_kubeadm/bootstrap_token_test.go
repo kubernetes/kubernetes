@@ -17,6 +17,7 @@ limitations under the License.
 package kubeadm
 
 import (
+	"context"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,7 +51,7 @@ var _ = Describe("bootstrap token", func() {
 	ginkgo.It("should exist and be properly configured", func() {
 		secrets, err := f.ClientSet.CoreV1().
 			Secrets(kubeSystemNamespace).
-			List(metav1.ListOptions{})
+			List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "error reading Secrets")
 
 		tokenNum := 0

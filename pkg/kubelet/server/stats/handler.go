@@ -26,7 +26,9 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/klog"
+	cadvisorv2 "github.com/google/cadvisor/info/v2"
+	"github.com/pkg/errors"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,6 +77,9 @@ type Provider interface {
 	// containerName. If subcontainers is true, this function will return the
 	// information of all the sub-containers as well.
 	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
+	// GetRequestedContainersInfo returns the information of the container with
+	// the containerName, and with the specified cAdvisor options.
+	GetRequestedContainersInfo(containerName string, options cadvisorv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error)
 
 	// The following information is provided by Kubelet.
 	//
@@ -215,13 +220,16 @@ func (h *handler) handleStats(request *restful.Request, response *restful.Respon
 // If "only_cpu_and_memory" GET param is true then only cpu and memory is returned in response.
 func (h *handler) handleSummary(request *restful.Request, response *restful.Response) {
 	onlyCPUAndMemory := false
-	request.Request.ParseForm()
+	err := request.Request.ParseForm()
+	if err != nil {
+		handleError(response, "/stats/summary", errors.Wrapf(err, "parse form failed"))
+		return
+	}
 	if onlyCluAndMemoryParam, found := request.Request.Form["only_cpu_and_memory"]; found &&
 		len(onlyCluAndMemoryParam) == 1 && onlyCluAndMemoryParam[0] == "true" {
 		onlyCPUAndMemory = true
 	}
 	var summary *statsapi.Summary
-	var err error
 	if onlyCPUAndMemory {
 		summary, err = h.summaryProvider.GetCPUAndMemoryStats()
 	} else {

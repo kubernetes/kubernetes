@@ -33,7 +33,7 @@ type FakeExec struct {
 	// and with the exact same arguments
 	ExactOrder bool
 	// DisableScripts removes the requirement that a slice of FakeCommandAction be
-	// propulated before calling Command(). This makes the fakeexec (and subsequent
+	// populated before calling Command(). This makes the fakeexec (and subsequent
 	// calls to Run() or CombinedOutput() always return success and there is no
 	// ability to set their output.
 	DisableScripts bool

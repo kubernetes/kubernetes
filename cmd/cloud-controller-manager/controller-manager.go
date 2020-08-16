@@ -27,11 +27,8 @@ import (
 	"k8s.io/component-base/logs"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app"
 
-	_ "k8s.io/component-base/metrics/prometheus/version" // for version metric registration
-	// NOTE: Importing all in-tree cloud-providers is not required when
-	// implementing an out-of-tree cloud-provider.
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugins
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
 )
 
 func main() {

@@ -73,7 +73,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	defer os.Remove(wardleToKASKubeConfigFile)
 	wardleCertDir, _ := ioutil.TempDir("", "test-integration-wardle-server")
 	defer os.RemoveAll(wardleCertDir)
-	listener, wardlePort, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0")
+	listener, wardlePort, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0", net.ListenConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = aggregatorClient.ApiregistrationV1beta1().APIServices().Create(&apiregistrationv1beta1.APIService{
+	_, err = aggregatorClient.ApiregistrationV1beta1().APIServices().Create(context.TODO(), &apiregistrationv1beta1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1alpha1.wardle.example.com"},
 		Spec: apiregistrationv1beta1.APIServiceSpec{
 			Service: &apiregistrationv1beta1.ServiceReference{
@@ -124,7 +124,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 			GroupPriorityMinimum: 200,
 			VersionPriority:      200,
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,7 @@
 package(default_visibility = ["//visibility:public"])
 
 load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
+load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
 load(":code_generation_test.bzl", "code_generation_test_suite")
 load(":container.bzl", "multi_arch_container", "multi_arch_container_push")
 load(":platforms.bzl", "SERVER_PLATFORMS", "for_platforms")
@@ -19,9 +20,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//build/debs:all-srcs",
+        "//build/go-runner:all-srcs",
         "//build/release-tars:all-srcs",
-        "//build/rpms:all-srcs",
         "//build/visible_to:all-srcs",
     ],
     tags = ["automanaged"],
@@ -31,15 +31,15 @@ filegroup(
 # in build/common.sh.
 DOCKERIZED_BINARIES = {
     "kube-apiserver": {
-        "base": "@debian-base-{ARCH}//image",
+        "base": "@go-runner-linux-{ARCH}//image",
         "target": "//cmd/kube-apiserver:kube-apiserver",
     },
     "kube-controller-manager": {
-        "base": "@debian-base-{ARCH}//image",
+        "base": "@go-runner-linux-{ARCH}//image",
         "target": "//cmd/kube-controller-manager:kube-controller-manager",
     },
     "kube-scheduler": {
-        "base": "@debian-base-{ARCH}//image",
+        "base": "@go-runner-linux-{ARCH}//image",
         "target": "//cmd/kube-scheduler:kube-scheduler",
     },
     "kube-proxy": {
@@ -48,6 +48,15 @@ DOCKERIZED_BINARIES = {
     },
 }
 
+[pkg_tar(
+    name = "%s-data-%s.tar" % (binary, arch),
+    srcs = select({"@io_bazel_rules_go//go/platform:" + arch: ["//cmd/" + binary]}),
+    mode = "0755",
+    package_dir = "/usr/bin",
+    tags = ["manual"],
+    visibility = ["//visibility:private"],
+) for binary in DOCKERIZED_BINARIES.keys() for arch in SERVER_PLATFORMS["linux"]]
+
 # When pushing to gcr.io, we want to use an arch, since the archless name is now used for a
 # manifest list. Bazel doesn't support manifest lists (yet), so we can't do that either.
 [multi_arch_container(
@@ -55,10 +64,6 @@ DOCKERIZED_BINARIES = {
     architectures = SERVER_PLATFORMS["linux"],
     base = meta["base"],
     cmd = ["/usr/bin/" + binary],
-    debs = select(for_platforms(
-        for_server = ["//build/debs:%s-{ARCH}.deb" % binary],
-        only_os = "linux",
-    )),
     # Since the multi_arch_container macro replaces the {ARCH} format string,
     # we need to escape the stamping vars.
     docker_push_tags = ["{{STABLE_DOCKER_PUSH_REGISTRY}}/%s-{ARCH}:{{STABLE_DOCKER_TAG}}" % binary],
@@ -70,6 +75,10 @@ DOCKERIZED_BINARIES = {
         "/usr/local/bin/" + binary: "/usr/bin/" + binary,
     },
     tags = ["manual"],
+    tars = select(for_platforms(
+        for_server = [":%s-data-{ARCH}.tar" % binary],
+        only_os = "linux",
+    )),
     visibility = ["//visibility:private"],
 ) for binary, meta in DOCKERIZED_BINARIES.items()]
 

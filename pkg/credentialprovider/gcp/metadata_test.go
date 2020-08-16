@@ -45,7 +45,7 @@ func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
 	registryURL := "hello.kubernetes.io"
 	email := "foo@bar.baz"
 	username := "foo"
-	password := "bar"
+	password := "bar" // Fake value for testing.
 	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 	sampleDockerConfig := fmt.Sprintf(`{
    "https://%s": {
@@ -118,7 +118,7 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
 	registryURL := "hello.kubernetes.io"
 	email := "foo@bar.baz"
 	username := "foo"
-	password := "bar"
+	password := "bar" // Fake value for testing.
 	auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 	sampleDockerConfig := fmt.Sprintf(`{
    "https://%s": {
@@ -197,7 +197,7 @@ func TestContainerRegistryBasics(t *testing.T) {
 	for _, registryURL := range registryURLs {
 		t.Run(registryURL, func(t *testing.T) {
 			email := "1234@project.gserviceaccount.com"
-			token := &tokenBlob{AccessToken: "ya26.lots-of-indiscernible-garbage"}
+			token := &tokenBlob{AccessToken: "ya26.lots-of-indiscernible-garbage"} // Fake value for testing.
 
 			const (
 				serviceAccountsEndpoint = "/computeMetadata/v1/instance/service-accounts/"

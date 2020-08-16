@@ -25,9 +25,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 
@@ -35,9 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
@@ -65,13 +62,13 @@ const (
 
 // The constants are used to map from the machine type (number of CPUs) to the limit of
 // persistent disks that can be attached to an instance. Please refer to gcloud doc
-// https://cloud.google.com/compute/docs/disks/#increased_persistent_disk_limits
+// https://cloud.google.com/compute/docs/machine-types
 // These constants are all the documented attach limit minus one because the
 // node boot disk is considered an attachable disk so effective attach limit is
 // one less.
 const (
 	volumeLimitSmall = 15
-	VolumeLimitBig   = 127
+	volumeLimitBig   = 127
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -149,12 +146,14 @@ func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, erro
 		klog.Errorf("Failed to get instance type from GCE cloud provider")
 		return volumeLimits, nil
 	}
-	if strings.HasPrefix(instanceType, "n1-") || strings.HasPrefix(instanceType, "custom-") {
-		volumeLimits[util.GCEVolumeLimitKey] = VolumeLimitBig
-	} else {
-		volumeLimits[util.GCEVolumeLimitKey] = volumeLimitSmall
+	smallMachineTypes := []string{"f1-micro", "g1-small", "e2-micro", "e2-small", "e2-medium"}
+	for _, small := range smallMachineTypes {
+		if instanceType == small {
+			volumeLimits[util.GCEVolumeLimitKey] = volumeLimitSmall
+			return volumeLimits, nil
+		}
 	}
-
+	volumeLimits[util.GCEVolumeLimitKey] = volumeLimitBig
 	return volumeLimits, nil
 }
 
@@ -430,7 +429,7 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, mounterArgs.FsGroup)
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	}
 	return nil
 }
@@ -499,13 +498,10 @@ func (c *gcePersistentDiskProvisioner) Provision(selectedNode *v1.Node, allowedT
 		fstype = "ext4"
 	}
 
-	var volumeMode *v1.PersistentVolumeMode
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		volumeMode = c.options.PVC.Spec.VolumeMode
-		if volumeMode != nil && *volumeMode == v1.PersistentVolumeBlock {
-			// Block volumes should not have any FSType
-			fstype = ""
-		}
+	volumeMode := c.options.PVC.Spec.VolumeMode
+	if volumeMode != nil && *volumeMode == v1.PersistentVolumeBlock {
+		// Block volumes should not have any FSType
+		fstype = ""
 	}
 
 	pv := &v1.PersistentVolume{

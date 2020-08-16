@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	time "time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,13 +62,13 @@ func NewFilteredTestTypeInformer(client versioned.Interface, namespace string, r
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ThirdExampleV1().TestTypes(namespace).List(options)
+				return client.ThirdExampleV1().TestTypes(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ThirdExampleV1().TestTypes(namespace).Watch(options)
+				return client.ThirdExampleV1().TestTypes(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&example3iov1.TestType{},

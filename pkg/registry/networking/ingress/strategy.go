@@ -18,17 +18,18 @@ package ingress
 
 import (
 	"context"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/networking/validation"
 )
 
-// ingressStrategy implements verification logic for Replication Ingresss.
+// ingressStrategy implements verification logic for Replication Ingress.
 type ingressStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
@@ -67,11 +68,14 @@ func (ingressStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 
 }
 
-// Validate validates a new Ingress.
+// Validate validates ingresses on create.
 func (ingressStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
+	var requestGV schema.GroupVersion
+	if requestInfo, ok := request.RequestInfoFrom(ctx); ok {
+		requestGV = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+	}
 	ingress := obj.(*networking.Ingress)
-	err := validation.ValidateIngress(ingress)
-	return err
+	return validation.ValidateIngressCreate(ingress, requestGV)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -83,11 +87,13 @@ func (ingressStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-// ValidateUpdate is the default update validation for an end user.
+// ValidateUpdate validates ingresses on update.
 func (ingressStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidateIngress(obj.(*networking.Ingress))
-	updateErrorList := validation.ValidateIngressUpdate(obj.(*networking.Ingress), old.(*networking.Ingress))
-	return append(validationErrorList, updateErrorList...)
+	var requestGV schema.GroupVersion
+	if requestInfo, ok := request.RequestInfoFrom(ctx); ok {
+		requestGV = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+	}
+	return validation.ValidateIngressUpdate(obj.(*networking.Ingress), old.(*networking.Ingress), requestGV)
 }
 
 // AllowUnconditionalUpdate is the default update policy for Ingress objects.

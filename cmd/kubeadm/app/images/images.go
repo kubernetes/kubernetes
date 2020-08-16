@@ -19,7 +19,7 @@ package images
 import (
 	"fmt"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -73,20 +73,18 @@ func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	}
 	// Etcd uses an imageTag that corresponds to the etcd version matching the Kubernetes version
 	etcdImageTag := constants.DefaultEtcdVersion
-	etcdVersion, err := constants.EtcdSupportedVersion(cfg.KubernetesVersion)
+	etcdVersion, warning, err := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, cfg.KubernetesVersion)
 	if err == nil {
 		etcdImageTag = etcdVersion.String()
+	}
+	if warning != nil {
+		klog.Warningln(warning)
 	}
 	// unless an override is specified
 	if cfg.Etcd.Local != nil && cfg.Etcd.Local.ImageTag != "" {
 		etcdImageTag = cfg.Etcd.Local.ImageTag
 	}
 	return GetGenericImage(etcdImageRepository, constants.Etcd, etcdImageTag)
-}
-
-// GetPauseImage returns the image for the "pause" container
-func GetPauseImage(cfg *kubeadmapi.ClusterConfiguration) string {
-	return GetGenericImage(cfg.ImageRepository, "pause", constants.PauseVersion)
 }
 
 // GetControlPlaneImages returns a list of container images kubeadm expects to use on a control plane node

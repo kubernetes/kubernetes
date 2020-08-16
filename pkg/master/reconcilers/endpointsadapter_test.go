@@ -17,6 +17,7 @@ limitations under the License.
 package reconcilers
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -83,7 +84,7 @@ func TestEndpointsAdapterGet(t *testing.T) {
 			}
 
 			for _, endpoints := range testCase.endpoints {
-				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(endpoints)
+				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error creating Endpoints: %v", err)
 				}
@@ -181,7 +182,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 			}
 
 			for _, endpoints := range testCase.endpoints {
-				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(endpoints)
+				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error creating Endpoints: %v", err)
 				}
@@ -197,7 +198,7 @@ func TestEndpointsAdapterCreate(t *testing.T) {
 				t.Errorf("Expected endpoints: %v, got: %v", testCase.expectedEndpoints, endpoints)
 			}
 
-			epSliceList, err := client.DiscoveryV1beta1().EndpointSlices(testCase.namespaceParam).List(metav1.ListOptions{})
+			epSliceList, err := client.DiscoveryV1beta1().EndpointSlices(testCase.namespaceParam).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("Error listing Endpoint Slices: %v", err)
 			}
@@ -292,7 +293,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 			}
 
 			for _, endpoints := range testCase.endpoints {
-				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(endpoints)
+				_, err := client.CoreV1().Endpoints(endpoints.Namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error creating Endpoints: %v", err)
 				}
@@ -308,7 +309,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 				t.Errorf("Expected endpoints: %v, got: %v", testCase.expectedEndpoints, endpoints)
 			}
 
-			epSliceList, err := client.DiscoveryV1beta1().EndpointSlices(testCase.namespaceParam).List(metav1.ListOptions{})
+			epSliceList, err := client.DiscoveryV1beta1().EndpointSlices(testCase.namespaceParam).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("Error listing Endpoint Slices: %v", err)
 			}
@@ -434,7 +435,7 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 			}
 
 			for _, endpointSlice := range testCase.endpointSlices {
-				_, err := client.DiscoveryV1beta1().EndpointSlices(endpointSlice.Namespace).Create(endpointSlice)
+				_, err := client.DiscoveryV1beta1().EndpointSlices(endpointSlice.Namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error creating EndpointSlice: %v", err)
 				}
@@ -445,7 +446,7 @@ func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
 				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
 			}
 
-			endpointSlice, err := client.DiscoveryV1beta1().EndpointSlices(testCase.namespaceParam).Get(testCase.endpointsParam.Name, metav1.GetOptions{})
+			endpointSlice, err := client.DiscoveryV1beta1().EndpointSlices(testCase.namespaceParam).Get(context.TODO(), testCase.endpointsParam.Name, metav1.GetOptions{})
 			if err != nil && !errors.IsNotFound(err) {
 				t.Fatalf("Error getting Endpoint Slice: %v", err)
 			}

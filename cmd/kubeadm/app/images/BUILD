@@ -8,14 +8,23 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["images.go"],
+    srcs = [
+        "images.go",
+        "images_unix.go",
+        "images_windows.go",
+    ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/images",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
-    ],
+        "//vendor/k8s.io/klog/v2:go_default_library",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//cmd/kubeadm/app/apis/kubeadm/v1beta2:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(

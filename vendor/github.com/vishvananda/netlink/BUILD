@@ -11,6 +11,7 @@ go_library(
         "class_linux.go",
         "conntrack_linux.go",
         "conntrack_unspecified.go",
+        "devlink_linux.go",
         "filter.go",
         "filter_linux.go",
         "fou.go",
@@ -30,11 +31,14 @@ go_library(
         "netlink.go",
         "netlink_linux.go",
         "netlink_unspecified.go",
+        "netns_linux.go",
+        "netns_unspecified.go",
         "order.go",
         "protinfo.go",
         "protinfo_linux.go",
         "qdisc.go",
         "qdisc_linux.go",
+        "rdma_link_linux.go",
         "route.go",
         "route_linux.go",
         "route_unspecified.go",
@@ -56,6 +60,9 @@ go_library(
         "//vendor/github.com/vishvananda/netlink/nl:go_default_library",
         "//vendor/golang.org/x/sys/unix:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//vendor/github.com/vishvananda/netns:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/github.com/vishvananda/netns:go_default_library",
         ],
@@ -68,7 +75,13 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/github.com/vishvananda/netns:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//vendor/github.com/vishvananda/netns:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/github.com/vishvananda/netns:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
             "//vendor/github.com/vishvananda/netns:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [

@@ -30,7 +30,7 @@ import (
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // NameSystems returns the name system used by the generators in this package.
@@ -258,8 +258,10 @@ func (g *listerGenerator) GenerateType(c *generator.Context, t *types.Type, w io
 
 var typeListerInterface = `
 // $.type|public$Lister helps list $.type|publicPlural$.
+// All objects returned here must be treated as read-only.
 type $.type|public$Lister interface {
 	// List lists all $.type|publicPlural$ in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*$.type|raw$, err error)
 	// $.type|publicPlural$ returns an object that can list and get $.type|publicPlural$.
 	$.type|publicPlural$(namespace string) $.type|public$NamespaceLister
@@ -269,10 +271,13 @@ type $.type|public$Lister interface {
 
 var typeListerInterface_NonNamespaced = `
 // $.type|public$Lister helps list $.type|publicPlural$.
+// All objects returned here must be treated as read-only.
 type $.type|public$Lister interface {
 	// List lists all $.type|publicPlural$ in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*$.type|raw$, err error)
 	// Get retrieves the $.type|public$ from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*$.type|raw$, error)
 	$.type|public$ListerExpansion
 }
@@ -325,10 +330,13 @@ func (s *$.type|private$Lister) Get(name string) (*$.type|raw$, error) {
 
 var namespaceListerInterface = `
 // $.type|public$NamespaceLister helps list and get $.type|publicPlural$.
+// All objects returned here must be treated as read-only.
 type $.type|public$NamespaceLister interface {
 	// List lists all $.type|publicPlural$ in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*$.type|raw$, err error)
 	// Get retrieves the $.type|public$ from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*$.type|raw$, error)
 	$.type|public$NamespaceListerExpansion
 }

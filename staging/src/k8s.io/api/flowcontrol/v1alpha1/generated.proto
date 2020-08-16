@@ -40,17 +40,17 @@ message FlowDistinguisherMethod {
 // similar attributes and is identified by a pair of strings: the name of the FlowSchema and a "flow distinguisher".
 message FlowSchema {
   // `metadata` is the standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // `spec` is the specification of the desired behavior of a FlowSchema.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional FlowSchemaSpec spec = 2;
 
   // `status` is the current status of a FlowSchema.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional FlowSchemaStatus status = 3;
 }
@@ -79,12 +79,11 @@ message FlowSchemaCondition {
 // FlowSchemaList is a list of FlowSchema objects.
 message FlowSchemaList {
   // `metadata` is the standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // `items` is a list of FlowSchemas.
-  // +listType=atomic
   repeated FlowSchema items = 2;
 }
 
@@ -231,17 +230,17 @@ message PolicyRulesWithSubjects {
 // PriorityLevelConfiguration represents the configuration of a priority level.
 message PriorityLevelConfiguration {
   // `metadata` is the standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // `spec` is the specification of the desired behavior of a "request-priority".
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional PriorityLevelConfigurationSpec spec = 2;
 
   // `status` is the current status of a "request-priority".
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional PriorityLevelConfigurationStatus status = 3;
 }
@@ -270,12 +269,11 @@ message PriorityLevelConfigurationCondition {
 // PriorityLevelConfigurationList is a list of PriorityLevelConfiguration objects.
 message PriorityLevelConfigurationList {
   // `metadata` is the standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // `items` is a list of request-priorities.
-  // +listType=atomic
   repeated PriorityLevelConfiguration items = 2;
 }
 

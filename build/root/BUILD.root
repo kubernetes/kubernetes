@@ -17,6 +17,7 @@
 package(default_visibility = ["//visibility:public"])
 
 load("@io_k8s_repo_infra//defs:build.bzl", "gcs_upload")
+load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
 load("//build:platforms.bzl", "for_platforms")
 
 filegroup(
@@ -25,7 +26,6 @@ filegroup(
         for_client = ["//build:client-targets-and-hashes"],
         for_node = [
             "//build:node-targets-and-hashes",
-            "//build/debs:debs-and-hashes",
         ],
         for_server = [
             "//build:docker-artifacts-and-hashes",
@@ -124,4 +124,19 @@ platform(
       }
       {PARENT_REMOTE_EXECUTION_PROPERTIES}
     """,
+)
+
+pkg_tar(
+    name = "LICENSES",
+    srcs = glob(
+        ["LICENSES/**/LICENSE"],
+        allow_empty = False,
+        exclude_directories = 0,
+    ),
+    mode = "0755",
+    strip_prefix = "//",
+    tags = [
+        "manual",
+        "no-cache",
+    ],
 )

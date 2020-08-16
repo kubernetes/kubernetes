@@ -96,6 +96,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 	out.BindAddress = in.BindAddress
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
+	out.BindAddressHardFail = in.BindAddressHardFail
 	out.EnableProfiling = in.EnableProfiling
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HostnameOverride = in.HostnameOverride
@@ -121,6 +122,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 		return err
 	}
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
+	out.DetectLocalMode = config.LocalMode(in.DetectLocalMode)
 	return nil
 }
 
@@ -134,6 +136,7 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 	out.BindAddress = in.BindAddress
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
+	out.BindAddressHardFail = in.BindAddressHardFail
 	out.EnableProfiling = in.EnableProfiling
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HostnameOverride = in.HostnameOverride
@@ -159,6 +162,7 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 		return err
 	}
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
+	out.DetectLocalMode = v1alpha1.LocalMode(in.DetectLocalMode)
 	return nil
 }
 

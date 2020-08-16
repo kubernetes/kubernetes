@@ -21,7 +21,7 @@ package vmclient
 import (
 	"context"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
@@ -45,4 +45,7 @@ type Interface interface {
 
 	// Update updates a VirtualMachine.
 	Update(ctx context.Context, resourceGroupName string, VMName string, parameters compute.VirtualMachineUpdate, source string) *retry.Error
+
+	// Delete deletes a VirtualMachine.
+	Delete(ctx context.Context, resourceGroupName string, VMName string) *retry.Error
 }

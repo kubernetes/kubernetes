@@ -196,7 +196,7 @@ func createPods(ifCreateNewPods bool) (map[string]corev1.Pod, []corev1.Pod) {
 	for i := 0; i < 8; i++ {
 		var uid types.UID
 		if ifCreateNewPods {
-			uid = types.UID(i)
+			uid = types.UID(strconv.Itoa(i))
 		} else {
 			uid = types.UID(strconv.Itoa(i) + strconv.Itoa(i))
 		}
@@ -241,7 +241,7 @@ func addEvictionSupport(t *testing.T, k *fake.Clientset) {
 		eviction := *action.(ktest.CreateAction).GetObject().(*policyv1beta1.Eviction)
 		// Avoid the lock
 		go func() {
-			err := k.CoreV1().Pods(eviction.Namespace).Delete(eviction.Name, &metav1.DeleteOptions{})
+			err := k.CoreV1().Pods(eviction.Namespace).Delete(context.TODO(), eviction.Name, metav1.DeleteOptions{})
 			if err != nil {
 				// Errorf because we can't call Fatalf from another goroutine
 				t.Errorf("failed to delete pod: %s/%s", eviction.Namespace, eviction.Name)
@@ -356,7 +356,7 @@ func TestDeleteOrEvict(t *testing.T) {
 			// Test that other pods are still there
 			var remainingPods []string
 			{
-				podList, err := k.CoreV1().Pods("").List(metav1.ListOptions{})
+				podList, err := k.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
 					t.Fatalf("error listing pods: %v", err)
 				}

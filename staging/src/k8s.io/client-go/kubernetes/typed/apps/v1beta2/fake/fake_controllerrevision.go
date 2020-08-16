@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -39,7 +41,7 @@ var controllerrevisionsResource = schema.GroupVersionResource{Group: "apps", Ver
 var controllerrevisionsKind = schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "ControllerRevision"}
 
 // Get takes name of the controllerRevision, and returns the corresponding controllerRevision object, and an error if there is any.
-func (c *FakeControllerRevisions) Get(name string, options v1.GetOptions) (result *v1beta2.ControllerRevision, err error) {
+func (c *FakeControllerRevisions) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta2.ControllerRevision, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(controllerrevisionsResource, c.ns, name), &v1beta2.ControllerRevision{})
 
@@ -50,7 +52,7 @@ func (c *FakeControllerRevisions) Get(name string, options v1.GetOptions) (resul
 }
 
 // List takes label and field selectors, and returns the list of ControllerRevisions that match those selectors.
-func (c *FakeControllerRevisions) List(opts v1.ListOptions) (result *v1beta2.ControllerRevisionList, err error) {
+func (c *FakeControllerRevisions) List(ctx context.Context, opts v1.ListOptions) (result *v1beta2.ControllerRevisionList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(controllerrevisionsResource, controllerrevisionsKind, c.ns, opts), &v1beta2.ControllerRevisionList{})
 
@@ -72,14 +74,14 @@ func (c *FakeControllerRevisions) List(opts v1.ListOptions) (result *v1beta2.Con
 }
 
 // Watch returns a watch.Interface that watches the requested controllerRevisions.
-func (c *FakeControllerRevisions) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeControllerRevisions) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(controllerrevisionsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a controllerRevision and creates it.  Returns the server's representation of the controllerRevision, and an error, if there is any.
-func (c *FakeControllerRevisions) Create(controllerRevision *v1beta2.ControllerRevision) (result *v1beta2.ControllerRevision, err error) {
+func (c *FakeControllerRevisions) Create(ctx context.Context, controllerRevision *v1beta2.ControllerRevision, opts v1.CreateOptions) (result *v1beta2.ControllerRevision, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(controllerrevisionsResource, c.ns, controllerRevision), &v1beta2.ControllerRevision{})
 
@@ -90,7 +92,7 @@ func (c *FakeControllerRevisions) Create(controllerRevision *v1beta2.ControllerR
 }
 
 // Update takes the representation of a controllerRevision and updates it. Returns the server's representation of the controllerRevision, and an error, if there is any.
-func (c *FakeControllerRevisions) Update(controllerRevision *v1beta2.ControllerRevision) (result *v1beta2.ControllerRevision, err error) {
+func (c *FakeControllerRevisions) Update(ctx context.Context, controllerRevision *v1beta2.ControllerRevision, opts v1.UpdateOptions) (result *v1beta2.ControllerRevision, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(controllerrevisionsResource, c.ns, controllerRevision), &v1beta2.ControllerRevision{})
 
@@ -101,7 +103,7 @@ func (c *FakeControllerRevisions) Update(controllerRevision *v1beta2.ControllerR
 }
 
 // Delete takes name of the controllerRevision and deletes it. Returns an error if one occurs.
-func (c *FakeControllerRevisions) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeControllerRevisions) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(controllerrevisionsResource, c.ns, name), &v1beta2.ControllerRevision{})
 
@@ -109,15 +111,15 @@ func (c *FakeControllerRevisions) Delete(name string, options *v1.DeleteOptions)
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeControllerRevisions) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(controllerrevisionsResource, c.ns, listOptions)
+func (c *FakeControllerRevisions) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(controllerrevisionsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta2.ControllerRevisionList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched controllerRevision.
-func (c *FakeControllerRevisions) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta2.ControllerRevision, err error) {
+func (c *FakeControllerRevisions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.ControllerRevision, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(controllerrevisionsResource, c.ns, name, pt, data, subresources...), &v1beta2.ControllerRevision{})
 

@@ -17,11 +17,12 @@ limitations under the License.
 package ipam
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -124,7 +125,7 @@ func listNodes(kubeClient clientset.Interface) (*v1.NodeList, error) {
 	// controller manager to restart.
 	if pollErr := wait.Poll(10*time.Second, apiserverStartupGracePeriod, func() (bool, error) {
 		var err error
-		nodeList, err = kubeClient.CoreV1().Nodes().List(metav1.ListOptions{
+		nodeList, err = kubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 			FieldSelector: fields.Everything().String(),
 			LabelSelector: labels.Everything().String(),
 		})

@@ -17,13 +17,13 @@ limitations under the License.
 package endpointslice
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	k8stesting "k8s.io/client-go/testing"
-	compmetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	utilpointer "k8s.io/utils/pointer"
@@ -61,6 +61,7 @@ func TestReconcileEmpty(t *testing.T) {
 	assert.Equal(t, svc.Name, slices[0].Labels[discovery.LabelServiceName])
 	assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
 	assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
+	expectTrackedResourceVersion(t, r.endpointSliceTracker, &slices[0], "100")
 	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0})
 }
 
@@ -189,6 +190,8 @@ func TestReconcile1Pod(t *testing.T) {
 				t.Errorf("Expected endpoint: %+v, got: %+v", testCase.expectedEndpoint, endpoint)
 			}
 
+			expectTrackedResourceVersion(t, r.endpointSliceTracker, &slice, "100")
+
 			expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 1, addedPerSync: 1, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0})
 		})
 	}
@@ -203,7 +206,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 	endpointSlice1 := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
 
-	_, createErr := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(endpointSlice1)
+	_, createErr := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(context.TODO(), endpointSlice1, metav1.CreateOptions{})
 	assert.Nil(t, createErr, "Expected no error creating endpoint slice")
 
 	numActionsBefore := len(client.Actions())
@@ -220,6 +223,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 	assert.Equal(t, svc.Name, slices[0].Labels[discovery.LabelServiceName])
 	assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
 	assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
+	expectTrackedResourceVersion(t, r.endpointSliceTracker, &slices[0], "200")
 	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 1, numDeleted: 0})
 }
 
@@ -738,6 +742,164 @@ func TestReconcileEndpointSlicesMetrics(t *testing.T) {
 	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 10, addedPerSync: 20, removedPerSync: 10, numCreated: 1, numUpdated: 1, numDeleted: 0})
 }
 
+// When a Service has a non-nil deletionTimestamp we want to avoid creating any
+// new EndpointSlices but continue to allow updates and deletes through. This
+// test uses 3 EndpointSlices, 1 "to-create", 1 "to-update", and 1 "to-delete".
+// Each test case exercises different combinations of calls to finalize with
+// those resources.
+func TestReconcilerFinalizeSvcDeletionTimestamp(t *testing.T) {
+	now := metav1.Now()
+
+	testCases := []struct {
+		name               string
+		deletionTimestamp  *metav1.Time
+		attemptCreate      bool
+		attemptUpdate      bool
+		attemptDelete      bool
+		expectCreatedSlice bool
+		expectUpdatedSlice bool
+		expectDeletedSlice bool
+	}{{
+		name:               "Attempt create and update, nil deletion timestamp",
+		deletionTimestamp:  nil,
+		attemptCreate:      true,
+		attemptUpdate:      true,
+		expectCreatedSlice: true,
+		expectUpdatedSlice: true,
+		expectDeletedSlice: true,
+	}, {
+		name:               "Attempt create and update, deletion timestamp set",
+		deletionTimestamp:  &now,
+		attemptCreate:      true,
+		attemptUpdate:      true,
+		expectCreatedSlice: false,
+		expectUpdatedSlice: true,
+		expectDeletedSlice: true,
+	}, {
+		// Slice scheduled for creation is transitioned to update of Slice
+		// scheduled for deletion.
+		name:               "Attempt create, update, and delete, nil deletion timestamp, recycling in action",
+		deletionTimestamp:  nil,
+		attemptCreate:      true,
+		attemptUpdate:      true,
+		attemptDelete:      true,
+		expectCreatedSlice: false,
+		expectUpdatedSlice: true,
+		expectDeletedSlice: true,
+	}, {
+		// Slice scheduled for creation is transitioned to update of Slice
+		// scheduled for deletion.
+		name:               "Attempt create, update, and delete, deletion timestamp set, recycling in action",
+		deletionTimestamp:  &now,
+		attemptCreate:      true,
+		attemptUpdate:      true,
+		attemptDelete:      true,
+		expectCreatedSlice: false,
+		expectUpdatedSlice: true,
+		expectDeletedSlice: true,
+	}, {
+		// Update and delete continue to work when deletionTimestamp is set.
+		name:               "Attempt update delete, deletion timestamp set",
+		deletionTimestamp:  &now,
+		attemptCreate:      false,
+		attemptUpdate:      true,
+		attemptDelete:      true,
+		expectCreatedSlice: false,
+		expectUpdatedSlice: true,
+		expectDeletedSlice: false,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			client := newClientset()
+			setupMetrics()
+			r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+
+			namespace := "test"
+			svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
+			svc.DeletionTimestamp = tc.deletionTimestamp
+			esToCreate := &discovery.EndpointSlice{
+				ObjectMeta:  metav1.ObjectMeta{Name: "to-create"},
+				AddressType: endpointMeta.AddressType,
+				Ports:       endpointMeta.Ports,
+			}
+
+			// Add EndpointSlice that can be updated.
+			esToUpdate, err := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(context.TODO(), &discovery.EndpointSlice{
+				ObjectMeta:  metav1.ObjectMeta{Name: "to-update"},
+				AddressType: endpointMeta.AddressType,
+				Ports:       endpointMeta.Ports,
+			}, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Expected no error creating EndpointSlice during test setup, got %v", err)
+			}
+			// Add an endpoint so we can see if this has actually been updated by
+			// finalize func.
+			esToUpdate.Endpoints = []discovery.Endpoint{{Addresses: []string{"10.2.3.4"}}}
+
+			// Add EndpointSlice that can be deleted.
+			esToDelete, err := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(context.TODO(), &discovery.EndpointSlice{
+				ObjectMeta:  metav1.ObjectMeta{Name: "to-delete"},
+				AddressType: endpointMeta.AddressType,
+				Ports:       endpointMeta.Ports,
+			}, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Expected no error creating EndpointSlice during test setup, got %v", err)
+			}
+
+			slicesToCreate := []*discovery.EndpointSlice{}
+			if tc.attemptCreate {
+				slicesToCreate = append(slicesToCreate, esToCreate.DeepCopy())
+			}
+			slicesToUpdate := []*discovery.EndpointSlice{}
+			if tc.attemptUpdate {
+				slicesToUpdate = append(slicesToUpdate, esToUpdate.DeepCopy())
+			}
+			slicesToDelete := []*discovery.EndpointSlice{}
+			if tc.attemptDelete {
+				slicesToDelete = append(slicesToDelete, esToDelete.DeepCopy())
+			}
+
+			err = r.finalize(&svc, slicesToCreate, slicesToUpdate, slicesToDelete, time.Now())
+			if err != nil {
+				t.Errorf("Error calling r.finalize(): %v", err)
+			}
+
+			fetchedSlices := fetchEndpointSlices(t, client, namespace)
+
+			createdSliceFound := false
+			updatedSliceFound := false
+			deletedSliceFound := false
+			for _, epSlice := range fetchedSlices {
+				if epSlice.Name == esToCreate.Name {
+					createdSliceFound = true
+				}
+				if epSlice.Name == esToUpdate.Name {
+					updatedSliceFound = true
+					if tc.attemptUpdate && len(epSlice.Endpoints) != len(esToUpdate.Endpoints) {
+						t.Errorf("Expected EndpointSlice to be updated with %d endpoints, got %d endpoints", len(esToUpdate.Endpoints), len(epSlice.Endpoints))
+					}
+				}
+				if epSlice.Name == esToDelete.Name {
+					deletedSliceFound = true
+				}
+			}
+
+			if createdSliceFound != tc.expectCreatedSlice {
+				t.Errorf("Expected created EndpointSlice existence to be %t, got %t", tc.expectCreatedSlice, createdSliceFound)
+			}
+
+			if updatedSliceFound != tc.expectUpdatedSlice {
+				t.Errorf("Expected updated EndpointSlice existence to be %t, got %t", tc.expectUpdatedSlice, updatedSliceFound)
+			}
+
+			if deletedSliceFound != tc.expectDeletedSlice {
+				t.Errorf("Expected deleted EndpointSlice existence to be %t, got %t", tc.expectDeletedSlice, deletedSliceFound)
+			}
+		})
+	}
+}
+
 // Test Helpers
 
 func newReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPerSlice int32) *reconciler {
@@ -820,6 +982,17 @@ func expectActions(t *testing.T, actions []k8stesting.Action, num int, verb, res
 	}
 }
 
+func expectTrackedResourceVersion(t *testing.T, tracker *endpointSliceTracker, slice *discovery.EndpointSlice, expectedRV string) {
+	rrv, _ := tracker.relatedResourceVersions(slice)
+	rv, tracked := rrv[slice.Name]
+	if !tracked {
+		t.Fatalf("Expected EndpointSlice %s to be tracked", slice.Name)
+	}
+	if rv != expectedRV {
+		t.Errorf("Expected ResourceVersion of %s to be %s, got %s", slice.Name, expectedRV, rv)
+	}
+}
+
 func portsAndAddressTypeEqual(slice1, slice2 discovery.EndpointSlice) bool {
 	return apiequality.Semantic.DeepEqual(slice1.Ports, slice2.Ports) && apiequality.Semantic.DeepEqual(slice1.AddressType, slice2.AddressType)
 }
@@ -827,7 +1000,7 @@ func portsAndAddressTypeEqual(slice1, slice2 discovery.EndpointSlice) bool {
 func createEndpointSlices(t *testing.T, client *fake.Clientset, namespace string, endpointSlices []*discovery.EndpointSlice) {
 	t.Helper()
 	for _, endpointSlice := range endpointSlices {
-		_, err := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(endpointSlice)
+		_, err := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Expected no error creating Endpoint Slice, got: %v", err)
 		}
@@ -836,7 +1009,7 @@ func createEndpointSlices(t *testing.T, client *fake.Clientset, namespace string
 
 func fetchEndpointSlices(t *testing.T, client *fake.Clientset, namespace string) []discovery.EndpointSlice {
 	t.Helper()
-	fetchedSlices, err := client.DiscoveryV1beta1().EndpointSlices(namespace).List(metav1.ListOptions{})
+	fetchedSlices, err := client.DiscoveryV1beta1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error fetching Endpoint Slices, got: %v", err)
 		return []discovery.EndpointSlice{}
@@ -868,44 +1041,58 @@ type expectedMetrics struct {
 func expectMetrics(t *testing.T, em expectedMetrics) {
 	t.Helper()
 
-	actualDesiredSlices := getGaugeMetricValue(t, metrics.DesiredEndpointSlices.WithLabelValues())
+	actualDesiredSlices, err := testutil.GetGaugeMetricValue(metrics.DesiredEndpointSlices.WithLabelValues())
+	handleErr(t, err, "desiredEndpointSlices")
 	if actualDesiredSlices != float64(em.desiredSlices) {
 		t.Errorf("Expected desiredEndpointSlices to be %d, got %v", em.desiredSlices, actualDesiredSlices)
 	}
 
-	actualNumSlices := getGaugeMetricValue(t, metrics.NumEndpointSlices.WithLabelValues())
+	actualNumSlices, err := testutil.GetGaugeMetricValue(metrics.NumEndpointSlices.WithLabelValues())
+	handleErr(t, err, "numEndpointSlices")
 	if actualDesiredSlices != float64(em.desiredSlices) {
 		t.Errorf("Expected numEndpointSlices to be %d, got %v", em.actualSlices, actualNumSlices)
 	}
 
-	actualEndpointsDesired := getGaugeMetricValue(t, metrics.EndpointsDesired.WithLabelValues())
+	actualEndpointsDesired, err := testutil.GetGaugeMetricValue(metrics.EndpointsDesired.WithLabelValues())
+	handleErr(t, err, "desiredEndpoints")
 	if actualEndpointsDesired != float64(em.desiredEndpoints) {
 		t.Errorf("Expected desiredEndpoints to be %d, got %v", em.desiredEndpoints, actualEndpointsDesired)
 	}
 
-	actualAddedPerSync := getHistogramMetricValue(t, metrics.EndpointsAddedPerSync.WithLabelValues())
+	actualAddedPerSync, err := testutil.GetHistogramMetricValue(metrics.EndpointsAddedPerSync.WithLabelValues())
+	handleErr(t, err, "endpointsAddedPerSync")
 	if actualAddedPerSync != float64(em.addedPerSync) {
 		t.Errorf("Expected endpointsAddedPerSync to be %d, got %v", em.addedPerSync, actualAddedPerSync)
 	}
 
-	actualRemovedPerSync := getHistogramMetricValue(t, metrics.EndpointsRemovedPerSync.WithLabelValues())
+	actualRemovedPerSync, err := testutil.GetHistogramMetricValue(metrics.EndpointsRemovedPerSync.WithLabelValues())
+	handleErr(t, err, "endpointsRemovedPerSync")
 	if actualRemovedPerSync != float64(em.removedPerSync) {
 		t.Errorf("Expected endpointsRemovedPerSync to be %d, got %v", em.removedPerSync, actualRemovedPerSync)
 	}
 
-	actualCreated := getCounterMetricValue(t, metrics.EndpointSliceChanges.WithLabelValues("create"))
+	actualCreated, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("create"))
+	handleErr(t, err, "endpointSliceChangesCreated")
 	if actualCreated != float64(em.numCreated) {
 		t.Errorf("Expected endpointSliceChangesCreated to be %d, got %v", em.numCreated, actualCreated)
 	}
 
-	actualUpdated := getCounterMetricValue(t, metrics.EndpointSliceChanges.WithLabelValues("update"))
+	actualUpdated, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("update"))
+	handleErr(t, err, "endpointSliceChangesUpdated")
 	if actualUpdated != float64(em.numUpdated) {
 		t.Errorf("Expected endpointSliceChangesUpdated to be %d, got %v", em.numUpdated, actualUpdated)
 	}
 
-	actualDeleted := getCounterMetricValue(t, metrics.EndpointSliceChanges.WithLabelValues("delete"))
+	actualDeleted, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("delete"))
+	handleErr(t, err, "desiredEndpointSlices")
 	if actualDeleted != float64(em.numDeleted) {
 		t.Errorf("Expected endpointSliceChangesDeleted to be %d, got %v", em.numDeleted, actualDeleted)
+	}
+}
+
+func handleErr(t *testing.T, err error, metricName string) {
+	if err != nil {
+		t.Errorf("Failed to get %s value, err: %v", metricName, err)
 	}
 }
 
@@ -919,31 +1106,4 @@ func setupMetrics() {
 	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "create"})
 	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "update"})
 	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "delete"})
-}
-
-func getGaugeMetricValue(t *testing.T, metric compmetrics.GaugeMetric) float64 {
-	t.Helper()
-	metricProto := &dto.Metric{}
-	if err := metric.Write(metricProto); err != nil {
-		t.Errorf("Error writing metric: %v", err)
-	}
-	return metricProto.Gauge.GetValue()
-}
-
-func getCounterMetricValue(t *testing.T, metric compmetrics.CounterMetric) float64 {
-	t.Helper()
-	metricProto := &dto.Metric{}
-	if err := metric.(compmetrics.Metric).Write(metricProto); err != nil {
-		t.Errorf("Error writing metric: %v", err)
-	}
-	return metricProto.Counter.GetValue()
-}
-
-func getHistogramMetricValue(t *testing.T, metric compmetrics.ObserverMetric) float64 {
-	t.Helper()
-	metricProto := &dto.Metric{}
-	if err := metric.(compmetrics.Metric).Write(metricProto); err != nil {
-		t.Errorf("Error writing metric: %v", err)
-	}
-	return metricProto.Histogram.GetSampleSum()
 }

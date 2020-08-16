@@ -24,6 +24,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 )
 
 const (
@@ -87,7 +89,7 @@ type InstanceMetadata struct {
 // InstanceMetadataService knows how to query the Azure instance metadata server.
 type InstanceMetadataService struct {
 	metadataURL string
-	imsCache    *timedCache
+	imsCache    *azcache.TimedCache
 }
 
 // NewInstanceMetadataService creates an instance of the InstanceMetadataService accessor object.
@@ -96,7 +98,7 @@ func NewInstanceMetadataService(metadataURL string) (*InstanceMetadataService, e
 		metadataURL: metadataURL,
 	}
 
-	imsCache, err := newTimedcache(metadataCacheTTL, ims.getInstanceMetadata)
+	imsCache, err := azcache.NewTimedcache(metadataCacheTTL, ims.getInstanceMetadata)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +147,7 @@ func (ims *InstanceMetadataService) getInstanceMetadata(key string) (interface{}
 
 // GetMetadata gets instance metadata from cache.
 // crt determines if we can get data from stalled cache/need fresh if cache expired.
-func (ims *InstanceMetadataService) GetMetadata(crt cacheReadType) (*InstanceMetadata, error) {
+func (ims *InstanceMetadataService) GetMetadata(crt azcache.AzureCacheReadType) (*InstanceMetadata, error) {
 	cache, err := ims.imsCache.Get(metadataCacheKey, crt)
 	if err != nil {
 		return nil, err

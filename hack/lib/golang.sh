@@ -49,7 +49,6 @@ readonly KUBE_SUPPORTED_CLIENT_PLATFORMS=(
   linux/s390x
   linux/ppc64le
   darwin/amd64
-  darwin/386
   windows/amd64
   windows/386
 )
@@ -76,6 +75,7 @@ kube::golang::server_targets() {
     cmd/kubelet
     cmd/kubeadm
     cmd/kube-scheduler
+    vendor/k8s.io/kube-aggregator
     vendor/k8s.io/apiextensions-apiserver
     cluster/gce/gci/mounter
   )
@@ -465,9 +465,9 @@ EOF
   fi
 
   local go_version
-  IFS=" " read -ra go_version <<< "$(go version)"
+  IFS=" " read -ra go_version <<< "$(GOFLAGS='' go version)"
   local minimum_go_version
-  minimum_go_version=go1.13.4
+  minimum_go_version=go1.15.0
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
@@ -674,6 +674,9 @@ kube::golang::build_some_binaries() {
 }
 
 kube::golang::build_binaries_for_platform() {
+  # This is for sanity.  Without it, user umasks can leak through.
+  umask 0022
+
   local platform=$1
 
   local -a statics=()
@@ -774,7 +777,7 @@ kube::golang::build_binaries() {
   (
     # Check for `go` binary and set ${GOPATH}.
     kube::golang::setup_env
-    V=2 kube::log::info "Go version: $(go version)"
+    V=2 kube::log::info "Go version: $(GOFLAGS='' go version)"
 
     local host_platform
     host_platform=$(kube::golang::host_platform)
@@ -784,7 +787,7 @@ kube::golang::build_binaries() {
     # Disable SC2153 for this, as it will throw a warning that the local
     # variable goldflags will exist, and it suggest changing it to this.
     # shellcheck disable=SC2153
-    goldflags="${GOLDFLAGS=-s -w} $(kube::version::ldflags)"
+    goldflags="${GOLDFLAGS=-s -w -buildid=} $(kube::version::ldflags)"
     goasmflags="-trimpath=${KUBE_ROOT}"
     gogcflags="${GOGCFLAGS:-} -trimpath=${KUBE_ROOT}"
 

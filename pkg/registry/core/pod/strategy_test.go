@@ -18,11 +18,14 @@ package pod
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,8 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 
 	// ensure types are installed
@@ -319,6 +326,7 @@ func (g mockPodGetter) Get(context.Context, string, *metav1.GetOptions) (runtime
 }
 
 func TestCheckLogLocation(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 	ctx := genericapirequest.NewDefaultContext()
 	fakePodName := "test"
 	tcs := []struct {
@@ -405,7 +413,28 @@ func TestCheckLogLocation(t *testing.T) {
 				Status: api.PodStatus{},
 			},
 			opts:              &api.PodLogOptions{},
-			expectedErr:       errors.NewBadRequest("a container name must be specified for pod test, choose one of: [container1 container2] or one of the init containers: [initcontainer1]"),
+			expectedErr:       errors.NewBadRequest("a container name must be specified for pod test, choose one of: [initcontainer1 container1 container2]"),
+			expectedTransport: nil,
+		},
+		{
+			in: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: fakePodName},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "container1"},
+						{Name: "container2"},
+					},
+					InitContainers: []api.Container{
+						{Name: "initcontainer1"},
+					},
+					EphemeralContainers: []api.EphemeralContainer{
+						{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "debugger"}},
+					},
+				},
+				Status: api.PodStatus{},
+			},
+			opts:              &api.PodLogOptions{},
+			expectedErr:       errors.NewBadRequest("a container name must be specified for pod test, choose one of: [initcontainer1 container1 container2 debugger]"),
 			expectedTransport: nil,
 		},
 		{
@@ -454,12 +483,12 @@ func TestCheckLogLocation(t *testing.T) {
 				InsecureSkipTLSVerifyTransport: fakeInsecureRoundTripper,
 			}}
 
-			_, actualTransport, err := LogLocation(getter, connectionGetter, ctx, fakePodName, tc.opts)
+			_, actualTransport, err := LogLocation(ctx, getter, connectionGetter, fakePodName, tc.opts)
 			if !reflect.DeepEqual(err, tc.expectedErr) {
-				t.Errorf("expected %v, got %v", tc.expectedErr, err)
+				t.Errorf("expected %q, got %q", tc.expectedErr, err)
 			}
 			if actualTransport != tc.expectedTransport {
-				t.Errorf("expected %v, got %v", tc.expectedTransport, actualTransport)
+				t.Errorf("expected %q, got %q", tc.expectedTransport, actualTransport)
 			}
 		})
 	}
@@ -469,7 +498,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		"v1",
 		"Pod",
-		PodToSelectableFields(&api.Pod{}),
+		ToSelectableFields(&api.Pod{}),
 		nil,
 	)
 }
@@ -530,7 +559,7 @@ func TestPortForwardLocation(t *testing.T) {
 	for _, tc := range tcs {
 		getter := &mockPodGetter{tc.in}
 		connectionGetter := &mockConnectionInfoGetter{tc.info}
-		loc, _, err := PortForwardLocation(getter, connectionGetter, ctx, "test", tc.opts)
+		loc, _, err := PortForwardLocation(ctx, getter, connectionGetter, "test", tc.opts)
 		if !reflect.DeepEqual(err, tc.expectedErr) {
 			t.Errorf("expected %v, got %v", tc.expectedErr, err)
 		}
@@ -629,3 +658,448 @@ var (
 	fakeSecureRoundTripper   = fakeTransport{val: "secure"}
 	fakeInsecureRoundTripper = fakeTransport{val: "insecure"}
 )
+
+func TestPodIndexFunc(t *testing.T) {
+	tcs := []struct {
+		name          string
+		indexFunc     cache.IndexFunc
+		pod           interface{}
+		expectedValue string
+		expectedErr   error
+	}{
+		{
+			name:      "node name index",
+			indexFunc: NodeNameIndexFunc,
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					NodeName: "test-pod",
+				},
+			},
+			expectedValue: "test-pod",
+			expectedErr:   nil,
+		},
+		{
+			name:          "not a pod failed",
+			indexFunc:     NodeNameIndexFunc,
+			pod:           "not a pod object",
+			expectedValue: "test-pod",
+			expectedErr:   fmt.Errorf("not a pod"),
+		},
+	}
+
+	for _, tc := range tcs {
+		indexValues, err := tc.indexFunc(tc.pod)
+		if !reflect.DeepEqual(err, tc.expectedErr) {
+			t.Errorf("name %v, expected %v, got %v", tc.name, tc.expectedErr, err)
+		}
+		if err == nil && len(indexValues) != 1 && indexValues[0] != tc.expectedValue {
+			t.Errorf("name %v, expected %v, got %v", tc.name, tc.expectedValue, indexValues)
+		}
+
+	}
+}
+func TestApplySeccompVersionSkew(t *testing.T) {
+	const containerName = "container"
+	testProfile := "test"
+
+	for _, test := range []struct {
+		description string
+		pod         *api.Pod
+		validation  func(*testing.T, *api.Pod)
+	}{
+		{
+			description: "Security context nil",
+			pod:         &api.Pod{},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.NotNil(t, pod)
+			},
+		},
+		{
+			description: "Security context not nil",
+			pod: &api.Pod{
+				Spec: api.PodSpec{SecurityContext: &api.PodSecurityContext{}},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.NotNil(t, pod)
+			},
+		},
+		{
+			description: "Field type unconfined and no annotation present",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						SeccompProfile: &api.SeccompProfile{
+							Type: api.SeccompProfileTypeUnconfined,
+						},
+					},
+				},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Len(t, pod.Annotations, 1)
+				require.Equal(t, v1.SeccompProfileNameUnconfined, pod.Annotations[api.SeccompPodAnnotationKey])
+			},
+		},
+		{
+			description: "Field type default and no annotation present",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						SeccompProfile: &api.SeccompProfile{
+							Type: api.SeccompProfileTypeRuntimeDefault,
+						},
+					},
+				},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Len(t, pod.Annotations, 1)
+				require.Equal(t, v1.SeccompProfileRuntimeDefault, pod.Annotations[v1.SeccompPodAnnotationKey])
+			},
+		},
+		{
+			description: "Field type localhost and no annotation present",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						SeccompProfile: &api.SeccompProfile{
+							Type:             api.SeccompProfileTypeLocalhost,
+							LocalhostProfile: &testProfile,
+						},
+					},
+				},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Len(t, pod.Annotations, 1)
+				require.Equal(t, "localhost/test", pod.Annotations[v1.SeccompPodAnnotationKey])
+			},
+		},
+		{
+			description: "Field type localhost but profile is nil",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						SeccompProfile: &api.SeccompProfile{
+							Type: api.SeccompProfileTypeLocalhost,
+						},
+					},
+				},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Len(t, pod.Annotations, 0)
+			},
+		},
+		{
+			description: "Annotation 'unconfined' and no field present",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						v1.SeccompPodAnnotationKey: v1.SeccompProfileNameUnconfined,
+					},
+				},
+				Spec: api.PodSpec{},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Equal(t, api.SeccompProfileTypeUnconfined, pod.Spec.SecurityContext.SeccompProfile.Type)
+				require.Nil(t, pod.Spec.SecurityContext.SeccompProfile.LocalhostProfile)
+			},
+		},
+		{
+			description: "Annotation 'runtime/default' and no field present",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						v1.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
+					},
+				},
+				Spec: api.PodSpec{SecurityContext: &api.PodSecurityContext{}},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Equal(t, api.SeccompProfileTypeRuntimeDefault, pod.Spec.SecurityContext.SeccompProfile.Type)
+				require.Nil(t, pod.Spec.SecurityContext.SeccompProfile.LocalhostProfile)
+			},
+		},
+		{
+			description: "Annotation 'docker/default' and no field present",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						v1.SeccompPodAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
+					},
+				},
+				Spec: api.PodSpec{SecurityContext: &api.PodSecurityContext{}},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Equal(t, api.SeccompProfileTypeRuntimeDefault, pod.Spec.SecurityContext.SeccompProfile.Type)
+				require.Nil(t, pod.Spec.SecurityContext.SeccompProfile.LocalhostProfile)
+			},
+		},
+		{
+			description: "Annotation 'localhost/test' and no field present",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						v1.SeccompPodAnnotationKey: v1.SeccompLocalhostProfileNamePrefix + testProfile,
+					},
+				},
+				Spec: api.PodSpec{SecurityContext: &api.PodSecurityContext{}},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Equal(t, api.SeccompProfileTypeLocalhost, pod.Spec.SecurityContext.SeccompProfile.Type)
+				require.Equal(t, testProfile, *pod.Spec.SecurityContext.SeccompProfile.LocalhostProfile)
+			},
+		},
+		{
+			description: "Annotation 'localhost/' has zero length",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						v1.SeccompPodAnnotationKey: v1.SeccompLocalhostProfileNamePrefix,
+					},
+				},
+				Spec: api.PodSpec{SecurityContext: &api.PodSecurityContext{}},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Nil(t, pod.Spec.SecurityContext.SeccompProfile)
+			},
+		},
+		{
+			description: "Security context nil (container)",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{}},
+				},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.NotNil(t, pod)
+			},
+		},
+		{
+			description: "Security context not nil (container)",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						SecurityContext: &api.SecurityContext{},
+					}},
+				},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.NotNil(t, pod)
+			},
+		},
+		{
+			description: "Field type unconfined and no annotation present (container)",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: containerName,
+							SecurityContext: &api.SecurityContext{
+								SeccompProfile: &api.SeccompProfile{
+									Type: api.SeccompProfileTypeUnconfined,
+								},
+							},
+						},
+					},
+				},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Len(t, pod.Annotations, 1)
+				require.Equal(t, v1.SeccompProfileNameUnconfined, pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName])
+			},
+		},
+		{
+			description: "Field type runtime/default and no annotation present (container)",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: containerName,
+							SecurityContext: &api.SecurityContext{
+								SeccompProfile: &api.SeccompProfile{
+									Type: api.SeccompProfileTypeRuntimeDefault,
+								},
+							},
+						},
+					},
+				},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Len(t, pod.Annotations, 1)
+				require.Equal(t, v1.SeccompProfileRuntimeDefault, pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName])
+			},
+		},
+		{
+			description: "Field type localhost and no annotation present (container)",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: containerName,
+							SecurityContext: &api.SecurityContext{
+								SeccompProfile: &api.SeccompProfile{
+									Type:             api.SeccompProfileTypeLocalhost,
+									LocalhostProfile: &testProfile,
+								},
+							},
+						},
+					},
+				},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Len(t, pod.Annotations, 1)
+				require.Equal(t, "localhost/test", pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName])
+			},
+		},
+		{
+			description: "Multiple containers with fields (container)",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name: containerName + "1",
+							SecurityContext: &api.SecurityContext{
+								SeccompProfile: &api.SeccompProfile{
+									Type: api.SeccompProfileTypeUnconfined,
+								},
+							},
+						},
+						{
+							Name: containerName + "2",
+						},
+						{
+							Name: containerName + "3",
+							SecurityContext: &api.SecurityContext{
+								SeccompProfile: &api.SeccompProfile{
+									Type: api.SeccompProfileTypeRuntimeDefault,
+								},
+							},
+						},
+					},
+				},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Len(t, pod.Annotations, 2)
+				require.Equal(t, v1.SeccompProfileNameUnconfined, pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName+"1"])
+				require.Equal(t, v1.SeccompProfileRuntimeDefault, pod.Annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName+"3"])
+			},
+		},
+		{
+			description: "Annotation 'unconfined' and no field present (container)",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						v1.SeccompContainerAnnotationKeyPrefix + containerName: v1.SeccompProfileNameUnconfined,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name: containerName,
+					}},
+				},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Equal(t, api.SeccompProfileTypeUnconfined, pod.Spec.Containers[0].SecurityContext.SeccompProfile.Type)
+				require.Nil(t, pod.Spec.Containers[0].SecurityContext.SeccompProfile.LocalhostProfile)
+			},
+		},
+		{
+			description: "Annotation 'runtime/default' and no field present (container)",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						v1.SeccompContainerAnnotationKeyPrefix + containerName: v1.SeccompProfileRuntimeDefault,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:            containerName,
+						SecurityContext: &api.SecurityContext{},
+					}},
+				},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Equal(t, api.SeccompProfileTypeRuntimeDefault, pod.Spec.Containers[0].SecurityContext.SeccompProfile.Type)
+				require.Nil(t, pod.Spec.Containers[0].SecurityContext.SeccompProfile.LocalhostProfile)
+			},
+		},
+		{
+			description: "Annotation 'docker/default' and no field present (container)",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						v1.SeccompContainerAnnotationKeyPrefix + containerName: v1.DeprecatedSeccompProfileDockerDefault,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:            containerName,
+						SecurityContext: &api.SecurityContext{},
+					}},
+				},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Equal(t, api.SeccompProfileTypeRuntimeDefault, pod.Spec.Containers[0].SecurityContext.SeccompProfile.Type)
+				require.Nil(t, pod.Spec.Containers[0].SecurityContext.SeccompProfile.LocalhostProfile)
+			},
+		},
+		{
+			description: "Multiple containers by annotations (container)",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						v1.SeccompContainerAnnotationKeyPrefix + containerName + "1": v1.SeccompLocalhostProfileNamePrefix + testProfile,
+						v1.SeccompContainerAnnotationKeyPrefix + containerName + "3": v1.SeccompProfileRuntimeDefault,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: containerName + "1"},
+						{Name: containerName + "2"},
+						{Name: containerName + "3"},
+					},
+				},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Equal(t, api.SeccompProfileTypeLocalhost, pod.Spec.Containers[0].SecurityContext.SeccompProfile.Type)
+				require.Equal(t, testProfile, *pod.Spec.Containers[0].SecurityContext.SeccompProfile.LocalhostProfile)
+				require.Equal(t, api.SeccompProfileTypeRuntimeDefault, pod.Spec.Containers[2].SecurityContext.SeccompProfile.Type)
+			},
+		},
+		{
+			description: "Annotation 'localhost/test' and no field present (container)",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						v1.SeccompContainerAnnotationKeyPrefix + containerName: v1.SeccompLocalhostProfileNamePrefix + testProfile,
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Name:            containerName,
+						SecurityContext: &api.SecurityContext{},
+					}},
+				},
+			},
+			validation: func(t *testing.T, pod *api.Pod) {
+				require.Equal(t, api.SeccompProfileTypeLocalhost, pod.Spec.Containers[0].SecurityContext.SeccompProfile.Type)
+				require.Equal(t, testProfile, *pod.Spec.Containers[0].SecurityContext.SeccompProfile.LocalhostProfile)
+			},
+		},
+	} {
+		output := &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
+		}
+		for i, ctr := range test.pod.Spec.Containers {
+			output.Spec.Containers = append(output.Spec.Containers, api.Container{})
+			if ctr.SecurityContext != nil && ctr.SecurityContext.SeccompProfile != nil {
+				output.Spec.Containers[i].SecurityContext = &api.SecurityContext{
+					SeccompProfile: &api.SeccompProfile{
+						Type:             api.SeccompProfileType(ctr.SecurityContext.SeccompProfile.Type),
+						LocalhostProfile: ctr.SecurityContext.SeccompProfile.LocalhostProfile,
+					},
+				}
+			}
+		}
+		applySeccompVersionSkew(test.pod)
+		test.validation(t, test.pod)
+	}
+}

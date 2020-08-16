@@ -18,7 +18,7 @@ limitations under the License.
 
 package eviction
 
-import "k8s.io/klog"
+import "k8s.io/klog/v2"
 
 // NewCgroupNotifier creates a cgroup notifier that does nothing because cgroups do not exist on non-linux systems.
 func NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier, error) {

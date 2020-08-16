@@ -1,0 +1,17 @@
+language: go
+
+go:
+  - "1.12.x"
+
+install:
+  - go get -u github.com/vbatts/git-validation
+  - go get -u github.com/kunalkushwaha/ltag
+  - go get -t ./...
+
+before_script:
+  - pushd ..; git clone https://github.com/containerd/project; popd
+
+script:
+  - DCO_VERBOSITY=-q ../project/script/validate/dco
+  - ../project/script/validate/fileheader ../project/
+  - go test -race -v ./...

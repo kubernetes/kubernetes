@@ -86,20 +86,6 @@ func (r *Result) PrintTo(writer io.Writer) error {
 	return err
 }
 
-// String returns a formatted string in the form of "[IP4: $1,][ IP6: $2,] DNS: $3" where
-// $1 represents the receiver's IPv4, $2 represents the receiver's IPv6 and $3 the
-// receiver's DNS. If $1 or $2 are nil, they won't be present in the returned string.
-func (r *Result) String() string {
-	var str string
-	if r.IP4 != nil {
-		str = fmt.Sprintf("IP4:%+v, ", *r.IP4)
-	}
-	if r.IP6 != nil {
-		str += fmt.Sprintf("IP6:%+v, ", *r.IP6)
-	}
-	return fmt.Sprintf("%sDNS:%+v", str, r.DNS)
-}
-
 // IPConfig contains values necessary to configure an interface
 type IPConfig struct {
 	IP      net.IPNet

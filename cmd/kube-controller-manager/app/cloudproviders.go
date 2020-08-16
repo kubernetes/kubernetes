@@ -19,7 +19,7 @@ package app
 import (
 	"fmt"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/client-go/informers"
 	cloudprovider "k8s.io/cloud-provider"
@@ -41,6 +41,8 @@ func createCloudProvider(cloudProvider string, externalCloudVolumePlugin string,
 		}
 		cloud, err = cloudprovider.InitCloudProvider(externalCloudVolumePlugin, cloudConfigFile)
 	} else {
+		cloudprovider.DeprecationWarningForProvider(cloudProvider)
+
 		loopMode = IncludeCloudLoops
 		cloud, err = cloudprovider.InitCloudProvider(cloudProvider, cloudConfigFile)
 	}

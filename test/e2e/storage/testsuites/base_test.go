@@ -19,14 +19,14 @@ package testsuites
 import (
 	"testing"
 
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 )
 
 // getSizeRangesIntersection takes two instances of storage size ranges and determines the
 // intersection of the intervals (if it exists) and return the minimum of the intersection
 // to be used as the claim size for the test.
 // if value not set, that means there's no minimum or maximum size limitation and we set default size for it.
-// Considerate all corner case as followed：
+// Considerate all corner case as followed:
 // first: A,B is regular value and ? means unspecified
 // second: C,D is regular value and ? means unspecified
 // ----------------------------------------------------------------
@@ -43,8 +43,8 @@ import (
 // |---------------------------------------------------------------|
 func Test_getSizeRangesIntersection(t *testing.T) {
 	type args struct {
-		first  volume.SizeRange
-		second volume.SizeRange
+		first  e2evolume.SizeRange
+		second e2evolume.SizeRange
 	}
 	tests := []struct {
 		name    string
@@ -55,10 +55,10 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #1: first{min=A,max=?} second{min=C,max=?} where C > A ",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Min: "10Gi",
 				},
 			},
@@ -68,10 +68,10 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #1: first{min=A,max=?} second{min=C,max=?} where C < A ",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Min: "1Gi",
 				},
 			},
@@ -81,10 +81,10 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #2: first{min=A,max=?} second{min=C,max=D} where A > D ",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Min: "1Gi",
 					Max: "4Gi",
 				},
@@ -95,11 +95,11 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #2: first{min=A,max=?} second{min=C,max=D} where D > A > C ",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 					Max: "",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Min: "3Gi",
 					Max: "10Gi",
 				},
@@ -110,11 +110,11 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #2: first{min=A,max=?} second{min=C,max=D} where A < C ",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 					Max: "",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Min: "6Gi",
 					Max: "10Gi",
 				},
@@ -125,11 +125,11 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #3: first{min=A,max=?} second{min=?,max=D} where A > D",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 					Max: "",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Max: "1Gi",
 				},
 			},
@@ -139,11 +139,11 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #3: first{min=A,max=?} second{min=?,max=D} where A < D",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 					Max: "",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Max: "10Gi",
 				},
 			},
@@ -153,11 +153,11 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #4: first{min=A,max=?} second{min=?,max=?} ",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 					Max: "",
 				},
-				second: volume.SizeRange{},
+				second: e2evolume.SizeRange{},
 			},
 			want:    "5Gi",
 			wantErr: false,
@@ -166,11 +166,11 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #5: first{min=A,max=B} second{min=C,max=?} where C < A ",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 					Max: "10Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Min: "1Gi",
 				},
 			},
@@ -180,11 +180,11 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #5: first{min=A,max=B} second{min=C,max=?} where B > C > A ",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 					Max: "10Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Min: "6Gi",
 				},
 			},
@@ -194,11 +194,11 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #5: first{min=A,max=B} second{min=C,max=?} where C > B ",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 					Max: "10Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Min: "15Gi",
 				},
 			},
@@ -208,11 +208,11 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #6: first{min=A,max=B} second{min=C,max=D} where A < B < C < D",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 					Max: "6Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Min: "7Gi",
 					Max: "8Gi",
 				},
@@ -223,11 +223,11 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #6: first{min=A,max=B} second{min=C,max=D} where A < C < B < D ",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 					Max: "10Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Min: "8Gi",
 					Max: "15Gi",
 				},
@@ -238,11 +238,11 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #7: first{min=A,max=B} second{min=?,max=D} where D < A",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 					Max: "10Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Max: "3Gi",
 				},
 			},
@@ -252,11 +252,11 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #7: first{min=A,max=B} second{min=?,max=D} where B > D > A",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 					Max: "10Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Max: "8Gi",
 				},
 			},
@@ -266,11 +266,11 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #7: first{min=A,max=B} second{min=?,max=D} where D > B",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 					Max: "10Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Max: "15Gi",
 				},
 			},
@@ -280,11 +280,11 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #8: first{min=A,max=B} second{min=?,max=?}",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Min: "5Gi",
 					Max: "10Gi",
 				},
-				second: volume.SizeRange{},
+				second: e2evolume.SizeRange{},
 			},
 			want:    "5Gi",
 			wantErr: false,
@@ -292,10 +292,10 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #9: first{min=?,max=B} second{min=C,max=?} where C > B",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Max: "5Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Min: "10Gi",
 				},
 			},
@@ -305,10 +305,10 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #9: first{min=?,max=B} second{min=C,max=?} where C < B",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Max: "10Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Min: "5Gi",
 				},
 			},
@@ -318,10 +318,10 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #10: first{min=?,max=B} second{min=C,max=D} where B > D",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Max: "10Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Min: "1Gi",
 					Max: "5Gi",
 				},
@@ -332,10 +332,10 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #10: first{min=?,max=B} second{min=C,max=D} where C < B < D",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Max: "10Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Min: "5Gi",
 					Max: "15Gi",
 				},
@@ -346,10 +346,10 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #10: first{min=?,max=B} second{min=C,max=D} where B < C",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Max: "10Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Min: "15Gi",
 					Max: "20Gi",
 				},
@@ -360,10 +360,10 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #11: first{min=?,max=B} second{min=?,max=D} where D < B",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Max: "10Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Max: "5Gi",
 				},
 			},
@@ -373,10 +373,10 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #11: first{min=?,max=B} second{min=?,max=D} where D > B",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Max: "10Gi",
 				},
-				second: volume.SizeRange{
+				second: e2evolume.SizeRange{
 					Max: "15Gi",
 				},
 			},
@@ -386,10 +386,10 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #12: first{min=?,max=B} second{min=?,max=?} ",
 			args: args{
-				first: volume.SizeRange{
+				first: e2evolume.SizeRange{
 					Max: "10Gi",
 				},
-				second: volume.SizeRange{},
+				second: e2evolume.SizeRange{},
 			},
 			want:    minValidSize,
 			wantErr: false,
@@ -397,8 +397,8 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #13: first{min=?,max=?} second{min=C,max=?} ",
 			args: args{
-				first: volume.SizeRange{},
-				second: volume.SizeRange{
+				first: e2evolume.SizeRange{},
+				second: e2evolume.SizeRange{
 					Min: "5Gi",
 				},
 			},
@@ -408,8 +408,8 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #14: first{min=?,max=?} second{min=C,max=D} where C < D",
 			args: args{
-				first: volume.SizeRange{},
-				second: volume.SizeRange{
+				first: e2evolume.SizeRange{},
+				second: e2evolume.SizeRange{
 					Min: "5Gi",
 					Max: "10Gi",
 				},
@@ -420,8 +420,8 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #14: first{min=?,max=?} second{min=C,max=D} where C > D",
 			args: args{
-				first: volume.SizeRange{},
-				second: volume.SizeRange{
+				first: e2evolume.SizeRange{},
+				second: e2evolume.SizeRange{
 					Min: "10Gi",
 					Max: "5Gi",
 				},
@@ -432,8 +432,8 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #14: first{min=?,max=?} second{min=C,max=D} where C = D",
 			args: args{
-				first: volume.SizeRange{},
-				second: volume.SizeRange{
+				first: e2evolume.SizeRange{},
+				second: e2evolume.SizeRange{
 					Min: "1Mi",
 					Max: "1Mi",
 				},
@@ -444,8 +444,8 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #15: first{min=?,max=?} second{min=?,max=D}",
 			args: args{
-				first: volume.SizeRange{},
-				second: volume.SizeRange{
+				first: e2evolume.SizeRange{},
+				second: e2evolume.SizeRange{
 					Max: "10Gi",
 				},
 			},
@@ -455,8 +455,8 @@ func Test_getSizeRangesIntersection(t *testing.T) {
 		{
 			name: "case #16: first{min=?,max=?} second{min=?,max=?}",
 			args: args{
-				first:  volume.SizeRange{},
-				second: volume.SizeRange{},
+				first:  e2evolume.SizeRange{},
+				second: e2evolume.SizeRange{},
 			},
 			want:    minValidSize,
 			wantErr: false,

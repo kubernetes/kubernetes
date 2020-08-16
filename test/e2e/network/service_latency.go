@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -48,7 +49,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 	f := framework.NewDefaultFramework("svc-latency")
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Service endpoint latency, thresholds
 		Description: Run 100 iterations of create service with the Pod running the pause image, measure the time it takes for creating the service and the endpoint with the service name is available. These durations are captured for 100 iterations, then the durations are sorted to compute 50th, 90th and 99th percentile. The single server latency MUST not exceed liberally set thresholds of 20s for 50th percentile and 50s for the 90th percentile.
 	*/
@@ -295,11 +296,11 @@ func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				obj, err := f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).List(options)
+				obj, err := f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).List(context.TODO(), options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).Watch(options)
+				return f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).Watch(context.TODO(), options)
 			},
 		},
 		&v1.Endpoints{},
@@ -344,7 +345,7 @@ func singleServiceLatency(f *framework.Framework, name string, q *endpointQuerie
 		},
 	}
 	startTime := time.Now()
-	gotSvc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(svc)
+	gotSvc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if err != nil {
 		return 0, err
 	}

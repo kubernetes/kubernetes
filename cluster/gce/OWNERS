@@ -10,6 +10,7 @@ reviewers:
   - jingax10
   - yujuhong
   - mtaufen
+  - sig-scalability-reviewers
 approvers:
   - bowei
   - cjcullen
@@ -20,5 +21,9 @@ approvers:
   - jingax10
   - yujuhong
   - mtaufen
+  - sig-scalability-approvers
 emeritus_approvers:
   - jszczepkowski
+labels:
+- sig/cloud-provider
+- area/provider/gcp

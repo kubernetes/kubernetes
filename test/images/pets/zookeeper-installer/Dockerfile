@@ -14,7 +14,8 @@
 
 # TODO: get rid of bash dependency and switch to plain busybox.
 # The tar in busybox also doesn't seem to understand compression.
-FROM BASEIMAGE
+ARG BASEIMAGE
+FROM $BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 

@@ -20,7 +20,7 @@ go_library(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
@@ -40,6 +40,7 @@ filegroup(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset:all-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/deprecated:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1:all-srcs",

@@ -252,6 +252,7 @@ func Test_Run_Positive_RegisterThenUnregister(t *testing.T) {
 	}
 
 	dsw.RemovePlugin(socketPath)
+	os.Remove(socketPath)
 	waitForUnregistration(t, socketPath, asw)
 
 	// Get asw plugins; it should no longer contain the added plugin

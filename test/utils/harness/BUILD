@@ -5,7 +5,7 @@ go_library(
     srcs = ["harness.go"],
     importpath = "k8s.io/kubernetes/test/utils/harness",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/k8s.io/klog:go_default_library"],
+    deps = ["//vendor/k8s.io/klog/v2:go_default_library"],
 )
 
 filegroup(

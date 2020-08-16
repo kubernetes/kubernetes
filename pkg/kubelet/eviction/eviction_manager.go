@@ -22,10 +22,11 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -45,6 +46,15 @@ import (
 const (
 	podCleanupTimeout  = 30 * time.Second
 	podCleanupPollFreq = time.Second
+)
+
+const (
+	// signalEphemeralContainerFsLimit is amount of storage available on filesystem requested by the container
+	signalEphemeralContainerFsLimit string = "ephemeralcontainerfs.limit"
+	// signalEphemeralPodFsLimit is amount of storage available on filesystem requested by the pod
+	signalEphemeralPodFsLimit string = "ephemeralpodfs.limit"
+	// signalEmptyDirFsLimit is amount of storage available on filesystem requested by an emptyDir
+	signalEmptyDirFsLimit string = "emptydirfs.limit"
 )
 
 // managerImpl implements Manager
@@ -89,6 +99,8 @@ type managerImpl struct {
 	thresholdNotifiers []ThresholdNotifier
 	// thresholdsLastUpdated is the last time the thresholdNotifiers were updated.
 	thresholdsLastUpdated time.Time
+	// etcHostsPath is a function that will get the etc-hosts file's path for a pod given its UID
+	etcHostsPath func(podUID types.UID) string
 }
 
 // ensure it implements the required interface
@@ -105,6 +117,7 @@ func NewManager(
 	recorder record.EventRecorder,
 	nodeRef *v1.ObjectReference,
 	clock clock.Clock,
+	etcHostsPath func(types.UID) string,
 ) (Manager, lifecycle.PodAdmitHandler) {
 	manager := &managerImpl{
 		clock:                        clock,
@@ -120,6 +133,7 @@ func NewManager(
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 		dedicatedImageFs:             nil,
 		thresholdNotifiers:           []ThresholdNotifier{},
+		etcHostsPath:                 etcHostsPath,
 	}
 	return manager, manager
 }
@@ -311,7 +325,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// evict pods if there is a resource usage violation from local volume temporary storage
 	// If eviction happens in localStorageEviction function, skip the rest of eviction action
 	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		if evictedPods := m.localStorageEviction(summary, activePods); len(evictedPods) > 0 {
+		if evictedPods := m.localStorageEviction(activePods, statsFunc); len(evictedPods) > 0 {
 			return evictedPods
 		}
 	}
@@ -441,8 +455,7 @@ func (m *managerImpl) reclaimNodeLevelResources(signalToReclaim evictionapi.Sign
 
 // localStorageEviction checks the EmptyDir volume usage for each pod and determine whether it exceeds the specified limit and needs
 // to be evicted. It also checks every container in the pod, if the container overlay usage exceeds the limit, the pod will be evicted too.
-func (m *managerImpl) localStorageEviction(summary *statsapi.Summary, pods []*v1.Pod) []*v1.Pod {
-	statsFunc := cachedStatsFunc(summary.Pods)
+func (m *managerImpl) localStorageEviction(pods []*v1.Pod, statsFunc statsFunc) []*v1.Pod {
 	evicted := []*v1.Pod{}
 	for _, pod := range pods {
 		podStats, ok := statsFunc(pod)
@@ -480,7 +493,11 @@ func (m *managerImpl) emptyDirLimitEviction(podStats statsapi.PodStats, pod *v1.
 			used := podVolumeUsed[pod.Spec.Volumes[i].Name]
 			if used != nil && size != nil && size.Sign() == 1 && used.Cmp(*size) > 0 {
 				// the emptyDir usage exceeds the size limit, evict the pod
-				return m.evictPod(pod, 0, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil)
+				if m.evictPod(pod, 0, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil) {
+					metrics.Evictions.WithLabelValues(signalEmptyDirFsLimit).Inc()
+					return true
+				}
+				return false
 			}
 		}
 	}
@@ -502,7 +519,7 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStat
 	} else {
 		fsStatsSet = []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}
 	}
-	podEphemeralUsage, err := podLocalEphemeralStorageUsage(podStats, pod, fsStatsSet)
+	podEphemeralUsage, err := podLocalEphemeralStorageUsage(podStats, pod, fsStatsSet, m.etcHostsPath(pod.UID))
 	if err != nil {
 		klog.Errorf("eviction manager: error getting pod disk usage %v", err)
 		return false
@@ -512,7 +529,11 @@ func (m *managerImpl) podEphemeralStorageLimitEviction(podStats statsapi.PodStat
 	podEphemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
 	if podEphemeralStorageTotalUsage.Cmp(podEphemeralStorageLimit) > 0 {
 		// the total usage of pod exceeds the total size limit of containers, evict the pod
-		return m.evictPod(pod, 0, fmt.Sprintf(podEphemeralStorageMessageFmt, podEphemeralStorageLimit.String()), nil)
+		if m.evictPod(pod, 0, fmt.Sprintf(podEphemeralStorageMessageFmt, podEphemeralStorageLimit.String()), nil) {
+			metrics.Evictions.WithLabelValues(signalEphemeralPodFsLimit).Inc()
+			return true
+		}
+		return false
 	}
 	return false
 }
@@ -534,8 +555,11 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 
 		if ephemeralStorageThreshold, ok := thresholdsMap[containerStat.Name]; ok {
 			if ephemeralStorageThreshold.Cmp(*containerUsed) < 0 {
-				return m.evictPod(pod, 0, fmt.Sprintf(containerEphemeralStorageMessageFmt, containerStat.Name, ephemeralStorageThreshold.String()), nil)
-
+				if m.evictPod(pod, 0, fmt.Sprintf(containerEphemeralStorageMessageFmt, containerStat.Name, ephemeralStorageThreshold.String()), nil) {
+					metrics.Evictions.WithLabelValues(signalEphemeralContainerFsLimit).Inc()
+					return true
+				}
+				return false
 			}
 		}
 	}

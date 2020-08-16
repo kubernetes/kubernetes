@@ -116,6 +116,8 @@ type KubeProxyConfiguration struct {
 	// metricsBindAddress is the IP address and port for the metrics server to serve on,
 	// defaulting to 127.0.0.1:10249 (set to 0.0.0.0 for all interfaces)
 	MetricsBindAddress string `json:"metricsBindAddress"`
+	// bindAddressHardFail, if true, kube-proxy will treat failure to bind to a port as fatal and exit
+	BindAddressHardFail bool `json:"bindAddressHardFail"`
 	// enableProfiling enables profiling via web interface on /debug/pprof handler.
 	// Profiling handlers will be handled by metrics server.
 	EnableProfiling bool `json:"enableProfiling"`
@@ -160,6 +162,8 @@ type KubeProxyConfiguration struct {
 	Winkernel KubeProxyWinkernelConfiguration `json:"winkernel"`
 	// ShowHiddenMetricsForVersion is the version for which you want to show hidden metrics.
 	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion"`
+	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
+	DetectLocalMode LocalMode `json:"detectLocalMode"`
 }
 
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
@@ -176,3 +180,6 @@ type KubeProxyConfiguration struct {
 // future). If winkernel proxy is selected, regardless of how, but the Windows kernel can't support this mode of proxy,
 // this always falls back to the userspace proxy.
 type ProxyMode string
+
+// LocalMode represents modes to detect local traffic from the node
+type LocalMode string

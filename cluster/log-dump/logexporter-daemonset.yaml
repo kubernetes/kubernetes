@@ -36,7 +36,7 @@ spec:
     spec:
       containers:
       - name: logexporter-test
-        image: gcr.io/k8s-testimages/logexporter:v20190729-6ada3329e
+        image: gcr.io/k8s-testimages/logexporter:v20200401-c3269f485
         env:
         - name: NODE_NAME
           valueFrom:
@@ -50,8 +50,9 @@ spec:
         - --gcloud-auth-file-path=/etc/service-account/service-account.json
         - --enable-hollow-node-logs={{.EnableHollowNodeLogs}}
         - --dump-systemd-journal={{.DumpSystemdJournal}}
+        - --extra-log-files={{.ExtraLogFiles}}
+        - --extra-systemd-services={{.ExtraSystemdServices}}
         - --sleep-duration=24h
-        - --alsologtostderr
         volumeMounts:
         - mountPath: /etc/service-account
           name: service

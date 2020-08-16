@@ -195,7 +195,7 @@ func newV1beta1TokenAuthenticator(serverURL string, clientCert, clientKey, ca []
 		return nil, err
 	}
 
-	c, err := tokenReviewInterfaceFromKubeconfig(p, "v1beta1")
+	c, err := tokenReviewInterfaceFromKubeconfig(p, "v1beta1", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -481,7 +481,7 @@ func TestV1beta1WebhookTokenAuthenticator(t *testing.T) {
 			expectedAuthenticated: false,
 		},
 	}
-	token := "my-s3cr3t-t0ken"
+	token := "my-s3cr3t-t0ken" // Fake token for testing.
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			wh, err := newV1beta1TokenAuthenticator(s.URL, clientCert, clientKey, caCert, 0, tt.implicitAuds)

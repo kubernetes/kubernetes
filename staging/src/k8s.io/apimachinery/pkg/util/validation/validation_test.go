@@ -557,7 +557,8 @@ func TestIsFullyQualifiedDomainName(t *testing.T) {
 		"bbc.co.uk",
 		"10.0.0.1", // DNS labels can start with numbers and there is no requirement for letters.
 		"hyphens-are-good.k8s.io",
-		strings.Repeat("a", 246) + ".k8s.io",
+		strings.Repeat("a", 63) + ".k8s.io",
+		strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 54) + ".k8s.io",
 	}
 	for _, val := range goodValues {
 		if err := IsFullyQualifiedDomainName(field.NewPath(""), val).ToAggregate(); err != nil {
@@ -579,7 +580,8 @@ func TestIsFullyQualifiedDomainName(t *testing.T) {
 		"underscores_are_bad.k8s.io",
 		"foo@bar.example.com",
 		"http://foo.example.com",
-		strings.Repeat("a", 247) + ".k8s.io",
+		strings.Repeat("a", 64) + ".k8s.io",
+		strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 55) + ".k8s.io",
 	}
 	for _, val := range badValues {
 		if err := IsFullyQualifiedDomainName(field.NewPath(""), val).ToAggregate(); err == nil {
@@ -664,6 +666,53 @@ func TestIsFullyQualifiedName(t *testing.T) {
 			t.Errorf("%q: unexpected no error, expected %s", tc.name, tc.err)
 		case tc.err != "" && err != nil && !strings.Contains(err.Error(), tc.err):
 			t.Errorf("%q: expected %s, got %v", tc.name, tc.err, err)
+		}
+	}
+}
+
+func TestIsDomainPrefixedPath(t *testing.T) {
+	goodValues := []string{
+		"a/b",
+		"a/b/c/d",
+		"a.com/foo",
+		"a.b.c.d/foo",
+		"k8s.io/foo/bar",
+		"k8s.io/FOO/BAR",
+		"dev.k8s.io/more/path",
+		"this.is.a.really.long.fqdn/even/longer/path/just/because",
+		"bbc.co.uk/path/goes/here",
+		"10.0.0.1/foo",
+		"hyphens-are-good.k8s.io/and-in-paths-too",
+		strings.Repeat("a", 240) + ".k8s.io/a",
+		"k8s.io/" + strings.Repeat("a", 240),
+	}
+	for _, val := range goodValues {
+		if err := IsDomainPrefixedPath(field.NewPath(""), val).ToAggregate(); err != nil {
+			t.Errorf("expected no errors for %q: %v", val, err)
+		}
+	}
+
+	badValues := []string{
+		".",
+		"...",
+		"/b",
+		"com",
+		".com",
+		"a.b.c.d/foo?a=b",
+		"a.b.c.d/foo#a",
+		"Dev.k8s.io",
+		".foo.example.com",
+		"*.example.com",
+		"example.com/foo{}[]@^`",
+		"underscores_are_bad.k8s.io",
+		"underscores_are_bad.k8s.io/foo",
+		"foo@bar.example.com",
+		"foo@bar.example.com/foo",
+		strings.Repeat("a", 247) + ".k8s.io",
+	}
+	for _, val := range badValues {
+		if err := IsDomainPrefixedPath(field.NewPath(""), val).ToAggregate(); err == nil {
+			t.Errorf("expected errors for %q", val)
 		}
 	}
 }

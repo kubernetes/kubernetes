@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -32,8 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
-	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -255,61 +252,6 @@ func TestPodToEndpoint(t *testing.T) {
 	}
 }
 
-func TestPodChangedWithPodEndpointChanged(t *testing.T) {
-	podStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
-	ns := "test"
-	podStore.Add(newPod(1, ns, true, 1))
-	pods := podStore.List()
-	if len(pods) != 1 {
-		t.Errorf("podStore size: expected: %d, got: %d", 1, len(pods))
-		return
-	}
-	oldPod := pods[0].(*v1.Pod)
-	newPod := oldPod.DeepCopy()
-
-	if podChangedHelper(oldPod, newPod, podEndpointChanged) {
-		t.Errorf("Expected pod to be unchanged for copied pod")
-	}
-
-	newPod.Spec.NodeName = "changed"
-	if !podChangedHelper(oldPod, newPod, podEndpointChanged) {
-		t.Errorf("Expected pod to be changed for pod with NodeName changed")
-	}
-	newPod.Spec.NodeName = oldPod.Spec.NodeName
-
-	newPod.ObjectMeta.ResourceVersion = "changed"
-	if podChangedHelper(oldPod, newPod, podEndpointChanged) {
-		t.Errorf("Expected pod to be unchanged for pod with only ResourceVersion changed")
-	}
-	newPod.ObjectMeta.ResourceVersion = oldPod.ObjectMeta.ResourceVersion
-
-	newPod.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.1"}}
-	if !podChangedHelper(oldPod, newPod, podEndpointChanged) {
-		t.Errorf("Expected pod to be changed with pod IP address change")
-	}
-	newPod.Status.PodIPs = oldPod.Status.PodIPs
-
-	newPod.ObjectMeta.Name = "wrong-name"
-	if !podChangedHelper(oldPod, newPod, podEndpointChanged) {
-		t.Errorf("Expected pod to be changed with pod name change")
-	}
-	newPod.ObjectMeta.Name = oldPod.ObjectMeta.Name
-
-	saveConditions := oldPod.Status.Conditions
-	oldPod.Status.Conditions = nil
-	if !podChangedHelper(oldPod, newPod, podEndpointChanged) {
-		t.Errorf("Expected pod to be changed with pod readiness change")
-	}
-	oldPod.Status.Conditions = saveConditions
-
-	now := metav1.NewTime(time.Now().UTC())
-	newPod.ObjectMeta.DeletionTimestamp = &now
-	if !podChangedHelper(oldPod, newPod, podEndpointChanged) {
-		t.Errorf("Expected pod to be changed with DeletionTimestamp change")
-	}
-	newPod.ObjectMeta.DeletionTimestamp = oldPod.ObjectMeta.DeletionTimestamp.DeepCopy()
-}
-
 func TestServiceControllerKey(t *testing.T) {
 	testCases := map[string]struct {
 		endpointSlice *discovery.EndpointSlice
@@ -348,6 +290,97 @@ func TestServiceControllerKey(t *testing.T) {
 			}
 			if actualKey != tc.expectedKey {
 				t.Errorf("Expected %s, got %s", tc.expectedKey, actualKey)
+			}
+		})
+	}
+}
+
+func TestGetEndpointPorts(t *testing.T) {
+	protoTCP := v1.ProtocolTCP
+
+	testCases := map[string]struct {
+		service       *v1.Service
+		pod           *v1.Pod
+		expectedPorts []*discovery.EndpointPort
+	}{
+		"service with AppProtocol on one port": {
+			service: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
+						Name:        "http",
+						Port:        80,
+						TargetPort:  intstr.FromInt(80),
+						Protocol:    protoTCP,
+						AppProtocol: utilpointer.StringPtr("example.com/custom-protocol"),
+					}},
+				},
+			},
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Ports: []v1.ContainerPort{},
+					}},
+				},
+			},
+			expectedPorts: []*discovery.EndpointPort{{
+				Name:        utilpointer.StringPtr("http"),
+				Port:        utilpointer.Int32Ptr(80),
+				Protocol:    &protoTCP,
+				AppProtocol: utilpointer.StringPtr("example.com/custom-protocol"),
+			}},
+		},
+		"service with named port and AppProtocol on one port": {
+			service: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
+						Name:       "http",
+						Port:       80,
+						TargetPort: intstr.FromInt(80),
+						Protocol:   protoTCP,
+					}, {
+						Name:        "https",
+						Protocol:    protoTCP,
+						TargetPort:  intstr.FromString("https"),
+						AppProtocol: utilpointer.StringPtr("https"),
+					}},
+				},
+			},
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Ports: []v1.ContainerPort{{
+							Name:          "https",
+							ContainerPort: int32(443),
+							Protocol:      protoTCP,
+						}},
+					}},
+				},
+			},
+			expectedPorts: []*discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr("http"),
+				Port:     utilpointer.Int32Ptr(80),
+				Protocol: &protoTCP,
+			}, {
+				Name:        utilpointer.StringPtr("https"),
+				Port:        utilpointer.Int32Ptr(443),
+				Protocol:    &protoTCP,
+				AppProtocol: utilpointer.StringPtr("https"),
+			}},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			actualPorts := getEndpointPorts(tc.service, tc.pod)
+
+			if len(actualPorts) != len(tc.expectedPorts) {
+				t.Fatalf("Expected %d ports, got %d", len(tc.expectedPorts), len(actualPorts))
+			}
+
+			for i, actualPort := range actualPorts {
+				if !reflect.DeepEqual(&actualPort, tc.expectedPorts[i]) {
+					t.Errorf("Expected port: %+v, got %+v", tc.expectedPorts[i], &actualPort)
+				}
 			}
 		})
 	}
@@ -401,7 +434,13 @@ func newClientset() *fake.Clientset {
 			endpointSlice.ObjectMeta.Name = fmt.Sprintf("%s-%s", endpointSlice.ObjectMeta.GenerateName, rand.String(8))
 			endpointSlice.ObjectMeta.GenerateName = ""
 		}
+		endpointSlice.ObjectMeta.ResourceVersion = "100"
 
+		return false, endpointSlice, nil
+	}))
+	client.PrependReactor("update", "endpointslices", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
+		endpointSlice := action.(k8stesting.CreateAction).GetObject().(*discovery.EndpointSlice)
+		endpointSlice.ObjectMeta.ResourceVersion = "200"
 		return false, endpointSlice, nil
 	}))
 
@@ -447,9 +486,4 @@ func newEmptyEndpointSlice(n int, namespace string, endpointMeta endpointMeta, s
 		AddressType: endpointMeta.AddressType,
 		Endpoints:   []discovery.Endpoint{},
 	}
-}
-
-func podChangedHelper(oldPod, newPod *v1.Pod, endpointChanged endpointutil.EndpointsMatch) bool {
-	podChanged, _ := endpointutil.PodChanged(oldPod, newPod, podEndpointChanged)
-	return podChanged
 }

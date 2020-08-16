@@ -17,6 +17,7 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"sync"
@@ -185,12 +186,12 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType}).String()
-				obj, err := f.ClientSet.CoreV1().Pods(ns).List(options)
+				obj, err := f.ClientSet.CoreV1().Pods(ns).List(context.TODO(), options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				options.LabelSelector = labels.SelectorFromSet(labels.Set{"type": podType}).String()
-				return f.ClientSet.CoreV1().Pods(ns).Watch(options)
+				return f.ClientSet.CoreV1().Pods(ns).Watch(context.TODO(), options)
 			},
 		},
 		&v1.Pod{},
@@ -235,7 +236,7 @@ func newDensityTestPods(numPods int, volume bool, imageName, podType string) []*
 					},
 				},
 				NodeSelector: map[string]string{
-					"beta.kubernetes.io/os": "windows",
+					"kubernetes.io/os": "windows",
 				},
 			},
 		}
@@ -264,7 +265,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
 
-			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
+			err := f.PodClient().Delete(context.TODO(), pod.ObjectMeta.Name, *metav1.NewDeleteOptions(30))
 			framework.ExpectNoError(err)
 
 			err = e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),

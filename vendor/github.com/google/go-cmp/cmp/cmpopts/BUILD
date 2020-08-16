@@ -15,6 +15,7 @@ go_library(
     deps = [
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp/internal/function:go_default_library",
+        "//vendor/golang.org/x/xerrors:go_default_library",
     ],
 )
 

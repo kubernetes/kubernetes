@@ -29,16 +29,15 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 const (
@@ -108,11 +107,18 @@ func updateISCSIDiscoverydb(b iscsiDiskMounter, tp string) error {
 }
 
 func updateISCSINode(b iscsiDiskMounter, tp string) error {
+	// setting node.session.scan to manual to handle https://github.com/kubernetes/kubernetes/issues/90982
+	out, err := execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "-o", "update", "-n", "node.session.scan", "-v", "manual")
+	if err != nil {
+		// don't fail if iscsiadm fails or the version does not support node.session.scan - log a warning to highlight the potential exposure
+		klog.Warningf("iscsi: failed to update node with node.session.scan=manual, possible exposure to issue 90982: %v", out)
+	}
+
 	if !b.chapSession {
 		return nil
 	}
 
-	out, err := execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "-o", "update", "-n", "node.session.auth.authmethod", "-v", "CHAP")
+	out, err = execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "-o", "update", "-n", "node.session.auth.authmethod", "-v", "CHAP")
 	if err != nil {
 		return fmt.Errorf("iscsi: failed to update node with CHAP, output: %v", out)
 	}
@@ -196,7 +202,9 @@ func (util *ISCSIUtil) MakeGlobalVDPDName(iscsi iscsiDisk) string {
 	return makeVDPDNameInternal(iscsi.plugin.host, iscsi.Portals[0], iscsi.Iqn, iscsi.Lun, iscsi.Iface)
 }
 
-func (util *ISCSIUtil) persistISCSI(conf iscsiDisk, mnt string) error {
+// persistISCSIFile saves iSCSI volume configuration for DetachDisk
+// into given directory.
+func (util *ISCSIUtil) persistISCSIFile(conf iscsiDisk, mnt string) error {
 	file := filepath.Join(mnt, "iscsi.json")
 	fp, err := os.Create(file)
 	if err != nil {
@@ -362,7 +370,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 				}
 
 				// in case of node failure/restart, explicitly set to manual login so it doesn't hang on boot
-				out, err = execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-o", "update", "-n", "node.startup", "-v", "manual")
+				_, err = execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-o", "update", "-n", "node.startup", "-v", "manual")
 				if err != nil {
 					// don't fail if we can't set startup mode, but log warning so there is a clue
 					klog.Warningf("Warning: Failed to set iSCSI login mode to manual. Error: %v", err)
@@ -459,63 +467,48 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	}
 
 	klog.V(5).Infof("iscsi: AttachDisk devicePath: %s", devicePath)
-	// run global mount path related operations based on volumeMode
-	return globalPDPathOperation(b)(b, devicePath, util)
+
+	if err = util.persistISCSI(b); err != nil {
+		// Return uncertain error so kubelet calls Unmount / Unmap when the pod
+		// is deleted.
+		return "", types.NewUncertainProgressError(err.Error())
+	}
+	return devicePath, nil
 }
 
-// globalPDPathOperation returns global mount path related operations based on volumeMode.
-// If the volumeMode is 'Filesystem' or not defined, plugin needs to create a dir, persist
-// iscsi configurations, and then format/mount the volume.
-// If the volumeMode is 'Block', plugin creates a dir and persists iscsi configurations.
-// Since volume type is block, plugin doesn't need to format/mount the volume.
-func globalPDPathOperation(b iscsiDiskMounter) func(iscsiDiskMounter, string, *ISCSIUtil) (string, error) {
-	// TODO: remove feature gate check after no longer needed
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		klog.V(5).Infof("iscsi: AttachDisk volumeMode: %s", b.volumeMode)
-		if b.volumeMode == v1.PersistentVolumeBlock {
-			// If the volumeMode is 'Block', plugin don't need to format the volume.
-			return func(b iscsiDiskMounter, devicePath string, util *ISCSIUtil) (string, error) {
-				globalPDPath := b.manager.MakeGlobalVDPDName(*b.iscsiDisk)
-				// Create dir like /var/lib/kubelet/plugins/kubernetes.io/iscsi/volumeDevices/{ifaceName}/{portal-some_iqn-lun-lun_id}
-				if err := os.MkdirAll(globalPDPath, 0750); err != nil {
-					klog.Errorf("iscsi: failed to mkdir %s, error", globalPDPath)
-					return "", err
-				}
-				// Persist iscsi disk config to json file for DetachDisk path
-				util.persistISCSI(*(b.iscsiDisk), globalPDPath)
-
-				return devicePath, nil
-			}
-		}
+// persistISCSI saves iSCSI volume configuration for DetachDisk into global
+// mount / map directory.
+func (util *ISCSIUtil) persistISCSI(b iscsiDiskMounter) error {
+	klog.V(5).Infof("iscsi: AttachDisk volumeMode: %s", b.volumeMode)
+	var globalPDPath string
+	if b.volumeMode == v1.PersistentVolumeBlock {
+		globalPDPath = b.manager.MakeGlobalVDPDName(*b.iscsiDisk)
+	} else {
+		globalPDPath = b.manager.MakeGlobalPDName(*b.iscsiDisk)
 	}
-	// If the volumeMode is 'Filesystem', plugin needs to format the volume
-	// and mount it to globalPDPath.
-	return func(b iscsiDiskMounter, devicePath string, util *ISCSIUtil) (string, error) {
-		globalPDPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
+
+	if err := os.MkdirAll(globalPDPath, 0750); err != nil {
+		klog.Errorf("iscsi: failed to mkdir %s, error", globalPDPath)
+		return err
+	}
+
+	if b.volumeMode == v1.PersistentVolumeFilesystem {
 		notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
-		if err != nil && !os.IsNotExist(err) {
-			return "", fmt.Errorf("Heuristic determination of mount point failed:%v", err)
-		}
-		// Return confirmed devicePath to caller
-		if !notMnt {
-			klog.Infof("iscsi: %s already mounted", globalPDPath)
-			return devicePath, nil
-		}
-		// Create dir like /var/lib/kubelet/plugins/kubernetes.io/iscsi/{ifaceName}/{portal-some_iqn-lun-lun_id}
-		if err := os.MkdirAll(globalPDPath, 0750); err != nil {
-			klog.Errorf("iscsi: failed to mkdir %s, error", globalPDPath)
-			return "", err
-		}
-		// Persist iscsi disk config to json file for DetachDisk path
-		util.persistISCSI(*(b.iscsiDisk), globalPDPath)
-
-		err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil)
 		if err != nil {
-			klog.Errorf("iscsi: failed to mount iscsi volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
+			return err
 		}
-
-		return devicePath, nil
+		if !notMnt {
+			// The volume is already mounted, therefore the previous WaitForAttach must have
+			// persisted the volume metadata. In addition, the metadata is actually *inside*
+			// globalPDPath and we can't write it here, because it was shadowed by the volume
+			// mount.
+			klog.V(4).Infof("Skipping persistISCSI, the volume is already mounted at %s", globalPDPath)
+			return nil
+		}
 	}
+
+	// Persist iscsi disk config to json file for DetachDisk path
+	return util.persistISCSIFile(*(b.iscsiDisk), globalPDPath)
 }
 
 // Delete 1 block device of the form "sd*"
@@ -978,7 +971,7 @@ func ignoreExitCodes(err error, ignoredExitCodes ...int) error {
 func execWithLog(b iscsiDiskMounter, cmd string, args ...string) (string, error) {
 	start := time.Now()
 	out, err := b.exec.Command(cmd, args...).CombinedOutput()
-	if klog.V(5) {
+	if klog.V(5).Enabled() {
 		d := time.Since(start)
 		klog.V(5).Infof("Executed %s %v in %v, err: %v", cmd, args, d, err)
 		klog.V(5).Infof("Output: %s", string(out))

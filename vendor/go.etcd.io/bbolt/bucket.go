@@ -123,10 +123,12 @@ func (b *Bucket) Bucket(name []byte) *Bucket {
 func (b *Bucket) openBucket(value []byte) *Bucket {
 	var child = newBucket(b.tx)
 
-	// If unaligned load/stores are broken on this arch and value is
-	// unaligned simply clone to an aligned byte array.
-	unaligned := brokenUnaligned && uintptr(unsafe.Pointer(&value[0]))&3 != 0
-
+	// Unaligned access requires a copy to be made.
+	const unalignedMask = unsafe.Alignof(struct {
+		bucket
+		page
+	}{}) - 1
+	unaligned := uintptr(unsafe.Pointer(&value[0]))&unalignedMask != 0
 	if unaligned {
 		value = cloneBytes(value)
 	}
@@ -206,7 +208,7 @@ func (b *Bucket) CreateBucketIfNotExists(key []byte) (*Bucket, error) {
 }
 
 // DeleteBucket deletes a bucket at the given key.
-// Returns an error if the bucket does not exists, or if the key represents a non-bucket value.
+// Returns an error if the bucket does not exist, or if the key represents a non-bucket value.
 func (b *Bucket) DeleteBucket(key []byte) error {
 	if b.tx.db == nil {
 		return ErrTxClosed
@@ -228,7 +230,7 @@ func (b *Bucket) DeleteBucket(key []byte) error {
 	// Recursively delete all child buckets.
 	child := b.Bucket(key)
 	err := child.ForEach(func(k, v []byte) error {
-		if v == nil {
+		if _, _, childFlags := child.Cursor().seek(k); (childFlags & bucketLeafFlag) != 0 {
 			if err := child.DeleteBucket(k); err != nil {
 				return fmt.Errorf("delete bucket: %s", err)
 			}
@@ -409,7 +411,7 @@ func (b *Bucket) Stats() BucketStats {
 
 			if p.count != 0 {
 				// If page has any elements, add all element headers.
-				used += leafPageElementSize * int(p.count-1)
+				used += leafPageElementSize * uintptr(p.count-1)
 
 				// Add all element key, value sizes.
 				// The computation takes advantage of the fact that the position
@@ -417,16 +419,16 @@ func (b *Bucket) Stats() BucketStats {
 				// of all previous elements' keys and values.
 				// It also includes the last element's header.
 				lastElement := p.leafPageElement(p.count - 1)
-				used += int(lastElement.pos + lastElement.ksize + lastElement.vsize)
+				used += uintptr(lastElement.pos + lastElement.ksize + lastElement.vsize)
 			}
 
 			if b.root == 0 {
 				// For inlined bucket just update the inline stats
-				s.InlineBucketInuse += used
+				s.InlineBucketInuse += int(used)
 			} else {
 				// For non-inlined bucket update all the leaf stats
 				s.LeafPageN++
-				s.LeafInuse += used
+				s.LeafInuse += int(used)
 				s.LeafOverflowN += int(p.overflow)
 
 				// Collect stats from sub-buckets.
@@ -447,13 +449,13 @@ func (b *Bucket) Stats() BucketStats {
 
 			// used totals the used bytes for the page
 			// Add header and all element headers.
-			used := pageHeaderSize + (branchPageElementSize * int(p.count-1))
+			used := pageHeaderSize + (branchPageElementSize * uintptr(p.count-1))
 
 			// Add size of all keys and values.
 			// Again, use the fact that last element's position equals to
 			// the total of key, value sizes of all previous elements.
-			used += int(lastElement.pos + lastElement.ksize)
-			s.BranchInuse += used
+			used += uintptr(lastElement.pos + lastElement.ksize)
+			s.BranchInuse += int(used)
 			s.BranchOverflowN += int(p.overflow)
 		}
 
@@ -593,7 +595,7 @@ func (b *Bucket) inlineable() bool {
 	// our threshold for inline bucket size.
 	var size = pageHeaderSize
 	for _, inode := range n.inodes {
-		size += leafPageElementSize + len(inode.key) + len(inode.value)
+		size += leafPageElementSize + uintptr(len(inode.key)) + uintptr(len(inode.value))
 
 		if inode.flags&bucketLeafFlag != 0 {
 			return false
@@ -606,8 +608,8 @@ func (b *Bucket) inlineable() bool {
 }
 
 // Returns the maximum total size of a bucket to make it a candidate for inlining.
-func (b *Bucket) maxInlineBucketSize() int {
-	return b.tx.db.pageSize / 4
+func (b *Bucket) maxInlineBucketSize() uintptr {
+	return uintptr(b.tx.db.pageSize / 4)
 }
 
 // write allocates and writes a bucket to a byte slice.

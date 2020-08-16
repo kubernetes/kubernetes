@@ -19,14 +19,18 @@ limitations under the License.
 package azure
 
 import (
-	"context"
 	"sync"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+
 	cloudprovider "k8s.io/cloud-provider"
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
+	"k8s.io/legacy-cloud-providers/azure/clients/vmssclient/mockvmssclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient/mockvmssvmclient"
 )
 
 func TestExtractVmssVMName(t *testing.T) {
@@ -74,20 +78,30 @@ func TestExtractVmssVMName(t *testing.T) {
 }
 
 func TestVMSSVMCache(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	vmssName := "vmss"
 	vmList := []string{"vmssee6c2000000", "vmssee6c2000001", "vmssee6c2000002"}
-	ss, err := newTestScaleSet(vmssName, "", 0, vmList)
+	ss, err := newTestScaleSet(ctrl)
 	assert.NoError(t, err)
 
+	mockVMSSClient := mockvmssclient.NewMockInterface(ctrl)
+	mockVMSSVMClient := mockvmssvmclient.NewMockInterface(ctrl)
+	ss.cloud.VirtualMachineScaleSetsClient = mockVMSSClient
+	ss.cloud.VirtualMachineScaleSetVMsClient = mockVMSSVMClient
+
+	expectedScaleSet := buildTestVMSS(vmssName, "vmssee6c2")
+	mockVMSSClient.EXPECT().List(gomock.Any(), gomock.Any()).Return([]compute.VirtualMachineScaleSet{expectedScaleSet}, nil).AnyTimes()
+
+	expectedVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, vmssName, "", 0, vmList, "", false)
+	mockVMSSVMClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(expectedVMs, nil).AnyTimes()
+
 	// validate getting VMSS VM via cache.
-	virtualMachines, rerr := ss.VirtualMachineScaleSetVMsClient.List(
-		context.Background(), "rg", "vmss", "")
-	assert.Nil(t, rerr)
-	assert.Equal(t, 3, len(virtualMachines))
-	for i := range virtualMachines {
-		vm := virtualMachines[i]
+	for i := range expectedVMs {
+		vm := expectedVMs[i]
 		vmName := to.String(vm.OsProfile.ComputerName)
-		ssName, instanceID, realVM, err := ss.getVmssVM(vmName, cacheReadTypeDefault)
+		ssName, instanceID, realVM, err := ss.getVmssVM(vmName, azcache.CacheReadTypeDefault)
 		assert.Nil(t, err)
 		assert.Equal(t, "vmss", ssName)
 		assert.Equal(t, to.String(vm.InstanceID), instanceID)
@@ -95,20 +109,22 @@ func TestVMSSVMCache(t *testing.T) {
 	}
 
 	// validate deleteCacheForNode().
-	vm := virtualMachines[0]
+	vm := expectedVMs[0]
 	vmName := to.String(vm.OsProfile.ComputerName)
 	err = ss.deleteCacheForNode(vmName)
 	assert.NoError(t, err)
 
 	// the VM should be removed from cache after deleteCacheForNode().
-	cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey, cacheReadTypeDefault)
+	cacheKey, cache, err := ss.getVMSSVMCache("rg", vmssName)
+	assert.NoError(t, err)
+	cached, err := cache.Get(cacheKey, azcache.CacheReadTypeDefault)
 	assert.NoError(t, err)
 	cachedVirtualMachines := cached.(*sync.Map)
 	_, ok := cachedVirtualMachines.Load(vmName)
 	assert.Equal(t, false, ok)
 
-	// the VM should be get back after another cache refresh.
-	ssName, instanceID, realVM, err := ss.getVmssVM(vmName, cacheReadTypeDefault)
+	// the VM should be back after another cache refresh.
+	ssName, instanceID, realVM, err := ss.getVmssVM(vmName, azcache.CacheReadTypeDefault)
 	assert.NoError(t, err)
 	assert.Equal(t, "vmss", ssName)
 	assert.Equal(t, to.String(vm.InstanceID), instanceID)
@@ -116,21 +132,34 @@ func TestVMSSVMCache(t *testing.T) {
 }
 
 func TestVMSSVMCacheWithDeletingNodes(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	vmssName := "vmss"
 	vmList := []string{"vmssee6c2000000", "vmssee6c2000001", "vmssee6c2000002"}
-	ss, err := newTestScaleSetWithState(vmssName, "", 0, vmList, "Deleting")
+	ss, err := newTestScaleSetWithState(ctrl)
 	assert.NoError(t, err)
 
-	virtualMachines, rerr := ss.VirtualMachineScaleSetVMsClient.List(
-		context.Background(), "rg", "vmss", "")
-	assert.Nil(t, rerr)
-	assert.Equal(t, 3, len(virtualMachines))
-	for i := range virtualMachines {
-		vm := virtualMachines[i]
+	mockVMSSClient := mockvmssclient.NewMockInterface(ctrl)
+	mockVMSSVMClient := mockvmssvmclient.NewMockInterface(ctrl)
+	ss.cloud.VirtualMachineScaleSetsClient = mockVMSSClient
+	ss.cloud.VirtualMachineScaleSetVMsClient = mockVMSSVMClient
+
+	expectedScaleSet := compute.VirtualMachineScaleSet{
+		Name:                             &vmssName,
+		VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{},
+	}
+	mockVMSSClient.EXPECT().List(gomock.Any(), gomock.Any()).Return([]compute.VirtualMachineScaleSet{expectedScaleSet}, nil).AnyTimes()
+
+	expectedVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, vmssName, "", 0, vmList, string(compute.ProvisioningStateDeleting), false)
+	mockVMSSVMClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(expectedVMs, nil).AnyTimes()
+
+	for i := range expectedVMs {
+		vm := expectedVMs[i]
 		vmName := to.String(vm.OsProfile.ComputerName)
 		assert.Equal(t, vm.ProvisioningState, to.StringPtr(string(compute.ProvisioningStateDeleting)))
 
-		ssName, instanceID, realVM, err := ss.getVmssVM(vmName, cacheReadTypeDefault)
+		ssName, instanceID, realVM, err := ss.getVmssVM(vmName, azcache.CacheReadTypeDefault)
 		assert.Nil(t, realVM)
 		assert.Equal(t, "", ssName)
 		assert.Equal(t, instanceID, ssName)

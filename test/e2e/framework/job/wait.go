@@ -17,14 +17,15 @@ limitations under the License.
 package job
 
 import (
+	"context"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	jobutil "k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -49,7 +50,7 @@ func WaitForAllJobPodsRunning(c clientset.Interface, ns, jobName string, paralle
 // WaitForJobComplete uses c to wait for completions to complete for the Job jobName in namespace ns.
 func WaitForJobComplete(c clientset.Interface, ns, jobName string, completions int32) error {
 	return wait.Poll(framework.Poll, JobTimeout, func() (bool, error) {
-		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		curr, err := c.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -60,18 +61,29 @@ func WaitForJobComplete(c clientset.Interface, ns, jobName string, completions i
 // WaitForJobFinish uses c to wait for the Job jobName in namespace ns to finish (either Failed or Complete).
 func WaitForJobFinish(c clientset.Interface, ns, jobName string) error {
 	return wait.PollImmediate(framework.Poll, JobTimeout, func() (bool, error) {
-		curr, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		curr, err := c.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
-		return jobutil.IsJobFinished(curr), nil
+
+		return isJobFinished(curr), nil
 	})
+}
+
+func isJobFinished(j *batchv1.Job) bool {
+	for _, c := range j.Status.Conditions {
+		if (c.Type == batchv1.JobComplete || c.Type == batchv1.JobFailed) && c.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+
+	return false
 }
 
 // WaitForJobGone uses c to wait for up to timeout for the Job named jobName in namespace ns to be removed.
 func WaitForJobGone(c clientset.Interface, ns, jobName string, timeout time.Duration) error {
 	return wait.Poll(framework.Poll, timeout, func() (bool, error) {
-		_, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		_, err := c.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}

@@ -22,17 +22,19 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	utilsexec "k8s.io/utils/exec"
 )
 
 const (
@@ -50,6 +52,7 @@ type applyFlags struct {
 	renewCerts         bool
 	imagePullTimeout   time.Duration
 	kustomizeDir       string
+	patchesDir         string
 }
 
 // sessionIsInteractive returns true if the session is of an interactive type (the default, can be opted out of with -y, -f or --dry-run)
@@ -71,12 +74,7 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 		DisableFlagsInUseLine: true,
 		Short:                 "Upgrade your Kubernetes cluster to the specified version",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			userVersion, err := getK8sVersionFromUserInput(flags.applyPlanFlags, args, true)
-			if err != nil {
-				return err
-			}
-
-			return runApply(flags, userVersion)
+			return runApply(flags, args)
 		},
 	}
 
@@ -89,7 +87,10 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&flags.etcdUpgrade, "etcd-upgrade", flags.etcdUpgrade, "Perform the upgrade of etcd.")
 	cmd.Flags().BoolVar(&flags.renewCerts, options.CertificateRenewal, flags.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
 	cmd.Flags().DurationVar(&flags.imagePullTimeout, "image-pull-timeout", flags.imagePullTimeout, "The maximum amount of time to wait for the control plane pods to be downloaded.")
+	// TODO: The flag was deprecated in 1.19; remove the flag following a GA deprecation policy of 12 months or 2 releases (whichever is longer)
+	cmd.Flags().MarkDeprecated("image-pull-timeout", "This flag is deprecated and will be removed in a future version.")
 	options.AddKustomizePodsFlag(cmd.Flags(), &flags.kustomizeDir)
+	options.AddPatchesFlag(cmd.Flags(), &flags.patchesDir)
 
 	return cmd
 }
@@ -106,12 +107,12 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 //   - Creating the RBAC rules for the bootstrap tokens and the cluster-info ConfigMap
 //   - Applying new kube-dns and kube-proxy manifests
 //   - Uploads the newly used configuration to the cluster ConfigMap
-func runApply(flags *applyFlags, userVersion string) error {
+func runApply(flags *applyFlags, args []string) error {
 
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
 	klog.V(1).Infoln("[upgrade/apply] verifying health of cluster")
 	klog.V(1).Infoln("[upgrade/apply] retrieving configuration from cluster")
-	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, flags.dryRun, userVersion)
+	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, args, flags.dryRun, true)
 	if err != nil {
 		return err
 	}
@@ -145,19 +146,18 @@ func runApply(flags *applyFlags, userVersion string) error {
 		}
 	}
 
-	waiter := getWaiter(flags.dryRun, client)
+	if !flags.dryRun {
+		fmt.Println("[upgrade/prepull] Pulling images required for setting up a Kubernetes cluster")
+		fmt.Println("[upgrade/prepull] This might take a minute or two, depending on the speed of your internet connection")
+		fmt.Println("[upgrade/prepull] You can also perform this action in beforehand using 'kubeadm config images pull'")
+		if err := preflight.RunPullImagesCheck(utilsexec.New(), cfg, sets.NewString(cfg.NodeRegistration.IgnorePreflightErrors...)); err != nil {
+			return err
+		}
+	} else {
+		fmt.Println("[upgrade/prepull] Would pull the required images (like 'kubeadm config images pull')")
+	}
 
-	// Use a prepuller implementation based on creating DaemonSets
-	// and block until all DaemonSets are ready; then we know for sure that all control plane images are cached locally
-	klog.V(1).Infoln("[upgrade/apply] creating prepuller")
-	prepuller := upgrade.NewDaemonSetPrepuller(client, waiter, &cfg.ClusterConfiguration)
-	componentsToPrepull := constants.ControlPlaneComponents
-	if cfg.Etcd.External == nil && flags.etcdUpgrade {
-		componentsToPrepull = append(componentsToPrepull, constants.Etcd)
-	}
-	if err := upgrade.PrepullImagesInParallel(prepuller, flags.imagePullTimeout, componentsToPrepull); err != nil {
-		return errors.Wrap(err, "[upgrade/prepull] Failed prepulled the images for the control plane components error")
-	}
+	waiter := getWaiter(flags.dryRun, client, upgrade.UpgradeManifestTimeout)
 
 	// Now; perform the upgrade procedure
 	klog.V(1).Infoln("[upgrade/apply] performing upgrade")
@@ -167,7 +167,7 @@ func runApply(flags *applyFlags, userVersion string) error {
 
 	// Upgrade RBAC rules and addons.
 	klog.V(1).Infoln("[upgrade/postupgrade] upgrading RBAC rules and addons")
-	if err := upgrade.PerformPostUpgradeTasks(client, cfg, newK8sVersion, flags.dryRun); err != nil {
+	if err := upgrade.PerformPostUpgradeTasks(client, cfg, flags.dryRun); err != nil {
 		return errors.Wrap(err, "[upgrade/postupgrade] FATAL post-upgrade error")
 	}
 
@@ -217,8 +217,8 @@ func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, w
 	fmt.Printf("[upgrade/apply] Upgrading your Static Pod-hosted control plane to version %q...\n", internalcfg.KubernetesVersion)
 
 	if flags.dryRun {
-		return upgrade.DryRunStaticPodUpgrade(flags.kustomizeDir, internalcfg)
+		return upgrade.DryRunStaticPodUpgrade(flags.kustomizeDir, flags.patchesDir, internalcfg)
 	}
 
-	return upgrade.PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade, flags.renewCerts, flags.kustomizeDir)
+	return upgrade.PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade, flags.renewCerts, flags.kustomizeDir, flags.patchesDir)
 }

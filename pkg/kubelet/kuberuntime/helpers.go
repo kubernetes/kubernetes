@@ -22,10 +22,10 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -48,14 +48,14 @@ func (p podSandboxByCreated) Len() int           { return len(p) }
 func (p podSandboxByCreated) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p podSandboxByCreated) Less(i, j int) bool { return p[i].CreatedAt > p[j].CreatedAt }
 
-type containerStatusByCreated []*kubecontainer.ContainerStatus
+type containerStatusByCreated []*kubecontainer.Status
 
 func (c containerStatusByCreated) Len() int           { return len(c) }
 func (c containerStatusByCreated) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 func (c containerStatusByCreated) Less(i, j int) bool { return c[i].CreatedAt.After(c[j].CreatedAt) }
 
-// toKubeContainerState converts runtimeapi.ContainerState to kubecontainer.ContainerState.
-func toKubeContainerState(state runtimeapi.ContainerState) kubecontainer.ContainerState {
+// toKubeContainerState converts runtimeapi.ContainerState to kubecontainer.State.
+func toKubeContainerState(state runtimeapi.ContainerState) kubecontainer.State {
 	switch state {
 	case runtimeapi.ContainerState_CONTAINER_CREATED:
 		return kubecontainer.ContainerStateCreated
@@ -141,7 +141,7 @@ func (m *kubeGenericRuntimeManager) getImageUser(image string) (*int64, string, 
 
 // isInitContainerFailed returns true if container has exited and exitcode is not zero
 // or is in unknown state.
-func isInitContainerFailed(status *kubecontainer.ContainerStatus) bool {
+func isInitContainerFailed(status *kubecontainer.Status) bool {
 	if status.State == kubecontainer.ContainerStateExited && status.ExitCode != 0 {
 		return true
 	}
@@ -202,31 +202,57 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 	return &kubecontainer.RuntimeStatus{Conditions: conditions}
 }
 
-// getSeccompProfileFromAnnotations gets seccomp profile from annotations.
-// It gets pod's profile if containerName is empty.
-func (m *kubeGenericRuntimeManager) getSeccompProfileFromAnnotations(annotations map[string]string, containerName string) string {
-	// try the pod profile.
-	profile, profileOK := annotations[v1.SeccompPodAnnotationKey]
+func fieldProfile(scmp *v1.SeccompProfile, profileRootPath string) string {
+	if scmp == nil {
+		return ""
+	}
+	if scmp.Type == v1.SeccompProfileTypeRuntimeDefault {
+		return v1.SeccompProfileRuntimeDefault
+	}
+	if scmp.Type == v1.SeccompProfileTypeLocalhost && scmp.LocalhostProfile != nil && len(*scmp.LocalhostProfile) > 0 {
+		fname := filepath.Join(profileRootPath, *scmp.LocalhostProfile)
+		return v1.SeccompLocalhostProfileNamePrefix + fname
+	}
+	if scmp.Type == v1.SeccompProfileTypeUnconfined {
+		return v1.SeccompProfileNameUnconfined
+	}
+	return ""
+}
+
+func annotationProfile(profile, profileRootPath string) string {
+	if strings.HasPrefix(profile, v1.SeccompLocalhostProfileNamePrefix) {
+		name := strings.TrimPrefix(profile, v1.SeccompLocalhostProfileNamePrefix)
+		fname := filepath.Join(profileRootPath, filepath.FromSlash(name))
+		return v1.SeccompLocalhostProfileNamePrefix + fname
+	}
+	return profile
+}
+
+func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]string, containerName string,
+	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext) string {
+	// container fields are applied first
+	if containerSecContext != nil && containerSecContext.SeccompProfile != nil {
+		return fieldProfile(containerSecContext.SeccompProfile, m.seccompProfileRoot)
+	}
+
+	// if container field does not exist, try container annotation (deprecated)
 	if containerName != "" {
-		// try the container profile.
-		cProfile, cProfileOK := annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName]
-		if cProfileOK {
-			profile = cProfile
-			profileOK = cProfileOK
+		if profile, ok := annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName]; ok {
+			return annotationProfile(profile, m.seccompProfileRoot)
 		}
 	}
 
-	if !profileOK {
-		return ""
+	// when container seccomp is not defined, try to apply from pod field
+	if podSecContext != nil && podSecContext.SeccompProfile != nil {
+		return fieldProfile(podSecContext.SeccompProfile, m.seccompProfileRoot)
 	}
 
-	if strings.HasPrefix(profile, "localhost/") {
-		name := strings.TrimPrefix(profile, "localhost/")
-		fname := filepath.Join(m.seccompProfileRoot, filepath.FromSlash(name))
-		return "localhost/" + fname
+	// as last resort, try to apply pod annotation (deprecated)
+	if profile, ok := annotations[v1.SeccompPodAnnotationKey]; ok {
+		return annotationProfile(profile, m.seccompProfileRoot)
 	}
 
-	return profile
+	return ""
 }
 
 func ipcNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {

@@ -17,13 +17,13 @@ limitations under the License.
 package security
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -63,7 +63,7 @@ elif [[ $(< /proc/self/attr/current) != "%[3]s" ]]; then
 fi`, appArmorDeniedPath, appArmorAllowedPath, appArmorProfilePrefix+nsName)
 
 	if unconfined {
-		profile = apparmor.ProfileNameUnconfined
+		profile = v1.AppArmorBetaProfileNameUnconfined
 		testCmd = `
 if cat /proc/sysrq-trigger 2>&1 | grep 'Permission denied'; then
   echo 'FAILURE: reading /proc/sysrq-trigger should be allowed'
@@ -97,7 +97,7 @@ done`, testCmd)
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "test-apparmor-",
 			Annotations: map[string]string{
-				apparmor.ContainerAnnotationKeyPrefix + "test": profile,
+				v1.AppArmorBetaContainerAnnotationKeyPrefix + "test": profile,
 			},
 			Labels: map[string]string{
 				"test": "apparmor",
@@ -119,7 +119,7 @@ done`, testCmd)
 		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(
 			clientset, pod.Name, nsName))
 		var err error
-		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
+		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 	} else {
 		pod = podClient.CreateSync(pod)
@@ -155,7 +155,7 @@ profile %s flags=(attach_disconnected) {
 			profileName: profile,
 		},
 	}
-	_, err := clientset.CoreV1().ConfigMaps(nsName).Create(cm)
+	_, err := clientset.CoreV1().ConfigMaps(nsName).Create(context.TODO(), cm, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create apparmor-profiles ConfigMap")
 }
 
@@ -223,7 +223,7 @@ func createAppArmorProfileLoader(nsName string, clientset clientset.Interface) {
 			},
 		},
 	}
-	_, err := clientset.CoreV1().ReplicationControllers(nsName).Create(loader)
+	_, err := clientset.CoreV1().ReplicationControllers(nsName).Create(context.TODO(), loader, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create apparmor-loader ReplicationController")
 
 	// Wait for loader to be ready.

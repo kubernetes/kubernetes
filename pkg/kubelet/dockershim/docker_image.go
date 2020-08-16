@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -26,7 +28,7 @@ import (
 	"github.com/docker/docker/pkg/jsonmessage"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 

@@ -17,6 +17,7 @@ limitations under the License.
 package integration
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -52,6 +53,10 @@ var defaultingFixture = &apiextensionsv1.CustomResourceDefinition{
 				Served:  true,
 				Subresources: &apiextensionsv1.CustomResourceSubresources{
 					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+						SpecReplicasPath:   ".spec.replicas",
+						StatusReplicasPath: ".status.replicas",
+					},
 				},
 			},
 			{
@@ -60,6 +65,10 @@ var defaultingFixture = &apiextensionsv1.CustomResourceDefinition{
 				Served:  false,
 				Subresources: &apiextensionsv1.CustomResourceSubresources{
 					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+						SpecReplicasPath:   ".spec.replicas",
+						StatusReplicasPath: ".status.replicas",
+					},
 				},
 			},
 		},
@@ -93,6 +102,11 @@ properties:
         default: "v1beta1"
       v1beta2:
         type: string
+      replicas:
+        default: 1
+        format: int32
+        minimum: 0
+        type: integer
   status:
     type: object
     properties:
@@ -109,6 +123,11 @@ properties:
         default: "v1beta1"
       v1beta2:
         type: string
+      replicas:
+        default: 0
+        format: int32
+        minimum: 0
+        type: integer
 `
 
 const defaultingFooV1beta2Schema = `
@@ -130,6 +149,11 @@ properties:
       v1beta2:
         type: string
         default: "v1beta2"
+      replicas:
+        default: 1
+        format: int32
+        minimum: 0
+        type: integer
   status:
     type: object
     properties:
@@ -146,6 +170,11 @@ properties:
       v1beta2:
         type: string
         default: "v1beta2"
+      replicas:
+        default: 0
+        format: int32
+        minimum: 0
+        type: integer
 `
 
 const defaultingFooInstance = `
@@ -206,12 +235,12 @@ func testDefaulting(t *testing.T, watchCache bool) {
 		var err error
 		for retry := 0; retry < 10; retry++ {
 			var obj *apiextensionsv1.CustomResourceDefinition
-			obj, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+			obj, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
 			update(obj)
-			obj, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(obj)
+			obj, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), obj, metav1.UpdateOptions{})
 			if err != nil && apierrors.IsConflict(err) {
 				continue
 			} else if err != nil {
@@ -264,7 +293,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	}
 	unstructured.SetNestedField(foo.Object, "a", "spec", "a")
 	unstructured.SetNestedField(foo.Object, "b", "status", "b")
-	foo, err = fooClient.Create(foo, metav1.CreateOptions{})
+	foo, err = fooClient.Create(context.TODO(), foo, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unable to create CR: %v", err)
 	}
@@ -273,22 +302,22 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	// spec.a and spec.b are defaulted in both versions
 	// spec.v1beta1 is defaulted when reading the incoming request
 	// spec.v1beta2 is defaulted when reading the storage response
-	mustExist(foo.Object, [][]string{{"spec", "a"}, {"spec", "b"}, {"spec", "v1beta1"}, {"spec", "v1beta2"}})
+	mustExist(foo.Object, [][]string{{"spec", "a"}, {"spec", "b"}, {"spec", "v1beta1"}, {"spec", "v1beta2"}, {"spec", "replicas"}})
 	mustNotExist(foo.Object, [][]string{{"status"}})
 
 	t.Logf("Updating status and expecting 'a' and 'b' to show up.")
 	unstructured.SetNestedField(foo.Object, map[string]interface{}{}, "status")
-	if foo, err = fooClient.UpdateStatus(foo, metav1.UpdateOptions{}); err != nil {
+	if foo, err = fooClient.UpdateStatus(context.TODO(), foo, metav1.UpdateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	mustExist(foo.Object, [][]string{{"spec", "a"}, {"spec", "b"}, {"status", "a"}, {"status", "b"}})
+	mustExist(foo.Object, [][]string{{"spec", "a"}, {"spec", "b"}, {"status", "a"}, {"status", "b"}, {"status", "replicas"}})
 
 	t.Logf("Add 'c' default to the storage version and wait until GET sees it in both status and spec")
 	addDefault("v1beta2", "c", "C")
 
 	t.Logf("wait until GET sees 'c' in both status and spec")
 	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		obj, err := fooClient.Get(foo.GetName(), metav1.GetOptions{})
+		obj, err := fooClient.Get(context.TODO(), foo.GetName(), metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -305,7 +334,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 
 	t.Logf("wait until GET sees 'c' in both status and spec of cached get")
 	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		obj, err := fooClient.Get(foo.GetName(), metav1.GetOptions{ResourceVersion: "0"})
+		obj, err := fooClient.Get(context.TODO(), foo.GetName(), metav1.GetOptions{ResourceVersion: "0"})
 		if err != nil {
 			return false, err
 		}
@@ -321,7 +350,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	mustExist(foo.Object, [][]string{{"spec", "a"}, {"spec", "b"}, {"spec", "c"}, {"status", "a"}, {"status", "b"}, {"status", "c"}})
 
 	t.Logf("verify LIST sees 'c' in both status and spec")
-	foos, err := fooClient.List(metav1.ListOptions{})
+	foos, err := fooClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,7 +359,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	}
 
 	t.Logf("verify LIST from cache sees 'c' in both status and spec")
-	foos, err = fooClient.List(metav1.ListOptions{ResourceVersion: "0"})
+	foos, err = fooClient.List(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +372,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	// The contents of the watch cache are seen by list with rv=0, which is tested by this test.
 	if !watchCache {
 		t.Logf("verify WATCH sees 'c' in both status and spec")
-		w, err := fooClient.Watch(metav1.ListOptions{ResourceVersion: initialResourceVersion})
+		w, err := fooClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: initialResourceVersion})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -368,7 +397,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	addDefault("v1beta1", "c", "C")
 	removeDefault("v1beta2", "c")
 	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		obj, err := fooClient.Get(foo.GetName(), metav1.GetOptions{})
+		obj, err := fooClient.Get(context.TODO(), foo.GetName(), metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -382,7 +411,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	mustNotExist(foo.Object, [][]string{{"spec", "c"}, {"status", "c"}})
 
 	t.Logf("Updating status, expecting 'c' to be set in status only")
-	if foo, err = fooClient.UpdateStatus(foo, metav1.UpdateOptions{}); err != nil {
+	if foo, err = fooClient.UpdateStatus(context.TODO(), foo, metav1.UpdateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	mustExist(foo.Object, [][]string{{"spec", "a"}, {"spec", "b"}, {"status", "a"}, {"status", "b"}, {"status", "c"}})
@@ -393,7 +422,7 @@ func testDefaulting(t *testing.T, watchCache bool) {
 	removeDefault("v1beta1", "b")
 	removeDefault("v1beta1", "c")
 	if err := wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		obj, err := fooClient.Get(foo.GetName(), metav1.GetOptions{})
+		obj, err := fooClient.Get(context.TODO(), foo.GetName(), metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -622,7 +651,7 @@ func TestCustomResourceDefaultingOfMetaFields(t *testing.T) {
 			}
 		}
 	}
-	returnedFoo, err = fooClient.Create(returnedFoo, metav1.CreateOptions{})
+	returnedFoo, err = fooClient.Create(context.TODO(), returnedFoo, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unable to create CR: %v", err)
 	}

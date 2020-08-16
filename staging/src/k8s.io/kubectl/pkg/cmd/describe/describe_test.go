@@ -28,18 +28,17 @@ import (
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/describe"
-	versioneddescribe "k8s.io/kubectl/pkg/describe/versioned"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := versioneddescribe.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		versioneddescribe.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	versioneddescribe.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("non-default")
 	defer tf.Cleanup()
@@ -67,11 +66,11 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := versioneddescribe.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		versioneddescribe.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	versioneddescribe.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
@@ -99,11 +98,11 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 
 func TestDescribeObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := versioneddescribe.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		versioneddescribe.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	versioneddescribe.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
 	_, _, rc := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -140,11 +139,11 @@ func TestDescribeObject(t *testing.T) {
 
 func TestDescribeListObjects(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := versioneddescribe.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		versioneddescribe.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	versioneddescribe.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
 	pods, _, _ := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -167,11 +166,11 @@ func TestDescribeListObjects(t *testing.T) {
 
 func TestDescribeObjectShowEvents(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := versioneddescribe.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		versioneddescribe.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	versioneddescribe.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
 	pods, _, _ := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -193,11 +192,11 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 
 func TestDescribeObjectSkipEvents(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := versioneddescribe.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		versioneddescribe.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	versioneddescribe.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
 	pods, _, _ := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -245,6 +244,59 @@ func TestDescribeHelpMessage(t *testing.T) {
 	}
 }
 
+func TestDescribeNoResourcesFound(t *testing.T) {
+	testNS := "testns"
+	testCases := []struct {
+		name           string
+		flags          map[string]string
+		namespace      string
+		expectedOutput string
+		expectedErr    string
+	}{
+		{
+			name:           "all namespaces",
+			flags:          map[string]string{"all-namespaces": "true"},
+			expectedOutput: "",
+			expectedErr:    "No resources found\n",
+		},
+		{
+			name:           "all in namespace",
+			namespace:      testNS,
+			expectedOutput: "",
+			expectedErr:    "No resources found in " + testNS + " namespace.\n",
+		},
+	}
+	cmdtesting.InitTestErrorHandler(t)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			pods, _, _ := cmdtesting.EmptyTestData()
+			tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
+			defer tf.Cleanup()
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+				Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
+			}
+
+			streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
+
+			cmd := NewCmdDescribe("kubectl", tf, streams)
+			for name, value := range testCase.flags {
+				_ = cmd.Flags().Set(name, value)
+			}
+			cmd.Run(cmd, []string{"pods"})
+
+			if e, a := testCase.expectedOutput, buf.String(); e != a {
+				t.Errorf("Unexpected output:\nExpected:\n%v\nActual:\n%v", e, a)
+			}
+			if e, a := testCase.expectedErr, errbuf.String(); e != a {
+				t.Errorf("Unexpected error:\nExpected:\n%v\nActual:\n%v", e, a)
+			}
+		})
+	}
+}
+
 type testDescriber struct {
 	Name, Namespace string
 	Settings        describe.DescriberSettings
@@ -257,6 +309,6 @@ func (t *testDescriber) Describe(namespace, name string, describerSettings descr
 	t.Settings = describerSettings
 	return t.Output, t.Err
 }
-func (t *testDescriber) describerFor(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (describe.Describer, error) {
+func (t *testDescriber) describerFor(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (describe.ResourceDescriber, error) {
 	return t, nil
 }

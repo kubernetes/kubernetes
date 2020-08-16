@@ -18,7 +18,9 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"os"
 	"text/template"
 	"time"
 
@@ -55,36 +57,33 @@ var (
 // CurrentSuite represents current test suite.
 var CurrentSuite Suite
 
-// CommonImageWhiteList is the list of images used in common test. These images should be prepulled
-// before a tests starts, so that the tests won't fail due image pulling flakes. Currently, this is
-// only used by node e2e test.
+// PrePulledImages are a list of images used in e2e/common tests. These images should be prepulled
+// before tests starts, so that the tests won't fail due image pulling flakes.
+// Currently, this is only used by node e2e test.
+// See also updateImageAllowList() in ../../e2e_node/image_list.go
 // TODO(random-liu): Change the image puller pod to use similar mechanism.
-var CommonImageWhiteList = sets.NewString(
+var PrePulledImages = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Agnhost),
 	imageutils.GetE2EImage(imageutils.BusyBox),
 	imageutils.GetE2EImage(imageutils.IpcUtils),
-	imageutils.GetE2EImage(imageutils.Mounttest),
-	imageutils.GetE2EImage(imageutils.MounttestUser),
 	imageutils.GetE2EImage(imageutils.Nginx),
 	imageutils.GetE2EImage(imageutils.Httpd),
-	imageutils.GetE2EImage(imageutils.TestWebserver),
 	imageutils.GetE2EImage(imageutils.VolumeNFSServer),
 	imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
 	imageutils.GetE2EImage(imageutils.NonRoot),
 )
 
 type testImagesStruct struct {
-	AgnhostImage   string
-	BusyBoxImage   string
-	KittenImage    string
-	MounttestImage string
-	NautilusImage  string
-	NginxImage     string
-	NginxNewImage  string
-	HttpdImage     string
-	HttpdNewImage  string
-	PauseImage     string
-	RedisImage     string
+	AgnhostImage  string
+	BusyBoxImage  string
+	KittenImage   string
+	NautilusImage string
+	NginxImage    string
+	NginxNewImage string
+	HttpdImage    string
+	HttpdNewImage string
+	PauseImage    string
+	RedisImage    string
 }
 
 var testImages testImagesStruct
@@ -94,7 +93,6 @@ func init() {
 		imageutils.GetE2EImage(imageutils.Agnhost),
 		imageutils.GetE2EImage(imageutils.BusyBox),
 		imageutils.GetE2EImage(imageutils.Kitten),
-		imageutils.GetE2EImage(imageutils.Mounttest),
 		imageutils.GetE2EImage(imageutils.Nautilus),
 		imageutils.GetE2EImage(imageutils.Nginx),
 		imageutils.GetE2EImage(imageutils.NginxNew),
@@ -140,7 +138,7 @@ func svcByName(name string, port int) *v1.Service {
 // NewSVCByName creates a service by name.
 func NewSVCByName(c clientset.Interface, ns, name string) error {
 	const testPort = 9376
-	_, err := c.CoreV1().Services(ns).Create(svcByName(name, testPort))
+	_, err := c.CoreV1().Services(ns).Create(context.TODO(), svcByName(name, testPort), metav1.CreateOptions{})
 	return err
 }
 
@@ -152,8 +150,8 @@ func NewRCByName(c clientset.Interface, ns, name string, replicas int32, gracePe
 		containerArgs = []string{"serve-hostname"}
 	}
 
-	return c.CoreV1().ReplicationControllers(ns).Create(rcByNamePort(
-		name, replicas, framework.ServeHostnameImage, containerArgs, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod))
+	return c.CoreV1().ReplicationControllers(ns).Create(context.TODO(), rcByNamePort(
+		name, replicas, framework.ServeHostnameImage, containerArgs, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod), metav1.CreateOptions{})
 }
 
 // RestartNodes restarts specific nodes.
@@ -189,7 +187,7 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 	for i := range nodes {
 		node := &nodes[i]
 		if err := wait.Poll(30*time.Second, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
-			newNode, err := c.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+			newNode, err := c.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, fmt.Errorf("error getting node info after reboot: %s", err)
 			}
@@ -221,4 +219,25 @@ func setPodNonRootUser(pod *v1.Pod) {
 	} else {
 		pod.Spec.SecurityContext.RunAsUser = &nonRootTestUserID
 	}
+}
+
+// getFileModeRegex returns a file mode related regex which should be matched by the mounttest pods' output.
+// If the given mask is nil, then the regex will contain the default OS file modes, which are 0644 for Linux and 0775 for Windows.
+func getFileModeRegex(filePath string, mask *int32) string {
+	var (
+		linuxMask   int32
+		windowsMask int32
+	)
+	if mask == nil {
+		linuxMask = int32(0644)
+		windowsMask = int32(0775)
+	} else {
+		linuxMask = *mask
+		windowsMask = *mask
+	}
+
+	linuxOutput := fmt.Sprintf("mode of file \"%s\": %v", filePath, os.FileMode(linuxMask))
+	windowsOutput := fmt.Sprintf("mode of Windows file \"%v\": %s", filePath, os.FileMode(windowsMask))
+
+	return fmt.Sprintf("(%s|%s)", linuxOutput, windowsOutput)
 }

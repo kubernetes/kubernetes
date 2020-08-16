@@ -177,7 +177,12 @@ var tooLargeResourceVersionCauseMsg = "Too large resource version"
 // a minimum resource version that is larger than the largest currently available resource version for a requested resource.
 func NewTooLargeResourceVersionError(minimumResourceVersion, currentRevision uint64, retrySeconds int) error {
 	err := errors.NewTimeoutError(fmt.Sprintf("Too large resource version: %d, current: %d", minimumResourceVersion, currentRevision), retrySeconds)
-	err.ErrStatus.Details.Causes = []metav1.StatusCause{{Message: tooLargeResourceVersionCauseMsg}}
+	err.ErrStatus.Details.Causes = []metav1.StatusCause{
+		{
+			Type:    metav1.CauseTypeResourceVersionTooLarge,
+			Message: tooLargeResourceVersionCauseMsg,
+		},
+	}
 	return err
 }
 
@@ -186,15 +191,5 @@ func IsTooLargeResourceVersion(err error) bool {
 	if !errors.IsTimeout(err) {
 		return false
 	}
-	switch t := err.(type) {
-	case errors.APIStatus:
-		if d := t.Status().Details; d != nil {
-			for _, cause := range d.Causes {
-				if cause.Message == tooLargeResourceVersionCauseMsg {
-					return true
-				}
-			}
-		}
-	}
-	return false
+	return errors.HasStatusCause(err, metav1.CauseTypeResourceVersionTooLarge)
 }

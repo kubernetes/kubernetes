@@ -33,7 +33,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstrap "k8s.io/cluster-bootstrap/token/jws"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -210,7 +210,7 @@ func getClusterInfo(client clientset.Interface, kubeconfig *clientcmdapi.Config,
 	defer cancel()
 
 	wait.JitterUntil(func() {
-		cm, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
+		cm, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		if err != nil {
 			klog.V(1).Infof("[discovery] Failed to request cluster-info, will try again: %v", err)
 			return

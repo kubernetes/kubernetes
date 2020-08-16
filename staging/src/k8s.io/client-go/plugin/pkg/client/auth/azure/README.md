@@ -38,7 +38,13 @@ This plugin provides an integration with Azure Active Directory device flow. If 
    * Replace `APISERVER_APPLICATION_ID` with the application ID of your `apiserver` application ID
    * Be sure to also (create and) select a context that uses above user
 
- 6. The access token is acquired when first `kubectl` command is executed
+6. (Optionally) the AAD token has `aud` claim with `spn:` prefix. To omit that, add following auth configuration:
+
+   ```
+     --auth-provider-arg=config-mode="1"
+   ```
+
+ 7. The access token is acquired when first `kubectl` command is executed
 
    ```
    kubectl get pods

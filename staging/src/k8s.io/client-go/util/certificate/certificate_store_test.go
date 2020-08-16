@@ -284,6 +284,43 @@ func TestUpdateRotation(t *testing.T) {
 	}
 }
 
+func TestUpdateTwoCerts(t *testing.T) {
+	prefix := "kubelet-server"
+	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
+	if err != nil {
+		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
+	}
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Errorf("Unable to clean up test directory %q: %v", dir, err)
+		}
+	}()
+	keyFile := filepath.Join(dir, "kubelet.key")
+	if err := ioutil.WriteFile(keyFile, storeTwoCertsData.keyPEM, 0600); err != nil {
+		t.Fatalf("Unable to create the file %q: %v", keyFile, err)
+	}
+	certFile := filepath.Join(dir, "kubelet.crt")
+	if err := ioutil.WriteFile(certFile, storeTwoCertsData.certificatePEM, 0600); err != nil {
+		t.Fatalf("Unable to create the file %q: %v", certFile, err)
+	}
+
+	s, err := NewFileStore(prefix, dir, dir, certFile, keyFile)
+	if err != nil {
+		t.Fatalf("Got %v while creating a new store.", err)
+	}
+
+	cert, err := s.Update(storeTwoCertsData.certificatePEM, storeTwoCertsData.keyPEM)
+	if err != nil {
+		t.Errorf("Got %v while updating certificate store.", err)
+	}
+	if cert == nil {
+		t.Fatalf("Got nil certificate, expected something real.")
+	}
+	if len(cert.Certificate) != 2 {
+		t.Fatalf("Unexpected number of certificates, expected 2, got %v", len(cert.Certificate))
+	}
+}
+
 func TestUpdateWithBadCertKeyData(t *testing.T) {
 	prefix := "kubelet-server"
 	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
@@ -391,6 +428,46 @@ func TestCurrentCertKeyFiles(t *testing.T) {
 	}
 	if cert.Leaf == nil {
 		t.Fatalf("Got an empty leaf, expected private data.")
+	}
+}
+
+func TestCurrentTwoCerts(t *testing.T) {
+	prefix := "kubelet-server"
+	dir, err := ioutil.TempDir("", "k8s-test-certstore-current")
+	if err != nil {
+		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
+	}
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Errorf("Unable to clean up test directory %q: %v", dir, err)
+		}
+	}()
+	certFile := filepath.Join(dir, "kubelet.crt")
+	if err := ioutil.WriteFile(certFile, storeTwoCertsData.certificatePEM, 0600); err != nil {
+		t.Fatalf("Unable to create the file %q: %v", certFile, err)
+	}
+	keyFile := filepath.Join(dir, "kubelet.key")
+	if err := ioutil.WriteFile(keyFile, storeTwoCertsData.keyPEM, 0600); err != nil {
+		t.Fatalf("Unable to create the file %q: %v", keyFile, err)
+	}
+
+	store, err := NewFileStore(prefix, dir, dir, certFile, keyFile)
+	if err != nil {
+		t.Fatalf("Failed to initialize certificate store: %v", err)
+	}
+
+	cert, err := store.Current()
+	if err != nil {
+		t.Fatalf("Could not load certificate from disk: %v", err)
+	}
+	if cert == nil {
+		t.Fatalf("There was no error, but no certificate data was returned.")
+	}
+	if cert.Leaf == nil {
+		t.Fatalf("Got an empty leaf, expected private data.")
+	}
+	if len(cert.Certificate) != 2 {
+		t.Fatalf("Unexpected number of certificates, expected 2, got %v", len(cert.Certificate))
 	}
 }
 

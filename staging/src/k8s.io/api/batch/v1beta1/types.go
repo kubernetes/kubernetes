@@ -18,11 +18,13 @@ package v1beta1
 
 import (
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.8
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // JobTemplate describes a template for creating copies of a predefined pod.
 type JobTemplate struct {
@@ -53,6 +55,8 @@ type JobTemplateSpec struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.8
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // CronJob represents the configuration of a single cron job.
 type CronJob struct {
@@ -74,6 +78,8 @@ type CronJob struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.8
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // CronJobList is a collection of cron jobs.
 type CronJobList struct {

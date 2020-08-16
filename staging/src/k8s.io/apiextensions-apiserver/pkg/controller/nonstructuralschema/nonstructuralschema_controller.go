@@ -17,6 +17,7 @@ limitations under the License.
 package nonstructuralschema
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -28,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
@@ -159,7 +160,7 @@ func (c *ConditionController) sync(key string) error {
 		apiextensionshelpers.SetCRDCondition(crd, *cond)
 	}
 
-	_, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+	_, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(context.TODO(), crd, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
 		return nil

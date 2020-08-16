@@ -17,6 +17,7 @@ limitations under the License.
 package podgc
 
 import (
+	"context"
 	"sort"
 	"sync"
 	"time"
@@ -35,7 +36,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -75,7 +76,7 @@ func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInfor
 		nodeQueue:              workqueue.NewNamedDelayingQueue("orphaned_pods_nodes"),
 		deletePod: func(namespace, name string) error {
 			klog.Infof("PodGC is force deleting Pod: %v/%v", namespace, name)
-			return kubeClient.CoreV1().Pods(namespace).Delete(name, metav1.NewDeleteOptions(0))
+			return kubeClient.CoreV1().Pods(namespace).Delete(context.TODO(), name, *metav1.NewDeleteOptions(0))
 		},
 	}
 
@@ -214,7 +215,7 @@ func (gcc *PodGCController) discoverDeletedNodes(existingNodeNames sets.String) 
 }
 
 func (gcc *PodGCController) checkIfNodeExists(name string) (bool, error) {
-	_, fetchErr := gcc.kubeClient.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+	_, fetchErr := gcc.kubeClient.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 	if errors.IsNotFound(fetchErr) {
 		return false, nil
 	}

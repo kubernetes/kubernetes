@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
@@ -36,7 +37,7 @@ func CRDFromDynamic(client dynamic.Interface) CRDGetter {
 			Group:    "apiextensions.k8s.io",
 			Version:  "v1beta1",
 			Resource: "customresourcedefinitions",
-		}).List(metav1.ListOptions{})
+		}).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to list CRDs: %v", err)
 		}

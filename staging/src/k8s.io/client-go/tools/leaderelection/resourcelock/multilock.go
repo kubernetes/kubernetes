@@ -18,6 +18,7 @@ package resourcelock
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,13 +35,13 @@ type MultiLock struct {
 }
 
 // Get returns the older election record of the lock
-func (ml *MultiLock) Get() (*LeaderElectionRecord, []byte, error) {
-	primary, primaryRaw, err := ml.Primary.Get()
+func (ml *MultiLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte, error) {
+	primary, primaryRaw, err := ml.Primary.Get(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	secondary, secondaryRaw, err := ml.Secondary.Get()
+	secondary, secondaryRaw, err := ml.Secondary.Get(ctx)
 	if err != nil {
 		// Lock is held by old client
 		if apierrors.IsNotFound(err) && primary.HolderIdentity != ml.Identity() {
@@ -60,25 +61,25 @@ func (ml *MultiLock) Get() (*LeaderElectionRecord, []byte, error) {
 }
 
 // Create attempts to create both primary lock and secondary lock
-func (ml *MultiLock) Create(ler LeaderElectionRecord) error {
-	err := ml.Primary.Create(ler)
+func (ml *MultiLock) Create(ctx context.Context, ler LeaderElectionRecord) error {
+	err := ml.Primary.Create(ctx, ler)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
-	return ml.Secondary.Create(ler)
+	return ml.Secondary.Create(ctx, ler)
 }
 
 // Update will update and existing annotation on both two resources.
-func (ml *MultiLock) Update(ler LeaderElectionRecord) error {
-	err := ml.Primary.Update(ler)
+func (ml *MultiLock) Update(ctx context.Context, ler LeaderElectionRecord) error {
+	err := ml.Primary.Update(ctx, ler)
 	if err != nil {
 		return err
 	}
-	_, _, err = ml.Secondary.Get()
+	_, _, err = ml.Secondary.Get(ctx)
 	if err != nil && apierrors.IsNotFound(err) {
-		return ml.Secondary.Create(ler)
+		return ml.Secondary.Create(ctx, ler)
 	}
-	return ml.Secondary.Update(ler)
+	return ml.Secondary.Update(ctx, ler)
 }
 
 // RecordEvent in leader election while adding meta-data

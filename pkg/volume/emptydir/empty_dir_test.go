@@ -19,20 +19,24 @@ limitations under the License.
 package emptydir
 
 import (
+	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"k8s.io/utils/mount"
-
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltesting "k8s.io/client-go/util/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/utils/mount"
 )
 
 // Construct an instance of a plugin, by name.
@@ -71,8 +75,8 @@ type fakeMountDetector struct {
 	isMount bool
 }
 
-func (fake *fakeMountDetector) GetMountMedium(path string) (v1.StorageMedium, bool, error) {
-	return fake.medium, fake.isMount, nil
+func (fake *fakeMountDetector) GetMountMedium(path string, requestedMedium v1.StorageMedium) (v1.StorageMedium, bool, *resource.Quantity, error) {
+	return fake.medium, fake.isMount, nil, nil
 }
 
 func TestPluginEmptyRootContext(t *testing.T) {
@@ -83,12 +87,33 @@ func TestPluginEmptyRootContext(t *testing.T) {
 }
 
 func TestPluginHugetlbfs(t *testing.T) {
-	doTestPlugin(t, pluginTestConfig{
-		medium:                        v1.StorageMediumHugePages,
-		expectedSetupMounts:           1,
-		expectedTeardownMounts:        0,
-		shouldBeMountedBeforeTeardown: true,
-	})
+	testCases := map[string]struct {
+		medium                          v1.StorageMedium
+		enableHugePageStorageMediumSize bool
+	}{
+		"HugePageStorageMediumSize enabled: medium without size": {
+			medium:                          "HugePages",
+			enableHugePageStorageMediumSize: true,
+		},
+		"HugePageStorageMediumSize disabled: medium without size": {
+			medium: "HugePages",
+		},
+		"HugePageStorageMediumSize enabled: medium with size": {
+			medium:                          "HugePages-2Mi",
+			enableHugePageStorageMediumSize: true,
+		},
+	}
+	for tcName, tc := range testCases {
+		t.Run(tcName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePageStorageMediumSize, tc.enableHugePageStorageMediumSize)()
+			doTestPlugin(t, pluginTestConfig{
+				medium:                        tc.medium,
+				expectedSetupMounts:           1,
+				expectedTeardownMounts:        0,
+				shouldBeMountedBeforeTeardown: true,
+			})
+		})
+	}
 }
 
 type pluginTestConfig struct {
@@ -307,11 +332,13 @@ func TestMetrics(t *testing.T) {
 
 func TestGetHugePagesMountOptions(t *testing.T) {
 	testCases := map[string]struct {
-		pod            *v1.Pod
-		shouldFail     bool
-		expectedResult string
+		pod                             *v1.Pod
+		medium                          v1.StorageMedium
+		shouldFail                      bool
+		expectedResult                  string
+		enableHugePageStorageMediumSize bool
 	}{
-		"testWithProperValues": {
+		"ProperValues": {
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -325,10 +352,11 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 					},
 				},
 			},
+			medium:         v1.StorageMediumHugePages,
 			shouldFail:     false,
 			expectedResult: "pagesize=2Mi",
 		},
-		"testWithProperValuesAndDifferentPageSize": {
+		"ProperValuesAndDifferentPageSize": {
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
@@ -349,6 +377,7 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 					},
 				},
 			},
+			medium:         v1.StorageMediumHugePages,
 			shouldFail:     false,
 			expectedResult: "pagesize=1Gi",
 		},
@@ -373,6 +402,7 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 					},
 				},
 			},
+			medium:         v1.StorageMediumHugePages,
 			shouldFail:     false,
 			expectedResult: "pagesize=1Gi",
 		},
@@ -397,6 +427,7 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 					},
 				},
 			},
+			medium:         v1.StorageMediumHugePages,
 			shouldFail:     true,
 			expectedResult: "",
 		},
@@ -421,24 +452,469 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 					},
 				},
 			},
-			shouldFail:     true,
-			expectedResult: "",
+			medium:                          v1.StorageMediumHugePages,
+			shouldFail:                      true,
+			expectedResult:                  "",
+			enableHugePageStorageMediumSize: true,
 		},
 		"PodWithNoHugePagesRequest": {
 			pod:            &v1.Pod{},
+			medium:         v1.StorageMediumHugePages,
+			shouldFail:     true,
+			expectedResult: "",
+		},
+		"ProperValuesMultipleSizes": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			medium:                          v1.StorageMediumHugePagesPrefix + "1Gi",
+			shouldFail:                      false,
+			expectedResult:                  "pagesize=1Gi",
+			enableHugePageStorageMediumSize: true,
+		},
+		"InitContainerAndContainerHasProperValuesMultipleSizes": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+									v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("4Gi"),
+									v1.ResourceName("hugepages-2Mi"): resource.MustParse("50Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			medium:                          v1.StorageMediumHugePagesPrefix + "2Mi",
+			shouldFail:                      false,
+			expectedResult:                  "pagesize=2Mi",
+			enableHugePageStorageMediumSize: true,
+		},
+		"MediumWithoutSizeMultipleSizes": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			medium:         v1.StorageMediumHugePagesPrefix,
+			shouldFail:     true,
+			expectedResult: "",
+		},
+		"IncorrectMediumFormatMultipleSizes": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			medium:         "foo",
+			shouldFail:     true,
+			expectedResult: "",
+		},
+		"MediumSizeDoesntMatchResourcesMultipleSizes": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+									v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			medium:         v1.StorageMediumHugePagesPrefix + "1Mi",
 			shouldFail:     true,
 			expectedResult: "",
 		},
 	}
 
 	for testCaseName, testCase := range testCases {
-		value, err := getPageSizeMountOptionFromPod(testCase.pod)
-		if testCase.shouldFail && err == nil {
-			t.Errorf("Expected an error in %v", testCaseName)
-		} else if !testCase.shouldFail && err != nil {
-			t.Errorf("Unexpected error in %v, got %v", testCaseName, err)
-		} else if testCase.expectedResult != value {
-			t.Errorf("Unexpected mountOptions for Pod. Expected %v, got %v", testCase.expectedResult, value)
-		}
+		t.Run(testCaseName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePageStorageMediumSize, testCase.enableHugePageStorageMediumSize)()
+			value, err := getPageSizeMountOption(testCase.medium, testCase.pod)
+			if testCase.shouldFail && err == nil {
+				t.Errorf("%s: Unexpected success", testCaseName)
+			} else if !testCase.shouldFail && err != nil {
+				t.Errorf("%s: Unexpected error: %v", testCaseName, err)
+			} else if testCase.expectedResult != value {
+				t.Errorf("%s: Unexpected mountOptions for Pod. Expected %v, got %v", testCaseName, testCase.expectedResult, value)
+			}
+		})
+	}
+}
+
+type testMountDetector struct {
+	pageSize *resource.Quantity
+	isMnt    bool
+	err      error
+}
+
+func (md *testMountDetector) GetMountMedium(path string, requestedMedium v1.StorageMedium) (v1.StorageMedium, bool, *resource.Quantity, error) {
+	return v1.StorageMediumHugePages, md.isMnt, md.pageSize, md.err
+}
+
+func TestSetupHugepages(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "TestSetupHugepages")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	pageSize2Mi := resource.MustParse("2Mi")
+
+	testCases := map[string]struct {
+		path       string
+		ed         *emptyDir
+		shouldFail bool
+	}{
+		"Valid: mount expected": {
+			path: tmpdir,
+			ed: &emptyDir{
+				medium: v1.StorageMediumHugePages,
+				pod: &v1.Pod{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+									},
+								},
+							},
+						},
+					},
+				},
+				mounter: &mount.FakeMounter{},
+				mountDetector: &testMountDetector{
+					pageSize: &resource.Quantity{},
+					isMnt:    false,
+					err:      nil,
+				},
+			},
+			shouldFail: false,
+		},
+		"Valid: already mounted with correct pagesize": {
+			path: tmpdir,
+			ed: &emptyDir{
+				medium: "HugePages-2Mi",
+				pod: &v1.Pod{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+									},
+								},
+							},
+						},
+					},
+				},
+				mounter: mount.NewFakeMounter([]mount.MountPoint{{Path: tmpdir, Opts: []string{"rw", "pagesize=2M", "realtime"}}}),
+				mountDetector: &testMountDetector{
+					pageSize: &pageSize2Mi,
+					isMnt:    true,
+					err:      nil,
+				},
+			},
+			shouldFail: false,
+		},
+		"Valid: already mounted": {
+			path: tmpdir,
+			ed: &emptyDir{
+				medium: "HugePages",
+				pod: &v1.Pod{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+									},
+								},
+							},
+						},
+					},
+				},
+				mounter: mount.NewFakeMounter([]mount.MountPoint{{Path: tmpdir, Opts: []string{"rw", "pagesize=2M", "realtime"}}}),
+				mountDetector: &testMountDetector{
+					pageSize: nil,
+					isMnt:    true,
+					err:      nil,
+				},
+			},
+			shouldFail: false,
+		},
+		"Invalid: mounter is nil": {
+			path: tmpdir,
+			ed: &emptyDir{
+				medium: "HugePages-2Mi",
+				pod: &v1.Pod{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+									},
+								},
+							},
+						},
+					},
+				},
+				mounter: nil,
+			},
+			shouldFail: true,
+		},
+		"Invalid: GetMountMedium error": {
+			path: tmpdir,
+			ed: &emptyDir{
+				medium: "HugePages-2Mi",
+				pod: &v1.Pod{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+									},
+								},
+							},
+						},
+					},
+				},
+				mounter: mount.NewFakeMounter([]mount.MountPoint{{Path: tmpdir, Opts: []string{"rw", "pagesize=2M", "realtime"}}}),
+				mountDetector: &testMountDetector{
+					pageSize: &pageSize2Mi,
+					isMnt:    true,
+					err:      fmt.Errorf("GetMountMedium error"),
+				},
+			},
+			shouldFail: true,
+		},
+		"Invalid: medium and page size differ": {
+			path: tmpdir,
+			ed: &emptyDir{
+				medium: "HugePages-1Gi",
+				pod: &v1.Pod{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+									},
+								},
+							},
+						},
+					},
+				},
+				mounter: mount.NewFakeMounter([]mount.MountPoint{{Path: tmpdir, Opts: []string{"rw", "pagesize=2M", "realtime"}}}),
+				mountDetector: &testMountDetector{
+					pageSize: &pageSize2Mi,
+					isMnt:    true,
+					err:      nil,
+				},
+			},
+			shouldFail: true,
+		},
+		"Invalid medium": {
+			path: tmpdir,
+			ed: &emptyDir{
+				medium: "HugePages-NN",
+				pod: &v1.Pod{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+									},
+								},
+							},
+						},
+					},
+				},
+				mounter: &mount.FakeMounter{},
+				mountDetector: &testMountDetector{
+					pageSize: &resource.Quantity{},
+					isMnt:    false,
+					err:      nil,
+				},
+			},
+			shouldFail: true,
+		},
+		"Invalid: setupDir fails": {
+			path: "",
+			ed: &emptyDir{
+				medium: v1.StorageMediumHugePages,
+				pod: &v1.Pod{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Resources: v1.ResourceRequirements{
+									Requests: v1.ResourceList{
+										v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+									},
+								},
+							},
+						},
+					},
+				},
+				mounter: &mount.FakeMounter{},
+			},
+			shouldFail: true,
+		},
+	}
+
+	for testCaseName, testCase := range testCases {
+		t.Run(testCaseName, func(t *testing.T) {
+			err := testCase.ed.setupHugepages(testCase.path)
+			if testCase.shouldFail && err == nil {
+				t.Errorf("%s: Unexpected success", testCaseName)
+			} else if !testCase.shouldFail && err != nil {
+				t.Errorf("%s: Unexpected error: %v", testCaseName, err)
+			}
+		})
+	}
+}
+
+func TestGetPageSize(t *testing.T) {
+	mounter := &mount.FakeMounter{
+		MountPoints: []mount.MountPoint{
+			{
+				Device: "/dev/sda2",
+				Type:   "ext4",
+				Path:   "/",
+				Opts:   []string{"rw", "relatime", "errors=remount-ro"},
+			},
+			{
+				Device: "/dev/hugepages",
+				Type:   "hugetlbfs",
+				Path:   "/mnt/hugepages-2Mi",
+				Opts:   []string{"rw", "relatime", "pagesize=2M"},
+			},
+			{
+				Device: "/dev/hugepages",
+				Type:   "hugetlbfs",
+				Path:   "/mnt/hugepages-2Mi",
+				Opts:   []string{"rw", "relatime", "pagesize=2Mi"},
+			},
+			{
+				Device: "sysfs",
+				Type:   "sysfs",
+				Path:   "/sys",
+				Opts:   []string{"rw", "nosuid", "nodev", "noexec", "relatime"},
+			},
+			{
+				Device: "/dev/hugepages",
+				Type:   "hugetlbfs",
+				Path:   "/mnt/hugepages-1Gi",
+				Opts:   []string{"rw", "relatime", "pagesize=1024M"},
+			},
+			{
+				Device: "/dev/hugepages",
+				Type:   "hugetlbfs",
+				Path:   "/mnt/noopt",
+				Opts:   []string{"rw", "relatime"},
+			},
+			{
+				Device: "/dev/hugepages",
+				Type:   "hugetlbfs",
+				Path:   "/mnt/badopt",
+				Opts:   []string{"rw", "relatime", "pagesize=NN"},
+			},
+		},
+	}
+
+	testCases := map[string]struct {
+		path           string
+		mounter        mount.Interface
+		expectedResult resource.Quantity
+		shouldFail     bool
+	}{
+		"Valid: existing 2Mi mount": {
+			path:           "/mnt/hugepages-2Mi",
+			mounter:        mounter,
+			shouldFail:     false,
+			expectedResult: resource.MustParse("2Mi"),
+		},
+		"Valid: existing 1Gi mount": {
+			path:           "/mnt/hugepages-1Gi",
+			mounter:        mounter,
+			shouldFail:     false,
+			expectedResult: resource.MustParse("1Gi"),
+		},
+		"Invalid: mount point doesn't exist": {
+			path:       "/mnt/nomp",
+			mounter:    mounter,
+			shouldFail: true,
+		},
+		"Invalid: no pagesize option": {
+			path:       "/mnt/noopt",
+			mounter:    mounter,
+			shouldFail: true,
+		},
+		"Invalid: incorrect pagesize option": {
+			path:       "/mnt/badopt",
+			mounter:    mounter,
+			shouldFail: true,
+		},
+	}
+
+	for testCaseName, testCase := range testCases {
+		t.Run(testCaseName, func(t *testing.T) {
+			pageSize, err := getPageSize(testCase.path, testCase.mounter)
+			if testCase.shouldFail && err == nil {
+				t.Errorf("%s: Unexpected success", testCaseName)
+			} else if !testCase.shouldFail && err != nil {
+				t.Errorf("%s: Unexpected error: %v", testCaseName, err)
+			}
+			if err == nil && pageSize.Cmp(testCase.expectedResult) != 0 {
+				t.Errorf("%s: Unexpected result: %s, expected: %s", testCaseName, pageSize.String(), testCase.expectedResult.String())
+			}
+		})
 	}
 }

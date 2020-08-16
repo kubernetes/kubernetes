@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 
@@ -31,7 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
@@ -39,8 +40,8 @@ const (
 	// not active means the instance is under deleting from Azure VMSS.
 	vmssVMNotActiveErrorMessage = "not an active Virtual Machine Scale Set VM instanceId"
 
-	// operationCancledErrorMessage means the operation is canceled by another new operation.
-	operationCancledErrorMessage = "canceledandsupersededduetoanotheroperation"
+	// operationCanceledErrorMessage means the operation is canceled by another new operation.
+	operationCanceledErrorMessage = "canceledandsupersededduetoanotheroperation"
 )
 
 // RequestBackoff if backoff is disabled in cloud provider it
@@ -65,7 +66,7 @@ func (az *Cloud) Event(obj runtime.Object, eventtype, reason, message string) {
 }
 
 // GetVirtualMachineWithRetry invokes az.getVirtualMachine with exponential backoff retry
-func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName, crt cacheReadType) (compute.VirtualMachine, error) {
+func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName, crt azcache.AzureCacheReadType) (compute.VirtualMachine, error) {
 	var machine compute.VirtualMachine
 	var retryErr error
 	err := wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
@@ -103,10 +104,6 @@ func (az *Cloud) ListVirtualMachines(resourceGroup string) ([]compute.VirtualMac
 // getPrivateIPsForMachine is wrapper for optional backoff getting private ips
 // list of a node by name
 func (az *Cloud) getPrivateIPsForMachine(nodeName types.NodeName) ([]string, error) {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		return az.vmSet.GetPrivateIPsByNodeName(string(nodeName))
-	}
-
 	return az.getPrivateIPsForMachineWithRetry(nodeName)
 }
 
@@ -130,10 +127,6 @@ func (az *Cloud) getPrivateIPsForMachineWithRetry(nodeName types.NodeName) ([]st
 }
 
 func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, string, error) {
-	if az.Config.shouldOmitCloudProviderBackoff() {
-		return az.vmSet.GetIPByNodeName(string(nodeName))
-	}
-
 	return az.GetIPForMachineWithRetry(nodeName)
 }
 
@@ -173,8 +166,8 @@ func (az *Cloud) CreateOrUpdateSecurityGroup(service *v1.Service, sg network.Sec
 	}
 
 	// Invalidate the cache because another new operation has canceled the current request.
-	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
-		klog.V(3).Infof("SecurityGroup cache for %s is cleanup because CreateOrUpdateSecurityGroup is canceld by another operation", *sg.Name)
+	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCanceledErrorMessage) {
+		klog.V(3).Infof("SecurityGroup cache for %s is cleanup because CreateOrUpdateSecurityGroup is canceled by another operation", *sg.Name)
 		az.nsgCache.Delete(*sg.Name)
 	}
 
@@ -201,7 +194,7 @@ func (az *Cloud) CreateOrUpdateLB(service *v1.Service, lb network.LoadBalancer) 
 		az.lbCache.Delete(*lb.Name)
 	}
 	// Invalidate the cache because another new operation has canceled the current request.
-	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
+	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCanceledErrorMessage) {
 		klog.V(3).Infof("LoadBalancer cache for %s is cleanup because CreateOrUpdate is canceled by another operation", *lb.Name)
 		az.lbCache.Delete(*lb.Name)
 	}
@@ -324,7 +317,7 @@ func (az *Cloud) CreateOrUpdateRouteTable(routeTable network.RouteTable) error {
 		az.rtCache.Delete(*routeTable.Name)
 	}
 	// Invalidate the cache because another new operation has canceled the current request.
-	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
+	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCanceledErrorMessage) {
 		klog.V(3).Infof("Route table cache for %s is cleanup because CreateOrUpdateRouteTable is canceld by another operation", *routeTable.Name)
 		az.rtCache.Delete(*routeTable.Name)
 	}
@@ -349,7 +342,7 @@ func (az *Cloud) CreateOrUpdateRoute(route network.Route) error {
 		az.rtCache.Delete(az.RouteTableName)
 	}
 	// Invalidate the cache because another new operation has canceled the current request.
-	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
+	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCanceledErrorMessage) {
 		klog.V(3).Infof("Route cache for %s is cleanup because CreateOrUpdateRouteTable is canceld by another operation", *route.Name)
 		az.rtCache.Delete(az.RouteTableName)
 	}
@@ -397,8 +390,4 @@ func (az *Cloud) CreateOrUpdateVMSS(resourceGroupName string, VMScaleSetName str
 	}
 
 	return nil
-}
-
-func (cfg *Config) shouldOmitCloudProviderBackoff() bool {
-	return cfg.CloudProviderBackoffMode == backoffModeV2
 }

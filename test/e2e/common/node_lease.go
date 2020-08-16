@@ -17,6 +17,7 @@ limitations under the License.
 package common
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -54,7 +55,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 			)
 			ginkgo.By("check that lease for this Kubelet exists in the kube-node-lease namespace")
 			gomega.Eventually(func() error {
-				lease, err = leaseClient.Get(nodeName, metav1.GetOptions{})
+				lease, err = leaseClient.Get(context.TODO(), nodeName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -65,7 +66,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 
 			ginkgo.By("check that node lease is updated at least once within the lease duration")
 			gomega.Eventually(func() error {
-				newLease, err := leaseClient.Get(nodeName, metav1.GetOptions{})
+				newLease, err := leaseClient.Get(context.TODO(), nodeName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -91,7 +92,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 				leaseList *coordinationv1.LeaseList
 			)
 			gomega.Eventually(func() error {
-				leaseList, err = leaseClient.List(metav1.ListOptions{})
+				leaseList, err = leaseClient.List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
 					return err
 				}
@@ -116,7 +117,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 			var err error
 			var lease *coordinationv1.Lease
 			gomega.Eventually(func() error {
-				lease, err = f.ClientSet.CoordinationV1().Leases(v1.NamespaceNodeLease).Get(nodeName, metav1.GetOptions{})
+				lease, err = f.ClientSet.CoordinationV1().Leases(v1.NamespaceNodeLease).Get(context.TODO(), nodeName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -175,7 +176,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 			// This check on node status is only meaningful when this e2e test is
 			// running as cluster e2e test, because node e2e test does not create and
 			// run controller manager, i.e., no node lifecycle controller.
-			node, err := f.ClientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 			gomega.Expect(err).To(gomega.BeNil())
 			_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
 			framework.ExpectEqual(readyCondition.Status, v1.ConditionTrue)
@@ -184,7 +185,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 })
 
 func getHeartbeatTimeAndStatus(clientSet clientset.Interface, nodeName string) (time.Time, v1.NodeStatus) {
-	node, err := clientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	node, err := clientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	gomega.Expect(err).To(gomega.BeNil())
 	_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
 	framework.ExpectEqual(readyCondition.Status, v1.ConditionTrue)

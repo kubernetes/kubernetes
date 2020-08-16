@@ -156,7 +156,7 @@ func TestWaitForPathToExist(t *testing.T) {
 		t.Errorf("waitForPathToExist: wrong code path called for %s", devicePath[1])
 	}
 
-	exist = waitForPathToExistInternal(&devicePath[1], 1, "fake_iface", os.Stat, fakeFilepathGlob2)
+	_ = waitForPathToExistInternal(&devicePath[1], 1, "fake_iface", os.Stat, fakeFilepathGlob2)
 	if devicePath[1] != fpath {
 		t.Errorf("waitForPathToExist: wrong code path called for %s", devicePath[1])
 	}
@@ -353,14 +353,14 @@ func TestClonedIfaceUpdateError(t *testing.T) {
 func TestGetVolCount(t *testing.T) {
 	// This will create a dir structure like this:
 	// /tmp/refcounter555814673
-	// ├── iface-127.0.0.1:3260:pv1
-	// │   └── 127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-3
-	// └── iface-127.0.0.1:3260:pv2
-	// │   ├── 127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-2
-	// │   └── 192.168.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-1
-	// └── volumeDevices
-	//     └── 192.168.0.2:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-4
-	//     └── 192.168.0.3:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-5
+	// +-- iface-127.0.0.1:3260:pv1
+	// |   +-- 127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-3
+	// +-- iface-127.0.0.1:3260:pv2
+	// |   +-- 127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-2
+	// |   +-- 192.168.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-1
+	// +-- volumeDevices
+	//     +-- 192.168.0.2:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-4
+	//     +-- 192.168.0.3:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-5
 
 	baseDir, err := createFakePluginDirs()
 	if err != nil {

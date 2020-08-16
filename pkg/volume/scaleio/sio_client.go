@@ -32,7 +32,7 @@ import (
 
 	sio "github.com/thecodeteam/goscaleio"
 	siotypes "github.com/thecodeteam/goscaleio/types/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -126,8 +126,9 @@ func (c *sioClient) init() error {
 			Username: c.username,
 			Password: c.password},
 	); err != nil {
-		klog.Error(log("client authentication failed: %v", err))
-		return err
+		// don't log error details from client calls in events
+		klog.V(4).Infof(log("client authentication failed: %v", err))
+		return errors.New("client authentication failed")
 	}
 
 	// retrieve system
@@ -214,8 +215,9 @@ func (c *sioClient) CreateVolume(name string, sizeGB int64) (*siotypes.Volume, e
 	}
 	createResponse, err := c.client.CreateVolume(params, c.storagePool.Name)
 	if err != nil {
-		klog.Error(log("failed to create volume %s: %v", name, err))
-		return nil, err
+		// don't log error details from client calls in events
+		klog.V(4).Infof(log("failed to create volume %s: %v", name, err))
+		return nil, errors.New("failed to create volume: see kubernetes logs for details")
 	}
 	return c.Volume(sioVolumeID(createResponse.ID))
 }
@@ -243,8 +245,9 @@ func (c *sioClient) AttachVolume(id sioVolumeID, multipleMappings bool) error {
 	volClient.Volume = &siotypes.Volume{ID: string(id)}
 
 	if err := volClient.MapVolumeSdc(params); err != nil {
-		klog.Error(log("failed to attach volume id %s: %v", id, err))
-		return err
+		// don't log error details from client calls in events
+		klog.V(4).Infof(log("failed to attach volume id %s: %v", id, err))
+		return errors.New("failed to attach volume: see kubernetes logs for details")
 	}
 
 	klog.V(4).Info(log("volume %s attached successfully", id))
@@ -269,7 +272,9 @@ func (c *sioClient) DetachVolume(id sioVolumeID) error {
 	volClient := sio.NewVolume(c.client)
 	volClient.Volume = &siotypes.Volume{ID: string(id)}
 	if err := volClient.UnmapVolumeSdc(params); err != nil {
-		return err
+		// don't log error details from client calls in events
+		klog.V(4).Infof(log("failed to detach volume id %s: %v", id, err))
+		return errors.New("failed to detach volume: see kubernetes logs for details")
 	}
 	return nil
 }
@@ -287,7 +292,9 @@ func (c *sioClient) DeleteVolume(id sioVolumeID) error {
 	volClient := sio.NewVolume(c.client)
 	volClient.Volume = vol
 	if err := volClient.RemoveVolume("ONLY_ME"); err != nil {
-		return err
+		// don't log error details from client calls in events
+		klog.V(4).Infof(log("failed to remove volume id %s: %v", id, err))
+		return errors.New("failed to remove volume: see kubernetes logs for details")
 	}
 	return nil
 }
@@ -306,8 +313,9 @@ func (c *sioClient) IID() (string, error) {
 		}
 		sdc, err := c.sysClient.FindSdc("SdcGUID", guid)
 		if err != nil {
-			klog.Error(log("failed to retrieve sdc info %s", err))
-			return "", err
+			// don't log error details from client calls in events
+			klog.V(4).Infof(log("failed to retrieve sdc info %s", err))
+			return "", errors.New("failed to retrieve sdc info: see kubernetes logs for details")
 		}
 		c.instanceID = sdc.Sdc.ID
 		klog.V(4).Info(log("retrieved instanceID %s", c.instanceID))
@@ -472,12 +480,15 @@ func (c *sioClient) WaitForDetachedDevice(token string) error {
 // ***********************************************************************
 func (c *sioClient) findSystem(sysname string) (sys *siotypes.System, err error) {
 	if c.sysClient, err = c.client.FindSystem("", sysname, ""); err != nil {
-		return nil, err
+		// don't log error details from clients in events
+		klog.V(4).Infof(log("failed to find system %q: %v", sysname, err))
+		return nil, errors.New("failed to find system: see kubernetes logs for details")
 	}
 	systems, err := c.client.GetInstance("")
 	if err != nil {
-		klog.Error(log("failed to retrieve instances: %v", err))
-		return nil, err
+		// don't log error details from clients in events
+		klog.V(4).Infof(log("failed to retrieve instances: %v", err))
+		return nil, errors.New("failed to retrieve instances: see kubernetes logs for details")
 	}
 	for _, sys = range systems {
 		if sys.Name == sysname {
@@ -493,8 +504,9 @@ func (c *sioClient) findProtectionDomain(pdname string) (*siotypes.ProtectionDom
 	if c.sysClient != nil {
 		protectionDomain, err := c.sysClient.FindProtectionDomain("", pdname, "")
 		if err != nil {
-			klog.Error(log("failed to retrieve protection domains: %v", err))
-			return nil, err
+			// don't log error details from clients in events
+			klog.V(4).Infof(log("failed to retrieve protection domains: %v", err))
+			return nil, errors.New("failed to retrieve protection domains: see kubernetes logs for details")
 		}
 		c.pdClient.ProtectionDomain = protectionDomain
 		return protectionDomain, nil
@@ -508,8 +520,9 @@ func (c *sioClient) findStoragePool(spname string) (*siotypes.StoragePool, error
 	if c.pdClient != nil {
 		sp, err := c.pdClient.FindStoragePool("", spname, "")
 		if err != nil {
-			klog.Error(log("failed to retrieve storage pool: %v", err))
-			return nil, err
+			// don't log error details from clients in events
+			klog.V(4).Infof(log("failed to retrieve storage pool: %v", err))
+			return nil, errors.New("failed to retrieve storage pool: see kubernetes logs for details")
 		}
 		c.spClient.StoragePool = sp
 		return sp, nil
@@ -519,14 +532,32 @@ func (c *sioClient) findStoragePool(spname string) (*siotypes.StoragePool, error
 }
 
 func (c *sioClient) getVolumes() ([]*siotypes.Volume, error) {
-	return c.client.GetVolume("", "", "", "", true)
+	volumes, err := c.client.GetVolume("", "", "", "", true)
+	if err != nil {
+		// don't log error details from clients in events
+		klog.V(4).Infof(log("failed to get volumes: %v", err))
+		return nil, errors.New("failed to get volumes: see kubernetes logs for details")
+	}
+	return volumes, nil
 }
 func (c *sioClient) getVolumesByID(id sioVolumeID) ([]*siotypes.Volume, error) {
-	return c.client.GetVolume("", string(id), "", "", true)
+	volumes, err := c.client.GetVolume("", string(id), "", "", true)
+	if err != nil {
+		// don't log error details from clients in events
+		klog.V(4).Infof(log("failed to get volumes by id: %v", err))
+		return nil, errors.New("failed to get volumes by id: see kubernetes logs for details")
+	}
+	return volumes, nil
 }
 
 func (c *sioClient) getVolumesByName(name string) ([]*siotypes.Volume, error) {
-	return c.client.GetVolume("", "", "", name, true)
+	volumes, err := c.client.GetVolume("", "", "", name, true)
+	if err != nil {
+		// don't log error details from clients in events
+		klog.V(4).Infof(log("failed to get volumes by name: %v", err))
+		return nil, errors.New("failed to get volumes by name: see kubernetes logs for details")
+	}
+	return volumes, nil
 }
 
 func (c *sioClient) getSdcPath() string {

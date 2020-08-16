@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -236,7 +236,7 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 		return fmt.Errorf("failed to exec 'git reset --hard': %s: %v", output, err)
 	}
 
-	volume.SetVolumeOwnership(b, mounterArgs.FsGroup)
+	volume.SetVolumeOwnership(b, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/)
 
 	volumeutil.SetReady(b.getMetaDir())
 	return nil

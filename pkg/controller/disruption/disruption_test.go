@@ -46,7 +46,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
 	utilpointer "k8s.io/utils/pointer"
@@ -1054,14 +1054,14 @@ func TestUpdatePDBStatusRetries(t *testing.T) {
 
 	// Create a PDB and 3 pods that match it.
 	pdb, pdbKey := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(1))
-	pdb, err := dc.coreClient.PolicyV1beta1().PodDisruptionBudgets(pdb.Namespace).Create(pdb)
+	pdb, err := dc.coreClient.PolicyV1beta1().PodDisruptionBudgets(pdb.Namespace).Create(context.TODO(), pdb, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create PDB: %v", err)
 	}
 	podNames := []string{"moe", "larry", "curly"}
 	for _, name := range podNames {
 		pod, _ := newPod(t, name)
-		_, err := dc.coreClient.CoreV1().Pods(pod.Namespace).Create(pod)
+		_, err := dc.coreClient.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create pod: %v", err)
 		}
@@ -1133,7 +1133,7 @@ func TestUpdatePDBStatusRetries(t *testing.T) {
 	})
 
 	// (A) Delete one pod
-	if err := dc.coreClient.CoreV1().Pods("default").Delete(podNames[0], &metav1.DeleteOptions{}); err != nil {
+	if err := dc.coreClient.CoreV1().Pods("default").Delete(context.TODO(), podNames[0], metav1.DeleteOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := waitForCacheCount(dc.podStore, len(podNames)-1); err != nil {
@@ -1151,7 +1151,7 @@ func TestUpdatePDBStatusRetries(t *testing.T) {
 
 	// (C) Whether or not sync() returned an error, the PDB status should reflect
 	// the evictions that took place.
-	finalPDB, err := dc.coreClient.PolicyV1beta1().PodDisruptionBudgets("default").Get(pdb.Name, metav1.GetOptions{})
+	finalPDB, err := dc.coreClient.PolicyV1beta1().PodDisruptionBudgets("default").Get(context.TODO(), pdb.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get PDB: %v", err)
 	}

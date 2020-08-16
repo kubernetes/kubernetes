@@ -29,13 +29,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/docker/docker/daemon/logger/jsonfilelog/jsonlog"
 	"github.com/fsnotify/fsnotify"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/tail"
 )
 
@@ -48,13 +48,10 @@ import (
 // TODO(random-liu): Support log rotation.
 
 const (
-	// timeFormat is the time format used in the log.
-	timeFormat = time.RFC3339Nano
-
-	// stateCheckPeriod is the period to check container state while following
-	// the container log. Kubelet should not keep following the log when the
-	// container is not running.
-	stateCheckPeriod = 5 * time.Second
+	// timeFormatOut is the format for writing timestamps to output.
+	timeFormatOut = types.RFC3339NanoFixed
+	// timeFormatIn is the format for parsing timestamps from other logs.
+	timeFormatIn = types.RFC3339NanoLenient
 
 	// logForceCheckPeriod is the period to check for a new read
 	logForceCheckPeriod = 1 * time.Second
@@ -134,9 +131,9 @@ func parseCRILog(log []byte, msg *logMessage) error {
 	if idx < 0 {
 		return fmt.Errorf("timestamp is not found")
 	}
-	msg.timestamp, err = time.Parse(timeFormat, string(log[:idx]))
+	msg.timestamp, err = time.Parse(timeFormatIn, string(log[:idx]))
 	if err != nil {
-		return fmt.Errorf("unexpected timestamp format %q: %v", timeFormat, err)
+		return fmt.Errorf("unexpected timestamp format %q: %v", timeFormatIn, err)
 	}
 
 	// Parse stream type
@@ -170,13 +167,24 @@ func parseCRILog(log []byte, msg *logMessage) error {
 	return nil
 }
 
+// jsonLog is a log message, typically a single entry from a given log stream.
+// since the data structure is originally from docker, we should be careful to
+// with any changes to jsonLog
+type jsonLog struct {
+	// Log is the log message
+	Log string `json:"log,omitempty"`
+	// Stream is the log source
+	Stream string `json:"stream,omitempty"`
+	// Created is the created timestamp of log
+	Created time.Time `json:"time"`
+}
+
 // parseDockerJSONLog parses logs in Docker JSON log format. Docker JSON log format
 // example:
 //   {"log":"content 1","stream":"stdout","time":"2016-10-20T18:39:20.57606443Z"}
 //   {"log":"content 2","stream":"stderr","time":"2016-10-20T18:39:20.57606444Z"}
 func parseDockerJSONLog(log []byte, msg *logMessage) error {
-	var l = &jsonlog.JSONLog{}
-	l.Reset()
+	var l = &jsonLog{}
 
 	// TODO: JSON decoding is fairly expensive, we should evaluate this.
 	if err := json.Unmarshal(log, l); err != nil {
@@ -233,7 +241,7 @@ func (w *logWriter) write(msg *logMessage) error {
 	}
 	line := msg.log
 	if w.opts.timestamp {
-		prefix := append([]byte(msg.timestamp.Format(timeFormat)), delimiter[0])
+		prefix := append([]byte(msg.timestamp.Format(timeFormatOut)), delimiter[0])
 		line = append(prefix, line...)
 	}
 	// If the line is longer than the remaining bytes, cut it.
@@ -447,10 +455,6 @@ func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeServic
 			errRetry--
 		case <-time.After(logForceCheckPeriod):
 			return true, false, nil
-		case <-time.After(stateCheckPeriod):
-			if running, err := isContainerRunning(id, runtimeService); !running {
-				return false, false, err
-			}
 		}
 	}
 }

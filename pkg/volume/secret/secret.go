@@ -19,7 +19,7 @@ package secret
 import (
 	"fmt"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 
@@ -251,7 +251,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 		return err
 	}
 
-	err = volume.SetVolumeOwnership(b, mounterArgs.FsGroup)
+	err = volume.SetVolumeOwnership(b, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/)
 	if err != nil {
 		klog.Errorf("Error applying volume ownership settings for group: %v", mounterArgs.FsGroup)
 		return err

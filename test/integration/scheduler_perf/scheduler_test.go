@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -69,7 +69,8 @@ var (
 
 // TestSchedule100Node3KPods schedules 3k pods on 100 nodes.
 func TestSchedule100Node3KPods(t *testing.T) {
-	if testing.Short() {
+	// TODO (#93112) skip test until appropriate timeout established
+	if testing.Short() || true {
 		t.Skip("Skipping because we want to run short tests")
 	}
 
@@ -243,11 +244,11 @@ func (na nodeAffinity) mutatePodTemplate(pod *v1.Pod) {
 // generateNodes generates nodes to be used for scheduling.
 func (inputConfig *schedulerPerfConfig) generateNodes(config *testConfig) {
 	for i := 0; i < inputConfig.NodeCount; i++ {
-		config.clientset.CoreV1().Nodes().Create(config.mutatedNodeTemplate)
+		config.clientset.CoreV1().Nodes().Create(context.TODO(), config.mutatedNodeTemplate, metav1.CreateOptions{})
 
 	}
 	for i := 0; i < config.numNodes-inputConfig.NodeCount; i++ {
-		config.clientset.CoreV1().Nodes().Create(baseNodeTemplate)
+		config.clientset.CoreV1().Nodes().Create(context.TODO(), baseNodeTemplate, metav1.CreateOptions{})
 	}
 }
 

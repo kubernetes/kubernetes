@@ -153,7 +153,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"app": "go"},
 				},
 			},
-			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "type": "LoadBalancer", "dry-run": "true"},
+			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "type": "LoadBalancer", "dry-run": "client"},
 			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
 				Spec: corev1.ServiceSpec{
@@ -184,7 +184,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"app": "go"},
 				},
 			},
-			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "type": "LoadBalancer", "session-affinity": "ClientIP", "dry-run": "true"},
+			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "type": "LoadBalancer", "session-affinity": "ClientIP", "dry-run": "client"},
 			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
 				Spec: corev1.ServiceSpec{
@@ -216,7 +216,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"app": "go"},
 				},
 			},
-			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "cluster-ip": "10.10.10.10", "dry-run": "true"},
+			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "cluster-ip": "10.10.10.10", "dry-run": "client"},
 			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
 				Spec: corev1.ServiceSpec{
@@ -248,7 +248,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"app": "go"},
 				},
 			},
-			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "cluster-ip": "None", "dry-run": "true"},
+			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "cluster-ip": "None", "dry-run": "client"},
 			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
 				Spec: corev1.ServiceSpec{
@@ -280,7 +280,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"app": "go"},
 				},
 			},
-			flags: map[string]string{"selector": "func=stream", "name": "foo", "labels": "svc=test", "cluster-ip": "None", "dry-run": "true"},
+			flags: map[string]string{"selector": "func=stream", "name": "foo", "labels": "svc=test", "cluster-ip": "None", "dry-run": "client"},
 			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
 				Spec: corev1.ServiceSpec{
@@ -306,7 +306,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"app": "go"},
 				},
 			},
-			flags: map[string]string{"filename": "../../../testdata/redis-master-service.yaml", "selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "dry-run": "true"},
+			flags: map[string]string{"filename": "../../../testdata/redis-master-service.yaml", "selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "dry-run": "client"},
 			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{"svc": "test"}},
 				Spec: corev1.ServiceSpec{
@@ -335,7 +335,7 @@ func TestRunExposeService(t *testing.T) {
 			},
 			flags: map[string]string{"selector": "svc=frompod", "port": "90", "labels": "svc=frompod", "generator": "service/v2"},
 			output: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "a-name-that-is-toooo-big-for-a-service-because-it-can-only-handle-63-characters", Namespace: "", Labels: map[string]string{"svc": "frompod"}},
+				ObjectMeta: metav1.ObjectMeta{Name: "a-name-that-is-toooo-big-for-a-service-because-it-can-only-handle-63-characters"[:63], Namespace: "", Labels: map[string]string{"svc": "frompod"}},
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{
@@ -375,7 +375,7 @@ func TestRunExposeService(t *testing.T) {
 					},
 				},
 			},
-			flags: map[string]string{"selector": "svc=fromfoo", "generator": "service/v2", "name": "fromfoo", "dry-run": "true"},
+			flags: map[string]string{"selector": "svc=fromfoo", "generator": "service/v2", "name": "fromfoo", "dry-run": "client"},
 			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "fromfoo", Namespace: "", Labels: map[string]string{"svc": "multiport"}},
 				Spec: corev1.ServiceSpec{
@@ -433,7 +433,7 @@ func TestRunExposeService(t *testing.T) {
 					},
 				},
 			},
-			flags: map[string]string{"selector": "svc=fromfoo", "generator": "service/v2", "name": "fromfoo", "dry-run": "true"},
+			flags: map[string]string{"selector": "svc=fromfoo", "generator": "service/v2", "name": "fromfoo", "dry-run": "client"},
 			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "fromfoo", Namespace: "", Labels: map[string]string{"svc": "multiport"}},
 				Spec: corev1.ServiceSpec{
@@ -544,7 +544,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"app": "go"},
 				},
 			},
-			flags: map[string]string{"selector": "func=stream", "protocol": "SCTP", "port": "14", "name": "foo", "labels": "svc=test", "cluster-ip": "10.10.10.10", "dry-run": "true"},
+			flags: map[string]string{"selector": "func=stream", "protocol": "SCTP", "port": "14", "name": "foo", "labels": "svc=test", "cluster-ip": "10.10.10.10", "dry-run": "client"},
 			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
 				Spec: corev1.ServiceSpec{
@@ -576,7 +576,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"app": "go"},
 				},
 			},
-			flags: map[string]string{"selector": "func=stream", "protocol": "SCTP", "port": "14", "name": "foo", "labels": "svc=test", "cluster-ip": "None", "dry-run": "true"},
+			flags: map[string]string{"selector": "func=stream", "protocol": "SCTP", "port": "14", "name": "foo", "labels": "svc=test", "cluster-ip": "None", "dry-run": "client"},
 			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
 				Spec: corev1.ServiceSpec{
@@ -611,6 +611,8 @@ func TestRunExposeService(t *testing.T) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == test.calls[m] && m == "GET":
 						return &http.Response{StatusCode: test.status, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.input)}, nil
+					case p == test.calls[m] && m == "POST":
+						return &http.Response{StatusCode: test.status, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.output)}, nil
 					default:
 						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 						return nil, nil

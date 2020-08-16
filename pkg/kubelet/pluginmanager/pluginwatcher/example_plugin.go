@@ -17,6 +17,7 @@ limitations under the License.
 package pluginwatcher
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -24,9 +25,8 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"

@@ -25,15 +25,16 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/pflag"
+	"k8s.io/component-base/logs"
 
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
-	auditdynamic "k8s.io/apiserver/plugin/pkg/audit/dynamic"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/metrics"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -98,13 +99,13 @@ func TestAddFlags(t *testing.T) {
 		"--contention-profiling=true",
 		"--egress-selector-config-file=/var/run/kubernetes/egress-selector/connectivity.yaml",
 		"--enable-aggregator-routing=true",
+		"--enable-priority-and-fairness=false",
 		"--enable-logs-handler=false",
 		"--endpoint-reconciler-type=" + string(reconcilers.LeaseEndpointReconcilerType),
 		"--etcd-keyfile=/var/run/kubernetes/etcd.key",
 		"--etcd-certfile=/var/run/kubernetes/etcdce.crt",
 		"--etcd-cafile=/var/run/kubernetes/etcdca.crt",
 		"--http2-max-streams-per-connection=42",
-		"--kubelet-https=true",
 		"--kubelet-read-only-port=10255",
 		"--kubelet-timeout=5s",
 		"--kubelet-client-certificate=/var/run/kubernetes/ceserver.crt",
@@ -158,6 +159,7 @@ func TestAddFlags(t *testing.T) {
 				Prefix:                "/registry",
 				CompactionInterval:    storagebackend.DefaultCompactInterval,
 				CountMetricPollPeriod: time.Minute,
+				DBMetricPollInterval:  storagebackend.DefaultDBMetricPollInterval,
 			},
 			DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
 			DeleteCollectionWorkers: 1,
@@ -190,7 +192,6 @@ func TestAddFlags(t *testing.T) {
 				string(kapi.NodeExternalDNS),
 				string(kapi.NodeExternalIP),
 			},
-			EnableHTTPS: true,
 			HTTPTimeout: time.Duration(5) * time.Second,
 			TLSClientConfig: restclient.TLSClientConfig{
 				CertFile: "/var/run/kubernetes/ceserver.crt",
@@ -249,9 +250,6 @@ func TestAddFlags(t *testing.T) {
 				InitialBackoff:     2 * time.Second,
 				GroupVersionString: "audit.k8s.io/v1alpha1",
 			},
-			DynamicOptions: apiserveroptions.AuditDynamicOptions{
-				BatchConfig: auditdynamic.NewDefaultWebhookBatchConfig(),
-			},
 			PolicyFile: "/policy",
 		},
 		Features: &apiserveroptions.FeatureOptions{
@@ -275,7 +273,6 @@ func TestAddFlags(t *testing.T) {
 				UsernameClaim: "sub",
 				SigningAlgs:   []string{"RS256"},
 			},
-			PasswordFile:  &kubeoptions.PasswordFileAuthenticationOptions{},
 			RequestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{},
 			ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
 				Lookup: true,
@@ -306,6 +303,8 @@ func TestAddFlags(t *testing.T) {
 		EnableAggregatorRouting: true,
 		ProxyClientKeyFile:      "/var/run/kubernetes/proxy.key",
 		ProxyClientCertFile:     "/var/run/kubernetes/proxy.crt",
+		Metrics:                 &metrics.Options{},
+		Logs:                    logs.NewOptions(),
 	}
 
 	if !reflect.DeepEqual(expected, s) {

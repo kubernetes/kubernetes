@@ -11,7 +11,6 @@ package hcsschema
 
 //  memory usage as viewed from within the container
 type ContainerMemoryInformation struct {
-
 	TotalPhysicalBytes int32 `json:"TotalPhysicalBytes,omitempty"`
 
 	TotalUsage int32 `json:"TotalUsage,omitempty"`

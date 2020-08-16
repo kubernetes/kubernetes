@@ -26,8 +26,10 @@ import (
 )
 
 // TestTypeLister helps list TestTypes.
+// All objects returned here must be treated as read-only.
 type TestTypeLister interface {
 	// List lists all TestTypes in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.TestType, err error)
 	// TestTypes returns an object that can list and get TestTypes.
 	TestTypes(namespace string) TestTypeNamespaceLister
@@ -58,10 +60,13 @@ func (s *testTypeLister) TestTypes(namespace string) TestTypeNamespaceLister {
 }
 
 // TestTypeNamespaceLister helps list and get TestTypes.
+// All objects returned here must be treated as read-only.
 type TestTypeNamespaceLister interface {
 	// List lists all TestTypes in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.TestType, err error)
 	// Get retrieves the TestType from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.TestType, error)
 	TestTypeNamespaceListerExpansion
 }

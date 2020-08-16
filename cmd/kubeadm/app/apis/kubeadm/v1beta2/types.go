@@ -364,8 +364,7 @@ type BootstrapTokenDiscovery struct {
 	// pinning, which can be unsafe. Each hash is specified as "<type>:<value>",
 	// where the only currently supported type is "sha256". This is a hex-encoded
 	// SHA-256 hash of the Subject Public Key Info (SPKI) object in DER-encoded
-	// ASN.1. These hashes can be calculated using, for example, OpenSSL:
-	// openssl x509 -pubkey -in ca.crt openssl rsa -pubin -outform der 2>&/dev/null | openssl dgst -sha256 -hex
+	// ASN.1. These hashes can be calculated using, for example, OpenSSL.
 	CACertHashes []string `json:"caCertHashes,omitempty"`
 
 	// UnsafeSkipCAVerification allows token-based discovery

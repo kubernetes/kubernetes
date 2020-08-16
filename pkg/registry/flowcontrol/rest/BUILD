@@ -22,7 +22,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
@@ -47,6 +47,7 @@ go_test(
     deps = [
         "//pkg/apis/flowcontrol/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/flowcontrol/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

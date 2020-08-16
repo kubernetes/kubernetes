@@ -63,7 +63,7 @@ func GetRoundtripTestCases(t *testing.T, scheme *runtime.Scheme, codecs serializ
 
 					testname := dir.Name()
 					cases = append(cases, TestCase{
-						name:  fmt.Sprintf("%sTo%s_%s", vin, vout, testname),
+						name:  fmt.Sprintf("%s_%sTo%s_%s", gk.Kind, vin, vout, testname),
 						in:    filepath.Join(testdir, testname, vin+".yaml"),
 						out:   filepath.Join(testdir, testname, vout+".yaml"),
 						codec: codec,

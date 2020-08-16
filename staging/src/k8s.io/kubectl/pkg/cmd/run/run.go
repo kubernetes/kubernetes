@@ -23,7 +23,7 @@ import (
 
 	"github.com/docker/distribution/reference"
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -74,7 +73,7 @@ var (
 		kubectl run hazelcast --image=hazelcast/hazelcast --labels="app=hazelcast,env=prod"
 
 		# Dry run. Print the corresponding API objects without creating them.
-		kubectl run nginx --image=nginx --dry-run
+		kubectl run nginx --image=nginx --dry-run=client
 
 		# Start a nginx pod, but overload the spec with a partial set of values parsed from JSON.
 		kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'
@@ -107,12 +106,11 @@ type RunOptions struct {
 	DeleteFlags   *delete.DeleteFlags
 	DeleteOptions *delete.DeleteOptions
 
-	DryRun bool
+	DryRunStrategy cmdutil.DryRunStrategy
+	DryRunVerifier *resource.DryRunVerifier
 
 	PrintObj func(runtime.Object) error
 	Recorder genericclioptions.Recorder
-
-	DynamicClient dynamic.Interface
 
 	ArgsLenAtDash  int
 	Attach         bool
@@ -122,9 +120,14 @@ type RunOptions struct {
 	Interactive    bool
 	LeaveStdinOpen bool
 	Port           string
+	Privileged     bool
 	Quiet          bool
 	Schedule       string
 	TTY            bool
+	fieldManager   string
+
+	Namespace        string
+	EnforceNamespace bool
 
 	genericclioptions.IOStreams
 }
@@ -147,7 +150,7 @@ func NewCmdRun(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	o := NewRunOptions(streams)
 
 	cmd := &cobra.Command{
-		Use:                   "run NAME --image=image [--env=\"key=value\"] [--port=port] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
+		Use:                   "run NAME --image=image [--env=\"key=value\"] [--port=port] [--dry-run=server|client] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Run a particular image on the cluster"),
 		Long:                  runLong,
@@ -188,7 +191,7 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, "Allocated a TTY for each container in the pod.")
 	cmd.Flags().BoolVar(&opt.Attach, "attach", opt.Attach, "If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true. With '--restart=Never' the exit code of the container process is returned.")
 	cmd.Flags().BoolVar(&opt.LeaveStdinOpen, "leave-stdin-open", opt.LeaveStdinOpen, "If the pod is started in interactive mode or with stdin, leave stdin open after the first attach completes. By default, stdin will be closed after the first attach completes.")
-	cmd.Flags().String("restart", "Always", i18n.T("The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`."))
+	cmd.Flags().String("restart", "Always", i18n.T("The restart policy for this Pod.  Legal values [Always, OnFailure, Never]."))
 	cmd.Flags().Bool("command", false, "If true and extra arguments are present, use them as the 'command' field in the container, rather than the 'args' field which is the default.")
 	cmd.Flags().String("requests", "", i18n.T("The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges."))
 	cmd.Flags().String("limits", "", i18n.T("The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."))
@@ -200,6 +203,8 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmd.Flags().BoolVar(&opt.Quiet, "quiet", opt.Quiet, "If true, suppress prompt messages.")
 	cmd.Flags().StringVar(&opt.Schedule, "schedule", opt.Schedule, i18n.T("A schedule in the Cron format the job should be run with."))
 	cmd.Flags().MarkDeprecated("schedule", "has no effect and will be removed in the future.")
+	cmd.Flags().BoolVar(&opt.Privileged, "privileged", opt.Privileged, i18n.T("If true, run the container in privileged mode."))
+	cmdutil.AddFieldManagerFlagVar(cmd, &opt.fieldManager, "kubectl-run")
 }
 
 func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
@@ -211,22 +216,27 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.DynamicClient, err = f.DynamicClient()
+	o.ArgsLenAtDash = cmd.ArgsLenAtDash()
+	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
 	if err != nil {
 		return err
 	}
-
-	o.ArgsLenAtDash = cmd.ArgsLenAtDash()
-	o.DryRun = cmdutil.GetClientSideDryRun(cmd)
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 
 	attachFlag := cmd.Flags().Lookup("attach")
 	if !attachFlag.Changed && o.Interactive {
 		o.Attach = true
 	}
 
-	if o.DryRun {
-		o.PrintFlags.Complete("%s (dry run)")
-	}
+	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -235,7 +245,7 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return printer.PrintObj(obj, o.Out)
 	}
 
-	deleteOpts := o.DeleteFlags.ToOptions(o.DynamicClient, o.IOStreams)
+	deleteOpts := o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
 	deleteOpts.IgnoreNotFound = true
 	deleteOpts.WaitForDeletion = false
 	deleteOpts.GracePeriod = -1
@@ -270,15 +280,11 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	if o.TTY && !o.Interactive {
 		return cmdutil.UsageErrorf(cmd, "-i/--stdin is required for containers with -t/--tty=true")
 	}
-	replicas := cmdutil.GetFlagInt(cmd, "replicas")
-	if o.Interactive && replicas != 1 {
-		return cmdutil.UsageErrorf(cmd, "-i/--stdin requires that replicas is 1, found %d", replicas)
-	}
 	if o.Expose && len(o.Port) == 0 {
 		return cmdutil.UsageErrorf(cmd, "--port must be set when exposing a service")
 	}
 
-	namespace, _, err := f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -286,17 +292,14 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	if err != nil {
 		return err
 	}
-	if restartPolicy != corev1.RestartPolicyAlways && replicas != 1 {
-		return cmdutil.UsageErrorf(cmd, "--restart=%s requires that --replicas=1, found %d", restartPolicy, replicas)
-	}
 
 	remove := cmdutil.GetFlagBool(cmd, "rm")
 	if !o.Attach && remove {
 		return cmdutil.UsageErrorf(cmd, "--rm should only be used for attached containers")
 	}
 
-	if o.Attach && o.DryRun {
-		return cmdutil.UsageErrorf(cmd, "--dry-run can't be used with attached containers options (--attach, --stdin, or --tty)")
+	if o.Attach && o.DryRunStrategy != cmdutil.DryRunNone {
+		return cmdutil.UsageErrorf(cmd, "--dry-run=[server|client] can't be used with attached containers options (--attach, --stdin, or --tty)")
 	}
 
 	if err := verifyImagePullPolicy(cmd); err != nil {
@@ -319,7 +322,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	params["env"] = cmdutil.GetFlagStringArray(cmd, "env")
 
 	var createdObjects = []*RunObject{}
-	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"), namespace)
+	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"))
 	if err != nil {
 		return err
 	}
@@ -331,7 +334,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		if len(serviceGenerator) == 0 {
 			return cmdutil.UsageErrorf(cmd, "No service generator specified")
 		}
-		serviceRunObject, err := o.generateService(f, cmd, serviceGenerator, params, namespace)
+		serviceRunObject, err := o.generateService(f, cmd, serviceGenerator, params)
 		if err != nil {
 			allErrs = append(allErrs, err)
 		} else {
@@ -378,17 +381,21 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		}
 
 		var pod *corev1.Pod
-		leaveStdinOpen := o.LeaveStdinOpen
-		waitForExitCode := !leaveStdinOpen && restartPolicy == corev1.RestartPolicyNever
+		waitForExitCode := !o.LeaveStdinOpen && (restartPolicy == corev1.RestartPolicyNever || restartPolicy == corev1.RestartPolicyOnFailure)
 		if waitForExitCode {
-			pod, err = waitForPod(clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, podCompleted)
+			// we need different exit condition depending on restart policy
+			// for Never it can either fail or succeed, for OnFailure only
+			// success matters
+			exitCondition := podCompleted
+			if restartPolicy == corev1.RestartPolicyOnFailure {
+				exitCondition = podSucceeded
+			}
+			pod, err = waitForPod(clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, opts.GetPodTimeout, exitCondition)
 			if err != nil {
 				return err
 			}
-		}
-
-		// after removal is done, return successfully if we are not interested in the exit code
-		if !waitForExitCode {
+		} else {
+			// after removal is done, return successfully if we are not interested in the exit code
 			return nil
 		}
 
@@ -450,44 +457,26 @@ func (o *RunOptions) removeCreatedObjects(f cmdutil.Factory, createdObjects []*R
 }
 
 // waitForPod watches the given pod until the exitCondition is true
-func waitForPod(podClient corev1client.PodsGetter, ns, name string, exitCondition watchtools.ConditionFunc) (*corev1.Pod, error) {
-	// TODO: expose the timeout
-	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), 0*time.Second)
+func waitForPod(podClient corev1client.PodsGetter, ns, name string, timeout time.Duration, exitCondition watchtools.ConditionFunc) (*corev1.Pod, error) {
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
 	defer cancel()
-
-	preconditionFunc := func(store cache.Store) (bool, error) {
-		_, exists, err := store.Get(&metav1.ObjectMeta{Namespace: ns, Name: name})
-		if err != nil {
-			return true, err
-		}
-		if !exists {
-			// We need to make sure we see the object in the cache before we start waiting for events
-			// or we would be waiting for the timeout if such object didn't exist.
-			// (e.g. it was deleted before we started informers so they wouldn't even see the delete event)
-			return true, errors.NewNotFound(corev1.Resource("pods"), name)
-		}
-
-		return false, nil
-	}
 
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", name).String()
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
-			return podClient.Pods(ns).List(options)
+			return podClient.Pods(ns).List(context.TODO(), options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
-			return podClient.Pods(ns).Watch(options)
+			return podClient.Pods(ns).Watch(context.TODO(), options)
 		},
 	}
 
 	intr := interrupt.New(nil, cancel)
 	var result *corev1.Pod
 	err := intr.Run(func() error {
-		ev, err := watchtools.UntilWithSync(ctx, lw, &corev1.Pod{}, preconditionFunc, func(ev watch.Event) (bool, error) {
-			return exitCondition(ev)
-		})
+		ev, err := watchtools.UntilWithSync(ctx, lw, &corev1.Pod{}, nil, exitCondition)
 		if ev != nil {
 			result = ev.Object.(*corev1.Pod)
 		}
@@ -498,7 +487,7 @@ func waitForPod(podClient corev1client.PodsGetter, ns, name string, exitConditio
 }
 
 func handleAttachPod(f cmdutil.Factory, podClient corev1client.PodsGetter, ns, name string, opts *attach.AttachOptions) error {
-	pod, err := waitForPod(podClient, ns, name, podRunningAndReady)
+	pod, err := waitForPod(podClient, ns, name, opts.GetPodTimeout, podRunningAndReady)
 	if err != nil && err != ErrPodCompleted {
 		return err
 	}
@@ -572,7 +561,7 @@ func verifyImagePullPolicy(cmd *cobra.Command) error {
 	return cmdutil.UsageErrorf(cmd, "invalid image pull policy: %s", pullPolicy)
 }
 
-func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serviceGenerator string, paramsIn map[string]interface{}, namespace string) (*RunObject, error) {
+func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serviceGenerator string, paramsIn map[string]interface{}) (*RunObject, error) {
 	generators := generateversioned.GeneratorFn("expose")
 	generator, found := generators[serviceGenerator]
 	if !found {
@@ -602,7 +591,7 @@ func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serv
 		params["default-name"] = name
 	}
 
-	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "service-overrides"), namespace)
+	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "service-overrides"))
 	if err != nil {
 		return nil, err
 	}
@@ -618,7 +607,7 @@ func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serv
 	return runObject, nil
 }
 
-func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator generate.Generator, names []generate.GeneratorParam, params map[string]interface{}, overrides, namespace string) (*RunObject, error) {
+func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator generate.Generator, names []generate.GeneratorParam, params map[string]interface{}, overrides string) (*RunObject, error) {
 	err := generate.ValidateParams(names, params)
 	if err != nil {
 		return nil, err
@@ -657,7 +646,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 	}
 
 	actualObj := obj
-	if !o.DryRun {
+	if o.DryRunStrategy != cmdutil.DryRunClient {
 		if err := util.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), obj, scheme.DefaultJSONEncoder()); err != nil {
 			return nil, err
 		}
@@ -665,9 +654,22 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 		if err != nil {
 			return nil, err
 		}
-		actualObj, err = resource.NewHelper(client, mapping).Create(namespace, false, obj)
+		if o.DryRunStrategy == cmdutil.DryRunServer {
+			if err := o.DryRunVerifier.HasSupport(mapping.GroupVersionKind); err != nil {
+				return nil, err
+			}
+		}
+		actualObj, err = resource.
+			NewHelper(client, mapping).
+			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
+			WithFieldManager(o.fieldManager).
+			Create(o.Namespace, false, obj)
 		if err != nil {
 			return nil, err
+		}
+	} else {
+		if meta, err := meta.Accessor(actualObj); err == nil && o.EnforceNamespace {
+			meta.SetNamespace(o.Namespace)
 		}
 	}
 
@@ -694,6 +696,20 @@ func podCompleted(event watch.Event) (bool, error) {
 		case corev1.PodFailed, corev1.PodSucceeded:
 			return true, nil
 		}
+	}
+	return false, nil
+}
+
+// podSucceeded returns true if the pod has run to completion, false if the pod has not yet
+// reached running state, or an error in any other case.
+func podSucceeded(event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+	}
+	switch t := event.Object.(type) {
+	case *corev1.Pod:
+		return t.Status.Phase == corev1.PodSucceeded, nil
 	}
 	return false, nil
 }

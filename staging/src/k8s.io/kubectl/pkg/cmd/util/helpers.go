@@ -43,7 +43,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -89,7 +89,7 @@ func DefaultBehaviorOnFatal() {
 // fatal prints the message (if provided) and then exits. If V(2) or greater,
 // klog.Fatal is invoked for extended information.
 func fatal(msg string, code int) {
-	if klog.V(2) {
+	if klog.V(2).Enabled() {
 		klog.FatalDepth(2, msg)
 	}
 	if len(msg) > 0 {
@@ -430,10 +430,13 @@ func AddDryRunFlag(cmd *cobra.Command) {
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 }
 
+func AddFieldManagerFlagVar(cmd *cobra.Command, p *string, defaultFieldManager string) {
+	cmd.Flags().StringVar(p, "field-manager", defaultFieldManager, "Name of the manager used to track field ownership.")
+}
+
 func AddServerSideApplyFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("server-side", false, "If true, apply runs in the server instead of the client.")
 	cmd.Flags().Bool("force-conflicts", false, "If true, server-side apply will force the changes against conflicts.")
-	cmd.Flags().String("field-manager", "kubectl", "Name of the manager used to track field ownership.")
 }
 
 func AddPodRunningTimeoutFlag(cmd *cobra.Command, defaultTimeout time.Duration) {
@@ -452,6 +455,7 @@ func AddApplyAnnotationVarFlags(cmd *cobra.Command, applyAnnotation *bool) {
 // TODO: need to take a pass at other generator commands to use this set of flags
 func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
 	cmd.Flags().String("generator", defaultGenerator, "The name of the API generator to use.")
+	cmd.Flags().MarkDeprecated("generator", "has no effect and will be removed in the future.")
 	AddDryRunFlag(cmd)
 }
 
@@ -519,23 +523,25 @@ func GetFieldManagerFlag(cmd *cobra.Command) string {
 type DryRunStrategy int
 
 const (
+	// DryRunNone indicates the client will make all mutating calls
 	DryRunNone DryRunStrategy = iota
+
+	// DryRunClient, or client-side dry-run, indicates the client will prevent
+	// making mutating calls such as CREATE, PATCH, and DELETE
 	DryRunClient
+
+	// DryRunServer, or server-side dry-run, indicates the client will send
+	// mutating calls to the APIServer with the dry-run parameter to prevent
+	// persisting changes.
+	//
+	// Note that clients sending server-side dry-run calls should verify that
+	// the APIServer and the resource supports server-side dry-run, and otherwise
+	// clients should fail early.
+	//
+	// If a client sends a server-side dry-run call to an APIServer that doesn't
+	// support server-side dry-run, then the APIServer will persist changes inadvertently.
 	DryRunServer
 )
-
-// TODO(julianvmodesto): remove GetClientSideDryRun once we support
-// server-side dry-run in all commands
-func GetClientSideDryRun(cmd *cobra.Command) bool {
-	dryRunStrategy, err := GetDryRunStrategy(cmd)
-	if err != nil {
-		klog.Fatalf("error accessing --dry-run flag for command %s: %v", cmd.Name(), err)
-	}
-	if dryRunStrategy == DryRunServer {
-		klog.Fatalf("--dry-run=server for command %s is not supported yet", cmd.Name())
-	}
-	return dryRunStrategy == DryRunClient
-}
 
 func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
 	var dryRunFlag = GetFlagString(cmd, "dry-run")

@@ -10,7 +10,6 @@
 package hcsschema
 
 type UefiBootEntry struct {
-
 	DeviceType string `json:"DeviceType,omitempty"`
 
 	DevicePath string `json:"DevicePath,omitempty"`

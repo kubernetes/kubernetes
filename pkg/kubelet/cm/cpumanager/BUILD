@@ -14,7 +14,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/core/v1/helper/qos:go_default_library",
-        "//pkg/kubelet/cm/cpumanager/containermap:go_default_library",
+        "//pkg/kubelet/cm/containermap:go_default_library",
         "//pkg/kubelet/cm/cpumanager/state:go_default_library",
         "//pkg/kubelet/cm/cpumanager/topology:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",
@@ -27,7 +27,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
@@ -43,7 +43,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubelet/cm/cpumanager/containermap:go_default_library",
+        "//pkg/kubelet/cm/containermap:go_default_library",
         "//pkg/kubelet/cm/cpumanager/state:go_default_library",
         "//pkg/kubelet/cm/cpumanager/topology:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",
@@ -69,7 +69,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubelet/cm/cpumanager/containermap:all-srcs",
         "//pkg/kubelet/cm/cpumanager/state:all-srcs",
         "//pkg/kubelet/cm/cpumanager/topology:all-srcs",
     ],

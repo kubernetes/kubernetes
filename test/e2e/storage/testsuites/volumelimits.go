@@ -17,6 +17,7 @@ limitations under the License.
 package testsuites
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -127,7 +128,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		ginkgo.By("Picking a node")
 		// Some CSI drivers are deployed to a single node (e.g csi-hostpath),
 		// so we use that node instead of picking a random one.
-		nodeName := l.config.ClientNodeName
+		nodeName := l.config.ClientNodeSelection.Name
 		if nodeName == "" {
 			node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
 			framework.ExpectNoError(err)
@@ -163,18 +164,22 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 				ClaimSize:        claimSize,
 				StorageClassName: &l.resource.Sc.Name,
 			}, l.ns.Name)
-			pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(pvc)
+			pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			l.pvcs = append(l.pvcs, pvc)
 		}
 
 		ginkgo.By("Creating pod to use all PVC(s)")
-		pod := e2epod.MakeSecPod(l.ns.Name, l.pvcs, nil, false, "", false, false, e2epv.SELinuxLabel, nil)
-		// Use affinity to schedule everything on the right node
-		selection := e2epod.NodeSelection{}
-		e2epod.SetAffinity(&selection, nodeName)
-		pod.Spec.Affinity = selection.Affinity
-		l.runningPod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(pod)
+		selection := e2epod.NodeSelection{Name: nodeName}
+		podConfig := e2epod.Config{
+			NS:            l.ns.Name,
+			PVCs:          l.pvcs,
+			SeLinuxLabel:  e2epv.SELinuxLabel,
+			NodeSelection: selection,
+		}
+		pod, err := e2epod.MakeSecPod(&podConfig)
+		framework.ExpectNoError(err)
+		l.runningPod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for all PVCs to get Bound")
@@ -186,11 +191,15 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating an extra pod with one volume to exceed the limit")
-		pod = e2epod.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.resource.Pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil)
-		// Use affinity to schedule everything on the right node
-		e2epod.SetAffinity(&selection, nodeName)
-		pod.Spec.Affinity = selection.Affinity
-		l.unschedulablePod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(pod)
+		podConfig = e2epod.Config{
+			NS:            l.ns.Name,
+			PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
+			SeLinuxLabel:  e2epv.SELinuxLabel,
+			NodeSelection: selection,
+		}
+		pod, err = e2epod.MakeSecPod(&podConfig)
+		framework.ExpectNoError(err)
+		l.unschedulablePod, err = l.cs.CoreV1().Pods(l.ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create an extra pod with one volume to exceed the limit")
 
 		ginkgo.By("Waiting for the pod to get unschedulable with the right message")
@@ -219,19 +228,19 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 func cleanupTest(cs clientset.Interface, ns string, runningPodName, unschedulablePodName string, pvcs []*v1.PersistentVolumeClaim, pvNames sets.String) error {
 	var cleanupErrors []string
 	if runningPodName != "" {
-		err := cs.CoreV1().Pods(ns).Delete(runningPodName, nil)
+		err := cs.CoreV1().Pods(ns).Delete(context.TODO(), runningPodName, metav1.DeleteOptions{})
 		if err != nil {
 			cleanupErrors = append(cleanupErrors, fmt.Sprintf("failed to delete pod %s: %s", runningPodName, err))
 		}
 	}
 	if unschedulablePodName != "" {
-		err := cs.CoreV1().Pods(ns).Delete(unschedulablePodName, nil)
+		err := cs.CoreV1().Pods(ns).Delete(context.TODO(), unschedulablePodName, metav1.DeleteOptions{})
 		if err != nil {
 			cleanupErrors = append(cleanupErrors, fmt.Sprintf("failed to delete pod %s: %s", unschedulablePodName, err))
 		}
 	}
 	for _, pvc := range pvcs {
-		err := cs.CoreV1().PersistentVolumeClaims(ns).Delete(pvc.Name, nil)
+		err := cs.CoreV1().PersistentVolumeClaims(ns).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{})
 		if err != nil {
 			cleanupErrors = append(cleanupErrors, fmt.Sprintf("failed to delete PVC %s: %s", pvc.Name, err))
 		}
@@ -242,7 +251,7 @@ func cleanupTest(cs clientset.Interface, ns string, runningPodName, unschedulabl
 	err := wait.Poll(5*time.Second, testSlowMultiplier*e2epv.PVDeletingTimeout, func() (bool, error) {
 		existing := 0
 		for _, pvName := range pvNames.UnsortedList() {
-			_, err := cs.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+			_, err := cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
 			if err == nil {
 				existing++
 			} else {
@@ -274,7 +283,7 @@ func waitForAllPVCsBound(cs clientset.Interface, timeout time.Duration, pvcs []*
 	err := wait.Poll(5*time.Second, timeout, func() (bool, error) {
 		unbound := 0
 		for _, pvc := range pvcs {
-			pvc, err := cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
+			pvc, err := cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -304,7 +313,7 @@ func getNodeLimits(cs clientset.Interface, config *PerTestConfig, nodeName strin
 }
 
 func getInTreeNodeLimits(cs clientset.Interface, nodeName string, driverInfo *DriverInfo) (int, error) {
-	node, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil {
 		return 0, err
 	}
@@ -334,7 +343,7 @@ func getCSINodeLimits(cs clientset.Interface, config *PerTestConfig, nodeName st
 	// Retry with a timeout, the driver might just have been installed and kubelet takes a while to publish everything.
 	var limit int
 	err := wait.PollImmediate(2*time.Second, csiNodeInfoTimeout, func() (bool, error) {
-		csiNode, err := cs.StorageV1().CSINodes().Get(nodeName, metav1.GetOptions{})
+		csiNode, err := cs.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("%s", err)
 			return false, nil

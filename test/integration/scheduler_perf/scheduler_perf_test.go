@@ -19,16 +19,16 @@ package benchmark
 import (
 	"fmt"
 	"io/ioutil"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/cache"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	"sigs.k8s.io/yaml"
@@ -38,13 +38,26 @@ const (
 	configFile = "config/performance-config.yaml"
 )
 
+var (
+	defaultMetricsCollectorConfig = metricsCollectorConfig{
+		Metrics: []string{
+			"scheduler_scheduling_algorithm_predicate_evaluation_seconds",
+			"scheduler_scheduling_algorithm_priority_evaluation_seconds",
+			"scheduler_binding_duration_seconds",
+			"scheduler_e2e_scheduling_duration_seconds",
+			"scheduler_scheduling_algorithm_preemption_evaluation_seconds",
+			"scheduler_pod_scheduling_duration_seconds",
+		},
+	}
+)
+
 // testCase configures a test case to run the scheduler performance test. Users should be able to
 // provide this via a YAML file.
 //
 // It specifies nodes and pods in the cluster before running the test. It also specifies the pods to
 // schedule during the test. The config can be as simple as just specify number of nodes/pods, where
-// default spec will be applied. It also allows the user to specify a pod spec template for more compicated
-// test cases.
+// default spec will be applied. It also allows the user to specify a pod spec template for more
+// complicated test cases.
 //
 // It also specifies the metrics to be collected after the test. If nothing is specified, default metrics
 // such as scheduling throughput and latencies will be collected.
@@ -54,11 +67,16 @@ type testCase struct {
 	// configures nodes in the cluster
 	Nodes nodeCase
 	// configures pods in the cluster before running the tests
-	InitPods podCase
+	InitPods []podCase
+	// configures the test to now wait for init pods to schedule before creating
+	// test pods.
+	SkipWaitUntilInitPodsScheduled bool
 	// pods to be scheduled during the test.
 	PodsToSchedule podCase
 	// optional, feature gates to set before running the test
 	FeatureGates map[featuregate.Feature]bool
+	// optional, replaces default defaultMetricsCollectorConfig if supplied.
+	MetricsCollectorConfig *metricsCollectorConfig
 }
 
 type nodeCase struct {
@@ -87,174 +105,244 @@ type simpleTestCases struct {
 
 type testParams struct {
 	NumNodes          int
-	NumInitPods       int
+	NumInitPods       []int
 	NumPodsToSchedule int
 }
 
+type testDataCollector interface {
+	run(stopCh chan struct{})
+	collect() []DataItem
+}
+
 func BenchmarkPerfScheduling(b *testing.B) {
-	tests := getSimpleTestCases(configFile)
+	dataItems := DataItems{Version: "v1"}
+	tests, err := parseTestCases(configFile)
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	for _, test := range tests {
-		name := fmt.Sprintf("%v/%vNodes/%vInitPods/%vPodsToSchedule", test.Desc, test.Nodes.Num, test.InitPods.Num, test.PodsToSchedule.Num)
+		initPods := 0
+		for _, p := range test.InitPods {
+			initPods += p.Num
+		}
+		name := fmt.Sprintf("%v/%vNodes/%vInitPods/%vPodsToSchedule", test.Desc, test.Nodes.Num, initPods, test.PodsToSchedule.Num)
 		b.Run(name, func(b *testing.B) {
 			for feature, flag := range test.FeatureGates {
 				defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)()
 			}
-			perfScheduling(test, b)
+			dataItems.DataItems = append(dataItems.DataItems, perfScheduling(test, b)...)
 		})
+	}
+	if err := dataItems2JSONFile(dataItems, b.Name()); err != nil {
+		klog.Fatalf("%v: unable to write measured data: %v", b.Name(), err)
 	}
 }
 
-func perfScheduling(test testCase, b *testing.B) {
-	var nodeStrategy testutils.PrepareNodeStrategy = &testutils.TrivialNodePrepareStrategy{}
-	if test.Nodes.NodeAllocatableStrategy != nil {
-		nodeStrategy = test.Nodes.NodeAllocatableStrategy
-	} else if test.Nodes.LabelNodePrepareStrategy != nil {
-		nodeStrategy = test.Nodes.LabelNodePrepareStrategy
-	} else if test.Nodes.UniqueNodeLabelStrategy != nil {
-		nodeStrategy = test.Nodes.UniqueNodeLabelStrategy
-	}
-
-	setupPodStrategy := getPodStrategy(test.InitPods)
-	testPodStrategy := getPodStrategy(test.PodsToSchedule)
-
-	var nodeSpec *v1.Node
-	if test.Nodes.NodeTemplatePath != nil {
-		nodeSpec = getNodeSpecFromFile(test.Nodes.NodeTemplatePath)
-	}
-
+func perfScheduling(test testCase, b *testing.B) []DataItem {
 	finalFunc, podInformer, clientset := mustSetupScheduler()
 	defer finalFunc()
 
-	var nodePreparer testutils.TestNodePreparer
-	if nodeSpec != nil {
-		nodePreparer = framework.NewIntegrationTestNodePreparerWithNodeSpec(
-			clientset,
-			[]testutils.CountToStrategy{{Count: test.Nodes.Num, Strategy: nodeStrategy}},
-			nodeSpec,
-		)
-	} else {
-		nodePreparer = framework.NewIntegrationTestNodePreparer(
-			clientset,
-			[]testutils.CountToStrategy{{Count: test.Nodes.Num, Strategy: nodeStrategy}},
-			"scheduler-perf-",
-		)
+	nodePreparer, err := getNodePreparer(test.Nodes, clientset)
+	if err != nil {
+		b.Fatal(err)
 	}
-
 	if err := nodePreparer.PrepareNodes(); err != nil {
-		klog.Fatalf("%v", err)
+		b.Fatal(err)
 	}
 	defer nodePreparer.CleanupNodes()
 
-	config := testutils.NewTestPodCreatorConfig()
-	config.AddStrategy(setupNamespace, test.InitPods.Num, setupPodStrategy)
-	podCreator := testutils.NewTestPodCreator(clientset, config)
-	podCreator.CreatePods()
-
-	for {
-		scheduled, err := getScheduledPods(podInformer)
-		if err != nil {
-			klog.Fatalf("%v", err)
+	total := 0
+	for _, p := range test.InitPods {
+		if err := createPods(setupNamespace, p, clientset); err != nil {
+			b.Fatal(err)
 		}
-		if len(scheduled) >= test.InitPods.Num {
-			break
-		}
-		klog.Infof("got %d existing pods, required: %d", len(scheduled), test.InitPods.Num)
-		time.Sleep(1 * time.Second)
+		total += p.Num
 	}
-
-	scheduled := int32(0)
-	completedCh := make(chan struct{})
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		UpdateFunc: func(old, cur interface{}) {
-			curPod := cur.(*v1.Pod)
-			oldPod := old.(*v1.Pod)
-
-			if len(oldPod.Spec.NodeName) == 0 && len(curPod.Spec.NodeName) > 0 {
-				if atomic.AddInt32(&scheduled, 1) >= int32(test.PodsToSchedule.Num) {
-					completedCh <- struct{}{}
-				}
-			}
-		},
-	})
+	if !test.SkipWaitUntilInitPodsScheduled {
+		if err := waitNumPodsScheduled(b, total, podInformer, setupNamespace); err != nil {
+			b.Fatal(err)
+		}
+	}
 
 	// start benchmark
 	b.ResetTimer()
-	config = testutils.NewTestPodCreatorConfig()
-	config.AddStrategy(testNamespace, test.PodsToSchedule.Num, testPodStrategy)
-	podCreator = testutils.NewTestPodCreator(clientset, config)
-	podCreator.CreatePods()
 
-	<-completedCh
+	// Start test data collectors.
+	stopCh := make(chan struct{})
+	collectors := getTestDataCollectors(test, podInformer, b)
+	for _, collector := range collectors {
+		go collector.run(stopCh)
+	}
 
+	// Schedule the main workload
+	if err := createPods(testNamespace, test.PodsToSchedule, clientset); err != nil {
+		b.Fatal(err)
+	}
+	if err := waitNumPodsScheduled(b, test.PodsToSchedule.Num, podInformer, testNamespace); err != nil {
+		b.Fatal(err)
+	}
+
+	close(stopCh)
 	// Note: without this line we're taking the overhead of defer() into account.
 	b.StopTimer()
+
+	var dataItems []DataItem
+	for _, collector := range collectors {
+		dataItems = append(dataItems, collector.collect()...)
+	}
+	return dataItems
 }
 
-func getPodStrategy(pc podCase) testutils.TestPodCreateStrategy {
+func waitNumPodsScheduled(b *testing.B, num int, podInformer coreinformers.PodInformer, namespace string) error {
+	for {
+		scheduled, err := getScheduledPods(podInformer, namespace)
+		if err != nil {
+			return err
+		}
+		if len(scheduled) >= num {
+			break
+		}
+		klog.Infof("%s: got %d existing pods, required: %d", b.Name(), len(scheduled), num)
+		time.Sleep(1 * time.Second)
+	}
+	return nil
+}
+
+func getTestDataCollectors(tc testCase, podInformer coreinformers.PodInformer, b *testing.B) []testDataCollector {
+	collectors := []testDataCollector{newThroughputCollector(podInformer, map[string]string{"Name": b.Name()}, []string{testNamespace})}
+	metricsCollectorConfig := defaultMetricsCollectorConfig
+	if tc.MetricsCollectorConfig != nil {
+		metricsCollectorConfig = *tc.MetricsCollectorConfig
+	}
+	collectors = append(collectors, newMetricsCollector(metricsCollectorConfig, map[string]string{"Name": b.Name()}))
+	return collectors
+}
+
+func getNodePreparer(nc nodeCase, clientset clientset.Interface) (testutils.TestNodePreparer, error) {
+	var nodeStrategy testutils.PrepareNodeStrategy = &testutils.TrivialNodePrepareStrategy{}
+	if nc.NodeAllocatableStrategy != nil {
+		nodeStrategy = nc.NodeAllocatableStrategy
+	} else if nc.LabelNodePrepareStrategy != nil {
+		nodeStrategy = nc.LabelNodePrepareStrategy
+	} else if nc.UniqueNodeLabelStrategy != nil {
+		nodeStrategy = nc.UniqueNodeLabelStrategy
+	}
+
+	if nc.NodeTemplatePath != nil {
+		node, err := getNodeSpecFromFile(nc.NodeTemplatePath)
+		if err != nil {
+			return nil, err
+		}
+		return framework.NewIntegrationTestNodePreparerWithNodeSpec(
+			clientset,
+			[]testutils.CountToStrategy{{Count: nc.Num, Strategy: nodeStrategy}},
+			node,
+		), nil
+	}
+	return framework.NewIntegrationTestNodePreparer(
+		clientset,
+		[]testutils.CountToStrategy{{Count: nc.Num, Strategy: nodeStrategy}},
+		"scheduler-perf-",
+	), nil
+}
+
+func createPods(ns string, pc podCase, clientset clientset.Interface) error {
+	strategy, err := getPodStrategy(pc)
+	if err != nil {
+		return err
+	}
+	config := testutils.NewTestPodCreatorConfig()
+	config.AddStrategy(ns, pc.Num, strategy)
+	podCreator := testutils.NewTestPodCreator(clientset, config)
+	return podCreator.CreatePods()
+}
+
+func getPodStrategy(pc podCase) (testutils.TestPodCreateStrategy, error) {
 	basePod := makeBasePod()
 	if pc.PodTemplatePath != nil {
-		basePod = getPodSpecFromFile(pc.PodTemplatePath)
+		var err error
+		basePod, err = getPodSpecFromFile(pc.PodTemplatePath)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if pc.PersistentVolumeClaimTemplatePath == nil {
-		return testutils.NewCustomCreatePodStrategy(basePod)
+		return testutils.NewCustomCreatePodStrategy(basePod), nil
 	}
 
-	pvTemplate := getPersistentVolumeSpecFromFile(pc.PersistentVolumeTemplatePath)
-	pvcTemplate := getPersistentVolumeClaimSpecFromFile(pc.PersistentVolumeClaimTemplatePath)
-	return testutils.NewCreatePodWithPersistentVolumeStrategy(pvcTemplate, getCustomVolumeFactory(pvTemplate), basePod)
+	pvTemplate, err := getPersistentVolumeSpecFromFile(pc.PersistentVolumeTemplatePath)
+	if err != nil {
+		return nil, err
+	}
+	pvcTemplate, err := getPersistentVolumeClaimSpecFromFile(pc.PersistentVolumeClaimTemplatePath)
+	if err != nil {
+		return nil, err
+	}
+	return testutils.NewCreatePodWithPersistentVolumeStrategy(pvcTemplate, getCustomVolumeFactory(pvTemplate), basePod), nil
 }
 
-func getSimpleTestCases(path string) []testCase {
+func parseTestCases(path string) ([]testCase, error) {
 	var simpleTests []simpleTestCases
-	getSpecFromFile(&path, &simpleTests)
+	if err := getSpecFromFile(&path, &simpleTests); err != nil {
+		return nil, fmt.Errorf("parsing test cases: %v", err)
+	}
 
 	testCases := make([]testCase, 0)
 	for _, s := range simpleTests {
 		testCase := s.Template
 		for _, p := range s.Params {
 			testCase.Nodes.Num = p.NumNodes
-			testCase.InitPods.Num = p.NumInitPods
+			testCase.InitPods = append([]podCase(nil), testCase.InitPods...)
+			for i, v := range p.NumInitPods {
+				testCase.InitPods[i].Num = v
+			}
 			testCase.PodsToSchedule.Num = p.NumPodsToSchedule
 			testCases = append(testCases, testCase)
 		}
 	}
 
-	return testCases
+	return testCases, nil
 }
 
-func getNodeSpecFromFile(path *string) *v1.Node {
+func getNodeSpecFromFile(path *string) (*v1.Node, error) {
 	nodeSpec := &v1.Node{}
-	getSpecFromFile(path, nodeSpec)
-	return nodeSpec
+	if err := getSpecFromFile(path, nodeSpec); err != nil {
+		return nil, fmt.Errorf("parsing Node: %v", err)
+	}
+	return nodeSpec, nil
 }
 
-func getPodSpecFromFile(path *string) *v1.Pod {
+func getPodSpecFromFile(path *string) (*v1.Pod, error) {
 	podSpec := &v1.Pod{}
-	getSpecFromFile(path, podSpec)
-	return podSpec
+	if err := getSpecFromFile(path, podSpec); err != nil {
+		return nil, fmt.Errorf("parsing Pod: %v", err)
+	}
+	return podSpec, nil
 }
 
-func getPersistentVolumeSpecFromFile(path *string) *v1.PersistentVolume {
+func getPersistentVolumeSpecFromFile(path *string) (*v1.PersistentVolume, error) {
 	persistentVolumeSpec := &v1.PersistentVolume{}
-	getSpecFromFile(path, persistentVolumeSpec)
-	return persistentVolumeSpec
+	if err := getSpecFromFile(path, persistentVolumeSpec); err != nil {
+		return nil, fmt.Errorf("parsing PersistentVolume: %v", err)
+	}
+	return persistentVolumeSpec, nil
 }
 
-func getPersistentVolumeClaimSpecFromFile(path *string) *v1.PersistentVolumeClaim {
+func getPersistentVolumeClaimSpecFromFile(path *string) (*v1.PersistentVolumeClaim, error) {
 	persistentVolumeClaimSpec := &v1.PersistentVolumeClaim{}
-	getSpecFromFile(path, persistentVolumeClaimSpec)
-	return persistentVolumeClaimSpec
+	if err := getSpecFromFile(path, persistentVolumeClaimSpec); err != nil {
+		return nil, fmt.Errorf("parsing PersistentVolumeClaim: %v", err)
+	}
+	return persistentVolumeClaimSpec, nil
 }
 
-func getSpecFromFile(path *string, spec interface{}) {
+func getSpecFromFile(path *string, spec interface{}) error {
 	bytes, err := ioutil.ReadFile(*path)
 	if err != nil {
-		klog.Fatalf("%v", err)
+		return err
 	}
-	if err := yaml.Unmarshal(bytes, spec); err != nil {
-		klog.Fatalf("%v", err)
-	}
+	return yaml.Unmarshal(bytes, spec)
 }
 
 func getCustomVolumeFactory(pvTemplate *v1.PersistentVolume) func(id int) *v1.PersistentVolume {

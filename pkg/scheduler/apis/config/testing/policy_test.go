@@ -36,7 +36,7 @@ extenders:
   filterVerb: filter
   prioritizeVerb: prioritize
   weight: 1
-  enableHttps: false
+  enableHttps: true
 `
 )
 
@@ -48,7 +48,7 @@ func TestSchedulerPolicy(t *testing.T) {
 				FilterVerb:     "filter",
 				PrioritizeVerb: "prioritize",
 				Weight:         1,
-				EnableHTTPS:    false,
+				EnableHTTPS:    true,
 			},
 		},
 	}

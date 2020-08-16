@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/operationexecutor"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
@@ -127,7 +127,7 @@ func (rc *reconciler) reconcile() {
 
 		if unregisterPlugin {
 			klog.V(5).Infof(registeredPlugin.GenerateMsgDetailed("Starting operationExecutor.UnregisterPlugin", ""))
-			err := rc.operationExecutor.UnregisterPlugin(registeredPlugin.SocketPath, rc.getHandlers(), rc.actualStateOfWorld)
+			err := rc.operationExecutor.UnregisterPlugin(registeredPlugin, rc.actualStateOfWorld)
 			if err != nil &&
 				!goroutinemap.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {

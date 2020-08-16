@@ -13,6 +13,7 @@ go_library(
     importpath = "github.com/docker/docker/errdefs",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/github.com/containerd/containerd/errdefs:go_default_library",
         "//vendor/github.com/docker/distribution/registry/api/errcode:go_default_library",
         "//vendor/github.com/sirupsen/logrus:go_default_library",
         "//vendor/google.golang.org/grpc/codes:go_default_library",

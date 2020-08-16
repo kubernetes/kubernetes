@@ -78,8 +78,8 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 	}
 	block := v1.PersistentVolumeBlock
 	specMode := spec.PersistentVolume.Spec.VolumeMode
-	if &specMode == nil {
-		t.Errorf("Invalid volumeMode from GlobalMapPath spec: %v - %v", &specMode, block)
+	if specMode == nil {
+		t.Errorf("Invalid volumeMode from GlobalMapPath spec: %v - %v", specMode, block)
 	}
 	if *specMode != block {
 		t.Errorf("Invalid volumeMode from GlobalMapPath spec: %v - %v", *specMode, block)

@@ -27,6 +27,7 @@ import (
 	"unicode/utf8"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -139,24 +140,8 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		}
 
 		trace.Step("About to store object in database")
-		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			if scope.FieldManager != nil {
-				liveObj, err := scope.Creater.New(scope.Kind)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err)
-				}
-				obj, err = scope.FieldManager.Update(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
-				if err != nil {
-					return nil, fmt.Errorf("failed to update object (Create for %v) managed fields: %v", scope.Kind, err)
-				}
-			}
-
-			admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, options, dryrun.IsDryRun(options.DryRun), userInfo)
-			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
-				if err := mutatingAdmission.Admit(ctx, admissionAttributes, scope); err != nil {
-					return nil, err
-				}
-			}
+		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, options, dryrun.IsDryRun(options.DryRun), userInfo)
+		requestFunc := func() (runtime.Object, error) {
 			return r.Create(
 				ctx,
 				name,
@@ -164,6 +149,30 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 				rest.AdmissionToValidateObjectFunc(admit, admissionAttributes, scope),
 				options,
 			)
+		}
+		result, err := finishRequest(timeout, func() (runtime.Object, error) {
+			if scope.FieldManager != nil {
+				liveObj, err := scope.Creater.New(scope.Kind)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err)
+				}
+				obj = scope.FieldManager.UpdateNoErrors(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
+			}
+			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
+				if err := mutatingAdmission.Admit(ctx, admissionAttributes, scope); err != nil {
+					return nil, err
+				}
+			}
+			result, err := requestFunc()
+			// If the object wasn't committed to storage because it's serialized size was too large,
+			// it is safe to remove managedFields (which can be large) and try again.
+			if isTooLargeError(err) {
+				if accessor, accessorErr := meta.Accessor(obj); accessorErr == nil {
+					accessor.SetManagedFields(nil)
+					result, err = requestFunc()
+				}
+			}
+			return result, err
 		})
 		if err != nil {
 			scope.err(err, w, req)

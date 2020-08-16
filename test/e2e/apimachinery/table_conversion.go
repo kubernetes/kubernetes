@@ -55,7 +55,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		podName := "pod-1"
 		framework.Logf("Creating pod %s", podName)
 
-		_, err := c.CoreV1().Pods(ns).Create(newTablePod(podName))
+		_, err := c.CoreV1().Pods(ns).Create(context.TODO(), newTablePod(podName), metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", podName, ns)
 
 		table := &metav1beta1.Table{}
@@ -83,7 +83,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		ginkgo.By("creating a large number of resources")
 		workqueue.ParallelizeUntil(context.TODO(), 5, 20, func(i int) {
 			for tries := 3; tries >= 0; tries-- {
-				_, err := client.Create(&v1.PodTemplate{
+				_, err := client.Create(context.TODO(), &v1.PodTemplate{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fmt.Sprintf("template-%04d", i),
 					},
@@ -94,7 +94,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 							},
 						},
 					},
-				})
+				}, metav1.CreateOptions{})
 				if err == nil {
 					return
 				}
@@ -146,7 +146,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 	})
 
 	/*
-			    Release : v1.16
+			    Release: v1.16
 				Testname: API metadata HTTP return
 				Description: Issue a HTTP request to the API.
 		        HTTP request MUST return a HTTP status code of 406.

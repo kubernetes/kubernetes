@@ -21,7 +21,7 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	autoscaling "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -201,7 +201,7 @@ func sortGroupDiscoveryByKubeAwareVersion(gd []metav1.GroupVersionForDiscovery) 
 	})
 }
 
-func (c *DiscoveryController) Run(stopCh <-chan struct{}) {
+func (c *DiscoveryController) Run(stopCh <-chan struct{}, synchedCh chan<- struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 	defer klog.Infof("Shutting down DiscoveryController")
@@ -212,6 +212,31 @@ func (c *DiscoveryController) Run(stopCh <-chan struct{}) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
+
+	// initially sync all group versions to make sure we serve complete discovery
+	if err := wait.PollImmediateUntil(time.Second, func() (bool, error) {
+		crds, err := c.crdLister.List(labels.Everything())
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("failed to initially list CRDs: %v", err))
+			return false, nil
+		}
+		for _, crd := range crds {
+			for _, v := range crd.Spec.Versions {
+				gv := schema.GroupVersion{crd.Spec.Group, v.Name}
+				if err := c.sync(gv); err != nil {
+					utilruntime.HandleError(fmt.Errorf("failed to initially sync CRD version %v: %v", gv, err))
+					return false, nil
+				}
+			}
+		}
+		return true, nil
+	}, stopCh); err == wait.ErrWaitTimeout {
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for discovery endpoint to initialize"))
+		return
+	} else if err != nil {
+		panic(fmt.Errorf("unexpected error: %v", err))
+	}
+	close(synchedCh)
 
 	// only start one worker thread since its a slow moving API
 	go wait.Until(c.runWorker, time.Second, stopCh)

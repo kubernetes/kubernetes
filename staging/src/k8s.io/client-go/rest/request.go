@@ -30,6 +30,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/net/http2"
@@ -38,12 +39,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
+	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -51,6 +53,9 @@ var (
 	// throttled (via the provided rateLimiter) for more than longThrottleLatency will
 	// be logged.
 	longThrottleLatency = 50 * time.Millisecond
+
+	// extraLongThrottleLatency defines the threshold for logging requests at log level 2.
+	extraLongThrottleLatency = 1 * time.Second
 )
 
 // HTTPClient is an interface for testing a request object.
@@ -83,9 +88,12 @@ var noBackoff = &NoBackoff{}
 type Request struct {
 	c *RESTClient
 
+	warningHandler WarningHandler
+
 	rateLimiter flowcontrol.RateLimiter
 	backoff     BackoffManager
 	timeout     time.Duration
+	maxRetries  int
 
 	// generic components accessible via method setters
 	verb       string
@@ -129,11 +137,13 @@ func NewRequest(c *RESTClient) *Request {
 	}
 
 	r := &Request{
-		c:           c,
-		rateLimiter: c.rateLimiter,
-		backoff:     backoff,
-		timeout:     timeout,
-		pathPrefix:  pathPrefix,
+		c:              c,
+		rateLimiter:    c.rateLimiter,
+		backoff:        backoff,
+		timeout:        timeout,
+		pathPrefix:     pathPrefix,
+		maxRetries:     10,
+		warningHandler: c.warningHandler,
 	}
 
 	switch {
@@ -208,6 +218,13 @@ func (r *Request) BackOff(manager BackoffManager) *Request {
 	}
 
 	r.backoff = manager
+	return r
+}
+
+// WarningHandler sets the handler this client uses when warning headers are encountered.
+// If set to nil, this client will use the default warning handler (see SetDefaultWarningHandler).
+func (r *Request) WarningHandler(handler WarningHandler) *Request {
+	r.warningHandler = handler
 	return r
 }
 
@@ -386,6 +403,18 @@ func (r *Request) Timeout(d time.Duration) *Request {
 	return r
 }
 
+// MaxRetries makes the request use the given integer as a ceiling of retrying upon receiving
+// "Retry-After" headers and 429 status-code in the response. The default is 10 unless this
+// function is specifically called with a different value.
+// A zero maxRetries prevent it from doing retires and return an error immediately.
+func (r *Request) MaxRetries(maxRetries int) *Request {
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
+	r.maxRetries = maxRetries
+	return r
+}
+
 // Body makes the request use obj as the body. Optional.
 // If obj is a string, try to read a file of that name.
 // If obj is a []byte, send it directly.
@@ -547,11 +576,74 @@ func (r *Request) tryThrottle(ctx context.Context) error {
 
 	err := r.rateLimiter.Wait(ctx)
 
-	if latency := time.Since(now); latency > longThrottleLatency {
+	latency := time.Since(now)
+	if latency > longThrottleLatency {
 		klog.V(3).Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
 	}
+	if latency > extraLongThrottleLatency {
+		// If the rate limiter latency is very high, the log message should be printed at a higher log level,
+		// but we use a throttled logger to prevent spamming.
+		globalThrottledLogger.Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
+	}
+	metrics.RateLimiterLatency.Observe(r.verb, r.finalURLTemplate(), latency)
 
 	return err
+}
+
+type throttleSettings struct {
+	logLevel       klog.Level
+	minLogInterval time.Duration
+
+	lastLogTime time.Time
+	lock        sync.RWMutex
+}
+
+type throttledLogger struct {
+	clock    utilclock.PassiveClock
+	settings []*throttleSettings
+}
+
+var globalThrottledLogger = &throttledLogger{
+	clock: utilclock.RealClock{},
+	settings: []*throttleSettings{
+		{
+			logLevel:       2,
+			minLogInterval: 1 * time.Second,
+		}, {
+			logLevel:       0,
+			minLogInterval: 10 * time.Second,
+		},
+	},
+}
+
+func (b *throttledLogger) attemptToLog() (klog.Level, bool) {
+	for _, setting := range b.settings {
+		if bool(klog.V(setting.logLevel).Enabled()) {
+			// Return early without write locking if possible.
+			if func() bool {
+				setting.lock.RLock()
+				defer setting.lock.RUnlock()
+				return b.clock.Since(setting.lastLogTime) >= setting.minLogInterval
+			}() {
+				setting.lock.Lock()
+				defer setting.lock.Unlock()
+				if b.clock.Since(setting.lastLogTime) >= setting.minLogInterval {
+					setting.lastLogTime = b.clock.Now()
+					return setting.logLevel, true
+				}
+			}
+			return -1, false
+		}
+	}
+	return -1, false
+}
+
+// Infof will write a log message at each logLevel specified by the reciever's throttleSettings
+// as long as it hasn't written a log message more recently than minLogInterval.
+func (b *throttledLogger) Infof(message string, args ...interface{}) {
+	if logLevel, ok := b.attemptToLog(); ok {
+		klog.V(logLevel).Infof(message, args...)
+	}
 }
 
 // Watch attempts to begin watching the requested location.
@@ -587,7 +679,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 	if err != nil {
 		// The watch stream mechanism handles many common partial data errors, so closed
 		// connections can be retried in many cases.
-		if net.IsProbableEOF(err) {
+		if net.IsProbableEOF(err) || net.IsTimeout(err) {
 			return watch.NewEmptyWatch(), nil
 		}
 		return nil, err
@@ -609,6 +701,8 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	handleWarnings(resp.Header, r.warningHandler)
 
 	frameReader := framer.NewFrameReader(resp.Body)
 	watchEventDecoder := streaming.NewDecoder(frameReader, streamingSerializer)
@@ -682,6 +776,7 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 
 	switch {
 	case (resp.StatusCode >= 200) && (resp.StatusCode < 300):
+		handleWarnings(resp.Header, r.warningHandler)
 		return resp.Body, nil
 
 	default:
@@ -763,7 +858,6 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 	}
 
 	// Right now we make about ten retry attempts if we get a Retry-After response.
-	maxRetries := 10
 	retries := 0
 	for {
 
@@ -792,7 +886,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 			r.backoff.UpdateBackoff(r.URL(), err, resp.StatusCode)
 		}
 		if err != nil {
-			// "Connection reset by peer", "Connection refused" or "apiserver is shutting down" are usually a transient errors.
+			// "Connection reset by peer" or "apiserver is shutting down" are usually a transient errors.
 			// Thus in case of "GET" operations, we simply retry it.
 			// We are not automatically retrying "write" operations, as
 			// they are not idempotent.
@@ -800,7 +894,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 				return err
 			}
 			// For connection errors and apiserver shutdown errors retry.
-			if net.IsConnectionReset(err) || net.IsConnectionRefused(err) {
+			if net.IsConnectionReset(err) || net.IsProbableEOF(err) {
 				// For the purpose of retry, we set the artificial "retry-after" response.
 				// TODO: Should we clean the original response if it exists?
 				resp = &http.Response{
@@ -826,7 +920,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 			}()
 
 			retries++
-			if seconds, wait := checkWait(resp); wait && retries < maxRetries {
+			if seconds, wait := checkWait(resp); wait && retries <= r.maxRetries {
 				if seeker, ok := r.body.(io.Seeker); ok && r.body != nil {
 					_, err := seeker.Seek(0, 0)
 					if err != nil {
@@ -939,6 +1033,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 				body:        body,
 				contentType: contentType,
 				statusCode:  resp.StatusCode,
+				warnings:    handleWarnings(resp.Header, r.warningHandler),
 			}
 		}
 	}
@@ -957,6 +1052,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 			statusCode:  resp.StatusCode,
 			decoder:     decoder,
 			err:         err,
+			warnings:    handleWarnings(resp.Header, r.warningHandler),
 		}
 	}
 
@@ -965,6 +1061,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		contentType: contentType,
 		statusCode:  resp.StatusCode,
 		decoder:     decoder,
+		warnings:    handleWarnings(resp.Header, r.warningHandler),
 	}
 }
 
@@ -972,11 +1069,11 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 func truncateBody(body string) string {
 	max := 0
 	switch {
-	case bool(klog.V(10)):
+	case bool(klog.V(10).Enabled()):
 		return body
-	case bool(klog.V(9)):
+	case bool(klog.V(9).Enabled()):
 		max = 10240
-	case bool(klog.V(8)):
+	case bool(klog.V(8).Enabled()):
 		max = 1024
 	}
 
@@ -991,7 +1088,7 @@ func truncateBody(body string) string {
 // allocating a new string for the body output unless necessary. Uses a simple heuristic to determine
 // whether the body is printable.
 func glogBody(prefix string, body []byte) {
-	if klog.V(8) {
+	if klog.V(8).Enabled() {
 		if bytes.IndexFunc(body, func(r rune) bool {
 			return r < 0x0a
 		}) != -1 {
@@ -1100,6 +1197,7 @@ func retryAfterSeconds(resp *http.Response) (int, bool) {
 // Result contains the result of calling Request.Do().
 type Result struct {
 	body        []byte
+	warnings    []net.WarningHeader
 	contentType string
 	err         error
 	statusCode  int
@@ -1211,6 +1309,11 @@ func (r Result) Error() error {
 		}
 	}
 	return r.err
+}
+
+// Warnings returns any warning headers received in the response
+func (r Result) Warnings() []net.WarningHeader {
+	return r.warnings
 }
 
 // NameMayNotBe specifies strings that cannot be used as names specified as path segments (like the REST API or etcd store)

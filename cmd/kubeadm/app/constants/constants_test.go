@@ -18,10 +18,7 @@ package constants
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -149,50 +146,62 @@ func TestAddSelfHostedPrefix(t *testing.T) {
 }
 
 func TestEtcdSupportedVersion(t *testing.T) {
+	var supportedEtcdVersion = map[uint8]string{
+		13: "3.2.24",
+		14: "3.3.10",
+		15: "3.3.10",
+		16: "3.3.17-0",
+		17: "3.4.3-0",
+		18: "3.4.3-0",
+	}
 	var tests = []struct {
 		kubernetesVersion string
 		expectedVersion   *version.Version
-		expectedError     error
+		expectedWarning   bool
+		expectedError     bool
 	}{
 		{
-			kubernetesVersion: "1.99.0",
+			kubernetesVersion: "1.x.1",
 			expectedVersion:   nil,
-			expectedError:     errors.New("unsupported or unknown Kubernetes version(1.99.0)"),
+			expectedWarning:   false,
+			expectedError:     true,
 		},
 		{
-			kubernetesVersion: MinimumControlPlaneVersion.WithPatch(1).String(),
-			expectedVersion:   version.MustParseSemantic(SupportedEtcdVersion[uint8(MinimumControlPlaneVersion.Minor())]),
-			expectedError:     nil,
+			kubernetesVersion: "1.10.1",
+			expectedVersion:   version.MustParseSemantic("3.2.24"),
+			expectedWarning:   true,
+			expectedError:     false,
 		},
 		{
-			kubernetesVersion: CurrentKubernetesVersion.String(),
-			expectedVersion:   version.MustParseSemantic(SupportedEtcdVersion[uint8(CurrentKubernetesVersion.Minor())]),
-			expectedError:     nil,
+			kubernetesVersion: "1.99.0",
+			expectedVersion:   version.MustParseSemantic("3.4.3-0"),
+			expectedWarning:   true,
+			expectedError:     false,
+		},
+		{
+			kubernetesVersion: "v1.16.0",
+			expectedVersion:   version.MustParseSemantic("3.3.17-0"),
+			expectedWarning:   false,
+			expectedError:     false,
+		},
+		{
+			kubernetesVersion: "1.17.2",
+			expectedVersion:   version.MustParseSemantic("3.4.3-0"),
+			expectedWarning:   false,
+			expectedError:     false,
 		},
 	}
 	for _, rt := range tests {
 		t.Run(rt.kubernetesVersion, func(t *testing.T) {
-			actualVersion, actualError := EtcdSupportedVersion(rt.kubernetesVersion)
-			if actualError != nil {
-				if rt.expectedError == nil {
-					t.Errorf("failed EtcdSupportedVersion:\n\texpected no error, but got: %v", actualError)
-				} else if actualError.Error() != rt.expectedError.Error() {
-					t.Errorf(
-						"failed EtcdSupportedVersion:\n\texpected error: %v\n\t  actual error: %v",
-						rt.expectedError,
-						actualError,
-					)
-				}
-			} else {
-				if rt.expectedError != nil {
-					t.Errorf("failed EtcdSupportedVersion:\n\texpected error: %v, but got no error", rt.expectedError)
-				} else if strings.Compare(actualVersion.String(), rt.expectedVersion.String()) != 0 {
-					t.Errorf(
-						"failed EtcdSupportedVersion:\n\texpected version: %s\n\t  actual version: %s",
-						rt.expectedVersion.String(),
-						actualVersion.String(),
-					)
-				}
+			actualVersion, actualWarning, actualError := EtcdSupportedVersion(supportedEtcdVersion, rt.kubernetesVersion)
+			if (actualError != nil) != rt.expectedError {
+				t.Fatalf("expected error %v, got %v", rt.expectedError, actualError != nil)
+			}
+			if (actualWarning != nil) != rt.expectedWarning {
+				t.Fatalf("expected warning %v, got %v", rt.expectedWarning, actualWarning != nil)
+			}
+			if actualError == nil && actualVersion.String() != rt.expectedVersion.String() {
+				t.Errorf("expected version %s, got %s", rt.expectedVersion.String(), actualVersion.String())
 			}
 		})
 	}

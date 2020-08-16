@@ -17,11 +17,12 @@ limitations under the License.
 package ipam
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -306,7 +307,7 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			// Initialize the range allocator.
 			fakeNodeInformer := getFakeNodeInformer(tc.fakeNodeHandler)
-			nodeList, _ := tc.fakeNodeHandler.List(metav1.ListOptions{})
+			nodeList, _ := tc.fakeNodeHandler.List(context.TODO(), metav1.ListOptions{})
 			_, err := NewCIDRRangeAllocator(tc.fakeNodeHandler, fakeNodeInformer, tc.allocatorParams, nodeList)
 			if err == nil && tc.ctrlCreateFail {
 				t.Fatalf("creating range allocator was expected to fail, but it did not")

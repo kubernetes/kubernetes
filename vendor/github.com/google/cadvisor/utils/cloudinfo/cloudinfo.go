@@ -18,7 +18,7 @@ package cloudinfo
 
 import (
 	info "github.com/google/cadvisor/info/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type CloudInfo interface {
@@ -75,14 +75,14 @@ func NewRealCloudInfo() CloudInfo {
 	}
 }
 
-func (self *realCloudInfo) GetCloudProvider() info.CloudProvider {
-	return self.cloudProvider
+func (i *realCloudInfo) GetCloudProvider() info.CloudProvider {
+	return i.cloudProvider
 }
 
-func (self *realCloudInfo) GetInstanceType() info.InstanceType {
-	return self.instanceType
+func (i *realCloudInfo) GetInstanceType() info.InstanceType {
+	return i.instanceType
 }
 
-func (self *realCloudInfo) GetInstanceID() info.InstanceID {
-	return self.instanceID
+func (i *realCloudInfo) GetInstanceID() info.InstanceID {
+	return i.instanceID
 }

@@ -2,18 +2,18 @@
 
 approvers:
 - justinsb
-- zmerlynn
 - gnufied
 - jsafrane
 - micahhausler
-- mcrute
 - m00nf1sh
 reviewers:
 - gnufied
 - jsafrane
 - justinsb
-- zmerlynn
 - chrislovecnm
 - nckturner
 - micahhausler
 - m00nf1sh
+emeritus_approvers:
+- zmerlynn
+- mcrute

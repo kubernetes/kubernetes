@@ -4,63 +4,37 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file"
 load("//build:workspace_mirror.bzl", "mirror")
 
 http_archive(
-    name = "bazel_toolchains",
-    sha256 = "3a6ffe6dd91ee975f5d5bc5c50b34f58e3881dfac59a7b7aba3323bd8f8571a8",
-    strip_prefix = "bazel-toolchains-92dd8a7",
+    name = "io_k8s_repo_infra",
+    strip_prefix = "repo-infra-0.0.12",
+    sha256 = "e309a655a5b04fd76b6e950b3371aa8636bb929f2860a7ec22fa9b4b0b7c8236",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/92dd8a7.tar.gz",
-        "https://github.com/bazelbuild/bazel-toolchains/archive/92dd8a7.tar.gz",
+        "https://github.com/kubernetes/repo-infra/archive/v0.0.12.tar.gz",
     ],
 )
 
-load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
+load("@io_k8s_repo_infra//:load.bzl", repo_infra_repositories = "repositories")
 
-rbe_autoconfig(
-    name = "rbe_default",
-    base_container_digest = "sha256:677c1317f14c6fd5eba2fd8ec645bfdc5119f64b3e5e944e13c89e0525cc8ad1",
-    digest = "sha256:b7c2e7a18968b9df2db43eda722c5ae592aafbf774ba2766074a9c96926743d8",
-    registry = "gcr.io",
-    repository = "k8s-testimages/bazel-krte",
-    # tag = "latest",
+repo_infra_repositories()
+
+load("@io_k8s_repo_infra//:repos.bzl", repo_infra_configure = "configure", repo_infra_go_repositories = "go_repositories")
+
+# IMPORTANT: Only one go version may be specified at a time
+#            'go_version':          used to specify a published upstream go version
+#            'override_go_version': used to specify an alternate go version provided
+#                                   by kubernetes/repo-infra
+repo_infra_configure(
+    go_version = "1.15",
+    minimum_bazel_version = "2.2.0",
 )
 
-http_archive(
-    name = "bazel_skylib",
-    sha256 = "eb5c57e4c12e68c0c20bc774bfbc60a568e800d025557bc4ea022c6479acc867",
-    strip_prefix = "bazel-skylib-0.6.0",
-    urls = mirror("https://github.com/bazelbuild/bazel-skylib/archive/0.6.0.tar.gz"),
-)
+repo_infra_go_repositories()
 
-load("@bazel_skylib//lib:versions.bzl", "versions")
-
-versions.check(minimum_bazel_version = "0.23.0")
-
-http_archive(
-    name = "io_k8s_repo_infra",
-    sha256 = "f6d65480241ec0fd7a0d01f432938b97d7395aeb8eefbe859bb877c9b4eafa56",
-    strip_prefix = "repo-infra-9f4571ad7242bf3ec4b47365062498c2528f9a5f",
-    urls = mirror("https://github.com/kubernetes/repo-infra/archive/9f4571ad7242bf3ec4b47365062498c2528f9a5f.tar.gz"),
-)
-
-http_archive(
-    name = "io_bazel_rules_go",
-    sha256 = "0a99597dd30ecfd94f64fc64717cd1b6c4bd9807918942a8501a3883990e4b1d",
-    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/v0.19.10/rules_go-v0.19.10.tar.gz"),
-)
-
-load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
-
-go_rules_dependencies()
-
-go_register_toolchains(
-    go_version = "1.13.6",
-)
-
+# begin setup rules_docker
 http_archive(
     name = "io_bazel_rules_docker",
-    sha256 = "aed1c249d4ec8f703edddf35cbe9dfaca0b5f5ea6e4cd9e83e99f3b0d1136c3d",
-    strip_prefix = "rules_docker-0.7.0",
-    urls = mirror("https://github.com/bazelbuild/rules_docker/archive/v0.7.0.tar.gz"),
+    sha256 = "4521794f0fba2e20f3bf15846ab5e01d5332e587e9ce81629c7f96c793bb7036",
+    strip_prefix = "rules_docker-0.14.4",
+    urls = mirror("https://github.com/bazelbuild/rules_docker/releases/download/v0.14.4/rules_docker-v0.14.4.tar.gz"),
 )
 
 load(
@@ -70,7 +44,20 @@ load(
 
 container_repositories()
 
-load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
+load("@io_bazel_rules_docker//repositories:deps.bzl", container_deps = "deps")
+
+container_deps()
+
+load("@io_bazel_rules_docker//repositories:pip_repositories.bzl", "pip_deps")
+
+pip_deps()
+
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_pull",
+)
+
+# end setup rules_docker
 
 container_pull(
     name = "distroless_base",
@@ -87,3 +74,7 @@ release_dependencies()
 load("//build:workspace_mirror.bzl", "export_urls")
 
 export_urls("workspace_urls")
+
+load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
+
+bazel_skylib_workspace()

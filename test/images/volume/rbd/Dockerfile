@@ -15,7 +15,8 @@
 # CEPH all in one
 # Based on image by Ricardo Rocha, ricardo@catalyst.net.nz
 
-FROM BASEIMAGE
+ARG BASEIMAGE
+FROM $BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 

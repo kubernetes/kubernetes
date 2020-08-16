@@ -27,7 +27,7 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	cloudprovider "k8s.io/cloud-provider"
@@ -110,6 +110,11 @@ func (g *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, svc *v1
 		status.Ingress = []v1.LoadBalancerIngress{{IP: fwd.IPAddress}}
 
 		return status, true, nil
+	}
+	// Checking for finalizer is more accurate because controller restart could happen in the middle of resource
+	// deletion. So even though forwarding rule was deleted, cleanup might not have been complete.
+	if hasFinalizer(svc, ILBFinalizerV1) {
+		return &v1.LoadBalancerStatus{}, true, nil
 	}
 	return nil, false, ignoreNotFound(err)
 }

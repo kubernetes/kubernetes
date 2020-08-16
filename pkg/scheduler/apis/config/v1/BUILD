@@ -1,8 +1,9 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
     srcs = [
+        "conversion.go",
         "doc.go",
         "register.go",
         "zz_generated.conversion.go",
@@ -32,4 +33,16 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["conversion_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//pkg/scheduler/apis/config:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/kube-scheduler/config/v1:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
+    ],
 )

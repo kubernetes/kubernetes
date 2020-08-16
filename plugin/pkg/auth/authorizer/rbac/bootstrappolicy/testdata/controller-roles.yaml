@@ -102,6 +102,25 @@ items:
     verbs:
     - update
   - apiGroups:
+    - certificates.k8s.io
+    resourceNames:
+    - kubernetes.io/kube-apiserver-client-kubelet
+    resources:
+    - signers
+    verbs:
+    - approve
+  - apiGroups:
+    - certificates.k8s.io
+    resourceNames:
+    - kubernetes.io/kube-apiserver-client
+    - kubernetes.io/kube-apiserver-client-kubelet
+    - kubernetes.io/kubelet-serving
+    - kubernetes.io/legacy-unknown
+    resources:
+    - signers
+    verbs:
+    - sign
+  - apiGroups:
     - authorization.k8s.io
     resources:
     - subjectaccessreviews
@@ -475,6 +494,62 @@ items:
     - get
     - list
     - watch
+  - apiGroups:
+    - ""
+    resources:
+    - services/finalizers
+    verbs:
+    - update
+  - apiGroups:
+    - discovery.k8s.io
+    resources:
+    - endpointslices
+    verbs:
+    - create
+    - delete
+    - get
+    - list
+    - update
+  - apiGroups:
+    - ""
+    - events.k8s.io
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:endpointslicemirroring-controller
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - endpoints
+    - services
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - services/finalizers
+    verbs:
+    - update
+  - apiGroups:
+    - ""
+    resources:
+    - endpoints/finalizers
+    verbs:
+    - update
   - apiGroups:
     - discovery.k8s.io
     resources:

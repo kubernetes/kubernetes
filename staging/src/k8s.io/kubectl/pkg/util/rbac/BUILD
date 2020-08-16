@@ -6,7 +6,10 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/util/rbac",
     importpath = "k8s.io/kubectl/pkg/util/rbac",
     visibility = ["//visibility:public"],
-    deps = ["//staging/src/k8s.io/api/rbac/v1:go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/api/rbac/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+    ],
 )
 
 filegroup(

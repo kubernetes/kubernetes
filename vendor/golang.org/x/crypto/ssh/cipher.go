@@ -16,9 +16,8 @@ import (
 	"hash"
 	"io"
 	"io/ioutil"
-	"math/bits"
 
-	"golang.org/x/crypto/internal/chacha20"
+	"golang.org/x/crypto/chacha20"
 	"golang.org/x/crypto/poly1305"
 )
 
@@ -120,7 +119,7 @@ var cipherModes = map[string]*cipherMode{
 	chacha20Poly1305ID: {64, 0, newChaCha20Cipher},
 
 	// CBC mode is insecure and so is not included in the default config.
-	// (See http://www.isg.rhul.ac.uk/~kp/SandPfinal.pdf). If absolutely
+	// (See https://www.ieee-security.org/TC/SP2013/papers/4977a526.pdf). If absolutely
 	// needed, it's possible to specify a custom Config to enable it.
 	// You should expect that an active attacker can recover plaintext if
 	// you do.
@@ -642,8 +641,8 @@ const chacha20Poly1305ID = "chacha20-poly1305@openssh.com"
 // the methods here also implement padding, which RFC4253 Section 6
 // also requires of stream ciphers.
 type chacha20Poly1305Cipher struct {
-	lengthKey  [8]uint32
-	contentKey [8]uint32
+	lengthKey  [32]byte
+	contentKey [32]byte
 	buf        []byte
 }
 
@@ -656,21 +655,21 @@ func newChaCha20Cipher(key, unusedIV, unusedMACKey []byte, unusedAlgs directionA
 		buf: make([]byte, 256),
 	}
 
-	for i := range c.contentKey {
-		c.contentKey[i] = binary.LittleEndian.Uint32(key[i*4 : (i+1)*4])
-	}
-	for i := range c.lengthKey {
-		c.lengthKey[i] = binary.LittleEndian.Uint32(key[(i+8)*4 : (i+9)*4])
-	}
+	copy(c.contentKey[:], key[:32])
+	copy(c.lengthKey[:], key[32:])
 	return c, nil
 }
 
 func (c *chacha20Poly1305Cipher) readCipherPacket(seqNum uint32, r io.Reader) ([]byte, error) {
-	nonce := [3]uint32{0, 0, bits.ReverseBytes32(seqNum)}
-	s := chacha20.New(c.contentKey, nonce)
-	var polyKey [32]byte
+	nonce := make([]byte, 12)
+	binary.BigEndian.PutUint32(nonce[8:], seqNum)
+	s, err := chacha20.NewUnauthenticatedCipher(c.contentKey[:], nonce)
+	if err != nil {
+		return nil, err
+	}
+	var polyKey, discardBuf [32]byte
 	s.XORKeyStream(polyKey[:], polyKey[:])
-	s.Advance() // skip next 32 bytes
+	s.XORKeyStream(discardBuf[:], discardBuf[:]) // skip the next 32 bytes
 
 	encryptedLength := c.buf[:4]
 	if _, err := io.ReadFull(r, encryptedLength); err != nil {
@@ -678,7 +677,11 @@ func (c *chacha20Poly1305Cipher) readCipherPacket(seqNum uint32, r io.Reader) ([
 	}
 
 	var lenBytes [4]byte
-	chacha20.New(c.lengthKey, nonce).XORKeyStream(lenBytes[:], encryptedLength)
+	ls, err := chacha20.NewUnauthenticatedCipher(c.lengthKey[:], nonce)
+	if err != nil {
+		return nil, err
+	}
+	ls.XORKeyStream(lenBytes[:], encryptedLength)
 
 	length := binary.BigEndian.Uint32(lenBytes[:])
 	if length > maxPacket {
@@ -724,11 +727,15 @@ func (c *chacha20Poly1305Cipher) readCipherPacket(seqNum uint32, r io.Reader) ([
 }
 
 func (c *chacha20Poly1305Cipher) writeCipherPacket(seqNum uint32, w io.Writer, rand io.Reader, payload []byte) error {
-	nonce := [3]uint32{0, 0, bits.ReverseBytes32(seqNum)}
-	s := chacha20.New(c.contentKey, nonce)
-	var polyKey [32]byte
+	nonce := make([]byte, 12)
+	binary.BigEndian.PutUint32(nonce[8:], seqNum)
+	s, err := chacha20.NewUnauthenticatedCipher(c.contentKey[:], nonce)
+	if err != nil {
+		return err
+	}
+	var polyKey, discardBuf [32]byte
 	s.XORKeyStream(polyKey[:], polyKey[:])
-	s.Advance() // skip next 32 bytes
+	s.XORKeyStream(discardBuf[:], discardBuf[:]) // skip the next 32 bytes
 
 	// There is no blocksize, so fall back to multiple of 8 byte
 	// padding, as described in RFC 4253, Sec 6.
@@ -748,7 +755,11 @@ func (c *chacha20Poly1305Cipher) writeCipherPacket(seqNum uint32, w io.Writer, r
 	}
 
 	binary.BigEndian.PutUint32(c.buf, uint32(1+len(payload)+padding))
-	chacha20.New(c.lengthKey, nonce).XORKeyStream(c.buf, c.buf[:4])
+	ls, err := chacha20.NewUnauthenticatedCipher(c.lengthKey[:], nonce)
+	if err != nil {
+		return err
+	}
+	ls.XORKeyStream(c.buf, c.buf[:4])
 	c.buf[4] = byte(padding)
 	copy(c.buf[5:], payload)
 	packetEnd := 5 + len(payload) + padding

@@ -17,6 +17,7 @@ limitations under the License.
 package conversion
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -196,7 +197,7 @@ func testWebhookConverter(t *testing.T, watchCache bool) {
 	defer ctcTearDown()
 
 	// read only object to read at a different version than stored when we need to force conversion
-	marker, err := ctc.versionedClient("marker", "v1beta1").Create(newConversionMultiVersionFixture("marker", "marker", "v1beta1"), metav1.CreateOptions{})
+	marker, err := ctc.versionedClient("marker", "v1beta1").Create(context.TODO(), newConversionMultiVersionFixture("marker", "marker", "v1beta1"), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +216,7 @@ func testWebhookConverter(t *testing.T, watchCache bool) {
 
 			// wait until new webhook is called the first time
 			if err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
-				_, err := ctc.versionedClient(marker.GetNamespace(), "v1alpha1").Get(marker.GetName(), metav1.GetOptions{})
+				_, err := ctc.versionedClient(marker.GetNamespace(), "v1alpha1").Get(context.TODO(), marker.GetName(), metav1.GetOptions{})
 				select {
 				case <-upCh:
 					return true, nil
@@ -246,13 +247,13 @@ func validateStorageVersion(t *testing.T, ctc *conversionTestContext) {
 		t.Run(version.Name, func(t *testing.T) {
 			name := "storageversion-" + version.Name
 			client := ctc.versionedClient(ns, version.Name)
-			obj, err := client.Create(newConversionMultiVersionFixture(ns, name, version.Name), metav1.CreateOptions{})
+			obj, err := client.Create(context.TODO(), newConversionMultiVersionFixture(ns, name, version.Name), metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
 			ctc.setAndWaitStorageVersion(t, "v1beta2")
 
-			if _, err = client.Get(obj.GetName(), metav1.GetOptions{}); err != nil {
+			if _, err = client.Get(context.TODO(), obj.GetName(), metav1.GetOptions{}); err != nil {
 				t.Fatal(err)
 			}
 
@@ -274,7 +275,7 @@ func validateMixedStorageVersions(versions ...string) func(t *testing.T, ctc *co
 			ctc.setAndWaitStorageVersion(t, version)
 
 			name := "mixedstorage-stored-as-" + version
-			obj, err := clients[version].Create(newConversionMultiVersionFixture(ns, name, version), metav1.CreateOptions{})
+			obj, err := clients[version].Create(context.TODO(), newConversionMultiVersionFixture(ns, name, version), metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -284,12 +285,12 @@ func validateMixedStorageVersions(versions ...string) func(t *testing.T, ctc *co
 		// Ensure copies of an object have the same fields and values at each custom resource definition version regardless of storage version
 		for clientVersion, client := range clients {
 			t.Run(clientVersion, func(t *testing.T) {
-				o1, err := client.Get(objNames[0], metav1.GetOptions{})
+				o1, err := client.Get(context.TODO(), objNames[0], metav1.GetOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
 				for _, objName := range objNames[1:] {
-					o2, err := client.Get(objName, metav1.GetOptions{})
+					o2, err := client.Get(context.TODO(), objName, metav1.GetOptions{})
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -313,7 +314,7 @@ func validateServed(t *testing.T, ctc *conversionTestContext) {
 		t.Run(version.Name, func(t *testing.T) {
 			name := "served-" + version.Name
 			client := ctc.versionedClient(ns, version.Name)
-			obj, err := client.Create(newConversionMultiVersionFixture(ns, name, version.Name), metav1.CreateOptions{})
+			obj, err := client.Create(context.TODO(), newConversionMultiVersionFixture(ns, name, version.Name), metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -339,7 +340,7 @@ func validateNonTrivialConverted(t *testing.T, ctc *conversionTestContext) {
 					t.Fatal(err)
 				}
 			}
-			if _, err := client.Create(fixture, metav1.CreateOptions{}); err != nil {
+			if _, err := client.Create(context.TODO(), fixture, metav1.CreateOptions{}); err != nil {
 				t.Fatal(err)
 			}
 
@@ -352,7 +353,7 @@ func validateNonTrivialConverted(t *testing.T, ctc *conversionTestContext) {
 
 			for _, getVersion := range ctc.crd.Spec.Versions {
 				client := ctc.versionedClient(ns, getVersion.Name)
-				obj, err := client.Get(name, metav1.GetOptions{})
+				obj, err := client.Get(context.TODO(), name, metav1.GetOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -360,7 +361,7 @@ func validateNonTrivialConverted(t *testing.T, ctc *conversionTestContext) {
 			}
 
 			// send a non-trivial patch to the main resource to verify the oldObject is in the right version
-			if _, err := client.Patch(name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"main":"true"}}}`), metav1.PatchOptions{}); err != nil {
+			if _, err := client.Patch(context.TODO(), name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"main":"true"}}}`), metav1.PatchOptions{}); err != nil {
 				t.Fatal(err)
 			}
 			// verify that the right, pruned version is in storage
@@ -371,7 +372,7 @@ func validateNonTrivialConverted(t *testing.T, ctc *conversionTestContext) {
 			verifyMultiVersionObject(t, "v1beta1", obj)
 
 			// send a non-trivial patch to the status subresource to verify the oldObject is in the right version
-			if _, err := client.Patch(name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"status":"true"}}}`), metav1.PatchOptions{}, "status"); err != nil {
+			if _, err := client.Patch(context.TODO(), name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"status":"true"}}}`), metav1.PatchOptions{}, "status"); err != nil {
 				t.Fatal(err)
 			}
 			// verify that the right, pruned version is in storage
@@ -397,7 +398,7 @@ func validateNonTrivialConvertedList(t *testing.T, ctc *conversionTestContext) {
 				t.Fatal(err)
 			}
 		}
-		_, err := client.Create(fixture, metav1.CreateOptions{})
+		_, err := client.Create(context.TODO(), fixture, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -407,7 +408,7 @@ func validateNonTrivialConvertedList(t *testing.T, ctc *conversionTestContext) {
 	for _, listVersion := range ctc.crd.Spec.Versions {
 		t.Run(fmt.Sprintf("listing objects as %s", listVersion.Name), func(t *testing.T) {
 			client := ctc.versionedClient(ns, listVersion.Name)
-			obj, err := client.List(metav1.ListOptions{})
+			obj, err := client.List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -442,7 +443,7 @@ func validateStoragePruning(t *testing.T, ctc *conversionTestContext) {
 			if err := unstructured.SetNestedField(fixture.Object, "foo", "garbage"); err != nil {
 				t.Fatal(err)
 			}
-			_, err := client.Create(fixture, metav1.CreateOptions{})
+			_, err := client.Create(context.TODO(), fixture, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -470,7 +471,7 @@ func validateStoragePruning(t *testing.T, ctc *conversionTestContext) {
 
 			for _, getVersion := range ctc.crd.Spec.Versions {
 				client := ctc.versionedClient(ns, getVersion.Name)
-				obj, err := client.Get(name, metav1.GetOptions{})
+				obj, err := client.Get(context.TODO(), name, metav1.GetOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -495,7 +496,7 @@ func validateObjectMetaMutation(t *testing.T, ctc *conversionTestContext) {
 	ctc.setAndWaitStorageVersion(t, storageVersion)
 	name := "objectmeta-mutation-" + storageVersion
 	client := ctc.versionedClient(ns, storageVersion)
-	obj, err := client.Create(newConversionMultiVersionFixture(ns, name, storageVersion), metav1.CreateOptions{})
+	obj, err := client.Create(context.TODO(), newConversionMultiVersionFixture(ns, name, storageVersion), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -503,7 +504,7 @@ func validateObjectMetaMutation(t *testing.T, ctc *conversionTestContext) {
 
 	t.Logf("Getting object in other version v1beta2")
 	client = ctc.versionedClient(ns, "v1beta2")
-	obj, err = client.Get(name, metav1.GetOptions{})
+	obj, err = client.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -512,7 +513,7 @@ func validateObjectMetaMutation(t *testing.T, ctc *conversionTestContext) {
 	t.Logf("Creating object in non-storage version")
 	name = "objectmeta-mutation-v1beta2"
 	client = ctc.versionedClient(ns, "v1beta2")
-	obj, err = client.Create(newConversionMultiVersionFixture(ns, name, "v1beta2"), metav1.CreateOptions{})
+	obj, err = client.Create(context.TODO(), newConversionMultiVersionFixture(ns, name, "v1beta2"), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -520,7 +521,7 @@ func validateObjectMetaMutation(t *testing.T, ctc *conversionTestContext) {
 
 	t.Logf("Listing objects in non-storage version")
 	client = ctc.versionedClient(ns, "v1beta2")
-	list, err := client.List(metav1.ListOptions{})
+	list, err := client.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -581,7 +582,7 @@ func validateUIDMutation(t *testing.T, ctc *conversionTestContext) {
 	ctc.setAndWaitStorageVersion(t, storageVersion)
 	name := "uid-mutation-" + storageVersion
 	client := ctc.versionedClient(ns, "v1beta2")
-	obj, err := client.Create(newConversionMultiVersionFixture(ns, name, "v1beta2"), metav1.CreateOptions{})
+	obj, err := client.Create(context.TODO(), newConversionMultiVersionFixture(ns, name, "v1beta2"), metav1.CreateOptions{})
 	if err == nil {
 		t.Fatalf("expected creation error, but got: %v", obj)
 	} else if !strings.Contains(err.Error(), "must have the same UID") {
@@ -606,7 +607,7 @@ func validateDefaulting(t *testing.T, ctc *conversionTestContext) {
 			if err := unstructured.SetNestedField(fixture.Object, map[string]interface{}{}, "defaults"); err != nil {
 				t.Fatal(err)
 			}
-			created, err := client.Create(fixture, metav1.CreateOptions{})
+			created, err := client.Create(context.TODO(), fixture, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -653,7 +654,7 @@ func validateDefaulting(t *testing.T, ctc *conversionTestContext) {
 					continue
 				}
 
-				got, err := ctc.versionedClient(ns, v.Name).Get(created.GetName(), metav1.GetOptions{})
+				got, err := ctc.versionedClient(ns, v.Name).Get(context.TODO(), created.GetName(), metav1.GetOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -680,7 +681,7 @@ func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *
 		clients := ctc.versionedClients(ns)
 		var err error
 		// storage version is v1beta1, so this skips conversion
-		obj, err := clients["v1beta1"].Create(newConversionMultiVersionFixture(ns, id, "v1beta1"), metav1.CreateOptions{})
+		obj, err := clients["v1beta1"].Create(context.TODO(), newConversionMultiVersionFixture(ns, id, "v1beta1"), metav1.CreateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -688,19 +689,19 @@ func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *
 			t.Run(verb, func(t *testing.T) {
 				switch verb {
 				case "get":
-					_, err = clients["v1beta2"].Get(obj.GetName(), metav1.GetOptions{})
+					_, err = clients["v1beta2"].Get(context.TODO(), obj.GetName(), metav1.GetOptions{})
 				case "list":
-					_, err = clients["v1beta2"].List(metav1.ListOptions{})
+					_, err = clients["v1beta2"].List(context.TODO(), metav1.ListOptions{})
 				case "create":
-					_, err = clients["v1beta2"].Create(newConversionMultiVersionFixture(ns, id, "v1beta2"), metav1.CreateOptions{})
+					_, err = clients["v1beta2"].Create(context.TODO(), newConversionMultiVersionFixture(ns, id, "v1beta2"), metav1.CreateOptions{})
 				case "update":
-					_, err = clients["v1beta2"].Update(obj, metav1.UpdateOptions{})
+					_, err = clients["v1beta2"].Update(context.TODO(), obj, metav1.UpdateOptions{})
 				case "patch":
-					_, err = clients["v1beta2"].Patch(obj.GetName(), types.MergePatchType, []byte(`{"metadata":{"annotations":{"patch":"true"}}}`), metav1.PatchOptions{})
+					_, err = clients["v1beta2"].Patch(context.TODO(), obj.GetName(), types.MergePatchType, []byte(`{"metadata":{"annotations":{"patch":"true"}}}`), metav1.PatchOptions{})
 				case "delete":
-					err = clients["v1beta2"].Delete(obj.GetName(), &metav1.DeleteOptions{})
+					err = clients["v1beta2"].Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{})
 				case "deletecollection":
-					err = clients["v1beta2"].DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{})
+					err = clients["v1beta2"].DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 				}
 
 				if err == nil {
@@ -715,11 +716,11 @@ func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *
 				t.Run(fmt.Sprintf("%s-%s", subresource, verb), func(t *testing.T) {
 					switch verb {
 					case "create":
-						_, err = clients["v1beta2"].Create(newConversionMultiVersionFixture(ns, id, "v1beta2"), metav1.CreateOptions{}, subresource)
+						_, err = clients["v1beta2"].Create(context.TODO(), newConversionMultiVersionFixture(ns, id, "v1beta2"), metav1.CreateOptions{}, subresource)
 					case "update":
-						_, err = clients["v1beta2"].Update(obj, metav1.UpdateOptions{}, subresource)
+						_, err = clients["v1beta2"].Update(context.TODO(), obj, metav1.UpdateOptions{}, subresource)
 					case "patch":
-						_, err = clients["v1beta2"].Patch(obj.GetName(), types.MergePatchType, []byte(`{"metadata":{"annotations":{"patch":"true"}}}`), metav1.PatchOptions{}, subresource)
+						_, err = clients["v1beta2"].Patch(context.TODO(), obj.GetName(), types.MergePatchType, []byte(`{"metadata":{"annotations":{"patch":"true"}}}`), metav1.PatchOptions{}, subresource)
 					}
 
 					if err == nil {
@@ -904,7 +905,7 @@ func newConversionTestContext(t *testing.T, apiExtensionsClient clientset.Interf
 	if err != nil {
 		t.Fatal(err)
 	}
-	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(v1CRD.Name, metav1.GetOptions{})
+	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), v1CRD.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -943,7 +944,7 @@ func (c *conversionTestContext) versionedClients(ns string) map[string]dynamic.R
 }
 
 func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClientConfig *apiextensionsv1beta1.WebhookClientConfig, reviewVersions []string) {
-	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(c.crd.Name, metav1.GetOptions{})
+	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), c.crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -952,7 +953,7 @@ func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClient
 		WebhookClientConfig:      webhookClientConfig,
 		ConversionReviewVersions: reviewVersions,
 	}
-	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -961,7 +962,7 @@ func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClient
 }
 
 func (c *conversionTestContext) removeConversionWebhook(t *testing.T) {
-	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(c.crd.Name, metav1.GetOptions{})
+	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), c.crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -969,7 +970,7 @@ func (c *conversionTestContext) removeConversionWebhook(t *testing.T) {
 		Strategy: apiextensionsv1beta1.NoneConverter,
 	}
 
-	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -982,7 +983,7 @@ func (c *conversionTestContext) setAndWaitStorageVersion(t *testing.T, version s
 	// create probe object. Version should be the default one to avoid webhook calls during test setup.
 	client := c.versionedClient("probe", "v1beta1")
 	name := fmt.Sprintf("probe-%v", uuid.NewUUID())
-	storageProbe, err := client.Create(newConversionMultiVersionFixture("probe", name, "v1beta1"), metav1.CreateOptions{})
+	storageProbe, err := client.Create(context.TODO(), newConversionMultiVersionFixture("probe", name, "v1beta1"), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -990,21 +991,21 @@ func (c *conversionTestContext) setAndWaitStorageVersion(t *testing.T, version s
 	// update object continuously and wait for etcd to have the target storage version.
 	c.waitForStorageVersion(t, version, c.versionedClient(storageProbe.GetNamespace(), "v1beta1"), storageProbe)
 
-	err = client.Delete(name, &metav1.DeleteOptions{})
+	err = client.Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 func (c *conversionTestContext) setStorageVersion(t *testing.T, version string) {
-	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(c.crd.Name, metav1.GetOptions{})
+	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), c.crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	for i, v := range crd.Spec.Versions {
 		crd.Spec.Versions[i].Storage = v.Name == version
 	}
-	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1013,7 +1014,7 @@ func (c *conversionTestContext) setStorageVersion(t *testing.T, version string) 
 
 func (c *conversionTestContext) waitForStorageVersion(t *testing.T, version string, versionedClient dynamic.ResourceInterface, obj *unstructured.Unstructured) *unstructured.Unstructured {
 	if err := c.etcdObjectReader.WaitForStorageVersion(version, obj.GetNamespace(), obj.GetName(), 30*time.Second, func() {
-		if _, err := versionedClient.Patch(obj.GetName(), types.MergePatchType, []byte(`{}`), metav1.PatchOptions{}); err != nil {
+		if _, err := versionedClient.Patch(context.TODO(), obj.GetName(), types.MergePatchType, []byte(`{}`), metav1.PatchOptions{}); err != nil {
 			t.Fatalf("failed to update object: %v", err)
 		}
 	}); err != nil {
@@ -1026,7 +1027,7 @@ func (c *conversionTestContext) waitForStorageVersion(t *testing.T, version stri
 }
 
 func (c *conversionTestContext) setServed(t *testing.T, version string, served bool) {
-	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(c.crd.Name, metav1.GetOptions{})
+	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), c.crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1035,7 +1036,7 @@ func (c *conversionTestContext) setServed(t *testing.T, version string, served b
 			crd.Spec.Versions[i].Served = served
 		}
 	}
-	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1046,7 +1047,7 @@ func (c *conversionTestContext) waitForServed(t *testing.T, version string, serv
 	timeout := 30 * time.Second
 	waitCh := time.After(timeout)
 	for {
-		obj, err := versionedClient.Get(obj.GetName(), metav1.GetOptions{})
+		obj, err := versionedClient.Get(context.TODO(), obj.GetName(), metav1.GetOptions{})
 		if (err == nil && served) || (errors.IsNotFound(err) && served == false) {
 			return
 		}

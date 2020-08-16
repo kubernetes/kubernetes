@@ -18,6 +18,7 @@ package kubectl
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -97,7 +98,7 @@ func (tk *TestKubeconfig) KubectlCmd(args ...string) *exec.Cmd {
 
 // LogFailedContainers runs `kubectl logs` on a failed containers.
 func LogFailedContainers(c clientset.Interface, ns string, logFunc func(ftm string, args ...interface{})) {
-	podList, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
+	podList, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		logFunc("Error getting pods in namespace '%s': %v", ns, err)
 		return

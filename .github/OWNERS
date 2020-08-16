@@ -7,12 +7,10 @@ reviewers:
   - mrbobbytables
   - nikhita
   - parispittman
-  - Phillels
 approvers:
-  - castrojo
-  - cblecker
-  - nikhita
+  - sig-contribex-approvers
   - parispittman
+emeritus_approvers:
   - Phillels
 labels:
   - sig/contributor-experience

@@ -19,6 +19,7 @@ package scheduler
 // This file tests scheduler extender.
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -32,8 +33,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
+	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -230,7 +232,7 @@ func (e *Extender) Bind(binding *extenderv1.ExtenderBindingArgs) error {
 		},
 	}
 
-	return e.Client.CoreV1().Pods(b.Namespace).Bind(b)
+	return e.Client.CoreV1().Pods(b.Namespace).Bind(context.TODO(), b, metav1.CreateOptions{})
 }
 
 func machine1_2_3Predicate(pod *v1.Pod, node *v1.Node) (bool, error) {
@@ -278,8 +280,8 @@ func machine3Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*extenderv1.HostPrior
 }
 
 func TestSchedulerExtender(t *testing.T) {
-	testCtx := initTestMaster(t, "scheduler-extender", nil)
-	clientSet := testCtx.clientSet
+	testCtx := testutils.InitTestMaster(t, "scheduler-extender", nil)
+	clientSet := testCtx.ClientSet
 
 	extender1 := &Extender{
 		name:         "extender1",
@@ -348,16 +350,18 @@ func TestSchedulerExtender(t *testing.T) {
 	}
 	policy.APIVersion = "v1"
 
-	testCtx = initTestScheduler(t, testCtx, false, &policy)
-	defer cleanupTest(t, testCtx)
+	testCtx = testutils.InitTestScheduler(t, testCtx, false, &policy)
+	testutils.SyncInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.Ctx)
+	defer testutils.CleanupTest(t, testCtx)
 
-	DoTestPodScheduling(testCtx.ns, t, clientSet)
+	DoTestPodScheduling(testCtx.NS, t, clientSet)
 }
 
 func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface) {
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
-	defer cs.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
+	defer cs.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	goodCondition := v1.NodeCondition{
 		Type:              v1.NodeReady,
@@ -377,7 +381,7 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 
 	for ii := 0; ii < 5; ii++ {
 		node.Name = fmt.Sprintf("machine%d", ii+1)
-		if _, err := cs.CoreV1().Nodes().Create(node); err != nil {
+		if _, err := cs.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create nodes: %v", err)
 		}
 	}
@@ -399,27 +403,27 @@ func DoTestPodScheduling(ns *v1.Namespace, t *testing.T, cs clientset.Interface)
 		},
 	}
 
-	myPod, err := cs.CoreV1().Pods(ns.Name).Create(pod)
+	myPod, err := cs.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
-	err = wait.Poll(time.Second, wait.ForeverTestTimeout, podScheduled(cs, myPod.Namespace, myPod.Name))
+	err = wait.Poll(time.Second, wait.ForeverTestTimeout, testutils.PodScheduled(cs, myPod.Namespace, myPod.Name))
 	if err != nil {
 		t.Fatalf("Failed to schedule pod: %v", err)
 	}
 
-	myPod, err = cs.CoreV1().Pods(ns.Name).Get(myPod.Name, metav1.GetOptions{})
+	myPod, err = cs.CoreV1().Pods(ns.Name).Get(context.TODO(), myPod.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get pod: %v", err)
 	} else if myPod.Spec.NodeName != "machine2" {
 		t.Fatalf("Failed to schedule using extender, expected machine2, got %v", myPod.Spec.NodeName)
 	}
 	var gracePeriod int64
-	if err := cs.CoreV1().Pods(ns.Name).Delete(myPod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}); err != nil {
+	if err := cs.CoreV1().Pods(ns.Name).Delete(context.TODO(), myPod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}); err != nil {
 		t.Fatalf("Failed to delete pod: %v", err)
 	}
-	_, err = cs.CoreV1().Pods(ns.Name).Get(myPod.Name, metav1.GetOptions{})
+	_, err = cs.CoreV1().Pods(ns.Name).Get(context.TODO(), myPod.Name, metav1.GetOptions{})
 	if err == nil {
 		t.Fatalf("Failed to delete pod: %v", err)
 	}

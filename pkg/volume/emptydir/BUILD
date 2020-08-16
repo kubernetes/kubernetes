@@ -24,7 +24,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/mount:go_default_library",
         "//vendor/k8s.io/utils/strings:go_default_library",
     ] + select({
@@ -44,6 +44,7 @@ go_test(
     embed = [":go_default_library"],
     deps = select({
         "@io_bazel_rules_go//go/platform:android": [
+            "//pkg/features:go_default_library",
             "//pkg/volume:go_default_library",
             "//pkg/volume/testing:go_default_library",
             "//pkg/volume/util:go_default_library",
@@ -51,10 +52,13 @@ go_test(
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
             "//staging/src/k8s.io/client-go/util/testing:go_default_library",
+            "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
             "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/features:go_default_library",
             "//pkg/volume:go_default_library",
             "//pkg/volume/testing:go_default_library",
             "//pkg/volume/util:go_default_library",
@@ -62,7 +66,9 @@ go_test(
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
             "//staging/src/k8s.io/client-go/util/testing:go_default_library",
+            "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
             "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "//conditions:default": [],

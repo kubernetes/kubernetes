@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/gpu"
+	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/scheduling"
@@ -93,7 +93,7 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 					Args:    []string{"nvidia-smi && sleep infinity"},
 					Resources: v1.ResourceRequirements{
 						Limits: v1.ResourceList{
-							gpu.NVIDIAGPUResourceName: *resource.NewQuantity(1, resource.DecimalSI),
+							e2egpu.NVIDIAGPUResourceName: *resource.NewQuantity(1, resource.DecimalSI),
 						},
 					},
 				},

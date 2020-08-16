@@ -25,7 +25,7 @@ import (
 	"syscall"
 	"testing"
 
-	libipvs "github.com/docker/libnetwork/ipvs"
+	libipvs "github.com/moby/ipvs"
 )
 
 func Test_toVirtualServer(t *testing.T) {
@@ -181,7 +181,7 @@ func Test_toVirtualServer(t *testing.T) {
 		if !Tests[i].expectError && err != nil {
 			t.Errorf("case: %d, unexpected error: %v", i, err)
 		}
-		if got != nil && &Tests[i].virtualServer != nil {
+		if got != nil {
 			if !reflect.DeepEqual(*got, Tests[i].virtualServer) {
 				t.Errorf("case: %d, got %#v, want %#v", i, *got, Tests[i].virtualServer)
 			}

@@ -17,6 +17,7 @@ limitations under the License.
 package replicaset
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -47,7 +48,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	. "k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -1158,7 +1159,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	}
 
 	oldRS := newReplicaSet(1, map[string]string{"foo": "bar"})
-	oldRS, err := client.AppsV1().ReplicaSets(oldRS.Namespace).Create(oldRS)
+	oldRS, err := client.AppsV1().ReplicaSets(oldRS.Namespace).Create(context.TODO(), oldRS, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1195,14 +1196,14 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Errorf("No expectations found for ReplicaSet %q", oldRSKey)
 	}
 	if rsExp.Fulfilled() {
-		t.Errorf("There should be unfulfiled expectation for creating new pods for ReplicaSet %q", oldRSKey)
+		t.Errorf("There should be unfulfilled expectations for creating new pods for ReplicaSet %q", oldRSKey)
 	}
 
 	if manager.queue.Len() != 0 {
 		t.Fatal("Unexpected item in the queue")
 	}
 
-	err = client.AppsV1().ReplicaSets(oldRS.Namespace).Delete(oldRS.Name, &metav1.DeleteOptions{})
+	err = client.AppsV1().ReplicaSets(oldRS.Namespace).Delete(context.TODO(), oldRS.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1239,7 +1240,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 
 	newRS := oldRS.DeepCopy()
 	newRS.UID = uuid.NewUUID()
-	newRS, err = client.AppsV1().ReplicaSets(newRS.Namespace).Create(newRS)
+	newRS, err = client.AppsV1().ReplicaSets(newRS.Namespace).Create(context.TODO(), newRS, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1274,7 +1275,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Errorf("No expectations found for ReplicaSet %q", oldRSKey)
 	}
 	if rsExp.Fulfilled() {
-		t.Errorf("There should be unfulfiled expectation for creating new pods for ReplicaSet %q", oldRSKey)
+		t.Errorf("There should be unfulfilled expectations for creating new pods for ReplicaSet %q", oldRSKey)
 	}
 
 	err = validateSyncReplicaSet(&fakePodControl, 1, 0, 0)

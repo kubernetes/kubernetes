@@ -19,6 +19,7 @@ limitations under the License.
 package testsuites
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 
@@ -44,8 +45,7 @@ type topologyTest struct {
 	config        *PerTestConfig
 	driverCleanup func()
 
-	intreeOps   opCounts
-	migratedOps opCounts
+	migrationCheck *migrationOpCheck
 
 	resource      VolumeResource
 	pod           *v1.Pod
@@ -147,7 +147,7 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 			StorageClassName: &(l.resource.Sc.Name),
 		}, l.config.Framework.Namespace.Name)
 
-		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
+		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
 		return l
 	}
 
@@ -157,7 +157,7 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		l.driverCleanup = nil
 		framework.ExpectNoError(err, "while cleaning up driver")
 
-		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
+		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
 	ginkgo.It("should provision a volume and schedule a pod with AllowedTopologies", func() {
@@ -179,10 +179,10 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying pod scheduled to correct node")
-		pod, err := cs.CoreV1().Pods(l.pod.Namespace).Get(l.pod.Name, metav1.GetOptions{})
+		pod, err := cs.CoreV1().Pods(l.pod.Namespace).Get(context.TODO(), l.pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
-		node, err := cs.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
+		node, err := cs.CoreV1().Nodes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		t.verifyNodeTopology(node, allowedTopologies)
@@ -324,25 +324,23 @@ func (t *topologyTestSuite) createResources(cs clientset.Interface, l *topologyT
 	framework.Logf("Creating storage class object and pvc object for driver - sc: %v, pvc: %v", l.resource.Sc, l.resource.Pvc)
 
 	ginkgo.By("Creating sc")
-	l.resource.Sc, err = cs.StorageV1().StorageClasses().Create(l.resource.Sc)
+	l.resource.Sc, err = cs.StorageV1().StorageClasses().Create(context.TODO(), l.resource.Sc, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Creating pvc")
-	l.resource.Pvc, err = cs.CoreV1().PersistentVolumeClaims(l.resource.Pvc.Namespace).Create(l.resource.Pvc)
+	l.resource.Pvc, err = cs.CoreV1().PersistentVolumeClaims(l.resource.Pvc.Namespace).Create(context.TODO(), l.resource.Pvc, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Creating pod")
-	l.pod = e2epod.MakeSecPod(l.config.Framework.Namespace.Name,
-		[]*v1.PersistentVolumeClaim{l.resource.Pvc},
-		nil,
-		false,
-		"",
-		false,
-		false,
-		e2epv.SELinuxLabel,
-		nil)
-	l.pod.Spec.Affinity = affinity
-	l.pod, err = cs.CoreV1().Pods(l.pod.Namespace).Create(l.pod)
+	podConfig := e2epod.Config{
+		NS:            l.config.Framework.Namespace.Name,
+		PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
+		SeLinuxLabel:  e2epv.SELinuxLabel,
+		NodeSelection: e2epod.NodeSelection{Affinity: affinity},
+	}
+	l.pod, err = e2epod.MakeSecPod(&podConfig)
+	framework.ExpectNoError(err)
+	l.pod, err = cs.CoreV1().Pods(l.pod.Namespace).Create(context.TODO(), l.pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 }
 

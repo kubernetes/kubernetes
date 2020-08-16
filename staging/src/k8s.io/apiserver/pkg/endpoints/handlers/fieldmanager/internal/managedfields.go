@@ -20,12 +20,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // ManagedInterface groups a fieldpath.ManagedFields together with the timestamps associated with each operation.
@@ -54,6 +53,11 @@ func (m *managedStruct) Times() map[string]*metav1.Time {
 	return m.times
 }
 
+// NewEmptyManaged creates an empty ManagedInterface.
+func NewEmptyManaged() ManagedInterface {
+	return NewManaged(fieldpath.ManagedFields{}, map[string]*metav1.Time{})
+}
+
 // NewManaged creates a ManagedInterface from a fieldpath.ManagedFields and the timestamps associated with each operation.
 func NewManaged(f fieldpath.ManagedFields, t map[string]*metav1.Time) ManagedInterface {
 	return &managedStruct{
@@ -74,16 +78,8 @@ func RemoveObjectManagedFields(obj runtime.Object) {
 }
 
 // DecodeObjectManagedFields extracts and converts the objects ManagedFields into a fieldpath.ManagedFields.
-func DecodeObjectManagedFields(from runtime.Object) (ManagedInterface, error) {
-	if from == nil {
-		return &managedStruct{}, nil
-	}
-	accessor, err := meta.Accessor(from)
-	if err != nil {
-		panic(fmt.Sprintf("couldn't get accessor: %v", err))
-	}
-
-	managed, err := decodeManagedFields(accessor.GetManagedFields())
+func DecodeObjectManagedFields(from []metav1.ManagedFieldsEntry) (ManagedInterface, error) {
+	managed, err := decodeManagedFields(from)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert managed fields from API: %v", err)
 	}
@@ -111,7 +107,16 @@ func EncodeObjectManagedFields(obj runtime.Object, managed ManagedInterface) err
 func decodeManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (managed managedStruct, err error) {
 	managed.fields = make(fieldpath.ManagedFields, len(encodedManagedFields))
 	managed.times = make(map[string]*metav1.Time, len(encodedManagedFields))
-	for _, encodedVersionedSet := range encodedManagedFields {
+
+	for i, encodedVersionedSet := range encodedManagedFields {
+		switch encodedVersionedSet.FieldsType {
+		case "FieldsV1":
+			// Valid case.
+		case "":
+			return managedStruct{}, fmt.Errorf("missing fieldsType in managed fields entry %d", i)
+		default:
+			return managedStruct{}, fmt.Errorf("invalid fieldsType %q in managed fields entry %d", encodedVersionedSet.FieldsType, i)
+		}
 		manager, err := BuildManagerIdentifier(&encodedVersionedSet)
 		if err != nil {
 			return managedStruct{}, fmt.Errorf("error decoding manager from %v: %v", encodedVersionedSet, err)
@@ -194,15 +199,15 @@ func sortEncodedManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) 
 			return p.Operation < q.Operation
 		}
 
-		ntime := &metav1.Time{Time: time.Time{}}
-		if p.Time == nil {
-			p.Time = ntime
+		pSeconds, qSeconds := int64(0), int64(0)
+		if p.Time != nil {
+			pSeconds = p.Time.Unix()
 		}
-		if q.Time == nil {
-			q.Time = ntime
+		if q.Time != nil {
+			qSeconds = q.Time.Unix()
 		}
-		if !p.Time.Equal(q.Time) {
-			return p.Time.Before(q.Time)
+		if pSeconds != qSeconds {
+			return pSeconds < qSeconds
 		}
 
 		if p.Manager != q.Manager {

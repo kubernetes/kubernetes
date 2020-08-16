@@ -17,12 +17,13 @@ limitations under the License.
 package autoregister
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -240,7 +241,7 @@ func (c *autoRegisterController) checkAPIService(name string) (err error) {
 
 	// we don't have an entry and we do want one (2B,2C)
 	case apierrors.IsNotFound(err) && desired != nil:
-		_, err := c.apiServiceClient.APIServices().Create(desired)
+		_, err := c.apiServiceClient.APIServices().Create(context.TODO(), desired, metav1.CreateOptions{})
 		if apierrors.IsAlreadyExists(err) {
 			// created in the meantime, we'll get called again
 			return nil
@@ -261,8 +262,8 @@ func (c *autoRegisterController) checkAPIService(name string) (err error) {
 
 	// we have a spurious APIService that we're managing, delete it (5A,6A)
 	case desired == nil:
-		opts := &metav1.DeleteOptions{Preconditions: metav1.NewUIDPreconditions(string(curr.UID))}
-		err := c.apiServiceClient.APIServices().Delete(curr.Name, opts)
+		opts := metav1.DeleteOptions{Preconditions: metav1.NewUIDPreconditions(string(curr.UID))}
+		err := c.apiServiceClient.APIServices().Delete(context.TODO(), curr.Name, opts)
 		if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 			// deleted or changed in the meantime, we'll get called again
 			return nil
@@ -277,7 +278,7 @@ func (c *autoRegisterController) checkAPIService(name string) (err error) {
 	// we have an entry and we have a desired, now we deconflict.  Only a few fields matter. (5B,5C,6B,6C)
 	apiService := curr.DeepCopy()
 	apiService.Spec = desired.Spec
-	_, err = c.apiServiceClient.APIServices().Update(apiService)
+	_, err = c.apiServiceClient.APIServices().Update(context.TODO(), apiService, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
 		return nil

@@ -23,9 +23,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -36,7 +36,7 @@ import (
 	"k8s.io/legacy-cloud-providers/azure"
 )
 
-// interface exposed by the cloud provider implementing Disk functionality
+// DiskController interface exposed by the cloud provider implementing Disk functionality
 type DiskController interface {
 	CreateBlobDisk(dataDiskName string, storageAccountType storage.SkuName, sizeGB int) (string, error)
 	DeleteBlobDisk(diskUri string) error

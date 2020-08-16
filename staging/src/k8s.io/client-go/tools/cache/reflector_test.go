@@ -136,7 +136,7 @@ func TestReflectorWatchHandlerError(t *testing.T) {
 		fw.Stop()
 	}()
 	var resumeRV string
-	err := g.watchHandler(fw, &resumeRV, nevererrc, wait.NeverStop)
+	err := g.watchHandler(time.Now(), fw, &resumeRV, nevererrc, wait.NeverStop)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -156,7 +156,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 		fw.Stop()
 	}()
 	var resumeRV string
-	err := g.watchHandler(fw, &resumeRV, nevererrc, wait.NeverStop)
+	err := g.watchHandler(time.Now(), fw, &resumeRV, nevererrc, wait.NeverStop)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -205,7 +205,7 @@ func TestReflectorStopWatch(t *testing.T) {
 	var resumeRV string
 	stopWatch := make(chan struct{}, 1)
 	stopWatch <- struct{}{}
-	err := g.watchHandler(fw, &resumeRV, nevererrc, stopWatch)
+	err := g.watchHandler(time.Now(), fw, &resumeRV, nevererrc, stopWatch)
 	if err != errorStopRequested {
 		t.Errorf("expected stop error, got %q", err)
 	}
@@ -425,12 +425,100 @@ func TestReflectorWatchListPageSize(t *testing.T) {
 		},
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	// Set resource version to test pagination also for not consistent reads.
+	r.setLastSyncResourceVersion("10")
 	// Set the reflector to paginate the list request in 4 item chunks.
 	r.WatchListPageSize = 4
 	r.ListAndWatch(stopCh)
 
 	results := s.List()
 	if len(results) != 10 {
+		t.Errorf("Expected 10 results, got %d", len(results))
+	}
+}
+
+func TestReflectorNotPaginatingNotConsistentReads(t *testing.T) {
+	stopCh := make(chan struct{})
+	s := NewStore(MetaNamespaceKeyFunc)
+
+	lw := &testLW{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			// Stop once the reflector begins watching since we're only interested in the list.
+			close(stopCh)
+			fw := watch.NewFake()
+			return fw, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			if options.ResourceVersion != "10" {
+				t.Fatalf("Expected ResourceVersion: \"10\", got: %s", options.ResourceVersion)
+			}
+			if options.Limit != 0 {
+				t.Fatalf("Expected list Limit of 0 but got %d", options.Limit)
+			}
+			pods := make([]v1.Pod, 10)
+			for i := 0; i < 10; i++ {
+				pods[i] = v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod-%d", i), ResourceVersion: fmt.Sprintf("%d", i)}}
+			}
+			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods}, nil
+		},
+	}
+	r := NewReflector(lw, &v1.Pod{}, s, 0)
+	r.setLastSyncResourceVersion("10")
+	r.ListAndWatch(stopCh)
+
+	results := s.List()
+	if len(results) != 10 {
+		t.Errorf("Expected 10 results, got %d", len(results))
+	}
+}
+
+func TestReflectorPaginatingNonConsistentReadsIfWatchCacheDisabled(t *testing.T) {
+	var stopCh chan struct{}
+	s := NewStore(MetaNamespaceKeyFunc)
+
+	lw := &testLW{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			// Stop once the reflector begins watching since we're only interested in the list.
+			close(stopCh)
+			fw := watch.NewFake()
+			return fw, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			// Check that default pager limit is set.
+			if options.Limit != 500 {
+				t.Fatalf("Expected list Limit of 500 but got %d", options.Limit)
+			}
+			pods := make([]v1.Pod, 10)
+			for i := 0; i < 10; i++ {
+				pods[i] = v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod-%d", i), ResourceVersion: fmt.Sprintf("%d", i)}}
+			}
+			switch options.Continue {
+			case "":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10", Continue: "C1"}, Items: pods[0:4]}, nil
+			case "C1":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10", Continue: "C2"}, Items: pods[4:8]}, nil
+			case "C2":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}, Items: pods[8:10]}, nil
+			default:
+				t.Fatalf("Unrecognized continue: %s", options.Continue)
+			}
+			return nil, nil
+		},
+	}
+	r := NewReflector(lw, &v1.Pod{}, s, 0)
+
+	// Initial list should initialize paginatedResult in the reflector.
+	stopCh = make(chan struct{})
+	r.ListAndWatch(stopCh)
+	if results := s.List(); len(results) != 10 {
+		t.Errorf("Expected 10 results, got %d", len(results))
+	}
+
+	// Since initial list for ResourceVersion="0" was paginated, the subsequent
+	// ones should also be paginated.
+	stopCh = make(chan struct{})
+	r.ListAndWatch(stopCh)
+	if results := s.List(); len(results) != 10 {
 		t.Errorf("Expected 10 results, got %d", len(results))
 	}
 }
@@ -623,6 +711,62 @@ func TestReflectorFullListIfExpired(t *testing.T) {
 	expectedRVs := []string{"0", "10", "", "10"}
 	if !reflect.DeepEqual(listCallRVs, expectedRVs) {
 		t.Errorf("Expected series of list calls with resource versiosn of %#v but got: %#v", expectedRVs, listCallRVs)
+	}
+}
+
+func TestReflectorFullListIfTooLarge(t *testing.T) {
+	stopCh := make(chan struct{})
+	s := NewStore(MetaNamespaceKeyFunc)
+	listCallRVs := []string{}
+
+	lw := &testLW{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			// Stop once the reflector begins watching since we're only interested in the list.
+			close(stopCh)
+			fw := watch.NewFake()
+			return fw, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			listCallRVs = append(listCallRVs, options.ResourceVersion)
+
+			switch options.ResourceVersion {
+			// initial list
+			case "0":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "20"}}, nil
+			// relist after the initial list
+			case "20":
+				err := apierrors.NewTimeoutError("too large resource version", 1)
+				err.ErrStatus.Details.Causes = []metav1.StatusCause{{Type: metav1.CauseTypeResourceVersionTooLarge}}
+				return nil, err
+			// relist from etcd after "too large" error
+			case "":
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}, nil
+			default:
+				return nil, fmt.Errorf("unexpected List call: %s", options.ResourceVersion)
+			}
+		},
+	}
+	r := NewReflector(lw, &v1.Pod{}, s, 0)
+
+	// Initial list should use RV=0
+	if err := r.ListAndWatch(stopCh); err != nil {
+		t.Fatal(err)
+	}
+
+	// Relist from the future version.
+	// This may happen, as watchcache is initialized from "current global etcd resource version"
+	// when kube-apiserver is starting and if no objects are changing after that each kube-apiserver
+	// may be synced to a different version and they will never converge.
+	// TODO: We should use etcd progress-notify feature to avoid this behavior but until this is
+	// done we simply try to relist from now to avoid continuous errors on relists.
+	stopCh = make(chan struct{})
+	if err := r.ListAndWatch(stopCh); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedRVs := []string{"0", "20", ""}
+	if !reflect.DeepEqual(listCallRVs, expectedRVs) {
+		t.Errorf("Expected series of list calls with resource version of %#v but got: %#v", expectedRVs, listCallRVs)
 	}
 }
 

@@ -23,14 +23,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ishidawataru/sctp"
 	"github.com/spf13/cobra"
 )
 
 // CmdConnect is used by agnhost Cobra.
 var CmdConnect = &cobra.Command{
 	Use:   "connect [host:port]",
-	Short: "Attempts a TCP connection and returns useful errors",
-	Long: `Tries to open a TCP connection to the given host and port. On error it prints an error message prefixed with a specific fixed string that test cases can check for:
+	Short: "Attempts a TCP or SCTP connection and returns useful errors",
+	Long: `Tries to open a TCP or SCTP connection to the given host and port. On error it prints an error message prefixed with a specific fixed string that test cases can check for:
 
 * UNKNOWN - Generic/unknown (non-network) error (eg, bad arguments)
 * TIMEOUT - The connection attempt timed out
@@ -42,14 +43,27 @@ var CmdConnect = &cobra.Command{
 }
 
 var timeout time.Duration
+var protocol string
 
 func init() {
 	CmdConnect.Flags().DurationVar(&timeout, "timeout", time.Duration(0), "Maximum time before returning an error")
+	CmdConnect.Flags().StringVar(&protocol, "protocol", "tcp", "The protocol to use to perform the connection, can be tcp or sctp")
 }
 
 func main(cmd *cobra.Command, args []string) {
 	dest := args[0]
+	switch protocol {
+	case "", "tcp":
+		connectTCP(dest, timeout)
+	case "sctp":
+		connectSCTP(dest, timeout)
+	default:
+		fmt.Fprint(os.Stderr, "Unsupported protocol\n", protocol)
+		os.Exit(1)
+	}
+}
 
+func connectTCP(dest string, timeout time.Duration) {
 	// Redundantly parse and resolve the destination so we can return the correct
 	// errors if there's a problem.
 	if _, _, err := net.SplitHostPort(dest); err != nil {
@@ -80,4 +94,34 @@ func main(cmd *cobra.Command, args []string) {
 
 	fmt.Fprintf(os.Stderr, "OTHER: %v\n", err)
 	os.Exit(1)
+}
+
+func connectSCTP(dest string, timeout time.Duration) {
+	addr, err := sctp.ResolveSCTPAddr("sctp", dest)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "DNS: %v\n", err)
+		os.Exit(1)
+	}
+
+	timeoutCh := time.After(timeout)
+	errCh := make(chan (error))
+
+	go func() {
+		conn, err := sctp.DialSCTP("sctp", nil, addr)
+		if err == nil {
+			conn.Close()
+		}
+		errCh <- err
+	}()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "OTHER: %v\n", err)
+			os.Exit(1)
+		}
+	case <-timeoutCh:
+		fmt.Fprint(os.Stderr, "TIMEOUT\n")
+		os.Exit(1)
+	}
 }

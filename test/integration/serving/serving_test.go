@@ -89,7 +89,7 @@ func TestComponentSecureServingAndAuth(t *testing.T) {
 	}
 
 	// authenticate to apiserver via bearer token
-	token := "flwqkenfjasasdfmwerasd"
+	token := "flwqkenfjasasdfmwerasd" // Fake token for testing.
 	tokenFile, err := ioutil.TempFile("", "kubeconfig")
 	if err != nil {
 		t.Fatal(err)

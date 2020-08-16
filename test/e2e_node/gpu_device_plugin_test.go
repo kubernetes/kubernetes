@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"os/exec"
 	"strconv"
 	"time"
@@ -24,14 +25,15 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/component-base/metrics/testutil"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/gpu"
-	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
+	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	"github.com/prometheus/common/model"
 )
 
 // numberOfNVIDIAGPUs returns the number of GPUs advertised by a node
@@ -39,7 +41,7 @@ import (
 // After the NVIDIA drivers were installed
 // TODO make this generic and not linked to COS only
 func numberOfNVIDIAGPUs(node *v1.Node) int64 {
-	val, ok := node.Status.Capacity[gpu.NVIDIAGPUResourceName]
+	val, ok := node.Status.Capacity[e2egpu.NVIDIAGPUResourceName]
 	if !ok {
 		return 0
 	}
@@ -48,7 +50,7 @@ func numberOfNVIDIAGPUs(node *v1.Node) int64 {
 
 // NVIDIADevicePlugin returns the official Google Device Plugin pod for NVIDIA GPU in GKE
 func NVIDIADevicePlugin() *v1.Pod {
-	ds, err := framework.DsFromManifest(gpu.GPUDevicePluginDSYAML)
+	ds, err := e2emanifest.DaemonSetFromURL(e2egpu.GPUDevicePluginDSYAML)
 	framework.ExpectNoError(err)
 	p := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -76,7 +78,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			}
 
 			ginkgo.By("Creating the Google Device Plugin pod for NVIDIA GPU in GKE")
-			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(NVIDIADevicePlugin())
+			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), NVIDIADevicePlugin(), metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Waiting for GPUs to become available on the local node")
@@ -90,7 +92,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 		})
 
 		ginkgo.AfterEach(func() {
-			l, err := f.PodClient().List(metav1.ListOptions{})
+			l, err := f.PodClient().List(context.TODO(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
 
 			for _, p := range l.Items {
@@ -98,18 +100,18 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 					continue
 				}
 
-				f.PodClient().Delete(p.Name, &metav1.DeleteOptions{})
+				f.PodClient().Delete(context.TODO(), p.Name, metav1.DeleteOptions{})
 			}
 		})
 
 		ginkgo.It("checks that when Kubelet restarts exclusive GPU assignation to pods is kept.", func() {
 			ginkgo.By("Creating one GPU pod on a node with at least two GPUs")
 			podRECMD := "devs=$(ls /dev/ | egrep '^nvidia[0-9]+$') && echo gpu devices: $devs"
-			p1 := f.PodClient().CreateSync(makeBusyboxPod(gpu.NVIDIAGPUResourceName, podRECMD))
+			p1 := f.PodClient().CreateSync(makeBusyboxPod(e2egpu.NVIDIAGPUResourceName, podRECMD))
 
 			deviceIDRE := "gpu devices: (nvidia[0-9]+)"
 			devID1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
-			p1, err := f.PodClient().Get(p1.Name, metav1.GetOptions{})
+			p1, err := f.PodClient().Get(context.TODO(), p1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Restarting Kubelet and waiting for the current running pod to restart")
@@ -126,7 +128,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			gomega.Eventually(func() bool {
 				return numberOfNVIDIAGPUs(getLocalNode(f)) > 0
 			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
-			p2 := f.PodClient().CreateSync(makeBusyboxPod(gpu.NVIDIAGPUResourceName, podRECMD))
+			p2 := f.PodClient().CreateSync(makeBusyboxPod(e2egpu.NVIDIAGPUResourceName, podRECMD))
 
 			ginkgo.By("Checking that pods got a different GPU")
 			devID2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
@@ -134,10 +136,10 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			framework.ExpectEqual(devID1, devID2)
 
 			ginkgo.By("Deleting device plugin.")
-			f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(devicePluginPod.Name, &metav1.DeleteOptions{})
+			f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), devicePluginPod.Name, metav1.DeleteOptions{})
 			ginkgo.By("Waiting for GPUs to become unavailable on the local node")
 			gomega.Eventually(func() bool {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				return numberOfNVIDIAGPUs(node) <= 0
 			}, 10*time.Minute, framework.Poll).Should(gomega.BeTrue())
@@ -161,8 +163,8 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			logDevicePluginMetrics()
 
 			// Cleanup
-			f.PodClient().DeleteSync(p1.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClient().DeleteSync(p2.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClient().DeleteSync(p1.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClient().DeleteSync(p2.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 		})
 	})
 })
@@ -178,7 +180,7 @@ func checkIfNvidiaGPUsExistOnNode() bool {
 }
 
 func logDevicePluginMetrics() {
-	ms, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
+	ms, err := e2emetrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
 	framework.ExpectNoError(err)
 	for msKey, samples := range ms {
 		switch msKey {
@@ -187,7 +189,7 @@ func logDevicePluginMetrics() {
 				latency := sample.Value
 				resource := string(sample.Metric["resource_name"])
 				var quantile float64
-				if val, ok := sample.Metric[model.QuantileLabel]; ok {
+				if val, ok := sample.Metric[testutil.QuantileLabel]; ok {
 					var err error
 					if quantile, err = strconv.ParseFloat(string(val), 64); err != nil {
 						continue

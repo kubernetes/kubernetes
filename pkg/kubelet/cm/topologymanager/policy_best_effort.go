@@ -16,10 +16,6 @@ limitations under the License.
 
 package topologymanager
 
-import (
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-)
-
 type bestEffortPolicy struct {
 	//List of NUMA Nodes available on the underlying machine
 	numaNodes []int
@@ -39,13 +35,11 @@ func (p *bestEffortPolicy) Name() string {
 	return PolicyBestEffort
 }
 
-func (p *bestEffortPolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
-	return lifecycle.PodAdmitResult{
-		Admit: true,
-	}
+func (p *bestEffortPolicy) canAdmitPodResult(hint *TopologyHint) bool {
+	return true
 }
 
-func (p *bestEffortPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
+func (p *bestEffortPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
 	filteredProvidersHints := filterProvidersHints(providersHints)
 	bestHint := mergeFilteredHints(p.numaNodes, filteredProvidersHints)
 	admit := p.canAdmitPodResult(&bestHint)

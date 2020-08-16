@@ -12,7 +12,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/retry:go_default_library",
-        "//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
     ],
 )
 
@@ -28,7 +28,10 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/armclient:all-srcs",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/containerserviceclient:all-srcs",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/deploymentclient:all-srcs",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/diskclient:all-srcs",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/fileclient:all-srcs",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/interfaceclient:all-srcs",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/loadbalancerclient:all-srcs",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/publicipclient:all-srcs",

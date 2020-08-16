@@ -265,7 +265,7 @@ func TestGetTopologyHints(t *testing.T) {
 			sourcesReady:      &sourcesReadyStub{},
 		}
 
-		hints := m.GetTopologyHints(tc.pod, tc.container)[string(v1.ResourceCPU)]
+		hints := m.GetTopologyHints(&tc.pod, &tc.container)[string(v1.ResourceCPU)]
 		if len(tc.expectedHints) == 0 && len(hints) == 0 {
 			continue
 		}

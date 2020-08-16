@@ -17,6 +17,7 @@ limitations under the License.
 package scheduling
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -143,7 +145,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 		// Defer the cleanup
 		defer func() {
 			framework.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
-			err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil)
+			err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{})
 			if err != nil {
 				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}
@@ -160,11 +162,11 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 	ginkgo.By("Checking that PDs have been provisioned in only the expected zones")
 	for _, claim := range pvcList {
 		// Get a new copy of the claim to have all fields populated
-		claim, err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+		claim, err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(context.TODO(), claim.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		// Get the related PV
-		pv, err := c.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+		pv, err := c.CoreV1().PersistentVolumes().Get(context.TODO(), claim.Spec.VolumeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		pvZone, ok := pv.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
@@ -188,7 +190,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 	c := f.ClientSet
 	ns := f.Namespace.Name
 
-	zones, err := framework.GetClusterZones(c)
+	zones, err := e2enode.GetClusterZones(c)
 	framework.ExpectNoError(err)
 	zonelist := zones.List()
 	ginkgo.By("Creating static PVs across zones")
@@ -235,7 +237,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 	ginkgo.By("Creating pods for each static PV")
 	for _, config := range configs {
 		podConfig := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{config.pvc}, false, "")
-		config.pod, err = c.CoreV1().Pods(ns).Create(podConfig)
+		config.pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), podConfig, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 	}
 

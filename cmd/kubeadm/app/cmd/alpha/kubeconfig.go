@@ -94,6 +94,7 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 			// Otherwise, write a kubeconfig file with a generate client cert
 			return kubeconfigphase.WriteKubeConfigWithClientCert(out, internalcfg, clientName, organizations)
 		},
+		Args: cobra.NoArgs,
 	}
 
 	// Add ClusterConfiguration backed flags to the command

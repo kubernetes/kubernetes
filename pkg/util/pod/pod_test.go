@@ -17,6 +17,7 @@ limitations under the License.
 package pod
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -33,21 +34,23 @@ func TestPatchPodStatus(t *testing.T) {
 	name := "name"
 	uid := types.UID("myuid")
 	client := &fake.Clientset{}
-	client.CoreV1().Pods(ns).Create(&v1.Pod{
+	client.CoreV1().Pods(ns).Create(context.TODO(), &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns,
 			Name:      name,
 		},
-	})
+	}, metav1.CreateOptions{})
 
 	testCases := []struct {
 		description        string
 		mutate             func(input v1.PodStatus) v1.PodStatus
+		expectUnchanged    bool
 		expectedPatchBytes []byte
 	}{
 		{
 			"no change",
 			func(input v1.PodStatus) v1.PodStatus { return input },
+			true,
 			[]byte(fmt.Sprintf(`{"metadata":{"uid":"myuid"}}`)),
 		},
 		{
@@ -56,6 +59,7 @@ func TestPatchPodStatus(t *testing.T) {
 				input.Message = "random message"
 				return input
 			},
+			false,
 			[]byte(fmt.Sprintf(`{"metadata":{"uid":"myuid"},"status":{"message":"random message"}}`)),
 		},
 		{
@@ -64,6 +68,7 @@ func TestPatchPodStatus(t *testing.T) {
 				input.Conditions[0].Status = v1.ConditionFalse
 				return input
 			},
+			false,
 			[]byte(fmt.Sprintf(`{"metadata":{"uid":"myuid"},"status":{"$setElementOrder/conditions":[{"type":"Ready"},{"type":"PodScheduled"}],"conditions":[{"status":"False","type":"Ready"}]}}`)),
 		},
 		{
@@ -77,17 +82,23 @@ func TestPatchPodStatus(t *testing.T) {
 				}
 				return input
 			},
+			false,
 			[]byte(fmt.Sprintf(`{"metadata":{"uid":"myuid"},"status":{"initContainerStatuses":[{"image":"","imageID":"","lastState":{},"name":"init-container","ready":true,"restartCount":0,"state":{}}]}}`)),
 		},
 	}
 	for _, tc := range testCases {
-		_, patchBytes, err := PatchPodStatus(client, ns, name, uid, getPodStatus(), tc.mutate(getPodStatus()))
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !reflect.DeepEqual(patchBytes, tc.expectedPatchBytes) {
-			t.Errorf("for test case %q, expect patchBytes: %q, got: %q\n", tc.description, tc.expectedPatchBytes, patchBytes)
-		}
+		t.Run(tc.description, func(t *testing.T) {
+			_, patchBytes, unchanged, err := PatchPodStatus(client, ns, name, uid, getPodStatus(), tc.mutate(getPodStatus()))
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if unchanged != tc.expectUnchanged {
+				t.Errorf("unexpected change: %t", unchanged)
+			}
+			if !reflect.DeepEqual(patchBytes, tc.expectedPatchBytes) {
+				t.Errorf("expect patchBytes: %q, got: %q\n", tc.expectedPatchBytes, patchBytes)
+			}
+		})
 	}
 }
 

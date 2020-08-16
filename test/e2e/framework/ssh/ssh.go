@@ -18,34 +18,36 @@ package ssh
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/onsi/gomega"
+
 	"golang.org/x/crypto/ssh"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	sshutil "k8s.io/kubernetes/pkg/ssh"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
-	// ssh port
-	sshPort = "22"
+	// SSHPort is tcp port number of SSH
+	SSHPort = "22"
 
 	// pollNodeInterval is how often to Poll pods.
 	pollNodeInterval = 2 * time.Second
 
 	// singleCallTimeout is how long to try single API calls (like 'get' or 'list'). Used to prevent
 	// transient failures from failing tests.
-	// TODO: client should not apply this timeout to Watch calls. Increased from 30s until that is fixed.
 	singleCallTimeout = 5 * time.Minute
 )
 
@@ -54,7 +56,7 @@ const (
 func GetSigner(provider string) (ssh.Signer, error) {
 	// honor a consistent SSH key across all providers
 	if path := os.Getenv("KUBE_SSH_KEY_PATH"); len(path) > 0 {
-		return sshutil.MakePrivateKeySignerFromFile(path)
+		return makePrivateKeySignerFromFile(path)
 	}
 
 	// Select the key itself to use. When implementing more providers here,
@@ -93,7 +95,21 @@ func GetSigner(provider string) (ssh.Signer, error) {
 		keyfile = filepath.Join(keydir, keyfile)
 	}
 
-	return sshutil.MakePrivateKeySignerFromFile(keyfile)
+	return makePrivateKeySignerFromFile(keyfile)
+}
+
+func makePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
+	buffer, err := ioutil.ReadFile(key)
+	if err != nil {
+		return nil, fmt.Errorf("error reading SSH key %s: '%v'", key, err)
+	}
+
+	signer, err := ssh.ParsePrivateKey(buffer)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing SSH key: '%v'", err)
+	}
+
+	return signer, err
 }
 
 // NodeSSHHosts returns SSH-able host names for all schedulable nodes - this
@@ -120,7 +136,7 @@ func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 
 	sshHosts := make([]string, 0, len(hosts))
 	for _, h := range hosts {
-		sshHosts = append(sshHosts, net.JoinHostPort(h, sshPort))
+		sshHosts = append(sshHosts, net.JoinHostPort(h, SSHPort))
 	}
 	return sshHosts, nil
 }
@@ -139,7 +155,7 @@ type Result struct {
 // eg: the name returned by framework.GetMasterHost(). This is also not guaranteed to work across
 // cloud providers since it involves ssh.
 func NodeExec(nodeName, cmd, provider string) (Result, error) {
-	return SSH(cmd, net.JoinHostPort(nodeName, sshPort), provider)
+	return SSH(cmd, net.JoinHostPort(nodeName, SSHPort), provider)
 }
 
 // SSH synchronously SSHs to a node running on provider and runs cmd. If there
@@ -169,12 +185,66 @@ func SSH(cmd, host, provider string) (Result, error) {
 		return result, err
 	}
 
-	stdout, stderr, code, err := sshutil.RunSSHCommand(cmd, result.User, host, signer)
+	stdout, stderr, code, err := runSSHCommand(cmd, result.User, host, signer)
 	result.Stdout = stdout
 	result.Stderr = stderr
 	result.Code = code
 
 	return result, err
+}
+
+// runSSHCommandViaBastion returns the stdout, stderr, and exit code from running cmd on
+// host as specific user, along with any SSH-level error.
+func runSSHCommand(cmd, user, host string, signer ssh.Signer) (string, string, int, error) {
+	if user == "" {
+		user = os.Getenv("USER")
+	}
+	// Setup the config, dial the server, and open a session.
+	config := &ssh.ClientConfig{
+		User:            user,
+		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+	client, err := ssh.Dial("tcp", host, config)
+	if err != nil {
+		err = wait.Poll(5*time.Second, 20*time.Second, func() (bool, error) {
+			fmt.Printf("error dialing %s@%s: '%v', retrying\n", user, host, err)
+			if client, err = ssh.Dial("tcp", host, config); err != nil {
+				return false, err
+			}
+			return true, nil
+		})
+	}
+	if err != nil {
+		return "", "", 0, fmt.Errorf("error getting SSH client to %s@%s: '%v'", user, host, err)
+	}
+	defer client.Close()
+	session, err := client.NewSession()
+	if err != nil {
+		return "", "", 0, fmt.Errorf("error creating session to %s@%s: '%v'", user, host, err)
+	}
+	defer session.Close()
+
+	// Run the command.
+	code := 0
+	var bout, berr bytes.Buffer
+	session.Stdout, session.Stderr = &bout, &berr
+	if err = session.Run(cmd); err != nil {
+		// Check whether the command failed to run or didn't complete.
+		if exiterr, ok := err.(*ssh.ExitError); ok {
+			// If we got an ExitError and the exit code is nonzero, we'll
+			// consider the SSH itself successful (just that the command run
+			// errored on the host).
+			if code = exiterr.ExitStatus(); code != 0 {
+				err = nil
+			}
+		} else {
+			// Some other kind of error happened (e.g. an IOError); consider the
+			// SSH unsuccessful.
+			err = fmt.Errorf("failed running `%s` on %s@%s: '%v'", cmd, user, host, err)
+		}
+	}
+	return bout.String(), berr.String(), code, err
 }
 
 // runSSHCommandViaBastion returns the stdout, stderr, and exit code from running cmd on
@@ -260,7 +330,7 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*Result, er
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP && a.Address != "" {
-			host = net.JoinHostPort(a.Address, sshPort)
+			host = net.JoinHostPort(a.Address, SSHPort)
 			break
 		}
 	}
@@ -269,7 +339,7 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*Result, er
 		// No external IPs were found, let's try to use internal as plan B
 		for _, a := range node.Status.Addresses {
 			if a.Type == v1.NodeInternalIP && a.Address != "" {
-				host = net.JoinHostPort(a.Address, sshPort)
+				host = net.JoinHostPort(a.Address, SSHPort)
 				break
 			}
 		}
@@ -319,7 +389,7 @@ func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
 	var nodes *v1.NodeList
 	var err error
 	if wait.PollImmediate(pollNodeInterval, singleCallTimeout, func() (bool, error) {
-		nodes, err = c.CoreV1().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
+		nodes, err = c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
 		if err != nil {

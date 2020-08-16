@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	structuraldefaulting "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting"
@@ -55,8 +57,10 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 		return ret
 	}
 
+	allowDefaults, rejectDefaultsReason := allowDefaults(requestGV, nil)
 	opts := validationOptions{
-		allowDefaults:                            allowDefaults(requestGV, nil),
+		allowDefaults:                            allowDefaults,
+		disallowDefaultsReason:                   rejectDefaultsReason,
 		requireRecognizedConversionReviewVersion: true,
 		requireImmutableNames:                    false,
 		requireOpenAPISchema:                     requireOpenAPISchema(requestGV, nil),
@@ -64,6 +68,7 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 		requireStructuralSchema:                  requireStructuralSchema(requestGV, nil),
 		requirePrunedDefaults:                    true,
 		requireAtomicSetType:                     true,
+		requireMapListKeysMapSetValidation:       true,
 	}
 
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, nameValidationFn, field.NewPath("metadata"))
@@ -79,6 +84,8 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 type validationOptions struct {
 	// allowDefaults permits the validation schema to contain default attributes
 	allowDefaults bool
+	// disallowDefaultsReason gives a reason as to why allowDefaults is false (for better user feedback)
+	disallowDefaultsReason string
 	// requireRecognizedConversionReviewVersion requires accepted webhook conversion versions to contain a recognized version
 	requireRecognizedConversionReviewVersion bool
 	// requireImmutableNames disables changing spec.names
@@ -93,12 +100,18 @@ type validationOptions struct {
 	requirePrunedDefaults bool
 	// requireAtomicSetType indicates that the items type for a x-kubernetes-list-type=set list must be atomic.
 	requireAtomicSetType bool
+	// requireMapListKeysMapSetValidation indicates that:
+	// 1. For x-kubernetes-list-type=map list, key fields are not nullable, and are required or have a default
+	// 2. For x-kubernetes-list-type=map or x-kubernetes-list-type=set list, the whole item must not be nullable.
+	requireMapListKeysMapSetValidation bool
 }
 
 // ValidateCustomResourceDefinitionUpdate statically validates
 func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomResourceDefinition, requestGV schema.GroupVersion) field.ErrorList {
+	allowDefaults, rejectDefaultsReason := allowDefaults(requestGV, &oldObj.Spec)
 	opts := validationOptions{
-		allowDefaults:                            allowDefaults(requestGV, &oldObj.Spec),
+		allowDefaults:                            allowDefaults,
+		disallowDefaultsReason:                   rejectDefaultsReason,
 		requireRecognizedConversionReviewVersion: oldObj.Spec.Conversion == nil || hasValidConversionReviewVersionOrEmpty(oldObj.Spec.Conversion.ConversionReviewVersions),
 		requireImmutableNames:                    apiextensions.IsCRDConditionTrue(oldObj, apiextensions.Established),
 		requireOpenAPISchema:                     requireOpenAPISchema(requestGV, &oldObj.Spec),
@@ -106,6 +119,7 @@ func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomRes
 		requireStructuralSchema:                  requireStructuralSchema(requestGV, &oldObj.Spec),
 		requirePrunedDefaults:                    requirePrunedDefaults(&oldObj.Spec),
 		requireAtomicSetType:                     requireAtomicSetType(&oldObj.Spec),
+		requireMapListKeysMapSetValidation:       requireMapListKeysMapSetValidation(&oldObj.Spec),
 	}
 
 	allErrs := genericvalidation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &oldObj.ObjectMeta, field.NewPath("metadata"))
@@ -154,12 +168,45 @@ func ValidateUpdateCustomResourceDefinitionStatus(obj, oldObj *apiextensions.Cus
 // validateCustomResourceDefinitionVersion statically validates.
 func validateCustomResourceDefinitionVersion(version *apiextensions.CustomResourceDefinitionVersion, fldPath *field.Path, statusEnabled bool, opts validationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
+	for _, err := range validateDeprecationWarning(version.Deprecated, version.DeprecationWarning) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("deprecationWarning"), version.DeprecationWarning, err))
+	}
 	allErrs = append(allErrs, validateCustomResourceDefinitionValidation(version.Schema, statusEnabled, opts, fldPath.Child("schema"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionSubresources(version.Subresources, fldPath.Child("subresources"))...)
 	for i := range version.AdditionalPrinterColumns {
 		allErrs = append(allErrs, ValidateCustomResourceColumnDefinition(&version.AdditionalPrinterColumns[i], fldPath.Child("additionalPrinterColumns").Index(i))...)
 	}
 	return allErrs
+}
+
+func validateDeprecationWarning(deprecated bool, deprecationWarning *string) []string {
+	if !deprecated && deprecationWarning != nil {
+		return []string{"can only be set for deprecated versions"}
+	}
+	if deprecationWarning == nil {
+		return nil
+	}
+	var errors []string
+	if len(*deprecationWarning) > 256 {
+		errors = append(errors, "must be <= 256 characters long")
+	}
+	if len(*deprecationWarning) == 0 {
+		errors = append(errors, "must not be an empty string")
+	}
+	for i, r := range *deprecationWarning {
+		if !unicode.IsPrint(r) {
+			errors = append(errors, fmt.Sprintf("must only contain printable UTF-8 characters; non-printable character found at index %d", i))
+			break
+		}
+		if unicode.IsControl(r) {
+			errors = append(errors, fmt.Sprintf("must only contain printable UTF-8 characters; control character found at index %d", i))
+			break
+		}
+	}
+	if !utf8.ValidString(*deprecationWarning) {
+		errors = append(errors, "must only contain printable UTF-8 characters")
+	}
+	return errors
 }
 
 func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefinitionSpec, opts validationOptions, fldPath *field.Path) field.ErrorList {
@@ -655,6 +702,7 @@ func validateCustomResourceDefinitionValidation(customResourceValidation *apiext
 
 		openAPIV3Schema := &specStandardValidatorV3{
 			allowDefaults:            opts.allowDefaults,
+			disallowDefaultsReason:   opts.disallowDefaultsReason,
 			requireValidPropertyType: opts.requireValidPropertyType,
 		}
 
@@ -866,6 +914,58 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		}
 	}
 
+	if opts.requireMapListKeysMapSetValidation {
+		allErrs = append(allErrs, validateMapListKeysMapSet(schema, fldPath)...)
+	}
+
+	return allErrs
+}
+
+func validateMapListKeysMapSet(schema *apiextensions.JSONSchemaProps, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if schema.Items == nil || schema.Items.Schema == nil {
+		return nil
+	}
+	if schema.XListType == nil {
+		return nil
+	}
+	if *schema.XListType != "set" && *schema.XListType != "map" {
+		return nil
+	}
+
+	// set and map list items cannot be nullable
+	if schema.Items.Schema.Nullable {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("items").Child("nullable"), "cannot be nullable when x-kubernetes-list-type is "+*schema.XListType))
+	}
+
+	switch *schema.XListType {
+	case "map":
+		// ensure all map keys are required or have a default
+		isRequired := make(map[string]bool, len(schema.Items.Schema.Required))
+		for _, required := range schema.Items.Schema.Required {
+			isRequired[required] = true
+		}
+
+		for _, k := range schema.XListMapKeys {
+			obj, ok := schema.Items.Schema.Properties[k]
+			if !ok {
+				// we validate that all XListMapKeys are existing properties in ValidateCustomResourceDefinitionOpenAPISchema, so skipping here is ok
+				continue
+			}
+
+			if isRequired[k] == false && obj.Default == nil {
+				allErrs = append(allErrs, field.Required(fldPath.Child("items").Child("properties").Key(k).Child("default"), "this property is in x-kubernetes-list-map-keys, so it must have a default or be a required property"))
+			}
+
+			if obj.Nullable {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("items").Child("properties").Key(k).Child("nullable"), "this property is in x-kubernetes-list-map-keys, so it cannot be nullable"))
+			}
+		}
+	case "set":
+		// no other set-specific validation
+	}
+
 	return allErrs
 }
 
@@ -1052,16 +1152,17 @@ func allVersionsSpecifyOpenAPISchema(spec *apiextensions.CustomResourceDefinitio
 	return true
 }
 
-// allowDefaults returns true if the defaulting feature is enabled and the request group version allows adding defaults
-func allowDefaults(requestGV schema.GroupVersion, oldCRDSpec *apiextensions.CustomResourceDefinitionSpec) bool {
+// allowDefaults returns true if the defaulting feature is enabled and the request group version allows adding defaults,
+// or false and a reason for the user if defaults are not allowed.
+func allowDefaults(requestGV schema.GroupVersion, oldCRDSpec *apiextensions.CustomResourceDefinitionSpec) (bool, string) {
 	if oldCRDSpec != nil && specHasDefaults(oldCRDSpec) {
 		// don't tighten validation on existing persisted data
-		return true
+		return true, ""
 	}
 	if requestGV == apiextensionsv1beta1.SchemeGroupVersion {
-		return false
+		return false, "(cannot set default values in apiextensions.k8s.io/v1beta1 CRDs, must use apiextensions.k8s.io/v1)"
 	}
-	return true
+	return true, ""
 }
 
 func specHasDefaults(spec *apiextensions.CustomResourceDefinitionSpec) bool {
@@ -1265,6 +1366,16 @@ func hasNonAtomicSetType(schema *apiextensions.JSONSchemaProps) bool {
 			}
 		}
 		return false
+	})
+}
+
+func requireMapListKeysMapSetValidation(oldCRDSpec *apiextensions.CustomResourceDefinitionSpec) bool {
+	return !hasSchemaWith(oldCRDSpec, hasInvalidMapListKeysMapSet)
+}
+
+func hasInvalidMapListKeysMapSet(schema *apiextensions.JSONSchemaProps) bool {
+	return schemaHas(schema, func(schema *apiextensions.JSONSchemaProps) bool {
+		return len(validateMapListKeysMapSet(schema, field.NewPath(""))) > 0
 	})
 }
 

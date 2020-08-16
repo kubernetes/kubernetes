@@ -22,7 +22,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	compute "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	compute "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	gomock "github.com/golang/mock/gomock"
 	retry "k8s.io/legacy-cloud-providers/azure/retry"
 )
@@ -106,4 +106,18 @@ func (m *MockInterface) Update(ctx context.Context, resourceGroupName, VMName st
 func (mr *MockInterfaceMockRecorder) Update(ctx, resourceGroupName, VMName, parameters, source interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockInterface)(nil).Update), ctx, resourceGroupName, VMName, parameters, source)
+}
+
+// Delete mocks base method
+func (m *MockInterface) Delete(ctx context.Context, resourceGroupName, VMName string) *retry.Error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delete", ctx, resourceGroupName, VMName)
+	ret0, _ := ret[0].(*retry.Error)
+	return ret0
+}
+
+// Delete indicates an expected call of Delete
+func (mr *MockInterfaceMockRecorder) Delete(ctx, resourceGroupName, VMName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockInterface)(nil).Delete), ctx, resourceGroupName, VMName)
 }

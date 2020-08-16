@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -50,7 +51,7 @@ import (
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/utils/integer"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -419,7 +420,7 @@ type RealRSControl struct {
 var _ RSControlInterface = &RealRSControl{}
 
 func (r RealRSControl) PatchReplicaSet(namespace, name string, data []byte) error {
-	_, err := r.KubeClient.AppsV1().ReplicaSets(namespace).Patch(name, types.StrategicMergePatchType, data)
+	_, err := r.KubeClient.AppsV1().ReplicaSets(namespace).Patch(context.TODO(), name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
 	return err
 }
 
@@ -439,7 +440,7 @@ type RealControllerRevisionControl struct {
 var _ ControllerRevisionControlInterface = &RealControllerRevisionControl{}
 
 func (r RealControllerRevisionControl) PatchControllerRevision(namespace, name string, data []byte) error {
-	_, err := r.KubeClient.AppsV1().ControllerRevisions(namespace).Patch(name, types.StrategicMergePatchType, data)
+	_, err := r.KubeClient.AppsV1().ControllerRevisions(namespace).Patch(context.TODO(), name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
 	return err
 }
 
@@ -536,7 +537,7 @@ func (r RealPodControl) CreatePodsOnNode(nodeName, namespace string, template *v
 }
 
 func (r RealPodControl) PatchPod(namespace, name string, data []byte) error {
-	_, err := r.KubeClient.CoreV1().Pods(namespace).Patch(name, types.StrategicMergePatchType, data)
+	_, err := r.KubeClient.CoreV1().Pods(namespace).Patch(context.TODO(), name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
 	return err
 }
 
@@ -576,7 +577,7 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodT
 	if len(labels.Set(pod.Labels)) == 0 {
 		return fmt.Errorf("unable to create pods, no labels")
 	}
-	newPod, err := r.KubeClient.CoreV1().Pods(namespace).Create(pod)
+	newPod, err := r.KubeClient.CoreV1().Pods(namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		// only send an event if the namespace isn't terminating
 		if !apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
@@ -600,8 +601,12 @@ func (r RealPodControl) DeletePod(namespace string, podID string, object runtime
 	if err != nil {
 		return fmt.Errorf("object does not have ObjectMeta, %v", err)
 	}
-	klog.V(2).Infof("Controller %v deleting pod %v/%v", accessor.GetName(), namespace, podID)
-	if err := r.KubeClient.CoreV1().Pods(namespace).Delete(podID, nil); err != nil && !apierrors.IsNotFound(err) {
+	klog.V(2).InfoS("Deleting pod", "controller", accessor.GetName(), "pod", klog.KRef(namespace, podID))
+	if err := r.KubeClient.CoreV1().Pods(namespace).Delete(context.TODO(), podID, metav1.DeleteOptions{}); err != nil {
+		if apierrors.IsNotFound(err) {
+			klog.V(4).Infof("pod %v/%v has already been deleted.", namespace, podID)
+			return err
+		}
 		r.Recorder.Eventf(object, v1.EventTypeWarning, FailedDeletePodReason, "Error deleting: %v", err)
 		return fmt.Errorf("unable to delete pods: %v", err)
 	}
@@ -1013,10 +1018,10 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 		// First we try getting node from the API server cache, as it's cheaper. If it fails
 		// we get it from etcd to be sure to have fresh data.
 		if firstTry {
-			oldNode, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			oldNode, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{ResourceVersion: "0"})
 			firstTry = false
 		} else {
-			oldNode, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			oldNode, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		}
 		if err != nil {
 			return err
@@ -1070,10 +1075,10 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, t
 		// First we try getting node from the API server cache, as it's cheaper. If it fails
 		// we get it from etcd to be sure to have fresh data.
 		if firstTry {
-			oldNode, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			oldNode, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{ResourceVersion: "0"})
 			firstTry = false
 		} else {
-			oldNode, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			oldNode, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		}
 		if err != nil {
 			return err
@@ -1118,7 +1123,7 @@ func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, n
 		return fmt.Errorf("failed to create patch for node %q: %v", nodeName, err)
 	}
 
-	_, err = c.CoreV1().Nodes().Patch(nodeName, types.StrategicMergePatchType, patchBytes)
+	_, err = c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	return err
 }
 
@@ -1147,10 +1152,10 @@ func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, la
 		// First we try getting node from the API server cache, as it's cheaper. If it fails
 		// we get it from etcd to be sure to have fresh data.
 		if firstTry {
-			node, err = kubeClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			node, err = kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{ResourceVersion: "0"})
 			firstTry = false
 		} else {
-			node, err = kubeClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			node, err = kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		}
 		if err != nil {
 			return err
@@ -1177,7 +1182,7 @@ func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, la
 		if err != nil {
 			return fmt.Errorf("failed to create a two-way merge patch: %v", err)
 		}
-		if _, err := kubeClient.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, patchBytes); err != nil {
+		if _, err := kubeClient.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 			return fmt.Errorf("failed to patch the node: %v", err)
 		}
 		return nil
@@ -1185,7 +1190,7 @@ func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, la
 }
 
 func getOrCreateServiceAccount(coreClient v1core.CoreV1Interface, namespace, name string) (*v1.ServiceAccount, error) {
-	sa, err := coreClient.ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+	sa, err := coreClient.ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		return sa, nil
 	}
@@ -1195,17 +1200,17 @@ func getOrCreateServiceAccount(coreClient v1core.CoreV1Interface, namespace, nam
 
 	// Create the namespace if we can't verify it exists.
 	// Tolerate errors, since we don't know whether this component has namespace creation permissions.
-	if _, err := coreClient.Namespaces().Get(namespace, metav1.GetOptions{}); apierrors.IsNotFound(err) {
-		if _, err = coreClient.Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}); err != nil && !apierrors.IsAlreadyExists(err) {
+	if _, err := coreClient.Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); apierrors.IsNotFound(err) {
+		if _, err = coreClient.Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
 			klog.Warningf("create non-exist namespace %s failed:%v", namespace, err)
 		}
 	}
 
 	// Create the service account
-	sa, err = coreClient.ServiceAccounts(namespace).Create(&v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name}})
+	sa, err = coreClient.ServiceAccounts(namespace).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name}}, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		// If we're racing to init and someone else already created it, re-fetch
-		return coreClient.ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+		return coreClient.ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	}
 	return sa, err
 }

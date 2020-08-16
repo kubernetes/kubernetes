@@ -17,7 +17,7 @@ limitations under the License.
 package devicemanager
 
 import (
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"

@@ -19,6 +19,8 @@ package connrotation
 import (
 	"context"
 	"net"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -47,6 +49,73 @@ func TestCloseAll(t *testing.T) {
 				t.Fatalf("iteration %d: 1s after CloseAll only %d/%d connections closed", i, j, numConns)
 			}
 		}
+	}
+}
+
+// TestCloseAllRace ensures CloseAll works with connections being simultaneously dialed
+func TestCloseAllRace(t *testing.T) {
+	conns := int64(0)
+	dialer := NewDialer(func(ctx context.Context, network, address string) (net.Conn, error) {
+		return closeOnlyConn{onClose: func() { atomic.AddInt64(&conns, -1) }}, nil
+	})
+
+	done := make(chan struct{})
+	wg := &sync.WaitGroup{}
+
+	// Close all as fast as we can
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-done:
+				return
+			default:
+				dialer.CloseAll()
+			}
+		}
+	}()
+
+	// Dial as fast as we can
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-done:
+				return
+			default:
+				if _, err := dialer.Dial("", ""); err != nil {
+					t.Error(err)
+					return
+				}
+				atomic.AddInt64(&conns, 1)
+			}
+		}
+	}()
+
+	// Soak to ensure no races
+	time.Sleep(time.Second)
+
+	// Signal completion
+	close(done)
+	// Wait for goroutines
+	wg.Wait()
+	// Ensure CloseAll ran after all dials
+	dialer.CloseAll()
+
+	// Expect all connections to close within 5 seconds
+	for start := time.Now(); time.Now().Sub(start) < 5*time.Second; time.Sleep(10 * time.Millisecond) {
+		// Ensure all connections were closed
+		if c := atomic.LoadInt64(&conns); c == 0 {
+			break
+		} else {
+			t.Logf("got %d open connections, want 0, will retry", c)
+		}
+	}
+	// Ensure all connections were closed
+	if c := atomic.LoadInt64(&conns); c != 0 {
+		t.Fatalf("got %d open connections, want 0", c)
 	}
 }
 

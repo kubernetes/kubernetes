@@ -41,7 +41,7 @@ go_library(
         "//vendor/github.com/docker/docker/pkg/jsonmessage:go_default_library",
         "//vendor/github.com/docker/docker/pkg/stdcopy:go_default_library",
         "//vendor/github.com/opencontainers/go-digest:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

@@ -40,6 +40,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//vendor/github.com/Microsoft/go-winio/pkg/guid:all-srcs",
+        "//vendor/github.com/Microsoft/go-winio/vhd:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

@@ -25,7 +25,7 @@ import (
 	"path"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
@@ -79,7 +79,7 @@ func (v *validator) Validate(pod *v1.Pod) error {
 	}
 
 	var retErr error
-	podutil.VisitContainers(&pod.Spec, func(container *v1.Container) bool {
+	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
 		retErr = validateProfile(GetProfileName(pod, container.Name), loadedProfiles)
 		if retErr != nil {
 			return false
@@ -125,8 +125,8 @@ func validateProfile(profile string, loadedProfiles map[string]bool) error {
 		return err
 	}
 
-	if strings.HasPrefix(profile, ProfileNamePrefix) {
-		profileName := strings.TrimPrefix(profile, ProfileNamePrefix)
+	if strings.HasPrefix(profile, v1.AppArmorBetaProfileNamePrefix) {
+		profileName := strings.TrimPrefix(profile, v1.AppArmorBetaProfileNamePrefix)
 		if !loadedProfiles[profileName] {
 			return fmt.Errorf("profile %q is not loaded", profileName)
 		}
@@ -137,10 +137,10 @@ func validateProfile(profile string, loadedProfiles map[string]bool) error {
 
 // ValidateProfileFormat checks the format of the profile.
 func ValidateProfileFormat(profile string) error {
-	if profile == "" || profile == ProfileRuntimeDefault || profile == ProfileNameUnconfined {
+	if profile == "" || profile == v1.AppArmorBetaProfileRuntimeDefault || profile == v1.AppArmorBetaProfileNameUnconfined {
 		return nil
 	}
-	if !strings.HasPrefix(profile, ProfileNamePrefix) {
+	if !strings.HasPrefix(profile, v1.AppArmorBetaProfileNamePrefix) {
 		return fmt.Errorf("invalid AppArmor profile name: %q", profile)
 	}
 	return nil

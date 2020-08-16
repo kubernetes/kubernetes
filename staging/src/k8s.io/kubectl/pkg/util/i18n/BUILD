@@ -9,7 +9,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/kubectl/pkg/generated:go_default_library",
         "//vendor/github.com/chai2010/gettext-go/gettext:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

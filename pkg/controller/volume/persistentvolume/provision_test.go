@@ -449,8 +449,14 @@ func TestProvisionSync(t *testing.T) {
 			novolumes,
 			novolumes,
 			newClaimArray("claim11-21", "uid11-21", "1Gi", "", v1.ClaimPending, &classGold),
-			claimWithAnnotation(pvutil.AnnStorageProvisioner, "vendor.com/MockCSIPlugin",
-				newClaimArray("claim11-21", "uid11-21", "1Gi", "", v1.ClaimPending, &classGold)),
+			[]*v1.PersistentVolumeClaim{
+				annotateClaim(
+					newClaim("claim11-21", "uid11-21", "1Gi", "", v1.ClaimPending, &classGold),
+					map[string]string{
+						pvutil.AnnStorageProvisioner: "vendor.com/MockCSIDriver",
+						pvutil.AnnMigratedTo:         "vendor.com/MockCSIDriver",
+					}),
+			},
 			[]string{"Normal ExternalProvisioning"},
 			noerrors, wrapTestWithCSIMigrationProvisionCalls(testSyncClaim),
 		},

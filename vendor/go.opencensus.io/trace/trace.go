@@ -296,7 +296,7 @@ func (s *Span) makeSpanData() *SpanData {
 	var sd SpanData
 	s.mu.Lock()
 	sd = *s.data
-	if s.lruAttributes.simpleLruMap.Len() > 0 {
+	if s.lruAttributes.len() > 0 {
 		sd.Attributes = s.lruAttributesToAttributeMap()
 		sd.DroppedAttributeCount = s.lruAttributes.droppedCount
 	}
@@ -370,8 +370,8 @@ func (s *Span) interfaceArrayToAnnotationArray() []Annotation {
 
 func (s *Span) lruAttributesToAttributeMap() map[string]interface{} {
 	attributes := make(map[string]interface{})
-	for _, key := range s.lruAttributes.simpleLruMap.Keys() {
-		value, ok := s.lruAttributes.simpleLruMap.Get(key)
+	for _, key := range s.lruAttributes.keys() {
+		value, ok := s.lruAttributes.get(key)
 		if ok {
 			keyStr := key.(string)
 			attributes[keyStr] = value

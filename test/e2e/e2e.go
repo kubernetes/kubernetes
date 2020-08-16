@@ -17,13 +17,19 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
@@ -39,9 +45,9 @@ import (
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/manifest"
 	e2ereporters "k8s.io/kubernetes/test/e2e/reporters"
 	testutils "k8s.io/kubernetes/test/utils"
 	utilnet "k8s.io/utils/net"
@@ -57,6 +63,14 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/kubemark"
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/openstack"
 	_ "k8s.io/kubernetes/test/e2e/framework/providers/vsphere"
+)
+
+const (
+	// namespaceCleanupTimeout is how long to wait for the namespace to be deleted.
+	// If there are any orphaned namespaces to clean up, this test is running
+	// on a long lived cluster. A long wait here is preferably to spurious test
+	// failures caused by leaked resources from a previous test run.
+	namespaceCleanupTimeout = 15 * time.Minute
 )
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
@@ -106,6 +120,12 @@ func RunE2ETests(t *testing.T) {
 	// Stream the progress to stdout and optionally a URL accepting progress updates.
 	r = append(r, e2ereporters.NewProgressReporter(framework.TestContext.ProgressReportURL))
 
+	// The DetailsRepoerter will output details about every test (name, files, lines, etc) which helps
+	// when documenting our tests.
+	if len(framework.TestContext.SpecSummaryOutput) > 0 {
+		r = append(r, e2ereporters.NewDetailsReporterFile(framework.TestContext.SpecSummaryOutput))
+	}
+
 	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }
@@ -115,18 +135,18 @@ func RunE2ETests(t *testing.T) {
 func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 	path := "test/images/clusterapi-tester/pod.yaml"
 	framework.Logf("Parsing pod from %v", path)
-	p, err := manifest.PodFromManifest(path)
+	p, err := e2emanifest.PodFromManifest(path)
 	if err != nil {
 		framework.Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
 		return
 	}
 	p.Namespace = ns
-	if _, err := c.CoreV1().Pods(ns).Create(p); err != nil {
+	if _, err := c.CoreV1().Pods(ns).Create(context.TODO(), p, metav1.CreateOptions{}); err != nil {
 		framework.Logf("Failed to create %v: %v", p.Name, err)
 		return
 	}
 	defer func() {
-		if err := c.CoreV1().Pods(ns).Delete(p.Name, nil); err != nil {
+		if err := c.CoreV1().Pods(ns).Delete(context.TODO(), p.Name, metav1.DeleteOptions{}); err != nil {
 			framework.Logf("Failed to delete pod %v: %v", p.Name, err)
 		}
 	}()
@@ -150,7 +170,7 @@ func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 // but we can detect if a cluster is dual stack because pods have two addresses (one per family)
 func getDefaultClusterIPFamily(c clientset.Interface) string {
 	// Get the ClusterIP of the kubernetes service created in the default namespace
-	svc, err := c.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
+	svc, err := c.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 	if err != nil {
 		framework.Failf("Failed to get kubernetes service ClusterIP: %v", err)
 	}
@@ -170,7 +190,7 @@ func waitForDaemonSets(c clientset.Interface, ns string, allowedNotReadyNodes in
 		timeout, ns)
 
 	return wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		dsList, err := c.AppsV1().DaemonSets(ns).List(metav1.ListOptions{})
+		dsList, err := c.AppsV1().DaemonSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			framework.Logf("Error getting daemonsets in namespace: '%s': %v", ns, err)
 			if testutils.IsRetryableAPIError(err) {
@@ -209,7 +229,7 @@ func setupSuite() {
 
 	switch framework.TestContext.Provider {
 	case "gce", "gke":
-		framework.LogClusterImageSources()
+		logClusterImageSources()
 	}
 
 	c, err := framework.LoadClientset()
@@ -231,7 +251,7 @@ func setupSuite() {
 			framework.Failf("Error deleting orphaned namespaces: %v", err)
 		}
 		klog.Infof("Waiting for deletion of the following namespaces: %v", deleted)
-		if err := framework.WaitForNamespacesDeleted(c, deleted, framework.NamespaceCleanupTimeout); err != nil {
+		if err := framework.WaitForNamespacesDeleted(c, deleted, namespaceCleanupTimeout); err != nil {
 			framework.Failf("Failed to delete orphaned namespaces %v: %v", deleted, err)
 		}
 	}
@@ -285,6 +305,111 @@ func setupSuite() {
 		nodeKiller := framework.NewNodeKiller(framework.TestContext.NodeKiller, c, framework.TestContext.Provider)
 		go nodeKiller.Run(framework.TestContext.NodeKiller.NodeKillerStopCh)
 	}
+}
+
+// logClusterImageSources writes out cluster image sources.
+func logClusterImageSources() {
+	masterImg, nodeImg, err := lookupClusterImageSources()
+	if err != nil {
+		framework.Logf("Cluster image sources lookup failed: %v\n", err)
+		return
+	}
+	framework.Logf("cluster-master-image: %s", masterImg)
+	framework.Logf("cluster-node-image: %s", nodeImg)
+
+	images := map[string]string{
+		"master_os_image": masterImg,
+		"node_os_image":   nodeImg,
+	}
+
+	outputBytes, _ := json.MarshalIndent(images, "", "  ")
+	filePath := filepath.Join(framework.TestContext.ReportDir, "images.json")
+	if err := ioutil.WriteFile(filePath, outputBytes, 0644); err != nil {
+		framework.Logf("cluster images sources, could not write to %q: %v", filePath, err)
+	}
+}
+
+// TODO: These should really just use the GCE API client library or at least use
+// better formatted output from the --format flag.
+
+// Returns master & node image string, or error
+func lookupClusterImageSources() (string, string, error) {
+	// Given args for a gcloud compute command, run it with other args, and return the values,
+	// whether separated by newlines, commas or semicolons.
+	gcloudf := func(argv ...string) ([]string, error) {
+		args := []string{"compute"}
+		args = append(args, argv...)
+		args = append(args, "--project", framework.TestContext.CloudConfig.ProjectID)
+		if framework.TestContext.CloudConfig.MultiMaster {
+			args = append(args, "--region", framework.TestContext.CloudConfig.Region)
+		} else {
+			args = append(args, "--zone", framework.TestContext.CloudConfig.Zone)
+		}
+		outputBytes, err := exec.Command("gcloud", args...).CombinedOutput()
+		str := strings.Replace(string(outputBytes), ",", "\n", -1)
+		str = strings.Replace(str, ";", "\n", -1)
+		lines := strings.Split(str, "\n")
+		if err != nil {
+			framework.Logf("lookupDiskImageSources: gcloud error with [%#v]; err:%v", argv, err)
+			for _, l := range lines {
+				framework.Logf(" > %s", l)
+			}
+		}
+		return lines, err
+	}
+
+	// Given a GCE instance, look through its disks, finding one that has a sourceImage
+	host2image := func(instance string) (string, error) {
+		// gcloud compute instances describe {INSTANCE} --format="get(disks[].source)"
+		// gcloud compute disks describe {DISKURL} --format="get(sourceImage)"
+		disks, err := gcloudf("instances", "describe", instance, "--format=get(disks[].source)")
+		if err != nil {
+			return "", err
+		} else if len(disks) == 0 {
+			return "", fmt.Errorf("instance %q had no findable disks", instance)
+		}
+		// Loop over disks, looking for the boot disk
+		for _, disk := range disks {
+			lines, err := gcloudf("disks", "describe", disk, "--format=get(sourceImage)")
+			if err != nil {
+				return "", err
+			} else if len(lines) > 0 && lines[0] != "" {
+				return lines[0], nil // break, we're done
+			}
+		}
+		return "", fmt.Errorf("instance %q had no disk with a sourceImage", instance)
+	}
+
+	// gcloud compute instance-groups list-instances {GROUPNAME} --format="get(instance)"
+	nodeName := ""
+	instGroupName := strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",")[0]
+	if lines, err := gcloudf("instance-groups", "list-instances", instGroupName, "--format=get(instance)"); err != nil {
+		return "", "", err
+	} else if len(lines) == 0 {
+		return "", "", fmt.Errorf("no instances inside instance-group %q", instGroupName)
+	} else {
+		nodeName = lines[0]
+	}
+
+	nodeImg, err := host2image(nodeName)
+	if err != nil {
+		return "", "", err
+	}
+	frags := strings.Split(nodeImg, "/")
+	nodeImg = frags[len(frags)-1]
+
+	// For GKE clusters, MasterName will not be defined; we just leave masterImg blank.
+	masterImg := ""
+	if masterName := framework.TestContext.CloudConfig.MasterName; masterName != "" {
+		img, err := host2image(masterName)
+		if err != nil {
+			return "", "", err
+		}
+		frags = strings.Split(img, "/")
+		masterImg = frags[len(frags)-1]
+	}
+
+	return masterImg, nodeImg, nil
 }
 
 // setupSuitePerGinkgoNode is the boilerplate that can be used to setup ginkgo test suites, on the SynchronizedBeforeSuite step.

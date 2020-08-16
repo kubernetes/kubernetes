@@ -21,12 +21,11 @@ package app
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -95,28 +94,16 @@ func createAggregatorConfig(
 		return nil, err
 	}
 
-	var certBytes, keyBytes []byte
-	if len(commandOptions.ProxyClientCertFile) > 0 && len(commandOptions.ProxyClientKeyFile) > 0 {
-		certBytes, err = ioutil.ReadFile(commandOptions.ProxyClientCertFile)
-		if err != nil {
-			return nil, err
-		}
-		keyBytes, err = ioutil.ReadFile(commandOptions.ProxyClientKeyFile)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	aggregatorConfig := &aggregatorapiserver.Config{
 		GenericConfig: &genericapiserver.RecommendedConfig{
 			Config:                genericConfig,
 			SharedInformerFactory: externalInformers,
 		},
 		ExtraConfig: aggregatorapiserver.ExtraConfig{
-			ProxyClientCert: certBytes,
-			ProxyClientKey:  keyBytes,
-			ServiceResolver: serviceResolver,
-			ProxyTransport:  proxyTransport,
+			ProxyClientCertFile: commandOptions.ProxyClientCertFile,
+			ProxyClientKeyFile:  commandOptions.ProxyClientKeyFile,
+			ServiceResolver:     serviceResolver,
+			ProxyTransport:      proxyTransport,
 		},
 	}
 
@@ -252,6 +239,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "extensions", Version: "v1beta1"}: {group: 17900, version: 1},
 	// to my knowledge, nothing below here collides
 	{Group: "apps", Version: "v1"}:                               {group: 17800, version: 15},
+	{Group: "events.k8s.io", Version: "v1"}:                      {group: 17750, version: 15},
 	{Group: "events.k8s.io", Version: "v1beta1"}:                 {group: 17750, version: 5},
 	{Group: "authentication.k8s.io", Version: "v1"}:              {group: 17700, version: 15},
 	{Group: "authentication.k8s.io", Version: "v1beta1"}:         {group: 17700, version: 9},
@@ -263,6 +251,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "batch", Version: "v1"}:                              {group: 17400, version: 15},
 	{Group: "batch", Version: "v1beta1"}:                         {group: 17400, version: 9},
 	{Group: "batch", Version: "v2alpha1"}:                        {group: 17400, version: 9},
+	{Group: "certificates.k8s.io", Version: "v1"}:                {group: 17300, version: 15},
 	{Group: "certificates.k8s.io", Version: "v1beta1"}:           {group: 17300, version: 9},
 	{Group: "networking.k8s.io", Version: "v1"}:                  {group: 17200, version: 15},
 	{Group: "networking.k8s.io", Version: "v1beta1"}:             {group: 17200, version: 9},
@@ -283,7 +272,6 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "scheduling.k8s.io", Version: "v1alpha1"}:            {group: 16600, version: 9},
 	{Group: "coordination.k8s.io", Version: "v1"}:                {group: 16500, version: 15},
 	{Group: "coordination.k8s.io", Version: "v1beta1"}:           {group: 16500, version: 9},
-	{Group: "auditregistration.k8s.io", Version: "v1alpha1"}:     {group: 16400, version: 1},
 	{Group: "node.k8s.io", Version: "v1alpha1"}:                  {group: 16300, version: 1},
 	{Group: "node.k8s.io", Version: "v1beta1"}:                   {group: 16300, version: 9},
 	{Group: "discovery.k8s.io", Version: "v1beta1"}:              {group: 16200, version: 12},

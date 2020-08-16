@@ -24,7 +24,7 @@ def _bazel_go_library_test_impl(ctx):
     ]
     for input, expected in test_cases:
         asserts.equals(env, expected, bazel_go_library(input))
-    unittest.end(env)
+    return unittest.end(env)
 
 bazel_go_library_test = unittest.make(_bazel_go_library_test_impl)
 
@@ -32,12 +32,12 @@ def _go_pkg_test_impl(ctx):
     env = unittest.begin(ctx)
     test_cases = [
         ("pkg/kubectl/util", "k8s.io/kubernetes/pkg/kubectl/util"),
-        ("vendor/some/third/party", "k8s.io/kubernetes/vendor/some/third/party"),
-        ("staging/src/k8s.io/apimachinery/api", "k8s.io/kubernetes/vendor/k8s.io/apimachinery/api"),
+        ("vendor/some/third/party", "some/third/party"),
+        ("staging/src/k8s.io/apimachinery/api", "k8s.io/apimachinery/api"),
     ]
     for input, expected in test_cases:
         asserts.equals(env, expected, go_pkg(input))
-    unittest.end(env)
+    return unittest.end(env)
 
 go_pkg_test = unittest.make(_go_pkg_test_impl)
 

@@ -1,143 +1,89 @@
 package ebpf
 
 import (
-	"github.com/pkg/errors"
+	"bufio"
+	"bytes"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"syscall"
+
+	"github.com/cilium/ebpf/internal"
 )
 
-// CollectionABI describes the interface of an eBPF collection.
-type CollectionABI struct {
-	Maps     map[string]*MapABI
-	Programs map[string]*ProgramABI
-}
-
-// CheckSpec verifies that all maps and programs mentioned
-// in the ABI are present in the spec.
-func (abi *CollectionABI) CheckSpec(cs *CollectionSpec) error {
-	for name := range abi.Maps {
-		if cs.Maps[name] == nil {
-			return errors.Errorf("missing map %s", name)
-		}
-	}
-
-	for name := range abi.Programs {
-		if cs.Programs[name] == nil {
-			return errors.Errorf("missing program %s", name)
-		}
-	}
-
-	return nil
-}
-
-// Check verifies that all items in a collection conform to this ABI.
-func (abi *CollectionABI) Check(coll *Collection) error {
-	for name, mapABI := range abi.Maps {
-		m := coll.Maps[name]
-		if m == nil {
-			return errors.Errorf("missing map %s", name)
-		}
-		if err := mapABI.Check(m); err != nil {
-			return errors.Wrapf(err, "map %s", name)
-		}
-	}
-
-	for name, progABI := range abi.Programs {
-		p := coll.Programs[name]
-		if p == nil {
-			return errors.Errorf("missing program %s", name)
-		}
-		if err := progABI.Check(p); err != nil {
-			return errors.Wrapf(err, "program %s", name)
-		}
-	}
-
-	return nil
-}
-
-// MapABI describes a Map.
-//
-// Use it to assert that a Map matches what your code expects.
+// MapABI are the attributes of a Map which are available across all supported kernels.
 type MapABI struct {
 	Type       MapType
 	KeySize    uint32
 	ValueSize  uint32
 	MaxEntries uint32
-	InnerMap   *MapABI
+	Flags      uint32
 }
 
 func newMapABIFromSpec(spec *MapSpec) *MapABI {
-	var inner *MapABI
-	if spec.InnerMap != nil {
-		inner = newMapABIFromSpec(spec.InnerMap)
-	}
-
 	return &MapABI{
 		spec.Type,
 		spec.KeySize,
 		spec.ValueSize,
 		spec.MaxEntries,
-		inner,
+		spec.Flags,
 	}
 }
 
-func newMapABIFromFd(fd *bpfFD) (*MapABI, error) {
+func newMapABIFromFd(fd *internal.FD) (string, *MapABI, error) {
 	info, err := bpfGetMapInfoByFD(fd)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, syscall.EINVAL) {
+			abi, err := newMapABIFromProc(fd)
+			return "", abi, err
+		}
+		return "", nil, err
 	}
 
-	mapType := MapType(info.mapType)
-	if mapType == ArrayOfMaps || mapType == HashOfMaps {
-		return nil, errors.New("can't get map info for nested maps")
-	}
-
-	return &MapABI{
-		mapType,
+	return "", &MapABI{
+		MapType(info.mapType),
 		info.keySize,
 		info.valueSize,
 		info.maxEntries,
-		nil,
+		info.flags,
 	}, nil
 }
 
-// Check verifies that a Map conforms to the ABI.
-//
-// Members of ABI which have the zero value of their type are not checked.
-func (abi *MapABI) Check(m *Map) error {
-	return abi.check(&m.abi)
+func newMapABIFromProc(fd *internal.FD) (*MapABI, error) {
+	var abi MapABI
+	err := scanFdInfo(fd, map[string]interface{}{
+		"map_type":    &abi.Type,
+		"key_size":    &abi.KeySize,
+		"value_size":  &abi.ValueSize,
+		"max_entries": &abi.MaxEntries,
+		"map_flags":   &abi.Flags,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &abi, nil
 }
 
-func (abi *MapABI) check(other *MapABI) error {
-	if abi.Type != UnspecifiedMap && other.Type != abi.Type {
-		return errors.Errorf("expected map type %s, have %s", abi.Type, other.Type)
+// Equal returns true if two ABIs have the same values.
+func (abi *MapABI) Equal(other *MapABI) bool {
+	switch {
+	case abi.Type != other.Type:
+		return false
+	case abi.KeySize != other.KeySize:
+		return false
+	case abi.ValueSize != other.ValueSize:
+		return false
+	case abi.MaxEntries != other.MaxEntries:
+		return false
+	case abi.Flags != other.Flags:
+		return false
+	default:
+		return true
 	}
-	if err := checkUint32("key size", abi.KeySize, other.KeySize); err != nil {
-		return err
-	}
-	if err := checkUint32("value size", abi.ValueSize, other.ValueSize); err != nil {
-		return err
-	}
-	if err := checkUint32("max entries", abi.MaxEntries, other.MaxEntries); err != nil {
-		return err
-	}
-
-	if abi.InnerMap == nil {
-		if abi.Type == ArrayOfMaps || abi.Type == HashOfMaps {
-			return errors.New("missing inner map ABI")
-		}
-
-		return nil
-	}
-
-	if other.InnerMap == nil {
-		return errors.New("missing inner map")
-	}
-
-	return errors.Wrap(abi.InnerMap.check(other.InnerMap), "inner map")
 }
 
-// ProgramABI describes a Program.
-//
-// Use it to assert that a Program matches what your code expects.
+// ProgramABI are the attributes of a Program which are available across all supported kernels.
 type ProgramABI struct {
 	Type ProgramType
 }
@@ -148,36 +94,113 @@ func newProgramABIFromSpec(spec *ProgramSpec) *ProgramABI {
 	}
 }
 
-func newProgramABIFromFd(fd *bpfFD) (*ProgramABI, error) {
+func newProgramABIFromFd(fd *internal.FD) (string, *ProgramABI, error) {
 	info, err := bpfGetProgInfoByFD(fd)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, syscall.EINVAL) {
+			return newProgramABIFromProc(fd)
+		}
+
+		return "", nil, err
 	}
 
-	return newProgramABIFromInfo(info), nil
-}
+	var name string
+	if bpfName := internal.CString(info.name[:]); bpfName != "" {
+		name = bpfName
+	} else {
+		name = internal.CString(info.tag[:])
+	}
 
-func newProgramABIFromInfo(info *bpfProgInfo) *ProgramABI {
-	return &ProgramABI{
+	return name, &ProgramABI{
 		Type: ProgramType(info.progType),
-	}
+	}, nil
 }
 
-// Check verifies that a Program conforms to the ABI.
-//
-// Members which have the zero value of their type
-// are not checked.
-func (abi *ProgramABI) Check(prog *Program) error {
-	if abi.Type != UnspecifiedProgram && prog.abi.Type != abi.Type {
-		return errors.Errorf("expected program type %s, have %s", abi.Type, prog.abi.Type)
+func newProgramABIFromProc(fd *internal.FD) (string, *ProgramABI, error) {
+	var (
+		abi  ProgramABI
+		name string
+	)
+
+	err := scanFdInfo(fd, map[string]interface{}{
+		"prog_type": &abi.Type,
+		"prog_tag":  &name,
+	})
+	if errors.Is(err, errMissingFields) {
+		return "", nil, &internal.UnsupportedFeatureError{
+			Name:           "reading ABI from /proc/self/fdinfo",
+			MinimumVersion: internal.Version{4, 11, 0},
+		}
+	}
+	if err != nil {
+		return "", nil, err
+	}
+
+	return name, &abi, nil
+}
+
+func scanFdInfo(fd *internal.FD, fields map[string]interface{}) error {
+	raw, err := fd.Value()
+	if err != nil {
+		return err
+	}
+
+	fh, err := os.Open(fmt.Sprintf("/proc/self/fdinfo/%d", raw))
+	if err != nil {
+		return err
+	}
+	defer fh.Close()
+
+	if err := scanFdInfoReader(fh, fields); err != nil {
+		return fmt.Errorf("%s: %w", fh.Name(), err)
+	}
+	return nil
+}
+
+var errMissingFields = errors.New("missing fields")
+
+func scanFdInfoReader(r io.Reader, fields map[string]interface{}) error {
+	var (
+		scanner = bufio.NewScanner(r)
+		scanned int
+	)
+
+	for scanner.Scan() {
+		parts := bytes.SplitN(scanner.Bytes(), []byte("\t"), 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		name := bytes.TrimSuffix(parts[0], []byte(":"))
+		field, ok := fields[string(name)]
+		if !ok {
+			continue
+		}
+
+		if n, err := fmt.Fscanln(bytes.NewReader(parts[1]), field); err != nil || n != 1 {
+			return fmt.Errorf("can't parse field %s: %v", name, err)
+		}
+
+		scanned++
+	}
+
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+
+	if scanned != len(fields) {
+		return errMissingFields
 	}
 
 	return nil
 }
 
-func checkUint32(name string, want, have uint32) error {
-	if want != 0 && have != want {
-		return errors.Errorf("expected %s to be %d, have %d", name, want, have)
+// Equal returns true if two ABIs have the same values.
+func (abi *ProgramABI) Equal(other *ProgramABI) bool {
+	switch {
+	case abi.Type != other.Type:
+		return false
+	default:
+		return true
 	}
-	return nil
 }

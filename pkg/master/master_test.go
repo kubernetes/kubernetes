@@ -259,10 +259,10 @@ func TestGetNodeAddresses(t *testing.T) {
 	assert.Equal([]string(nil), addrs)
 
 	// Pass case with External type IP
-	nodes, _ := fakeNodeClient.List(metav1.ListOptions{})
+	nodes, _ := fakeNodeClient.List(context.TODO(), metav1.ListOptions{})
 	for index := range nodes.Items {
 		nodes.Items[index].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeExternalIP, Address: "127.0.0.1"}}
-		fakeNodeClient.Update(&nodes.Items[index])
+		fakeNodeClient.Update(context.TODO(), &nodes.Items[index], metav1.UpdateOptions{})
 	}
 	addrs, err = addressProvider.externalAddresses()
 	assert.NoError(err, "addresses should not have returned an error.")
@@ -276,9 +276,9 @@ func TestGetNodeAddressesWithOnlySomeExternalIP(t *testing.T) {
 	addressProvider := nodeAddressProvider{fakeNodeClient}
 
 	// Pass case with 1 External type IP (index == 1) and nodes (indexes 0 & 2) have no External IP.
-	nodes, _ := fakeNodeClient.List(metav1.ListOptions{})
+	nodes, _ := fakeNodeClient.List(context.TODO(), metav1.ListOptions{})
 	nodes.Items[1].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeExternalIP, Address: "127.0.0.1"}}
-	fakeNodeClient.Update(&nodes.Items[1])
+	fakeNodeClient.Update(context.TODO(), &nodes.Items[1], metav1.UpdateOptions{})
 
 	addrs, err := addressProvider.externalAddresses()
 	assert.NoError(err, "addresses should not have returned an error.")

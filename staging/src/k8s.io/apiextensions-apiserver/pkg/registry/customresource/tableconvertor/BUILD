@@ -37,6 +37,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",

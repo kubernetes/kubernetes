@@ -63,6 +63,7 @@ func setupServerCert(namespaceName, serviceName string) *certContext {
 	signedCert, err := utils.NewSignedCert(
 		&cert.Config{
 			CommonName: serviceName + "." + namespaceName + ".svc",
+			AltNames:   cert.AltNames{DNSNames: []string{serviceName + "." + namespaceName + ".svc"}},
 			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		},
 		key, signingCert, signingKey,

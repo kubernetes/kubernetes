@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"io"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -127,6 +127,7 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 	pod := a.GetObject().(*api.Pod)
 	if len(pod.Spec.Tolerations) > 0 {
 		whitelist, err := p.getNamespaceTolerationsWhitelist(a.GetNamespace())
+		whitelistScope := "namespace"
 		if err != nil {
 			return err
 		}
@@ -135,12 +136,13 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 		// fall back to cluster's whitelist of tolerations.
 		if whitelist == nil {
 			whitelist = p.pluginConfig.Whitelist
+			whitelistScope = "cluster"
 		}
 
 		if len(whitelist) > 0 {
 			// check if the merged pod tolerations satisfy its namespace whitelist
 			if !tolerations.VerifyAgainstWhitelist(pod.Spec.Tolerations, whitelist) {
-				return fmt.Errorf("pod tolerations (possibly merged with namespace default tolerations) conflict with its namespace whitelist")
+				return fmt.Errorf("pod tolerations (possibly merged with namespace default tolerations) conflict with its %s whitelist", whitelistScope)
 			}
 		}
 	}
@@ -205,7 +207,7 @@ func (p *Plugin) getNamespace(nsName string) (*corev1.Namespace, error) {
 	namespace, err := p.namespaceLister.Get(nsName)
 	if errors.IsNotFound(err) {
 		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
-		namespace, err = p.client.CoreV1().Namespaces().Get(nsName, metav1.GetOptions{})
+		namespace, err = p.client.CoreV1().Namespaces().Get(context.TODO(), nsName, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return nil, err

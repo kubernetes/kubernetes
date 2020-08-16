@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"context"
 	"fmt"
 	"path"
 
@@ -42,7 +43,7 @@ var (
 	durationForStuckMount = 110 * time.Second
 )
 
-var _ = utils.SIGDescribe("Detaching volumes", func() {
+var _ = utils.SIGDescribe("[Feature:Flexvolumes] Detaching volumes", func() {
 	f := framework.NewDefaultFramework("flexvolume")
 
 	// note that namespace deletion is handled by delete-namespace flag
@@ -84,7 +85,7 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 
 		clientPod := getFlexVolumePod(volumeSource, node.Name)
 		ginkgo.By("Creating pod that uses slow format volume")
-		pod, err := cs.CoreV1().Pods(ns.Name).Create(clientPod)
+		pod, err := cs.CoreV1().Pods(ns.Name).Create(context.TODO(), clientPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		uniqueVolumeName := getUniqueVolumeName(pod, driverInstallAs)
@@ -127,12 +128,12 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 })
 
 func getUniqueVolumeName(pod *v1.Pod, driverName string) string {
-	return fmt.Sprintf("flexvolume-k8s/%s/%s", driverName, pod.Spec.Volumes[0].Name)
+	return fmt.Sprintf("k8s/%s/%s", driverName, pod.Spec.Volumes[0].Name)
 }
 
 func waitForVolumesNotInUse(client clientset.Interface, nodeName, volumeName string) error {
 	waitErr := wait.PollImmediate(10*time.Second, 60*time.Second, func() (bool, error) {
-		node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching node %s with %v", nodeName, err)
 		}
@@ -152,7 +153,7 @@ func waitForVolumesNotInUse(client clientset.Interface, nodeName, volumeName str
 
 func waitForVolumesAttached(client clientset.Interface, nodeName, volumeName string) error {
 	waitErr := wait.PollImmediate(2*time.Second, 2*time.Minute, func() (bool, error) {
-		node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching node %s with %v", nodeName, err)
 		}
@@ -172,7 +173,7 @@ func waitForVolumesAttached(client clientset.Interface, nodeName, volumeName str
 
 func waitForVolumesInUse(client clientset.Interface, nodeName, volumeName string) error {
 	waitErr := wait.PollImmediate(10*time.Second, 60*time.Second, func() (bool, error) {
-		node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("error fetching node %s with %v", nodeName, err)
 		}

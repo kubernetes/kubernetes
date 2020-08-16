@@ -28,7 +28,7 @@ import (
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Datacenter extends the govmomi Datacenter object

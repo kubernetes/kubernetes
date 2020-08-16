@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	time "time"
 
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
@@ -60,13 +61,13 @@ func NewFilteredCSIDriverInformer(client kubernetes.Interface, resyncPeriod time
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.StorageV1beta1().CSIDrivers().List(options)
+				return client.StorageV1beta1().CSIDrivers().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.StorageV1beta1().CSIDrivers().Watch(options)
+				return client.StorageV1beta1().CSIDrivers().Watch(context.TODO(), options)
 			},
 		},
 		&storagev1beta1.CSIDriver{},

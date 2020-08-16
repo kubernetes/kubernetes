@@ -13,7 +13,9 @@ const (
 	IFLA_INFO_KIND
 	IFLA_INFO_DATA
 	IFLA_INFO_XSTATS
-	IFLA_INFO_MAX = IFLA_INFO_XSTATS
+	IFLA_INFO_SLAVE_KIND
+	IFLA_INFO_SLAVE_DATA
+	IFLA_INFO_MAX = IFLA_INFO_SLAVE_DATA
 )
 
 const (
@@ -87,7 +89,8 @@ const (
 const (
 	IFLA_IPVLAN_UNSPEC = iota
 	IFLA_IPVLAN_MODE
-	IFLA_IPVLAN_MAX = IFLA_IPVLAN_MODE
+	IFLA_IPVLAN_FLAG
+	IFLA_IPVLAN_MAX = IFLA_IPVLAN_FLAG
 )
 
 const (
@@ -164,6 +167,8 @@ const (
 	IFLA_BOND_SLAVE_PERM_HWADDR
 	IFLA_BOND_SLAVE_QUEUE_ID
 	IFLA_BOND_SLAVE_AD_AGGREGATOR_ID
+	IFLA_BOND_SLAVE_AD_ACTOR_OPER_PORT_STATE
+	IFLA_BOND_SLAVE_AD_PARTNER_OPER_PORT_STATE
 )
 
 const (
@@ -217,9 +222,11 @@ const (
 	IFLA_VF_RSS_QUERY_EN /* RSS Redirection Table and Hash Key query
 	 * on/off switch
 	 */
-	IFLA_VF_STATS /* network device statistics */
-	IFLA_VF_TRUST /* Trust state of VF */
-	IFLA_VF_MAX   = IFLA_VF_TRUST
+	IFLA_VF_STATS        /* network device statistics */
+	IFLA_VF_TRUST        /* Trust state of VF */
+	IFLA_VF_IB_NODE_GUID /* VF Infiniband node GUID */
+	IFLA_VF_IB_PORT_GUID /* VF Infiniband port GUID */
+	IFLA_VF_MAX          = IFLA_VF_IB_PORT_GUID
 )
 
 const (
@@ -248,6 +255,7 @@ const (
 	SizeofVfLinkState  = 0x08
 	SizeofVfRssQueryEn = 0x08
 	SizeofVfTrust      = 0x08
+	SizeofVfGUID       = 0x10
 )
 
 // struct ifla_vf_mac {
@@ -430,6 +438,30 @@ func (msg *VfTrust) Serialize() []byte {
 	return (*(*[SizeofVfTrust]byte)(unsafe.Pointer(msg)))[:]
 }
 
+// struct ifla_vf_guid {
+//   __u32 vf;
+//   __u32 rsvd;
+//   __u64 guid;
+// };
+
+type VfGUID struct {
+	Vf   uint32
+	Rsvd uint32
+	GUID uint64
+}
+
+func (msg *VfGUID) Len() int {
+	return SizeofVfGUID
+}
+
+func DeserializeVfGUID(b []byte) *VfGUID {
+	return (*VfGUID)(unsafe.Pointer(&b[0:SizeofVfGUID][0]))
+}
+
+func (msg *VfGUID) Serialize() []byte {
+	return (*(*[SizeofVfGUID]byte)(unsafe.Pointer(msg)))[:]
+}
+
 const (
 	XDP_FLAGS_UPDATE_IF_NOEXIST = 1 << iota
 	XDP_FLAGS_SKB_MODE
@@ -545,4 +577,34 @@ const (
 const (
 	GTP_ROLE_GGSN = iota
 	GTP_ROLE_SGSN
+)
+
+const (
+	IFLA_XFRM_UNSPEC = iota
+	IFLA_XFRM_LINK
+	IFLA_XFRM_IF_ID
+
+	IFLA_XFRM_MAX = iota - 1
+)
+
+const (
+	IFLA_TUN_UNSPEC = iota
+	IFLA_TUN_OWNER
+	IFLA_TUN_GROUP
+	IFLA_TUN_TYPE
+	IFLA_TUN_PI
+	IFLA_TUN_VNET_HDR
+	IFLA_TUN_PERSIST
+	IFLA_TUN_MULTI_QUEUE
+	IFLA_TUN_NUM_QUEUES
+	IFLA_TUN_NUM_DISABLED_QUEUES
+	IFLA_TUN_MAX = IFLA_TUN_NUM_DISABLED_QUEUES
+)
+
+const (
+	IFLA_IPOIB_UNSPEC = iota
+	IFLA_IPOIB_PKEY
+	IFLA_IPOIB_MODE
+	IFLA_IPOIB_UMCAST
+	IFLA_IPOIB_MAX = IFLA_IPOIB_UMCAST
 )

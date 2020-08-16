@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	storagev1 "k8s.io/api/storage/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -38,7 +40,7 @@ var csinodesResource = schema.GroupVersionResource{Group: "storage.k8s.io", Vers
 var csinodesKind = schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1", Kind: "CSINode"}
 
 // Get takes name of the cSINode, and returns the corresponding cSINode object, and an error if there is any.
-func (c *FakeCSINodes) Get(name string, options v1.GetOptions) (result *storagev1.CSINode, err error) {
+func (c *FakeCSINodes) Get(ctx context.Context, name string, options v1.GetOptions) (result *storagev1.CSINode, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(csinodesResource, name), &storagev1.CSINode{})
 	if obj == nil {
@@ -48,7 +50,7 @@ func (c *FakeCSINodes) Get(name string, options v1.GetOptions) (result *storagev
 }
 
 // List takes label and field selectors, and returns the list of CSINodes that match those selectors.
-func (c *FakeCSINodes) List(opts v1.ListOptions) (result *storagev1.CSINodeList, err error) {
+func (c *FakeCSINodes) List(ctx context.Context, opts v1.ListOptions) (result *storagev1.CSINodeList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(csinodesResource, csinodesKind, opts), &storagev1.CSINodeList{})
 	if obj == nil {
@@ -69,13 +71,13 @@ func (c *FakeCSINodes) List(opts v1.ListOptions) (result *storagev1.CSINodeList,
 }
 
 // Watch returns a watch.Interface that watches the requested cSINodes.
-func (c *FakeCSINodes) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeCSINodes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(csinodesResource, opts))
 }
 
 // Create takes the representation of a cSINode and creates it.  Returns the server's representation of the cSINode, and an error, if there is any.
-func (c *FakeCSINodes) Create(cSINode *storagev1.CSINode) (result *storagev1.CSINode, err error) {
+func (c *FakeCSINodes) Create(ctx context.Context, cSINode *storagev1.CSINode, opts v1.CreateOptions) (result *storagev1.CSINode, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootCreateAction(csinodesResource, cSINode), &storagev1.CSINode{})
 	if obj == nil {
@@ -85,7 +87,7 @@ func (c *FakeCSINodes) Create(cSINode *storagev1.CSINode) (result *storagev1.CSI
 }
 
 // Update takes the representation of a cSINode and updates it. Returns the server's representation of the cSINode, and an error, if there is any.
-func (c *FakeCSINodes) Update(cSINode *storagev1.CSINode) (result *storagev1.CSINode, err error) {
+func (c *FakeCSINodes) Update(ctx context.Context, cSINode *storagev1.CSINode, opts v1.UpdateOptions) (result *storagev1.CSINode, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootUpdateAction(csinodesResource, cSINode), &storagev1.CSINode{})
 	if obj == nil {
@@ -95,22 +97,22 @@ func (c *FakeCSINodes) Update(cSINode *storagev1.CSINode) (result *storagev1.CSI
 }
 
 // Delete takes name of the cSINode and deletes it. Returns an error if one occurs.
-func (c *FakeCSINodes) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeCSINodes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewRootDeleteAction(csinodesResource, name), &storagev1.CSINode{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeCSINodes) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(csinodesResource, listOptions)
+func (c *FakeCSINodes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewRootDeleteCollectionAction(csinodesResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &storagev1.CSINodeList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched cSINode.
-func (c *FakeCSINodes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *storagev1.CSINode, err error) {
+func (c *FakeCSINodes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *storagev1.CSINode, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(csinodesResource, name, pt, data, subresources...), &storagev1.CSINode{})
 	if obj == nil {

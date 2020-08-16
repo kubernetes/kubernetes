@@ -19,6 +19,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cespare/xxhash/v2"
+	//lint:ignore SA1019 Need to keep deprecated package for compatibility.
 	"github.com/golang/protobuf/proto"
 	"github.com/prometheus/common/model"
 
@@ -126,24 +128,24 @@ func NewDesc(fqName, help string, variableLabels []string, constLabels Labels) *
 		return d
 	}
 
-	vh := hashNew()
+	xxh := xxhash.New()
 	for _, val := range labelValues {
-		vh = hashAdd(vh, val)
-		vh = hashAddByte(vh, separatorByte)
+		xxh.WriteString(val)
+		xxh.Write(separatorByteSlice)
 	}
-	d.id = vh
+	d.id = xxh.Sum64()
 	// Sort labelNames so that order doesn't matter for the hash.
 	sort.Strings(labelNames)
 	// Now hash together (in this order) the help string and the sorted
 	// label names.
-	lh := hashNew()
-	lh = hashAdd(lh, help)
-	lh = hashAddByte(lh, separatorByte)
+	xxh.Reset()
+	xxh.WriteString(help)
+	xxh.Write(separatorByteSlice)
 	for _, labelName := range labelNames {
-		lh = hashAdd(lh, labelName)
-		lh = hashAddByte(lh, separatorByte)
+		xxh.WriteString(labelName)
+		xxh.Write(separatorByteSlice)
 	}
-	d.dimHash = lh
+	d.dimHash = xxh.Sum64()
 
 	d.constLabelPairs = make([]*dto.LabelPair, 0, len(constLabels))
 	for n, v := range constLabels {

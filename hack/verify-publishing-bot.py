@@ -71,6 +71,16 @@ def main():
     processed_repos = []
     for rule in rules_dependencies["rules"]:
         branch = rule["branches"][0]
+
+        # If this no longer exists in master
+        if rule["destination"] not in gomod_dependencies:
+            # Make sure we don't include a rule to publish it from master
+            for branch in rule["branches"]:
+                if branch["name"] == "master":
+                    raise Exception("cannot find master branch for destination %s" % rule["destination"])
+            # And skip validation of publishing rules for it
+            continue
+
         if branch["name"] != "master":
             raise Exception("cannot find master branch for destination %s" % rule["destination"])
         if branch["source"]["branch"] != "master":

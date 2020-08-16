@@ -103,6 +103,27 @@ func HugePageUnitSizeFromByteSize(size int64) (string, error) {
 	return fmt.Sprintf("%d%s", size, hugePageSizeUnitList[idx]), nil
 }
 
+// IsHugePageMedium returns true if the volume medium is in 'HugePages[-size]' format
+func IsHugePageMedium(medium v1.StorageMedium) bool {
+	if medium == v1.StorageMediumHugePages {
+		return true
+	}
+	return strings.HasPrefix(string(medium), string(v1.StorageMediumHugePagesPrefix))
+}
+
+// HugePageSizeFromMedium returns the page size for the specified huge page medium.
+// If the specified input is not a valid huge page medium an error is returned.
+func HugePageSizeFromMedium(medium v1.StorageMedium) (resource.Quantity, error) {
+	if !IsHugePageMedium(medium) {
+		return resource.Quantity{}, fmt.Errorf("medium: %s is not a hugepage medium", medium)
+	}
+	if medium == v1.StorageMediumHugePages {
+		return resource.Quantity{}, fmt.Errorf("medium: %s doesn't have size information", medium)
+	}
+	pageSize := strings.TrimPrefix(string(medium), string(v1.StorageMediumHugePagesPrefix))
+	return resource.ParseQuantity(pageSize)
+}
+
 // IsOvercommitAllowed returns true if the resource is in the default
 // namespace and is not hugepages.
 func IsOvercommitAllowed(name v1.ResourceName) bool {
@@ -110,22 +131,25 @@ func IsOvercommitAllowed(name v1.ResourceName) bool {
 		!IsHugePageResourceName(name)
 }
 
+// IsAttachableVolumeResourceName returns true when the resource name is prefixed in attachable volume
 func IsAttachableVolumeResourceName(name v1.ResourceName) bool {
 	return strings.HasPrefix(string(name), v1.ResourceAttachableVolumesPrefix)
 }
 
-// Extended and Hugepages resources
+// IsScalarResourceName validates the resource for Extended, Hugepages, Native and AttachableVolume resources
 func IsScalarResourceName(name v1.ResourceName) bool {
 	return IsExtendedResourceName(name) || IsHugePageResourceName(name) ||
 		IsPrefixedNativeResource(name) || IsAttachableVolumeResourceName(name)
 }
 
-// this function aims to check if the service's ClusterIP is set or not
+// IsServiceIPSet aims to check if the service's ClusterIP is set or not
 // the objective is not to perform validation here
 func IsServiceIPSet(service *v1.Service) bool {
 	return service.Spec.ClusterIP != v1.ClusterIPNone && service.Spec.ClusterIP != ""
 }
 
+// LoadBalancerStatusEqual evaluates the given load balancers' ingress IP addresses
+// and hostnames and returns true if equal or false if otherwise
 // TODO: make method on LoadBalancerStatus?
 func LoadBalancerStatusEqual(l, r *v1.LoadBalancerStatus) bool {
 	return ingressSliceEqual(l.Ingress, r.Ingress)
@@ -170,7 +194,7 @@ func GetAccessModesAsString(modes []v1.PersistentVolumeAccessMode) string {
 	return strings.Join(modesStr, ",")
 }
 
-// GetAccessModesAsString returns an array of AccessModes from a string created by GetAccessModesAsString
+// GetAccessModesFromString returns an array of AccessModes from a string created by GetAccessModesAsString
 func GetAccessModesFromString(modes string) []v1.PersistentVolumeAccessMode {
 	strmodes := strings.Split(modes, ",")
 	accessModes := []v1.PersistentVolumeAccessMode{}
@@ -446,7 +470,7 @@ func getFilteredTaints(taints []v1.Taint, inclusionFilter taintsFilterFunc) []v1
 	return filteredTaints
 }
 
-// Returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
+// GetMatchingTolerations returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
 func GetMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (bool, []v1.Toleration) {
 	if len(taints) == 0 {
 		return true, []v1.Toleration{}
@@ -471,6 +495,8 @@ func GetMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (boo
 	return true, result
 }
 
+// GetAvoidPodsFromNodeAnnotations scans the list of annotations and
+// returns the pods that needs to be avoided for this node from scheduling
 func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (v1.AvoidPods, error) {
 	var avoidPods v1.AvoidPods
 	if len(annotations) > 0 && annotations[v1.PreferAvoidPodsAnnotationKey] != "" {

@@ -26,7 +26,7 @@ limitations under the License.
 package testsuites_test
 
 import (
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 )
@@ -39,7 +39,7 @@ func (f *fakeSuite) GetTestSuiteInfo() testsuites.TestSuiteInfo {
 		Name:               "fake",
 		FeatureTag:         "",
 		TestPatterns:       []testpatterns.TestPattern{testpatterns.DefaultFsDynamicPV},
-		SupportedSizeRange: volume.SizeRange{Min: "1Mi", Max: "1Gi"},
+		SupportedSizeRange: e2evolume.SizeRange{Min: "1Mi", Max: "1Gi"},
 	}
 }
 

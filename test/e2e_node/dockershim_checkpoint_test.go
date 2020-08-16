@@ -26,14 +26,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -47,7 +49,7 @@ var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker][Legacy:Do
 	f := framework.NewDefaultFramework("dockerhism-checkpoint-test")
 
 	ginkgo.BeforeEach(func() {
-		framework.RunIfContainerRuntimeIs("docker")
+		e2eskipper.RunIfContainerRuntimeIs("docker")
 	})
 
 	ginkgo.It("should clean up pod sandbox checkpoint after pod deletion", func() {
@@ -167,7 +169,7 @@ func runPodCheckpointTest(f *framework.Framework, podName string, twist func()) 
 	twist()
 
 	ginkgo.By("Remove test pod")
-	f.PodClient().DeleteSync(podName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+	f.PodClient().DeleteSync(podName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 
 	ginkgo.By("Waiting for checkpoint to be removed")
 	if err := wait.PollImmediate(10*time.Second, gcTimeout, func() (bool, error) {

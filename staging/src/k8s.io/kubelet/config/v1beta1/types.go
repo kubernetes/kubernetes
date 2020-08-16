@@ -19,6 +19,7 @@ package v1beta1
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -74,6 +75,12 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// enableServer enables Kubelet's secured server.
+	// Note: Kubelet's insecure port is controlled by the readOnlyPort option.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may disrupt components that interact with the Kubelet server.
+	// Default: true
+	EnableServer *bool `json:"enableServer,omitempty"`
 	// staticPodPath is the path to the directory containing local (static) pods to
 	// run, or the path to a single static pod file.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
@@ -171,8 +178,7 @@ type KubeletConfiguration struct {
 	TLSMinVersion string `json:"tlsMinVersion,omitempty"`
 	// rotateCertificates enables client certificate rotation. The Kubelet will request a
 	// new certificate from the certificates.k8s.io API. This requires an approver to approve the
-	// certificate signing requests. The RotateKubeletClientCertificate feature
-	// must be enabled.
+	// certificate signing requests.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// disabling it may disrupt the Kubelet's ability to authenticate with the API server
 	// after the current certificate expires.
@@ -490,6 +496,11 @@ type KubeletConfiguration struct {
 	// Default: "/etc/resolv.conf"
 	// +optional
 	ResolverConfig string `json:"resolvConf,omitempty"`
+	// RunOnce causes the Kubelet to check the API server once for pods,
+	// run those in addition to the pods specified by static pod files, and exit.
+	// Default: false
+	// +optional
+	RunOnce bool `json:"runOnce,omitempty"`
 	// cpuCFSQuota enables CPU CFS quota enforcement for containers that
 	// specify CPU limits.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
@@ -504,6 +515,13 @@ type KubeletConfiguration struct {
 	// Default: "100ms"
 	// +optional
 	CPUCFSQuotaPeriod *metav1.Duration `json:"cpuCFSQuotaPeriod,omitempty"`
+	// nodeStatusMaxImages caps the number of images reported in Node.Status.Images.
+	// Note: If -1 is specified, no cap will be applied. If 0 is specified, no image is returned.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// different values can be reported on node status.
+	// Default: 50
+	// +optional
+	NodeStatusMaxImages *int32 `json:"nodeStatusMaxImages,omitempty"`
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// it may impact the ability of the Kubelet to interact with the node's filesystem.
@@ -714,6 +732,14 @@ type KubeletConfiguration struct {
 	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
 	// This option overwrites CPUs provided by system-reserved and kube-reserved.
 	ReservedSystemCPUs string `json:"reservedSystemCPUs,omitempty"`
+	// The previous version for which you want to show hidden metrics.
+	// Only the previous minor version is meaningful, other values will not be allowed.
+	// The format is <major>.<minor>, e.g.: '1.16'.
+	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
+	// rather than being surprised when they are permanently removed in the release after that.
+	// Default: ""
+	// +optional
+	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion,omitempty"`
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
 	// Dynamic Kubelet Config (beta): This field should not be updated without a full node
@@ -747,6 +773,37 @@ type KubeletConfiguration struct {
 	// Default: []
 	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
+	// volumePluginDir is the full path of the directory in which to search
+	// for additional third party volume plugins.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that changing
+	// the volumePluginDir may disrupt workloads relying on third party volume plugins.
+	// Default: "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"
+	// +optional
+	VolumePluginDir string `json:"volumePluginDir,omitempty"`
+	// providerID, if set, sets the unique id of the instance that an external provider (i.e. cloudprovider)
+	// can use to identify a specific node.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may impact the ability of the Kubelet to interact with cloud providers.
+	// Default: ""
+	// +optional
+	ProviderID string `json:"providerID,omitempty"`
+	// kernelMemcgNotification, if set, the kubelet will integrate with the kernel memcg notification
+	// to determine if memory eviction thresholds are crossed rather than polling.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may impact the way Kubelet interacts with the kernel.
+	// Default: false
+	// +optional
+	KernelMemcgNotification bool `json:"kernelMemcgNotification,omitempty"`
+	// Logging specifies the options of logging.
+	// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
+	// Defaults:
+	//   Format: text
+	// + optional
+	Logging componentbaseconfigv1alpha1.LoggingConfiguration `json:"logging,omitempty"`
+	// enableSystemLogHandler enables system logs via web interface host:port/logs/
+	// Default: true
+	// +optional
+	EnableSystemLogHandler *bool `json:"enableSystemLogHandler,omitempty"`
 }
 
 type KubeletAuthorizationMode string

@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	csidriverstore "k8s.io/kubernetes/pkg/registry/storage/csidriver/storage"
 	csinodestore "k8s.io/kubernetes/pkg/registry/storage/csinode/storage"
+	csistoragecapacitystore "k8s.io/kubernetes/pkg/registry/storage/csistoragecapacity/storage"
 	storageclassstore "k8s.io/kubernetes/pkg/registry/storage/storageclass/storage"
 	volumeattachmentstore "k8s.io/kubernetes/pkg/registry/storage/volumeattachment/storage"
 )
@@ -76,6 +77,15 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 	}
 	storage["volumeattachments"] = volumeAttachmentStorage.VolumeAttachment
 
+	// register csistoragecapacity if CSIStorageCapacity feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+		csiStorageStorage, err := csistoragecapacitystore.NewStorage(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage["csistoragecapacities"] = csiStorageStorage.CSIStorageCapacity
+	}
+
 	return storage, nil
 }
 
@@ -104,14 +114,12 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 		storage["csinodes"] = csiNodeStorage.CSINode
 	}
 
-	// register csidrivers if CSIDriverRegistry feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		csiDriverStorage, err := csidriverstore.NewStorage(restOptionsGetter)
-		if err != nil {
-			return storage, err
-		}
-		storage["csidrivers"] = csiDriverStorage.CSIDriver
+	// register csidrivers
+	csiDriverStorage, err := csidriverstore.NewStorage(restOptionsGetter)
+	if err != nil {
+		return storage, err
 	}
+	storage["csidrivers"] = csiDriverStorage.CSIDriver
 
 	return storage, nil
 }
@@ -143,6 +151,13 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 		}
 		storage["csinodes"] = csiNodeStorage.CSINode
 	}
+
+	// register csidrivers
+	csiDriverStorage, err := csidriverstore.NewStorage(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
+	storage["csidrivers"] = csiDriverStorage.CSIDriver
 
 	return storage, nil
 }

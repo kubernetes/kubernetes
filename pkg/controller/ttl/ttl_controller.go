@@ -27,6 +27,7 @@ limitations under the License.
 package ttl
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strconv"
@@ -35,6 +36,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -47,7 +49,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type TTLController struct {
@@ -263,12 +265,12 @@ func (ttlc *TTLController) patchNodeWithAnnotation(node *v1.Node, annotationKey 
 	if err != nil {
 		return err
 	}
-	_, err = ttlc.kubeClient.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, patchBytes)
+	_, err = ttlc.kubeClient.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
-		klog.V(2).Infof("Failed to change ttl annotation for node %s: %v", node.Name, err)
+		klog.V(2).InfoS("Failed to change ttl annotation for node", "node", klog.KObj(node), "err", err)
 		return err
 	}
-	klog.V(2).Infof("Changed ttl annotation for node %s to %d seconds", node.Name, value)
+	klog.V(2).InfoS("Changed ttl annotation", "node", klog.KObj(node), "new_ttl", time.Duration(value)*time.Second)
 	return nil
 }
 

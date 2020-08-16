@@ -410,6 +410,107 @@ func testPodWithTwoContainersAndTwoInitContainers() *corev1.Pod {
 	}
 }
 
+func TestLogsForObjectWithClient(t *testing.T) {
+	cases := []struct {
+		name              string
+		podFn             func() *corev1.Pod
+		podLogOptions     *corev1.PodLogOptions
+		expectedFieldPath string
+		allContainers     bool
+		expectedError     string
+	}{
+		{
+			name:          "two container pod without default container selected",
+			podFn:         testPodWithTwoContainers,
+			podLogOptions: &corev1.PodLogOptions{},
+			expectedError: `a container name must be specified for pod foo-two-containers, choose one of: [foo-2-c1 foo-2-c2]`,
+		},
+		{
+			name: "two container pod with default container selected",
+			podFn: func() *corev1.Pod {
+				pod := testPodWithTwoContainers()
+				pod.Annotations = map[string]string{defaultLogsContainerAnnotationName: "foo-2-c1"}
+				return pod
+			},
+			podLogOptions:     &corev1.PodLogOptions{},
+			expectedFieldPath: `spec.containers{foo-2-c1}`,
+		},
+		{
+			name: "two container pod with default container selected but also container set explicitly",
+			podFn: func() *corev1.Pod {
+				pod := testPodWithTwoContainers()
+				pod.Annotations = map[string]string{defaultLogsContainerAnnotationName: "foo-2-c1"}
+				return pod
+			},
+			podLogOptions: &corev1.PodLogOptions{
+				Container: "foo-2-c2",
+			},
+			expectedFieldPath: `spec.containers{foo-2-c2}`,
+		},
+		{
+			name: "two container pod with non-existing default container selected",
+			podFn: func() *corev1.Pod {
+				pod := testPodWithTwoContainers()
+				pod.Annotations = map[string]string{defaultLogsContainerAnnotationName: "non-existing"}
+				return pod
+			},
+			podLogOptions: &corev1.PodLogOptions{},
+			expectedError: `a container name must be specified for pod foo-two-containers, choose one of: [foo-2-c1 foo-2-c2]`,
+		},
+		{
+			name: "two container pod with default container set, but allContainers also set",
+			podFn: func() *corev1.Pod {
+				pod := testPodWithTwoContainers()
+				pod.Annotations = map[string]string{defaultLogsContainerAnnotationName: "foo-2-c1"}
+				return pod
+			},
+			allContainers:     true,
+			podLogOptions:     &corev1.PodLogOptions{},
+			expectedFieldPath: `spec.containers{foo-2-c2}`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := tc.podFn()
+			fakeClientset := fakeexternal.NewSimpleClientset(pod)
+			responses, err := logsForObjectWithClient(fakeClientset.CoreV1(), pod, tc.podLogOptions, 20*time.Second, tc.allContainers)
+			if err != nil {
+				if len(tc.expectedError) > 0 {
+					if err.Error() == tc.expectedError {
+						return
+					}
+				}
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if len(tc.expectedError) > 0 {
+				t.Errorf("expected error %q, got none", tc.expectedError)
+				return
+			}
+			if !tc.allContainers && len(responses) != 1 {
+				t.Errorf("expected one response, got %d", len(responses))
+				return
+			}
+			if tc.allContainers && len(responses) != 2 {
+				t.Errorf("expected 2 responses for allContainers, got %d", len(responses))
+				return
+			}
+			// do not check actual responses in this case as we know there are at least two, which means the preselected
+			// container was not used (which is desired).
+			if tc.allContainers {
+				return
+			}
+			for r := range responses {
+				if r.FieldPath != tc.expectedFieldPath {
+					t.Errorf("expected %q container to be preselected, got %q", tc.expectedFieldPath, r.FieldPath)
+				}
+			}
+		})
+	}
+
+}
+
 func testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers() *corev1.Pod {
 	return &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{

@@ -35,7 +35,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA Kubelet [Slow]", func() {
+var _ = SIGDescribe("[Feature:Windows] GMSA Kubelet [Slow]", func() {
 	f := framework.NewDefaultFramework("gmsa-kubelet-test-windows")
 
 	ginkgo.Describe("kubelet GMSA support", func() {

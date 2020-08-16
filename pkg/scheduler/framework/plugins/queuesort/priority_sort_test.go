@@ -31,20 +31,20 @@ func TestLess(t *testing.T) {
 	t2 := t1.Add(time.Second)
 	for _, tt := range []struct {
 		name     string
-		p1       *framework.PodInfo
-		p2       *framework.PodInfo
+		p1       *framework.QueuedPodInfo
+		p2       *framework.QueuedPodInfo
 		expected bool
 	}{
 		{
 			name: "p1.priority less than p2.priority",
-			p1: &framework.PodInfo{
+			p1: &framework.QueuedPodInfo{
 				Pod: &v1.Pod{
 					Spec: v1.PodSpec{
 						Priority: &lowPriority,
 					},
 				},
 			},
-			p2: &framework.PodInfo{
+			p2: &framework.QueuedPodInfo{
 				Pod: &v1.Pod{
 					Spec: v1.PodSpec{
 						Priority: &highPriority,
@@ -55,14 +55,14 @@ func TestLess(t *testing.T) {
 		},
 		{
 			name: "p1.priority greater than p2.priority",
-			p1: &framework.PodInfo{
+			p1: &framework.QueuedPodInfo{
 				Pod: &v1.Pod{
 					Spec: v1.PodSpec{
 						Priority: &highPriority,
 					},
 				},
 			},
-			p2: &framework.PodInfo{
+			p2: &framework.QueuedPodInfo{
 				Pod: &v1.Pod{
 					Spec: v1.PodSpec{
 						Priority: &lowPriority,
@@ -73,7 +73,7 @@ func TestLess(t *testing.T) {
 		},
 		{
 			name: "equal priority. p1 is added to schedulingQ earlier than p2",
-			p1: &framework.PodInfo{
+			p1: &framework.QueuedPodInfo{
 				Pod: &v1.Pod{
 					Spec: v1.PodSpec{
 						Priority: &highPriority,
@@ -81,7 +81,7 @@ func TestLess(t *testing.T) {
 				},
 				Timestamp: t1,
 			},
-			p2: &framework.PodInfo{
+			p2: &framework.QueuedPodInfo{
 				Pod: &v1.Pod{
 					Spec: v1.PodSpec{
 						Priority: &highPriority,
@@ -93,7 +93,7 @@ func TestLess(t *testing.T) {
 		},
 		{
 			name: "equal priority. p2 is added to schedulingQ earlier than p1",
-			p1: &framework.PodInfo{
+			p1: &framework.QueuedPodInfo{
 				Pod: &v1.Pod{
 					Spec: v1.PodSpec{
 						Priority: &highPriority,
@@ -101,7 +101,7 @@ func TestLess(t *testing.T) {
 				},
 				Timestamp: t2,
 			},
-			p2: &framework.PodInfo{
+			p2: &framework.QueuedPodInfo{
 				Pod: &v1.Pod{
 					Spec: v1.PodSpec{
 						Priority: &highPriority,

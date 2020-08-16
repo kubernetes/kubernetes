@@ -33,7 +33,7 @@ import (
 	"unicode"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ProcFS provides a helper for getting container name via pid.

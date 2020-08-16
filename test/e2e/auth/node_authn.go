@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,7 +39,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 	ginkgo.BeforeEach(func() {
 		ns = f.Namespace.Name
 
-		nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+		nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "failed to list nodes in namespace: %s", ns)
 		framework.ExpectNotEqual(len(nodeList.Items), 0)
 
@@ -49,7 +50,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 
 		// make sure ServiceAccount admission controller is enabled, so secret generation on SA creation works
 		saName := "default"
-		sa, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Get(saName, metav1.GetOptions{})
+		sa, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Get(context.TODO(), saName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to retrieve service account (%s:%s)", ns, saName)
 		framework.ExpectNotEqual(len(sa.Secrets), 0)
 
@@ -74,7 +75,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 			},
 			AutomountServiceAccountToken: &trueValue,
 		}
-		_, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Create(newSA)
+		_, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Create(context.TODO(), newSA, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create service account (%s:%s)", ns, newSA.Name)
 
 		pod := createNodeAuthTestPod(f)

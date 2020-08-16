@@ -75,10 +75,18 @@ func TestNewManager(t *testing.T) {
 
 type mockHintProvider struct {
 	th map[string][]TopologyHint
+	//TODO: Add this field and add some tests to make sure things error out
+	//appropriately on allocation errors.
+	//allocateError error
 }
 
-func (m *mockHintProvider) GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]TopologyHint {
+func (m *mockHintProvider) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint {
 	return m.th
+}
+
+func (m *mockHintProvider) Allocate(pod *v1.Pod, container *v1.Container) error {
+	//return allocateError
+	return nil
 }
 
 func TestGetAffinity(t *testing.T) {
@@ -223,7 +231,7 @@ func TestAccumulateProvidersHints(t *testing.T) {
 		mngr := manager{
 			hintProviders: tc.hp,
 		}
-		actual := mngr.accumulateProvidersHints(v1.Pod{}, v1.Container{})
+		actual := mngr.accumulateProvidersHints(&v1.Pod{}, &v1.Container{})
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("Test Case %s: Expected NUMANodeAffinity in result to be %v, got %v", tc.name, tc.expected, actual)
 		}
@@ -235,9 +243,9 @@ type mockPolicy struct {
 	ph []map[string][]TopologyHint
 }
 
-func (p *mockPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
+func (p *mockPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
 	p.ph = providersHints
-	return TopologyHint{}, lifecycle.PodAdmitResult{}
+	return TopologyHint{}, true
 }
 
 func TestCalculateAffinity(t *testing.T) {
@@ -342,7 +350,7 @@ func TestCalculateAffinity(t *testing.T) {
 		mngr := manager{}
 		mngr.policy = &mockPolicy{}
 		mngr.hintProviders = tc.hp
-		mngr.calculateAffinity(v1.Pod{}, v1.Container{})
+		mngr.calculateAffinity(&v1.Pod{}, &v1.Container{})
 		actual := mngr.policy.(*mockPolicy).ph
 		if !reflect.DeepEqual(tc.expected, actual) {
 			t.Errorf("Test Case: %s", tc.name)

@@ -24,7 +24,7 @@ package cm
 import (
 	"fmt"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 type containerManagerImpl struct {
@@ -52,6 +52,14 @@ type containerManagerImpl struct {
 	cadvisorInterface cadvisor.Interface
 	// Config of this node.
 	nodeConfig NodeConfig
+}
+
+type noopWindowsResourceAllocator struct{}
+
+func (ra *noopWindowsResourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	return lifecycle.PodAdmitResult{
+		Admit: true,
+	}
 }
 
 func (cm *containerManagerImpl) Start(node *v1.Node,
@@ -76,7 +84,6 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 
 // NewContainerManager creates windows container manager.
 func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
-	var capacity = v1.ResourceList{}
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
 	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
@@ -84,7 +91,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	if err != nil {
 		return nil, err
 	}
-	capacity = cadvisor.CapacityFromMachineInfo(machineInfo)
+	capacity := cadvisor.CapacityFromMachineInfo(machineInfo)
 
 	return &containerManagerImpl{
 		capacity:          capacity,
@@ -158,7 +165,7 @@ func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Containe
 	return &kubecontainer.RunContainerOptions{}, nil
 }
 
-func (cm *containerManagerImpl) UpdatePluginResources(*schedulernodeinfo.NodeInfo, *lifecycle.PodAdmitAttributes) error {
+func (cm *containerManagerImpl) UpdatePluginResources(*schedulerframework.NodeInfo, *lifecycle.PodAdmitAttributes) error {
 	return nil
 }
 
@@ -178,6 +185,10 @@ func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 	return false
 }
 
-func (cm *containerManagerImpl) GetTopologyPodAdmitHandler() topologymanager.Manager {
-	return nil
+func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
+	return &noopWindowsResourceAllocator{}
+}
+
+func (cm *containerManagerImpl) UpdateAllocatedDevices() {
+	return
 }

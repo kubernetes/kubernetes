@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "generated_expansion.go",
         "ingress.go",
+        "ingressclass.go",
         "networking_client.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/networking/v1beta1",

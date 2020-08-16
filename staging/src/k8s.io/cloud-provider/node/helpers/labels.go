@@ -17,6 +17,7 @@ limitations under the License.
 package helpers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -29,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	clientretry "k8s.io/client-go/util/retry"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var updateLabelBackoff = wait.Backoff{
@@ -64,10 +65,10 @@ func addOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, la
 		// First we try getting node from the API server cache, as it's cheaper. If it fails
 		// we get it from etcd to be sure to have fresh data.
 		if firstTry {
-			node, err = kubeClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			node, err = kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{ResourceVersion: "0"})
 			firstTry = false
 		} else {
-			node, err = kubeClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			node, err = kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		}
 		if err != nil {
 			return err
@@ -94,7 +95,7 @@ func addOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, la
 		if err != nil {
 			return fmt.Errorf("failed to create a two-way merge patch: %v", err)
 		}
-		if _, err := kubeClient.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, patchBytes); err != nil {
+		if _, err := kubeClient.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 			return fmt.Errorf("failed to patch the node: %v", err)
 		}
 		return nil

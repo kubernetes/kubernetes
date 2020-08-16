@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/imagepolicy/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -261,7 +261,7 @@ func NewImagePolicyWebhook(configFile io.Reader) (*Plugin, error) {
 		return nil, err
 	}
 
-	gw, err := webhook.NewGenericWebhook(legacyscheme.Scheme, legacyscheme.Codecs, whConfig.KubeConfigFile, groupVersions, whConfig.RetryBackoff)
+	gw, err := webhook.NewGenericWebhook(legacyscheme.Scheme, legacyscheme.Codecs, whConfig.KubeConfigFile, groupVersions, whConfig.RetryBackoff, nil)
 	if err != nil {
 		return nil, err
 	}

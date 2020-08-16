@@ -17,7 +17,6 @@ limitations under the License.
 package options
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -26,7 +25,6 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
@@ -34,7 +32,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
 
@@ -212,7 +210,7 @@ func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 	fs.StringVar(&s.RemoteKubeConfigFile, "authentication-kubeconfig", s.RemoteKubeConfigFile, ""+
 		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to create "+
-		"tokenaccessreviews.authentication.k8s.io."+optionalKubeConfigSentence)
+		"tokenreviews.authentication.k8s.io."+optionalKubeConfigSentence)
 
 	fs.DurationVar(&s.CacheTTL, "authentication-token-webhook-cache-ttl", s.CacheTTL,
 		"The duration to cache responses from the webhook token authenticator.")
@@ -318,7 +316,6 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 	if openAPIConfig != nil {
 		openAPIConfig.SecurityDefinitions = securityDefinitions
 	}
-	authenticationInfo.SupportsBasicAuth = false
 
 	return nil
 }
@@ -330,64 +327,26 @@ const (
 	// by --requestheader-username-headers. This is created in the cluster by the kube-apiserver.
 	// "WARNING: generally do not depend on authorization being already done for incoming requests.")
 	authenticationConfigMapName = "extension-apiserver-authentication"
-	authenticationRoleName      = "extension-apiserver-authentication-reader"
 )
 
 func (s *DelegatingAuthenticationOptions) createRequestHeaderConfig(client kubernetes.Interface) (*authenticatorfactory.RequestHeaderConfig, error) {
-	requestHeaderCAProvider, err := dynamiccertificates.NewDynamicCAFromConfigMapController("client-ca", authenticationConfigMapNamespace, authenticationConfigMapName, "requestheader-client-ca-file", client)
+	dynamicRequestHeaderProvider, err := newDynamicRequestHeaderController(client)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create request header authentication config: %v", err)
 	}
 
-	authConfigMap, err := client.CoreV1().ConfigMaps(authenticationConfigMapNamespace).Get(authenticationConfigMapName, metav1.GetOptions{})
-	switch {
-	case errors.IsNotFound(err):
-		// ignore, authConfigMap is nil now
-		return nil, nil
-	case errors.IsForbidden(err):
-		klog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
-			"'kubectl create rolebinding -n %s ROLEBINDING_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
-			authenticationConfigMapName, authenticationConfigMapNamespace, authenticationConfigMapNamespace, authenticationRoleName)
-		return nil, err
-	case err != nil:
-		return nil, err
-	}
-
-	usernameHeaders, err := deserializeStrings(authConfigMap.Data["requestheader-username-headers"])
-	if err != nil {
-		return nil, err
-	}
-	groupHeaders, err := deserializeStrings(authConfigMap.Data["requestheader-group-headers"])
-	if err != nil {
-		return nil, err
-	}
-	extraHeaderPrefixes, err := deserializeStrings(authConfigMap.Data["requestheader-extra-headers-prefix"])
-	if err != nil {
-		return nil, err
-	}
-	allowedNames, err := deserializeStrings(authConfigMap.Data["requestheader-allowed-names"])
-	if err != nil {
+	//  look up authentication configuration in the cluster and in case of an err defer to authentication-tolerate-lookup-failure flag
+	if err := dynamicRequestHeaderProvider.RunOnce(); err != nil {
 		return nil, err
 	}
 
 	return &authenticatorfactory.RequestHeaderConfig{
-		CAContentProvider:   requestHeaderCAProvider,
-		UsernameHeaders:     headerrequest.StaticStringSlice(usernameHeaders),
-		GroupHeaders:        headerrequest.StaticStringSlice(groupHeaders),
-		ExtraHeaderPrefixes: headerrequest.StaticStringSlice(extraHeaderPrefixes),
-		AllowedClientNames:  headerrequest.StaticStringSlice(allowedNames),
+		CAContentProvider:   dynamicRequestHeaderProvider,
+		UsernameHeaders:     headerrequest.StringSliceProvider(headerrequest.StringSliceProviderFunc(dynamicRequestHeaderProvider.UsernameHeaders)),
+		GroupHeaders:        headerrequest.StringSliceProvider(headerrequest.StringSliceProviderFunc(dynamicRequestHeaderProvider.GroupHeaders)),
+		ExtraHeaderPrefixes: headerrequest.StringSliceProvider(headerrequest.StringSliceProviderFunc(dynamicRequestHeaderProvider.ExtraHeaderPrefixes)),
+		AllowedClientNames:  headerrequest.StringSliceProvider(headerrequest.StringSliceProviderFunc(dynamicRequestHeaderProvider.AllowedClientNames)),
 	}, nil
-}
-
-func deserializeStrings(in string) ([]string, error) {
-	if len(in) == 0 {
-		return nil, nil
-	}
-	var ret []string
-	if err := json.Unmarshal([]byte(in), &ret); err != nil {
-		return nil, err
-	}
-	return ret, nil
 }
 
 // getClient returns a Kubernetes clientset. If s.RemoteKubeConfigFileOptional is true, nil will be returned

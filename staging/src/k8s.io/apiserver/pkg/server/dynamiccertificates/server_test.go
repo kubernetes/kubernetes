@@ -79,7 +79,7 @@ func TestServingCert(t *testing.T) {
 	}
 
 	dynamicCertificateController := NewDynamicServingCertificateController(
-		*tlsConfig,
+		tlsConfig,
 		&nullCAContent{name: "client-ca"},
 		defaultCertProvider,
 		sniCerts,

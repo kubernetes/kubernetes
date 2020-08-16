@@ -17,7 +17,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

@@ -17,6 +17,7 @@ limitations under the License.
 package apimachinery
 
 import (
+	"context"
 	"strconv"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
@@ -110,7 +112,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		ginkgo.By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value})).String()
 		options := metav1.ListOptions{LabelSelector: selector}
-		pods, err := podClient.List(options)
+		pods, err := podClient.List(context.TODO(), options)
 		if err != nil {
 			framework.Failf("Failed to query for pods: %v", err)
 		}
@@ -119,13 +121,13 @@ var _ = SIGDescribe("Generated clientset", func() {
 			LabelSelector:   selector,
 			ResourceVersion: pods.ListMeta.ResourceVersion,
 		}
-		w, err := podClient.Watch(options)
+		w, err := podClient.Watch(context.TODO(), options)
 		if err != nil {
 			framework.Failf("Failed to set up watch: %v", err)
 		}
 
 		ginkgo.By("creating the pod")
-		pod, err = podClient.Create(pod)
+		pod, err = podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create pod: %v", err)
 		}
@@ -135,7 +137,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 			LabelSelector:   selector,
 			ResourceVersion: pod.ResourceVersion,
 		}
-		pods, err = podClient.List(options)
+		pods, err = podClient.List(context.TODO(), options)
 		if err != nil {
 			framework.Failf("Failed to query for pods: %v", err)
 		}
@@ -146,11 +148,11 @@ var _ = SIGDescribe("Generated clientset", func() {
 
 		// We need to wait for the pod to be scheduled, otherwise the deletion
 		// will be carried out immediately rather than gracefully.
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name))
 
 		ginkgo.By("deleting the pod gracefully")
 		gracePeriod := int64(31)
-		if err := podClient.Delete(pod.Name, metav1.NewDeleteOptions(gracePeriod)); err != nil {
+		if err := podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(gracePeriod)); err != nil {
 			framework.Failf("Failed to delete pod: %v", err)
 		}
 
@@ -226,7 +228,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 		ginkgo.By("setting up watch")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value})).String()
 		options := metav1.ListOptions{LabelSelector: selector}
-		cronJobs, err := cronJobClient.List(options)
+		cronJobs, err := cronJobClient.List(context.TODO(), options)
 		if err != nil {
 			framework.Failf("Failed to query for cronJobs: %v", err)
 		}
@@ -235,13 +237,13 @@ var _ = SIGDescribe("Generated clientset", func() {
 			LabelSelector:   selector,
 			ResourceVersion: cronJobs.ListMeta.ResourceVersion,
 		}
-		w, err := cronJobClient.Watch(options)
+		w, err := cronJobClient.Watch(context.TODO(), options)
 		if err != nil {
 			framework.Failf("Failed to set up watch: %v", err)
 		}
 
 		ginkgo.By("creating the cronJob")
-		cronJob, err = cronJobClient.Create(cronJob)
+		cronJob, err = cronJobClient.Create(context.TODO(), cronJob, metav1.CreateOptions{})
 		if err != nil {
 			framework.Failf("Failed to create cronJob: %v", err)
 		}
@@ -251,7 +253,7 @@ var _ = SIGDescribe("Generated clientset", func() {
 			LabelSelector:   selector,
 			ResourceVersion: cronJob.ResourceVersion,
 		}
-		cronJobs, err = cronJobClient.List(options)
+		cronJobs, err = cronJobClient.List(context.TODO(), options)
 		if err != nil {
 			framework.Failf("Failed to query for cronJobs: %v", err)
 		}
@@ -263,12 +265,12 @@ var _ = SIGDescribe("Generated clientset", func() {
 		ginkgo.By("deleting the cronJob")
 		// Use DeletePropagationBackground so the CronJob is really gone when the call returns.
 		propagationPolicy := metav1.DeletePropagationBackground
-		if err := cronJobClient.Delete(cronJob.Name, &metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
+		if err := cronJobClient.Delete(context.TODO(), cronJob.Name, metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
 			framework.Failf("Failed to delete cronJob: %v", err)
 		}
 
 		options = metav1.ListOptions{LabelSelector: selector}
-		cronJobs, err = cronJobClient.List(options)
+		cronJobs, err = cronJobClient.List(context.TODO(), options)
 		if err != nil {
 			framework.Failf("Failed to list cronJobs to verify deletion: %v", err)
 		}

@@ -17,6 +17,7 @@ limitations under the License.
 package admissionwebhook
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -307,7 +308,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 	}
 
 	for priorityClass, priority := range map[string]int{"low-priority": 1, "high-priority": 10} {
-		_, err = client.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityClass}, Value: int32(priority)})
+		_, err = client.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityClass}, Value: int32(priority)}, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -319,7 +320,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 			testCaseID := strconv.Itoa(i)
 			ns := "reinvoke-" + testCaseID
 			nsLabels := map[string]string{"test-case": testCaseID}
-			_, err = client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns, Labels: nsLabels}})
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns, Labels: nsLabels}}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -327,13 +328,13 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 			// Write markers to a separate namespace to avoid cross-talk
 			markerNs := ns + "-markers"
 			markerNsLabels := map[string]string{"test-markers": testCaseID}
-			_, err = client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: markerNs, Labels: markerNsLabels}})
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: markerNs, Labels: markerNsLabels}}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			// Create a maker object to use to check for the webhook configurations to be ready.
-			marker, err := client.CoreV1().Pods(markerNs).Create(newReinvocationMarkerFixture(markerNs))
+			marker, err := client.CoreV1().Pods(markerNs).Create(context.TODO(), newReinvocationMarkerFixture(markerNs), metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -377,15 +378,15 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 				AdmissionReviewVersions: []string{"v1beta1"},
 			})
 
-			cfg, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&admissionv1beta1.MutatingWebhookConfiguration{
+			cfg, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.MutatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("admission.integration.test-%d", i)},
 				Webhooks:   webhooks,
-			})
+			}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer func() {
-				err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(cfg.GetName(), &metav1.DeleteOptions{})
+				err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(context.TODO(), cfg.GetName(), metav1.DeleteOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -393,7 +394,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 
 			// wait until new webhook is called the first time
 			if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
-				_, err = client.CoreV1().Pods(markerNs).Patch(marker.Name, types.JSONPatchType, []byte("[]"))
+				_, err = client.CoreV1().Pods(markerNs).Patch(context.TODO(), marker.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
 				select {
 				case <-upCh:
 					return true, nil
@@ -421,7 +422,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 			if tt.initialPriorityClass != "" {
 				pod.Spec.PriorityClassName = tt.initialPriorityClass
 			}
-			obj, err := client.CoreV1().Pods(ns).Create(pod)
+			obj, err := client.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 
 			if tt.expectError {
 				if err == nil {

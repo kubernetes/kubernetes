@@ -19,7 +19,7 @@ package restmapper
 import (
 	"testing"
 
-	"github.com/googleapis/gnostic/OpenAPIv2"
+	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"

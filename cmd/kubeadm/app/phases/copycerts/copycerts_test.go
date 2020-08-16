@@ -17,6 +17,7 @@ limitations under the License.
 package copycerts
 
 import (
+	"context"
 	"encoding/hex"
 	"io/ioutil"
 	"os"
@@ -180,7 +181,7 @@ func TestUploadCerts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error decoding key: %v", err)
 	}
-	secretMap, err := cs.CoreV1().Secrets(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmCertsSecret, metav1.GetOptions{})
+	secretMap, err := cs.CoreV1().Secrets(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.KubeadmCertsSecret, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("could not fetch secret: %v", err)
 	}

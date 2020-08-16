@@ -33,6 +33,11 @@
 * [Port Forward to Pods](pages/container_debugging/port_forward_to_pods.md)
 * [Proxying Traffic to Services](pages/container_debugging/proxying_traffic_to_services.md)
 
+## Extending Kubectl
+
+* [Plugin mechanism](pages/extending_kubectl/plugin_mechanism.md)
+* [Discovering plugins](pages/extending_kubectl/discovering_plugins.md)
+
 ## App Customization
 
 * [Introduction](pages/app_customization/introduction.md)

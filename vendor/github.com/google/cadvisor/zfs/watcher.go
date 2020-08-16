@@ -19,7 +19,7 @@ import (
 	"time"
 
 	zfs "github.com/mistifyio/go-zfs"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // zfsWatcher maintains a cache of filesystem -> usage stats for a

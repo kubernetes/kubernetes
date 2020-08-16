@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -27,6 +28,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -52,7 +54,7 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 			configEnabled, err := isKubeletConfigEnabled(f)
 			framework.ExpectNoError(err)
 			if !configEnabled {
-				framework.Skipf("unable to run test without dynamic kubelet config enabled.")
+				e2eskipper.Skipf("unable to run test without dynamic kubelet config enabled.")
 			}
 			// because adminssion Priority enable, If the priority class is not found, the Pod is rejected.
 			node := getNodeName(f)
@@ -85,7 +87,7 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 			f.PodClientNS(kubeapi.NamespaceSystem).CreateSync(criticalPod)
 
 			// Check that non-critical pods other than the besteffort have been evicted
-			updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+			updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			for _, p := range updatedPodList.Items {
 				if p.Name == nonCriticalBestEffort.Name {
@@ -97,10 +99,10 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 		})
 		ginkgo.AfterEach(func() {
 			// Delete Pods
-			f.PodClient().DeleteSync(guaranteedPodName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClient().DeleteSync(burstablePodName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClient().DeleteSync(bestEffortPodName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClientNS(kubeapi.NamespaceSystem).DeleteSync(criticalPodName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClient().DeleteSync(guaranteedPodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClient().DeleteSync(burstablePodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClient().DeleteSync(bestEffortPodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			f.PodClientNS(kubeapi.NamespaceSystem).DeleteSync(criticalPodName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			// Log Events
 			logPodEvents(f)
 			logNodeEvents(f)
@@ -110,7 +112,7 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 })
 
 func getNodeCPUAndMemoryCapacity(f *framework.Framework) v1.ResourceList {
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	// Assuming that there is only one node, because this is a node e2e test.
 	framework.ExpectEqual(len(nodeList.Items), 1)
@@ -122,7 +124,7 @@ func getNodeCPUAndMemoryCapacity(f *framework.Framework) v1.ResourceList {
 }
 
 func getNodeName(f *framework.Framework) string {
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	// Assuming that there is only one node, because this is a node e2e test.
 	framework.ExpectEqual(len(nodeList.Items), 1)

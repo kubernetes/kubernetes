@@ -23,7 +23,7 @@ import (
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -51,7 +51,7 @@ var _ = framework.KubeDescribe("KubeletManagedEtcHosts", func() {
 	}
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Kubelet, managed etc hosts
 		Description: Create a Pod with containers with hostNetwork set to false, one of the containers mounts the /etc/hosts file form the host. Create a second Pod with hostNetwork set to true.
 			1. The Pod with hostNetwork=false MUST have /etc/hosts of containers managed by the Kubelet.

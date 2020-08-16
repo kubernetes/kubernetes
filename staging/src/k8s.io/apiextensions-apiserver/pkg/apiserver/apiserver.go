@@ -26,8 +26,6 @@ import (
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	_ "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	_ "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	externalinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	"k8s.io/apiextensions-apiserver/pkg/controller/apiapproval"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
@@ -142,16 +140,22 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	if apiResourceConfig.VersionEnabled(v1beta1.SchemeGroupVersion) {
 		storage := map[string]rest.Storage{}
 		// customresourcedefinitions
-		customResourceDefintionStorage := customresourcedefinition.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
-		storage["customresourcedefinitions"] = customResourceDefintionStorage
-		storage["customresourcedefinitions/status"] = customresourcedefinition.NewStatusREST(Scheme, customResourceDefintionStorage)
+		customResourceDefinitionStorage, err := customresourcedefinition.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage["customresourcedefinitions"] = customResourceDefinitionStorage
+		storage["customresourcedefinitions/status"] = customresourcedefinition.NewStatusREST(Scheme, customResourceDefinitionStorage)
 
 		apiGroupInfo.VersionedResourcesStorageMap[v1beta1.SchemeGroupVersion.Version] = storage
 	}
 	if apiResourceConfig.VersionEnabled(v1.SchemeGroupVersion) {
 		storage := map[string]rest.Storage{}
 		// customresourcedefinitions
-		customResourceDefintionStorage := customresourcedefinition.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
+		customResourceDefintionStorage, err := customresourcedefinition.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
 		storage["customresourcedefinitions"] = customResourceDefintionStorage
 		storage["customresourcedefinitions/status"] = customresourcedefinition.NewStatusREST(Scheme, customResourceDefintionStorage)
 
@@ -207,7 +211,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", crdHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.HandlePrefix("/apis/", crdHandler)
 
-	crdController := NewDiscoveryController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler)
+	discoveryController := NewDiscoveryController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), versionDiscoveryHandler, groupDiscoveryHandler)
 	namingController := status.NewNamingConditionController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdClient.ApiextensionsV1())
 	nonStructuralSchemaController := nonstructuralschema.NewConditionController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdClient.ApiextensionsV1())
 	apiApprovalController := apiapproval.NewKubernetesAPIApprovalPolicyConformantConditionController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdClient.ApiextensionsV1())
@@ -231,12 +235,19 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			go openapiController.Run(s.GenericAPIServer.StaticOpenAPISpec, s.GenericAPIServer.OpenAPIVersionedService, context.StopCh)
 		}
 
-		go crdController.Run(context.StopCh)
 		go namingController.Run(context.StopCh)
 		go establishingController.Run(context.StopCh)
 		go nonStructuralSchemaController.Run(5, context.StopCh)
 		go apiApprovalController.Run(5, context.StopCh)
 		go finalizingController.Run(5, context.StopCh)
+
+		discoverySyncedCh := make(chan struct{})
+		go discoveryController.Run(context.StopCh, discoverySyncedCh)
+		select {
+		case <-context.StopCh:
+		case <-discoverySyncedCh:
+		}
+
 		return nil
 	})
 	// we don't want to report healthy until we can handle all CRDs that have already been registered.  Waiting for the informer

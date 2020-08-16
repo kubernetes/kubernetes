@@ -5,7 +5,7 @@ go_library(
     srcs = ["autoneg.go"],
     importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg",
     importpath = "github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg",
-    visibility = ["//staging/src/k8s.io/component-base/metrics:prometheus_import_allow_list"],
+    visibility = ["//build/visible_to:vendor_githubcom_prometheus_CONSUMERS"],
 )
 
 filegroup(

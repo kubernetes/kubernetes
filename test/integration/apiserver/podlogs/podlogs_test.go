@@ -82,9 +82,9 @@ func TestInsecurePodLogs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	node, err := clientSet.CoreV1().Nodes().Create(&corev1.Node{
+	node, err := clientSet.CoreV1().Nodes().Create(context.TODO(), &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "fake"},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,27 +101,27 @@ func TestInsecurePodLogs(t *testing.T) {
 			},
 		},
 	}
-	node, err = clientSet.CoreV1().Nodes().UpdateStatus(node)
+	node, err = clientSet.CoreV1().Nodes().UpdateStatus(context.TODO(), node, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = clientSet.CoreV1().Namespaces().Create(&corev1.Namespace{
+	_, err = clientSet.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: "ns"},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = clientSet.CoreV1().ServiceAccounts("ns").Create(&corev1.ServiceAccount{
+	_, err = clientSet.CoreV1().ServiceAccounts("ns").Create(context.TODO(), &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{Name: "default", Namespace: "ns"},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	falseRef := false
-	pod, err := clientSet.CoreV1().Pods("ns").Create(&corev1.Pod{
+	pod, err := clientSet.CoreV1().Pods("ns").Create(context.TODO(), &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "ns"},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
@@ -133,7 +133,7 @@ func TestInsecurePodLogs(t *testing.T) {
 			NodeName:                     node.Name,
 			AutomountServiceAccountToken: &falseRef,
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

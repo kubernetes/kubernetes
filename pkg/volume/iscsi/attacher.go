@@ -21,14 +21,12 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/keymutex"
 	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -209,26 +207,17 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, targetLocks 
 		return nil, err
 	}
 	exec := host.GetExec(iscsiPluginName)
-	// TODO: remove feature gate check after no longer needed
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		volumeMode, err := volumeutil.GetVolumeMode(spec)
-		if err != nil {
-			return nil, err
-		}
-		klog.V(5).Infof("iscsi: VolumeSpecToMounter volumeMode %s", volumeMode)
-		return &iscsiDiskMounter{
-			iscsiDisk:  iscsiDisk,
-			fsType:     fsType,
-			volumeMode: volumeMode,
-			readOnly:   readOnly,
-			mounter:    &mount.SafeFormatAndMount{Interface: host.GetMounter(iscsiPluginName), Exec: exec},
-			exec:       exec,
-			deviceUtil: volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
-		}, nil
+
+	volumeMode, err := volumeutil.GetVolumeMode(spec)
+	if err != nil {
+		return nil, err
 	}
+
+	klog.V(5).Infof("iscsi: VolumeSpecToMounter volumeMode %s", volumeMode)
 	return &iscsiDiskMounter{
 		iscsiDisk:  iscsiDisk,
 		fsType:     fsType,
+		volumeMode: volumeMode,
 		readOnly:   readOnly,
 		mounter:    &mount.SafeFormatAndMount{Interface: host.GetMounter(iscsiPluginName), Exec: exec},
 		exec:       exec,

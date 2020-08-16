@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
@@ -32,8 +33,10 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	clientexec "k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -118,7 +121,7 @@ func isSudoPresent(nodeIP string, provider string) bool {
 // address. Returns an error if the node the pod is on doesn't have an
 // address.
 func getHostAddress(client clientset.Interface, p *v1.Pod) (string, error) {
-	node, err := client.CoreV1().Nodes().Get(p.Spec.NodeName, metav1.GetOptions{})
+	node, err := client.CoreV1().Nodes().Get(context.TODO(), p.Spec.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -298,15 +301,15 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 
 	ginkgo.By(fmt.Sprintf("Deleting Pod %q", clientPod.Name))
 	if forceDelete {
-		err = c.CoreV1().Pods(clientPod.Namespace).Delete(clientPod.Name, metav1.NewDeleteOptions(0))
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, *metav1.NewDeleteOptions(0))
 	} else {
-		err = c.CoreV1().Pods(clientPod.Namespace).Delete(clientPod.Name, &metav1.DeleteOptions{})
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, metav1.DeleteOptions{})
 	}
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Starting the kubelet and waiting for pod to delete.")
 	KubeletCommand(KStart, c, clientPod)
-	err = f.WaitForPodNotFound(clientPod.Name, framework.PodDeleteTimeout)
+	err = e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, clientPod.Name, f.Namespace.Name, framework.PodDeleteTimeout)
 	if err != nil {
 		framework.ExpectNoError(err, "Expected pod to be not found.")
 	}
@@ -384,15 +387,15 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *fra
 
 	ginkgo.By(fmt.Sprintf("Deleting Pod %q", clientPod.Name))
 	if forceDelete {
-		err = c.CoreV1().Pods(clientPod.Namespace).Delete(clientPod.Name, metav1.NewDeleteOptions(0))
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, *metav1.NewDeleteOptions(0))
 	} else {
-		err = c.CoreV1().Pods(clientPod.Namespace).Delete(clientPod.Name, &metav1.DeleteOptions{})
+		err = c.CoreV1().Pods(clientPod.Namespace).Delete(context.TODO(), clientPod.Name, metav1.DeleteOptions{})
 	}
 	framework.ExpectNoError(err, "Failed to delete pod.")
 
 	ginkgo.By("Starting the kubelet and waiting for pod to delete.")
 	KubeletCommand(KStart, c, clientPod)
-	err = f.WaitForPodNotFound(clientPod.Name, framework.PodDeleteTimeout)
+	err = e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, clientPod.Name, f.Namespace.Name, framework.PodDeleteTimeout)
 	framework.ExpectNoError(err, "Expected pod to be not found.")
 
 	if forceDelete {
@@ -465,7 +468,7 @@ func RunInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 			},
 		},
 	}
-	pod, err := c.CoreV1().Pods(ns).Create(pod)
+	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 	defer func() {
 		e2epod.DeletePodOrFail(c, ns, pod.Name)
@@ -535,13 +538,13 @@ func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginNa
 			},
 		},
 	}
-	provisionerPod, err := podClient.Create(provisionerPod)
+	provisionerPod, err := podClient.Create(context.TODO(), provisionerPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create %s pod: %v", provisionerPod.Name, err)
 
 	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(c, provisionerPod))
 
 	ginkgo.By("locating the provisioner pod")
-	pod, err := podClient.Get(provisionerPod.Name, metav1.GetOptions{})
+	pod, err := podClient.Get(context.TODO(), provisionerPod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
 
 	return pod
@@ -578,9 +581,9 @@ func PrivilegedTestPSPClusterRoleBinding(client clientset.Interface,
 			},
 		}
 
-		roleBindingClient.Delete(binding.GetName(), &metav1.DeleteOptions{})
+		roleBindingClient.Delete(context.TODO(), binding.GetName(), metav1.DeleteOptions{})
 		err := wait.Poll(2*time.Second, 2*time.Minute, func() (bool, error) {
-			_, err := roleBindingClient.Get(binding.GetName(), metav1.GetOptions{})
+			_, err := roleBindingClient.Get(context.TODO(), binding.GetName(), metav1.GetOptions{})
 			return apierrors.IsNotFound(err), nil
 		})
 		framework.ExpectNoError(err, "Timed out waiting for RBAC binding %s deletion: %v", binding.GetName(), err)
@@ -589,7 +592,7 @@ func PrivilegedTestPSPClusterRoleBinding(client clientset.Interface,
 			continue
 		}
 
-		_, err = roleBindingClient.Create(binding)
+		_, err = roleBindingClient.Create(context.TODO(), binding, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create %s role binding: %v", binding.GetName(), err)
 
 	}
@@ -701,4 +704,61 @@ func findMountPoints(hostExec HostExec, node *v1.Node, dir string) []string {
 // FindVolumeGlobalMountPoints returns all volume global mount points on the node of given pod.
 func FindVolumeGlobalMountPoints(hostExec HostExec, node *v1.Node) sets.String {
 	return sets.NewString(findMountPoints(hostExec, node, "/var/lib/kubelet/plugins")...)
+}
+
+// CreateDriverNamespace creates a namespace for CSI driver installation.
+// The namespace is still tracked and ensured that gets deleted when test terminates.
+func CreateDriverNamespace(f *framework.Framework) *v1.Namespace {
+	ginkgo.By(fmt.Sprintf("Building a driver namespace object, basename %s", f.Namespace.Name))
+	// The driver namespace will be bound to the test namespace in the prefix
+	namespace, err := f.CreateNamespace(f.Namespace.Name, map[string]string{
+		"e2e-framework":      f.BaseName,
+		"e2e-test-namespace": f.Namespace.Name,
+	})
+	framework.ExpectNoError(err)
+
+	if framework.TestContext.VerifyServiceAccount {
+		ginkgo.By("Waiting for a default service account to be provisioned in namespace")
+		err = framework.WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
+		framework.ExpectNoError(err)
+	} else {
+		framework.Logf("Skipping waiting for service account")
+	}
+	return namespace
+}
+
+// WaitForGVRDeletion waits until an object has been deleted
+func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, objectName string, poll, timeout time.Duration) error {
+	framework.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)
+
+	if successful := WaitUntil(poll, timeout, func() bool {
+		_, err := c.Resource(gvr).Get(context.TODO(), objectName, metav1.GetOptions{})
+		if err != nil && apierrors.IsNotFound(err) {
+			framework.Logf("%s %v is not found and has been deleted", gvr.Resource, objectName)
+			return true
+		} else if err != nil {
+			framework.Logf("Get $s %v returned an error: %v", objectName, err.Error())
+		} else {
+			framework.Logf("%s %v has been found and is not deleted", gvr.Resource, objectName)
+		}
+
+		return false
+	}); successful {
+		return nil
+	}
+
+	return fmt.Errorf("%s %s is not deleted within %v", gvr.Resource, objectName, timeout)
+}
+
+// WaitUntil runs checkDone until a timeout is reached
+func WaitUntil(poll, timeout time.Duration, checkDone func() bool) bool {
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
+		if checkDone() {
+			framework.Logf("WaitUntil finished successfully after %v", time.Since(start))
+			return true
+		}
+	}
+
+	framework.Logf("WaitUntil failed after reaching the timeout %v", timeout)
+	return false
 }

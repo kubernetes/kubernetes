@@ -17,6 +17,10 @@ limitations under the License.
 package apimachinery
 
 import (
+	"context"
+	"strings"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -75,6 +79,49 @@ var _ = SIGDescribe("Discovery", func() {
 		}
 		if !found {
 			framework.Failf("didn't find resource %s in the discovery doc", spec.Names.Plural)
+		}
+	})
+
+	/*
+	   Release : v1.19
+	   Testname: Discovery, confirm the PreferredVersion for each api group
+	   Description: Ensure that a list of apis is retrieved.
+	   Each api group found MUST return a valid PreferredVersion unless the group suffix is example.com.
+	*/
+	framework.ConformanceIt("should validate PreferredVersion for each APIGroup", func() {
+
+		// get list of APIGroup endpoints
+		list := &metav1.APIGroupList{}
+		err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/").Do(context.TODO()).Into(list)
+		framework.ExpectNoError(err, "Failed to find /apis/")
+		framework.ExpectNotEqual(len(list.Groups), 0, "Missing APIGroups")
+
+		for _, group := range list.Groups {
+			if strings.HasSuffix(group.Name, ".example.com") {
+				// ignore known example dynamic API groups that are added/removed during the e2e test run
+				continue
+			}
+			framework.Logf("Checking APIGroup: %v", group.Name)
+
+			// locate APIGroup endpoint
+			checkGroup := &metav1.APIGroup{}
+			apiPath := "/apis/" + group.Name + "/"
+			err = f.ClientSet.Discovery().RESTClient().Get().AbsPath(apiPath).Do(context.TODO()).Into(checkGroup)
+			framework.ExpectNoError(err, "Fail to access: %s", apiPath)
+			framework.ExpectNotEqual(len(checkGroup.Versions), 0, "No version found for %v", group.Name)
+			framework.Logf("PreferredVersion.GroupVersion: %s", checkGroup.PreferredVersion.GroupVersion)
+			framework.Logf("Versions found %v", checkGroup.Versions)
+
+			// confirm that the PreferredVersion is a valid version
+			match := false
+			for _, version := range checkGroup.Versions {
+				if version.GroupVersion == checkGroup.PreferredVersion.GroupVersion {
+					framework.Logf("%s matches %s", version.GroupVersion, checkGroup.PreferredVersion.GroupVersion)
+					match = true
+					break
+				}
+			}
+			framework.ExpectEqual(true, match, "failed to find a valid version for PreferredVersion")
 		}
 	})
 })

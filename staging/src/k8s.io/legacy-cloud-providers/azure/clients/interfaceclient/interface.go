@@ -45,4 +45,7 @@ type Interface interface {
 
 	// CreateOrUpdate creates or updates a network.Interface.
 	CreateOrUpdate(ctx context.Context, resourceGroupName string, networkInterfaceName string, parameters network.Interface) *retry.Error
+
+	// Delete deletes a network interface by name.
+	Delete(ctx context.Context, resourceGroupName string, networkInterfaceName string) *retry.Error
 }

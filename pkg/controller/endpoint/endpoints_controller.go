@@ -17,8 +17,8 @@ limitations under the License.
 package endpoint
 
 import (
+	"context"
 	"fmt"
-	"reflect"
 	"strconv"
 	"time"
 
@@ -40,7 +40,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -79,7 +79,7 @@ const (
 func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
 	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration) *EndpointController {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartLogging(klog.Infof)
+	broadcaster.StartStructuredLogging(0)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-controller"})
 
@@ -110,6 +110,9 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	e.podLister = podInformer.Lister()
 	e.podsSynced = podInformer.Informer().HasSynced
 
+	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		DeleteFunc: e.onEndpointsDelete,
+	})
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
 
@@ -212,39 +215,27 @@ func (e *EndpointController) addPod(obj interface{}) {
 }
 
 func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointAddress, error) {
+	var endpointIP string
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		return podToEndpointAddress(pod), nil
-	}
-
-	// api-server service controller ensured that the service got the correct IP Family
-	// according to user setup, here we only need to match EndPoint IPs' family to service
-	// actual IP family. as in, we don't need to check service.IPFamily
-
-	ipv6ClusterIP := utilnet.IsIPv6String(svc.Spec.ClusterIP)
-	for _, podIP := range pod.Status.PodIPs {
-		ipv6PodIP := utilnet.IsIPv6String(podIP.IP)
-		// same family?
-		// TODO (khenidak) when we remove the max of 2 PodIP limit from pods
-		// we will have to return multiple endpoint addresses
-		if ipv6ClusterIP == ipv6PodIP {
-			return &v1.EndpointAddress{
-				IP:       podIP.IP,
-				NodeName: &pod.Spec.NodeName,
-				TargetRef: &v1.ObjectReference{
-					Kind:            "Pod",
-					Namespace:       pod.ObjectMeta.Namespace,
-					Name:            pod.ObjectMeta.Name,
-					UID:             pod.ObjectMeta.UID,
-					ResourceVersion: pod.ObjectMeta.ResourceVersion,
-				}}, nil
+		// In a legacy cluster, the pod IP is guaranteed to be usable
+		endpointIP = pod.Status.PodIP
+	} else {
+		ipv6Service := endpointutil.IsIPv6Service(svc)
+		for _, podIP := range pod.Status.PodIPs {
+			ipv6PodIP := utilnet.IsIPv6String(podIP.IP)
+			if ipv6Service == ipv6PodIP {
+				endpointIP = podIP.IP
+				break
+			}
+		}
+		if endpointIP == "" {
+			return nil, fmt.Errorf("failed to find a matching endpoint for service %v", svc.Name)
 		}
 	}
-	return nil, fmt.Errorf("failed to find a matching endpoint for service %v", svc.Name)
-}
 
-func podToEndpointAddress(pod *v1.Pod) *v1.EndpointAddress {
 	return &v1.EndpointAddress{
-		IP:       pod.Status.PodIP,
+		IP:       endpointIP,
 		NodeName: &pod.Spec.NodeName,
 		TargetRef: &v1.ObjectReference{
 			Kind:            "Pod",
@@ -252,24 +243,15 @@ func podToEndpointAddress(pod *v1.Pod) *v1.EndpointAddress {
 			Name:            pod.ObjectMeta.Name,
 			UID:             pod.ObjectMeta.UID,
 			ResourceVersion: pod.ObjectMeta.ResourceVersion,
-		}}
-}
-
-func endpointChanged(pod1, pod2 *v1.Pod) bool {
-	endpointAddress1 := podToEndpointAddress(pod1)
-	endpointAddress2 := podToEndpointAddress(pod2)
-
-	endpointAddress1.TargetRef.ResourceVersion = ""
-	endpointAddress2.TargetRef.ResourceVersion = ""
-
-	return !reflect.DeepEqual(endpointAddress1, endpointAddress2)
+		},
+	}, nil
 }
 
 // When a pod is updated, figure out what services it used to be a member of
 // and what services it will be a member of, and enqueue the union of these.
 // old and cur must be *v1.Pod types.
 func (e *EndpointController) updatePod(old, cur interface{}) {
-	services := endpointutil.GetServicesToUpdateOnPodChange(e.serviceLister, e.serviceSelectorCache, old, cur, endpointChanged)
+	services := endpointutil.GetServicesToUpdateOnPodChange(e.serviceLister, e.serviceSelectorCache, old, cur)
 	for key := range services {
 		e.queue.AddAfter(key, e.endpointUpdatesBatchPeriod)
 	}
@@ -308,6 +290,15 @@ func (e *EndpointController) onServiceDelete(obj interface{}) {
 	e.queue.Add(key)
 }
 
+func (e *EndpointController) onEndpointsDelete(obj interface{}) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		return
+	}
+	e.queue.Add(key)
+}
+
 // worker runs a worker thread that just dequeues items, processes them, and
 // marks them done. You may run as many of these in parallel as you wish; the
 // workqueue guarantees that they will not end up processing the same service
@@ -336,8 +327,13 @@ func (e *EndpointController) handleErr(err error, key interface{}) {
 		return
 	}
 
+	ns, name, keyErr := cache.SplitMetaNamespaceKey(key.(string))
+	if keyErr != nil {
+		klog.ErrorS(err, "Failed to split meta namespace cache key", "key", key)
+	}
+
 	if e.queue.NumRequeues(key) < maxRetries {
-		klog.V(2).Infof("Error syncing endpoints for service %q, retrying. Error: %v", key, err)
+		klog.V(2).InfoS("Error syncing endpoints, retrying", "service", klog.KRef(ns, name), "err", err)
 		e.queue.AddRateLimited(key)
 		return
 	}
@@ -368,7 +364,7 @@ func (e *EndpointController) syncService(key string) error {
 		// service is deleted. However, if we're down at the time when
 		// the service is deleted, we will miss that deletion, so this
 		// doesn't completely solve the problem. See #6877.
-		err = e.client.CoreV1().Endpoints(namespace).Delete(name, nil)
+		err = e.client.CoreV1().Endpoints(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -443,17 +439,14 @@ func (e *EndpointController) syncService(key string) error {
 		} else {
 			for i := range service.Spec.Ports {
 				servicePort := &service.Spec.Ports[i]
-
-				portName := servicePort.Name
-				portProto := servicePort.Protocol
 				portNum, err := podutil.FindPort(pod, servicePort)
 				if err != nil {
 					klog.V(4).Infof("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
 					continue
 				}
+				epp := endpointPortFromServicePort(servicePort, portNum)
 
 				var readyEps, notReadyEps int
-				epp := &v1.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
 				subsets, readyEps, notReadyEps = addEndpointSubset(subsets, pod, epa, epp, tolerateUnreadyEndpoints)
 				totalReadyEps = totalReadyEps + readyEps
 				totalNotReadyEps = totalNotReadyEps + notReadyEps
@@ -512,10 +505,10 @@ func (e *EndpointController) syncService(key string) error {
 	klog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
 	if createEndpoints {
 		// No previous endpoints, create them
-		_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(newEndpoints)
+		_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(context.TODO(), newEndpoints, metav1.CreateOptions{})
 	} else {
 		// Pre-existing
-		_, err = e.client.CoreV1().Endpoints(service.Namespace).Update(newEndpoints)
+		_, err = e.client.CoreV1().Endpoints(service.Namespace).Update(context.TODO(), newEndpoints, metav1.UpdateOptions{})
 	}
 	if err != nil {
 		if createEndpoints && errors.IsForbidden(err) {
@@ -606,4 +599,16 @@ func shouldPodBeInEndpoints(pod *v1.Pod) bool {
 	default:
 		return true
 	}
+}
+
+func endpointPortFromServicePort(servicePort *v1.ServicePort, portNum int) *v1.EndpointPort {
+	epp := &v1.EndpointPort{
+		Name:     servicePort.Name,
+		Port:     int32(portNum),
+		Protocol: servicePort.Protocol,
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAppProtocol) {
+		epp.AppProtocol = servicePort.AppProtocol
+	}
+	return epp
 }

@@ -59,6 +59,13 @@ var registryTests = []struct {
 		},
 	},
 	{
+		"gcr.io/kubernetes-e2e-test-images/volume/test:123",
+		result{
+			result: "test.io/kubernetes-e2e-test-images/volume/test:123",
+			err:    nil,
+		},
+	},
+	{
 		"k8s.gcr.io/test:123",
 		result{
 			result: "test.io/test:123",
@@ -87,9 +94,9 @@ var registryTests = []struct {
 		},
 	},
 	{
-		"quay.io/k8scsi/test:latest",
+		"k8s.gcr.io/sig-storage/test:latest",
 		result{
-			result: "test.io/k8scsi/test:latest",
+			result: "test.io/sig-storage/test:latest",
 			err:    nil,
 		},
 	},
@@ -107,11 +114,12 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 	// Set custom registries
 	dockerLibraryRegistry = "test.io/library"
 	e2eRegistry = "test.io/kubernetes-e2e-test-images"
+	e2eVolumeRegistry = "test.io/kubernetes-e2e-test-images/volume"
 	gcRegistry = "test.io"
 	gcrReleaseRegistry = "test.io/gke-release"
 	PrivateRegistry = "test.io/k8s-authenticated-test"
 	sampleRegistry = "test.io/google-samples"
-	quayK8sCSI = "test.io/k8scsi"
+	sigStorageRegistry = "test.io/sig-storage"
 
 	for _, tt := range registryTests {
 		t.Run(tt.in, func(t *testing.T) {

@@ -3,10 +3,10 @@
 reviewers:
   - luxas
   - mkumatag
-  - ixdy
   - listx
 approvers:
   - luxas
   - mkumatag
-  - ixdy
   - listx
+emeritus_approvers:
+  - ixdy

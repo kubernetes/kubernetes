@@ -17,6 +17,7 @@ limitations under the License.
 package gcp
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -70,7 +71,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 			// events for the kube-system namespace on failures
 			namespaceName := metav1.NamespaceSystem
 			ginkgo.By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
-			events, err := f.ClientSet.CoreV1().Events(namespaceName).List(metav1.ListOptions{})
+			events, err := f.ClientSet.CoreV1().Events(namespaceName).List(context.TODO(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
 
 			for _, e := range events.Items {
@@ -113,7 +114,22 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	ginkgo.It("each node by switching off the network interface and ensure they function upon switch on", func() {
 		// switch the network interface off for a while to simulate a network outage
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before network is down.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && sudo ip link set eth0 down && sleep 120 && sudo ip link set eth0 up && (sudo dhclient || true)' >/dev/null 2>&1 &", nil)
+		cmd := "nohup sh -c '" +
+			"sleep 10; " +
+			"echo Shutting down eth0 | sudo tee /dev/kmsg; " +
+			"sudo ip link set eth0 down | sudo tee /dev/kmsg; " +
+			"sleep 120; " +
+			"echo Starting up eth0 | sudo tee /dev/kmsg; " +
+			"sudo ip link set eth0 up | sudo tee /dev/kmsg; " +
+			"sleep 10; " +
+			"echo Retrying starting up eth0 | sudo tee /dev/kmsg; " +
+			"sudo ip link set eth0 up | sudo tee /dev/kmsg; " +
+			"echo Running dhclient | sudo tee /dev/kmsg; " +
+			"sudo dhclient | sudo tee /dev/kmsg; " +
+			"echo Starting systemd-networkd | sudo tee /dev/kmsg; " +
+			"sudo systemctl restart systemd-networkd | sudo tee /dev/kmsg" +
+			"' >/dev/null 2>&1 &"
+		testReboot(f.ClientSet, cmd, nil)
 	})
 
 	ginkgo.It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
@@ -150,6 +166,7 @@ func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
 	failed := false
 	for ix := range nodelist.Items {
 		go func(ix int) {
+			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
 			n := nodelist.Items[ix]
 			result[ix] = rebootNode(c, framework.TestContext.Provider, n.ObjectMeta.Name, rebootCmd)
@@ -232,7 +249,7 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 
 	// Get the node initially.
 	framework.Logf("Getting %s", name)
-	node, err := c.CoreV1().Nodes().Get(name, metav1.GetOptions{})
+	node, err := c.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		framework.Logf("Couldn't get node %s", name)
 		return false

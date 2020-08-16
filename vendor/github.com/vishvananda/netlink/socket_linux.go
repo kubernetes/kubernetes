@@ -141,9 +141,12 @@ func SocketGet(local, remote net.Addr) (*Socket, error) {
 		},
 	})
 	s.Send(req)
-	msgs, err := s.Receive()
+	msgs, from, err := s.Receive()
 	if err != nil {
 		return nil, err
+	}
+	if from.Pid != nl.PidKernel {
+		return nil, fmt.Errorf("Wrong sender portid %d, expected %d", from.Pid, nl.PidKernel)
 	}
 	if len(msgs) == 0 {
 		return nil, errors.New("no message nor error from netlink")

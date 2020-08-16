@@ -35,6 +35,25 @@ func (d Dir) String() string {
 	return fmt.Sprintf("socket %d", d-XFRM_SOCKET_IN)
 }
 
+// PolicyAction is an enum representing an ipsec policy action.
+type PolicyAction uint8
+
+const (
+	XFRM_POLICY_ALLOW PolicyAction = 0
+	XFRM_POLICY_BLOCK PolicyAction = 1
+)
+
+func (a PolicyAction) String() string {
+	switch a {
+	case XFRM_POLICY_ALLOW:
+		return "allow"
+	case XFRM_POLICY_BLOCK:
+		return "block"
+	default:
+		return fmt.Sprintf("action %d", a)
+	}
+}
+
 // XfrmPolicyTmpl encapsulates a rule for the base addresses of an ipsec
 // policy. These rules are matched with XfrmState to determine encryption
 // and authentication algorithms.
@@ -64,11 +83,14 @@ type XfrmPolicy struct {
 	Dir      Dir
 	Priority int
 	Index    int
+	Action   PolicyAction
+	Ifindex  int
+	Ifid     int
 	Mark     *XfrmMark
 	Tmpls    []XfrmPolicyTmpl
 }
 
 func (p XfrmPolicy) String() string {
-	return fmt.Sprintf("{Dst: %v, Src: %v, Proto: %s, DstPort: %d, SrcPort: %d, Dir: %s, Priority: %d, Index: %d, Mark: %s, Tmpls: %s}",
-		p.Dst, p.Src, p.Proto, p.DstPort, p.SrcPort, p.Dir, p.Priority, p.Index, p.Mark, p.Tmpls)
+	return fmt.Sprintf("{Dst: %v, Src: %v, Proto: %s, DstPort: %d, SrcPort: %d, Dir: %s, Priority: %d, Index: %d, Action: %s, Ifindex: %d, Ifid: %d, Mark: %s, Tmpls: %s}",
+		p.Dst, p.Src, p.Proto, p.DstPort, p.SrcPort, p.Dir, p.Priority, p.Index, p.Action, p.Ifindex, p.Ifid, p.Mark, p.Tmpls)
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -244,7 +245,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 		ginkgo.AfterEach(func() {
 			for _, pod := range test.testPods {
 				ginkgo.By(fmt.Sprintf("Deleting Pod %v", pod.podName))
-				f.PodClient().DeleteSync(pod.podName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+				f.PodClient().DeleteSync(pod.podName, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			}
 
 			ginkgo.By("Making sure all containers get cleaned up")
@@ -313,7 +314,7 @@ func getRestartingContainerCommand(path string, containerNum int, restarts int32
 }
 
 func verifyPodRestartCount(f *framework.Framework, podName string, expectedNumContainers int, expectedRestartCount int32) error {
-	updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(podName, metav1.GetOptions{})
+	updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), podName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

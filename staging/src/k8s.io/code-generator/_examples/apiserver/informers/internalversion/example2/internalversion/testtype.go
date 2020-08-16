@@ -19,6 +19,7 @@ limitations under the License.
 package internalversion
 
 import (
+	"context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,13 +61,13 @@ func NewFilteredTestTypeInformer(client clientsetinternalversion.Interface, resy
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SecondExample().TestTypes().List(options)
+				return client.SecondExample().TestTypes().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SecondExample().TestTypes().Watch(options)
+				return client.SecondExample().TestTypes().Watch(context.TODO(), options)
 			},
 		},
 		&example2.TestType{},

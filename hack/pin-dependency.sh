@@ -14,11 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Usage:
-#   hack/pin-dependency.sh $MODULE $SHA-OR-TAG
-#
-# Example:
-#   hack/pin-dependency.sh github.com/docker/docker 501cb131a7b7
+# This script switches to the preferred version for specified module.
+# Usage: `hack/pin-dependency.sh $MODULE $SHA-OR-TAG`.
+# Example: `hack/pin-dependency.sh github.com/docker/docker 501cb131a7b7`.
 
 set -o errexit
 set -o nounset
@@ -29,8 +27,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Explicitly opt into go modules, even though we're inside a GOPATH directory
 export GO111MODULE=on
-# Explicitly clear GOFLAGS, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
-export GOFLAGS=
+# Explicitly set GOFLAGS to ignore vendor, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
+export GOFLAGS=-mod=mod
 # Detect problematic GOPROXY settings that prevent lookup of dependencies
 if [[ "${GOPROXY:-}" == "off" ]]; then
   kube::log::error "Cannot run with \$GOPROXY=off"

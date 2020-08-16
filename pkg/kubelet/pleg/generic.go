@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
@@ -67,7 +67,7 @@ type GenericPLEG struct {
 }
 
 // plegContainerState has a one-to-one mapping to the
-// kubecontainer.ContainerState except for the non-existent state. This state
+// kubecontainer.State except for the non-existent state. This state
 // is introduced here to complete the state transition scenarios.
 type plegContainerState string
 
@@ -83,7 +83,7 @@ const (
 	relistThreshold = 3 * time.Minute
 )
 
-func convertState(state kubecontainer.ContainerState) plegContainerState {
+func convertState(state kubecontainer.State) plegContainerState {
 	switch state {
 	case kubecontainer.ContainerStateCreated:
 		// kubelet doesn't use the "created" state yet, hence convert it to "unknown".
@@ -423,8 +423,7 @@ func getContainerState(pod *kubecontainer.Pod, cid *kubecontainer.ContainerID) p
 }
 
 func updateRunningPodAndContainerMetrics(pods []*kubecontainer.Pod) {
-	// Set the number of running pods in the parameter
-	metrics.RunningPodCount.Set(float64(len(pods)))
+	runningSandboxNum := 0
 	// intermediate map to store the count of each "container_state"
 	containerStateCount := make(map[string]int)
 
@@ -434,10 +433,23 @@ func updateRunningPodAndContainerMetrics(pods []*kubecontainer.Pod) {
 			// update the corresponding "container_state" in map to set value for the gaugeVec metrics
 			containerStateCount[string(container.State)]++
 		}
+
+		sandboxes := pod.Sandboxes
+
+		for _, sandbox := range sandboxes {
+			if sandbox.State == kubecontainer.ContainerStateRunning {
+				runningSandboxNum++
+				// every pod should only have one running sandbox
+				break
+			}
+		}
 	}
 	for key, value := range containerStateCount {
 		metrics.RunningContainerCount.WithLabelValues(key).Set(float64(value))
 	}
+
+	// Set the number of running pods in the parameter
+	metrics.RunningPodCount.Set(float64(runningSandboxNum))
 }
 
 func (pr podRecords) getOld(id types.UID) *kubecontainer.Pod {

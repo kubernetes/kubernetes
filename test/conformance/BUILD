@@ -2,9 +2,17 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["walk.go"],
+    srcs = [
+        "doc.go",
+        "walk.go",
+    ],
     importpath = "k8s.io/kubernetes/test/conformance",
     visibility = ["//visibility:private"],
+    deps = [
+        "//test/conformance/behaviors:go_default_library",
+        "//vendor/github.com/onsi/ginkgo/types:go_default_library",
+        "//vendor/gopkg.in/yaml.v2:go_default_library",
+    ],
 )
 
 go_binary(
@@ -24,30 +32,45 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//test/conformance/kubetestgen:all-srcs",
+        "//test/conformance/behaviors:all-srcs",
+        "//test/conformance/kubeconform:all-srcs",
+        "//test/conformance/testdata:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
 
 genrule(
-    name = "list_conformance_tests",
+    name = "list_conformance_specs",
     srcs = [
         "//test/e2e:all-srcs",
         "//test/e2e_node:all-srcs",
+        "//test/e2e:e2e.test_binary",
+        "//vendor/github.com/onsi/ginkgo/ginkgo",
     ],
-    outs = ["conformance.txt"],
-    cmd = "./$(location :conformance) $(locations //test/e2e:all-srcs) > $@",
+    outs = ["specsummaries.json"],
+    cmd = "$(location //vendor/github.com/onsi/ginkgo/ginkgo) --dryRun=true --focus=[Conformance] $(location //test/e2e:e2e.test_binary) -- --spec-dump $$(pwd)/$@ > /dev/null",
+    message = "Getting all conformance spec summaries.",
+)
+
+genrule(
+    name = "list_conformance_tests",
+    srcs = [
+        ":list_conformance_specs",
+        ":conformance",
+        "//test/e2e:all-srcs",
+    ],
+    outs = ["conformance.yaml"],
+    cmd = "$(location :conformance) $(location :list_conformance_specs) > $@",
     message = "Listing all conformance tests.",
-    tools = [":conformance"],
 )
 
 sh_test(
     name = "conformance_test",
     srcs = ["conformance_test.sh"],
     data = [
-        "testdata/conformance.txt",
         ":list_conformance_tests",
+        ":testdata",
     ],
 )
 
@@ -56,4 +79,18 @@ go_test(
     srcs = ["walk_test.go"],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
+    deps = ["//test/conformance/behaviors:go_default_library"],
+)
+
+genrule(
+    name = "gen_conformance_docs",
+    srcs = [
+        ":list_conformance_specs",
+        ":conformance",
+        "//test/e2e:all-srcs",
+        ":package-srcs",
+    ],
+    outs = ["conformance.md"],
+    cmd = "$(location :conformance) --docs $(location :list_conformance_specs) > $@",
+    message = "Listing all conformance tests.",
 )

@@ -22,13 +22,14 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/volume"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
 // TestDriver represents an interface for a driver to be tested in TestSuite.
 // Except for GetDriverInfo, all methods will be called at test runtime and thus
-// can use framework.Skipf, framework.Fatal, Gomega assertions, etc.
+// can use e2eskipper.Skipf, framework.Fatal, Gomega assertions, etc.
 type TestDriver interface {
 	// GetDriverInfo returns DriverInfo for the TestDriver. This must be static
 	// information.
@@ -169,7 +170,7 @@ type DriverInfo struct {
 	// Maximum single file size supported by this driver
 	MaxFileSize int64
 	// The range of disk size supported by this driver
-	SupportedSizeRange volume.SizeRange
+	SupportedSizeRange e2evolume.SizeRange
 	// Map of string for supported fs type
 	SupportedFsType sets.String
 	// Map of string for supported mount option
@@ -187,6 +188,17 @@ type DriverInfo struct {
 	// Only relevant if TopologyKeys is set. Defaults to 1.
 	// Example: multi-zonal disk requires at least 2 allowed topologies.
 	NumAllowedTopologies int
+	// [Optional] Scale parameters for stress tests.
+	StressTestOptions *StressTestOptions
+}
+
+// StressTestOptions contains parameters used for stress tests.
+type StressTestOptions struct {
+	// Number of pods to create in the test. This may also create
+	// up to 1 volume per pod.
+	NumPods int
+	// Number of times to restart each Pod.
+	NumRestarts int
 }
 
 // PerTestConfig represents parameters that control test execution.
@@ -205,21 +217,18 @@ type PerTestConfig struct {
 	// The framework instance allocated for the current test.
 	Framework *framework.Framework
 
-	// If non-empty, then pods using a volume will be scheduled
-	// onto the node with this name. Otherwise Kubernetes will
+	// If non-empty, Pods using a volume will be scheduled
+	// according to the NodeSelection. Otherwise Kubernetes will
 	// pick a node.
-	ClientNodeName string
-
-	// Some tests also support scheduling pods onto nodes with
-	// these label/value pairs. As not all tests use this field,
-	// a driver that absolutely needs the pods on a specific
-	// node must use ClientNodeName.
-	ClientNodeSelector map[string]string
+	ClientNodeSelection e2epod.NodeSelection
 
 	// Some test drivers initialize a storage server. This is
 	// the configuration that then has to be used to run tests.
 	// The values above are ignored for such tests.
-	ServerConfig *volume.TestConfig
+	ServerConfig *e2evolume.TestConfig
+
+	// Some drivers run in their own namespace
+	DriverNamespace *v1.Namespace
 }
 
 // GetUniqueDriverName returns unique driver name that can be used parallelly in tests

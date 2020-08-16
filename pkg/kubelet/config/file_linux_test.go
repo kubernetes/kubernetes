@@ -90,7 +90,7 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 					if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
 						t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
 					}
-					if errs := validation.ValidatePod(internalPod); len(errs) > 0 {
+					if errs := validation.ValidatePodCreate(internalPod, validation.PodValidationOptions{}); len(errs) > 0 {
 						t.Fatalf("%s: Invalid pod %#v, %#v", testCase.desc, internalPod, errs)
 					}
 				}
@@ -369,7 +369,7 @@ func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
 				if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
 					t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
 				}
-				if errs := validation.ValidatePod(internalPod); len(errs) > 0 {
+				if errs := validation.ValidatePodCreate(internalPod, validation.PodValidationOptions{}); len(errs) > 0 {
 					t.Fatalf("%s: Invalid pod %#v, %#v", testCase.desc, internalPod, errs)
 				}
 			}

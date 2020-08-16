@@ -63,7 +63,7 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 	// Make a few attempts to connect. This makes the test robust against
 	// being run as the first e2e test just after the e2e cluster has been created.
 	err := wait.Poll(pollingInterval, pollingTimeout, func() (bool, error) {
-		if _, err := s.Get("kibana-logging", metav1.GetOptions{}); err != nil {
+		if _, err := s.Get(context.TODO(), "kibana-logging", metav1.GetOptions{}); err != nil {
 			framework.Logf("Kibana is unreachable: %v", err)
 			return false, nil
 		}
@@ -75,7 +75,7 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 	ginkgo.By("Checking to make sure the Kibana pods are running")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{kibanaKey: kibanaValue}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
-	pods, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).List(options)
+	pods, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), options)
 	framework.ExpectNoError(err)
 	for _, pod := range pods.Items {
 		err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, &pod)

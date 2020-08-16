@@ -17,6 +17,7 @@ limitations under the License.
 package apimachinery
 
 import (
+	"context"
 	"fmt"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -129,6 +130,7 @@ var _ = SIGDescribe("CustomResourceDefinition Watch [Privileged:ClusterAdmin]", 
 
 func watchCRWithName(crdResourceClient dynamic.ResourceInterface, name string) (watch.Interface, error) {
 	return crdResourceClient.Watch(
+		context.TODO(),
 		metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + name,
 			TimeoutSeconds: int64ptr(600),
@@ -137,7 +139,7 @@ func watchCRWithName(crdResourceClient dynamic.ResourceInterface, name string) (
 }
 
 func instantiateCustomResource(instanceToCreate *unstructured.Unstructured, client dynamic.ResourceInterface, definition *apiextensionsv1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
-	createdInstance, err := client.Create(instanceToCreate, metav1.CreateOptions{})
+	createdInstance, err := client.Create(context.TODO(), instanceToCreate, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -167,6 +169,7 @@ func instantiateCustomResource(instanceToCreate *unstructured.Unstructured, clie
 
 func patchCustomResource(client dynamic.ResourceInterface, name string) error {
 	_, err := client.Patch(
+		context.TODO(),
 		name,
 		types.JSONPatchType,
 		[]byte(`[{ "op": "add", "path": "/dummy", "value": "test" }]`),
@@ -175,7 +178,7 @@ func patchCustomResource(client dynamic.ResourceInterface, name string) error {
 }
 
 func deleteCustomResource(client dynamic.ResourceInterface, name string) error {
-	return client.Delete(name, &metav1.DeleteOptions{})
+	return client.Delete(context.TODO(), name, metav1.DeleteOptions{})
 }
 
 func newNamespacedCustomResourceClient(ns string, client dynamic.Interface, crd *apiextensionsv1.CustomResourceDefinition) (dynamic.ResourceInterface, error) {

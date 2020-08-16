@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
@@ -31,8 +31,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
@@ -93,7 +91,7 @@ func (plugin *fcPlugin) RequiresRemount() bool {
 }
 
 func (plugin *fcPlugin) SupportsMountOption() bool {
-	return false
+	return true
 }
 
 func (plugin *fcPlugin) SupportsBulkVolumeVerification() bool {
@@ -134,32 +132,22 @@ func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, 
 		io:      &osIOHandler{},
 		plugin:  plugin,
 	}
-	// TODO: remove feature gate check after no longer needed
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		volumeMode, err := util.GetVolumeMode(spec)
-		if err != nil {
-			return nil, err
-		}
-		klog.V(5).Infof("fc: newMounterInternal volumeMode %s", volumeMode)
-		return &fcDiskMounter{
-			fcDisk:       fcDisk,
-			fsType:       fc.FSType,
-			volumeMode:   volumeMode,
-			readOnly:     readOnly,
-			mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
-			deviceUtil:   util.NewDeviceHandler(util.NewIOHandler()),
-			mountOptions: []string{},
-		}, nil
+
+	volumeMode, err := util.GetVolumeMode(spec)
+	if err != nil {
+		return nil, err
 	}
+
+	klog.V(5).Infof("fc: newMounterInternal volumeMode %s", volumeMode)
 	return &fcDiskMounter{
 		fcDisk:       fcDisk,
 		fsType:       fc.FSType,
+		volumeMode:   volumeMode,
 		readOnly:     readOnly,
 		mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
 		deviceUtil:   util.NewDeviceHandler(util.NewIOHandler()),
 		mountOptions: util.MountOptionFromSpec(spec),
 	}, nil
-
 }
 
 func (plugin *fcPlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.BlockVolumeMapper, error) {
@@ -312,7 +300,6 @@ func (plugin *fcPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, m
 type fcDisk struct {
 	volName string
 	podUID  types.UID
-	portal  string
 	wwns    []string
 	lun     string
 	wwids   []string
@@ -375,7 +362,7 @@ func (b *fcDiskMounter) SetUp(mounterArgs volume.MounterArgs) error {
 
 func (b *fcDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
-	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup)
+	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	if err != nil {
 		klog.Errorf("fc: failed to setup")
 	}

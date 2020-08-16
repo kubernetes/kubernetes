@@ -20,7 +20,7 @@ import (
 	"go/token"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"

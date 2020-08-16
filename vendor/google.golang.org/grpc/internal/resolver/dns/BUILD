@@ -11,6 +11,7 @@ go_library(
     visibility = ["//vendor/google.golang.org/grpc:__subpackages__"],
     deps = [
         "//vendor/google.golang.org/grpc/grpclog:go_default_library",
+        "//vendor/google.golang.org/grpc/internal/envconfig:go_default_library",
         "//vendor/google.golang.org/grpc/internal/grpcrand:go_default_library",
         "//vendor/google.golang.org/grpc/resolver:go_default_library",
         "//vendor/google.golang.org/grpc/serviceconfig:go_default_library",

@@ -33,10 +33,11 @@ import (
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	apiregistrationv1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationv1apihelper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 )
@@ -47,22 +48,26 @@ const (
 	aggregatedDiscoveryTimeout = 5 * time.Second
 )
 
+type certKeyFunc func() ([]byte, []byte)
+
 // proxyHandler provides a http.Handler which will proxy traffic to locations
 // specified by items implementing Redirector.
 type proxyHandler struct {
 	// localDelegate is used to satisfy local APIServices
 	localDelegate http.Handler
 
-	// proxyClientCert/Key are the client cert used to identify this proxy. Backing APIServices use
-	// this to confirm the proxy's identity
-	proxyClientCert []byte
-	proxyClientKey  []byte
-	proxyTransport  *http.Transport
+	// proxyCurrentCertKeyContent holds the client cert used to identify this proxy. Backing APIServices use this to confirm the proxy's identity
+	proxyCurrentCertKeyContent certKeyFunc
+	proxyTransport             *http.Transport
 
 	// Endpoints based routing to map from cluster IP to routable IP
 	serviceResolver ServiceResolver
 
 	handlingInfo atomic.Value
+
+	// egressSelector selects the proper egress dialer to communicate with the custom apiserver
+	// overwrites proxyTransport dialer if not nil
+	egressSelector *egressselector.EgressSelector
 }
 
 type proxyHandlingInfo struct {
@@ -232,7 +237,7 @@ func (r *responder) Object(statusCode int, obj runtime.Object) {
 }
 
 func (r *responder) Error(_ http.ResponseWriter, _ *http.Request, err error) {
-	http.Error(r.w, err.Error(), http.StatusInternalServerError)
+	http.Error(r.w, err.Error(), http.StatusServiceUnavailable)
 }
 
 // these methods provide locked access to fields
@@ -243,14 +248,16 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 		return
 	}
 
+	proxyClientCert, proxyClientKey := r.proxyCurrentCertKeyContent()
+
 	newInfo := proxyHandlingInfo{
 		name: apiService.Name,
 		restConfig: &restclient.Config{
 			TLSClientConfig: restclient.TLSClientConfig{
 				Insecure:   apiService.Spec.InsecureSkipTLSVerify,
 				ServerName: apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc",
-				CertData:   r.proxyClientCert,
-				KeyData:    r.proxyClientKey,
+				CertData:   proxyClientCert,
+				KeyData:    proxyClientKey,
 				CAData:     apiService.Spec.CABundle,
 			},
 		},
@@ -259,7 +266,16 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 		servicePort:      *apiService.Spec.Service.Port,
 		serviceAvailable: apiregistrationv1apihelper.IsAPIServiceConditionTrue(apiService, apiregistrationv1api.Available),
 	}
-	if r.proxyTransport != nil && r.proxyTransport.DialContext != nil {
+	if r.egressSelector != nil {
+		networkContext := egressselector.Cluster.AsNetworkContext()
+		var egressDialer utilnet.DialFunc
+		egressDialer, err := r.egressSelector.Lookup(networkContext)
+		if err != nil {
+			klog.Warning(err.Error())
+		} else {
+			newInfo.restConfig.Dial = egressDialer
+		}
+	} else if r.proxyTransport != nil && r.proxyTransport.DialContext != nil {
 		newInfo.restConfig.Dial = r.proxyTransport.DialContext
 	}
 	newInfo.proxyRoundTripper, newInfo.transportBuildingError = restclient.TransportFor(newInfo.restConfig)

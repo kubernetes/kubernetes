@@ -7,11 +7,12 @@ metadata:
     seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
   component: konnectivity-server
 spec:
-  priorityClassName: system-cluster-critical
+  priorityClassName: system-node-critical
+  priority: 2000001000
   hostNetwork: true
   containers:
   - name: konnectivity-server-container
-    image: gcr.io/google-containers/proxy-server:v0.0.3
+    image: k8s.gcr.io/kas-network-proxy/proxy-server:v0.0.9
     resources:
       requests:
         cpu: 25m
@@ -20,17 +21,17 @@ spec:
       httpGet:
         scheme: HTTP
         host: 127.0.0.1
-        port: {{ admin_port }}
+        port: {{ health_port }}
         path: /healthz
       initialDelaySeconds: {{ liveness_probe_initial_delay }}
       timeoutSeconds: 60
     ports:
-    - name: serverport
-      containerPort: {{ server_port }}
-      hostPort: {{ server_port }}
     - name: agentport
       containerPort: {{ agent_port }}
       hostPort: {{ agent_port }}
+    - name: healthport
+      containerPort: {{ health_port }}
+      hostPort: {{ health_port }}
     - name: adminport
       containerPort: {{ admin_port }}
       hostPort: {{ admin_port }}
@@ -38,21 +39,21 @@ spec:
     - name: varlogkonnectivityserver
       mountPath: /var/log/konnectivity-server.log
       readOnly: false
-    - name: pkiserver
-      mountPath: /etc/srv/kubernetes/pki/konnectivity-server
+    - name: pki
+      mountPath: /etc/srv/kubernetes/pki
       readOnly: true
-    - name: pkiagent
-      mountPath: /etc/srv/kubernetes/pki/konnectivity-agent
-      readOnly: true
+    - name: konnectivity-uds
+      mountPath: /etc/srv/kubernetes/konnectivity-server
+      readOnly: false
   volumes:
   - name: varlogkonnectivityserver
     hostPath:
       path: /var/log/konnectivity-server.log
       type: FileOrCreate
-  - name: pkiserver
+  - name: pki
     hostPath:
-      path: /etc/srv/kubernetes/pki/konnectivity-server
-  - name: pkiagent
+      path: /etc/srv/kubernetes/pki
+  - name: konnectivity-uds
     hostPath:
-      path: /etc/srv/kubernetes/pki/konnectivity-agent
-
+      path: /etc/srv/kubernetes/konnectivity-server
+      type: DirectoryOrCreate

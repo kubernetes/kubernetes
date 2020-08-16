@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
@@ -71,7 +71,7 @@ func (util *AWSDiskUtil) DeleteVolume(d *awsElasticBlockStoreDeleter) error {
 }
 
 // CreateVolume creates an AWS EBS volume.
-// Returns: volumeID, volumeSizeGB, labels, error
+// Returns: volumeID, volumeSizeGB, labels, fstype, error
 func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (aws.KubernetesVolumeID, int, map[string]string, string, error) {
 	cloud, err := getCloudProvider(c.awsElasticBlockStore.plugin.host.GetCloudProvider())
 	if err != nil {

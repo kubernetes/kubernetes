@@ -27,11 +27,11 @@ import (
 )
 
 func TestReadDockerConfigFile(t *testing.T) {
-	configJsonFileName := "config.json"
+	configJSONFileName := "config.json"
 	var fileInfo *os.File
 
 	//test dockerconfig json
-	inputDockerconfigJsonFile := "{ \"auths\": { \"http://foo.example.com\":{\"auth\":\"Zm9vOmJhcgo=\",\"email\":\"foo@example.com\"}}}"
+	inputDockerconfigJSONFile := "{ \"auths\": { \"http://foo.example.com\":{\"auth\":\"Zm9vOmJhcgo=\",\"email\":\"foo@example.com\"}}}"
 
 	preferredPath, err := ioutil.TempDir("", "test_foo_bar_dockerconfigjson_")
 	if err != nil {
@@ -39,7 +39,7 @@ func TestReadDockerConfigFile(t *testing.T) {
 		return
 	}
 	defer os.RemoveAll(preferredPath)
-	absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(preferredPath, configJsonFileName))
+	absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(preferredPath, configJSONFileName))
 	if err != nil {
 		t.Fatalf("While trying to canonicalize %s: %v", preferredPath, err)
 	}
@@ -53,7 +53,7 @@ func TestReadDockerConfigFile(t *testing.T) {
 		defer fileInfo.Close()
 	}
 
-	fileInfo.WriteString(inputDockerconfigJsonFile)
+	fileInfo.WriteString(inputDockerconfigJSONFile)
 
 	orgPreferredPath := GetPreferredDockercfgPath()
 	SetPreferredDockercfgPath(preferredPath)
@@ -63,9 +63,10 @@ func TestReadDockerConfigFile(t *testing.T) {
 	}
 }
 func TestDockerConfigJsonJSONDecode(t *testing.T) {
+	// Fake values for testing.
 	input := []byte(`{"auths": {"http://foo.example.com":{"username": "foo", "password": "bar", "email": "foo@example.com"}, "http://bar.example.com":{"username": "bar", "password": "baz", "email": "bar@example.com"}}}`)
 
-	expect := DockerConfigJson{
+	expect := DockerConfigJSON{
 		Auths: DockerConfig(map[string]DockerConfigEntry{
 			"http://foo.example.com": {
 				Username: "foo",
@@ -80,7 +81,7 @@ func TestDockerConfigJsonJSONDecode(t *testing.T) {
 		}),
 	}
 
-	var output DockerConfigJson
+	var output DockerConfigJSON
 	err := json.Unmarshal(input, &output)
 	if err != nil {
 		t.Errorf("Received unexpected error: %v", err)
@@ -92,6 +93,7 @@ func TestDockerConfigJsonJSONDecode(t *testing.T) {
 }
 
 func TestDockerConfigJSONDecode(t *testing.T) {
+	// Fake values for testing.
 	input := []byte(`{"http://foo.example.com":{"username": "foo", "password": "bar", "email": "foo@example.com"}, "http://bar.example.com":{"username": "bar", "password": "baz", "email": "bar@example.com"}}`)
 
 	expect := DockerConfig(map[string]DockerConfigEntry{
@@ -126,6 +128,7 @@ func TestDockerConfigEntryJSONDecode(t *testing.T) {
 	}{
 		// simple case, just decode the fields
 		{
+			// Fake values for testing.
 			input: []byte(`{"username": "foo", "password": "bar", "email": "foo@example.com"}`),
 			expect: DockerConfigEntry{
 				Username: "foo",
@@ -148,6 +151,7 @@ func TestDockerConfigEntryJSONDecode(t *testing.T) {
 
 		// auth field overrides username & password
 		{
+			// Fake values for testing.
 			input: []byte(`{"username": "foo", "password": "bar", "auth": "cGluZzpwb25n", "email": "foo@example.com"}`),
 			expect: DockerConfigEntry{
 				Username: "ping",
@@ -284,6 +288,7 @@ func TestDockerConfigEntryJSONCompatibleEncode(t *testing.T) {
 	}{
 		// simple case, just decode the fields
 		{
+			// Fake values for testing.
 			expect: []byte(`{"username":"foo","password":"bar","email":"foo@example.com","auth":"Zm9vOmJhcg=="}`),
 			input: DockerConfigEntry{
 				Username: "foo",

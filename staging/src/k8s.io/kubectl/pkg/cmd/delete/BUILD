@@ -24,7 +24,7 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/util/i18n:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 
@@ -41,6 +41,7 @@ go_test(
         "//staging/src/k8s.io/cli-runtime/pkg/resource:go_default_library",
         "//staging/src/k8s.io/client-go/rest/fake:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/testing:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],

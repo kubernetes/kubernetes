@@ -19,6 +19,7 @@ limitations under the License.
 package token
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -26,11 +27,12 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -64,7 +66,7 @@ func NewManager(c clientset.Interface) *Manager {
 			if c == nil {
 				return nil, errors.New("cannot use TokenManager when kubelet is in standalone mode")
 			}
-			tokenRequest, err := c.CoreV1().ServiceAccounts(namespace).CreateToken(name, tr)
+			tokenRequest, err := c.CoreV1().ServiceAccounts(namespace).CreateToken(context.TODO(), name, tr, metav1.CreateOptions{})
 			if apierrors.IsNotFound(err) && !tokenRequestsSupported() {
 				return nil, fmt.Errorf("the API server does not have TokenRequest endpoints enabled")
 			}
@@ -166,7 +168,9 @@ func (m *Manager) expired(t *authenticationv1.TokenRequest) bool {
 // ttl, or if the token is older than 24 hours.
 func (m *Manager) requiresRefresh(tr *authenticationv1.TokenRequest) bool {
 	if tr.Spec.ExpirationSeconds == nil {
-		klog.Errorf("expiration seconds was nil for tr: %#v", tr)
+		cpy := tr.DeepCopy()
+		cpy.Status.Token = ""
+		klog.Errorf("expiration seconds was nil for tr: %#v", cpy)
 		return false
 	}
 	now := m.clock.Now()

@@ -1,6 +1,6 @@
 package ebpf
 
-//go:generate stringer -output types_string.go -type=MapType,ProgramType
+//go:generate stringer -output types_string.go -type=MapType,ProgramType,AttachType
 
 // MapType indicates the type map structure
 // that will be initialized in the kernel.
@@ -57,40 +57,39 @@ const (
 	// HashOfMaps - Each item in the hash map is another map. The inner map mustn't be a map of maps
 	// itself.
 	HashOfMaps
+	// DevMap - Specialized map to store references to network devices.
+	DevMap
+	// SockMap - Specialized map to store references to sockets.
+	SockMap
+	// CPUMap - Specialized map to store references to CPUs.
+	CPUMap
+	// XSKMap - Specialized map for XDP programs to store references to open sockets.
+	XSKMap
+	// SockHash - Specialized hash to store references to sockets.
+	SockHash
+	// CGroupStorage - Special map for CGroups.
+	CGroupStorage
+	// ReusePortSockArray - Specialized map to store references to sockets that can be reused.
+	ReusePortSockArray
+	// PerCPUCGroupStorage - Special per CPU map for CGroups.
+	PerCPUCGroupStorage
+	// Queue - FIFO storage for BPF programs.
+	Queue
+	// Stack - LIFO storage for BPF programs.
+	Stack
+	// SkStorage - Specialized map for local storage at SK for BPF programs.
+	SkStorage
+	// DevMapHash - Hash-based indexing scheme for references to network devices.
+	DevMapHash
 )
 
 // hasPerCPUValue returns true if the Map stores a value per CPU.
 func (mt MapType) hasPerCPUValue() bool {
-	if mt == PerCPUHash || mt == PerCPUArray {
+	if mt == PerCPUHash || mt == PerCPUArray || mt == LRUCPUHash {
 		return true
 	}
 	return false
 }
-
-const (
-	_MapCreate = iota
-	_MapLookupElem
-	_MapUpdateElem
-	_MapDeleteElem
-	_MapGetNextKey
-	_ProgLoad
-	_ObjPin
-	_ObjGet
-	_ProgAttach
-	_ProgDetach
-	_ProgTestRun
-	_ProgGetNextID
-	_MapGetNextID
-	_ProgGetFDByID
-	_MapGetFDByID
-	_ObjGetInfoByFD
-)
-
-const (
-	_Any = iota
-	_NoExist
-	_Exist
-)
 
 // ProgramType of the eBPF program
 type ProgramType uint32
@@ -149,6 +148,8 @@ const (
 	RawTracepointWritable
 	// CGroupSockopt program
 	CGroupSockopt
+	// Tracing program
+	Tracing
 )
 
 // AttachType of the eBPF program, needed to differentiate allowed context accesses in
@@ -183,6 +184,12 @@ const (
 	AttachCGroupUDP6Recvmsg
 	AttachCGroupGetsockopt
 	AttachCGroupSetsockopt
+	AttachTraceRawTp
+	AttachTraceFEntry
+	AttachTraceFExit
+	AttachModifyReturn
+	AttachLSMMac
+	AttachTraceIter
 )
 
 // AttachFlags of the eBPF program used in BPF_PROG_ATTACH command

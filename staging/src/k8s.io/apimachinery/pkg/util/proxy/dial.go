@@ -24,13 +24,18 @@ import (
 	"net/http"
 	"net/url"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/third_party/forked/golang/netutil"
 )
 
-func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (net.Conn, error) {
+// dialURL will dial the specified URL using the underlying dialer held by the passed
+// RoundTripper. The primary use of this method is to support proxying upgradable connections.
+// For this reason this method will prefer to negotiate http/1.1 if the URL scheme is https.
+// If you wish to ensure ALPN negotiates http2 then set NextProto=[]string{"http2"} in the
+// TLSConfig of the http.Transport
+func dialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 	dialAddr := netutil.CanonicalAddr(url)
 
 	dialer, err := utilnet.DialerFor(transport)
@@ -81,6 +86,15 @@ func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 				tlsConfigCopy.ServerName = inferredHost
 				tlsConfig = tlsConfigCopy
 			}
+
+			// Since this method is primary used within a "Connection: Upgrade" call we assume the caller is
+			// going to write HTTP/1.1 request to the wire. http2 should not be allowed in the TLSConfig.NextProtos,
+			// so we explicitly set that here. We only do this check if the TLSConfig support http/1.1.
+			if supportsHTTP11(tlsConfig.NextProtos) {
+				tlsConfig = tlsConfig.Clone()
+				tlsConfig.NextProtos = []string{"http/1.1"}
+			}
+
 			tlsConn = tls.Client(netConn, tlsConfig)
 			if err := tlsConn.Handshake(); err != nil {
 				netConn.Close()
@@ -114,4 +128,16 @@ func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (ne
 	default:
 		return nil, fmt.Errorf("Unknown scheme: %s", url.Scheme)
 	}
+}
+
+func supportsHTTP11(nextProtos []string) bool {
+	if len(nextProtos) == 0 {
+		return true
+	}
+	for _, proto := range nextProtos {
+		if proto == "http/1.1" {
+			return true
+		}
+	}
+	return false
 }

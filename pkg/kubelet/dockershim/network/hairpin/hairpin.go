@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -25,7 +27,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/exec"
 )
 

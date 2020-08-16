@@ -20,15 +20,16 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/klog"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
 
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers"
@@ -52,6 +53,8 @@ type APIServiceRegistrationController struct {
 
 	queue workqueue.RateLimitingInterface
 }
+
+var _ dynamiccertificates.Listener = &APIServiceRegistrationController{}
 
 // NewAPIServiceRegistrationController returns a new APIServiceRegistrationController.
 func NewAPIServiceRegistrationController(apiServiceInformer informers.APIServiceInformer, apiHandlerManager APIHandlerManager) *APIServiceRegistrationController {
@@ -87,7 +90,7 @@ func (c *APIServiceRegistrationController) sync(key string) error {
 }
 
 // Run starts APIServiceRegistrationController which will process all registration requests until stopCh is closed.
-func (c *APIServiceRegistrationController) Run(stopCh <-chan struct{}) {
+func (c *APIServiceRegistrationController) Run(stopCh <-chan struct{}, handlerSyncedCh chan<- struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
@@ -97,6 +100,28 @@ func (c *APIServiceRegistrationController) Run(stopCh <-chan struct{}) {
 	if !controllers.WaitForCacheSync("APIServiceRegistrationController", stopCh, c.apiServiceSynced) {
 		return
 	}
+
+	/// initially sync all APIServices to make sure the proxy handler is complete
+	if err := wait.PollImmediateUntil(time.Second, func() (bool, error) {
+		services, err := c.apiServiceLister.List(labels.Everything())
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("failed to initially list APIServices: %v", err))
+			return false, nil
+		}
+		for _, s := range services {
+			if err := c.apiHandlerManager.AddAPIService(s); err != nil {
+				utilruntime.HandleError(fmt.Errorf("failed to initially sync APIService %s: %v", s.Name, err))
+				return false, nil
+			}
+		}
+		return true, nil
+	}, stopCh); err == wait.ErrWaitTimeout {
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for proxy handler to initialize"))
+		return
+	} else if err != nil {
+		panic(fmt.Errorf("unexpected error: %v", err))
+	}
+	close(handlerSyncedCh)
 
 	// only start one worker thread since its a slow moving API and the aggregation server adding bits
 	// aren't threadsafe
@@ -130,7 +155,7 @@ func (c *APIServiceRegistrationController) processNextWorkItem() bool {
 	return true
 }
 
-func (c *APIServiceRegistrationController) enqueue(obj *v1.APIService) {
+func (c *APIServiceRegistrationController) enqueueInternal(obj *v1.APIService) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		klog.Errorf("Couldn't get key for object %#v: %v", obj, err)
@@ -143,13 +168,13 @@ func (c *APIServiceRegistrationController) enqueue(obj *v1.APIService) {
 func (c *APIServiceRegistrationController) addAPIService(obj interface{}) {
 	castObj := obj.(*v1.APIService)
 	klog.V(4).Infof("Adding %s", castObj.Name)
-	c.enqueue(castObj)
+	c.enqueueInternal(castObj)
 }
 
 func (c *APIServiceRegistrationController) updateAPIService(obj, _ interface{}) {
 	castObj := obj.(*v1.APIService)
 	klog.V(4).Infof("Updating %s", castObj.Name)
-	c.enqueue(castObj)
+	c.enqueueInternal(castObj)
 }
 
 func (c *APIServiceRegistrationController) deleteAPIService(obj interface{}) {
@@ -167,5 +192,18 @@ func (c *APIServiceRegistrationController) deleteAPIService(obj interface{}) {
 		}
 	}
 	klog.V(4).Infof("Deleting %q", castObj.Name)
-	c.enqueue(castObj)
+	c.enqueueInternal(castObj)
+}
+
+// Enqueue queues all apiservices to be rehandled.
+// This method is used by the controller to notify when the proxy cert content changes.
+func (c *APIServiceRegistrationController) Enqueue() {
+	apiServices, err := c.apiServiceLister.List(labels.Everything())
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
+	for _, apiService := range apiServices {
+		c.addAPIService(apiService)
+	}
 }

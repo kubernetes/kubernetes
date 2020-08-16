@@ -10,7 +10,10 @@ go_test(
     name = "go_default_test",
     srcs = ["azure_test.go"],
     embed = [":go_default_library"],
-    deps = ["//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library"],
+    deps = [
+        "//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library",
+        "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
+    ],
 )
 
 go_library(
@@ -24,7 +27,7 @@ go_library(
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

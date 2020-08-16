@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This command is used by bazel as the workspace_status_command
-# to implement build stamping with git information.
+# This script is used by bazel as the workspace_status_command to implement
+# build stamping with git information.
+# Usage: `hack/print-workspace-status.sh`.
 
 set -o errexit
 set -o nounset

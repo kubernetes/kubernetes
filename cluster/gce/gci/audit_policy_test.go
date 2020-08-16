@@ -54,7 +54,7 @@ func TestCreateMasterAuditPolicy(t *testing.T) {
 	// Initialize required environment variables.
 	c.mustInvokeFunc(
 		kubeAPIServerEnv{KubeHome: c.kubeHome},
-		"configure-helper.sh",
+		[]string{"configure-helper.sh"},
 		"base.template",
 		"testdata/kube-apiserver/base.template",
 	)

@@ -9,6 +9,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
@@ -22,7 +23,7 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

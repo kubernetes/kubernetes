@@ -56,13 +56,17 @@ func IsCorruptedMnt(err error) bool {
 }
 
 // MountInfo represents a single line in /proc/<pid>/mountinfo.
-type MountInfo struct {
+type MountInfo struct { // nolint: golint
 	// Unique ID for the mount (maybe reused after umount).
 	ID int
 	// The ID of the parent mount (or of self for the root of this mount namespace's mount tree).
 	ParentID int
-	// The value of `st_dev` for files on this filesystem.
-	MajorMinor string
+	// Major indicates one half of the device ID which identifies the device class
+	// (parsed from `st_dev` for files on this filesystem).
+	Major int
+	// Minor indicates one half of the device ID which identifies a specific
+	// instance of device (parsed from `st_dev` for files on this filesystem).
+	Minor int
 	// The pathname of the directory in the filesystem which forms the root of this mount.
 	Root string
 	// Mount source, filesystem-specific information. e.g. device, tmpfs name.
@@ -106,10 +110,24 @@ func ParseMountInfo(filename string) ([]MountInfo, error) {
 		if err != nil {
 			return nil, err
 		}
+		mm := strings.Split(fields[2], ":")
+		if len(mm) != 2 {
+			return nil, fmt.Errorf("parsing '%s' failed: unexpected minor:major pair %s", line, mm)
+		}
+		major, err := strconv.Atoi(mm[0])
+		if err != nil {
+			return nil, fmt.Errorf("parsing '%s' failed: unable to parse major device id, err:%v", mm[0], err)
+		}
+		minor, err := strconv.Atoi(mm[1])
+		if err != nil {
+			return nil, fmt.Errorf("parsing '%s' failed: unable to parse minor device id, err:%v", mm[1], err)
+		}
+
 		info := MountInfo{
 			ID:           id,
 			ParentID:     parentID,
-			MajorMinor:   fields[2],
+			Major:        major,
+			Minor:        minor,
 			Root:         fields[3],
 			MountPoint:   fields[4],
 			MountOptions: strings.Split(fields[5], ","),

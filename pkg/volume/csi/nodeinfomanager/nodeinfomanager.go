@@ -19,6 +19,7 @@ limitations under the License.
 package nodeinfomanager // import "k8s.io/kubernetes/pkg/volume/csi/nodeinfomanager"
 
 import (
+	"context"
 	"encoding/json"
 	goerrors "errors"
 	"fmt"
@@ -37,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
@@ -183,7 +184,7 @@ func (nim *nodeInfoManager) tryUpdateNode(updateFuncs ...nodeUpdateFunc) error {
 	}
 
 	nodeClient := kubeClient.CoreV1().Nodes()
-	originalNode, err := nodeClient.Get(string(nim.nodeName), metav1.GetOptions{})
+	originalNode, err := nodeClient.Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -379,7 +380,7 @@ func (nim *nodeInfoManager) tryUpdateCSINode(
 	maxAttachLimit int64,
 	topology map[string]string) error {
 
-	nodeInfo, err := csiKubeClient.StorageV1().CSINodes().Get(string(nim.nodeName), metav1.GetOptions{})
+	nodeInfo, err := csiKubeClient.StorageV1().CSINodes().Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
 	if nodeInfo == nil || errors.IsNotFound(err) {
 		nodeInfo, err = nim.CreateCSINode()
 	}
@@ -396,23 +397,23 @@ func (nim *nodeInfoManager) InitializeCSINodeWithAnnotation() error {
 		return goerrors.New("error getting CSI client")
 	}
 
-	var updateErrs []error
+	var lastErr error
 	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
-		if err := nim.tryInitializeCSINodeWithAnnotation(csiKubeClient); err != nil {
-			updateErrs = append(updateErrs, err)
+		if lastErr = nim.tryInitializeCSINodeWithAnnotation(csiKubeClient); lastErr != nil {
+			klog.V(2).Infof("Failed to publish CSINode: %v", lastErr)
 			return false, nil
 		}
 		return true, nil
 	})
 	if err != nil {
-		return fmt.Errorf("error updating CSINode annotation: %v; caused by: %v", err, utilerrors.NewAggregate(updateErrs))
+		return fmt.Errorf("error updating CSINode annotation: %v; caused by: %v", err, lastErr)
 	}
 
 	return nil
 }
 
 func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient clientset.Interface) error {
-	nodeInfo, err := csiKubeClient.StorageV1().CSINodes().Get(string(nim.nodeName), metav1.GetOptions{})
+	nodeInfo, err := csiKubeClient.StorageV1().CSINodes().Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
 	if nodeInfo == nil || errors.IsNotFound(err) {
 		// CreateCSINode will set the annotation
 		_, err = nim.CreateCSINode()
@@ -424,7 +425,7 @@ func (nim *nodeInfoManager) tryInitializeCSINodeWithAnnotation(csiKubeClient cli
 	annotationModified := setMigrationAnnotation(nim.migratedPlugins, nodeInfo)
 
 	if annotationModified {
-		_, err := csiKubeClient.StorageV1().CSINodes().Update(nodeInfo)
+		_, err := csiKubeClient.StorageV1().CSINodes().Update(context.TODO(), nodeInfo, metav1.UpdateOptions{})
 		return err
 	}
 	return nil
@@ -443,7 +444,7 @@ func (nim *nodeInfoManager) CreateCSINode() (*storagev1.CSINode, error) {
 		return nil, fmt.Errorf("error getting CSI client")
 	}
 
-	node, err := kubeClient.CoreV1().Nodes().Get(string(nim.nodeName), metav1.GetOptions{})
+	node, err := kubeClient.CoreV1().Nodes().Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -467,7 +468,7 @@ func (nim *nodeInfoManager) CreateCSINode() (*storagev1.CSINode, error) {
 
 	setMigrationAnnotation(nim.migratedPlugins, nodeInfo)
 
-	return csiKubeClient.StorageV1().CSINodes().Create(nodeInfo)
+	return csiKubeClient.StorageV1().CSINodes().Create(context.TODO(), nodeInfo, metav1.CreateOptions{})
 }
 
 func setMigrationAnnotation(migratedPlugins map[string](func() bool), nodeInfo *storagev1.CSINode) (modified bool) {
@@ -570,7 +571,7 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 	newDriverSpecs = append(newDriverSpecs, driverSpec)
 	nodeInfo.Spec.Drivers = newDriverSpecs
 
-	_, err := csiKubeClient.StorageV1().CSINodes().Update(nodeInfo)
+	_, err := csiKubeClient.StorageV1().CSINodes().Update(context.TODO(), nodeInfo, metav1.UpdateOptions{})
 	return err
 }
 
@@ -601,7 +602,7 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
 	csiDriverName string) error {
 
 	nodeInfoClient := csiKubeClient.StorageV1().CSINodes()
-	nodeInfo, err := nodeInfoClient.Get(string(nim.nodeName), metav1.GetOptions{})
+	nodeInfo, err := nodeInfoClient.Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
 	if err != nil && errors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
@@ -627,7 +628,7 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINode(
 	}
 	nodeInfo.Spec.Drivers = drivers
 
-	_, err = nodeInfoClient.Update(nodeInfo)
+	_, err = nodeInfoClient.Update(context.TODO(), nodeInfo, metav1.UpdateOptions{})
 
 	return err // do not wrap error
 

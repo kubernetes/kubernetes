@@ -163,6 +163,9 @@ func TestUpdateStatus(t *testing.T) {
 	key, _ := storage.KeyFunc(ctx, "foo")
 	pvcStart := validNewPersistentVolumeClaim("foo", metav1.NamespaceDefault)
 	err := storage.Storage.Create(ctx, key, pvcStart, nil, 0, false)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	pvc := &api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{

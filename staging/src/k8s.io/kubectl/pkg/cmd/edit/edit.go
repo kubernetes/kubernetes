@@ -17,8 +17,6 @@ limitations under the License.
 package edit
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -77,14 +75,10 @@ func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Edit a resource on the server"),
 		Long:                  editLong,
-		Example:               fmt.Sprintf(editExample),
+		Example:               editExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := o.Complete(f, args, cmd); err != nil {
-				cmdutil.CheckErr(err)
-			}
-			if err := o.Run(); err != nil {
-				cmdutil.CheckErr(err)
-			}
+			cmdutil.CheckErr(o.Complete(f, args, cmd))
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
@@ -98,7 +92,7 @@ func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra
 	cmd.Flags().BoolVarP(&o.OutputPatch, "output-patch", "", o.OutputPatch, "Output the patch if the resource is edited.")
 	cmd.Flags().BoolVar(&o.WindowsLineEndings, "windows-line-endings", o.WindowsLineEndings,
 		"Defaults to the line ending native to your platform.")
-
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-edit")
 	cmdutil.AddApplyAnnotationVarFlags(cmd, &o.ApplyAnnotation)
 	return cmd
 }

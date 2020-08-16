@@ -22,7 +22,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/klog"
+	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
 )
 
 func TestCIDRSetFullyAllocated(t *testing.T) {
@@ -736,3 +737,208 @@ func TestCIDRSetv6(t *testing.T) {
 		})
 	}
 }
+
+func TestCidrSetMetrics(t *testing.T) {
+	cidr := "10.0.0.0/16"
+	_, clusterCIDR, _ := net.ParseCIDR(cidr)
+	// We have 256 free cidrs
+	a, err := NewCIDRSet(clusterCIDR, 24)
+	if err != nil {
+		t.Fatalf("unexpected error creating CidrSet: %v", err)
+	}
+	clearMetrics(map[string]string{"clusterCIDR": cidr})
+
+	// Allocate next all
+	for i := 1; i <= 256; i++ {
+		_, err := a.AllocateNext()
+		if err != nil {
+			t.Fatalf("unexpected error allocating a new CIDR: %v", err)
+		}
+		em := testMetrics{
+			usage:      float64(i) / float64(256),
+			allocs:     float64(i),
+			releases:   0,
+			allocTries: 0,
+		}
+		expectMetrics(t, cidr, em)
+	}
+	// Release all
+	a.Release(clusterCIDR)
+	em := testMetrics{
+		usage:      0,
+		allocs:     256,
+		releases:   256,
+		allocTries: 0,
+	}
+	expectMetrics(t, cidr, em)
+
+	// Allocate all
+	a.Occupy(clusterCIDR)
+	em = testMetrics{
+		usage:      1,
+		allocs:     512,
+		releases:   256,
+		allocTries: 0,
+	}
+	expectMetrics(t, cidr, em)
+
+}
+
+func TestCidrSetMetricsHistogram(t *testing.T) {
+	cidr := "10.0.0.0/16"
+	_, clusterCIDR, _ := net.ParseCIDR(cidr)
+	// We have 256 free cidrs
+	a, err := NewCIDRSet(clusterCIDR, 24)
+	if err != nil {
+		t.Fatalf("unexpected error creating CidrSet: %v", err)
+	}
+	clearMetrics(map[string]string{"clusterCIDR": cidr})
+
+	// Allocate half of the range
+	// Occupy does not update the nextCandidate
+	_, halfClusterCIDR, _ := net.ParseCIDR("10.0.0.0/17")
+	a.Occupy(halfClusterCIDR)
+	em := testMetrics{
+		usage:      0.5,
+		allocs:     128,
+		releases:   0,
+		allocTries: 0,
+	}
+	expectMetrics(t, cidr, em)
+	// Allocate next should iterate until the next free cidr
+	// that is exactly the same number we allocated previously
+	_, err = a.AllocateNext()
+	if err != nil {
+		t.Fatalf("unexpected error allocating a new CIDR: %v", err)
+	}
+	em = testMetrics{
+		usage:      float64(129) / float64(256),
+		allocs:     129,
+		releases:   0,
+		allocTries: 128,
+	}
+	expectMetrics(t, cidr, em)
+}
+
+func TestCidrSetMetricsDual(t *testing.T) {
+	// create IPv4 cidrSet
+	cidrIPv4 := "10.0.0.0/16"
+	_, clusterCIDRv4, _ := net.ParseCIDR(cidrIPv4)
+	a, err := NewCIDRSet(clusterCIDRv4, 24)
+	if err != nil {
+		t.Fatalf("unexpected error creating CidrSet: %v", err)
+	}
+	clearMetrics(map[string]string{"clusterCIDR": cidrIPv4})
+	// create IPv6 cidrSet
+	cidrIPv6 := "2001:db8::/48"
+	_, clusterCIDRv6, _ := net.ParseCIDR(cidrIPv6)
+	b, err := NewCIDRSet(clusterCIDRv6, 64)
+	if err != nil {
+		t.Fatalf("unexpected error creating CidrSet: %v", err)
+	}
+	clearMetrics(map[string]string{"clusterCIDR": cidrIPv6})
+	// Allocate all
+	a.Occupy(clusterCIDRv4)
+	em := testMetrics{
+		usage:      1,
+		allocs:     256,
+		releases:   0,
+		allocTries: 0,
+	}
+	expectMetrics(t, cidrIPv4, em)
+
+	b.Occupy(clusterCIDRv6)
+	em = testMetrics{
+		usage:      1,
+		allocs:     65536,
+		releases:   0,
+		allocTries: 0,
+	}
+	expectMetrics(t, cidrIPv6, em)
+
+	// Release all
+	a.Release(clusterCIDRv4)
+	em = testMetrics{
+		usage:      0,
+		allocs:     256,
+		releases:   256,
+		allocTries: 0,
+	}
+	expectMetrics(t, cidrIPv4, em)
+	b.Release(clusterCIDRv6)
+	em = testMetrics{
+		usage:      0,
+		allocs:     65536,
+		releases:   65536,
+		allocTries: 0,
+	}
+	expectMetrics(t, cidrIPv6, em)
+
+}
+
+// Metrics helpers
+func clearMetrics(labels map[string]string) {
+	cidrSetAllocations.Delete(labels)
+	cidrSetReleases.Delete(labels)
+	cidrSetUsage.Delete(labels)
+	cidrSetAllocationTriesPerRequest.Delete(labels)
+}
+
+type testMetrics struct {
+	usage      float64
+	allocs     float64
+	releases   float64
+	allocTries float64
+}
+
+func expectMetrics(t *testing.T, label string, em testMetrics) {
+	var m testMetrics
+	var err error
+	m.usage, err = testutil.GetGaugeMetricValue(cidrSetUsage.WithLabelValues(label))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", cidrSetUsage.Name, err)
+	}
+	m.allocs, err = testutil.GetCounterMetricValue(cidrSetAllocations.WithLabelValues(label))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", cidrSetAllocations.Name, err)
+	}
+	m.releases, err = testutil.GetCounterMetricValue(cidrSetReleases.WithLabelValues(label))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", cidrSetReleases.Name, err)
+	}
+	m.allocTries, err = testutil.GetHistogramMetricValue(cidrSetAllocationTriesPerRequest.WithLabelValues(label))
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", cidrSetAllocationTriesPerRequest.Name, err)
+	}
+
+	if m != em {
+		t.Fatalf("metrics error: expected %v, received %v", em, m)
+	}
+}
+
+// Benchmarks
+func benchmarkAllocateAllIPv6(cidr string, subnetMaskSize int, b *testing.B) {
+	_, clusterCIDR, _ := net.ParseCIDR(cidr)
+	a, _ := NewCIDRSet(clusterCIDR, subnetMaskSize)
+	for n := 0; n < b.N; n++ {
+		// Allocate the whole range + 1
+		for i := 0; i <= a.maxCIDRs; i++ {
+			a.AllocateNext()
+		}
+		// Release all
+		a.Release(clusterCIDR)
+	}
+}
+
+func BenchmarkAllocateAll_48_52(b *testing.B) { benchmarkAllocateAllIPv6("2001:db8::/48", 52, b) }
+func BenchmarkAllocateAll_48_56(b *testing.B) { benchmarkAllocateAllIPv6("2001:db8::/48", 56, b) }
+
+func BenchmarkAllocateAll_48_60(b *testing.B) { benchmarkAllocateAllIPv6("2001:db8::/48", 60, b) }
+func BenchmarkAllocateAll_48_64(b *testing.B) { benchmarkAllocateAllIPv6("2001:db8::/48", 64, b) }
+
+func BenchmarkAllocateAll_64_68(b *testing.B) { benchmarkAllocateAllIPv6("2001:db8::/64", 68, b) }
+
+func BenchmarkAllocateAll_64_72(b *testing.B) { benchmarkAllocateAllIPv6("2001:db8::/64", 72, b) }
+func BenchmarkAllocateAll_64_76(b *testing.B) { benchmarkAllocateAllIPv6("2001:db8::/64", 76, b) }
+
+func BenchmarkAllocateAll_64_80(b *testing.B) { benchmarkAllocateAllIPv6("2001:db8::/64", 80, b) }

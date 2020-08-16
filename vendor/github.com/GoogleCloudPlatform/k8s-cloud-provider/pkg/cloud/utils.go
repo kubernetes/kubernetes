@@ -199,3 +199,17 @@ func SelfLink(ver meta.Version, project, resource string, key *meta.Key) string 
 	return fmt.Sprintf("%s/%s", prefix, RelativeResourceName(project, resource, key))
 
 }
+
+// aggregatedListKey return the aggregated list key based on the resource key.
+func aggregatedListKey(k *meta.Key) string {
+	switch k.Type() {
+	case meta.Regional:
+		return fmt.Sprintf("regions/%s", k.Region)
+	case meta.Zonal:
+		return fmt.Sprintf("zones/%s", k.Zone)
+	case meta.Global:
+		return "global"
+	default:
+		return "unknownScope"
+	}
+}

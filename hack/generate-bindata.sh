@@ -28,14 +28,12 @@ if [[ ! -d "${KUBE_ROOT}/pkg" ]]; then
 	exit 1
 fi
 
-# kube::golang::build_kube_toolchain installs the vendored go-bindata in
-# $GOPATH/bin, so make sure that's explicitly part of our $PATH.
-export PATH="${KUBE_OUTPUT_BINPATH}:${PATH}"
+# Ensure that we find the binaries we build before anything else.
+export GOBIN="${KUBE_OUTPUT_BINPATH}"
+PATH="${GOBIN}:${PATH}"
 
-if ! which go-bindata &>/dev/null ; then
-	echo "Cannot find go-bindata."
-	exit 5
-fi
+# Install tools we need, but only from vendor/...
+go install k8s.io/kubernetes/vendor/github.com/go-bindata/go-bindata/go-bindata
 
 # run the generation from the root directory for stable output
 pushd "${KUBE_ROOT}" >/dev/null
@@ -46,7 +44,9 @@ BINDATA_OUTPUT="test/e2e/generated/bindata.go"
 # test/e2e/generated/BUILD and/or build/bindata.bzl.
 go-bindata -nometadata -o "${BINDATA_OUTPUT}.tmp" -pkg generated \
 	-ignore .jpg -ignore .png -ignore .md -ignore 'BUILD(\.bazel)?' \
+	"test/conformance/testdata/..." \
 	"test/e2e/testing-manifests/..." \
+	"test/e2e_node/testing-manifests/..." \
 	"test/images/..." \
 	"test/fixtures/..."
 

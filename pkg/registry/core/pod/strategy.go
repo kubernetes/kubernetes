@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -34,10 +35,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -72,6 +75,8 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	}
 
 	podutil.DropDisabledPodFields(pod, nil)
+
+	applySeccompVersionSkew(pod)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -86,8 +91,13 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 // Validate validates a new pod.
 func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
-	allErrs := validation.ValidatePodCreate(pod)
+	opts := validation.PodValidationOptions{
+		// Allow multiple huge pages on pod create if feature is enabled
+		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
+	}
+	allErrs := validation.ValidatePodCreate(pod, opts)
 	allErrs = append(allErrs, validation.ValidateConditionalPod(pod, nil, field.NewPath(""))...)
+
 	return allErrs
 }
 
@@ -102,8 +112,12 @@ func (podStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidatePod(obj.(*api.Pod))
-	errorList = append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
+	oldFailsSingleHugepagesValidation := len(validation.ValidatePodSingleHugePageResources(old.(*api.Pod), field.NewPath("spec"))) > 0
+	opts := validation.PodValidationOptions{
+		// Allow multiple huge pages on pod create if feature is enabled or if the old pod already has multiple hugepages specified
+		AllowMultipleHugePageResources: oldFailsSingleHugepagesValidation || utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
+	}
+	errorList := validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 	errorList = append(errorList, validation.ValidateConditionalPod(obj.(*api.Pod), old.(*api.Pod), field.NewPath(""))...)
 	return errorList
 }
@@ -147,6 +161,7 @@ type podStatusStrategy struct {
 	podStrategy
 }
 
+// StatusStrategy wraps and exports the used podStrategy for the storage package.
 var StatusStrategy = podStatusStrategy{Strategy}
 
 func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
@@ -168,6 +183,7 @@ type podEphemeralContainersStrategy struct {
 	podStrategy
 }
 
+// EphemeralContainersStrategy wraps and exports the used podStrategy for the storage package.
 var EphemeralContainersStrategy = podEphemeralContainersStrategy{Strategy}
 
 func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -180,7 +196,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	if !ok {
 		return nil, nil, fmt.Errorf("not a pod")
 	}
-	return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), nil
+	return labels.Set(pod.ObjectMeta.Labels), ToSelectableFields(pod), nil
 }
 
 // MatchPod returns a generic matcher for a given label and field selector.
@@ -198,9 +214,28 @@ func NodeNameTriggerFunc(obj runtime.Object) string {
 	return obj.(*api.Pod).Spec.NodeName
 }
 
-// PodToSelectableFields returns a field set that represents the object
+// NodeNameIndexFunc return value spec.nodename of given object.
+func NodeNameIndexFunc(obj interface{}) ([]string, error) {
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		return nil, fmt.Errorf("not a pod")
+	}
+	return []string{pod.Spec.NodeName}, nil
+}
+
+// Indexers returns the indexers for pod storage.
+func Indexers() *cache.Indexers {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.SelectorIndex) {
+		return &cache.Indexers{
+			storage.FieldIndex("spec.nodeName"): NodeNameIndexFunc,
+		}
+	}
+	return nil
+}
+
+// ToSelectableFields returns a field set that represents the object
 // TODO: fields are not labels, and the validation rules for them do not apply.
-func PodToSelectableFields(pod *api.Pod) fields.Set {
+func ToSelectableFields(pod *api.Pod) fields.Set {
 	// The purpose of allocation with a given number of elements is to reduce
 	// amount of allocations needed to create the fields.Set. If you add any
 	// field here or the number of object-meta related fields changes, this should
@@ -226,7 +261,7 @@ type ResourceGetter interface {
 	Get(context.Context, string, *metav1.GetOptions) (runtime.Object, error)
 }
 
-func getPod(getter ResourceGetter, ctx context.Context, name string) (*api.Pod, error) {
+func getPod(ctx context.Context, getter ResourceGetter, name string) (*api.Pod, error) {
 	obj, err := getter.Get(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -251,7 +286,7 @@ func getPodIP(pod *api.Pod) string {
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified pod.
-func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
+func ResourceLocation(ctx context.Context, getter ResourceGetter, rt http.RoundTripper, id string) (*url.URL, http.RoundTripper, error) {
 	// Allow ID as "podname" or "podname:port" or "scheme:podname:port".
 	// If port is not specified, try to use the first defined port on the pod.
 	scheme, name, port, valid := utilnet.SplitSchemeNamePort(id)
@@ -259,7 +294,7 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.C
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid pod request %q", id))
 	}
 
-	pod, err := getPod(getter, ctx, name)
+	pod, err := getPod(ctx, getter, name)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -289,25 +324,15 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.C
 	return loc, rt, nil
 }
 
-// getContainerNames returns a formatted string containing the container names
-func getContainerNames(containers []api.Container) string {
-	names := []string{}
-	for _, c := range containers {
-		names = append(names, c.Name)
-	}
-	return strings.Join(names, " ")
-}
-
 // LogLocation returns the log URL for a pod container. If opts.Container is blank
 // and only one container is present in the pod, that container is used.
 func LogLocation(
-	getter ResourceGetter,
+	ctx context.Context, getter ResourceGetter,
 	connInfo client.ConnectionInfoGetter,
-	ctx context.Context,
 	name string,
 	opts *api.PodLogOptions,
 ) (*url.URL, http.RoundTripper, error) {
-	pod, err := getPod(getter, ctx, name)
+	pod, err := getPod(ctx, getter, name)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -365,7 +390,7 @@ func LogLocation(
 
 func podHasContainerWithName(pod *api.Pod, containerName string) bool {
 	var hasContainer bool
-	podutil.VisitContainers(&pod.Spec, func(c *api.Container) bool {
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *api.Container, containerType podutil.ContainerType) bool {
 		if c.Name == containerName {
 			hasContainer = true
 			return false
@@ -423,37 +448,37 @@ func streamParams(params url.Values, opts runtime.Object) error {
 // AttachLocation returns the attach URL for a pod container. If opts.Container is blank
 // and only one container is present in the pod, that container is used.
 func AttachLocation(
+	ctx context.Context,
 	getter ResourceGetter,
 	connInfo client.ConnectionInfoGetter,
-	ctx context.Context,
 	name string,
 	opts *api.PodAttachOptions,
 ) (*url.URL, http.RoundTripper, error) {
-	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "attach")
+	return streamLocation(ctx, getter, connInfo, name, opts, opts.Container, "attach")
 }
 
 // ExecLocation returns the exec URL for a pod container. If opts.Container is blank
 // and only one container is present in the pod, that container is used.
 func ExecLocation(
+	ctx context.Context,
 	getter ResourceGetter,
 	connInfo client.ConnectionInfoGetter,
-	ctx context.Context,
 	name string,
 	opts *api.PodExecOptions,
 ) (*url.URL, http.RoundTripper, error) {
-	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "exec")
+	return streamLocation(ctx, getter, connInfo, name, opts, opts.Container, "exec")
 }
 
 func streamLocation(
+	ctx context.Context,
 	getter ResourceGetter,
 	connInfo client.ConnectionInfoGetter,
-	ctx context.Context,
 	name string,
 	opts runtime.Object,
 	container,
 	path string,
 ) (*url.URL, http.RoundTripper, error) {
-	pod, err := getPod(getter, ctx, name)
+	pod, err := getPod(ctx, getter, name)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -489,13 +514,13 @@ func streamLocation(
 
 // PortForwardLocation returns the port-forward URL for a pod.
 func PortForwardLocation(
+	ctx context.Context,
 	getter ResourceGetter,
 	connInfo client.ConnectionInfoGetter,
-	ctx context.Context,
 	name string,
 	opts *api.PodPortForwardOptions,
 ) (*url.URL, http.RoundTripper, error) {
-	pod, err := getPod(getter, ctx, name)
+	pod, err := getPod(ctx, getter, name)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -531,13 +556,13 @@ func validateContainer(container string, pod *api.Pod) (string, error) {
 		case 0:
 			return "", errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", pod.Name))
 		default:
-			containerNames := getContainerNames(pod.Spec.Containers)
-			initContainerNames := getContainerNames(pod.Spec.InitContainers)
-			err := fmt.Sprintf("a container name must be specified for pod %s, choose one of: [%s]", pod.Name, containerNames)
-			if len(initContainerNames) > 0 {
-				err += fmt.Sprintf(" or one of the init containers: [%s]", initContainerNames)
-			}
-			return "", errors.NewBadRequest(err)
+			var containerNames []string
+			podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(c *api.Container, containerType podutil.ContainerType) bool {
+				containerNames = append(containerNames, c.Name)
+				return true
+			})
+			errStr := fmt.Sprintf("a container name must be specified for pod %s, choose one of: %s", pod.Name, containerNames)
+			return "", errors.NewBadRequest(errStr)
 		}
 	} else {
 		if !podHasContainerWithName(pod, container) {
@@ -546,4 +571,75 @@ func validateContainer(container string, pod *api.Pod) (string, error) {
 	}
 
 	return container, nil
+}
+
+// applySeccompVersionSkew implements the version skew behavior described in:
+// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/20190717-seccomp-ga.md#version-skew-strategy
+func applySeccompVersionSkew(pod *api.Pod) {
+	// get possible annotation and field
+	annotation, hasAnnotation := pod.Annotations[v1.SeccompPodAnnotationKey]
+	field, hasField := (*api.SeccompProfile)(nil), false
+
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SeccompProfile != nil {
+		field = pod.Spec.SecurityContext.SeccompProfile
+		hasField = true
+	}
+
+	// sync field and annotation
+	if hasField && !hasAnnotation {
+		newAnnotation := podutil.SeccompAnnotationForField(field)
+
+		if newAnnotation != "" {
+			if pod.Annotations == nil {
+				pod.Annotations = map[string]string{}
+			}
+			pod.Annotations[v1.SeccompPodAnnotationKey] = newAnnotation
+		}
+	} else if hasAnnotation && !hasField {
+		newField := podutil.SeccompFieldForAnnotation(annotation)
+
+		if newField != nil {
+			if pod.Spec.SecurityContext == nil {
+				pod.Spec.SecurityContext = &api.PodSecurityContext{}
+			}
+			pod.Spec.SecurityContext.SeccompProfile = newField
+		}
+	}
+
+	// Handle the containers of the pod
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(),
+		func(ctr *api.Container, _ podutil.ContainerType) bool {
+			// get possible annotation and field
+			key := api.SeccompContainerAnnotationKeyPrefix + ctr.Name
+			annotation, hasAnnotation := pod.Annotations[key]
+
+			field, hasField := (*api.SeccompProfile)(nil), false
+			if ctr.SecurityContext != nil && ctr.SecurityContext.SeccompProfile != nil {
+				field = ctr.SecurityContext.SeccompProfile
+				hasField = true
+			}
+
+			// sync field and annotation
+			if hasField && !hasAnnotation {
+				newAnnotation := podutil.SeccompAnnotationForField(field)
+
+				if newAnnotation != "" {
+					if pod.Annotations == nil {
+						pod.Annotations = map[string]string{}
+					}
+					pod.Annotations[key] = newAnnotation
+				}
+			} else if hasAnnotation && !hasField {
+				newField := podutil.SeccompFieldForAnnotation(annotation)
+
+				if newField != nil {
+					if ctr.SecurityContext == nil {
+						ctr.SecurityContext = &api.SecurityContext{}
+					}
+					ctr.SecurityContext.SeccompProfile = newField
+				}
+			}
+
+			return true
+		})
 }

@@ -36,6 +36,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting:all-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning:all-srcs",
     ],

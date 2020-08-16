@@ -22,8 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	cliflag "k8s.io/component-base/cli/flag"
-	componentbaseconfig "k8s.io/component-base/config"
-	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
+	"k8s.io/component-base/config/options"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
@@ -39,9 +38,7 @@ type GenericControllerManagerConfigurationOptions struct {
 func NewGenericControllerManagerConfigurationOptions(cfg *kubectrlmgrconfig.GenericControllerManagerConfiguration) *GenericControllerManagerConfigurationOptions {
 	o := &GenericControllerManagerConfigurationOptions{
 		GenericControllerManagerConfiguration: cfg,
-		Debugging: &DebuggingOptions{
-			DebuggingConfiguration: &componentbaseconfig.DebuggingConfiguration{},
-		},
+		Debugging:                             RecommendedDebuggingOptions(),
 	}
 
 	return o
@@ -65,7 +62,7 @@ func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *cliflag.Nam
 		"named 'foo', '-foo' disables the controller named 'foo'.\nAll controllers: %s\nDisabled-by-default controllers: %s",
 		strings.Join(allControllers, ", "), strings.Join(disabledByDefaultControllers, ", ")))
 
-	leaderelectionconfig.BindFlags(&o.LeaderElection, genericfs)
+	options.BindLeaderElectionFlags(&o.LeaderElection, genericfs)
 }
 
 // ApplyTo fills up generic config with options.

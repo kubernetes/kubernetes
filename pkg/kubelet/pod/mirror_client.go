@@ -17,6 +17,7 @@ limitations under the License.
 package pod
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -24,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -95,7 +96,7 @@ func (mc *basicMirrorClient) CreateMirrorPod(pod *v1.Pod) error {
 		Controller: &controller,
 	}}
 
-	apiPod, err := mc.apiserverClient.CoreV1().Pods(copyPod.Namespace).Create(&copyPod)
+	apiPod, err := mc.apiserverClient.CoreV1().Pods(copyPod.Namespace).Create(context.TODO(), &copyPod, metav1.CreateOptions{})
 	if err != nil && apierrors.IsAlreadyExists(err) {
 		// Check if the existing pod is the same as the pod we want to create.
 		if h, ok := apiPod.Annotations[kubetypes.ConfigMirrorAnnotationKey]; ok && h == hash {
@@ -123,7 +124,7 @@ func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string, uid *types.UID)
 	}
 	klog.V(2).Infof("Deleting a mirror pod %q (uid %#v)", podFullName, uid)
 	var GracePeriodSeconds int64
-	if err := mc.apiserverClient.CoreV1().Pods(namespace).Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &GracePeriodSeconds, Preconditions: &metav1.Preconditions{UID: uid}}); err != nil {
+	if err := mc.apiserverClient.CoreV1().Pods(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{GracePeriodSeconds: &GracePeriodSeconds, Preconditions: &metav1.Preconditions{UID: uid}}); err != nil {
 		// Unfortunately, there's no generic error for failing a precondition
 		if !(apierrors.IsNotFound(err) || apierrors.IsConflict(err)) {
 			// We should return the error here, but historically this routine does

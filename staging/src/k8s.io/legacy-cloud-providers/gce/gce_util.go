@@ -19,6 +19,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -28,21 +29,21 @@ import (
 	"strings"
 	"sync"
 
+	"cloud.google.com/go/compute/metadata"
+
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock"
+
+	compute "google.golang.org/api/compute/v1"
+	"google.golang.org/api/googleapi"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
-
-	"encoding/json"
-
-	"cloud.google.com/go/compute/metadata"
-	compute "google.golang.org/api/compute/v1"
-	"google.golang.org/api/googleapi"
 	"k8s.io/client-go/kubernetes/fake"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	servicehelper "k8s.io/cloud-provider/service/helpers"
 )
 
 func fakeGCECloud(vals TestClusterValues) (*Cloud, error) {
@@ -79,6 +80,34 @@ func fakeGCECloud(vals TestClusterValues) (*Cloud, error) {
 	}
 
 	return gce, nil
+}
+
+func registerTargetPoolAddInstanceHook(gce *Cloud, callback func(*compute.TargetPoolsAddInstanceRequest)) error {
+	mockGCE, ok := gce.c.(*cloud.MockGCE)
+	if !ok {
+		return fmt.Errorf("couldn't cast cloud to mockGCE: %#v", gce)
+	}
+	existingHandler := mockGCE.MockTargetPools.AddInstanceHook
+	hook := func(ctx context.Context, key *meta.Key, req *compute.TargetPoolsAddInstanceRequest, m *cloud.MockTargetPools) error {
+		callback(req)
+		return existingHandler(ctx, key, req, m)
+	}
+	mockGCE.MockTargetPools.AddInstanceHook = hook
+	return nil
+}
+
+func registerTargetPoolRemoveInstanceHook(gce *Cloud, callback func(*compute.TargetPoolsRemoveInstanceRequest)) error {
+	mockGCE, ok := gce.c.(*cloud.MockGCE)
+	if !ok {
+		return fmt.Errorf("couldn't cast cloud to mockGCE: %#v", gce)
+	}
+	existingHandler := mockGCE.MockTargetPools.RemoveInstanceHook
+	hook := func(ctx context.Context, key *meta.Key, req *compute.TargetPoolsRemoveInstanceRequest, m *cloud.MockTargetPools) error {
+		callback(req)
+		return existingHandler(ctx, key, req, m)
+	}
+	mockGCE.MockTargetPools.RemoveInstanceHook = hook
+	return nil
 }
 
 type gceInstance struct {
@@ -252,18 +281,6 @@ func makeGoogleAPINotFoundError(message string) error {
 	return &googleapi.Error{Code: http.StatusNotFound, Message: message}
 }
 
-// TODO(#51665): Remove this once Network Tiers becomes Beta in GCP.
-func handleAlphaNetworkTierGetError(err error) (string, error) {
-	if isForbidden(err) {
-		// Network tier is still an Alpha feature in GCP, and not every project
-		// is whitelisted to access the API. If we cannot access the API, just
-		// assume the tier is premium.
-		return cloud.NetworkTierDefault.ToGCEValue(), nil
-	}
-	// Can't get the network tier, just return an error.
-	return "", err
-}
-
 // containsCIDR returns true if outer contains inner.
 func containsCIDR(outer, inner *net.IPNet) bool {
 	return outer.Contains(firstIPInRange(inner)) && outer.Contains(lastIPInRange(inner))
@@ -332,8 +349,7 @@ func addFinalizer(service *v1.Service, kubeClient v1core.CoreV1Interface, key st
 	updated := service.DeepCopy()
 	updated.ObjectMeta.Finalizers = append(updated.ObjectMeta.Finalizers, key)
 
-	// TODO(87447) use PatchService from k8s.io/cloud-provider/service/helpers
-	_, err := patchService(kubeClient, service, updated)
+	_, err := servicehelper.PatchService(kubeClient, service, updated)
 	return err
 }
 
@@ -347,7 +363,7 @@ func removeFinalizer(service *v1.Service, kubeClient v1core.CoreV1Interface, key
 	updated := service.DeepCopy()
 	updated.ObjectMeta.Finalizers = removeString(updated.ObjectMeta.Finalizers, key)
 
-	_, err := patchService(kubeClient, service, updated)
+	_, err := servicehelper.PatchService(kubeClient, service, updated)
 	return err
 }
 
@@ -371,36 +387,4 @@ func removeString(slice []string, s string) []string {
 		}
 	}
 	return newSlice
-}
-
-// patchService patches service's Status or ObjectMeta given the origin and
-// updated ones. Change to spec will be ignored.
-func patchService(c v1core.CoreV1Interface, oldSvc *v1.Service, newSvc *v1.Service) (*v1.Service, error) {
-	// Reset spec to make sure only patch for Status or ObjectMeta.
-	newSvc.Spec = oldSvc.Spec
-
-	patchBytes, err := getPatchBytes(oldSvc, newSvc)
-	if err != nil {
-		return nil, err
-	}
-
-	return c.Services(oldSvc.Namespace).Patch(oldSvc.Name, types.StrategicMergePatchType, patchBytes, "status")
-}
-
-func getPatchBytes(oldSvc *v1.Service, newSvc *v1.Service) ([]byte, error) {
-	oldData, err := json.Marshal(oldSvc)
-	if err != nil {
-		return nil, fmt.Errorf("failed to Marshal oldData for svc %s/%s: %v", oldSvc.Namespace, oldSvc.Name, err)
-	}
-
-	newData, err := json.Marshal(newSvc)
-	if err != nil {
-		return nil, fmt.Errorf("failed to Marshal newData for svc %s/%s: %v", newSvc.Namespace, newSvc.Name, err)
-	}
-
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Service{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to CreateTwoWayMergePatch for svc %s/%s: %v", oldSvc.Namespace, oldSvc.Name, err)
-	}
-	return patchBytes, nil
 }

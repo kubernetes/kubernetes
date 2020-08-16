@@ -17,9 +17,14 @@ limitations under the License.
 package metrics
 
 import (
+	"strings"
+	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/apimachinery/pkg/util/clock"
+	compbasemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	basemetricstestutil "k8s.io/component-base/metrics/testutil"
 )
 
 const (
@@ -28,8 +33,11 @@ const (
 )
 
 const (
+	requestKind   = "request_kind"
 	priorityLevel = "priorityLevel"
 	flowSchema    = "flowSchema"
+	phase         = "phase"
+	mark          = "mark"
 )
 
 var (
@@ -37,93 +45,181 @@ var (
 	requestDurationSecondsBuckets = []float64{0, 0.005, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 30}
 )
 
-func init() {
-	prometheus.MustRegister(apiserverRejectedRequests)
-	prometheus.MustRegister(apiserverCurrentInqueueRequests)
-	prometheus.MustRegister(apiserverRequestQueueLength)
-	prometheus.MustRegister(apiserverRequestConcurrencyLimit)
-	prometheus.MustRegister(apiserverCurrentExecutingRequests)
-	prometheus.MustRegister(apiserverRequestWaitingSeconds)
-	prometheus.MustRegister(apiserverRequestExecutionSeconds)
+var registerMetrics sync.Once
+
+// Register all metrics.
+func Register() {
+	registerMetrics.Do(func() {
+		for _, metric := range metrics {
+			legacyregistry.MustRegister(metric)
+		}
+	})
+}
+
+type resettable interface {
+	Reset()
+}
+
+// Reset all metrics to zero
+func Reset() {
+	for _, metric := range metrics {
+		rm := metric.(resettable)
+		rm.Reset()
+	}
+}
+
+// GatherAndCompare the given metrics with the given Prometheus syntax expected value
+func GatherAndCompare(expected string, metricNames ...string) error {
+	return basemetricstestutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...)
+}
+
+// Registerables is a slice of Registerable
+type Registerables []compbasemetrics.Registerable
+
+// Append adds more
+func (rs Registerables) Append(more ...compbasemetrics.Registerable) Registerables {
+	return append(rs, more...)
 }
 
 var (
-	apiserverRejectedRequests = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
+	apiserverRejectedRequestsTotal = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "rejectedRequests",
-			Help:      "Number of rejected requests by api priority and fairness system",
+			Name:      "rejected_requests_total",
+			Help:      "Number of requests rejected by API Priority and Fairness system",
 		},
-		[]string{priorityLevel, "reason"},
+		[]string{priorityLevel, flowSchema, "reason"},
 	)
-	apiserverCurrentInqueueRequests = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+	apiserverDispatchedRequestsTotal = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "currentInqueueRequests",
-			Help:      "Number of requests currently pending in the queue by the api priority and fairness system",
+			Name:      "dispatched_requests_total",
+			Help:      "Number of requests released by API Priority and Fairness system for service",
 		},
-		[]string{priorityLevel},
+		[]string{priorityLevel, flowSchema},
 	)
-	apiserverRequestQueueLength = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
+
+	// PriorityLevelConcurrencyObserverPairGenerator creates pairs that observe concurrency for priority levels
+	PriorityLevelConcurrencyObserverPairGenerator = NewSampleAndWaterMarkHistogramsPairGenerator(clock.RealClock{}, time.Millisecond,
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "priority_level_request_count_samples",
+			Help:           "Periodic observations of the number of requests",
+			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "priority_level_request_count_watermarks",
+			Help:           "Watermarks of the number of requests",
+			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{priorityLevel})
+
+	// ReadWriteConcurrencyObserverPairGenerator creates pairs that observe concurrency broken down by mutating vs readonly
+	ReadWriteConcurrencyObserverPairGenerator = NewSampleAndWaterMarkHistogramsPairGenerator(clock.RealClock{}, time.Millisecond,
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "read_vs_write_request_count_samples",
+			Help:           "Periodic observations of the number of requests",
+			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "read_vs_write_request_count_watermarks",
+			Help:           "Watermarks of the number of requests",
+			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{requestKind})
+
+	apiserverCurrentInqueueRequests = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "requestQueueLength",
-			Help:      "Length of queue in the api priority and fairness system",
+			Name:      "current_inqueue_requests",
+			Help:      "Number of requests currently pending in queues of the API Priority and Fairness system",
+		},
+		[]string{priorityLevel, flowSchema},
+	)
+	apiserverRequestQueueLength = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "request_queue_length_after_enqueue",
+			Help:      "Length of queue in the API Priority and Fairness system, as seen by each request after it is enqueued",
 			Buckets:   queueLengthBuckets,
 		},
-		[]string{priorityLevel},
+		[]string{priorityLevel, flowSchema},
 	)
-	apiserverRequestConcurrencyLimit = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+	apiserverRequestConcurrencyLimit = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "requestConcurrencyLimit",
-			Help:      "Shared concurrency limit in the api priority and fairness system",
+			Name:      "request_concurrency_limit",
+			Help:      "Shared concurrency limit in the API Priority and Fairness system",
 		},
 		[]string{priorityLevel},
 	)
-	apiserverCurrentExecutingRequests = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+	apiserverCurrentExecutingRequests = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "currentExecutingRequests",
-			Help:      "Number of requests currently executing in the api priority and fairness system",
+			Name:      "current_executing_requests",
+			Help:      "Number of requests currently executing in the API Priority and Fairness system",
 		},
-		[]string{priorityLevel},
+		[]string{priorityLevel, flowSchema},
 	)
-	apiserverRequestWaitingSeconds = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
+	apiserverRequestWaitingSeconds = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "request_wait_durationSeconds",
+			Name:      "request_wait_duration_seconds",
 			Help:      "Length of time a request spent waiting in its queue",
 			Buckets:   requestDurationSecondsBuckets,
 		},
 		[]string{priorityLevel, flowSchema, "execute"},
 	)
-	apiserverRequestExecutionSeconds = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
+	apiserverRequestExecutionSeconds = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "requestExecutionSeconds",
-			Help:      "Time of request executing in the api priority and fairness system",
+			Name:      "request_execution_seconds",
+			Help:      "Duration of request execution in the API Priority and Fairness system",
 			Buckets:   requestDurationSecondsBuckets,
 		},
 		[]string{priorityLevel, flowSchema},
 	)
+	metrics = Registerables{
+		apiserverRejectedRequestsTotal,
+		apiserverDispatchedRequestsTotal,
+		apiserverCurrentInqueueRequests,
+		apiserverRequestQueueLength,
+		apiserverRequestConcurrencyLimit,
+		apiserverCurrentExecutingRequests,
+		apiserverRequestWaitingSeconds,
+		apiserverRequestExecutionSeconds,
+	}.
+		Append(PriorityLevelConcurrencyObserverPairGenerator.metrics()...).
+		Append(ReadWriteConcurrencyObserverPairGenerator.metrics()...)
 )
 
-// UpdateFlowControlRequestsInQueue updates the value for the # of requests in the specified queues in flow control
-func UpdateFlowControlRequestsInQueue(priorityLevel string, inqueue int) {
-	apiserverCurrentInqueueRequests.WithLabelValues(priorityLevel).Set(float64(inqueue))
+// AddRequestsInQueues adds the given delta to the gauge of the # of requests in the queues of the specified flowSchema and priorityLevel
+func AddRequestsInQueues(priorityLevel, flowSchema string, delta int) {
+	apiserverCurrentInqueueRequests.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
 }
 
-// UpdateFlowControlRequestsExecuting updates the value for the # of requests executing in flow control
-func UpdateFlowControlRequestsExecuting(priorityLevel string, executing int) {
-	apiserverCurrentExecutingRequests.WithLabelValues(priorityLevel).Set(float64(executing))
+// AddRequestsExecuting adds the given delta to the gauge of executing requests of the given flowSchema and priorityLevel
+func AddRequestsExecuting(priorityLevel, flowSchema string, delta int) {
+	apiserverCurrentExecutingRequests.WithLabelValues(priorityLevel, flowSchema).Add(float64(delta))
 }
 
 // UpdateSharedConcurrencyLimit updates the value for the concurrency limit in flow control
@@ -132,13 +228,18 @@ func UpdateSharedConcurrencyLimit(priorityLevel string, limit int) {
 }
 
 // AddReject increments the # of rejected requests for flow control
-func AddReject(priorityLevel string, reason string) {
-	apiserverRejectedRequests.WithLabelValues(priorityLevel, reason).Add(1)
+func AddReject(priorityLevel, flowSchema, reason string) {
+	apiserverRejectedRequestsTotal.WithLabelValues(priorityLevel, flowSchema, reason).Add(1)
+}
+
+// AddDispatch increments the # of dispatched requests for flow control
+func AddDispatch(priorityLevel, flowSchema string) {
+	apiserverDispatchedRequestsTotal.WithLabelValues(priorityLevel, flowSchema).Add(1)
 }
 
 // ObserveQueueLength observes the queue length for flow control
-func ObserveQueueLength(priorityLevel string, length int) {
-	apiserverRequestQueueLength.WithLabelValues(priorityLevel).Observe(float64(length))
+func ObserveQueueLength(priorityLevel, flowSchema string, length int) {
+	apiserverRequestQueueLength.WithLabelValues(priorityLevel, flowSchema).Observe(float64(length))
 }
 
 // ObserveWaitingDuration observes the queue length for flow control

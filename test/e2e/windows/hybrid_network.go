@@ -36,7 +36,7 @@ const (
 )
 
 var (
-	windowsBusyBoximage = imageutils.GetE2EImage(imageutils.TestWebserver)
+	windowsBusyBoximage = imageutils.GetE2EImage(imageutils.Agnhost)
 	linuxBusyBoxImage   = "docker.io/library/nginx:1.15-alpine"
 )
 
@@ -52,7 +52,10 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 		ginkgo.It("should have stable networking for Linux and Windows pods", func() {
 			ginkgo.By("creating linux and windows pods")
 			linuxPod := createTestPod(f, linuxBusyBoxImage, linuxOS)
+			linuxPod = f.PodClient().CreateSync(linuxPod)
 			windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
+			windowsPod.Spec.Containers[0].Args = []string{"test-webserver"}
+			windowsPod = f.PodClient().CreateSync(windowsPod)
 
 			ginkgo.By("checking connectivity to 8.8.8.8 53 (google.com) from Linux")
 			assertConsistentConnectivity(f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck("8.8.8.8", 53))
@@ -117,7 +120,7 @@ func createTestPod(f *framework.Framework, image string, os string) *v1.Pod {
 				},
 			},
 			NodeSelector: map[string]string{
-				"beta.kubernetes.io/os": os,
+				"kubernetes.io/os": os,
 			},
 		},
 	}
@@ -129,5 +132,5 @@ func createTestPod(f *framework.Framework, image string, os string) *v1.Pod {
 			},
 		}
 	}
-	return f.PodClient().CreateSync(pod)
+	return pod
 }

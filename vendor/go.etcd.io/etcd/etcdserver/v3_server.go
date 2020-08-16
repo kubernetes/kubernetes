@@ -428,9 +428,10 @@ func (s *EtcdServer) Authenticate(ctx context.Context, r *pb.AuthenticateRequest
 			return nil, err
 		}
 
+		// internalReq doesn't need to have Password because the above s.AuthStore().CheckPassword() already did it.
+		// In addition, it will let a WAL entry not record password as a plain text.
 		internalReq := &pb.InternalAuthenticateRequest{
 			Name:        r.Name,
-			Password:    r.Password,
 			SimpleToken: st,
 		}
 
@@ -577,12 +578,7 @@ func (s *EtcdServer) raftRequestOnce(ctx context.Context, r pb.InternalRaftReque
 }
 
 func (s *EtcdServer) raftRequest(ctx context.Context, r pb.InternalRaftRequest) (proto.Message, error) {
-	for {
-		resp, err := s.raftRequestOnce(ctx, r)
-		if err != auth.ErrAuthOldRevision {
-			return resp, err
-		}
-	}
+	return s.raftRequestOnce(ctx, r)
 }
 
 // doSerialize handles the auth logic, with permissions checked by "chk", for a serialized request "get". Returns a non-nil error on authentication failure.

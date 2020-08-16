@@ -163,7 +163,7 @@ func TestRestorePV(t *testing.T) {
 	// Restore PV
 	cache.Restore(oldPV.Name)
 	if err := verifyPV(cache, oldPV.Name, oldPV); err != nil {
-		t.Fatalf("Failed to GetPV() after iniital restore: %v", err)
+		t.Fatalf("Failed to GetPV() after initial restore: %v", err)
 	}
 
 	// Assume newPV
@@ -420,7 +420,7 @@ func TestRestorePVC(t *testing.T) {
 	// Restore PVC
 	cache.Restore(getPVCName(oldPVC))
 	if err := verifyPVC(cache, getPVCName(oldPVC), oldPVC); err != nil {
-		t.Fatalf("Failed to GetPVC() after iniital restore: %v", err)
+		t.Fatalf("Failed to GetPVC() after initial restore: %v", err)
 	}
 
 	// Assume newPVC

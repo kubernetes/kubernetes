@@ -53,10 +53,9 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state *framework.CycleS
 	}
 
 	// ba.score favors nodes with balanced resource usage rate.
-	// It should **NOT** be used alone, and **MUST** be used together
-	// with NodeResourcesLeastAllocated plugin. It calculates the difference between the cpu and memory fraction
-	// of capacity, and prioritizes the host based on how close the two metrics are to each other.
-	// Detail: score = 10 - variance(cpuFraction,memoryFraction,volumeFraction)*10. The algorithm is partly inspired by:
+	// It calculates the difference between the cpu and memory fraction of capacity,
+	// and prioritizes the host based on how close the two metrics are to each other.
+	// Detail: score = (1 - variance(cpuFraction,memoryFraction,volumeFraction)) * MaxNodeScore. The algorithm is partly inspired by:
 	// "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced
 	// Resource Utilization"
 	return ba.score(pod, nodeInfo)
@@ -68,7 +67,7 @@ func (ba *BalancedAllocation) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // NewBalancedAllocation initializes a new plugin and returns it.
-func NewBalancedAllocation(_ *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
+func NewBalancedAllocation(_ runtime.Object, h framework.FrameworkHandle) (framework.Plugin, error) {
 	return &BalancedAllocation{
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{
@@ -99,15 +98,15 @@ func balancedResourceScorer(requested, allocable resourceToValueMap, includeVolu
 		mean := (cpuFraction + memoryFraction + volumeFraction) / float64(3)
 		variance := float64((((cpuFraction - mean) * (cpuFraction - mean)) + ((memoryFraction - mean) * (memoryFraction - mean)) + ((volumeFraction - mean) * (volumeFraction - mean))) / float64(3))
 		// Since the variance is between positive fractions, it will be positive fraction. 1-variance lets the
-		// score to be higher for node which has least variance and multiplying it with 10 provides the scaling
+		// score to be higher for node which has least variance and multiplying it with `MaxNodeScore` provides the scaling
 		// factor needed.
 		return int64((1 - variance) * float64(framework.MaxNodeScore))
 	}
 
 	// Upper and lower boundary of difference between cpuFraction and memoryFraction are -1 and 1
-	// respectively. Multiplying the absolute value of the difference by 10 scales the value to
-	// 0-10 with 0 representing well balanced allocation and 10 poorly balanced. Subtracting it from
-	// 10 leads to the score which also scales from 0 to 10 while 10 representing well balanced.
+	// respectively. Multiplying the absolute value of the difference by `MaxNodeScore` scales the value to
+	// 0-MaxNodeScore with 0 representing well balanced allocation and `MaxNodeScore` poorly balanced. Subtracting it from
+	// `MaxNodeScore` leads to the score which also scales from 0 to `MaxNodeScore` while `MaxNodeScore` representing well balanced.
 	diff := math.Abs(cpuFraction - memoryFraction)
 	return int64((1 - diff) * float64(framework.MaxNodeScore))
 }

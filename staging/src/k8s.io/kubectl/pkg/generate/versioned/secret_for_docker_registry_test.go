@@ -20,11 +20,12 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestSecretForDockerRegistryGenerate(t *testing.T) {
+	// Fake values for testing.
 	username, password, email, server := "test-user", "test-password", "test-user@example.org", "https://index.docker.io/v1/"
 	secretData, err := handleDockerCfgJSONContent(username, password, email, server)
 	if err != nil {

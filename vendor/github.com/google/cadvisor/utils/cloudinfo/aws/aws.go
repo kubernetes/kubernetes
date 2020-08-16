@@ -57,7 +57,11 @@ func fileContainsAmazonIdentifier(filename string) bool {
 }
 
 func getAwsMetadata(name string) string {
-	client := ec2metadata.New(session.New(&aws.Config{}))
+	sess, err := session.NewSession(&aws.Config{})
+	if err != nil {
+		return info.UnknownInstance
+	}
+	client := ec2metadata.New(sess)
 	data, err := client.GetMetadata(name)
 	if err != nil {
 		return info.UnknownInstance

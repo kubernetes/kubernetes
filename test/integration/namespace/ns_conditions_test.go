@@ -17,6 +17,7 @@ limitations under the License.
 package namespace
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -42,11 +43,11 @@ func TestNamespaceCondition(t *testing.T) {
 	closeFn, nsController, informers, kubeClient, dynamicClient := namespaceLifecycleSetup(t)
 	defer closeFn()
 	nsName := "test-namespace-conditions"
-	_, err := kubeClient.CoreV1().Namespaces().Create(&corev1.Namespace{
+	_, err := kubeClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nsName,
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +63,7 @@ func TestNamespaceCondition(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = dynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("pods")).Namespace(nsName).Create(podJSON, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("pods")).Namespace(nsName).Create(context.TODO(), podJSON, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,17 +73,17 @@ func TestNamespaceCondition(t *testing.T) {
 		t.Fatal(err)
 	}
 	deploymentJSON.SetFinalizers([]string{"custom.io/finalizer"})
-	_, err = dynamicClient.Resource(appsv1.SchemeGroupVersion.WithResource("deployments")).Namespace(nsName).Create(deploymentJSON, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(appsv1.SchemeGroupVersion.WithResource("deployments")).Namespace(nsName).Create(context.TODO(), deploymentJSON, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err = kubeClient.CoreV1().Namespaces().Delete(nsName, nil); err != nil {
+	if err = kubeClient.CoreV1().Namespaces().Delete(context.TODO(), nsName, metav1.DeleteOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
 	err = wait.PollImmediate(1*time.Second, 60*time.Second, func() (bool, error) {
-		curr, err := kubeClient.CoreV1().Namespaces().Get(nsName, metav1.GetOptions{})
+		curr, err := kubeClient.CoreV1().Namespaces().Get(context.TODO(), nsName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

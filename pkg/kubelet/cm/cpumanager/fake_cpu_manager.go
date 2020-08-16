@@ -18,8 +18,8 @@ package cpumanager
 
 import (
 	"k8s.io/api/core/v1"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/containermap"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -40,6 +40,11 @@ func (m *fakeManager) Policy() Policy {
 	return NewNonePolicy()
 }
 
+func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
+	klog.Infof("[fake cpumanager] Allocate (pod: %s, container: %s", pod.Name, container.Name)
+	return nil
+}
+
 func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
 	klog.Infof("[fake cpumanager] AddContainer (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
 	return nil
@@ -50,7 +55,7 @@ func (m *fakeManager) RemoveContainer(containerID string) error {
 	return nil
 }
 
-func (m *fakeManager) GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
+func (m *fakeManager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	klog.Infof("[fake cpumanager] Get Topology Hints")
 	return map[string][]topologymanager.TopologyHint{}
 }

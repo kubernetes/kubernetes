@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -37,7 +38,6 @@ import (
 type createAuthInfoOptions struct {
 	configAccess      clientcmd.ConfigAccess
 	name              string
-	authPath          cliflag.StringFlag
 	clientCertificate cliflag.StringFlag
 	clientKey         cliflag.StringFlag
 	token             cliflag.StringFlag
@@ -104,7 +104,7 @@ var (
 		kubectl config set-credentials cluster-admin --auth-provider=oidc --auth-provider-arg=client-secret-
 
 		# Enable new exec auth plugin for the "cluster-admin" entry
-		kubectl config set-credentials cluster-admin --exec-command=/path/to/the/executable --exec-api-version=client.authentication.k8s.io/v1beta
+		kubectl config set-credentials cluster-admin --exec-command=/path/to/the/executable --exec-api-version=client.authentication.k8s.io/v1beta1
 
 		# Define new exec auth plugin args for the "cluster-admin" entry
 		kubectl config set-credentials cluster-admin --exec-arg=arg1 --exec-arg=arg2
@@ -422,13 +422,13 @@ func (o createAuthInfoOptions) validate() error {
 			return fmt.Errorf("you must specify a --%s or --%s to embed", clientcmd.FlagCertFile, clientcmd.FlagKeyFile)
 		}
 		if certPath != "" {
-			if _, err := ioutil.ReadFile(certPath); err != nil {
-				return fmt.Errorf("error reading %s data from %s: %v", clientcmd.FlagCertFile, certPath, err)
+			if _, err := os.Stat(certPath); err != nil {
+				return fmt.Errorf("could not stat %s file %s: %v", clientcmd.FlagCertFile, certPath, err)
 			}
 		}
 		if keyPath != "" {
-			if _, err := ioutil.ReadFile(keyPath); err != nil {
-				return fmt.Errorf("error reading %s data from %s: %v", clientcmd.FlagKeyFile, keyPath, err)
+			if _, err := os.Stat(keyPath); err != nil {
+				return fmt.Errorf("could not stat %s file %s: %v", clientcmd.FlagKeyFile, keyPath, err)
 			}
 		}
 	}

@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -24,4 +26,20 @@ import (
 // be served from apiserver cache instead of from etcd.
 func FromApiserverCache(opts *metav1.GetOptions) {
 	opts.ResourceVersion = "0"
+}
+
+// GetNodenameForKernel gets hostname value to set in the hostname field (the nodename field of struct utsname) of the pod.
+func GetNodenameForKernel(hostname string, hostDomainName string, setHostnameAsFQDN *bool) (string, error) {
+	kernelHostname := hostname
+	// FQDN has to be 64 chars to fit in the Linux nodename kernel field (specification 64 chars and the null terminating char).
+	const fqdnMaxLen = 64
+	if len(hostDomainName) > 0 && setHostnameAsFQDN != nil && *setHostnameAsFQDN == true {
+		fqdn := fmt.Sprintf("%s.%s", hostname, hostDomainName)
+		// FQDN has to be shorter than hostnameMaxLen characters.
+		if len(fqdn) > fqdnMaxLen {
+			return "", fmt.Errorf("Failed to construct FQDN from pod hostname and cluster domain, FQDN %s is too long (%d characters is the max, %d characters requested)", fqdn, fqdnMaxLen, len(fqdn))
+		}
+		kernelHostname = fqdn
+	}
+	return kernelHostname, nil
 }

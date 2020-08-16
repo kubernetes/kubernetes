@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -265,6 +265,10 @@ type attachedVolume struct {
 	// deviceMountPath contains the path on the node where the device should
 	// be mounted after it is attached.
 	deviceMountPath string
+
+	// volumeInUseErrorForExpansion indicates volume driver has previously returned volume-in-use error
+	// for this volume and volume expansion on this node should not be retried
+	volumeInUseErrorForExpansion bool
 }
 
 // The mountedPod object represents a pod for which the kubelet volume manager
@@ -379,6 +383,17 @@ func (asw *actualStateOfWorld) GetDeviceMountState(volumeName v1.UniqueVolumeNam
 	}
 
 	return volumeObj.deviceMountState
+}
+
+func (asw *actualStateOfWorld) MarkForInUseExpansionError(volumeName v1.UniqueVolumeName) {
+	asw.Lock()
+	defer asw.Unlock()
+
+	volumeObj, ok := asw.attachedVolumes[volumeName]
+	if ok {
+		volumeObj.volumeInUseErrorForExpansion = true
+		asw.attachedVolumes[volumeName] = volumeObj
+	}
 }
 
 func (asw *actualStateOfWorld) GetVolumeMountState(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) operationexecutor.VolumeMountState {
@@ -672,6 +687,7 @@ func (asw *actualStateOfWorld) PodExistsInVolume(
 			return true, volumeObj.devicePath, newRemountRequiredError(volumeObj.volumeName, podObj.podName)
 		}
 		if podObj.fsResizeRequired &&
+			!volumeObj.volumeInUseErrorForExpansion &&
 			utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
 			return true, volumeObj.devicePath, newFsResizeRequiredError(volumeObj.volumeName, podObj.podName)
 		}

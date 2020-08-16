@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -186,7 +186,7 @@ func safeToApplyPodPresetsOnPod(pod *api.Pod, podPresets []*settingsv1alpha1.Pod
 	if _, err := mergeVolumes(pod.Spec.Volumes, podPresets); err != nil {
 		errs = append(errs, err)
 	}
-	pods.VisitContainersWithPath(&pod.Spec, func(c *api.Container, _ *field.Path) bool {
+	pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), func(c *api.Container, _ *field.Path) bool {
 		if err := safeToApplyPodPresetsOnContainer(c, podPresets); err != nil {
 			errs = append(errs, err)
 		}

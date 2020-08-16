@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -90,8 +91,13 @@ func TestApiserverMetrics(t *testing.T) {
 	// Make a request to the apiserver to ensure there's at least one data point
 	// for the metrics we're expecting -- otherwise, they won't be exported.
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-	if _, err := client.CoreV1().Pods(metav1.NamespaceDefault).List(metav1.ListOptions{}); err != nil {
+	if _, err := client.CoreV1().Pods(metav1.NamespaceDefault).List(context.TODO(), metav1.ListOptions{}); err != nil {
 		t.Fatalf("unexpected error getting pods: %v", err)
+	}
+
+	// Make a request to a deprecated API to ensure there's at least one data point
+	if _, err := client.RbacV1beta1().Roles(metav1.NamespaceDefault).List(context.TODO(), metav1.ListOptions{}); err != nil {
+		t.Fatalf("unexpected error getting rbac roles: %v", err)
 	}
 
 	metrics, err := scrapeMetrics(s)
@@ -99,6 +105,7 @@ func TestApiserverMetrics(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkForExpectedMetrics(t, metrics, []string{
+		"apiserver_requested_deprecated_apis",
 		"apiserver_request_total",
 		"apiserver_request_duration_seconds_sum",
 		"etcd_request_duration_seconds_sum",

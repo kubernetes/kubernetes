@@ -26,11 +26,6 @@ import (
 	dockerref "github.com/docker/distribution/reference"
 )
 
-const (
-	// DefaultImageTag is the default tag for docker image.
-	DefaultImageTag = "latest"
-)
-
 // ParseImageName parses a docker image string into three parts: repo, tag and digest.
 // If both tag and digest are empty, a default image tag will be returned.
 func ParseImageName(image string) (string, string, string, error) {
@@ -53,7 +48,7 @@ func ParseImageName(image string) (string, string, string, error) {
 	}
 	// If no tag was specified, use the default "latest".
 	if len(tag) == 0 && len(digest) == 0 {
-		tag = DefaultImageTag
+		tag = "latest"
 	}
 	return repoToPull, tag, digest, nil
 }

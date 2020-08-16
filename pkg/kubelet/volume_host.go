@@ -21,7 +21,7 @@ import (
 	"net"
 	"runtime"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/mount"
 
@@ -29,14 +29,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
+	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/token"
@@ -65,17 +63,15 @@ func NewInitializedVolumePluginMgr(
 	var csiDriverLister storagelisters.CSIDriverLister
 	var csiDriversSynced cache.InformerSynced
 	const resyncPeriod = 0
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		// Don't initialize if kubeClient is nil
-		if kubelet.kubeClient != nil {
-			informerFactory = informers.NewSharedInformerFactory(kubelet.kubeClient, resyncPeriod)
-			csiDriverInformer := informerFactory.Storage().V1beta1().CSIDrivers()
-			csiDriverLister = csiDriverInformer.Lister()
-			csiDriversSynced = csiDriverInformer.Informer().HasSynced
+	// Don't initialize if kubeClient is nil
+	if kubelet.kubeClient != nil {
+		informerFactory = informers.NewSharedInformerFactory(kubelet.kubeClient, resyncPeriod)
+		csiDriverInformer := informerFactory.Storage().V1().CSIDrivers()
+		csiDriverLister = csiDriverInformer.Lister()
+		csiDriversSynced = csiDriverInformer.Informer().HasSynced
 
-		} else {
-			klog.Warning("kubeClient is nil. Skip initialization of CSIDriverLister")
-		}
+	} else {
+		klog.Warning("kubeClient is nil. Skip initialization of CSIDriverLister")
 	}
 
 	kvh := &kubeletVolumeHost{

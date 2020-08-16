@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "conditions_test.go",
         "meta_test.go",
         "multirestmapper_test.go",
         "priority_test.go",
@@ -27,6 +28,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "conditions.go",
         "doc.go",
         "errors.go",
         "firsthit_restmapper.go",
@@ -48,7 +50,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
 

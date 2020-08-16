@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -31,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -142,7 +143,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 	}
 
 	// Check if the Job already exists and delete it
-	if _, err := client.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{}); err == nil {
+	if _, err := client.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{}); err == nil {
 		if err = deleteHealthCheckJob(client, ns, jobName); err != nil {
 			return err
 		}
@@ -156,7 +157,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 	// Create the Job, but retry in case it is being currently deleted
 	klog.V(2).Infof("Creating Job %q in the namespace %q", jobName, ns)
 	err := wait.PollImmediate(time.Second*1, timeout, func() (bool, error) {
-		if _, err := client.BatchV1().Jobs(ns).Create(job); err != nil {
+		if _, err := client.BatchV1().Jobs(ns).Create(context.TODO(), job, metav1.CreateOptions{}); err != nil {
 			klog.V(2).Infof("Could not create Job %q in the namespace %q, retrying: %v", jobName, ns, err)
 			lastError = err
 			return false, nil
@@ -172,7 +173,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 
 	// Wait for the Job to complete
 	err = wait.PollImmediate(time.Second*1, timeout, func() (bool, error) {
-		job, err := client.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
+		job, err := client.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if err != nil {
 			lastError = err
 			klog.V(2).Infof("could not get Job %q in the namespace %q, retrying: %v", jobName, ns, err)
@@ -199,10 +200,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 func deleteHealthCheckJob(client clientset.Interface, ns, jobName string) error {
 	klog.V(2).Infof("Deleting Job %q in the namespace %q", jobName, ns)
 	propagation := metav1.DeletePropagationForeground
-	deleteOptions := &metav1.DeleteOptions{
-		PropagationPolicy: &propagation,
-	}
-	if err := client.BatchV1().Jobs(ns).Delete(jobName, deleteOptions); err != nil {
+	if err := client.BatchV1().Jobs(ns).Delete(context.TODO(), jobName, metav1.DeleteOptions{PropagationPolicy: &propagation}); err != nil {
 		return errors.Wrapf(err, "could not delete Job %q in the namespace %q", jobName, ns)
 	}
 	return nil
@@ -213,7 +211,7 @@ func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterCon
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{
 		constants.LabelNodeRoleMaster: "",
 	}))
-	controlPlanes, err := client.CoreV1().Nodes().List(metav1.ListOptions{
+	controlPlanes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
@@ -262,7 +260,7 @@ func getNotReadyDaemonSets(client clientset.Interface) ([]error, error) {
 	notReadyDaemonSets := []error{}
 	for _, component := range constants.ControlPlaneComponents {
 		dsName := constants.AddSelfHostedPrefix(component)
-		ds, err := client.AppsV1().DaemonSets(metav1.NamespaceSystem).Get(dsName, metav1.GetOptions{})
+		ds, err := client.AppsV1().DaemonSets(metav1.NamespaceSystem).Get(context.TODO(), dsName, metav1.GetOptions{})
 		if err != nil {
 			return nil, errors.Errorf("couldn't get daemonset %q in the %s namespace", dsName, metav1.NamespaceSystem)
 		}

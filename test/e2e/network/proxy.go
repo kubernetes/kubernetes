@@ -64,30 +64,28 @@ var _ = SIGDescribe("Proxy", func() {
 		prefix := "/api/" + version
 
 		/*
-			Release : v1.9
-			Testname: Proxy, logs port endpoint
-			Description: Select any node in the cluster to invoke /proxy/nodes/<nodeip>:10250/logs endpoint. This endpoint MUST be reachable.
+			Test for Proxy, logs port endpoint
+			Select any node in the cluster to invoke /proxy/nodes/<nodeip>:10250/logs endpoint. This endpoint MUST be reachable.
 		*/
-		framework.ConformanceIt("should proxy logs on node with explicit kubelet port using proxy subresource ", func() { nodeProxyTest(f, prefix+"/nodes/", ":10250/proxy/logs/") })
+		ginkgo.It("should proxy logs on node with explicit kubelet port using proxy subresource ", func() { nodeProxyTest(f, prefix+"/nodes/", ":10250/proxy/logs/") })
 
 		/*
-			Release : v1.9
-			Testname: Proxy, logs endpoint
-			Description:  Select any node in the cluster to invoke /proxy/nodes/<nodeip>//logs endpoint. This endpoint MUST be reachable.
+			Test for Proxy, logs endpoint
+			Select any node in the cluster to invoke /proxy/nodes/<nodeip>//logs endpoint. This endpoint MUST be reachable.
 		*/
-		framework.ConformanceIt("should proxy logs on node using proxy subresource ", func() { nodeProxyTest(f, prefix+"/nodes/", "/proxy/logs/") })
+		ginkgo.It("should proxy logs on node using proxy subresource ", func() { nodeProxyTest(f, prefix+"/nodes/", "/proxy/logs/") })
 
 		// using the porter image to serve content, access the content
 		// (of multiple pods?) from multiple (endpoints/services?)
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Proxy, logs service endpoint
 			Description: Select any node in the cluster to invoke  /logs endpoint  using the /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
 		*/
 		framework.ConformanceIt("should proxy through a service and a pod ", func() {
 			start := time.Now()
 			labels := map[string]string{"proxy-service-target": "true"}
-			service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(&v1.Service{
+			service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(context.TODO(), &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "proxy-service-",
 				},
@@ -116,7 +114,7 @@ var _ = SIGDescribe("Proxy", func() {
 						},
 					},
 				},
-			})
+			}, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			// Make an RC with a single pod. The 'porter' image is
@@ -322,7 +320,7 @@ func waitForEndpoint(c clientset.Interface, ns, name string) error {
 	// registerTimeout is how long to wait for an endpoint to be registered.
 	registerTimeout := time.Minute
 	for t := time.Now(); time.Since(t) < registerTimeout; time.Sleep(framework.Poll) {
-		endpoint, err := c.CoreV1().Endpoints(ns).Get(name, metav1.GetOptions{})
+		endpoint, err := c.CoreV1().Endpoints(ns).Get(context.TODO(), name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			framework.Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue

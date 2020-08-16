@@ -27,6 +27,12 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
+// PutResourcesResponse defines the response for PutResources.
+type PutResourcesResponse struct {
+	Response *http.Response
+	Error    *retry.Error
+}
+
 // Interface is the client interface for ARM.
 // Don't forget to run the following command to generate the mock client:
 // mockgen -source=$GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/armclient/interface.go -package=mockarmclient Interface > $GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/armclient/mockarmclient/interface.go
@@ -60,6 +66,11 @@ type Interface interface {
 
 	// PutResource puts a resource by resource ID
 	PutResource(ctx context.Context, resourceID string, parameters interface{}) (*http.Response, *retry.Error)
+
+	// PutResources puts a list of resources from resources map[resourceID]parameters.
+	// Those resources sync requests are sequential while async requests are concurent. It 's especially
+	// useful when the ARM API doesn't support concurrent requests.
+	PutResources(ctx context.Context, resources map[string]interface{}) map[string]*PutResourcesResponse
 
 	// PutResourceWithDecorators puts a resource with decorators by resource ID
 	PutResourceWithDecorators(ctx context.Context, resourceID string, parameters interface{}, decorators []autorest.PrepareDecorator) (*http.Response, *retry.Error)

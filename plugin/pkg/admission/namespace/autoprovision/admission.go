@@ -90,7 +90,7 @@ func (p *Provision) Admit(ctx context.Context, a admission.Attributes, o admissi
 		Status: corev1.NamespaceStatus{},
 	}
 
-	_, err = p.client.CoreV1().Namespaces().Create(namespace)
+	_, err = p.client.CoreV1().Namespaces().Create(context.TODO(), namespace, metav1.CreateOptions{})
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return admission.NewForbidden(a, err)
 	}

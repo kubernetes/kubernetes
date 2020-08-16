@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -285,8 +285,7 @@ func TestProbe(t *testing.T) {
 	for i, test := range tests {
 		for _, probeType := range [...]probeType{liveness, readiness, startup} {
 			prober := &prober{
-				refManager: kubecontainer.NewRefManager(),
-				recorder:   &record.FakeRecorder{},
+				recorder: &record.FakeRecorder{},
 			}
 			testID := fmt.Sprintf("%d-%s", i, probeType)
 			testContainer := v1.Container{Env: test.env}
@@ -391,7 +390,7 @@ func TestNewExecInContainer(t *testing.T) {
 		if e, a := cmd, runner.Cmd; !reflect.DeepEqual(e, a) {
 			t.Errorf("%s: cmd: expected %v, got %v", test.name, e, a)
 		}
-		// this isn't 100% foolproof as a bug in a real ContainerCommandRunner where it fails to copy to stdout/stderr wouldn't be caught by this test
+		// this isn't 100% foolproof as a bug in a real CommandRunner where it fails to copy to stdout/stderr wouldn't be caught by this test
 		if e, a := test.expected, string(actualOutput); e != a {
 			t.Errorf("%s: output: expected %q, got %q", test.name, e, a)
 		}

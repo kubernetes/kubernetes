@@ -17,14 +17,19 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	api "k8s.io/api/core/v1"
-	"k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -46,40 +51,6 @@ func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string, t *testing.T
 	}
 	csiMapper := mapper.(*csiBlockMapper)
 	return csiMapper, spec, pv, nil
-}
-
-func prepareBlockUnmapperTest(plug *csiPlugin, specVolumeName string, t *testing.T) (*csiBlockMapper, *volume.Spec, *api.PersistentVolume, error) {
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
-	pv := makeTestPV(specVolumeName, 10, testDriver, testVol)
-	spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
-
-	// save volume data
-	dir := getVolumeDeviceDataDir(pv.ObjectMeta.Name, plug.host)
-	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
-		t.Errorf("failed to create dir [%s]: %v", dir, err)
-	}
-
-	if err := saveVolumeData(
-		dir,
-		volDataFileName,
-		map[string]string{
-			volDataKey.specVolID:  pv.ObjectMeta.Name,
-			volDataKey.driverName: testDriver,
-			volDataKey.volHandle:  testVol,
-		},
-	); err != nil {
-		t.Fatalf("failed to save volume data: %v", err)
-	}
-
-	unmapper, err := plug.NewBlockVolumeUnmapper(pv.ObjectMeta.Name, testPodUID)
-	if err != nil {
-		t.Fatalf("failed to make a new Unmapper: %v", err)
-	}
-
-	csiUnmapper := unmapper.(*csiBlockMapper)
-	csiUnmapper.csiClient = setupClient(t, true)
-
-	return csiUnmapper, spec, pv, nil
 }
 
 func TestBlockMapperGetGlobalMapPath(t *testing.T) {
@@ -152,7 +123,7 @@ func TestBlockMapperGetStagingPath(t *testing.T) {
 			t.Fatalf("Failed to make a new Mapper: %v", err)
 		}
 
-		path := csiMapper.getStagingPath()
+		path := csiMapper.GetStagingPath()
 
 		if tc.path != path {
 			t.Errorf("expecting path %s, got %s", tc.path, path)
@@ -257,19 +228,18 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
-	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(attachment)
+	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}
 	t.Log("created attachement ", attachID)
 
-	err = csiMapper.SetUpDevice()
+	stagingPath, err := csiMapper.SetUpDevice()
 	if err != nil {
 		t.Fatalf("mapper failed to SetupDevice: %v", err)
 	}
 
 	// Check if NodeStageVolume staged to the right path
-	stagingPath := csiMapper.getStagingPath()
 	svols := csiMapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodeStagedVolumes()
 	svol, ok := svols[csiMapper.volumeID]
 	if !ok {
@@ -277,6 +247,54 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	}
 	if svol.Path != stagingPath {
 		t.Errorf("csi server expected device path %s, got %s", stagingPath, svol.Path)
+	}
+}
+
+func TestBlockMapperSetupDeviceError(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+
+	plug, tmpDir := newTestPlugin(t, nil)
+	defer os.RemoveAll(tmpDir)
+
+	csiMapper, _, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mapper: %v", err)
+	}
+
+	pvName := pv.GetName()
+	nodeName := string(plug.host.GetNodeName())
+
+	csiMapper.csiClient = setupClient(t, true)
+	fClient := csiMapper.csiClient.(*fakeCsiDriverClient)
+	fClient.nodeClient.SetNextError(status.Error(codes.InvalidArgument, "mock final error"))
+
+	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
+	attachment := makeTestAttachment(attachID, nodeName, pvName)
+	attachment.Status.Attached = true
+	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.Background(), attachment, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to setup VolumeAttachment: %v", err)
+	}
+	t.Log("created attachement ", attachID)
+
+	stagingPath, err := csiMapper.SetUpDevice()
+	if err == nil {
+		t.Fatal("mapper unexpectedly succeeded")
+	}
+
+	// Check that all directories have been cleaned
+	// Check that all metadata / staging / publish directories were deleted
+	dataDir := getVolumeDeviceDataDir(pv.ObjectMeta.Name, plug.host)
+	if _, err := os.Stat(dataDir); err == nil {
+		t.Errorf("volume publish data directory %s was not deleted", dataDir)
+	}
+	devDir := getVolumeDeviceDataDir(pv.ObjectMeta.Name, plug.host)
+	if _, err := os.Stat(devDir); err == nil {
+		t.Errorf("volume publish device directory %s was not deleted", devDir)
+	}
+
+	if _, err := os.Stat(stagingPath); err == nil {
+		t.Errorf("volume staging path %s was not deleted", stagingPath)
 	}
 }
 
@@ -296,10 +314,10 @@ func TestBlockMapperMapPodDevice(t *testing.T) {
 
 	csiMapper.csiClient = setupClient(t, true)
 
-	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
+	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), nodeName)
 	attachment := makeTestAttachment(attachID, nodeName, pvName)
 	attachment.Status.Attached = true
-	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(attachment)
+	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.Background(), attachment, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to setup VolumeAttachment: %v", err)
 	}
@@ -329,19 +347,18 @@ func TestBlockMapperMapPodDevice(t *testing.T) {
 
 func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, true)()
 
 	fakeClient := fakeclient.NewSimpleClientset()
 	attachRequired := false
-	fakeDriver := &v1beta1.CSIDriver{
+	fakeDriver := &storagev1.CSIDriver{
 		ObjectMeta: meta.ObjectMeta{
 			Name: testDriver,
 		},
-		Spec: v1beta1.CSIDriverSpec{
+		Spec: storagev1.CSIDriverSpec{
 			AttachRequired: &attachRequired,
 		},
 	}
-	_, err := fakeClient.StorageV1beta1().CSIDrivers().Create(fakeDriver)
+	_, err := fakeClient.StorageV1().CSIDrivers().Create(context.TODO(), fakeDriver, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create a fakeDriver: %v", err)
 	}
@@ -426,5 +443,124 @@ func TestBlockMapperTearDownDevice(t *testing.T) {
 	vols := csiUnmapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodeStagedVolumes()
 	if _, ok := vols[csiUnmapper.volumeID]; ok {
 		t.Error("csi server may not have received NodeUnstageVolume call")
+	}
+}
+
+func TestVolumeSetupTeardown(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+
+	// Follow volume setup + teardown sequences at top of cs_block.go and set up / clean up one CSI block device.
+	// Focus on testing that there were no leftover files present after the cleanup.
+
+	plug, tmpDir := newTestPlugin(t, nil)
+	defer os.RemoveAll(tmpDir)
+
+	csiMapper, spec, pv, err := prepareBlockMapperTest(plug, "test-pv", t)
+	if err != nil {
+		t.Fatalf("Failed to make a new Mapper: %v", err)
+	}
+
+	pvName := pv.GetName()
+	nodeName := string(plug.host.GetNodeName())
+
+	csiMapper.csiClient = setupClient(t, true)
+
+	attachID := getAttachmentName(csiMapper.volumeID, string(csiMapper.driverName), string(nodeName))
+	attachment := makeTestAttachment(attachID, nodeName, pvName)
+	attachment.Status.Attached = true
+	_, err = csiMapper.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to setup VolumeAttachment: %v", err)
+	}
+	t.Log("created attachement ", attachID)
+
+	stagingPath, err := csiMapper.SetUpDevice()
+	if err != nil {
+		t.Fatalf("mapper failed to SetupDevice: %v", err)
+	}
+	// Check if NodeStageVolume staged to the right path
+	svols := csiMapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodeStagedVolumes()
+	svol, ok := svols[csiMapper.volumeID]
+	if !ok {
+		t.Error("csi server may not have received NodeStageVolume call")
+	}
+	if svol.Path != stagingPath {
+		t.Errorf("csi server expected device path %s, got %s", stagingPath, svol.Path)
+	}
+
+	path, err := csiMapper.MapPodDevice()
+	if err != nil {
+		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
+	}
+	pvols := csiMapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodePublishedVolumes()
+	pvol, ok := pvols[csiMapper.volumeID]
+	if !ok {
+		t.Error("csi server may not have received NodePublishVolume call")
+	}
+	publishPath := csiMapper.getPublishPath()
+	if pvol.Path != publishPath {
+		t.Errorf("csi server expected path %s, got %s", publishPath, pvol.Path)
+	}
+	if path != publishPath {
+		t.Errorf("csi server expected path %s, but MapPodDevice returned %s", publishPath, path)
+	}
+
+	unmapper, err := plug.NewBlockVolumeUnmapper(pv.ObjectMeta.Name, testPodUID)
+	if err != nil {
+		t.Fatalf("failed to make a new Unmapper: %v", err)
+	}
+
+	csiUnmapper := unmapper.(*csiBlockMapper)
+	csiUnmapper.csiClient = csiMapper.csiClient
+
+	globalMapPath, err := csiUnmapper.GetGlobalMapPath(spec)
+	if err != nil {
+		t.Fatalf("unmapper failed to GetGlobalMapPath: %v", err)
+	}
+
+	err = csiUnmapper.UnmapPodDevice()
+	if err != nil {
+		t.Errorf("unmapper failed to call UnmapPodDevice: %v", err)
+	}
+
+	// GenerateUnmapDeviceFunc uses "" as pod UUID, it is global operation over all pods that used the volume
+	unmapper, err = plug.NewBlockVolumeUnmapper(pv.ObjectMeta.Name, "")
+	if err != nil {
+		t.Fatalf("failed to make a new Unmapper: %v", err)
+	}
+	csiUnmapper = unmapper.(*csiBlockMapper)
+	csiUnmapper.csiClient = csiMapper.csiClient
+
+	err = csiUnmapper.TearDownDevice(globalMapPath, "/dev/test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubs := csiUnmapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodePublishedVolumes()
+	if _, ok := pubs[csiUnmapper.volumeID]; ok {
+		t.Error("csi server may not have received NodeUnpublishVolume call")
+	}
+	vols := csiUnmapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodeStagedVolumes()
+	if _, ok := vols[csiUnmapper.volumeID]; ok {
+		t.Error("csi server may not have received NodeUnstageVolume call")
+	}
+
+	// Check that all metadata / staging / publish directories were deleted
+	dataDir := getVolumeDeviceDataDir(pv.ObjectMeta.Name, plug.host)
+	if _, err := os.Stat(dataDir); err == nil {
+		t.Errorf("volume publish data directory %s was not deleted", dataDir)
+	}
+	devDir := getVolumeDeviceDataDir(pv.ObjectMeta.Name, plug.host)
+	if _, err := os.Stat(devDir); err == nil {
+		t.Errorf("volume publish device directory %s was not deleted", devDir)
+	}
+	if _, err := os.Stat(publishPath); err == nil {
+		t.Errorf("volume publish path %s was not deleted", publishPath)
+	}
+	publishDir := filepath.Dir(publishPath)
+	if _, err := os.Stat(publishDir); err == nil {
+		t.Errorf("volume publish parent directory %s was not deleted", publishDir)
+	}
+	if _, err := os.Stat(stagingPath); err == nil {
+		t.Errorf("volume staging path %s was not deleted", stagingPath)
 	}
 }

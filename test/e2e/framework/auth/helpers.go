@@ -17,6 +17,7 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -65,7 +66,7 @@ func WaitForNamedAuthorizationUpdate(c v1authorization.SubjectAccessReviewsGette
 	}
 
 	err := wait.Poll(policyCachePollInterval, policyCachePollTimeout, func() (bool, error) {
-		response, err := c.SubjectAccessReviews().Create(review)
+		response, err := c.SubjectAccessReviews().Create(context.TODO(), review, metav1.CreateOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -85,7 +86,7 @@ func BindClusterRole(c bindingsGetter, clusterRole, ns string, subjects ...rbacv
 	}
 
 	// Since the namespace names are unique, we can leave this lying around so we don't have to race any caches
-	_, err := c.ClusterRoleBindings().Create(&rbacv1.ClusterRoleBinding{
+	_, err := c.ClusterRoleBindings().Create(context.TODO(), &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: ns + "--" + clusterRole,
 		},
@@ -95,7 +96,7 @@ func BindClusterRole(c bindingsGetter, clusterRole, ns string, subjects ...rbacv
 			Name:     clusterRole,
 		},
 		Subjects: subjects,
-	})
+	}, metav1.CreateOptions{})
 
 	if err != nil {
 		return errors.Wrapf(err, "binding clusterrole/%s for %q for %v", clusterRole, ns, subjects)
@@ -122,7 +123,7 @@ func bindInNamespace(c bindingsGetter, roleType, role, ns string, subjects ...rb
 	}
 
 	// Since the namespace names are unique, we can leave this lying around so we don't have to race any caches
-	_, err := c.RoleBindings(ns).Create(&rbacv1.RoleBinding{
+	_, err := c.RoleBindings(ns).Create(context.TODO(), &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: ns + "--" + role,
 		},
@@ -132,7 +133,7 @@ func bindInNamespace(c bindingsGetter, roleType, role, ns string, subjects ...rb
 			Name:     role,
 		},
 		Subjects: subjects,
-	})
+	}, metav1.CreateOptions{})
 
 	if err != nil {
 		return errors.Wrapf(err, "binding %s/%s into %q for %v", roleType, role, ns, subjects)
@@ -149,7 +150,7 @@ var (
 // IsRBACEnabled returns true if RBAC is enabled. Otherwise false.
 func IsRBACEnabled(crGetter v1rbac.ClusterRolesGetter) bool {
 	isRBACEnabledOnce.Do(func() {
-		crs, err := crGetter.ClusterRoles().List(metav1.ListOptions{})
+		crs, err := crGetter.ClusterRoles().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			e2elog.Logf("Error listing ClusterRoles; assuming RBAC is disabled: %v", err)
 			isRBACEnabled = false

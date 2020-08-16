@@ -17,7 +17,9 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -31,15 +33,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	v1informers "k8s.io/client-go/informers/core/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationv1apihelper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
@@ -47,6 +51,8 @@ import (
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers"
 )
+
+type certKeyFunc func() ([]byte, []byte)
 
 // ServiceResolver knows how to convert a service reference into an actual location.
 type ServiceResolver interface {
@@ -67,8 +73,10 @@ type AvailableConditionController struct {
 	endpointsLister v1listers.EndpointsLister
 	endpointsSynced cache.InformerSynced
 
-	discoveryClient *http.Client
-	serviceResolver ServiceResolver
+	// dialContext specifies the dial function for creating unencrypted TCP connections.
+	dialContext                func(ctx context.Context, network, address string) (net.Conn, error)
+	proxyCurrentCertKeyContent certKeyFunc
+	serviceResolver            ServiceResolver
 
 	// To allow injection for testing.
 	syncFn func(key string) error
@@ -87,9 +95,9 @@ func NewAvailableConditionController(
 	endpointsInformer v1informers.EndpointsInformer,
 	apiServiceClient apiregistrationclient.APIServicesGetter,
 	proxyTransport *http.Transport,
-	proxyClientCert []byte,
-	proxyClientKey []byte,
+	proxyCurrentCertKeyContent certKeyFunc,
 	serviceResolver ServiceResolver,
+	egressSelector *egressselector.EgressSelector,
 ) (*AvailableConditionController, error) {
 	c := &AvailableConditionController{
 		apiServiceClient: apiServiceClient,
@@ -106,29 +114,19 @@ func NewAvailableConditionController(
 			// the maximum disruption time to a minimum, but it does prevent hot loops.
 			workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second),
 			"AvailableConditionController"),
+		proxyCurrentCertKeyContent: proxyCurrentCertKeyContent,
 	}
 
-	// if a particular transport was specified, use that otherwise build one
-	// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status
-	// that's not so bad) and sets a very short timeout.  This is a best effort GET that provides no additional information
-	restConfig := &rest.Config{
-		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: true,
-			CertData: proxyClientCert,
-			KeyData:  proxyClientKey,
-		},
-	}
-	if proxyTransport != nil && proxyTransport.DialContext != nil {
-		restConfig.Dial = proxyTransport.DialContext
-	}
-	transport, err := rest.TransportFor(restConfig)
-	if err != nil {
-		return nil, err
-	}
-	c.discoveryClient = &http.Client{
-		Transport: transport,
-		// the request should happen quickly.
-		Timeout: 5 * time.Second,
+	if egressSelector != nil {
+		networkContext := egressselector.Cluster.AsNetworkContext()
+		var egressDialer utilnet.DialFunc
+		egressDialer, err := egressSelector.Lookup(networkContext)
+		if err != nil {
+			return nil, err
+		}
+		c.dialContext = egressDialer
+	} else if proxyTransport != nil && proxyTransport.DialContext != nil {
+		c.dialContext = proxyTransport.DialContext
 	}
 
 	// resync on this one because it is low cardinality and rechecking the actual discovery
@@ -167,6 +165,34 @@ func (c *AvailableConditionController) sync(key string) error {
 	}
 	if err != nil {
 		return err
+	}
+
+	// if a particular transport was specified, use that otherwise build one
+	// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status
+	// that's not so bad) and sets a very short timeout.  This is a best effort GET that provides no additional information
+	restConfig := &rest.Config{
+		TLSClientConfig: rest.TLSClientConfig{
+			Insecure: true,
+		},
+	}
+
+	if c.proxyCurrentCertKeyContent != nil {
+		proxyClientCert, proxyClientKey := c.proxyCurrentCertKeyContent()
+
+		restConfig.TLSClientConfig.CertData = proxyClientCert
+		restConfig.TLSClientConfig.KeyData = proxyClientKey
+	}
+	if c.dialContext != nil {
+		restConfig.Dial = c.dialContext
+	}
+	restTransport, err := rest.TransportFor(restConfig)
+	if err != nil {
+		return err
+	}
+	discoveryClient := &http.Client{
+		Transport: restTransport,
+		// the request should happen quickly.
+		Timeout: 5 * time.Second,
 	}
 
 	apiService := originalAPIService.DeepCopy()
@@ -271,9 +297,14 @@ func (c *AvailableConditionController) sync(key string) error {
 					results <- err
 					return
 				}
-				discoveryURL.Path = "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
+				// render legacyAPIService health check path when it is delegated to a service
+				if apiService.Name == "v1." {
+					discoveryURL.Path = "/api/" + apiService.Spec.Version
+				} else {
+					discoveryURL.Path = "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
+				}
 
-				errCh := make(chan error)
+				errCh := make(chan error, 1)
 				go func() {
 					// be sure to check a URL that the aggregated API server is required to serve
 					newReq, err := http.NewRequest("GET", discoveryURL.String(), nil)
@@ -284,7 +315,7 @@ func (c *AvailableConditionController) sync(key string) error {
 
 					// setting the system-masters identity ensures that we will always have access rights
 					transport.SetAuthProxyHeaders(newReq, "system:kube-aggregator", []string{"system:masters"}, nil)
-					resp, err := c.discoveryClient.Do(newReq)
+					resp, err := discoveryClient.Do(newReq)
 					if resp != nil {
 						resp.Body.Close()
 						// we should always been in the 200s or 300s
@@ -347,34 +378,21 @@ func (c *AvailableConditionController) sync(key string) error {
 }
 
 // updateAPIServiceStatus only issues an update if a change is detected.  We have a tight resync loop to quickly detect dead
-// apiservices.  Doing that means we don't want to quickly issue no-op updates.
+// apiservices. Doing that means we don't want to quickly issue no-op updates.
 func updateAPIServiceStatus(client apiregistrationclient.APIServicesGetter, originalAPIService, newAPIService *apiregistrationv1.APIService) (*apiregistrationv1.APIService, error) {
+	// update this metric on every sync operation to reflect the actual state
+	setUnavailableGauge(newAPIService)
+
 	if equality.Semantic.DeepEqual(originalAPIService.Status, newAPIService.Status) {
 		return newAPIService, nil
 	}
 
-	newAPIService, err := client.APIServices().UpdateStatus(newAPIService)
+	newAPIService, err := client.APIServices().UpdateStatus(context.TODO(), newAPIService, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	// update metrics
-	wasAvailable := apiregistrationv1apihelper.IsAPIServiceConditionTrue(originalAPIService, apiregistrationv1.Available)
-	isAvailable := apiregistrationv1apihelper.IsAPIServiceConditionTrue(newAPIService, apiregistrationv1.Available)
-	if isAvailable != wasAvailable {
-		if isAvailable {
-			unavailableGauge.WithLabelValues(newAPIService.Name).Set(0.0)
-		} else {
-			unavailableGauge.WithLabelValues(newAPIService.Name).Set(1.0)
-
-			reason := "UnknownReason"
-			if newCondition := apiregistrationv1apihelper.GetAPIServiceConditionByType(newAPIService, apiregistrationv1.Available); newCondition != nil {
-				reason = newCondition.Reason
-			}
-			unavailableCounter.WithLabelValues(newAPIService.Name, reason).Inc()
-		}
-	}
-
+	setUnavailableCounter(originalAPIService, newAPIService)
 	return newAPIService, nil
 }
 
@@ -555,5 +573,30 @@ func (c *AvailableConditionController) deleteEndpoints(obj interface{}) {
 	}
 	for _, apiService := range c.getAPIServicesFor(castObj) {
 		c.queue.Add(apiService)
+	}
+}
+
+// setUnavailableGauge set the metrics so that it reflect the current state base on availability of the given service
+func setUnavailableGauge(newAPIService *apiregistrationv1.APIService) {
+	if apiregistrationv1apihelper.IsAPIServiceConditionTrue(newAPIService, apiregistrationv1.Available) {
+		unavailableGauge.WithLabelValues(newAPIService.Name).Set(0.0)
+		return
+	}
+
+	unavailableGauge.WithLabelValues(newAPIService.Name).Set(1.0)
+}
+
+// setUnavailableCounter increases the metrics only if the given service is unavailable and its APIServiceCondition has changed
+func setUnavailableCounter(originalAPIService, newAPIService *apiregistrationv1.APIService) {
+	wasAvailable := apiregistrationv1apihelper.IsAPIServiceConditionTrue(originalAPIService, apiregistrationv1.Available)
+	isAvailable := apiregistrationv1apihelper.IsAPIServiceConditionTrue(newAPIService, apiregistrationv1.Available)
+	statusChanged := isAvailable != wasAvailable
+
+	if statusChanged && !isAvailable {
+		reason := "UnknownReason"
+		if newCondition := apiregistrationv1apihelper.GetAPIServiceConditionByType(newAPIService, apiregistrationv1.Available); newCondition != nil {
+			reason = newCondition.Reason
+		}
+		unavailableCounter.WithLabelValues(newAPIService.Name, reason).Inc()
 	}
 }

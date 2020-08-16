@@ -7,14 +7,10 @@ go_library(
         "collection.go",
         "doc.go",
         "elf_reader.go",
-        "feature.go",
         "linker.go",
         "map.go",
         "marshalers.go",
         "prog.go",
-        "ptr_32_be.go",
-        "ptr_32_le.go",
-        "ptr_64.go",
         "syscalls.go",
         "types.go",
         "types_string.go",
@@ -25,8 +21,8 @@ go_library(
     deps = [
         "//vendor/github.com/cilium/ebpf/asm:go_default_library",
         "//vendor/github.com/cilium/ebpf/internal:go_default_library",
+        "//vendor/github.com/cilium/ebpf/internal/btf:go_default_library",
         "//vendor/github.com/cilium/ebpf/internal/unix:go_default_library",
-        "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )
 

@@ -14,4 +14,4 @@ spec:
     spec:
       containers:
       - name: mock-container
-        image: k8s.gcr.io/pause:3.1
+        image: k8s.gcr.io/pause:3.2

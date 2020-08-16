@@ -17,6 +17,7 @@ limitations under the License.
 package cloud
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -51,7 +52,6 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 		if err != nil {
 			framework.Logf("Unexpected error occurred: %v", err)
 		}
-		// TODO: write a wrapper for ExpectNoErrorWithOffset()
 		framework.ExpectNoErrorWithOffset(0, err)
 
 		framework.Logf("Original number of ready nodes: %d", len(origNodes.Items))
@@ -65,7 +65,7 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(newNodes), len(origNodes.Items)-1)
 
-		_, err = c.CoreV1().Nodes().Get(nodeToDelete.Name, metav1.GetOptions{})
+		_, err = c.CoreV1().Nodes().Get(context.TODO(), nodeToDelete.Name, metav1.GetOptions{})
 		if err == nil {
 			framework.Failf("node %q still exists when it should be deleted", nodeToDelete.Name)
 		} else if !apierrors.IsNotFound(err) {

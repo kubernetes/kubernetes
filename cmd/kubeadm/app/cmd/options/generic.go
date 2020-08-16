@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -92,4 +93,17 @@ func AddKubeadmOtherFlags(flagSet *pflag.FlagSet, rootfsPath *string) {
 // AddKustomizePodsFlag adds the --kustomize flag to the given flagset
 func AddKustomizePodsFlag(fs *pflag.FlagSet, kustomizeDir *string) {
 	fs.StringVarP(kustomizeDir, Kustomize, "k", *kustomizeDir, "The path where kustomize patches for static pod manifests are stored.")
+	fs.MarkDeprecated(Kustomize, fmt.Sprintf("This flag is deprecated and will be removed in a future version. Please use %s instead.", Patches))
+}
+
+// AddPatchesFlag adds the --patches flag to the given flagset
+func AddPatchesFlag(fs *pflag.FlagSet, patchesDir *string) {
+	fs.StringVar(patchesDir, Patches, *patchesDir, `Path to a directory that contains files named `+
+		`"target[suffix][+patchtype].extension". For example, `+
+		`"kube-apiserver0+merge.yaml" or just "etcd.json". `+
+		`"patchtype" can be one of "strategic", "merge" or "json" and they match the patch formats `+
+		`supported by kubectl. The default "patchtype" is "strategic". "extension" must be either `+
+		`"json" or "yaml". "suffix" is an optional string that can be used to determine `+
+		`which patches are applied first alpha-numerically.`,
+	)
 }

@@ -36,7 +36,9 @@ func NewPrivateEndpointConnectionsClient(subscriptionID string) PrivateEndpointC
 	return NewPrivateEndpointConnectionsClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// NewPrivateEndpointConnectionsClientWithBaseURI creates an instance of the PrivateEndpointConnectionsClient client.
+// NewPrivateEndpointConnectionsClientWithBaseURI creates an instance of the PrivateEndpointConnectionsClient client
+// using a custom endpoint.  Use this when interacting with an Azure cloud that uses a non-standard base URI (sovereign
+// clouds, Azure stack).
 func NewPrivateEndpointConnectionsClientWithBaseURI(baseURI string, subscriptionID string) PrivateEndpointConnectionsClient {
 	return PrivateEndpointConnectionsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -47,8 +49,8 @@ func NewPrivateEndpointConnectionsClientWithBaseURI(baseURI string, subscription
 // insensitive.
 // accountName - the name of the storage account within the specified resource group. Storage account names
 // must be between 3 and 24 characters in length and use numbers and lower-case letters only.
-// privateEndpointConnectionName - the name of the private endpoint connection associated with the Storage
-// Account
+// privateEndpointConnectionName - the name of the private endpoint connection associated with the Azure
+// resource
 func (client PrivateEndpointConnectionsClient) Delete(ctx context.Context, resourceGroupName string, accountName string, privateEndpointConnectionName string) (result autorest.Response, err error) {
 	if tracing.IsEnabled() {
 		ctx = tracing.StartSpan(ctx, fqdn+"/PrivateEndpointConnectionsClient.Delete")
@@ -119,8 +121,7 @@ func (client PrivateEndpointConnectionsClient) DeletePreparer(ctx context.Contex
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client PrivateEndpointConnectionsClient) DeleteSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // DeleteResponder handles the response to the Delete request. The method always
@@ -141,8 +142,8 @@ func (client PrivateEndpointConnectionsClient) DeleteResponder(resp *http.Respon
 // insensitive.
 // accountName - the name of the storage account within the specified resource group. Storage account names
 // must be between 3 and 24 characters in length and use numbers and lower-case letters only.
-// privateEndpointConnectionName - the name of the private endpoint connection associated with the Storage
-// Account
+// privateEndpointConnectionName - the name of the private endpoint connection associated with the Azure
+// resource
 func (client PrivateEndpointConnectionsClient) Get(ctx context.Context, resourceGroupName string, accountName string, privateEndpointConnectionName string) (result PrivateEndpointConnection, err error) {
 	if tracing.IsEnabled() {
 		ctx = tracing.StartSpan(ctx, fqdn+"/PrivateEndpointConnectionsClient.Get")
@@ -213,13 +214,103 @@ func (client PrivateEndpointConnectionsClient) GetPreparer(ctx context.Context, 
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client PrivateEndpointConnectionsClient) GetSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
 // closes the http.Response Body.
 func (client PrivateEndpointConnectionsClient) GetResponder(resp *http.Response) (result PrivateEndpointConnection, err error) {
+	err = autorest.Respond(
+		resp,
+		client.ByInspecting(),
+		azure.WithErrorUnlessStatusCode(http.StatusOK),
+		autorest.ByUnmarshallingJSON(&result),
+		autorest.ByClosing())
+	result.Response = autorest.Response{Response: resp}
+	return
+}
+
+// List list all the private endpoint connections associated with the storage account.
+// Parameters:
+// resourceGroupName - the name of the resource group within the user's subscription. The name is case
+// insensitive.
+// accountName - the name of the storage account within the specified resource group. Storage account names
+// must be between 3 and 24 characters in length and use numbers and lower-case letters only.
+func (client PrivateEndpointConnectionsClient) List(ctx context.Context, resourceGroupName string, accountName string) (result PrivateEndpointConnectionListResult, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/PrivateEndpointConnectionsClient.List")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: resourceGroupName,
+			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
+				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
+				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}},
+		{TargetValue: accountName,
+			Constraints: []validation.Constraint{{Target: "accountName", Name: validation.MaxLength, Rule: 24, Chain: nil},
+				{Target: "accountName", Name: validation.MinLength, Rule: 3, Chain: nil}}},
+		{TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+		return result, validation.NewError("storage.PrivateEndpointConnectionsClient", "List", err.Error())
+	}
+
+	req, err := client.ListPreparer(ctx, resourceGroupName, accountName)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "storage.PrivateEndpointConnectionsClient", "List", nil, "Failure preparing request")
+		return
+	}
+
+	resp, err := client.ListSender(req)
+	if err != nil {
+		result.Response = autorest.Response{Response: resp}
+		err = autorest.NewErrorWithError(err, "storage.PrivateEndpointConnectionsClient", "List", resp, "Failure sending request")
+		return
+	}
+
+	result, err = client.ListResponder(resp)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "storage.PrivateEndpointConnectionsClient", "List", resp, "Failure responding to request")
+	}
+
+	return
+}
+
+// ListPreparer prepares the List request.
+func (client PrivateEndpointConnectionsClient) ListPreparer(ctx context.Context, resourceGroupName string, accountName string) (*http.Request, error) {
+	pathParameters := map[string]interface{}{
+		"accountName":       autorest.Encode("path", accountName),
+		"resourceGroupName": autorest.Encode("path", resourceGroupName),
+		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
+	}
+
+	const APIVersion = "2019-06-01"
+	queryParameters := map[string]interface{}{
+		"api-version": APIVersion,
+	}
+
+	preparer := autorest.CreatePreparer(
+		autorest.AsGet(),
+		autorest.WithBaseURL(client.BaseURI),
+		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{accountName}/privateEndpointConnections", pathParameters),
+		autorest.WithQueryParameters(queryParameters))
+	return preparer.Prepare((&http.Request{}).WithContext(ctx))
+}
+
+// ListSender sends the List request. The method will close the
+// http.Response Body if it receives an error.
+func (client PrivateEndpointConnectionsClient) ListSender(req *http.Request) (*http.Response, error) {
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
+}
+
+// ListResponder handles the response to the List request. The method always
+// closes the http.Response Body.
+func (client PrivateEndpointConnectionsClient) ListResponder(resp *http.Response) (result PrivateEndpointConnectionListResult, err error) {
 	err = autorest.Respond(
 		resp,
 		client.ByInspecting(),
@@ -236,8 +327,8 @@ func (client PrivateEndpointConnectionsClient) GetResponder(resp *http.Response)
 // insensitive.
 // accountName - the name of the storage account within the specified resource group. Storage account names
 // must be between 3 and 24 characters in length and use numbers and lower-case letters only.
-// privateEndpointConnectionName - the name of the private endpoint connection associated with the Storage
-// Account
+// privateEndpointConnectionName - the name of the private endpoint connection associated with the Azure
+// resource
 // properties - the private endpoint connection properties.
 func (client PrivateEndpointConnectionsClient) Put(ctx context.Context, resourceGroupName string, accountName string, privateEndpointConnectionName string, properties PrivateEndpointConnection) (result PrivateEndpointConnection, err error) {
 	if tracing.IsEnabled() {
@@ -314,8 +405,7 @@ func (client PrivateEndpointConnectionsClient) PutPreparer(ctx context.Context, 
 // PutSender sends the Put request. The method will close the
 // http.Response Body if it receives an error.
 func (client PrivateEndpointConnectionsClient) PutSender(req *http.Request) (*http.Response, error) {
-	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
-	return autorest.SendWithSender(client, req, sd...)
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // PutResponder handles the response to the Put request. The method always

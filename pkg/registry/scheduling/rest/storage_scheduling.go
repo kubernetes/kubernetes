@@ -17,10 +17,11 @@ limitations under the License.
 package rest
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -123,10 +124,10 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 			}
 
 			for _, pc := range schedulingapiv1.SystemPriorityClasses() {
-				_, err := schedClientSet.PriorityClasses().Get(pc.Name, metav1.GetOptions{})
+				_, err := schedClientSet.PriorityClasses().Get(context.TODO(), pc.Name, metav1.GetOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) {
-						_, err := schedClientSet.PriorityClasses().Create(pc)
+						_, err := schedClientSet.PriorityClasses().Create(context.TODO(), pc, metav1.CreateOptions{})
 						if err != nil && !apierrors.IsAlreadyExists(err) {
 							return false, err
 						} else {

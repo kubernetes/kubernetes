@@ -42,3 +42,17 @@ export KUBECTL_EXTERNAL_DIFF=meld; kubectl diff -k ./dir/
 
 {% endmethod %}
 
+{% method %}
+## Exit status
+The following exit values shall be returned:
+
+ `0`
+No differences were found.
+ `1`
+Differences were found.
+ `>1`
+Kubectl or diff failed with an error.
+
+**Note:** `KUBECTL_EXTERNAL_DIFF`, if used, is expected to follow that convention.
+
+{% endmethod %}

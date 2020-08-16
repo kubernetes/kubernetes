@@ -17,6 +17,7 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,13 +33,13 @@ import (
 // WaitForServiceDeletedWithFinalizer waits for the service with finalizer to be deleted.
 func WaitForServiceDeletedWithFinalizer(cs clientset.Interface, namespace, name string) {
 	ginkgo.By("Delete service with finalizer")
-	if err := cs.CoreV1().Services(namespace).Delete(name, nil); err != nil {
+	if err := cs.CoreV1().Services(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 		framework.Failf("Failed to delete service %s/%s", namespace, name)
 	}
 
 	ginkgo.By("Wait for service to disappear")
 	if pollErr := wait.PollImmediate(LoadBalancerPollInterval, GetServiceLoadBalancerCreationTimeout(cs), func() (bool, error) {
-		svc, err := cs.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
+		svc, err := cs.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				framework.Logf("Service %s/%s is gone.", namespace, name)
@@ -58,7 +59,7 @@ func WaitForServiceDeletedWithFinalizer(cs clientset.Interface, namespace, name 
 func WaitForServiceUpdatedWithFinalizer(cs clientset.Interface, namespace, name string, hasFinalizer bool) {
 	ginkgo.By(fmt.Sprintf("Wait for service to hasFinalizer=%t", hasFinalizer))
 	if pollErr := wait.PollImmediate(LoadBalancerPollInterval, GetServiceLoadBalancerCreationTimeout(cs), func() (bool, error) {
-		svc, err := cs.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
+		svc, err := cs.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

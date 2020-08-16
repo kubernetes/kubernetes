@@ -4,11 +4,13 @@ approvers:
 - Random-Liu
 - dchen1107
 - derekwaynecarr
-- tallclair
 - vishh
 - yujuhong
+- dashpole
+- sjenning
 reviewers:
 - sig-node-reviewers
+- tallclair
 labels:
 - area/kubelet
 - sig/node

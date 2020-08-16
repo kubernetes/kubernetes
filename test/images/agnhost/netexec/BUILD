@@ -11,6 +11,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/images/agnhost/netexec",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//vendor/github.com/ishidawataru/sctp:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )

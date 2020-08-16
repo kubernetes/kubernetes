@@ -31,6 +31,10 @@
 // testing custom prometheus.Collector implementations and in particular whole
 // exporters, i.e. programs that retrieve telemetry data from a 3rd party source
 // and convert it into Prometheus metrics.
+//
+// In a similar pattern, CollectAndLint and GatherAndLint can be used to detect
+// metrics that have issues with their name, type, or metadata without being
+// necessarily invalid, e.g. a counter with a name missing the “_total” suffix.
 package testutil
 
 import (
@@ -108,9 +112,48 @@ func ToFloat64(c prometheus.Collector) float64 {
 	panic(fmt.Errorf("collected a non-gauge/counter/untyped metric: %s", pb))
 }
 
+// CollectAndCount registers the provided Collector with a newly created
+// pedantic Registry. It then calls GatherAndCount with that Registry and with
+// the provided metricNames. In the unlikely case that the registration or the
+// gathering fails, this function panics. (This is inconsistent with the other
+// CollectAnd… functions in this package and has historical reasons. Changing
+// the function signature would be a breaking change and will therefore only
+// happen with the next major version bump.)
+func CollectAndCount(c prometheus.Collector, metricNames ...string) int {
+	reg := prometheus.NewPedanticRegistry()
+	if err := reg.Register(c); err != nil {
+		panic(fmt.Errorf("registering collector failed: %s", err))
+	}
+	result, err := GatherAndCount(reg, metricNames...)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+// GatherAndCount gathers all metrics from the provided Gatherer and counts
+// them. It returns the number of metric children in all gathered metric
+// families together. If any metricNames are provided, only metrics with those
+// names are counted.
+func GatherAndCount(g prometheus.Gatherer, metricNames ...string) (int, error) {
+	got, err := g.Gather()
+	if err != nil {
+		return 0, fmt.Errorf("gathering metrics failed: %s", err)
+	}
+	if metricNames != nil {
+		got = filterMetrics(got, metricNames)
+	}
+
+	result := 0
+	for _, mf := range got {
+		result += len(mf.GetMetric())
+	}
+	return result, nil
+}
+
 // CollectAndCompare registers the provided Collector with a newly created
-// pedantic Registry. It then does the same as GatherAndCompare, gathering the
-// metrics from the pedantic Registry.
+// pedantic Registry. It then calls GatherAndCompare with that Registry and with
+// the provided metricNames.
 func CollectAndCompare(c prometheus.Collector, expected io.Reader, metricNames ...string) error {
 	reg := prometheus.NewPedanticRegistry()
 	if err := reg.Register(c); err != nil {

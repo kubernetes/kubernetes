@@ -84,7 +84,6 @@ type FlowSchemaList struct {
 	metav1.ListMeta
 
 	// `items` is a list of FlowSchemas.
-	// +listType=set
 	Items []FlowSchema
 }
 
@@ -350,7 +349,6 @@ type PriorityLevelConfigurationList struct {
 	// +optional
 	metav1.ListMeta
 	// `items` is a list of request-priorities.
-	// +listType=set
 	Items []PriorityLevelConfiguration
 }
 

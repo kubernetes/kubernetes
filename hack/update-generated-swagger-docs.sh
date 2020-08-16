@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Generates `types_swagger_doc_generated.go` files for API group
+# This script generates `types_swagger_doc_generated.go` files for API group
 # versions. That file contains functions on API structs that return
 # the comments that should be surfaced for the corresponding API type
 # in our API docs.
@@ -35,6 +35,8 @@ IFS=" " read -r -a GROUP_VERSIONS <<< "meta/v1 meta/v1beta1 ${KUBE_AVAILABLE_GRO
 for group_version in "${GROUP_VERSIONS[@]}"; do
   rm -f "$(kube::util::group-version-to-pkg-path "${group_version}")/types_swagger_doc_generated.go"
 done
+# ensure we have the latest genswaggertypedocs built
+go install k8s.io/kubernetes/cmd/genswaggertypedocs
 for group_version in "${GROUP_VERSIONS[@]}"; do
   kube::swagger::gen_types_swagger_doc "${group_version}" "$(kube::util::group-version-to-pkg-path "${group_version}")"
 done

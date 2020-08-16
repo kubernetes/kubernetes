@@ -36,6 +36,7 @@ type AdmissionResponse struct {
 	Patch            []byte
 	PatchType        admissionv1.PatchType
 	Result           *metav1.Status
+	Warnings         []string
 }
 
 // VerifyAdmissionResponse checks the validity of the provided admission review object, and returns the
@@ -93,6 +94,7 @@ func VerifyAdmissionResponse(uid types.UID, mutating bool, review runtime.Object
 			Patch:            patch,
 			PatchType:        patchType,
 			Result:           r.Response.Result,
+			Warnings:         r.Response.Warnings,
 		}, nil
 
 	case *admissionv1beta1.AdmissionReview:
@@ -118,6 +120,7 @@ func VerifyAdmissionResponse(uid types.UID, mutating bool, review runtime.Object
 			Patch:            patch,
 			PatchType:        patchType,
 			Result:           r.Response.Result,
+			Warnings:         r.Response.Warnings,
 		}, nil
 
 	default:

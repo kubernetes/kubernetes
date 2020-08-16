@@ -17,15 +17,17 @@ limitations under the License.
 package bootstrap
 
 import (
+	"context"
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -51,7 +53,7 @@ type SignerOptions struct {
 	// TokenSecretNamespace string is the namespace for token Secrets.
 	TokenSecretNamespace string
 
-	// ConfigMapResynce is the time.Duration at which to fully re-list configmaps.
+	// ConfigMapResync is the time.Duration at which to fully re-list configmaps.
 	// If zero, re-list will be delayed as long as possible
 	ConfigMapResync time.Duration
 
@@ -242,7 +244,7 @@ func (e *Signer) signConfigMap() {
 }
 
 func (e *Signer) updateConfigMap(cm *v1.ConfigMap) {
-	_, err := e.client.CoreV1().ConfigMaps(cm.Namespace).Update(cm)
+	_, err := e.client.CoreV1().ConfigMaps(cm.Namespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
 	if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
 		klog.V(3).Infof("Error updating ConfigMap: %v", err)
 	}

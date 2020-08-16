@@ -25,10 +25,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/klog"
-	utilexec "k8s.io/utils/exec"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/keymutex"
-	utilpath "k8s.io/utils/path"
 )
 
 // Mounter provides the default implementation of mount.Interface
@@ -53,10 +51,20 @@ var getSMBMountMutex = keymutex.NewHashed(0)
 // Mount : mounts source to target with given options.
 // currently only supports cifs(smb), bind mount(for disk)
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
+	return mounter.MountSensitive(source, target, fstype, options, nil /* sensitiveOptions */)
+}
+
+// MountSensitive is the same as Mount() but this method allows
+// sensitiveOptions to be passed in a separate parameter from the normal
+// mount options and ensures the sensitiveOptions are never logged. This
+// method should be used by callers that pass sensitive material (like
+// passwords) as mount options.
+func (mounter *Mounter) MountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
 	target = NormalizeWindowsPath(target)
+	sanitizedOptionsForLogging := sanitizedOptionsForLogging(options, sensitiveOptions)
 
 	if source == "tmpfs" {
-		klog.V(3).Infof("mounting source (%q), target (%q), with options (%q)", source, target, options)
+		klog.V(3).Infof("mounting source (%q), target (%q), with options (%q)", source, target, sanitizedOptionsForLogging)
 		return os.MkdirAll(target, 0755)
 	}
 
@@ -66,36 +74,37 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	}
 
 	klog.V(4).Infof("mount options(%q) source:%q, target:%q, fstype:%q, begin to mount",
-		options, source, target, fstype)
+		sanitizedOptionsForLogging, source, target, fstype)
 	bindSource := source
 
-	// tell it's going to mount azure disk or azure file according to options
-	if bind, _, _ := MakeBindOpts(options); bind {
-		// mount azure disk
+	if bind, _, _, _ := MakeBindOptsSensitive(options, sensitiveOptions); bind {
 		bindSource = NormalizeWindowsPath(source)
 	} else {
-		if len(options) < 2 {
+		allOptions := []string{}
+		allOptions = append(allOptions, options...)
+		allOptions = append(allOptions, sensitiveOptions...)
+		if len(allOptions) < 2 {
 			klog.Warningf("mount options(%q) command number(%d) less than 2, source:%q, target:%q, skip mounting",
-				options, len(options), source, target)
+				sanitizedOptionsForLogging, len(allOptions), source, target)
 			return nil
 		}
 
 		// currently only cifs mount is supported
 		if strings.ToLower(fstype) != "cifs" {
-			return fmt.Errorf("only cifs mount is supported now, fstype: %q, mounting source (%q), target (%q), with options (%q)", fstype, source, target, options)
+			return fmt.Errorf("only cifs mount is supported now, fstype: %q, mounting source (%q), target (%q), with options (%q)", fstype, source, target, sanitizedOptionsForLogging)
 		}
 
 		// lock smb mount for the same source
 		getSMBMountMutex.LockKey(source)
 		defer getSMBMountMutex.UnlockKey(source)
 
-		if output, err := newSMBMapping(options[0], options[1], source); err != nil {
+		if output, err := newSMBMapping(allOptions[0], allOptions[1], source); err != nil {
 			if isSMBMappingExist(source) {
 				klog.V(2).Infof("SMB Mapping(%s) already exists, now begin to remove and remount", source)
 				if output, err := removeSMBMapping(source); err != nil {
 					return fmt.Errorf("Remove-SmbGlobalMapping failed: %v, output: %q", err, output)
 				}
-				if output, err := newSMBMapping(options[0], options[1], source); err != nil {
+				if output, err := newSMBMapping(allOptions[0], allOptions[1], source); err != nil {
 					return fmt.Errorf("New-SmbGlobalMapping remount failed: %v, output: %q", err, output)
 				}
 			} else {
@@ -104,10 +113,12 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 		}
 	}
 
-	if output, err := exec.Command("cmd", "/c", "mklink", "/D", target, bindSource).CombinedOutput(); err != nil {
+	output, err := exec.Command("cmd", "/c", "mklink", "/D", target, bindSource).CombinedOutput()
+	if err != nil {
 		klog.Errorf("mklink failed: %v, source(%q) target(%q) output: %q", err, bindSource, target, string(output))
 		return err
 	}
+	klog.V(2).Infof("mklink source(%q) on target(%q) successfully, output: %q", bindSource, target, string(output))
 
 	return nil
 }
@@ -116,7 +127,7 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 // return (output, error)
 func newSMBMapping(username, password, remotepath string) (string, error) {
 	if username == "" || password == "" || remotepath == "" {
-		return "", fmt.Errorf("invalid parameter(username: %s, password: %s, remoteapth: %s)", username, password, remotepath)
+		return "", fmt.Errorf("invalid parameter(username: %s, password: %s, remoteapth: %s)", username, sensitiveOptionsRemoved, remotepath)
 	}
 
 	// use PowerShell Environment Variables to store user input string to prevent command line injection
@@ -172,19 +183,10 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	// If current file is a symlink, then it is a mountpoint.
-	if stat.Mode()&os.ModeSymlink != 0 {
-		target, err := os.Readlink(file)
-		if err != nil {
-			return true, fmt.Errorf("readlink error: %v", err)
-		}
-		exists, err := utilpath.Exists(utilpath.CheckFollowSymlink, target)
-		if err != nil {
-			return true, err
-		}
-		return !exists, nil
-	}
 
+	if stat.Mode()&os.ModeSymlink != 0 {
+		return false, err
+	}
 	return true, nil
 }
 
@@ -203,7 +205,7 @@ func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	return []string{pathname}, nil
 }
 
-func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
+func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
 	// Try to mount the disk
 	klog.V(4).Infof("Attempting to formatAndMount disk: %s %s %s", fstype, source, target)
 
@@ -219,37 +221,38 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 
 	// format disk if it is unformatted(raw)
 	cmd := fmt.Sprintf("Get-Disk -Number %s | Where partitionstyle -eq 'raw' | Initialize-Disk -PartitionStyle MBR -PassThru"+
-		" | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem %s -Confirm:$false", source, fstype)
+		" | New-Partition -UseMaximumSize | Format-Volume -FileSystem %s -Confirm:$false", source, fstype)
 	if output, err := mounter.Exec.Command("powershell", "/c", cmd).CombinedOutput(); err != nil {
 		return fmt.Errorf("diskMount: format disk failed, error: %v, output: %q", err, string(output))
 	}
 	klog.V(4).Infof("diskMount: Disk successfully formatted, disk: %q, fstype: %q", source, fstype)
 
-	driveLetter, err := getDriveLetterByDiskNumber(source, mounter.Exec)
+	volumeIds, err := listVolumesOnDisk(source)
 	if err != nil {
 		return err
 	}
-	driverPath := driveLetter + ":"
+	driverPath := volumeIds[0]
 	target = NormalizeWindowsPath(target)
-	klog.V(4).Infof("Attempting to formatAndMount disk: %s %s %s", fstype, driverPath, target)
-	if output, err := mounter.Exec.Command("cmd", "/c", "mklink", "/D", target, driverPath).CombinedOutput(); err != nil {
-		klog.Errorf("mklink failed: %v, output: %q", err, string(output))
+	output, err := mounter.Exec.Command("cmd", "/c", "mklink", "/D", target, driverPath).CombinedOutput()
+	if err != nil {
+		klog.Errorf("mklink(%s, %s) failed: %v, output: %q", target, driverPath, err, string(output))
 		return err
 	}
+	klog.V(2).Infof("formatAndMount disk(%s) fstype(%s) on(%s) with output(%s) successfully", driverPath, fstype, target, string(output))
 	return nil
 }
 
-// Get drive letter according to windows disk number
-func getDriveLetterByDiskNumber(diskNum string, exec utilexec.Interface) (string, error) {
-	cmd := fmt.Sprintf("(Get-Partition -DiskNumber %s).DriveLetter", diskNum)
+// ListVolumesOnDisk - returns back list of volumes(volumeIDs) in the disk (requested in diskID).
+func listVolumesOnDisk(diskID string) (volumeIDs []string, err error) {
+	cmd := fmt.Sprintf("(Get-Disk -DeviceId %s | Get-Partition | Get-Volume).UniqueId", diskID)
 	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
+	klog.V(4).Infof("listVolumesOnDisk id from %s: %s", diskID, string(output))
 	if err != nil {
-		return "", fmt.Errorf("azureMount: Get Drive Letter failed: %v, output: %q", err, string(output))
+		return []string{}, fmt.Errorf("error list volumes on disk. cmd: %s, output: %s, error: %v", cmd, string(output), err)
 	}
-	if len(string(output)) < 1 {
-		return "", fmt.Errorf("azureMount: Get Drive Letter failed, output is empty")
-	}
-	return string(output)[:1], nil
+
+	volumeIds := strings.Split(strings.TrimSpace(string(output)), "\r\n")
+	return volumeIds, nil
 }
 
 // getAllParentLinks walks all symbolic links and return all the parent targets recursively

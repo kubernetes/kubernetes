@@ -57,5 +57,7 @@ go_test(
         "//pkg/apis/core/helper:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/github.com/google/gofuzz:go_default_library",
     ],
 )

@@ -17,13 +17,20 @@ limitations under the License.
 package util
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
+	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
+	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 )
 
 // GetPodFullName returns a name that uniquely identifies a pod.
@@ -33,22 +40,15 @@ func GetPodFullName(pod *v1.Pod) string {
 	return pod.Name + "_" + pod.Namespace
 }
 
-// GetPodStartTime returns start time of the given pod.
+// GetPodStartTime returns start time of the given pod or current timestamp
+// if it hasn't started yet.
 func GetPodStartTime(pod *v1.Pod) *metav1.Time {
 	if pod.Status.StartTime != nil {
 		return pod.Status.StartTime
 	}
-	// Should not reach here as the start time of a running time should not be nil
-	// Return current timestamp as the default value.
-	// This will not affect the calculation of earliest timestamp of all the pods on one node,
-	// because current timestamp is always after the StartTime of any pod in good state.
-	klog.Errorf("pod.Status.StartTime is nil for pod %s. Should not reach here.", pod.Name)
+	// Assumed pods and bound pods that haven't started don't have a StartTime yet.
 	return &metav1.Time{Time: time.Now()}
 }
-
-// lessFunc is a function that receives two items and returns true if the first
-// item should be placed before the second one when the list is sorted.
-type lessFunc = func(item1, item2 interface{}) bool
 
 // GetEarliestPodStartTime returns the earliest start time of all pods that
 // have the highest priority among all victims.
@@ -90,29 +90,76 @@ func MoreImportantPod(pod1, pod2 *v1.Pod) bool {
 }
 
 // GetPodAffinityTerms gets pod affinity terms by a pod affinity object.
-func GetPodAffinityTerms(podAffinity *v1.PodAffinity) (terms []v1.PodAffinityTerm) {
-	if podAffinity != nil {
-		if len(podAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
-			terms = podAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+func GetPodAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
+	if affinity != nil && affinity.PodAffinity != nil {
+		if len(affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
+			terms = affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 		}
 		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		//if len(podAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
-		//	terms = append(terms, podAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
+		//if len(affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		//	terms = append(terms, affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
 		//}
 	}
 	return terms
 }
 
 // GetPodAntiAffinityTerms gets pod affinity terms by a pod anti-affinity.
-func GetPodAntiAffinityTerms(podAntiAffinity *v1.PodAntiAffinity) (terms []v1.PodAffinityTerm) {
-	if podAntiAffinity != nil {
-		if len(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
-			terms = podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+func GetPodAntiAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
+	if affinity != nil && affinity.PodAntiAffinity != nil {
+		if len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
+			terms = affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 		}
 		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		//if len(podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
-		//	terms = append(terms, podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
+		//if len(affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		//	terms = append(terms, affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
 		//}
 	}
 	return terms
+}
+
+// PatchPod calculates the delta bytes change from <old> to <new>,
+// and then submit a request to API server to patch the pod changes.
+func PatchPod(cs kubernetes.Interface, old *v1.Pod, new *v1.Pod) error {
+	oldData, err := json.Marshal(old)
+	if err != nil {
+		return err
+	}
+
+	newData, err := json.Marshal(new)
+	if err != nil {
+		return err
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &v1.Pod{})
+	if err != nil {
+		return fmt.Errorf("failed to create merge patch for pod %q/%q: %v", old.Namespace, old.Name, err)
+	}
+	_, err = cs.CoreV1().Pods(old.Namespace).Patch(context.TODO(), old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	return err
+}
+
+// GetUpdatedPod returns the latest version of <pod> from API server.
+func GetUpdatedPod(cs kubernetes.Interface, pod *v1.Pod) (*v1.Pod, error) {
+	return cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+}
+
+// DeletePod deletes the given <pod> from API server
+func DeletePod(cs kubernetes.Interface, pod *v1.Pod) error {
+	return cs.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+}
+
+// ClearNominatedNodeName internally submit a patch request to API server
+// to set each pods[*].Status.NominatedNodeName> to "".
+func ClearNominatedNodeName(cs kubernetes.Interface, pods ...*v1.Pod) utilerrors.Aggregate {
+	var errs []error
+	for _, p := range pods {
+		if len(p.Status.NominatedNodeName) == 0 {
+			continue
+		}
+		podCopy := p.DeepCopy()
+		podCopy.Status.NominatedNodeName = ""
+		if err := PatchPod(cs, p, podCopy); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return utilerrors.NewAggregate(errs)
 }

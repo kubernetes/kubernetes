@@ -54,6 +54,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
+	"k8s.io/client-go/tools/cache"
 )
 
 var scheme = runtime.NewScheme()
@@ -1611,7 +1612,6 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	}
 	if hasCacheEnabled {
 		config := cacherstorage.Config{
-			CacheCapacity:  10,
 			Storage:        s,
 			Versioner:      etcd3.APIObjectVersioner{},
 			ResourcePrefix: podPrefix,
@@ -2087,6 +2087,56 @@ func TestRetryDeleteValidation(t *testing.T) {
 		}
 		if called != 2 {
 			t.Fatalf("expected deleteValidation to be called twice")
+		}
+	}
+}
+
+func emptyIndexFunc(obj interface{}) ([]string, error) {
+	return []string{}, nil
+}
+
+func TestValidateIndexers(t *testing.T) {
+	testcases := []struct {
+		name          string
+		indexers      *cache.Indexers
+		expectedError bool
+	}{
+		{
+			name:          "nil indexers",
+			indexers:      nil,
+			expectedError: false,
+		},
+		{
+			name: "normal indexers",
+			indexers: &cache.Indexers{
+				"f:spec.nodeName":            emptyIndexFunc,
+				"l:controller-revision-hash": emptyIndexFunc,
+			},
+			expectedError: false,
+		},
+		{
+			name: "too short indexers",
+			indexers: &cache.Indexers{
+				"f": emptyIndexFunc,
+			},
+			expectedError: true,
+		},
+		{
+			name: "invalid indexers",
+			indexers: &cache.Indexers{
+				"spec.nodeName": emptyIndexFunc,
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		err := validateIndexers(tc.indexers)
+		if tc.expectedError && err == nil {
+			t.Errorf("%v: expected error, but got nil", tc.name)
+		}
+		if !tc.expectedError && err != nil {
+			t.Errorf("%v: expected no error, but got %v", tc.name, err)
 		}
 	}
 }

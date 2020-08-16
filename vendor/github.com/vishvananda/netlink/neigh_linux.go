@@ -1,10 +1,13 @@
 package netlink
 
 import (
+	"fmt"
 	"net"
+	"syscall"
 	"unsafe"
 
 	"github.com/vishvananda/netlink/nl"
+	"github.com/vishvananda/netns"
 	"golang.org/x/sys/unix"
 )
 
@@ -18,7 +21,10 @@ const (
 	NDA_PORT
 	NDA_VNI
 	NDA_IFINDEX
-	NDA_MAX = NDA_IFINDEX
+	NDA_MASTER
+	NDA_LINK_NETNSID
+	NDA_SRC_VNI
+	NDA_MAX = NDA_SRC_VNI
 )
 
 // Neighbor Cache Entry States.
@@ -43,6 +49,7 @@ const (
 	NTF_ROUTER = 0x80
 )
 
+// Ndmsg is for adding, removing or receiving information about a neighbor table entry
 type Ndmsg struct {
 	Family uint8
 	Index  uint32
@@ -170,45 +177,58 @@ func neighHandle(neigh *Neigh, req *nl.NetlinkRequest) error {
 		req.AddData(vniData)
 	}
 
+	if neigh.MasterIndex != 0 {
+		masterData := nl.NewRtAttr(NDA_MASTER, nl.Uint32Attr(uint32(neigh.MasterIndex)))
+		req.AddData(masterData)
+	}
+
 	_, err := req.Execute(unix.NETLINK_ROUTE, 0)
 	return err
 }
 
-// NeighList gets a list of IP-MAC mappings in the system (ARP table).
+// NeighList returns a list of IP-MAC mappings in the system (ARP table).
 // Equivalent to: `ip neighbor show`.
 // The list can be filtered by link and ip family.
 func NeighList(linkIndex, family int) ([]Neigh, error) {
 	return pkgHandle.NeighList(linkIndex, family)
 }
 
-// NeighProxyList gets a list of neighbor proxies in the system.
+// NeighProxyList returns a list of neighbor proxies in the system.
 // Equivalent to: `ip neighbor show proxy`.
 // The list can be filtered by link and ip family.
 func NeighProxyList(linkIndex, family int) ([]Neigh, error) {
 	return pkgHandle.NeighProxyList(linkIndex, family)
 }
 
-// NeighList gets a list of IP-MAC mappings in the system (ARP table).
+// NeighList returns a list of IP-MAC mappings in the system (ARP table).
 // Equivalent to: `ip neighbor show`.
 // The list can be filtered by link and ip family.
 func (h *Handle) NeighList(linkIndex, family int) ([]Neigh, error) {
-	return h.neighList(linkIndex, family, 0)
+	return h.NeighListExecute(Ndmsg{
+		Family: uint8(family),
+		Index:  uint32(linkIndex),
+	})
 }
 
-// NeighProxyList gets a list of neighbor proxies in the system.
+// NeighProxyList returns a list of neighbor proxies in the system.
 // Equivalent to: `ip neighbor show proxy`.
 // The list can be filtered by link, ip family.
 func (h *Handle) NeighProxyList(linkIndex, family int) ([]Neigh, error) {
-	return h.neighList(linkIndex, family, NTF_PROXY)
-}
-
-func (h *Handle) neighList(linkIndex, family, flags int) ([]Neigh, error) {
-	req := h.newNetlinkRequest(unix.RTM_GETNEIGH, unix.NLM_F_DUMP)
-	msg := Ndmsg{
+	return h.NeighListExecute(Ndmsg{
 		Family: uint8(family),
 		Index:  uint32(linkIndex),
-		Flags:  uint8(flags),
-	}
+		Flags:  NTF_PROXY,
+	})
+}
+
+// NeighListExecute returns a list of neighbour entries filtered by link, ip family, flag and state.
+func NeighListExecute(msg Ndmsg) ([]Neigh, error) {
+	return pkgHandle.NeighListExecute(msg)
+}
+
+// NeighListExecute returns a list of neighbour entries filtered by link, ip family, flag and state.
+func (h *Handle) NeighListExecute(msg Ndmsg) ([]Neigh, error) {
+	req := h.newNetlinkRequest(unix.RTM_GETNEIGH, unix.NLM_F_DUMP)
 	req.AddData(&msg)
 
 	msgs, err := req.Execute(unix.NETLINK_ROUTE, unix.RTM_NEWNEIGH)
@@ -219,7 +239,7 @@ func (h *Handle) neighList(linkIndex, family, flags int) ([]Neigh, error) {
 	var res []Neigh
 	for _, m := range msgs {
 		ndm := deserializeNdmsg(m)
-		if linkIndex != 0 && int(ndm.Index) != linkIndex {
+		if msg.Index != 0 && ndm.Index != msg.Index {
 			// Ignore messages from other interfaces
 			continue
 		}
@@ -251,14 +271,6 @@ func NeighDeserialize(m []byte) (*Neigh, error) {
 		return nil, err
 	}
 
-	// This should be cached for perfomance
-	// once per table dump
-	link, err := LinkByIndex(neigh.LinkIndex)
-	if err != nil {
-		return nil, err
-	}
-	encapType := link.Attrs().EncapType
-
 	for _, attr := range attrs {
 		switch attr.Attr.Type {
 		case NDA_DST:
@@ -268,13 +280,16 @@ func NeighDeserialize(m []byte) (*Neigh, error) {
 			// #define RTA_LENGTH(len) (RTA_ALIGN(sizeof(struct rtattr)) + (len))
 			// #define RTA_PAYLOAD(rta) ((int)((rta)->rta_len) - RTA_LENGTH(0))
 			attrLen := attr.Attr.Len - unix.SizeofRtAttr
-			if attrLen == 4 && (encapType == "ipip" ||
-				encapType == "sit" ||
-				encapType == "gre") {
+			if attrLen == 4 {
 				neigh.LLIPAddr = net.IP(attr.Value)
-			} else if attrLen == 16 &&
-				encapType == "tunnel6" {
-				neigh.IP = net.IP(attr.Value)
+			} else if attrLen == 16 {
+				// Can be IPv6 or FireWire HWAddr
+				link, err := LinkByIndex(neigh.LinkIndex)
+				if err == nil && link.Attrs().EncapType == "tunnel6" {
+					neigh.IP = net.IP(attr.Value)
+				} else {
+					neigh.HardwareAddr = net.HardwareAddr(attr.Value)
+				}
 			} else {
 				neigh.HardwareAddr = net.HardwareAddr(attr.Value)
 			}
@@ -282,8 +297,126 @@ func NeighDeserialize(m []byte) (*Neigh, error) {
 			neigh.Vlan = int(native.Uint16(attr.Value[0:2]))
 		case NDA_VNI:
 			neigh.VNI = int(native.Uint32(attr.Value[0:4]))
+		case NDA_MASTER:
+			neigh.MasterIndex = int(native.Uint32(attr.Value[0:4]))
 		}
 	}
 
 	return &neigh, nil
+}
+
+// NeighSubscribe takes a chan down which notifications will be sent
+// when neighbors are added or deleted. Close the 'done' chan to stop subscription.
+func NeighSubscribe(ch chan<- NeighUpdate, done <-chan struct{}) error {
+	return neighSubscribeAt(netns.None(), netns.None(), ch, done, nil, false)
+}
+
+// NeighSubscribeAt works like NeighSubscribe plus it allows the caller
+// to choose the network namespace in which to subscribe (ns).
+func NeighSubscribeAt(ns netns.NsHandle, ch chan<- NeighUpdate, done <-chan struct{}) error {
+	return neighSubscribeAt(ns, netns.None(), ch, done, nil, false)
+}
+
+// NeighSubscribeOptions contains a set of options to use with
+// NeighSubscribeWithOptions.
+type NeighSubscribeOptions struct {
+	Namespace     *netns.NsHandle
+	ErrorCallback func(error)
+	ListExisting  bool
+}
+
+// NeighSubscribeWithOptions work like NeighSubscribe but enable to
+// provide additional options to modify the behavior. Currently, the
+// namespace can be provided as well as an error callback.
+func NeighSubscribeWithOptions(ch chan<- NeighUpdate, done <-chan struct{}, options NeighSubscribeOptions) error {
+	if options.Namespace == nil {
+		none := netns.None()
+		options.Namespace = &none
+	}
+	return neighSubscribeAt(*options.Namespace, netns.None(), ch, done, options.ErrorCallback, options.ListExisting)
+}
+
+func neighSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- NeighUpdate, done <-chan struct{}, cberr func(error), listExisting bool) error {
+	s, err := nl.SubscribeAt(newNs, curNs, unix.NETLINK_ROUTE, unix.RTNLGRP_NEIGH)
+	makeRequest := func(family int) error {
+		req := pkgHandle.newNetlinkRequest(unix.RTM_GETNEIGH,
+			unix.NLM_F_DUMP)
+		infmsg := nl.NewIfInfomsg(family)
+		req.AddData(infmsg)
+		if err := s.Send(req); err != nil {
+			return err
+		}
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if done != nil {
+		go func() {
+			<-done
+			s.Close()
+		}()
+	}
+	if listExisting {
+		if err := makeRequest(unix.AF_UNSPEC); err != nil {
+			return err
+		}
+		// We have to wait for NLMSG_DONE before making AF_BRIDGE request
+	}
+	go func() {
+		defer close(ch)
+		for {
+			msgs, from, err := s.Receive()
+			if err != nil {
+				if cberr != nil {
+					cberr(err)
+				}
+				return
+			}
+			if from.Pid != nl.PidKernel {
+				if cberr != nil {
+					cberr(fmt.Errorf("Wrong sender portid %d, expected %d", from.Pid, nl.PidKernel))
+				}
+				continue
+			}
+			for _, m := range msgs {
+				if m.Header.Type == unix.NLMSG_DONE {
+					if listExisting {
+						// This will be called after handling AF_UNSPEC
+						// list request, we have to wait for NLMSG_DONE
+						// before making another request
+						if err := makeRequest(unix.AF_BRIDGE); err != nil {
+							if cberr != nil {
+								cberr(err)
+							}
+							return
+						}
+						listExisting = false
+					}
+					continue
+				}
+				if m.Header.Type == unix.NLMSG_ERROR {
+					native := nl.NativeEndian()
+					error := int32(native.Uint32(m.Data[0:4]))
+					if error == 0 {
+						continue
+					}
+					if cberr != nil {
+						cberr(syscall.Errno(-error))
+					}
+					return
+				}
+				neigh, err := NeighDeserialize(m.Data)
+				if err != nil {
+					if cberr != nil {
+						cberr(err)
+					}
+					return
+				}
+				ch <- NeighUpdate{Type: m.Header.Type, Neigh: *neigh}
+			}
+		}
+	}()
+
+	return nil
 }

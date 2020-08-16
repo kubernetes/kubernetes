@@ -17,6 +17,7 @@ limitations under the License.
 package kubemark
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -32,7 +33,7 @@ import (
 	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -194,11 +195,11 @@ func (kubemarkController *KubemarkController) SetNodeGroupSize(nodeGroup string,
 		}
 	case delta > 0:
 		kubemarkController.nodeGroupQueueSizeLock.Lock()
+		kubemarkController.nodeGroupQueueSize[nodeGroup] += delta
+		kubemarkController.nodeGroupQueueSizeLock.Unlock()
 		for i := 0; i < delta; i++ {
-			kubemarkController.nodeGroupQueueSize[nodeGroup]++
 			kubemarkController.createNodeQueue <- nodeGroup
 		}
-		kubemarkController.nodeGroupQueueSizeLock.Unlock()
 	}
 
 	return nil
@@ -226,7 +227,7 @@ func (kubemarkController *KubemarkController) addNodeToNodeGroup(nodeGroup strin
 
 	var err error
 	for i := 0; i < numRetries; i++ {
-		_, err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(node.Namespace).Create(node)
+		_, err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(node.Namespace).Create(context.TODO(), node, metav1.CreateOptions{})
 		if err == nil {
 			return nil
 		}
@@ -247,9 +248,8 @@ func (kubemarkController *KubemarkController) RemoveNodeFromNodeGroup(nodeGroup 
 	policy := metav1.DeletePropagationForeground
 	var err error
 	for i := 0; i < numRetries; i++ {
-		err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(namespaceKubemark).Delete(
-			pod.ObjectMeta.Labels["name"],
-			&metav1.DeleteOptions{PropagationPolicy: &policy})
+		err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(namespaceKubemark).Delete(context.TODO(), pod.ObjectMeta.Labels["name"],
+			metav1.DeleteOptions{PropagationPolicy: &policy})
 		if err == nil {
 			klog.Infof("marking node %s for deletion", node)
 			// Mark node for deletion from kubemark cluster.
@@ -374,7 +374,7 @@ func (kubemarkCluster *kubemarkCluster) removeUnneededNodes(oldObj interface{}, 
 			defer kubemarkCluster.nodesToDeleteLock.Unlock()
 			if kubemarkCluster.nodesToDelete[node.Name] {
 				kubemarkCluster.nodesToDelete[node.Name] = false
-				if err := kubemarkCluster.client.CoreV1().Nodes().Delete(node.Name, &metav1.DeleteOptions{}); err != nil {
+				if err := kubemarkCluster.client.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{}); err != nil {
 					klog.Errorf("failed to delete node %s from kubemark cluster, err: %v", node.Name, err)
 				}
 			}

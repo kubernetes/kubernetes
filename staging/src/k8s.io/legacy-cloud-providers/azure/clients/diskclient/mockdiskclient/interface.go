@@ -22,7 +22,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	compute "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	compute "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	gomock "github.com/golang/mock/gomock"
 	retry "k8s.io/legacy-cloud-providers/azure/retry"
 )

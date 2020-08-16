@@ -26,12 +26,13 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
@@ -105,7 +106,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		},
 	}
 
-	_, err = c.k8s.StorageV1().VolumeAttachments().Create(attachment)
+	_, err = c.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
 	alreadyExist := false
 	if err != nil {
 		if !apierrors.IsAlreadyExists(err) {
@@ -153,7 +154,7 @@ func (c *csiAttacher) waitForVolumeAttachment(volumeHandle, attachID string, tim
 func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID string, timer *time.Timer, timeout time.Duration) (string, error) {
 
 	klog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
-	attach, err := c.k8s.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+	attach, err := c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, meta.GetOptions{})
 	if err != nil {
 		klog.Error(log("attacher.WaitForAttach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
 		return "", fmt.Errorf("volume %v has GET error for volume attachment %v: %v", volumeHandle, attachID, err)
@@ -196,8 +197,19 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 		}
 
 		attachID := getAttachmentName(volumeHandle, driverName, string(nodeName))
+		var attach *storage.VolumeAttachment
+		if c.plugin.volumeAttachmentLister != nil {
+			attach, err = c.plugin.volumeAttachmentLister.Get(attachID)
+			if err == nil {
+				attached[spec] = attach.Status.Attached
+				continue
+			}
+			klog.V(4).Info(log("attacher.VolumesAreAttached failed in AttachmentLister for attach.ID=%v: %v. Probing the API server.", attachID, err))
+		}
+		// The cache lookup is not setup or the object is not found in the cache.
+		// Get the object from the API server.
 		klog.V(4).Info(log("probing attachment status for VolumeAttachment %v", attachID))
-		attach, err := c.k8s.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+		attach, err = c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, meta.GetOptions{})
 		if err != nil {
 			attached[spec] = false
 			klog.Error(log("attacher.VolumesAreAttached failed for attach.ID=%v: %v", attachID, err))
@@ -227,13 +239,19 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		return errors.New(log("attacher.MountDevice failed, deviceMountPath is empty"))
 	}
 
+	corruptedDir := false
 	mounted, err := isDirMounted(c.plugin, deviceMountPath)
 	if err != nil {
 		klog.Error(log("attacher.MountDevice failed while checking mount status for dir [%s]", deviceMountPath))
-		return err
+		if isCorruptedDir(deviceMountPath) {
+			corruptedDir = true // leave to CSI driver to handle corrupted mount
+			klog.Warning(log("attacher.MountDevice detected corrupted mount for dir [%s]", deviceMountPath))
+		} else {
+			return err
+		}
 	}
 
-	if mounted {
+	if mounted && !corruptedDir {
 		klog.V(4).Info(log("attacher.MountDevice skipping mount, dir already mounted [%s]", deviceMountPath))
 		return nil
 	}
@@ -286,7 +304,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	// Store volume metadata for UnmountDevice. Keep it around even if the
 	// driver does not support NodeStage, UnmountDevice still needs it.
-	if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
+	if err = os.MkdirAll(deviceMountPath, 0750); err != nil && !corruptedDir {
 		return errors.New(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
 	}
 	klog.V(4).Info(log("created target path successfully [%s]", deviceMountPath))
@@ -387,7 +405,7 @@ func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
 		attachID = getAttachmentName(volID, driverName, string(nodeName))
 	}
 
-	if err := c.k8s.StorageV1().VolumeAttachments().Delete(attachID, nil); err != nil {
+	if err := c.k8s.StorageV1().VolumeAttachments().Delete(context.TODO(), attachID, metav1.DeleteOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			// object deleted or never existed, done
 			klog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] not found, object deleted", attachID, volID))
@@ -413,7 +431,7 @@ func (c *csiAttacher) waitForVolumeDetachment(volumeHandle, attachID string, tim
 func (c *csiAttacher) waitForVolumeDetachmentInternal(volumeHandle, attachID string, timer *time.Timer,
 	timeout time.Duration) error {
 	klog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
-	attach, err := c.k8s.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+	attach, err := c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, meta.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			//object deleted or never existed, done
@@ -439,7 +457,7 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatus(attach *storage.VolumeAtta
 		return nil
 	}
 
-	watcher, err := c.k8s.StorageV1().VolumeAttachments().Watch(meta.SingleObject(meta.ObjectMeta{Name: attachID, ResourceVersion: attach.ResourceVersion}))
+	watcher, err := c.k8s.StorageV1().VolumeAttachments().Watch(context.TODO(), meta.SingleObject(meta.ObjectMeta{Name: attachID, ResourceVersion: attach.ResourceVersion}))
 	if err != nil {
 		return fmt.Errorf("watch error:%v for volume %v", err, volumeHandle)
 	}
@@ -588,7 +606,7 @@ func getDriverAndVolNameFromDeviceMountPath(k8s kubernetes.Interface, deviceMoun
 	pvName := filepath.Base(dir)
 
 	// Get PV and check for errors
-	pv, err := k8s.CoreV1().PersistentVolumes().Get(pvName, meta.GetOptions{})
+	pv, err := k8s.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, meta.GetOptions{})
 	if err != nil {
 		return "", "", err
 	}

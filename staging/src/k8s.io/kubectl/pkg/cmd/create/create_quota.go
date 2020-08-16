@@ -51,7 +51,7 @@ func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "quota NAME [--hard=key1=value1,key2=value2] [--scopes=Scope1,Scope2] [--dry-run=bool]",
+		Use:                   "quota NAME [--hard=key1=value1,key2=value2] [--scopes=Scope1,Scope2] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"resourcequota"},
 		Short:                 i18n.T("Create a quota with the specified name."),
@@ -70,6 +70,7 @@ func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 	cmdutil.AddGeneratorFlags(cmd, generateversioned.ResourceQuotaV1GeneratorName)
 	cmd.Flags().String("hard", "", i18n.T("A comma-delimited set of resource=quantity pairs that define a hard limit."))
 	cmd.Flags().String("scopes", "", i18n.T("A comma-delimited set of quota scopes that must all match each object tracked by the quota."))
+	cmdutil.AddFieldManagerFlagVar(cmd, &options.CreateSubcommandOptions.FieldManager, "kubectl-create")
 	return cmd
 }
 

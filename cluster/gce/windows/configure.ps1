@@ -132,15 +132,18 @@ try {
   Download-HelperScripts
 
   DownloadAndInstall-Crictl
+  Configure-Crictl
   Setup-ContainerRuntime
   DownloadAndInstall-AuthPlugin
   DownloadAndInstall-KubernetesBinaries
+  DownloadAndInstall-CSIProxyBinaries
+  Start-CSIProxy
   Create-NodePki
   Create-KubeletKubeconfig
   Create-KubeproxyKubeconfig
   Set-PodCidr
   Configure-HostNetworkingService
-  Configure-CniNetworking
+  Prepare-CniNetworking
   Configure-HostDnsConf
   Configure-GcePdTools
   Configure-Kubelet
@@ -151,6 +154,9 @@ try {
     Configure-LoggingAgent
     Restart-LoggingAgent
   }
+  # Flush cache to disk before starting kubelet & kube-proxy services
+  # to make metadata server route and stackdriver service more persistent.
+  Write-Volumecache C -PassThru
   Start-WorkerServices
   Log-Output 'Waiting 15 seconds for node to join cluster.'
   Start-Sleep 15
@@ -161,6 +167,8 @@ try {
   Schedule-LogRotation -Pattern '.*\.log$' -Path ${env:LOGS_DIR} -RepetitionInterval $(New-Timespan -Hour 1) -Config $config
 
   Pull-InfraContainer
+  # Flush cache to disk to persist the setup status
+  Write-Volumecache C -PassThru
 }
 catch {
   Write-Host 'Exception caught in script:'

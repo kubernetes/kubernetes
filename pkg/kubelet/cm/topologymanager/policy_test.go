@@ -858,7 +858,7 @@ func testPolicyMerge(policy Policy, tcases []policyMergeTestCase, t *testing.T) 
 	for _, tc := range tcases {
 		var providersHints []map[string][]TopologyHint
 		for _, provider := range tc.hp {
-			hints := provider.GetTopologyHints(v1.Pod{}, v1.Container{})
+			hints := provider.GetTopologyHints(&v1.Pod{}, &v1.Container{})
 			providersHints = append(providersHints, hints)
 		}
 

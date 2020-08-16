@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script verifies the build without in-tree cloud providers.
+# Usage: `hack/verify-typecheck-providerless.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

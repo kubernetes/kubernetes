@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -37,7 +39,7 @@ var nodemetricsesResource = schema.GroupVersionResource{Group: "metrics.k8s.io",
 var nodemetricsesKind = schema.GroupVersionKind{Group: "metrics.k8s.io", Version: "v1alpha1", Kind: "NodeMetrics"}
 
 // Get takes name of the nodeMetrics, and returns the corresponding nodeMetrics object, and an error if there is any.
-func (c *FakeNodeMetricses) Get(name string, options v1.GetOptions) (result *v1alpha1.NodeMetrics, err error) {
+func (c *FakeNodeMetricses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NodeMetrics, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootGetAction(nodemetricsesResource, name), &v1alpha1.NodeMetrics{})
 	if obj == nil {
@@ -47,7 +49,7 @@ func (c *FakeNodeMetricses) Get(name string, options v1.GetOptions) (result *v1a
 }
 
 // List takes label and field selectors, and returns the list of NodeMetricses that match those selectors.
-func (c *FakeNodeMetricses) List(opts v1.ListOptions) (result *v1alpha1.NodeMetricsList, err error) {
+func (c *FakeNodeMetricses) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NodeMetricsList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootListAction(nodemetricsesResource, nodemetricsesKind, opts), &v1alpha1.NodeMetricsList{})
 	if obj == nil {
@@ -68,7 +70,7 @@ func (c *FakeNodeMetricses) List(opts v1.ListOptions) (result *v1alpha1.NodeMetr
 }
 
 // Watch returns a watch.Interface that watches the requested nodeMetricses.
-func (c *FakeNodeMetricses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeNodeMetricses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(nodemetricsesResource, opts))
 }

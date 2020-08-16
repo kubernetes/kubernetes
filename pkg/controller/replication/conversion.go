@@ -22,6 +22,7 @@ limitations under the License.
 package replication
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -202,50 +203,56 @@ type conversionClient struct {
 	v1client.ReplicationControllerInterface
 }
 
-func (c conversionClient) Create(rs *apps.ReplicaSet) (*apps.ReplicaSet, error) {
-	return convertCall(c.ReplicationControllerInterface.Create, rs)
+func (c conversionClient) Create(ctx context.Context, rs *apps.ReplicaSet, opts metav1.CreateOptions) (*apps.ReplicaSet, error) {
+	return convertCall(func(rc *v1.ReplicationController) (*v1.ReplicationController, error) {
+		return c.ReplicationControllerInterface.Create(ctx, rc, opts)
+	}, rs)
 }
 
-func (c conversionClient) Update(rs *apps.ReplicaSet) (*apps.ReplicaSet, error) {
-	return convertCall(c.ReplicationControllerInterface.Update, rs)
+func (c conversionClient) Update(ctx context.Context, rs *apps.ReplicaSet, opts metav1.UpdateOptions) (*apps.ReplicaSet, error) {
+	return convertCall(func(rc *v1.ReplicationController) (*v1.ReplicationController, error) {
+		return c.ReplicationControllerInterface.Update(ctx, rc, opts)
+	}, rs)
 }
 
-func (c conversionClient) UpdateStatus(rs *apps.ReplicaSet) (*apps.ReplicaSet, error) {
-	return convertCall(c.ReplicationControllerInterface.UpdateStatus, rs)
+func (c conversionClient) UpdateStatus(ctx context.Context, rs *apps.ReplicaSet, opts metav1.UpdateOptions) (*apps.ReplicaSet, error) {
+	return convertCall(func(rc *v1.ReplicationController) (*v1.ReplicationController, error) {
+		return c.ReplicationControllerInterface.UpdateStatus(ctx, rc, opts)
+	}, rs)
 }
 
-func (c conversionClient) Get(name string, options metav1.GetOptions) (*apps.ReplicaSet, error) {
-	rc, err := c.ReplicationControllerInterface.Get(name, options)
+func (c conversionClient) Get(ctx context.Context, name string, options metav1.GetOptions) (*apps.ReplicaSet, error) {
+	rc, err := c.ReplicationControllerInterface.Get(context.TODO(), name, options)
 	if err != nil {
 		return nil, err
 	}
 	return convertRCtoRS(rc, nil)
 }
 
-func (c conversionClient) List(opts metav1.ListOptions) (*apps.ReplicaSetList, error) {
-	rcList, err := c.ReplicationControllerInterface.List(opts)
+func (c conversionClient) List(ctx context.Context, opts metav1.ListOptions) (*apps.ReplicaSetList, error) {
+	rcList, err := c.ReplicationControllerInterface.List(context.TODO(), opts)
 	if err != nil {
 		return nil, err
 	}
 	return convertList(rcList)
 }
 
-func (c conversionClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c conversionClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	// This is not used by RSC because we wrap the shared informer instead.
 	return nil, errors.New("Watch() is not implemented for conversionClient")
 }
 
-func (c conversionClient) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apps.ReplicaSet, err error) {
+func (c conversionClient) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *apps.ReplicaSet, err error) {
 	// This is not used by RSC.
 	return nil, errors.New("Patch() is not implemented for conversionClient")
 }
 
-func (c conversionClient) GetScale(name string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
+func (c conversionClient) GetScale(ctx context.Context, name string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	// This is not used by RSC.
 	return nil, errors.New("GetScale() is not implemented for conversionClient")
 }
 
-func (c conversionClient) UpdateScale(name string, scale *autoscalingv1.Scale) (result *autoscalingv1.Scale, err error) {
+func (c conversionClient) UpdateScale(ctx context.Context, name string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	// This is not used by RSC.
 	return nil, errors.New("UpdateScale() is not implemented for conversionClient")
 }

@@ -1,0 +1,34 @@
+# Copyright 2020 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+ARG BASEIMAGE
+from $BASEIMAGE as prep
+
+ENV CURL_VERSION 7.57.0
+WORKDIR /curl
+ADD https://skanthak.homepage.t-online.de/download/curl-$CURL_VERSION.cab curl.cab
+RUN expand /R curl.cab /F:* .
+
+FROM $BASEIMAGE
+
+COPY --from=prep /curl/AMD64 /curl
+COPY --from=prep /curl/CURL.LIC /curl
+ADD https://github.com/kubernetes-sigs/windows-testing/raw/master/images/busybox/busybox.exe /bin/busybox.exe
+ADD https://github.com/diegocr/netcat/raw/master/nc.exe /bin/nc.exe
+ADD hostname /bin/hostname.exe
+USER ContainerAdministrator
+RUN FOR /f "tokens=*" %i IN ('C:\bin\busybox --list') DO mklink C:\bin\%i.exe C:\bin\busybox.exe
+RUN setx /M PATH "C:\bin;C:\curl\;%PATH%" &\
+    mkdir C:\tmp
+ENTRYPOINT ["cmd.exe", "/s", "/c"]

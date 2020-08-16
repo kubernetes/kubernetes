@@ -17,6 +17,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -87,7 +88,7 @@ func TestVolumeTemplateNoopUpdate(t *testing.T) {
 	stsClient := c.Resource(appsv1.SchemeGroupVersion.WithResource("statefulsets")).Namespace("default")
 
 	// Create the statefulset
-	persistedSTS, err := stsClient.Create(sts, metav1.CreateOptions{})
+	persistedSTS, err := stsClient.Create(context.TODO(), sts, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +102,7 @@ func TestVolumeTemplateNoopUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = stsClient.Update(persistedSTS, metav1.UpdateOptions{})
+	_, err = stsClient.Update(context.TODO(), persistedSTS, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +141,7 @@ func TestSpecReplicasChange(t *testing.T) {
 	}
 
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		newSTS, err := stsClient.Get(sts.Name, metav1.GetOptions{})
+		newSTS, err := stsClient.Get(context.TODO(), sts.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -177,7 +178,7 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	updatePod(t, podClient, deletingPod.Name, func(pod *v1.Pod) {
 		pod.Finalizers = []string{"fake.example.com/blockDeletion"}
 	})
-	if err := c.CoreV1().Pods(ns.Name).Delete(deletingPod.Name, &metav1.DeleteOptions{}); err != nil {
+	if err := c.CoreV1().Pods(ns.Name).Delete(context.TODO(), deletingPod.Name, metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("error deleting pod %s: %v", deletingPod.Name, err)
 	}
 

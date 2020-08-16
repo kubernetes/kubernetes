@@ -91,9 +91,7 @@ func TestGetAccessModes(t *testing.T) {
 }
 
 type fakeDiskManager struct {
-	tmpDir       string
-	attachCalled bool
-	detachCalled bool
+	tmpDir string
 }
 
 func NewFakeDiskManager() *fakeDiskManager {
@@ -498,11 +496,11 @@ func TestGetISCSICHAP(t *testing.T) {
 		},
 	}
 	for _, testcase := range tests {
-		resultDiscoveryCHAP, err := getISCSIDiscoveryCHAPInfo(testcase.spec)
+		resultDiscoveryCHAP, _ := getISCSIDiscoveryCHAPInfo(testcase.spec)
 		resultSessionCHAP, err := getISCSISessionCHAPInfo(testcase.spec)
 		switch testcase.name {
 		case "no volume":
-			if err.Error() != testcase.expectedError.Error() || resultDiscoveryCHAP != testcase.expectedDiscoveryCHAP || resultSessionCHAP != testcase.expectedSessionCHAP {
+			if err == nil || err.Error() != testcase.expectedError.Error() || resultDiscoveryCHAP != testcase.expectedDiscoveryCHAP || resultSessionCHAP != testcase.expectedSessionCHAP {
 				t.Errorf("%s failed: expected err=%v DiscoveryCHAP=%v SessionCHAP=%v, got %v/%v/%v",
 					testcase.name, testcase.expectedError, testcase.expectedDiscoveryCHAP, testcase.expectedSessionCHAP,
 					err, resultDiscoveryCHAP, resultSessionCHAP)

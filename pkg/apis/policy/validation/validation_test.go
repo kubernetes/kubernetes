@@ -21,12 +21,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/utils/pointer"
@@ -223,11 +223,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 
 	invalidAppArmorDefault := validPSP()
 	invalidAppArmorDefault.Annotations = map[string]string{
-		apparmor.DefaultProfileAnnotationKey: "not-good",
+		v1.AppArmorBetaDefaultProfileAnnotationKey: "not-good",
 	}
 	invalidAppArmorAllowed := validPSP()
 	invalidAppArmorAllowed.Annotations = map[string]string{
-		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + ",not-good",
+		v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault + ",not-good",
 	}
 
 	invalidAllowedUnsafeSysctlPattern := validPSP()
@@ -521,8 +521,8 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 
 	validAppArmor := validPSP()
 	validAppArmor.Annotations = map[string]string{
-		apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
-		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + "," + apparmor.ProfileNamePrefix + "foo",
+		v1.AppArmorBetaDefaultProfileAnnotationKey:  v1.AppArmorBetaProfileRuntimeDefault,
+		v1.AppArmorBetaAllowedProfilesAnnotationKey: v1.AppArmorBetaProfileRuntimeDefault + "," + v1.AppArmorBetaProfileNamePrefix + "foo",
 	}
 
 	withForbiddenSysctl := validPSP()

@@ -32,6 +32,9 @@ import (
 const isNegativeErrorMsg string = `must be greater than or equal to 0`
 const isNotIntegerErrorMsg string = `must be an integer`
 
+// ValidateResourceRequirements will check if any of the resource
+// Limits/Requests are of a valid value. Any incorrect value will be added to
+// the ErrorList.
 func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	limPath := fldPath.Child("limits")
@@ -93,7 +96,7 @@ func ValidateResourceQuantityValue(resource string, value resource.Quantity, fld
 	return allErrs
 }
 
-// Validates that a Quantity is not negative
+// ValidateNonnegativeQuantity checks that a Quantity is not negative.
 func ValidateNonnegativeQuantity(value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if value.Cmp(resource.Quantity{}) < 0 {
@@ -122,6 +125,8 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidatePodLogOptions checks if options that are set are at the correct
+// value. Any incorrect value will be returned to the ErrorList.
 func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if opts.TailLines != nil && *opts.TailLines < 0 {
@@ -141,6 +146,8 @@ func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
 	return allErrs
 }
 
+// AccumulateUniqueHostPorts checks all the containers for duplicates ports. Any
+// duplicate port will be returned in the ErrorList.
 func AccumulateUniqueHostPorts(containers []v1.Container, accumulator *sets.String, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 

@@ -17,6 +17,7 @@ limitations under the License.
 package apply
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/dynamic"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 type pruner struct {
@@ -39,10 +41,9 @@ type pruner struct {
 	labelSelector     string
 	fieldSelector     string
 
-	cascade      bool
-	serverDryRun bool
-	dryRun       bool
-	gracePeriod  int
+	cascade        bool
+	dryRunStrategy cmdutil.DryRunStrategy
+	gracePeriod    int
 
 	toPrinter func(string) (printers.ResourcePrinter, error)
 
@@ -58,10 +59,9 @@ func newPruner(o *ApplyOptions) pruner {
 		visitedUids:       o.VisitedUids,
 		visitedNamespaces: o.VisitedNamespaces,
 
-		cascade:      o.DeleteOptions.Cascade,
-		dryRun:       o.DryRun,
-		serverDryRun: o.ServerDryRun,
-		gracePeriod:  o.DeleteOptions.GracePeriod,
+		cascade:        o.DeleteOptions.Cascade,
+		dryRunStrategy: o.DryRunStrategy,
+		gracePeriod:    o.DeleteOptions.GracePeriod,
 
 		toPrinter: o.ToPrinter,
 
@@ -77,9 +77,6 @@ func (p *pruner) pruneAll(o *ApplyOptions) error {
 	}
 
 	for n := range p.visitedNamespaces {
-		if len(o.Namespace) != 0 && n != o.Namespace {
-			continue
-		}
 		for _, m := range namespacedRESTMappings {
 			if err := p.prune(n, m); err != nil {
 				return fmt.Errorf("error pruning namespaced object %v: %v", m.GroupVersionKind, err)
@@ -98,7 +95,7 @@ func (p *pruner) pruneAll(o *ApplyOptions) error {
 func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 	objList, err := p.dynamicClient.Resource(mapping.Resource).
 		Namespace(namespace).
-		List(metav1.ListOptions{
+		List(context.TODO(), metav1.ListOptions{
 			LabelSelector: p.labelSelector,
 			FieldSelector: p.fieldSelector,
 		})
@@ -126,7 +123,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 			continue
 		}
 		name := metadata.GetName()
-		if !p.dryRun {
+		if p.dryRunStrategy != cmdutil.DryRunClient {
 			if err := p.delete(namespace, name, mapping); err != nil {
 				return err
 			}
@@ -142,23 +139,28 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 }
 
 func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping) error {
-	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.serverDryRun)
+	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.dryRunStrategy == cmdutil.DryRunServer)
 }
 
 func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascade bool, gracePeriod int, serverDryRun bool) error {
-	options := &metav1.DeleteOptions{}
-	if gracePeriod >= 0 {
-		options = metav1.NewDeleteOptions(int64(gracePeriod))
-	}
+	options := asDeleteOptions(cascade, gracePeriod)
 	if serverDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
+	}
+	return c.Resource(mapping.Resource).Namespace(namespace).Delete(context.TODO(), name, options)
+}
+
+func asDeleteOptions(cascade bool, gracePeriod int) metav1.DeleteOptions {
+	options := metav1.DeleteOptions{}
+	if gracePeriod >= 0 {
+		options = *metav1.NewDeleteOptions(int64(gracePeriod))
 	}
 	policy := metav1.DeletePropagationForeground
 	if !cascade {
 		policy = metav1.DeletePropagationOrphan
 	}
 	options.PropagationPolicy = &policy
-	return c.Resource(mapping.Resource).Namespace(namespace).Delete(name, options)
+	return options
 }
 
 type pruneResource struct {
