@@ -17,14 +17,14 @@ limitations under the License.
 package windows
 
 import (
-	"context"
+//	"context"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+//	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	appsv1 "k8s.io/api/apps/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+//	appsv1 "k8s.io/api/apps/v1"
+//	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
@@ -42,15 +42,15 @@ var _ = SIGDescribe("Device Plugin", func() {
 	})
 	ginkgo.It("should be able to create a functioning device plugin for Windows", func() {
 		ginkgo.By("creating Windows device plugin daemonset")
-		dsName := "directx-device-plugin"
-		daemonsetNameLabel := "daemonset-name"
-		image := "directxplugin"
-		mountName := "device-plugin"
-		mountPath := "/var/lib/kubelet/device-plugins"
-		privileged := true
-		labels := map[string]string{
+//		dsName := "directx-device-plugin"
+//		daemonsetNameLabel := "daemonset-name"
+//		image := "directxplugin"
+//		mountName := "device-plugin"
+//		mountPath := "/var/lib/kubelet/device-plugins"
+//		privileged := true
+/*		labels := map[string]string{
 			daemonsetNameLabel: dsName,
-		}
+		}*/
 /*        	ds := &appsv1.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: dsName,
