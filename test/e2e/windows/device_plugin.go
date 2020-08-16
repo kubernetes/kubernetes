@@ -51,7 +51,7 @@ var _ = SIGDescribe("Device Plugin", func() {
 		labels := map[string]string{
 			daemonsetNameLabel: dsName,
 		}
-        	ds := &appsv1.DaemonSet{
+/*        	ds := &appsv1.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: dsName,
 				Namespace: "kube-system",
@@ -106,10 +106,10 @@ var _ = SIGDescribe("Device Plugin", func() {
 				},
 			},
 		}
-
+*/
 		ns := f.Namespace.Name
-		ds, err := cs.AppsV1().DaemonSets(ns).Create(context.TODO(), ds, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
+//		ds, err := cs.AppsV1().DaemonSets(ns).Create(context.TODO(), ds, metav1.CreateOptions{})
+//		framework.ExpectNoError(err)
 
 		ginkgo.By("creating Windows testing Pod")
 		windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
@@ -117,8 +117,8 @@ var _ = SIGDescribe("Device Plugin", func() {
 
 		ginkgo.By("verifying device access in Windows testing Pod")
 		command := []string{"cmd.exe", "dxdiag", "/t", "dxdiag_output.txt", "&", "type", "dxdiag_output.txt"}
-		expectedString  := "Todo: DirectX Version: DirectX 12"
-		_, err = framework.LookForStringInPodExec(ns, windowsPod.Name, command, expectedString, time.Minute)
+		expectedString := "Todo: DirectX Version: DirectX 12"
+		_, err := framework.LookForStringInPodExec(ns, windowsPod.Name, command, expectedString, time.Minute)
 		framework.ExpectNoError(err, "failed: didn't find expected string in dxdiag output.")
 	})
 })
