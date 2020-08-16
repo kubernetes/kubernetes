@@ -19,11 +19,12 @@ package cpuset
 import (
 	"bytes"
 	"fmt"
-	"k8s.io/klog/v2"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
+
+	"k8s.io/klog/v2"
 )
 
 // Builder is a mutable builder for CPUSet. Functions that mutate instances
@@ -34,8 +35,8 @@ type Builder struct {
 }
 
 // NewBuilder returns a mutable CPUSet builder.
-func NewBuilder() Builder {
-	return Builder{
+func NewBuilder() *Builder {
+	return &Builder{
 		result: CPUSet{
 			elems: map[int]struct{}{},
 		},
@@ -44,18 +45,20 @@ func NewBuilder() Builder {
 
 // Add adds the supplied elements to the result. Calling Add after calling
 // Result has no effect.
-func (b Builder) Add(elems ...int) {
+func (b *Builder) Add(elems ...int) error {
 	if b.done {
-		return
+		klog.Errorf("Add() has no effect after calling Result()")
+		return fmt.Errorf("Add() has no effect after calling Result()")
 	}
 	for _, elem := range elems {
 		b.result.elems[elem] = struct{}{}
 	}
+	return nil
 }
 
 // Result returns the result CPUSet containing all elements that were
 // previously added to this builder. Subsequent calls to Add have no effect.
-func (b Builder) Result() CPUSet {
+func (b *Builder) Result() CPUSet {
 	b.done = true
 	return b.result
 }
