@@ -20,7 +20,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/images/directx-device-plugin/pkg/gpu-detection"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
-	dm "k8s.io/kubelet/pkg/cm/devicemanager"
+	dm "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"os"
 	"path"
 	"time"
@@ -87,7 +87,7 @@ func main() {
 
 	for _, gpuInfo := range gpus{
 		if !gpuInfo.MatchName(gpuMatchName) {
-			glog.Warningf("'%s' doesn't match  '%s', ignoring this gpu", gpuInfo.Name, gpuMatchName)
+			klog.Warningf("'%s' doesn't match  '%s', ignoring this gpu", gpuInfo.Name, gpuMatchName)
 			continue
 		}
 
