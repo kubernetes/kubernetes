@@ -182,7 +182,6 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected a volume to be mounted, got: %s", err)
 	}
-
 }
 
 func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
@@ -266,6 +265,31 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 		if !reflect.DeepEqual(tc.expected, actual) {
 			t.Errorf("Expected supplemental groups %v, got %v", tc.expected, actual)
 		}
+	}
+}
+
+func TestMultiVolumeAttachAndMountError(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager())
+	node, pod, pvs, claims := createMultiVolumeObjects()
+	kubeClient := fake.NewSimpleClientset(node, pod, pvs[0], pvs[1], pvs[2], claims[0], claims[1], claims[2])
+
+	manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient)
+
+	stopCh := runVolumeManager(manager)
+	defer close(stopCh)
+
+	podManager.SetPods([]*v1.Pod{pod})
+
+	err1 := manager.WaitForAttachAndMount(pod)
+	err2 := manager.WaitForAttachAndMount(pod)
+
+	if err1 == nil || err1 == err2 {
+		t.Errorf("Expected get same error")
 	}
 }
 
@@ -382,6 +406,165 @@ func createObjects(pvMode, podMode v1.PersistentVolumeMode) (*v1.Node, *v1.Pod, 
 		},
 		Status: v1.PersistentVolumeClaimStatus{
 			Phase: v1.ClaimBound,
+		},
+	}
+	return node, pod, pv, claim
+}
+
+func createMultiVolumeObjects() (*v1.Node, *v1.Pod, []*v1.PersistentVolume, []*v1.PersistentVolumeClaim) {
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: testHostname},
+		Status: v1.NodeStatus{
+			VolumesAttached: []v1.AttachedVolume{
+				{
+					Name:       "fake/fake-device",
+					DevicePath: "fake/path",
+				},
+			}},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "abc",
+			Namespace: "nsA",
+			UID:       "1234",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "container1",
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "vol1",
+							MountPath: "/mnt/vol1",
+						},
+						{
+							Name:      "vol2",
+							MountPath: "/mnt/vol2",
+						},
+						{
+							Name:      "vol3",
+							MountPath: "/mnt/vol3",
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "vol1",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "claimA",
+						},
+					},
+				},
+				{
+					Name: "vol2",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "claimB",
+						},
+					},
+				},
+				{
+					Name: "vol3",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "claimC",
+						},
+					},
+				},
+			},
+			SecurityContext: &v1.PodSecurityContext{
+				SupplementalGroups: []int64{555},
+			},
+		},
+	}
+	pv := []*v1.PersistentVolume{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pvA",
+			},
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+						PDName: "fake-device",
+					},
+				},
+				ClaimRef: &v1.ObjectReference{
+					Namespace: "nsA",
+					Name:      "claimA",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pvB",
+			},
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+						PDName: "fake-device",
+					},
+				},
+				ClaimRef: &v1.ObjectReference{
+					Namespace: "nsA",
+					Name:      "claimB",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pvC",
+			},
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+						PDName: "fake-device",
+					},
+				},
+				ClaimRef: &v1.ObjectReference{
+					Namespace: "nsC",
+					Name:      "claimB",
+				},
+			},
+		},
+	}
+	claim := []*v1.PersistentVolumeClaim{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "claimA",
+				Namespace: "nsA",
+			},
+			Spec: v1.PersistentVolumeClaimSpec{
+				VolumeName: "pvA",
+			},
+			Status: v1.PersistentVolumeClaimStatus{
+				Phase: v1.ClaimBound,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "claimB",
+				Namespace: "nsA",
+			},
+			Spec: v1.PersistentVolumeClaimSpec{
+				VolumeName: "pvB",
+			},
+			Status: v1.PersistentVolumeClaimStatus{
+				Phase: v1.ClaimBound,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "claimC",
+				Namespace: "nsA",
+			},
+			Spec: v1.PersistentVolumeClaimSpec{
+				VolumeName: "pvC",
+			},
+			Status: v1.PersistentVolumeClaimStatus{
+				Phase: v1.ClaimBound,
+			},
 		},
 	}
 	return node, pod, pv, claim

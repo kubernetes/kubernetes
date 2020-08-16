@@ -393,6 +393,11 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 			return nil
 		}
 
+		// The volumes should be sorted to generate the same error
+		// so that the event can be duplicated
+		sort.Strings(unmountedVolumes)
+		sort.Strings(unattachedVolumes)
+
 		return fmt.Errorf(
 			"unmounted volumes=%v, unattached volumes=%v: %s",
 			unmountedVolumes,
