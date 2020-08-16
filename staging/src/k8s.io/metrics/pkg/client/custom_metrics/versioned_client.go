@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 
@@ -35,7 +34,6 @@ import (
 )
 
 var (
-	codecs           = serializer.NewCodecFactory(scheme.Scheme)
 	versionConverter = NewMetricConverter()
 )
 

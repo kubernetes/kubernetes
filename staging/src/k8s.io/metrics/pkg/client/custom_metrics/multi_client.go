@@ -41,12 +41,13 @@ func PeriodicallyInvalidate(cache AvailableAPIsGetter, interval time.Duration, s
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+LABEL:
 	for {
 		select {
 		case <-ticker.C:
 			cache.Invalidate()
 		case <-stopCh:
-			break
+			break LABEL
 		}
 	}
 }
