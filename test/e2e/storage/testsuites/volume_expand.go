@@ -248,7 +248,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 			}()
 			framework.ExpectNoError(err, "While creating pods for resizing")
 
-			// We expand the PVC while no pod is using it to ensure offline expansion
+			// We expand the PVC while l.pod is using it for online expansion.
 			ginkgo.By("Expanding current pvc")
 			currentPvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
