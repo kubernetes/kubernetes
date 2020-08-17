@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"sync/atomic"
 
 	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
@@ -62,6 +63,9 @@ var waitingMark = &requestWatermark{
 	mutatingObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{epmetrics.MutatingKind}).RequestsWaiting,
 }
 
+// apfStartOnce is used to avoid sharing one-time mutex with maxinflight handler
+var apfStartOnce sync.Once
+
 var atomicMutatingExecuting, atomicReadOnlyExecuting int32
 var atomicMutatingWaiting, atomicReadOnlyWaiting int32
 
@@ -78,6 +82,8 @@ func WithPriorityAndFairness(
 	}
 	startOnce.Do(func() {
 		startRecordingUsage(watermark)
+	})
+	apfStartOnce.Do(func() {
 		startRecordingUsage(waitingMark)
 	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -144,6 +150,11 @@ func WithPriorityAndFairness(
 			}
 		}, execute)
 		if !served {
+			if isMutatingRequest {
+				epmetrics.DroppedRequests.WithLabelValues(epmetrics.MutatingKind).Inc()
+			} else {
+				epmetrics.DroppedRequests.WithLabelValues(epmetrics.ReadOnlyKind).Inc()
+			}
 			epmetrics.RecordRequestTermination(r, requestInfo, epmetrics.APIServerComponent, http.StatusTooManyRequests)
 			tooManyRequests(r, w)
 		}
