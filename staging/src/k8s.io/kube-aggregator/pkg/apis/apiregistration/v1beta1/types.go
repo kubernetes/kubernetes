@@ -91,7 +91,7 @@ type APIServiceSpec struct {
 	// Priority int64 `json:"priority" protobuf:"varint,6,opt,name=priority"`
 
 	// URL gives the location of the API server, in standard URL form
-	// (`scheme://host:port/path`). Only one of `url` or `service`
+	// (`scheme://host:port`). Only one of `url` or `service`
 	// should be specified.
 	//
 	// The `host` should not refer to a service running in the cluster; use
@@ -102,9 +102,9 @@ type APIServiceSpec struct {
 	//
 	// The scheme must be "https"; the URL must begin with "https://".
 	//
-	// A path is optional, and if present may be any string permissible in
-	// a URL. You may use the path to pass an arbitrary string to the
-	// API server, for example, a cluster identifier.
+	// Path must be empty (e.g. `https://host:8080` or `https://host:8080/`
+	// are allowed while `https://host:8080/path` and
+	// `https://host:8080/path/` are not).
 	//
 	// Attempting to use a user or basic auth e.g. "user:password@" is not
 	// allowed. Fragments ("#...") and query parameters ("?...") are not
