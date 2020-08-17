@@ -1640,6 +1640,9 @@ rules:
       branch: master
       dir: staging/src/k8s.io/controller-manager
     name: master
+    dependencies:
+      - repository: apimachinery
+        branch: master
   - source:
       branch: release-1.19
       dir: staging/src/k8s.io/controller-manager

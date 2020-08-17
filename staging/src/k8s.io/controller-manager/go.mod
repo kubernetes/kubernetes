@@ -4,4 +4,9 @@ module k8s.io/controller-manager
 
 go 1.15
 
-replace k8s.io/controller-manager => ../controller-manager
+require k8s.io/apimachinery v0.0.0
+
+replace (
+	k8s.io/apimachinery => ../apimachinery
+	k8s.io/controller-manager => ../controller-manager
+)
