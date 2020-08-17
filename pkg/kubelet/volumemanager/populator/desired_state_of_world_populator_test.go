@@ -479,6 +479,53 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 	}
 }
 
+func TestFindAndAddNewPods_Skip_PVC_Volumes_Before_HasAddedPods(t *testing.T) {
+	// create dswp
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dswp-test-volume-name",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			VolumeMode: nil,
+		},
+	}
+	pvc := &v1.PersistentVolumeClaim{
+		Spec: v1.PersistentVolumeClaimSpec{
+			VolumeName: "dswp-test-volume-name",
+			VolumeMode: nil,
+		},
+		Status: v1.PersistentVolumeClaimStatus{
+			Phase: v1.ClaimBound,
+		},
+	}
+	dswp, fakePodManager, _ := createDswpWithVolume(t, pv, pvc)
+	dswp.hasAddedPods = false
+
+	// create pod
+	containers := []v1.Container{
+		{
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "dswp-test-volume-name",
+					MountPath: "/mnt",
+				},
+			},
+		},
+	}
+	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
+
+	fakePodManager.AddPod(pod)
+	mountsMap, devicesMap := util.GetPodVolumeNames(pod)
+	_, volumeSpec, _, err :=
+		dswp.createVolumeSpec(pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+
+	// Assert
+	if volumeSpec != nil || err == nil {
+		t.Fatal("Unexpected processing PVC volumes before dswp.hasAddedPods is true")
+	}
+}
+
 func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
 	// create dswp
 	mode := v1.PersistentVolumeFilesystem
@@ -1029,6 +1076,7 @@ func createDswpWithVolume(t *testing.T, pv *v1.PersistentVolume, pvc *v1.Persist
 			processedPods: make(map[types.UniquePodName]bool)},
 		kubeContainerRuntime:     fakeRuntime,
 		keepTerminatedPodVolumes: false,
+		hasAddedPods:             true,
 		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator),
 		intreeToCSITranslator:    csiTranslator,
 	}

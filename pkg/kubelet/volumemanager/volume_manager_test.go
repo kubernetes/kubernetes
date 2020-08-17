@@ -108,6 +108,8 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 				stopCh,
 				manager)
 
+			go simulateSyncPod(pod, stopCh, manager)
+
 			err = manager.WaitForAttachAndMount(pod)
 			if err != nil && !test.expectError {
 				t.Errorf("Expected success: %v", err)
@@ -167,6 +169,8 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
 		stopCh,
 		manager)
+
+	go simulateSyncPod(pod, stopCh, manager)
 
 	// delayed claim binding
 	go delayClaimBecomesBound(kubeClient, claim.GetNamespace(), claim.ObjectMeta.Name)
@@ -255,6 +259,8 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
 			stopCh,
 			manager)
+
+		go simulateSyncPod(pod, stopCh, manager)
 
 		err = manager.WaitForAttachAndMount(pod)
 		if err != nil {
@@ -395,6 +401,20 @@ func simulateVolumeInUseUpdate(volumeName v1.UniqueVolumeName, stopCh <-chan str
 		case <-ticker.C:
 			volumeManager.MarkVolumesAsReportedInUse(
 				[]v1.UniqueVolumeName{volumeName})
+		case <-stopCh:
+			return
+		}
+	}
+}
+
+func simulateSyncPod(pod *v1.Pod, stopCh chan struct{}, manager VolumeManager) {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			_ = manager.WaitForAttachAndMount(pod)
 		case <-stopCh:
 			return
 		}

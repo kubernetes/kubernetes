@@ -142,6 +142,10 @@ func (dswp *desiredStateOfWorldPopulator) Run(sourcesReady config.SourcesReady, 
 		dswp.populatorLoop()
 		return done, nil
 	}, stopCh)
+
+	// Call dswp.populatorLoop here to process non PVC volumes first of all
+	dswp.populatorLoop()
+
 	dswp.hasAddedPodsLock.Lock()
 	dswp.hasAddedPods = true
 	dswp.hasAddedPodsLock.Unlock()
@@ -318,12 +322,14 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 		pvc, volumeSpec, volumeGidValue, err :=
 			dswp.createVolumeSpec(podVolume, pod, mounts, devices)
 		if err != nil {
-			klog.Errorf(
-				"Error processing volume %q for pod %q: %v",
-				podVolume.Name,
-				format.Pod(pod),
-				err)
-			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
+			if !isDelayPVCProcessingError(err) {
+				klog.Errorf(
+					"Error processing volume %q for pod %q: %v",
+					podVolume.Name,
+					format.Pod(pod),
+					err)
+				dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
+			}
 			allVolumesAdded = false
 			continue
 		}
@@ -513,6 +519,12 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			pod.Namespace,
 			pvcSource.ClaimName)
 
+		if !dswp.HasAddedPods() {
+			return nil, nil, "", newdelayPVCProcessingError(
+				pod.Namespace,
+				pvcSource.ClaimName)
+		}
+
 		// If podVolume is a PVC, fetch the real PV behind the claim
 		pvc, err := dswp.getPVCExtractPV(
 			pod.Namespace, pvcSource.ClaimName)
@@ -686,4 +698,33 @@ func getPVVolumeGidAnnotationValue(pv *v1.PersistentVolume) string {
 	}
 
 	return ""
+}
+
+// Compile-time check to ensure delayPVCProcessingError implements the error interface
+var _ error = delayPVCProcessingError{}
+
+// delayPVCProcessingError is an error returned when processing a PVC volume but
+// hasAddedPods flag is false.
+type delayPVCProcessingError struct {
+	namespace string
+	claimName string
+}
+
+func (err delayPVCProcessingError) Error() string {
+	return fmt.Sprintf(
+		"skip processing PVC %s/%s, process local volumes preferentially after kubelet started",
+		err.namespace,
+		err.claimName)
+}
+
+func newdelayPVCProcessingError(namespace string, claimName string) error {
+	return delayPVCProcessingError{
+		namespace: namespace,
+		claimName: claimName,
+	}
+}
+
+func isDelayPVCProcessingError(err error) bool {
+	_, ok := err.(delayPVCProcessingError)
+	return ok
 }
