@@ -870,7 +870,7 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 			return vs.vmUUID, nil
 		}
 
-		klog.Warningf("The VM: %s is not in %s state", convertToString(nodeName), vclib.ActivePowerState)
+		klog.Warningf("The VM: %s doesn't exist", convertToString(nodeName))
 		return "", cloudprovider.InstanceNotFound
 	}
 
