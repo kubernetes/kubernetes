@@ -486,17 +486,37 @@ var _ = SIGDescribe("Kubectl client", func() {
 			framework.ExpectEqual(ok, true)
 			framework.ExpectEqual(ee.ExitStatus(), 42)
 
+			serverVersion, _ := f.ClientSet.Discovery().ServerVersion()
+			serverMajorVersion, _ := strconv.Atoi(serverVersion.Major)
+			serverMinorVersion, _ := strconv.Atoi(regexp.MustCompile(`^\d+`).FindString(serverVersion.Minor))
+
 			ginkgo.By("running a failing command without --restart=Never")
 			_, err = framework.NewKubectlCommand(ns, nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "failure-2", "--", "/bin/sh", "-c", "cat && exit 42").
 				WithStdinData("abcd1234").
 				Exec()
-			framework.ExpectNoError(err)
+			if serverMajorVersion == 1 && serverMinorVersion < 19 {
+				framework.ExpectNoError(err)
+			} else {
+				ee, ok = err.(uexec.ExitError)
+				framework.ExpectEqual(ok, true)
+				if !strings.Contains(ee.String(), "timed out") {
+					framework.Failf("Missing expected 'timed out' error, got: %#v", ee)
+				}
+			}
 
 			ginkgo.By("running a failing command without --restart=Never, but with --rm")
 			_, err = framework.NewKubectlCommand(ns, nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "--rm", "failure-3", "--", "/bin/sh", "-c", "cat && exit 42").
 				WithStdinData("abcd1234").
 				Exec()
-			framework.ExpectNoError(err)
+			if serverMajorVersion == 1 && serverMinorVersion < 19 {
+				framework.ExpectNoError(err)
+			} else {
+				ee, ok = err.(uexec.ExitError)
+				framework.ExpectEqual(ok, true)
+				if !strings.Contains(ee.String(), "timed out") {
+					framework.Failf("Missing expected 'timed out' error, got: %#v", ee)
+				}
+			}
 			e2epod.WaitForPodToDisappear(f.ClientSet, ns, "failure-3", labels.Everything(), 2*time.Second, wait.ForeverTestTimeout)
 
 			ginkgo.By("running a failing command with --leave-stdin-open")
