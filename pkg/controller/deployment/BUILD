@@ -66,7 +66,6 @@ go_test(
         "//pkg/apis/core/install:go_default_library",
         "//pkg/apis/policy/install:go_default_library",
         "//pkg/apis/rbac/install:go_default_library",
-        "//pkg/apis/settings/install:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",

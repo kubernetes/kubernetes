@@ -51,7 +51,6 @@ go_library(
         "//pkg/apis/rbac/install:go_default_library",
         "//pkg/apis/scheduling/fuzzer:go_default_library",
         "//pkg/apis/scheduling/install:go_default_library",
-        "//pkg/apis/settings/install:go_default_library",
         "//pkg/apis/storage/fuzzer:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",

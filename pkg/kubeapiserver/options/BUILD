@@ -39,7 +39,6 @@ go_library(
         "//plugin/pkg/admission/noderestriction:go_default_library",
         "//plugin/pkg/admission/nodetaint:go_default_library",
         "//plugin/pkg/admission/podnodeselector:go_default_library",
-        "//plugin/pkg/admission/podpreset:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction:go_default_library",
         "//plugin/pkg/admission/priority:go_default_library",
         "//plugin/pkg/admission/resourcequota:go_default_library",
