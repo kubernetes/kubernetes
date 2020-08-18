@@ -182,6 +182,7 @@ func newTestKubeletWithImageList(
 	kubelet.masterServiceNamespace = metav1.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.serviceHasSynced = func() bool { return true }
+	kubelet.nodeHasSynced = func() bool { return true }
 	kubelet.nodeLister = testNodeLister{
 		nodes: []*v1.Node{
 			{
