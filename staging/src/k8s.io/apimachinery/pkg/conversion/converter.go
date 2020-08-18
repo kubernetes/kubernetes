@@ -303,37 +303,6 @@ func (s *scope) errorf(message string, args ...interface{}) error {
 	return fmt.Errorf(where+message, args...)
 }
 
-// Verifies whether a conversion function has a correct signature.
-func verifyConversionFunctionSignature(ft reflect.Type) error {
-	if ft.Kind() != reflect.Func {
-		return fmt.Errorf("expected func, got: %v", ft)
-	}
-	if ft.NumIn() != 3 {
-		return fmt.Errorf("expected three 'in' params, got: %v", ft)
-	}
-	if ft.NumOut() != 1 {
-		return fmt.Errorf("expected one 'out' param, got: %v", ft)
-	}
-	if ft.In(0).Kind() != reflect.Ptr {
-		return fmt.Errorf("expected pointer arg for 'in' param 0, got: %v", ft)
-	}
-	if ft.In(1).Kind() != reflect.Ptr {
-		return fmt.Errorf("expected pointer arg for 'in' param 1, got: %v", ft)
-	}
-	scopeType := Scope(nil)
-	if e, a := reflect.TypeOf(&scopeType).Elem(), ft.In(2); e != a {
-		return fmt.Errorf("expected '%v' arg for 'in' param 2, got '%v' (%v)", e, a, ft)
-	}
-	var forErrorType error
-	// This convolution is necessary, otherwise TypeOf picks up on the fact
-	// that forErrorType is nil.
-	errorType := reflect.TypeOf(&forErrorType).Elem()
-	if ft.Out(0) != errorType {
-		return fmt.Errorf("expected error return, got: %v", ft)
-	}
-	return nil
-}
-
 // RegisterUntypedConversionFunc registers a function that converts between a and b by passing objects of those
 // types to the provided function. The function *must* accept objects of a and b - this machinery will not enforce
 // any other guarantee.
@@ -636,10 +605,6 @@ type kvValue interface {
 
 type stringMapAdaptor reflect.Value
 
-func (a stringMapAdaptor) len() int {
-	return reflect.Value(a).Len()
-}
-
 func (a stringMapAdaptor) keys() []string {
 	v := reflect.Value(a)
 	keys := make([]string, v.Len())
@@ -668,11 +633,6 @@ func (a stringMapAdaptor) confirmSet(key string, v reflect.Value) bool {
 }
 
 type structAdaptor reflect.Value
-
-func (a structAdaptor) len() int {
-	v := reflect.Value(a)
-	return v.Type().NumField()
-}
 
 func (a structAdaptor) keys() []string {
 	v := reflect.Value(a)
