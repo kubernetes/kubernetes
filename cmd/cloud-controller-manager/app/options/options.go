@@ -182,7 +182,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config,
 	c.Kubeconfig.ContentConfig.AcceptContentTypes = o.Generic.ClientConnection.AcceptContentTypes
 	c.Kubeconfig.ContentConfig.ContentType = o.Generic.ClientConnection.ContentType
 	c.Kubeconfig.QPS = o.Generic.ClientConnection.QPS
-	c.Kubeconfig.Burst = int(o.Generic.ClientConnection.Burst)
+	c.Kubeconfig.Burst = o.Generic.ClientConnection.Burst
 
 	c.Client, err = clientset.NewForConfig(restclient.AddUserAgent(c.Kubeconfig, userAgent))
 	if err != nil {
