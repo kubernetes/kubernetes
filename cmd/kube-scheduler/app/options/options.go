@@ -348,7 +348,7 @@ func createClients(config componentbaseconfig.ClientConnectionConfiguration, mas
 	kubeConfig.ContentType = config.ContentType
 	kubeConfig.QPS = config.QPS
 	//TODO make config struct use int instead of int32?
-	kubeConfig.Burst = int(config.Burst)
+	kubeConfig.Burst = config.Burst
 
 	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeConfig, "scheduler"))
 	if err != nil {
