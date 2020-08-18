@@ -419,8 +419,10 @@ function DownloadAndInstall-CSIProxyBinaries {
 
 # TODO(jingxu97): Make csi-proxy.exe as a service similar to kubelet.exe
 function Start-CSIProxy {
-  Log-Output 'Starting CSI Proxy'
-  Start-Process "${env:NODE_DIR}\csi-proxy.exe"
+  if (Test-IsTestCluster $kube_env) {
+    Log-Output 'Starting CSI Proxy'
+    Start-Process "${env:NODE_DIR}\csi-proxy.exe"
+  }
 }
 
 # TODO(pjh): this is copied from
@@ -929,7 +931,6 @@ function Configure-GcePdTools {
 '$modulePath = "K8S_DIR\GetGcePdName.dll"
 Unblock-File $modulePath
 Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
-
   if (Test-IsTestCluster $kube_env) {
     if (ShouldWrite-File ${env:K8S_DIR}\diskutil.exe) {
       # The source code of this executable file is https://github.com/kubernetes-sigs/sig-windows-tools/blob/master/cmd/diskutil/diskutil.c

@@ -625,6 +625,12 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 	return nil
 }
 
+// RemoveNode removes the node object, leaving all other tracking information.
+func (n *NodeInfo) RemoveNode() {
+	n.node = nil
+	n.Generation = nextGeneration()
+}
+
 // FilterOutPods receives a list of pods and filters out those whose node names
 // are equal to the node of this NodeInfo, but are not found in the pods of this NodeInfo.
 //

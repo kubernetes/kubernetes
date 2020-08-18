@@ -84,6 +84,7 @@ var _translationsOwners = []byte(`# See the OWNERS docs at https://go.k8s.io/own
 reviewers:
   - brendandburns
 approvers:
+  - sig-cli-maintainers
   - brendandburns
 `)
 

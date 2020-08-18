@@ -3,4 +3,5 @@
 reviewers:
   - brendandburns
 approvers:
+  - sig-cli-maintainers
   - brendandburns
