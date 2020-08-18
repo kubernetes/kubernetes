@@ -38,8 +38,7 @@ func TestSimpleMetaFactoryInterpret(t *testing.T) {
 	}
 
 	// unparsable
-	gvk, err = factory.Interpret([]byte(`{`))
-	if err == nil {
+	if _, err = factory.Interpret([]byte(`{`)); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
