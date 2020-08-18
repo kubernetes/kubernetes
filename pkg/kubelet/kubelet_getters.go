@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net"
 	"path/filepath"
+	"time"
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	"k8s.io/klog"
@@ -30,6 +31,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -232,6 +234,15 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 	if kl.kubeClient == nil {
 		return kl.initialNode(context.TODO())
 	}
+	// if we have a valid kube client, we wait for initial lister to sync
+	if !kl.nodeHasSynced() {
+		err := wait.PollImmediate(time.Second, maxWaitForAPIServerSync, func() (bool, error) {
+			return kl.nodeHasSynced(), nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("nodes have not yet been read at least once, cannot construct node object")
+		}
+	}
 	return kl.nodeLister.Get(string(kl.nodeName))
 }
 
@@ -242,7 +253,7 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 // zero capacity, and the default labels.
 func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
 	if kl.kubeClient != nil {
-		if n, err := kl.nodeLister.Get(string(kl.nodeName)); err == nil {
+		if n, err := kl.GetNode(); err == nil {
 			return n, nil
 		}
 	}
