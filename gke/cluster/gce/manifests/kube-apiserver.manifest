@@ -35,6 +35,7 @@
                  "/go-runner", "--log-file=/var/log/kube-apiserver.log", "--also-stdout=false", "--redirect-stderr=true",
                  "/usr/local/bin/kube-apiserver",
                  "--allow-privileged={{pillar['allow_privileged']}}",
+                 "--profiling=false",
                  {{params}}
                ],
     {{container_env}}
