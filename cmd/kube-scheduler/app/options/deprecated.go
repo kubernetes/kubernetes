@@ -59,7 +59,7 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *kubeschedulerconfig
 	fs.StringVar(&cfg.ClientConnection.Kubeconfig, "kubeconfig", cfg.ClientConnection.Kubeconfig, "DEPRECATED: path to kubeconfig file with authorization and master location information.")
 	fs.StringVar(&cfg.ClientConnection.ContentType, "kube-api-content-type", cfg.ClientConnection.ContentType, "DEPRECATED: content type of requests sent to apiserver.")
 	fs.Float32Var(&cfg.ClientConnection.QPS, "kube-api-qps", cfg.ClientConnection.QPS, "DEPRECATED: QPS to use while talking with kubernetes apiserver")
-	fs.Int32Var(&cfg.ClientConnection.Burst, "kube-api-burst", cfg.ClientConnection.Burst, "DEPRECATED: burst to use while talking with kubernetes apiserver")
+	fs.IntVar(&cfg.ClientConnection.Burst, "kube-api-burst", cfg.ClientConnection.Burst, "DEPRECATED: burst to use while talking with kubernetes apiserver")
 	fs.StringVar(&cfg.LeaderElection.ResourceNamespace, "lock-object-namespace", cfg.LeaderElection.ResourceNamespace, "DEPRECATED: define the namespace of the lock object. Will be removed in favor of leader-elect-resource-namespace.")
 	fs.StringVar(&cfg.LeaderElection.ResourceName, "lock-object-name", cfg.LeaderElection.ResourceName, "DEPRECATED: define the name of the lock object. Will be removed in favor of leader-elect-resource-name")
 
