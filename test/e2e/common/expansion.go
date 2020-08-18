@@ -181,11 +181,16 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		Description: Make sure a container's subpath can not be set using an expansion of environment variables when absolute path is supplied.
 	*/
 	framework.ConformanceIt("should fail substituting values in a volume subpath with absolute path [sig-storage][Slow]", func() {
+		absolutePath := "/tmp"
+		if framework.NodeOSDistroIs("windows") {
+			// Windows does not typically have a C:\tmp folder.
+			absolutePath = "C:\\Users"
+		}
 
 		envVars := []v1.EnvVar{
 			{
 				Name:  "POD_NAME",
-				Value: "/tmp",
+				Value: absolutePath,
 			},
 		}
 		mounts := []v1.VolumeMount{
