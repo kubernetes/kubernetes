@@ -46,7 +46,9 @@
         "path": "/livez?exclude=etcd&exclude=kms-provider-0&exclude=kms-provider-1"
       },
       "initialDelaySeconds": {{liveness_probe_initial_delay}},
-      "timeoutSeconds": 15
+      "timeoutSeconds": {{liveness_probe_timeout}},
+      "periodSeconds": 5,
+      "failureThreshold": 6
     },
     "readinessProbe": {
       "httpGet": {
