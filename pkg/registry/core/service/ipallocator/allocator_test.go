@@ -47,7 +47,33 @@ func TestAllocate(t *testing.T) {
 			alreadyAllocated: "192.168.1.1",
 		},
 		{
+			name:     "IPv4 large",
+			cidr:     "10.96.0.0/12", // 10.96.0.1 - 10.111.255.254
+			free:     65535,
+			released: "10.96.0.5",
+			outOfRange: []string{
+				"10.95.0.1",  // not in 10.96.0.0/12
+				"10.96.0.0",  // reserved (base address)
+				"10.97.1.1",  // not in the low 16 bits of 10.96.0.0/12
+				"10.112.0.1", // not in 10.96.0.0/12
+			},
+			alreadyAllocated: "10.96.0.1",
+		},
+		{
 			name:     "IPv6",
+			cidr:     "2001:db8:1::/120",
+			free:     255,
+			released: "2001:db8:1::5",
+			outOfRange: []string{
+				"2001:db8::1",     // not in 2001:db8:1::/48
+				"2001:db8:1::",    // reserved (base address)
+				"2001:db8:1::1:0", // not in the low 16 bits of 2001:db8:1::/48
+				"2001:db8:2::2",   // not in 2001:db8:1::/48
+			},
+			alreadyAllocated: "2001:db8:1::1",
+		},
+		{
+			name:     "IPv6 large",
 			cidr:     "2001:db8:1::/48",
 			free:     65535,
 			released: "2001:db8:1::5",

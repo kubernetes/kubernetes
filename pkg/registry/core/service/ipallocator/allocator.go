@@ -86,12 +86,13 @@ func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.Allocator
 	base := utilnet.BigForIP(cidr.IP)
 	rangeSpec := cidr.String()
 
-	if utilnet.IsIPv6CIDR(cidr) {
-		// Limit the max size, since the allocator keeps a bitmap of that size.
-		if max > 65536 {
-			max = 65536
-		}
-	} else {
+	// Limit the max size, since the allocator keeps a bitmap of that size in etcd.
+	// Current Kubernetes Scalability tests are validating cluster with O(10k) services
+	// 65536 is a good compromise between bitmap size and number of services
+	// https://github.com/kubernetes/kubernetes/issues/94029
+	if max > 65536 {
+		max = 65536
+	} else if !utilnet.IsIPv6CIDR(cidr) {
 		// Don't use the IPv4 network's broadcast address.
 		max--
 	}
