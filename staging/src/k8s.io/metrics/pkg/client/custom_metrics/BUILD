@@ -49,12 +49,16 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["util_test.go"],
+    srcs = [
+        "multi_client_test.go",
+        "util_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/client-go/discovery/fake:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta2:go_default_library",
