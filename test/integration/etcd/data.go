@@ -321,13 +321,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/settings/v1alpha1
-		gvr("settings.k8s.io", "v1alpha1", "podpresets"): {
-			Stub:             `{"metadata": {"name": "podpre1"}, "spec": {"env": [{"name": "FOO"}]}}`,
-			ExpectedEtcdPath: "/registry/podpresets/" + namespace + "/podpre1",
-		},
-		// --
-
 		// k8s.io/kubernetes/pkg/apis/rbac/v1alpha1
 		gvr("rbac.authorization.k8s.io", "v1alpha1", "roles"): {
 			Stub:             `{"metadata": {"name": "role1"}, "rules": [{"apiGroups": ["v1"], "resources": ["events"], "verbs": ["watch"]}]}`,
