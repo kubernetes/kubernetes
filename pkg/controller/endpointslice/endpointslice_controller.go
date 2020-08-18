@@ -237,7 +237,7 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting endpoint slice controller")
 	defer klog.Infof("Shutting down endpoint slice controller")
 
-	if !cache.WaitForNamedCacheSync("endpoint_slice", stopCh, c.podsSynced, c.servicesSynced) {
+	if !cache.WaitForNamedCacheSync("endpoint_slice", stopCh, c.podsSynced, c.servicesSynced, c.endpointSlicesSynced, c.nodesSynced) {
 		return
 	}
 
