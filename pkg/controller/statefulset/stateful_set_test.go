@@ -650,7 +650,7 @@ func TestGetPodsForStatefulSetRelease(t *testing.T) {
 	}
 }
 
-func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSetController, *fakeStatefulPodControl, history.Interface) {
+func newFakeStatefulSetController(initialObjects ...runtime.Object) (*Controller, *fakeStatefulPodControl, history.Interface) {
 	client := fake.NewSimpleClientset(initialObjects...)
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	fpc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1().StatefulSets(), informerFactory.Apps().V1().ControllerRevisions())
@@ -671,7 +671,7 @@ func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSe
 	return ssc, fpc, ssh
 }
 
-func fakeWorker(ssc *StatefulSetController) {
+func fakeWorker(ssc *Controller) {
 	if obj, done := ssc.queue.Get(); !done {
 		ssc.sync(obj.(string))
 		ssc.queue.Done(obj)
@@ -686,7 +686,7 @@ func getPodAtOrdinal(pods []*v1.Pod, ordinal int) *v1.Pod {
 	return pods[ordinal]
 }
 
-func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetController, spc *fakeStatefulPodControl) error {
+func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *Controller, spc *fakeStatefulPodControl) error {
 	spc.setsIndexer.Add(set)
 	ssc.enqueueStatefulSet(set)
 	fakeWorker(ssc)
@@ -735,7 +735,7 @@ func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetControl
 	return assertMonotonicInvariants(set, spc)
 }
 
-func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetController, spc *fakeStatefulPodControl) error {
+func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *Controller, spc *fakeStatefulPodControl) error {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return err

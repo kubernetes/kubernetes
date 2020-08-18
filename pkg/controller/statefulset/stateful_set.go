@@ -48,13 +48,13 @@ import (
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
 
-// StatefulSetController controls statefulsets.
-type StatefulSetController struct {
+// Controller controls statefulsets.
+type Controller struct {
 	// client interface
 	kubeClient clientset.Interface
 	// control returns an interface capable of syncing a stateful set.
 	// Abstracted out for testing.
-	control StatefulSetControlInterface
+	control ControlInterface
 	// podControl is used for patching pods.
 	podControl controller.PodControlInterface
 	// podLister is able to list/get pods from a shared informer's store
@@ -80,13 +80,13 @@ func NewStatefulSetController(
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	revInformer appsinformers.ControllerRevisionInformer,
 	kubeClient clientset.Interface,
-) *StatefulSetController {
+) *Controller {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "statefulset-controller"})
 
-	ssc := &StatefulSetController{
+	ssc := &Controller{
 		kubeClient: kubeClient,
 		control: NewDefaultStatefulSetControl(
 			NewRealStatefulPodControl(
@@ -139,7 +139,7 @@ func NewStatefulSetController(
 }
 
 // Run runs the statefulset controller.
-func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
+func (ssc *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer ssc.queue.ShutDown()
 
@@ -158,7 +158,7 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 }
 
 // addPod adds the statefulset for the pod to the sync queue
-func (ssc *StatefulSetController) addPod(obj interface{}) {
+func (ssc *Controller) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
 
 	if pod.DeletionTimestamp != nil {
@@ -192,7 +192,7 @@ func (ssc *StatefulSetController) addPod(obj interface{}) {
 }
 
 // updatePod adds the statefulset for the current and old pods to the sync queue.
-func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
+func (ssc *Controller) updatePod(old, cur interface{}) {
 	curPod := cur.(*v1.Pod)
 	oldPod := old.(*v1.Pod)
 	if curPod.ResourceVersion == oldPod.ResourceVersion {
@@ -239,7 +239,7 @@ func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
 }
 
 // deletePod enqueues the statefulset for the pod accounting for deletion tombstones.
-func (ssc *StatefulSetController) deletePod(obj interface{}) {
+func (ssc *Controller) deletePod(obj interface{}) {
 	pod, ok := obj.(*v1.Pod)
 
 	// When a delete is dropped, the relist will notice a pod in the store not
@@ -276,7 +276,7 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 //
 // NOTE: Returned Pods are pointers to objects from the cache.
 //       If you need to modify one, you need to copy it first.
-func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet, selector labels.Selector) ([]*v1.Pod, error) {
+func (ssc *Controller) getPodsForStatefulSet(set *apps.StatefulSet, selector labels.Selector) ([]*v1.Pod, error) {
 	// List all pods to include the pods that don't match the selector anymore but
 	// has a ControllerRef pointing to this StatefulSet.
 	pods, err := ssc.podLister.Pods(set.Namespace).List(labels.Everything())
@@ -295,7 +295,7 @@ func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet, s
 
 // If any adoptions are attempted, we should first recheck for deletion with
 // an uncached quorum read sometime after listing Pods/ControllerRevisions (see #42639).
-func (ssc *StatefulSetController) canAdoptFunc(set *apps.StatefulSet) func() error {
+func (ssc *Controller) canAdoptFunc(set *apps.StatefulSet) func() error {
 	return controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
 		fresh, err := ssc.kubeClient.AppsV1().StatefulSets(set.Namespace).Get(context.TODO(), set.Name, metav1.GetOptions{})
 		if err != nil {
@@ -309,7 +309,7 @@ func (ssc *StatefulSetController) canAdoptFunc(set *apps.StatefulSet) func() err
 }
 
 // adoptOrphanRevisions adopts any orphaned ControllerRevisions matched by set's Selector.
-func (ssc *StatefulSetController) adoptOrphanRevisions(set *apps.StatefulSet) error {
+func (ssc *Controller) adoptOrphanRevisions(set *apps.StatefulSet) error {
 	revisions, err := ssc.control.ListRevisions(set)
 	if err != nil {
 		return err
@@ -332,7 +332,7 @@ func (ssc *StatefulSetController) adoptOrphanRevisions(set *apps.StatefulSet) er
 
 // getStatefulSetsForPod returns a list of StatefulSets that potentially match
 // a given pod.
-func (ssc *StatefulSetController) getStatefulSetsForPod(pod *v1.Pod) []*apps.StatefulSet {
+func (ssc *Controller) getStatefulSetsForPod(pod *v1.Pod) []*apps.StatefulSet {
 	sets, err := ssc.setLister.GetPodStatefulSets(pod)
 	if err != nil {
 		return nil
@@ -352,7 +352,7 @@ func (ssc *StatefulSetController) getStatefulSetsForPod(pod *v1.Pod) []*apps.Sta
 // resolveControllerRef returns the controller referenced by a ControllerRef,
 // or nil if the ControllerRef could not be resolved to a matching controller
 // of the correct Kind.
-func (ssc *StatefulSetController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *apps.StatefulSet {
+func (ssc *Controller) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *apps.StatefulSet {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
 	if controllerRef.Kind != controllerKind.Kind {
@@ -371,7 +371,7 @@ func (ssc *StatefulSetController) resolveControllerRef(namespace string, control
 }
 
 // enqueueStatefulSet enqueues the given statefulset in the work queue.
-func (ssc *StatefulSetController) enqueueStatefulSet(obj interface{}) {
+func (ssc *Controller) enqueueStatefulSet(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
@@ -382,7 +382,7 @@ func (ssc *StatefulSetController) enqueueStatefulSet(obj interface{}) {
 
 // processNextWorkItem dequeues items, processes them, and marks them done. It enforces that the syncHandler is never
 // invoked concurrently with the same key.
-func (ssc *StatefulSetController) processNextWorkItem() bool {
+func (ssc *Controller) processNextWorkItem() bool {
 	key, quit := ssc.queue.Get()
 	if quit {
 		return false
@@ -398,13 +398,13 @@ func (ssc *StatefulSetController) processNextWorkItem() bool {
 }
 
 // worker runs a worker goroutine that invokes processNextWorkItem until the controller's queue is closed
-func (ssc *StatefulSetController) worker() {
+func (ssc *Controller) worker() {
 	for ssc.processNextWorkItem() {
 	}
 }
 
 // sync syncs the given statefulset.
-func (ssc *StatefulSetController) sync(key string) error {
+func (ssc *Controller) sync(key string) error {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing statefulset %q (%v)", key, time.Since(startTime))
@@ -444,7 +444,7 @@ func (ssc *StatefulSetController) sync(key string) error {
 }
 
 // syncStatefulSet syncs a tuple of (statefulset, []*v1.Pod).
-func (ssc *StatefulSetController) syncStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) error {
+func (ssc *Controller) syncStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) error {
 	klog.V(4).Infof("Syncing StatefulSet %v/%v with %d pods", set.Namespace, set.Name, len(pods))
 	// TODO: investigate where we mutate the set during the update as it is not obvious.
 	if err := ssc.control.UpdateStatefulSet(set.DeepCopy(), pods); err != nil {

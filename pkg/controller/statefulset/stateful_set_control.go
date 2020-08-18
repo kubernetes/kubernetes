@@ -29,9 +29,9 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 )
 
-// StatefulSetControl implements the control logic for updating StatefulSets and their children Pods. It is implemented
+// ControlInterface implements the control logic for updating StatefulSets and their children Pods. It is implemented
 // as an interface to allow for extensions that provide different semantics. Currently, there is only one implementation.
-type StatefulSetControlInterface interface {
+type ControlInterface interface {
 	// UpdateStatefulSet implements the control logic for Pod creation, update, and deletion, and
 	// persistent volume creation, update, and deletion.
 	// If an implementation returns a non-nil error, the invocation will be retried using a rate-limited strategy.
@@ -46,22 +46,22 @@ type StatefulSetControlInterface interface {
 	AdoptOrphanRevisions(set *apps.StatefulSet, revisions []*apps.ControllerRevision) error
 }
 
-// NewDefaultStatefulSetControl returns a new instance of the default implementation StatefulSetControlInterface that
+// NewDefaultStatefulSetControl returns a new instance of the default implementation ControlInterface that
 // implements the documented semantics for StatefulSets. podControl is the PodControlInterface used to create, update,
-// and delete Pods and to create PersistentVolumeClaims. statusUpdater is the StatefulSetStatusUpdaterInterface used
+// and delete Pods and to create PersistentVolumeClaims. statusUpdater is the StatusUpdaterInterface used
 // to update the status of StatefulSets. You should use an instance returned from NewRealStatefulPodControl() for any
 // scenario other than testing.
 func NewDefaultStatefulSetControl(
 	podControl StatefulPodControlInterface,
-	statusUpdater StatefulSetStatusUpdaterInterface,
+	statusUpdater StatusUpdaterInterface,
 	controllerHistory history.Interface,
-	recorder record.EventRecorder) StatefulSetControlInterface {
+	recorder record.EventRecorder) ControlInterface {
 	return &defaultStatefulSetControl{podControl, statusUpdater, controllerHistory, recorder}
 }
 
 type defaultStatefulSetControl struct {
 	podControl        StatefulPodControlInterface
-	statusUpdater     StatefulSetStatusUpdaterInterface
+	statusUpdater     StatusUpdaterInterface
 	controllerHistory history.Interface
 	recorder          record.EventRecorder
 }
@@ -571,4 +571,4 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 	return nil
 }
 
-var _ StatefulSetControlInterface = &defaultStatefulSetControl{}
+var _ ControlInterface = &defaultStatefulSetControl{}

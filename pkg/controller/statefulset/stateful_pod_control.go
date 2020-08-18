@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-// StatefulPodControlInterface defines the interface that StatefulSetController uses to create, update, and delete Pods,
+// StatefulPodControlInterface defines the interface that Controller uses to create, update, and delete Pods,
 // and to update the Status of a StatefulSet. It follows the design paradigms used for PodControl, but its
 // implementation provides for PVC creation, ordered Pod creation, ordered Pod termination, and Pod identity enforcement.
 // Like controller.PodControlInterface, it is implemented as an interface to provide for testing fakes.
@@ -52,6 +52,7 @@ type StatefulPodControlInterface interface {
 	DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error
 }
 
+// NewRealStatefulPodControl creates a new realStatefulPodControl which implements StatefulPodControlInterface.
 func NewRealStatefulPodControl(
 	client clientset.Interface,
 	setLister appslisters.StatefulSetLister,
