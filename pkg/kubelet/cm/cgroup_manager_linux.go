@@ -318,11 +318,7 @@ func (m *cgroupManagerImpl) Destroy(cgroupConfig *CgroupConfig) error {
 	if m.adapter.cgroupManagerType == libcontainerSystemd {
 		updateSystemdCgroupInfo(libcontainerCgroupConfig, cgroupConfig.Name)
 	} else {
-		if libcontainercgroups.IsCgroup2UnifiedMode() {
-			libcontainerCgroupConfig.Path = m.buildCgroupUnifiedPath(cgroupConfig.Name)
-		} else {
-			libcontainerCgroupConfig.Path = cgroupConfig.Name.ToCgroupfs()
-		}
+		libcontainerCgroupConfig.Path = cgroupConfig.Name.ToCgroupfs()
 	}
 
 	manager, err := m.adapter.newManager(libcontainerCgroupConfig, cgroupPaths)
@@ -435,7 +431,7 @@ func getSupportedUnifiedControllers() sets.String {
 
 // propagateControllers on an unified hierarchy enables all the supported controllers for the specified cgroup
 func propagateControllers(path string) error {
-	if err := os.MkdirAll(path, 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(cmutil.CgroupRoot, path), 0755); err != nil {
 		return fmt.Errorf("failed to create cgroup %q : %v", path, err)
 	}
 
@@ -464,15 +460,12 @@ func propagateControllers(path string) error {
 	}
 
 	current := cmutil.CgroupRoot
-	relPath, err := filepath.Rel(cmutil.CgroupRoot, path)
-	if err != nil {
-		return fmt.Errorf("failed to get relative path to cgroup root from %q: %v", path, err)
-	}
+
 	// Write the controllers list to each "cgroup.subtree_control" file until it reaches the parent cgroup.
 	// For the /foo/bar/baz cgroup, controllers must be enabled sequentially in the files:
 	// - /sys/fs/cgroup/foo/cgroup.subtree_control
 	// - /sys/fs/cgroup/foo/bar/cgroup.subtree_control
-	for _, p := range strings.Split(filepath.Dir(relPath), "/") {
+	for _, p := range strings.Split(filepath.Dir(path), "/") {
 		current = filepath.Join(current, p)
 		if err := ioutil.WriteFile(filepath.Join(current, "cgroup.subtree_control"), []byte(controllers), 0755); err != nil {
 			return fmt.Errorf("failed to enable controllers on %q: %v", cmutil.CgroupRoot, err)
@@ -505,7 +498,7 @@ func setResourcesV2(cgroupConfig *libcontainerconfigs.Cgroup) error {
 		klog.V(6).Infof("Optional subsystem not supported: hugetlb")
 	}
 
-	manager, err := cgroupfs2.NewManager(cgroupConfig, cgroupConfig.Path, false)
+	manager, err := cgroupfs2.NewManager(cgroupConfig, filepath.Join(cmutil.CgroupRoot, cgroupConfig.Path), false)
 	if err != nil {
 		return fmt.Errorf("failed to create cgroup v2 manager: %v", err)
 	}
@@ -597,7 +590,7 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 
 	unified := libcontainercgroups.IsCgroup2UnifiedMode()
 	if unified {
-		libcontainerCgroupConfig.Path = m.buildCgroupUnifiedPath(cgroupConfig.Name)
+		libcontainerCgroupConfig.Path = cgroupConfig.Name.ToCgroupfs()
 	} else {
 		libcontainerCgroupConfig.Paths = m.buildCgroupPaths(cgroupConfig.Name)
 	}
@@ -641,11 +634,7 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 	if m.adapter.cgroupManagerType == libcontainerSystemd {
 		updateSystemdCgroupInfo(libcontainerCgroupConfig, cgroupConfig.Name)
 	} else {
-		if libcontainercgroups.IsCgroup2UnifiedMode() {
-			libcontainerCgroupConfig.Path = m.buildCgroupUnifiedPath(cgroupConfig.Name)
-		} else {
-			libcontainerCgroupConfig.Path = cgroupConfig.Name.ToCgroupfs()
-		}
+		libcontainerCgroupConfig.Path = cgroupConfig.Name.ToCgroupfs()
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && cgroupConfig.ResourceParameters != nil && cgroupConfig.ResourceParameters.PidsLimit != nil {
