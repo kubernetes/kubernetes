@@ -146,10 +146,14 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		topologyKeys:           service.Spec.TopologyKeys,
 	}
 
+	loadBalancerSourceRanges := make([]string, len(service.Spec.LoadBalancerSourceRanges))
+	for i, sourceRange := range service.Spec.LoadBalancerSourceRanges {
+		loadBalancerSourceRanges[i] = strings.TrimSpace(sourceRange)
+	}
+
 	if sct.isIPv6Mode == nil {
 		info.externalIPs = make([]string, len(service.Spec.ExternalIPs))
-		info.loadBalancerSourceRanges = make([]string, len(service.Spec.LoadBalancerSourceRanges))
-		copy(info.loadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges)
+		info.loadBalancerSourceRanges = loadBalancerSourceRanges
 		copy(info.externalIPs, service.Spec.ExternalIPs)
 		// Deep-copy in case the service instance changes
 		info.loadBalancerStatus = *service.Status.LoadBalancer.DeepCopy()
@@ -162,7 +166,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		if len(incorrectIPs) > 0 {
 			utilproxy.LogAndEmitIncorrectIPVersionEvent(sct.recorder, "externalIPs", strings.Join(incorrectIPs, ","), service.Namespace, service.Name, service.UID)
 		}
-		info.loadBalancerSourceRanges, incorrectIPs = utilproxy.FilterIncorrectCIDRVersion(service.Spec.LoadBalancerSourceRanges, *sct.isIPv6Mode)
+		info.loadBalancerSourceRanges, incorrectIPs = utilproxy.FilterIncorrectCIDRVersion(loadBalancerSourceRanges, *sct.isIPv6Mode)
 		if len(incorrectIPs) > 0 {
 			utilproxy.LogAndEmitIncorrectIPVersionEvent(sct.recorder, "loadBalancerSourceRanges", strings.Join(incorrectIPs, ","), service.Namespace, service.Name, service.UID)
 		}
