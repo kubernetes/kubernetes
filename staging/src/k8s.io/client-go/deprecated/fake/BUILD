@@ -126,8 +126,6 @@ go_library(
         "//staging/src/k8s.io/client-go/deprecated/typed/scheduling/v1alpha1/fake:go_default_library",
         "//staging/src/k8s.io/client-go/deprecated/typed/scheduling/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/deprecated/typed/scheduling/v1beta1/fake:go_default_library",
-        "//staging/src/k8s.io/client-go/deprecated/typed/settings/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/client-go/deprecated/typed/settings/v1alpha1/fake:go_default_library",
         "//staging/src/k8s.io/client-go/deprecated/typed/storage/v1:go_default_library",
         "//staging/src/k8s.io/client-go/deprecated/typed/storage/v1/fake:go_default_library",
         "//staging/src/k8s.io/client-go/deprecated/typed/storage/v1alpha1:go_default_library",
@@ -137,7 +135,6 @@ go_library(
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/discovery/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
-        "//vendor/k8s.io/api/settings/v1alpha1:go_default_library",
     ],
 )
 
