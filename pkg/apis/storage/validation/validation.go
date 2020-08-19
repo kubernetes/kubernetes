@@ -44,7 +44,7 @@ const (
 	maxAttachedVolumeMetadataSize = 256 * (1 << 10) // 256 kB
 	maxVolumeErrorMessageSize     = 1024
 
-	csiNodeIDMaxLength = 128
+	csiNodeIDMaxLength = 256
 )
 
 // ValidateStorageClass validates a StorageClass.
