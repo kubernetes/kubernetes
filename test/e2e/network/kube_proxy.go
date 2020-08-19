@@ -313,7 +313,7 @@ var _ = SIGDescribe("Network", func() {
 						Name:  "startup-script",
 						Image: imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{
-							"bash", "-c", "while true; do sleep 2; nc boom-server 9000& done",
+							"sh", "-c", "while true; do sleep 2; nc boom-server 9000& done",
 						},
 					},
 				},
