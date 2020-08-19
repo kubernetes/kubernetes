@@ -21,8 +21,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
 func TestKubeletDirs(t *testing.T) {
@@ -91,15 +89,5 @@ func TestKubeletDirs(t *testing.T) {
 
 	got = kubelet.getPodResourcesDir()
 	exp = filepath.Join(root, "pod-resources")
-	assert.Equal(t, exp, got)
-
-	// GetNodeConfig for containerManagerStub returns an empty node config
-	gotCfg := kubelet.GetNodeConfig()
-	expCfg := cm.NodeConfig{}
-	assert.Equal(t, expCfg, gotCfg)
-
-	// GetPodCgroupRoot for containerManagerStub returns an empty string
-	got = kubelet.GetPodCgroupRoot()
-	exp = ""
 	assert.Equal(t, exp, got)
 }
