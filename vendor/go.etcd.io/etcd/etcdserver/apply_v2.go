@@ -16,6 +16,7 @@ package etcdserver
 
 import (
 	"encoding/json"
+	"fmt"
 	"path"
 	"time"
 
@@ -114,7 +115,11 @@ func (a *applierV2store) Sync(r *RequestV2) Response {
 // applyV2Request interprets r as a call to v2store.X
 // and returns a Response interpreted from v2store.Event
 func (s *EtcdServer) applyV2Request(r *RequestV2) Response {
-	defer warnOfExpensiveRequest(s.getLogger(), time.Now(), r, nil, nil)
+	stringer := panicAlternativeStringer{
+		stringer:    r,
+		alternative: func() string { return fmt.Sprintf("id:%d,method:%s,path:%s", r.ID, r.Method, r.Path) },
+	}
+	defer warnOfExpensiveRequest(s.getLogger(), time.Now(), stringer, nil, nil)
 
 	switch r.Method {
 	case "POST":
