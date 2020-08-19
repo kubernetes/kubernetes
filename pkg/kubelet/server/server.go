@@ -38,11 +38,8 @@ import (
 	cadvisorv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/metrics"
 	"google.golang.org/grpc"
-	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
-	"k8s.io/utils/clock"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -61,6 +58,7 @@ import (
 	"k8s.io/component-base/logs"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
@@ -72,11 +70,13 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
+	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -145,12 +145,13 @@ func ListenAndServeKubeletServer(
 	auth AuthInterface,
 	enableCAdvisorJSONEndpoints,
 	enableDebuggingHandlers,
+	enableProfiling,
 	enableContentionProfiling,
 	redirectContainerStreaming,
 	enableSystemLogHandler bool,
 	criHandler http.Handler) {
 	klog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, redirectContainerStreaming, enableSystemLogHandler, criHandler)
+	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableProfiling, enableContentionProfiling, redirectContainerStreaming, enableSystemLogHandler, criHandler)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -172,7 +173,7 @@ func ListenAndServeKubeletServer(
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint, enableCAdvisorJSONEndpoints bool) {
 	klog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
-	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, false, false, false, false, nil)
+	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, false, false, false, false, false, nil)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -225,6 +226,7 @@ func NewServer(
 	auth AuthInterface,
 	enableCAdvisorJSONEndpoints,
 	enableDebuggingHandlers,
+	enableProfiling,
 	enableContentionProfiling,
 	redirectContainerStreaming,
 	enableSystemLogHandler bool,
@@ -247,10 +249,16 @@ func NewServer(
 		// To maintain backward compatibility serve logs only when enableDebuggingHandlers is also enabled
 		// see https://github.com/kubernetes/kubernetes/pull/87273
 		server.InstallSystemLogHandler(enableSystemLogHandler)
-		if enableContentionProfiling {
-			goruntime.SetBlockProfileRate(1)
+		if enableProfiling {
+			server.InstallProfilingHandlers()
+			if enableContentionProfiling {
+				goruntime.SetBlockProfileRate(1)
+			}
+		} else {
+			klog.Info("profiling is disabled")
 		}
 	} else {
+		klog.Info("debugging handlers and profiling are disabled")
 		server.InstallDebuggingDisabledHandlers()
 	}
 	return server
@@ -501,33 +509,6 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 	s.addMetricsBucketMatcher("configz")
 	configz.InstallHandler(s.restfulCont)
 
-	s.addMetricsBucketMatcher("debug")
-	handlePprofEndpoint := func(req *restful.Request, resp *restful.Response) {
-		name := strings.TrimPrefix(req.Request.URL.Path, pprofBasePath)
-		switch name {
-		case "profile":
-			pprof.Profile(resp, req.Request)
-		case "symbol":
-			pprof.Symbol(resp, req.Request)
-		case "cmdline":
-			pprof.Cmdline(resp, req.Request)
-		case "trace":
-			pprof.Trace(resp, req.Request)
-		default:
-			pprof.Index(resp, req.Request)
-		}
-	}
-	// Setup pprof handlers.
-	ws = new(restful.WebService).Path(pprofBasePath)
-	ws.Route(ws.GET("/{subpath:*}").To(func(req *restful.Request, resp *restful.Response) {
-		handlePprofEndpoint(req, resp)
-	})).Doc("pprof endpoint")
-	s.restfulCont.Add(ws)
-
-	// Setup flags handlers.
-	// so far, only logging related endpoints are considered valid to add for these debug flags.
-	s.restfulCont.Handle("/debug/flags/v", routes.StringFlagPutHandler(logs.GlogSetter))
-
 	// The /runningpods endpoint is used for testing only.
 	s.addMetricsBucketMatcher("runningpods")
 	ws = new(restful.WebService)
@@ -587,6 +568,35 @@ func (s *Server) InstallSystemLogHandler(enableSystemLogHandler bool) {
 		})
 		s.restfulCont.Handle(logsPath, h)
 	}
+}
+
+// InstallProfilingHandlers registers the HTTP request patterns that provide profiling webservice
+func (s *Server) InstallProfilingHandlers() {
+	s.addMetricsBucketMatcher("debug")
+	handlePprofEndpoint := func(req *restful.Request, resp *restful.Response) {
+		name := strings.TrimPrefix(req.Request.URL.Path, pprofBasePath)
+		switch name {
+		case "profile":
+			pprof.Profile(resp, req.Request)
+		case "symbol":
+			pprof.Symbol(resp, req.Request)
+		case "cmdline":
+			pprof.Cmdline(resp, req.Request)
+		case "trace":
+			pprof.Trace(resp, req.Request)
+		default:
+			pprof.Index(resp, req.Request)
+		}
+	}
+
+	// Setup pprof handlers.
+	ws := new(restful.WebService).Path(pprofBasePath)
+	ws.Route(ws.GET("/{subpath:*}").To(handlePprofEndpoint)).Doc("pprof endpoint")
+	s.restfulCont.Add(ws)
+
+	// Setup flags handlers.
+	// so far, only logging related endpoints are considered valid to add for these debug flags.
+	s.restfulCont.Handle("/debug/flags/v", routes.StringFlagPutHandler(logs.GlogSetter))
 }
 
 // Checks if kubelet's sync loop  that updates containers is working.

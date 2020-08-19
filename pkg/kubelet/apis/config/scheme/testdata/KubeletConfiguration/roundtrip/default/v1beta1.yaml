@@ -24,6 +24,7 @@ cpuManagerPolicy: none
 cpuManagerReconcilePeriod: 10s
 enableControllerAttachDetach: true
 enableDebuggingHandlers: true
+enableProfiling: true
 enableServer: true
 enableSystemLogHandler: true
 enforceNodeAllocatable:

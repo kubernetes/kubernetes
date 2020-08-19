@@ -162,6 +162,7 @@ var (
 		"ContainerLogMaxFiles",
 		"ContainerLogMaxSize",
 		"ContentType",
+		"EnableProfiling",
 		"EnableContentionProfiling",
 		"EnableControllerAttachDetach",
 		"EnableDebuggingHandlers",

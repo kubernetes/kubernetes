@@ -152,6 +152,8 @@ type KubeletConfiguration struct {
 	// enableDebuggingHandlers enables server endpoints for log collection
 	// and local running of containers and commands
 	EnableDebuggingHandlers bool
+	// enableProfiling enables profiling via web interface host:port/debug/pprof/
+	EnableProfiling bool
 	// enableContentionProfiling enables lock contention profiling, if enableDebuggingHandlers is true.
 	EnableContentionProfiling bool
 	// healthzPort is the port of the localhost healthz endpoint (set to 0 to disable)

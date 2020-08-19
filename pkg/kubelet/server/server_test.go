@@ -302,14 +302,14 @@ type serverTestFramework struct {
 }
 
 func newServerTest() *serverTestFramework {
-	return newServerTestWithDebug(true, false, nil)
+	return newServerTestWithDebug(true, true, false, nil)
 }
 
-func newServerTestWithDebug(enableDebugging, redirectContainerStreaming bool, streamingServer streaming.Server) *serverTestFramework {
-	return newServerTestWithDebuggingHandlers(enableDebugging, enableDebugging, redirectContainerStreaming, streamingServer)
+func newServerTestWithDebug(enableDebugging, enableProfiling, redirectContainerStreaming bool, streamingServer streaming.Server) *serverTestFramework {
+	return newServerTestWithDebuggingHandlers(enableDebugging, enableProfiling, enableDebugging, redirectContainerStreaming, streamingServer)
 }
 
-func newServerTestWithDebuggingHandlers(enableDebugging, enableSystemLogHandler, redirectContainerStreaming bool,
+func newServerTestWithDebuggingHandlers(enableDebugging, enableProfiling, enableSystemLogHandler, redirectContainerStreaming bool,
 	streamingServer streaming.Server) *serverTestFramework {
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
@@ -348,6 +348,7 @@ func newServerTestWithDebuggingHandlers(enableDebugging, enableSystemLogHandler,
 		fw.fakeAuth,
 		true,
 		enableDebugging,
+		enableProfiling,
 		false,
 		redirectContainerStreaming,
 		enableSystemLogHandler,
@@ -1036,7 +1037,7 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 	ss, err := newTestStreamingServer(100 * time.Millisecond)
 	require.NoError(t, err)
 	defer ss.testHTTPServer.Close()
-	fw := newServerTestWithDebug(true, false, ss)
+	fw := newServerTestWithDebug(true, true, false, ss)
 	defer fw.testHTTPServer.Close()
 
 	podNamespace := "other"
@@ -1095,7 +1096,7 @@ func testExecAttach(t *testing.T, verb string) {
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
 			defer ss.testHTTPServer.Close()
-			fw := newServerTestWithDebug(true, test.redirect, ss)
+			fw := newServerTestWithDebug(true, true, test.redirect, ss)
 			defer fw.testHTTPServer.Close()
 			fmt.Println(desc)
 
@@ -1299,7 +1300,7 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 	ss, err := newTestStreamingServer(100 * time.Millisecond)
 	require.NoError(t, err)
 	defer ss.testHTTPServer.Close()
-	fw := newServerTestWithDebug(true, false, ss)
+	fw := newServerTestWithDebug(true, true, false, ss)
 	defer fw.testHTTPServer.Close()
 
 	podNamespace := "other"
@@ -1360,7 +1361,7 @@ func TestServePortForward(t *testing.T) {
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
 			defer ss.testHTTPServer.Close()
-			fw := newServerTestWithDebug(true, test.redirect, ss)
+			fw := newServerTestWithDebug(true, true, test.redirect, ss)
 			defer fw.testHTTPServer.Close()
 
 			portForwardFuncDone := make(chan struct{})
@@ -1557,7 +1558,7 @@ func TestMetricMethodBuckets(t *testing.T) {
 func TestDebuggingDisabledHandlers(t *testing.T) {
 	// for backward compatibility even if enablesystemLogHandler is set but not enableDebuggingHandler then /logs
 	//shouldn't be served.
-	fw := newServerTestWithDebuggingHandlers(false, true, false, nil)
+	fw := newServerTestWithDebuggingHandlers(false, false, true, false, nil)
 	defer fw.testHTTPServer.Close()
 
 	paths := []string{
@@ -1597,15 +1598,22 @@ func TestDebuggingDisabledHandlers(t *testing.T) {
 	resp, err = http.Get(fw.testHTTPServer.URL + "/spec")
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
 }
 
 func TestDisablingSystemLogHandler(t *testing.T) {
-	fw := newServerTestWithDebuggingHandlers(true, false, false, nil)
+	fw := newServerTestWithDebuggingHandlers(true, false, false, false, nil)
 	defer fw.testHTTPServer.Close()
 
 	// verify logs endpoint is disabled
 	verifyEndpointResponse(t, fw, "/logs/kubelet.log", "logs endpoint is disabled.\n")
+}
+
+func TestDisableProfiling(t *testing.T) {
+	fw := newServerTestWithDebuggingHandlers(false, false, false, false, nil)
+	defer fw.testHTTPServer.Close()
+
+	// verify debug endpoint is disabled
+	verifyEndpointResponse(t, fw, "/debug/pprof/profile?seconds=2", "Debug endpoints are disabled.\n")
 }
 
 func TestFailedParseParamsSummaryHandler(t *testing.T) {

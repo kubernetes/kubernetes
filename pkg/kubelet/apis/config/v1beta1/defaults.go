@@ -239,4 +239,8 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.EnableSystemLogHandler == nil {
 		obj.EnableSystemLogHandler = utilpointer.BoolPtr(true)
 	}
+	// Enable profiling by default in the scheduler
+	if obj.EnableProfiling == nil {
+		obj.EnableProfiling = utilpointer.BoolPtr(true)
+	}
 }

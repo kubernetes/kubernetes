@@ -260,6 +260,12 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	EnableDebuggingHandlers *bool `json:"enableDebuggingHandlers,omitempty"`
+	// enableProfiling enables profiling via web interface host:port/debug/pprof/
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// enabling it may carry a performance impact.
+	// Default: true
+	// +optional
+	EnableProfiling *bool `json:"enableProfiling,omitempty"`
 	// enableContentionProfiling enables lock contention profiling, if enableDebuggingHandlers is true.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// enabling it may carry a performance impact.

@@ -131,6 +131,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.EnableProfiling != nil {
+		in, out := &in.EnableProfiling, &out.EnableProfiling
+		*out = new(bool)
+		**out = **in
+	}
 	if in.HealthzPort != nil {
 		in, out := &in.HealthzPort, &out.HealthzPort
 		*out = new(int32)
