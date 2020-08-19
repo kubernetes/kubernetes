@@ -18,7 +18,6 @@ package phases
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
@@ -26,6 +25,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
+	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 
 var (
@@ -87,8 +87,9 @@ func runEtcdPhaseLocal() func(c workflow.RunData) error {
 		if cfg.Etcd.External == nil {
 			// creates target folder if doesn't exist already
 			if !data.DryRun() {
-				if err := os.MkdirAll(cfg.Etcd.Local.DataDir, 0700); err != nil {
-					return errors.Wrapf(err, "failed to create etcd directory %q", cfg.Etcd.Local.DataDir)
+				// Create the etcd data directory
+				if err := etcdutil.CreateDataDirectory(cfg.Etcd.Local.DataDir); err != nil {
+					return err
 				}
 			} else {
 				fmt.Printf("[dryrun] Would ensure that %q directory is present\n", cfg.Etcd.Local.DataDir)
