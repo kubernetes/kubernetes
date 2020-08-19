@@ -687,6 +687,10 @@ func TestLoadBalancer(t *testing.T) {
 			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
 				IP: svcLBIP,
 			}}
+			// Also ensure that invalid LoadBalancerSourceRanges will not result
+			// in a crash.
+			svc.Spec.ExternalIPs = []string{svcLBIP}
+			svc.Spec.LoadBalancerSourceRanges = []string{" 1.2.3.4/28"}
 		}),
 	)
 
