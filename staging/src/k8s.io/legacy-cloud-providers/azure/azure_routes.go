@@ -33,6 +33,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
+	"k8s.io/legacy-cloud-providers/azure/metrics"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -282,6 +283,12 @@ func (az *Cloud) createRouteTable() error {
 // route.Name will be ignored, although the cloud-provider may use nameHint
 // to create a more user-meaningful name.
 func (az *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint string, kubeRoute *cloudprovider.Route) error {
+	mc := metrics.NewMetricContext("routes", "create_route", az.ResourceGroup, az.SubscriptionID, "")
+	isOperationSucceeded := false
+	defer func() {
+		mc.ObserveOperationWithResult(isOperationSucceeded)
+	}()
+
 	// Returns  for unmanaged nodes because azure cloud provider couldn't fetch information for them.
 	var targetIP string
 	nodeName := string(kubeRoute.TargetNode)
@@ -351,12 +358,20 @@ func (az *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	}
 
 	klog.V(2).Infof("CreateRoute: route created. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
+	isOperationSucceeded = true
+
 	return nil
 }
 
 // DeleteRoute deletes the specified managed route
 // Route should be as returned by ListRoutes
 func (az *Cloud) DeleteRoute(ctx context.Context, clusterName string, kubeRoute *cloudprovider.Route) error {
+	mc := metrics.NewMetricContext("routes", "delete_route", az.ResourceGroup, az.SubscriptionID, "")
+	isOperationSucceeded := false
+	defer func() {
+		mc.ObserveOperationWithResult(isOperationSucceeded)
+	}()
+
 	// Returns  for unmanaged nodes because azure cloud provider couldn't fetch information for them.
 	nodeName := string(kubeRoute.TargetNode)
 	unmanaged, err := az.IsNodeUnmanaged(nodeName)
@@ -392,6 +407,8 @@ func (az *Cloud) DeleteRoute(ctx context.Context, clusterName string, kubeRoute 
 	}
 
 	klog.V(2).Infof("DeleteRoute: route deleted. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
+	isOperationSucceeded = true
+
 	return nil
 }
 

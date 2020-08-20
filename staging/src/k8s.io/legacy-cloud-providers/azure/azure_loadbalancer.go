@@ -36,6 +36,7 @@ import (
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog/v2"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
+	"k8s.io/legacy-cloud-providers/azure/metrics"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 	utilnet "k8s.io/utils/net"
 )
@@ -157,6 +158,12 @@ func (az *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, ser
 	serviceName := getServiceName(service)
 	klog.V(5).Infof("ensureloadbalancer(%s): START clusterName=%q", serviceName, clusterName)
 
+	mc := metrics.NewMetricContext("services", "ensure_loadbalancer", az.ResourceGroup, az.SubscriptionID, serviceName)
+	isOperationSucceeded := false
+	defer func() {
+		mc.ObserveOperationWithResult(isOperationSucceeded)
+	}()
+
 	lb, err := az.reconcileLoadBalancer(clusterName, service, nodes, true /* wantLb */)
 	if err != nil {
 		klog.Errorf("reconcileLoadBalancer(%s) failed: %v", serviceName, err)
@@ -192,6 +199,8 @@ func (az *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, ser
 		return nil, err
 	}
 
+	isOperationSucceeded = true
+
 	return lbStatus, nil
 }
 
@@ -216,6 +225,12 @@ func (az *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName stri
 	serviceName := getServiceName(service)
 	klog.V(5).Infof("Delete service (%s): START clusterName=%q", serviceName, clusterName)
 
+	mc := metrics.NewMetricContext("services", "ensure_loadbalancer_deleted", az.ResourceGroup, az.SubscriptionID, serviceName)
+	isOperationSucceeded := false
+	defer func() {
+		mc.ObserveOperationWithResult(isOperationSucceeded)
+	}()
+
 	serviceIPToCleanup, err := az.findServiceIPAddress(ctx, clusterName, service, isInternal)
 	if err != nil && !retry.HasStatusForbiddenOrIgnoredError(err) {
 		return err
@@ -235,6 +250,8 @@ func (az *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName stri
 	}
 
 	klog.V(2).Infof("Delete service (%s): FINISH", serviceName)
+	isOperationSucceeded = true
+
 	return nil
 }
 
