@@ -426,7 +426,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	// The intent here is to prevent concurrent updates to a pod's status from
 	// clobbering each other so the phase of a pod progresses monotonically.
 	if isCached && isPodStatusByKubeletEqual(&cachedStatus.status, &status) && !forceUpdate {
-		klog.V(3).Infof("Ignoring same status for pod %q, status: %+v", format.Pod(pod), status)
+		klog.V(3).Infof("Ignoring same status for pod %q, status.Phase: %s", format.Pod(pod), status.Phase)
 		return false // No new status.
 	}
 
@@ -567,9 +567,9 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		return
 	}
 	if unchanged {
-		klog.V(3).Infof("Status for pod %q is up-to-date: (%d)", format.Pod(pod), status.version)
+		klog.V(3).Infof("Status for pod %q is up-to-date: (version: %d)", format.Pod(pod), status.version)
 	} else {
-		klog.V(3).Infof("Status for pod %q updated successfully: (%d, %+v)", format.Pod(pod), status.version, status.status)
+		klog.V(3).Infof("Status for pod %q updated successfully: (version: %d, phase: %s)", format.Pod(pod), status.version, status.status.Phase)
 		pod = newPod
 	}
 
