@@ -58,6 +58,7 @@ unschedulable="$( ( oc get nodes -o name -l 'node-role.kubernetes.io/master'; ) 
 # Execute Kubernetes prerequisites
 make WHAT=cmd/kubectl
 make WHAT=test/e2e/e2e.test
+make WHAT=vendor/github.com/onsi/ginkgo/ginkgo
 PATH="${OS_ROOT}/_output/local/bin/$( os::build::host_platform ):${PATH}"
 export PATH
 
@@ -72,8 +73,9 @@ rc=0
 e2e_test="$( which e2e.test )"
 
 # shellcheck disable=SC2086
-${e2e_test} \
-  -num-nodes 1 -ginkgo.noColor '-ginkgo.focus=(\[Conformance\].*\[Serial\]|\[Serial\].*\[Conformance\])' \
+ginkgo \
+  -nodes 1 -noColor '-focus=(\[Conformance\].*\[Serial\]|\[Serial\].*\[Conformance\])' \
+  ${e2e_test} -- \
   -report-dir "${test_report_dir}" \
   -allowed-not-ready-nodes ${unschedulable} \
   2>&1 | tee -a "${test_report_dir}/e2e.log" || rc=1
@@ -81,8 +83,9 @@ ${e2e_test} \
 rename -v junit_ junit_serial_ "${test_report_dir}"/junit*.xml
 
 # shellcheck disable=SC2086
-${e2e_test} \
-  -num-nodes 4 -ginkgo.noColor '-ginkgo.skip=\[Serial\]' '-ginkgo.focus=\[Conformance\]' \
+ginkgo \
+  -nodes 4 -noColor '-skip=\[Serial\]' '-focus=\[Conformance\]' \
+  ${e2e_test} -- \
   -report-dir "${test_report_dir}" \
   -allowed-not-ready-nodes ${unschedulable} \
   2>&1 | tee -a "${test_report_dir}/e2e.log" || rc=1
