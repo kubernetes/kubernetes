@@ -354,10 +354,27 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		return nil
 	}
 
-	//TODO (vladimirvivien) implement better AccessModes mapping between k8s and CSI
 	accessMode := v1.ReadWriteOnce
 	if spec.PersistentVolume.Spec.AccessModes != nil {
+		// default to the 1st AccessMode in the spec
 		accessMode = spec.PersistentVolume.Spec.AccessModes[0]
+		if spec.ReadOnly {
+			// if the available AccessModes contain ROX, use that for ReadOnly volumes
+			for _, mode := range spec.PersistentVolume.Spec.AccessModes {
+				if mode == v1.ReadOnlyMany {
+					accessMode = mode
+					break
+				}
+			}
+		} else {
+			// pick the 1st non-ROX AccessMode for non-ReadOnly volumes
+			for _, mode := range spec.PersistentVolume.Spec.AccessModes {
+				if mode != v1.ReadOnlyMany {
+					accessMode = mode
+					break
+				}
+			}
+		}
 	}
 
 	var mountOptions []string
