@@ -1,4 +1,20 @@
 dependencies:
+  # agnhost: bump this one first
+  - name: "agnhost"
+    version: "2.20"
+    refPaths:
+    - path: test/images/agnhost/VERSION
+      match: \d.\d
+    - path: test/images/agnhost/agnhost.go
+      match: "Version:"
+
+  # then after merge and successful postsubmit image push / promotion, bump this
+  - name: "agnhost: dependents"
+    version: "2.20"
+    refPaths:
+    - path: test/utils/image/manifest.go
+      match: configs\[Agnhost\] = Config{promoterE2eRegistry, "agnhost", "\d+\.\d+"}
+
   # Bazel
   - name: "repo-infra"
     version: 0.0.12
