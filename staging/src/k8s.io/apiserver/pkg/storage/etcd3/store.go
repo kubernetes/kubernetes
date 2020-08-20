@@ -202,7 +202,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 		return err
 	}
 	for {
-		origState, err := s.getState(getResp, key, v, false)
+		origState, _, err := s.getState(getResp, key, v, false)
 		if err != nil {
 			return err
 		}
@@ -248,26 +248,28 @@ func (s *store) GuaranteedUpdate(
 	}
 	key = path.Join(s.pathPrefix, key)
 
-	getCurrentState := func() (*objState, error) {
+	getCurrentState := func() (*objState, bool, error) {
 		startTime := time.Now()
 		getResp, err := s.client.KV.Get(ctx, key)
 		metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		return s.getState(getResp, key, v, ignoreNotFound)
 	}
 
 	var origState *objState
+	var objFound bool
 	var mustCheckData bool
 	if len(suggestion) == 1 && suggestion[0] != nil {
 		origState, err = s.getStateFromObject(suggestion[0])
 		if err != nil {
 			return err
 		}
+		objFound = true
 		mustCheckData = true
 	} else {
-		origState, err = getCurrentState()
+		origState, objFound, err = getCurrentState()
 		if err != nil {
 			return err
 		}
@@ -276,7 +278,7 @@ func (s *store) GuaranteedUpdate(
 
 	transformContext := authenticatedDataString(key)
 	for {
-		if err := preconditions.Check(key, origState.obj); err != nil {
+		if err := checkPreconditions(key, origState.obj, objFound, preconditions); err != nil {
 			// If our data is already up to date, return the error
 			if !mustCheckData {
 				return err
@@ -284,7 +286,7 @@ func (s *store) GuaranteedUpdate(
 
 			// It's possible we were working with stale data
 			// Actually fetch
-			origState, err = getCurrentState()
+			origState, objFound, err = getCurrentState()
 			if err != nil {
 				return err
 			}
@@ -302,7 +304,7 @@ func (s *store) GuaranteedUpdate(
 
 			// It's possible we were working with stale data
 			// Actually fetch
-			origState, err = getCurrentState()
+			origState, objFound, err = getCurrentState()
 			if err != nil {
 				return err
 			}
@@ -320,7 +322,7 @@ func (s *store) GuaranteedUpdate(
 			// etcd in order to be sure the data in the store is equivalent to
 			// our desired serialization
 			if mustCheckData {
-				origState, err = getCurrentState()
+				origState, objFound, err = getCurrentState()
 				if err != nil {
 					return err
 				}
@@ -363,7 +365,7 @@ func (s *store) GuaranteedUpdate(
 		if !txnResp.Succeeded {
 			getResp := (*clientv3.GetResponse)(txnResp.Responses[0].GetResponseRange())
 			klog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", key)
-			origState, err = s.getState(getResp, key, v, ignoreNotFound)
+			origState, objFound, err = s.getState(getResp, key, v, ignoreNotFound)
 			if err != nil {
 				return err
 			}
@@ -375,6 +377,30 @@ func (s *store) GuaranteedUpdate(
 
 		return decode(s.codec, s.versioner, data, out, putResp.Header.Revision)
 	}
+}
+
+func checkPreconditions(key string, obj runtime.Object, objExists bool, preconditions *storage.Preconditions) error {
+	// If the object does not exist but there are preconditions on it, fail
+	// with InvalidObject (HTTP 409 status) rather than NotFound (HTTP 404
+	// status) for backward compatibility, but make sure the error message
+	// is clear.
+	// Context at https://github.com/kubernetes/kubernetes/issues/89985 .
+	if !objExists && preconditions != nil {
+		if preconditions.UID != nil && *preconditions.UID != "" {
+			err := fmt.Sprintf(
+				"Precondition on UID (must be equal to \"%v\") failed because the object does not exist",
+				*preconditions.UID)
+			return storage.NewInvalidObjError(key, err)
+		}
+		if preconditions.ResourceVersion != nil && *preconditions.ResourceVersion != "" {
+			err := fmt.Sprintf(
+				"Precondition on ResourceVersion (must be equal to \"%v\") failed because the object does not exist",
+				*preconditions.ResourceVersion)
+			return storage.NewInvalidObjError(key, err)
+		}
+	}
+
+	return preconditions.Check(key, obj)
 }
 
 // GetToList implements storage.Interface.GetToList.
@@ -779,7 +805,7 @@ func (s *store) watch(ctx context.Context, key string, opts storage.ListOptions,
 	return s.watcher.Watch(ctx, key, int64(rev), recursive, opts.Predicate)
 }
 
-func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
+func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, bool, error) {
 	state := &objState{
 		meta: &storage.ResponseMeta{},
 	}
@@ -790,27 +816,29 @@ func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Va
 		state.obj = reflect.New(v.Type()).Interface().(runtime.Object)
 	}
 
+	found := false
 	if len(getResp.Kvs) == 0 {
 		if !ignoreNotFound {
-			return nil, storage.NewKeyNotFoundError(key, 0)
+			return nil, false, storage.NewKeyNotFoundError(key, 0)
 		}
 		if err := runtime.SetZeroValue(state.obj); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	} else {
 		data, stale, err := s.transformer.TransformFromStorage(getResp.Kvs[0].Value, authenticatedDataString(key))
 		if err != nil {
-			return nil, storage.NewInternalError(err.Error())
+			return nil, false, storage.NewInternalError(err.Error())
 		}
 		state.rev = getResp.Kvs[0].ModRevision
 		state.meta.ResourceVersion = uint64(state.rev)
 		state.data = data
 		state.stale = stale
 		if err := decode(s.codec, s.versioner, state.data, state.obj, state.rev); err != nil {
-			return nil, err
+			return nil, false, err
 		}
+		found = true
 	}
-	return state, nil
+	return state, found, nil
 }
 
 func (s *store) getStateFromObject(obj runtime.Object) (*objState, error) {
