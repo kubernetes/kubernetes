@@ -236,7 +236,7 @@ var _ = SIGDescribe("Network", func() {
 	// a problem where spurious retransmits in a long-running TCP connection to a service
 	// IP could result in the connection being closed with the error "Connection reset by
 	// peer"
-	ginkgo.It("should resolve connection reset issue #74839 [Slow]", func() {
+	ginkgo.It("should not be confused by out-of-order packets [Slow]", func() {
 		serverLabel := map[string]string{
 			"app": "boom-server",
 		}
@@ -253,7 +253,8 @@ var _ = SIGDescribe("Network", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "boom-server",
-						Image: imageutils.GetE2EImage(imageutils.RegressionIssue74839),
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"bad-tcp-seq-server", "--port", "9000"},
 						Ports: []v1.ContainerPort{
 							{
 								ContainerPort: 9000, // Default port exposed by boom-server
