@@ -227,6 +227,23 @@ func (cfgCtlr *configController) initializeConfigController(informerFactory kube
 		}})
 }
 
+// MaintainObservations keeps the observers from
+// metrics.PriorityLevelConcurrencyObserverPairGenerator from falling
+// too far behind
+func (cfgCtlr *configController) MaintainObservations(stopCh <-chan struct{}) {
+	wait.Until(cfgCtlr.updateObservations, 10*time.Second, stopCh)
+}
+
+func (cfgCtlr *configController) updateObservations() {
+	cfgCtlr.lock.Lock()
+	defer cfgCtlr.lock.Unlock()
+	for _, plc := range cfgCtlr.priorityLevelStates {
+		if plc.queues != nil {
+			plc.queues.UpdateObservations()
+		}
+	}
+}
+
 func (cfgCtlr *configController) Run(stopCh <-chan struct{}) error {
 	defer cfgCtlr.configQueue.ShutDown()
 	klog.Info("Starting API Priority and Fairness config controller")

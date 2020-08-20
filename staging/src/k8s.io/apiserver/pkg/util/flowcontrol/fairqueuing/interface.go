@@ -82,6 +82,10 @@ type QueueSet interface {
 	// exactly once.
 	StartRequest(ctx context.Context, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn QueueNoteFn) (req Request, idle bool)
 
+	// UpdateObservations makes sure any time-based statistics have
+	// caught up with the current clock reading
+	UpdateObservations()
+
 	// Dump saves and returns the instant internal state of the queue-set.
 	// Note that dumping process will stop the queue-set from proceeding
 	// any requests.
