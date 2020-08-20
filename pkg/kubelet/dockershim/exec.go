@@ -21,6 +21,7 @@ package dockershim
 import (
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
@@ -30,6 +31,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
+	utilexec "k8s.io/utils/exec"
 )
 
 // ExecHandler knows how to execute a command in a running Docker container.
@@ -110,29 +112,49 @@ func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container 
 		return err
 	}
 
+	var execTimeout <-chan time.Time
+	if timeout > 0 {
+		execTimeout = time.After(timeout)
+	} else {
+		// skip exec timeout if provided timeout is 0
+		execTimeout = make(chan time.Time, 1)
+	}
+
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	count := 0
 	for {
-		inspect, err2 := client.InspectExec(execObj.ID)
-		if err2 != nil {
-			return err2
-		}
-		if !inspect.Running {
-			if inspect.ExitCode != 0 {
-				err = &dockerExitError{inspect}
+		select {
+		case <-execTimeout:
+			// If exec timed out, return utilexec.CodeExitError with an exit status as expected
+			// from prober for failed probes.
+			// TODO: utilexec should have a TimedoutError type and we should return it here once available.
+			return utilexec.CodeExitError{
+				Err:  fmt.Errorf("command %q timed out", strings.Join(cmd, " ")),
+				Code: 1, // exit code here doesn't really matter, as long as it's not 0
 			}
-			break
-		}
+		// need to use "default" here instead of <-ticker.C, otherwise we delay the initial InspectExec by 2 seconds.
+		default:
+			inspect, inspectErr := client.InspectExec(execObj.ID)
+			if inspectErr != nil {
+				return inspectErr
+			}
 
-		count++
-		if count == 5 {
-			klog.Errorf("Exec session %s in container %s terminated but process still running!", execObj.ID, container.ID)
-			break
-		}
+			if !inspect.Running {
+				if inspect.ExitCode != 0 {
+					return &dockerExitError{inspect}
+				}
 
-		<-ticker.C
+				return nil
+			}
+
+			count++
+			if count == 5 {
+				klog.Errorf("Exec session %s in container %s terminated but process still running!", execObj.ID, container.ID)
+				return nil
+			}
+
+			<-ticker.C
+		}
 	}
-
-	return err
 }
