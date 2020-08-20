@@ -32,6 +32,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/logs"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
 
@@ -73,6 +74,10 @@ func (f *fakePodStateProvider) IsPodTerminated(uid types.UID) bool {
 
 func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, keyring credentialprovider.DockerKeyring) (*kubeGenericRuntimeManager, error) {
 	recorder := &record.FakeRecorder{}
+	logManager, err := logs.NewContainerLogManager(runtimeService, osInterface, "1", 2)
+	if err != nil {
+		return nil, err
+	}
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:           recorder,
 		cpuCFSQuota:        false,
@@ -88,6 +93,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		seccompProfileRoot: fakeSeccompProfileRoot,
 		internalLifecycle:  cm.NewFakeInternalContainerLifecycle(),
 		logReduction:       logreduction.NewLogReduction(identicalErrorDelay),
+		logManager:         logManager,
 	}
 
 	typedVersion, err := runtimeService.Version(kubeRuntimeAPIVersion)
