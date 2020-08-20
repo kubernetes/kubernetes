@@ -24,7 +24,7 @@ spec:
         port: {{ health_port }}
         path: /healthz
       initialDelaySeconds: {{ liveness_probe_initial_delay }}
-      timeoutSeconds: 60
+      timeoutSeconds: 61
     ports:
     - name: agentport
       containerPort: {{ agent_port }}
