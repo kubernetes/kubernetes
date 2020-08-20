@@ -368,10 +368,10 @@ github.com/emicklei/go-restful/log
 # github.com/euank/go-kmsg-parser v2.0.0+incompatible => github.com/euank/go-kmsg-parser v2.0.0+incompatible
 # github.com/euank/go-kmsg-parser => github.com/euank/go-kmsg-parser v2.0.0+incompatible
 github.com/euank/go-kmsg-parser/kmsgparser
-# github.com/evanphx/json-patch v0.0.0-20200808040245-162e5629780b => github.com/evanphx/json-patch v0.0.0-20200808040245-162e5629780b
+# github.com/evanphx/json-patch v4.9.0+incompatible => github.com/evanphx/json-patch v4.9.0+incompatible
 ## explicit
 github.com/evanphx/json-patch
-# github.com/evanphx/json-patch => github.com/evanphx/json-patch v0.0.0-20200808040245-162e5629780b
+# github.com/evanphx/json-patch => github.com/evanphx/json-patch v4.9.0+incompatible
 # github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d => github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
 github.com/exponent-io/jsonpath
 # github.com/exponent-io/jsonpath => github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
@@ -684,7 +684,6 @@ github.com/inconshreveable/mousetrap
 ## explicit
 github.com/ishidawataru/sctp
 # github.com/ishidawataru/sctp => github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
-# github.com/jessevdk/go-flags => github.com/jessevdk/go-flags v1.4.0
 # github.com/jimstudt/http-authentication => github.com/jimstudt/http-authentication v0.0.0-20140401203705-3eca13d6893a
 # github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af => github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
 github.com/jmespath/go-jmespath
