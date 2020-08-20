@@ -45,7 +45,7 @@ func OpenOrCreateDataDirectory(path string) (*DataDirectory, error) {
 	}
 	if !exists {
 		klog.Infof("data directory '%s' does not exist, creating it", path)
-		err := os.MkdirAll(path, 0777)
+		err := os.MkdirAll(path, 0700)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create data directory %s: %v", path, err)
 		}
@@ -83,7 +83,7 @@ func (d *DataDirectory) Backup() error {
 	if err != nil {
 		return err
 	}
-	err = os.MkdirAll(backupDir, 0777)
+	err = os.MkdirAll(backupDir, 0700)
 	if err != nil {
 		return err
 	}
