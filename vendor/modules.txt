@@ -623,7 +623,7 @@ github.com/openshift/api/security
 github.com/openshift/api/security/v1
 github.com/openshift/api/template/v1
 github.com/openshift/api/user/v1
-# github.com/openshift/apiserver-library-go v0.0.0-20200722231130-01c5eee5e10b => github.com/openshift/apiserver-library-go v0.0.0-20200722231130-01c5eee5e10b
+# github.com/openshift/apiserver-library-go v0.0.0-20200723181026-dd21ec96ba0a => github.com/openshift/apiserver-library-go v0.0.0-20200723181026-dd21ec96ba0a
 github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy
 github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy/apis/imagepolicy/v1
 github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy/apis/imagepolicy/validation
@@ -1894,8 +1894,6 @@ k8s.io/gengo/parser
 k8s.io/gengo/types
 # k8s.io/heapster v1.2.0-beta.1 => k8s.io/heapster v1.2.0-beta.1
 k8s.io/heapster/metrics/api/v1/types
-# k8s.io/klog v1.0.0 => k8s.io/klog v1.0.0
-k8s.io/klog
 # k8s.io/klog/v2 v2.2.0 => k8s.io/klog/v2 v2.2.0
 k8s.io/klog/v2
 # k8s.io/kube-aggregator v0.19.0-rc.2 => k8s.io/kube-aggregator v0.19.0-rc.2
