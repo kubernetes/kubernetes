@@ -19,10 +19,10 @@ package v1beta1
 const (
 	// Healthy means that the device is healthy
 	Healthy = "Healthy"
-	// UnHealthy means that the device is unhealthy
+	// Unhealthy means that the device is unhealthy
 	Unhealthy = "Unhealthy"
 
-	// Current version of the API supported by kubelet
+	// Version means current version of the API supported by kubelet
 	Version = "v1beta1"
 	// DevicePluginPath is the folder the Device Plugin is expecting sockets to be on
 	// Only privileged pods have access to this path
@@ -30,8 +30,12 @@ const (
 	DevicePluginPath = "/var/lib/kubelet/device-plugins/"
 	// KubeletSocket is the path of the Kubelet registry socket
 	KubeletSocket = DevicePluginPath + "kubelet.sock"
-	// Timeout duration in secs for PreStartContainer RPC
+	// KubeletPreStartContainerRPCTimeoutInSecs means timeout duration in secs for PreStartContainer RPC
 	KubeletPreStartContainerRPCTimeoutInSecs = 30
 )
 
+// SupportedVersions means the deviceplugin API versions the plugin supports at the given socket.
+// The Kubelet component communicating with the plugin should be able
+// to choose any preferred version from this list, or returns an error
+// if none of the listed versions is supported.
 var SupportedVersions = [...]string{"v1beta1"}
