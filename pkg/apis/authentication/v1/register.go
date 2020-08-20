@@ -34,7 +34,8 @@ func Resource(resource string) schema.GroupResource {
 
 var (
 	localSchemeBuilder = &authenticationv1.SchemeBuilder
-	AddToScheme        = localSchemeBuilder.AddToScheme
+	// AddToScheme adds stored functions to the scheme and makes them available for other APIs.
+	AddToScheme = localSchemeBuilder.AddToScheme
 )
 
 func init() {

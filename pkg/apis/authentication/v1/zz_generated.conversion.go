@@ -109,12 +109,12 @@ func RegisterConversions(s *runtime.Scheme) error {
 		return err
 	}
 	if err := s.AddConversionFunc((*authentication.UserInfo)(nil), (*v1.UserInfo)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authentication_UserInfo_To_v1_UserInfo(a.(*authentication.UserInfo), b.(*v1.UserInfo), scope)
+		return ConvertAuthenticationUserInfoToV1UserInfo(a.(*authentication.UserInfo), b.(*v1.UserInfo), scope)
 	}); err != nil {
 		return err
 	}
 	if err := s.AddConversionFunc((*v1.UserInfo)(nil), (*authentication.UserInfo)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_UserInfo_To_authentication_UserInfo(a.(*v1.UserInfo), b.(*authentication.UserInfo), scope)
+		return ConvertV1UserInfoToAuthenticationUserInfo(a.(*v1.UserInfo), b.(*authentication.UserInfo), scope)
 	}); err != nil {
 		return err
 	}
@@ -285,7 +285,7 @@ func Convert_authentication_TokenReviewSpec_To_v1_TokenReviewSpec(in *authentica
 
 func autoConvert_v1_TokenReviewStatus_To_authentication_TokenReviewStatus(in *v1.TokenReviewStatus, out *authentication.TokenReviewStatus, s conversion.Scope) error {
 	out.Authenticated = in.Authenticated
-	if err := Convert_v1_UserInfo_To_authentication_UserInfo(&in.User, &out.User, s); err != nil {
+	if err := ConvertV1UserInfoToAuthenticationUserInfo(&in.User, &out.User, s); err != nil {
 		return err
 	}
 	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
@@ -300,7 +300,7 @@ func Convert_v1_TokenReviewStatus_To_authentication_TokenReviewStatus(in *v1.Tok
 
 func autoConvert_authentication_TokenReviewStatus_To_v1_TokenReviewStatus(in *authentication.TokenReviewStatus, out *v1.TokenReviewStatus, s conversion.Scope) error {
 	out.Authenticated = in.Authenticated
-	if err := Convert_authentication_UserInfo_To_v1_UserInfo(&in.User, &out.User, s); err != nil {
+	if err := ConvertAuthenticationUserInfoToV1UserInfo(&in.User, &out.User, s); err != nil {
 		return err
 	}
 	out.Audiences = *(*[]string)(unsafe.Pointer(&in.Audiences))
