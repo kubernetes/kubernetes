@@ -1,3 +1,4 @@
-FROM mcr.microsoft.com/windows:1809-KB4561608
+ARG BASEIMAGE
+FROM $BASEIMAGE
 COPY . /
 ENTRYPOINT k8s-directx-device-plugin.exe
