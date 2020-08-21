@@ -24,6 +24,8 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
 
 	"k8s.io/component-base/logs/logreduction"
@@ -387,6 +389,17 @@ func (r *remoteRuntimeService) ExecSync(containerID string, cmd []string, timeou
 	resp, err := r.runtimeClient.ExecSync(ctx, req)
 	if err != nil {
 		klog.Errorf("ExecSync %s '%s' from runtime service failed: %v", containerID, strings.Join(cmd, " "), err)
+
+		// If exec timed out, return utilexec.CodeExitError with an exit status as expected
+		// from prober for failed probes.
+		// TODO: utilexec should have a TimedoutError type and we should return it here once available.
+		if status.Code(err) == codes.DeadlineExceeded {
+			err = utilexec.CodeExitError{
+				Err:  fmt.Errorf("command %q timed out", strings.Join(cmd, " ")),
+				Code: 1, // exit code here doesn't really matter, as long as it's not 0
+			}
+		}
+
 		return nil, nil, err
 	}
 
