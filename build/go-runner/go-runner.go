@@ -26,8 +26,6 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
-
-	"github.com/pkg/errors"
 )
 
 var (
@@ -52,13 +50,13 @@ func configureAndRun() error {
 
 	args := flag.Args()
 	if len(args) == 0 {
-		return errors.Errorf("not enough arguments to run")
+		return fmt.Errorf("not enough arguments to run")
 	}
 
 	if logFilePath != nil && *logFilePath != "" {
 		logFile, err := os.OpenFile(*logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			return errors.Wrapf(err, "failed to create log file %v", *logFilePath)
+			return fmt.Errorf("failed to create log file %v: %w", *logFilePath, err)
 		}
 		if *alsoToStdOut {
 			outputStream = io.MultiWriter(os.Stdout, logFile)
@@ -83,12 +81,15 @@ func configureAndRun() error {
 	log.Printf("Running command:\n%v", cmdInfo(cmd))
 	err := cmd.Start()
 	if err != nil {
-		return errors.Wrap(err, "starting command")
+		return fmt.Errorf("starting command: %w", err)
 	}
 
 	// Handle signals and shutdown process gracefully.
 	go setupSigHandler(cmd.Process)
-	return errors.Wrap(cmd.Wait(), "running command")
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("running command: %w", err)
+	}
+	return nil
 }
 
 // cmdInfo generates a useful look at what the command is for printing/debug.
