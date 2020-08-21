@@ -136,6 +136,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		ginkgo.It("should support multiple TLS certs", func() {
 			ginkgo.By("Creating an ingress with no certs.")
+
+			_ = gceController.CreateStaticIP(ns)
 			jig.CreateIngress(filepath.Join(e2eingress.IngressManifestPath, "multiple-certs"), ns, map[string]string{
 				e2eingress.IngressStaticIPKey: ns,
 			}, map[string]string{})
