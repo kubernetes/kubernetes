@@ -81,13 +81,17 @@ func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 	}
 }
 
+func deletePodSyncByName(f *framework.Framework, podName string) {
+	gp := int64(0)
+	delOpts := metav1.DeleteOptions{
+		GracePeriodSeconds: &gp,
+	}
+	f.PodClient().DeleteSync(podName, delOpts, framework.DefaultPodDeletionTimeout)
+}
+
 func deletePods(f *framework.Framework, podNames []string) {
 	for _, podName := range podNames {
-		gp := int64(0)
-		delOpts := metav1.DeleteOptions{
-			GracePeriodSeconds: &gp,
-		}
-		f.PodClient().DeleteSync(podName, delOpts, framework.DefaultPodDeletionTimeout)
+		deletePodSyncByName(f, podName)
 	}
 }
 
