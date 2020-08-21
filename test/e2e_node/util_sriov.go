@@ -55,17 +55,19 @@ const (
 	minSriovResource = 7 // This is the min number of SRIOV VFs needed on the system under test.
 )
 
-
-func detectSRIOVDevices() int {
+func countSRIOVDevices() (int, error) {
 	outData, err := exec.Command("/bin/sh", "-c", "ls /sys/bus/pci/devices/*/physfn | wc -w").Output()
-	framework.ExpectNoError(err)
-
-	devCount, err := strconv.Atoi(strings.TrimSpace(string(outData)))
-	framework.ExpectNoError(err)
-
-	return devCount
+	if err != nil {
+		return -1, err
+	}
+	return strconv.Atoi(strings.TrimSpace(string(outData)))
 }
 
+func detectSRIOVDevices() int {
+	devCount, err := countSRIOVDevices()
+	framework.ExpectNoError(err)
+	return devCount
+}
 
 // getSRIOVDevicePluginPod returns the Device Plugin pod for sriov resources in e2e tests.
 func getSRIOVDevicePluginPod() *v1.Pod {
@@ -207,7 +209,7 @@ func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
 		GracePeriodSeconds: &gp,
 	}
 
-	ginkgo.By("Delete SRIOV device plugin pod %s/%s")
+	ginkgo.By(fmt.Sprintf("Delete SRIOV device plugin pod %s/%s", sd.pod.Namespace, sd.pod.Name))
 	err = f.ClientSet.CoreV1().Pods(sd.pod.Namespace).Delete(context.TODO(), sd.pod.Name, deleteOptions)
 	framework.ExpectNoError(err)
 	waitForContainerRemoval(sd.pod.Spec.Containers[0].Name, sd.pod.Name, sd.pod.Namespace)

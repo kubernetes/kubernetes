@@ -46,8 +46,8 @@ import (
 const (
 	numalignCmd = `export CPULIST_ALLOWED=$( awk -F":\t*" '/Cpus_allowed_list/ { print $2 }' /proc/self/status); env; sleep 1d`
 
-	minNumaNodes     = 2
-	minCoreCount     = 4
+	minNumaNodes = 2
+	minCoreCount = 4
 )
 
 // Helper for makeTopologyManagerPod().
@@ -315,7 +315,7 @@ func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttr
 		pod := pods[podID]
 		framework.Logf("deleting the pod %s/%s and waiting for container removal",
 			pod.Namespace, pod.Name)
-		deletePods(f, []string{pod.Name})
+		deletePodSync(f, pod.Name)
 		waitForAllContainerRemoval(pod.Name, pod.Namespace)
 	}
 }
@@ -343,7 +343,7 @@ func runTopologyManagerNegativeTest(f *framework.Framework, numPods int, ctnAttr
 		framework.Failf("pod %s failed for wrong reason: %q", pod.Name, pod.Status.Reason)
 	}
 
-	deletePods(f, []string{pod.Name})
+	deletePodSync(f, pod.Name)
 }
 
 func isTopologyAffinityError(pod *v1.Pod) bool {
