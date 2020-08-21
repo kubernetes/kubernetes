@@ -140,7 +140,6 @@ go_test(
         "runtime_conformance_test.go",
         "runtimeclass_test.go",
         "security_context_test.go",
-        "startup_probe_test.go",
         "summary_test.go",
         "system_node_critical_test.go",
         "topology_manager_test.go",
