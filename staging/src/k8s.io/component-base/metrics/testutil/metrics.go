@@ -193,6 +193,16 @@ func ValidateMetrics(metrics Metrics, metricName string, expectedLabels ...strin
 	return nil
 }
 
+// GetMetricFamily returns MetricFamily whose name is equal to metricFamilyName from the metricFamily []*dto.MetricFamily
+func GetMetricFamily(metricFamily []*dto.MetricFamily, metricFamilyName string) *dto.MetricFamily {
+	for _, mf := range metricFamily {
+		if mf.GetName() == metricFamilyName {
+			return mf
+		}
+	}
+	return nil
+}
+
 // Histogram wraps prometheus histogram DTO (data transfer object)
 type Histogram struct {
 	*dto.Histogram
@@ -206,12 +216,7 @@ func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string) (His
 	if err != nil {
 		return Histogram{}, err
 	}
-	for _, mFamily := range m {
-		if mFamily.GetName() == metricName {
-			metricFamily = mFamily
-			break
-		}
-	}
+	metricFamily = GetMetricFamily(m, metricName)
 
 	if metricFamily == nil {
 		return Histogram{}, fmt.Errorf("metric %q not found", metricName)
