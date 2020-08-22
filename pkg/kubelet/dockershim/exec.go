@@ -117,7 +117,7 @@ func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container 
 		execTimeout = time.After(timeout)
 	} else {
 		// skip exec timeout if provided timeout is 0
-		execTimeout = make(chan time.Time, 1)
+		execTimeout = nil
 	}
 
 	ticker := time.NewTicker(2 * time.Second)
@@ -148,10 +148,14 @@ func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container 
 				return nil
 			}
 
-			count++
-			if count == 5 {
-				klog.Errorf("Exec session %s in container %s terminated but process still running!", execObj.ID, container.ID)
-				return nil
+			// Only limit the amount of InspectExec calls if the exec timeout was not set.
+			// When a timeout is not set, we stop polling the exec session after 5 attempts and allow the process to continue running.
+			if execTimeout == nil {
+				count++
+				if count == 5 {
+					klog.Errorf("Exec session %s in container %s terminated but process still running!", execObj.ID, container.ID)
+					return nil
+				}
 			}
 
 			<-ticker.C
