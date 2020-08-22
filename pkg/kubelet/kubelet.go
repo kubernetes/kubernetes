@@ -649,7 +649,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if err != nil {
 		return nil, err
 	}
-	klet.machineInfo = machineInfo
+	// Copy machineInfo to avoid race condition when the value is updated inside cadvisor
+	machineInfoCopy := *machineInfo
+	klet.machineInfo = &machineInfoCopy
 
 	imageBackOff := flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 
