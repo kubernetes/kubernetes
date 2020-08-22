@@ -227,7 +227,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	mapConfig := clientcmdapi.NewConfig()
 
 	for _, kubeconfig := range kubeconfigs {
-		mergo.MergeWithOverwrite(mapConfig, kubeconfig)
+		mergo.Merge(mapConfig, kubeconfig, mergo.WithOverride)
 	}
 
 	// merge all of the struct values in the reverse order so that priority is given correctly
@@ -235,14 +235,14 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	nonMapConfig := clientcmdapi.NewConfig()
 	for i := len(kubeconfigs) - 1; i >= 0; i-- {
 		kubeconfig := kubeconfigs[i]
-		mergo.MergeWithOverwrite(nonMapConfig, kubeconfig)
+		mergo.Merge(nonMapConfig, kubeconfig, mergo.WithOverride)
 	}
 
 	// since values are overwritten, but maps values are not, we can merge the non-map config on top of the map config and
 	// get the values we expect.
 	config := clientcmdapi.NewConfig()
-	mergo.MergeWithOverwrite(config, mapConfig)
-	mergo.MergeWithOverwrite(config, nonMapConfig)
+	mergo.Merge(config, mapConfig, mergo.WithOverride)
+	mergo.Merge(config, nonMapConfig, mergo.WithOverride)
 
 	if rules.ResolvePaths() {
 		if err := ResolveLocalPaths(config); err != nil {
@@ -375,17 +375,14 @@ func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
 	klog.V(6).Infoln("Config loaded from file: ", filename)
 
 	// set LocationOfOrigin on every Cluster, User, and Context
-	for key, obj := range config.AuthInfos {
+	for _, obj := range config.AuthInfos {
 		obj.LocationOfOrigin = filename
-		config.AuthInfos[key] = obj
 	}
-	for key, obj := range config.Clusters {
+	for _, obj := range config.Clusters {
 		obj.LocationOfOrigin = filename
-		config.Clusters[key] = obj
 	}
-	for key, obj := range config.Contexts {
+	for _, obj := range config.Contexts {
 		obj.LocationOfOrigin = filename
-		config.Contexts[key] = obj
 	}
 
 	if config.AuthInfos == nil {

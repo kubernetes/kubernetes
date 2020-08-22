@@ -62,7 +62,7 @@ func TestMergoSemantics(t *testing.T) {
 		},
 	}
 	for _, data := range testDataStruct {
-		err := mergo.MergeWithOverwrite(&data.dst, &data.src)
+		err := mergo.Merge(&data.dst, &data.src, mergo.WithOverride)
 		if err != nil {
 			t.Errorf("error while merging: %s", err)
 		}
@@ -75,7 +75,7 @@ func TestMergoSemantics(t *testing.T) {
 			// This test verifies that the semantics of the merge are what we expect.
 			// If they are not, the mergo library may have been updated and broken
 			// unexpectedly.
-			t.Errorf("mergo.MergeWithOverwrite did not provide expected output: %+v doesn't match %+v", data.dst, data.expected)
+			t.Errorf("mergo.Merge did not provide expected output: %+v doesn't match %+v", data.dst, data.expected)
 		}
 	}
 
@@ -91,7 +91,7 @@ func TestMergoSemantics(t *testing.T) {
 		},
 	}
 	for _, data := range testDataMap {
-		err := mergo.MergeWithOverwrite(&data.dst, &data.src)
+		err := mergo.Merge(&data.dst, &data.src, mergo.WithOverride)
 		if err != nil {
 			t.Errorf("error while merging: %s", err)
 		}
@@ -104,7 +104,7 @@ func TestMergoSemantics(t *testing.T) {
 			// This test verifies that the semantics of the merge are what we expect.
 			// If they are not, the mergo library may have been updated and broken
 			// unexpectedly.
-			t.Errorf("mergo.MergeWithOverwrite did not provide expected output: %+v doesn't match %+v", data.dst, data.expected)
+			t.Errorf("mergo.Merge did not provide expected output: %+v doesn't match %+v", data.dst, data.expected)
 		}
 	}
 }
