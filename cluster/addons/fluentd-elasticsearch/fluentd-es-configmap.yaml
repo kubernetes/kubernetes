@@ -343,7 +343,7 @@ data:
       matches [{ "_SYSTEMD_UNIT": "docker.service" }]
       <storage>
         @type local
-        persistent true
+        persistent false
         path /var/log/journald-docker.pos
       </storage>
       read_from_head true
@@ -356,7 +356,7 @@ data:
       matches [{ "_SYSTEMD_UNIT": "{{ fluentd_container_runtime_service }}.service" }]
       <storage>
         @type local
-        persistent true
+        persistent false
         path /var/log/journald-container-runtime.pos
       </storage>
       read_from_head true
@@ -369,7 +369,7 @@ data:
       matches [{ "_SYSTEMD_UNIT": "kubelet.service" }]
       <storage>
         @type local
-        persistent true
+        persistent false
         path /var/log/journald-kubelet.pos
       </storage>
       read_from_head true
@@ -382,7 +382,7 @@ data:
       matches [{ "_SYSTEMD_UNIT": "node-problem-detector.service" }]
       <storage>
         @type local
-        persistent true
+        persistent false
         path /var/log/journald-node-problem-detector.pos
       </storage>
       read_from_head true
@@ -395,7 +395,7 @@ data:
       matches [{ "_TRANSPORT": "kernel" }]
       <storage>
         @type local
-        persistent true
+        persistent false
         path /var/log/kernel.pos
       </storage>
       <entry>
