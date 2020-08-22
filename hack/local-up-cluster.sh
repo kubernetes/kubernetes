@@ -20,6 +20,14 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 # this as root to allow kubelet to open docker's socket, and to write the test
 # CA in /var/run/kubernetes.
 # Usage: `hack/local-up-cluster.sh`.
+# NOTE: kubelet only works on Linux! It will more or less turn the host
+# into a node ...
+if [[ "$(uname)" != "Linux" && "${START_MODE:-}" != "nokubelet" ]]; then
+  echo "ERROR: local-up-cluster.sh requires disabling kubelet unless run on Linux!" 1>&2
+  echo "You must set START_MODE=nokubelet to disable kubelet." 1>&2
+  echo "On other platforms you can use http://sigs.k8s.io/kind to create a cluster from source including kubelet." 1>&2
+  exit 1
+fi
 
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 export DOCKER=(docker "${DOCKER_OPTS[@]}")
