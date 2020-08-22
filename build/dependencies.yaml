@@ -143,14 +143,8 @@ dependencies:
     - path: test/utils/image/manifest.go
       match: configs\[DebianIptables\] = Config{buildImageRegistry, "debian-iptables", "v\d+\.\d+.\d+"}
 
-  - name: "k8s.gcr.io/go-runner"
-    version: 0.1.1
-    refPaths:
-    - path: build/go-runner/Makefile
-      match: TAG \?=
-
   - name: "k8s.gcr.io/go-runner: dependents"
-    version: 0.1.1
+    version: buster-v2.0.0
     refPaths:
     - path: build/common.sh
       match: go_runner_version=
