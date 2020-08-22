@@ -33,10 +33,6 @@ go_library(
             "//vendor/k8s.io/utils/mount:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",
         ],
-        "@io_bazel_rules_go//go/platform:illumos": [
-            "//vendor/k8s.io/utils/mount:go_default_library",
-            "//vendor/k8s.io/utils/nsenter:go_default_library",
-        ],
         "@io_bazel_rules_go//go/platform:ios": [
             "//vendor/k8s.io/utils/mount:go_default_library",
             "//vendor/k8s.io/utils/nsenter:go_default_library",

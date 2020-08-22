@@ -10,7 +10,6 @@ go_library(
         "output_interceptor_win.go",
         "server.go",
         "syscall_dup_linux_arm64.go",
-        "syscall_dup_linux_riscv64.go",
         "syscall_dup_solaris.go",
         "syscall_dup_unix.go",
     ],

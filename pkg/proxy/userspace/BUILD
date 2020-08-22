@@ -53,9 +53,6 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
-        "@io_bazel_rules_go//go/platform:illumos": [
-            "//vendor/golang.org/x/sys/unix:go_default_library",
-        ],
         "@io_bazel_rules_go//go/platform:ios": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],

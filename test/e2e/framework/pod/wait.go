@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/podutils"
+	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -52,6 +53,10 @@ const (
 
 	// podStartTimeout is how long to wait for the pod to be started.
 	podStartTimeout = 5 * time.Minute
+
+	// windowsPodStartTimeout is how long to wait for the pod to be started on Windows.
+	// windows pod start up time is typically longer than Linux due to disk formatting and image downloading
+	windowsPodStartTimeout = 10 * time.Minute
 
 	// poll is how often to poll pods, nodes and claims.
 	poll = 2 * time.Second
@@ -226,13 +231,20 @@ func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeou
 	return fmt.Errorf("Gave up after waiting %v for pod %q to be %q", timeout, podName, desc)
 }
 
+func podTimeout() time.Duration {
+	if framework.NodeOSDistroIs("windows") {
+		return windowsPodStartTimeout
+	}
+	return podStartTimeout
+}
+
 // WaitForPodTerminatedInNamespace returns an error if it takes too long for the pod to terminate,
 // if the pod Get api returns an error (IsNotFound or other), or if the pod failed (and thus did not
 // terminate) with an unexpected reason. Typically called to test that the passed-in pod is fully
 // terminated (reason==""), but may be called to detect if a pod did *not* terminate according to
 // the supplied reason.
 func WaitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, namespace string) error {
-	return WaitForPodCondition(c, namespace, podName, "terminated due to deadline exceeded", podStartTimeout, func(pod *v1.Pod) (bool, error) {
+	return WaitForPodCondition(c, namespace, podName, "terminated due to deadline exceeded", podTimeout(), func(pod *v1.Pod) (bool, error) {
 		// Only consider Failed pods. Successful pods will be deleted and detected in
 		// waitForPodCondition's Get call returning `IsNotFound`
 		if pod.Status.Phase == v1.PodFailed {
@@ -268,7 +280,7 @@ func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName, namespa
 // if the pod Get api returns an error (IsNotFound or other), or if the pod failed with an unexpected reason.
 // Typically called to test that the passed-in pod is Pending and Unschedulable.
 func WaitForPodNameUnschedulableInNamespace(c clientset.Interface, podName, namespace string) error {
-	return WaitForPodCondition(c, namespace, podName, v1.PodReasonUnschedulable, podStartTimeout, func(pod *v1.Pod) (bool, error) {
+	return WaitForPodCondition(c, namespace, podName, v1.PodReasonUnschedulable, podTimeout(), func(pod *v1.Pod) (bool, error) {
 		// Only consider Failed pods. Successful pods will be deleted and detected in
 		// waitForPodCondition's Get call returning `IsNotFound`
 		if pod.Status.Phase == v1.PodPending {
@@ -315,7 +327,7 @@ func WaitForMatchPodsCondition(c clientset.Interface, opts metav1.ListOptions, d
 // WaitForPodNameRunningInNamespace waits default amount of time (PodStartTimeout) for the specified pod to become running.
 // Returns an error if timeout occurs first, or pod goes in to failed state.
 func WaitForPodNameRunningInNamespace(c clientset.Interface, podName, namespace string) error {
-	return WaitTimeoutForPodRunningInNamespace(c, podName, namespace, podStartTimeout)
+	return WaitTimeoutForPodRunningInNamespace(c, podName, namespace, podTimeout())
 }
 
 // WaitForPodRunningInNamespaceSlow waits an extended amount of time (slowPodStartTimeout) for the specified pod to become running.
@@ -336,7 +348,7 @@ func WaitForPodRunningInNamespace(c clientset.Interface, pod *v1.Pod) error {
 	if pod.Status.Phase == v1.PodRunning {
 		return nil
 	}
-	return WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, podStartTimeout)
+	return WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, podTimeout())
 }
 
 // WaitTimeoutForPodNoLongerRunningInNamespace waits the given timeout duration for the specified pod to stop.
@@ -360,12 +372,12 @@ func WaitTimeoutForPodReadyInNamespace(c clientset.Interface, podName, namespace
 // The resourceVersion is used when Watching object changes, it tells since when we care
 // about changes to the pod.
 func WaitForPodNotPending(c clientset.Interface, ns, podName string) error {
-	return wait.PollImmediate(poll, podStartTimeout, podNotPending(c, podName, ns))
+	return wait.PollImmediate(poll, podTimeout(), podNotPending(c, podName, ns))
 }
 
 // WaitForPodSuccessInNamespace returns nil if the pod reached state success, or an error if it reached failure or until podStartupTimeout.
 func WaitForPodSuccessInNamespace(c clientset.Interface, podName string, namespace string) error {
-	return waitForPodSuccessInNamespaceTimeout(c, podName, namespace, podStartTimeout)
+	return waitForPodSuccessInNamespaceTimeout(c, podName, namespace, podTimeout())
 }
 
 // WaitForPodSuccessInNamespaceSlow returns nil if the pod reached state success, or an error if it reached failure or until slowPodStartupTimeout.

@@ -98,6 +98,7 @@ filegroup(
         "//third_party:all-srcs",
         "//translations:all-srcs",
         "//vendor:all-srcs",
+        "//windows/windows:all-srcs",
     ],
     tags = ["automanaged"],
 )

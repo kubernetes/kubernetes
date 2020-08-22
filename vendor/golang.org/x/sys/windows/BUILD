@@ -20,7 +20,6 @@ go_library(
         "types_windows.go",
         "types_windows_386.go",
         "types_windows_amd64.go",
-        "types_windows_arm.go",
         "zerrors_windows.go",
         "zknownfolderids_windows.go",
         "zsyscall_windows.go",

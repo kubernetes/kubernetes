@@ -35,9 +35,6 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/k8s.io/utils/io:go_default_library",
         ],
-        "@io_bazel_rules_go//go/platform:illumos": [
-            "//vendor/k8s.io/utils/io:go_default_library",
-        ],
         "@io_bazel_rules_go//go/platform:ios": [
             "//vendor/k8s.io/utils/io:go_default_library",
         ],

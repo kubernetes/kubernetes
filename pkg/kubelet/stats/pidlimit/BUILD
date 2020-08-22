@@ -28,9 +28,6 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         ],
-        "@io_bazel_rules_go//go/platform:illumos": [
-            "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
-        ],
         "@io_bazel_rules_go//go/platform:ios": [
             "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         ],
