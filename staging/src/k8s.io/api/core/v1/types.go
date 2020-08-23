@@ -4068,7 +4068,7 @@ type ServiceSpec struct {
 
 	// externalName is the external reference that kubedns or equivalent will
 	// return as a CNAME record for this service. No proxying will be involved.
-	// Must be a valid RFC-1123 hostname (https://tools.ietf.org/html/rfc1123)
+	// Must be a lowercase RFC-1123 hostname (https://tools.ietf.org/html/rfc1123)
 	// and requires Type to be ExternalName.
 	// +optional
 	ExternalName string `json:"externalName,omitempty" protobuf:"bytes,10,opt,name=externalName"`
