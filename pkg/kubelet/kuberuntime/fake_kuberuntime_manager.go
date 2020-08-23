@@ -94,7 +94,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		seccompProfileRoot:  fakeSeccompProfileRoot,
 		internalLifecycle:   cm.NewFakeInternalContainerLifecycle(),
 		logReduction:        logreduction.NewLogReduction(identicalErrorDelay),
-		logManager:         logManager,
+		logManager:          logManager,
 	}
 
 	typedVersion, err := runtimeService.Version(kubeRuntimeAPIVersion)
