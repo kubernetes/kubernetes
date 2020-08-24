@@ -78,25 +78,51 @@ function get-metadata-value {
   fi
 }
 
+# A function to fetch kube-env from GCE metadata server
+# or using hurl on the master if available
 function download-kube-env {
-  # Fetch kube-env from GCE metadata server.
   (
     umask 077
-    local -r tmp_kube_env="/tmp/kube-env.yaml"
-    # shellcheck disable=SC2086
-    retry-forever 10 curl ${CURL_FLAGS} \
-      -H "X-Google-Metadata-Request: True" \
-      -o "${tmp_kube_env}" \
-      http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
+    local kube_env_path="/tmp/kube-env.yaml"
+    if [[ "$(is-master)" == "true" && $(use-hurl) = "true" ]]; then
+      local kube_env_path="${KUBE_HOME}/kube-env.yaml"
+      download-kube-env-hurl "${kube_env_path}"
+    else
+      local meta_path="http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env"
+      echo "Downloading kube-env via GCE metadata from ${meta_path} to ${kube_env_path}"
+      # shellcheck disable=SC2086
+      retry-forever 10 curl ${CURL_FLAGS} \
+        -H "X-Google-Metadata-Request: True" \
+        -o "${kube_env_path}" \
+        "${meta_path}"
+    fi
+
     # Convert the yaml format file into a shell-style file.
     eval "$(python3 -c '''
 import pipes,sys,yaml
 items = yaml.load(sys.stdin, Loader=yaml.BaseLoader).items()
 for k, v in items:
     print("readonly {var}={value}".format(var=k, value=pipes.quote(str(v))))
-''' < "${tmp_kube_env}" > "${KUBE_HOME}/kube-env")"
-    rm -f "${tmp_kube_env}"
+''' < "${kube_env_path}" > "${KUBE_HOME}/kube-env")"
+
+    # Leave kube-env if we are a master
+    if [[ "$(is-master)" != "true" ]]; then
+      rm -f "${kube_env_path}"
+    fi
   )
+}
+
+# A function to pull kube-env from HMS using hurl
+function download-kube-env-hurl {
+  local -r kube_env_path="$1"
+  local -r endpoint=$(get-metadata-value "instance/attributes/gke-api-endpoint")
+  local -r kube_env_hms_path=$(get-metadata-value "instance/attributes/kube-env-path")
+
+  echo "Downloading kube-env via hurl from ${kube_env_hms_path} to ${kube_env_path}"
+  retry-forever 30 ${KUBE_HOME}/bin/hurl --hms_address $endpoint \
+    --dst "${kube_env_path}" \
+    "${kube_env_hms_path}"
+  chmod 600 "${kube_env_path}"
 }
 
 function download-kubelet-config {
@@ -117,7 +143,7 @@ function download-kubelet-config {
 }
 
 function download-kube-master-certs {
-  # Fetch kube-env from GCE metadata server.
+  # Fetch kube-master-certs from GCE metadata server.
   (
     umask 077
     local -r tmp_kube_master_certs="/tmp/kube-master-certs.yaml"
@@ -165,6 +191,28 @@ function valid-storage-scope {
     -H "Metadata-Flavor: Google" \
     "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" \
   | grep -E "auth/devstorage|auth/cloud-platform"
+}
+
+# Determine if this node is a master using metadata
+function is-master {
+  local -r is_master_val=$(get-metadata-value "instance/attributes/is-master-node")
+
+  local result="false"
+  if [[ ${is_master_val:-} == "true" ]]; then
+    result="true"
+  fi
+  echo $result
+}
+
+# A function that returns "true" if hurl should be used, "false" otherwise.
+function use-hurl {
+  local -r enable_hms_read=$(get-metadata-value "instance/attributes/enable_hms_read")
+  local result="false"
+
+  if [[ -f "${KUBE_HOME}/bin/hurl" && "${enable_hms_read}" == "true" ]]; then
+    result="true"
+  fi
+  echo $result
 }
 
 # Retry a download until we get it. Takes a hash and a set of URLs.
@@ -957,6 +1005,10 @@ log-wrap 'SetBrokenMotd' set-broken-motd
 KUBE_HOME="/home/kubernetes"
 KUBE_BIN="${KUBE_HOME}/bin"
 
+if [[ "$(is-master)" == "true" ]]; then
+  log-wrap 'InstallHurl' install-hurl
+fi
+
 # download and source kube-env
 log-wrap 'DownloadKubeEnv' download-kube-env
 log-wrap 'SourceKubeEnv' source "${KUBE_HOME}/kube-env"
@@ -974,9 +1026,5 @@ log-wrap 'EnsureContainerRuntime' ensure-container-runtime
 # binaries and kube-system manifests
 log-wrap 'InstallKubeBinaryConfig' install-kube-binary-config
 
-if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
-  log-wrap 'InstallHurl' install-hurl
-fi
-
-echo "Done for installing kubernetes files"
 log-end 'ConfigureMain'
+echo "Done for installing kubernetes files"
