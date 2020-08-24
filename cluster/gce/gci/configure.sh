@@ -54,15 +54,39 @@ Node instance:
 EOF
 }
 
+# A function that fetches a GCE metadata value and echoes to STDOUT.
+#
+# $1: URL path after /computeMetadata/v1/ (without heading slash).
+function get-metadata-value {
+    curl \
+        --retry 5 \
+        --retry-delay 3 \
+        ${CURL_RETRY_CONNREFUSED} \
+        --fail \
+        --silent \
+        -H 'Metadata-Flavor: Google' \
+        "http://metadata/computeMetadata/v1/${1}"
+}
+
+# A function to fetch kube-env from GCE metadata server
+# or using hurl on the master if available
 function download-kube-env {
-  # Fetch kube-env from GCE metadata server.
   (
     umask 077
-    local -r tmp_kube_env="/tmp/kube-env.yaml"
-    curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
-      -H "X-Google-Metadata-Request: True" \
-      -o "${tmp_kube_env}" \
-      http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
+
+    local kube_env_path="/tmp/kube-env.yaml"
+    if [[ "$(is-master)" == "true" && $(use-hurl) = "true" ]]; then
+      local kube_env_path="${KUBE_HOME}/kube-env.yaml"
+      download-kube-env-hurl "${kube_env_path}"
+    else
+      local meta_path="http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env"
+      echo "Downloading kube-env via GCE metadata from ${meta_path} to ${kube_env_path}"
+      curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
+        -H "X-Google-Metadata-Request: True" \
+        -o "${kube_env_path}" \
+        "${meta_path}"
+    fi
+
     # Convert the yaml format file into a shell-style file.
     eval $(${PYTHON} -c '''
 import pipes,sys,yaml
@@ -73,9 +97,26 @@ else:
     items = yaml.load(sys.stdin, Loader=yaml.BaseLoader).items()
 for k, v in items:
     print("readonly {var}={value}".format(var=k, value=pipes.quote(str(v))))
-''' < "${tmp_kube_env}" > "${KUBE_HOME}/kube-env")
-    rm -f "${tmp_kube_env}"
+''' < "${kube_env_path}" > "${KUBE_HOME}/kube-env")
+
+    # Leave kube-env if we are a master
+    if [[ "$(is-master)" != "true" ]]; then
+      rm -f "${kube_env_path}"
+    fi
   )
+}
+
+# A function to pull kube-env from HMS using hurl
+function download-kube-env-hurl {
+  local -r kube_env_path="$1"
+  local -r endpoint=$(get-metadata-value "instance/attributes/gke-api-endpoint")
+  local -r kube_env_hms_path=$(get-metadata-value "instance/attributes/kube-env-path")
+
+  echo "Downloading kube-env via hurl from ${kube_env_hms_path} to ${kube_env_path}"
+  ${KUBE_HOME}/bin/hurl --hms_address $endpoint \
+    --dst "${kube_env_path}" \
+    $kube_env_hms_path
+  chmod 600 "${kube_env_path}"
 }
 
 function download-kubelet-config {
@@ -99,7 +140,7 @@ function download-kubelet-config {
 }
 
 function download-kube-master-certs {
-  # Fetch kube-env from GCE metadata server.
+  # Fetch kube-master-certs from GCE metadata server.
   (
     umask 077
     local -r tmp_kube_master_certs="/tmp/kube-master-certs.yaml"
@@ -143,6 +184,28 @@ function get-credentials {
 
 function valid-storage-scope {
   curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -E "auth/devstorage|auth/cloud-platform"
+}
+
+# Determine if this node is a master using metadata
+function is-master {
+  local -r is_master_val=$(get-metadata-value "instance/attributes/is-master-node")
+
+  local result="false"
+  if [[ ${is_master_val:-} == "true" ]]; then
+    result="true"
+  fi
+  echo $result
+}
+
+# A function that returns "true" if hurl should be used, "false" otherwise.
+function use-hurl {
+  local -r enable_hms_read=$(get-metadata-value "instance/attributes/enable_hms_read")
+  local result="false"
+
+  if [[ -f "${KUBE_HOME}/bin/hurl" && "${enable_hms_read}" == "true" ]]; then
+    result="true"
+  fi
+  echo $result
 }
 
 # Retry a download until we get it. Takes a hash and a set of URLs.
@@ -694,6 +757,10 @@ else
 fi
 echo "Version : " $(${PYTHON} -V 2>&1)
 
+if [[ "$(is-master)" == "true" ]]; then
+  install-hurl
+fi
+
 # download and source kube-env
 download-kube-env
 source "${KUBE_HOME}/kube-env"
@@ -710,9 +777,5 @@ ensure-container-runtime
 
 # binaries and kube-system manifests
 install-kube-binary-config
-
-if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
-  install-hurl
-fi
 
 echo "Done for installing kubernetes files"
