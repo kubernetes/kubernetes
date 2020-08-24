@@ -30,7 +30,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		"v1",
 		"PersistentVolume",
-		PersistentVolumeToSelectableFields(&api.PersistentVolume{}),
+		ToSelectableFields(&api.PersistentVolume{}),
 		map[string]string{"name": "metadata.name"},
 	)
 }

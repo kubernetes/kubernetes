@@ -94,6 +94,7 @@ type persistentvolumeStatusStrategy struct {
 	persistentvolumeStrategy
 }
 
+// StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = persistentvolumeStatusStrategy{Strategy}
 
 // PrepareForUpdate sets the Spec field which is not allowed to be changed when updating a PV's Status
@@ -113,10 +114,10 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	if !ok {
 		return nil, nil, fmt.Errorf("not a persistentvolume")
 	}
-	return labels.Set(persistentvolumeObj.Labels), PersistentVolumeToSelectableFields(persistentvolumeObj), nil
+	return labels.Set(persistentvolumeObj.Labels), ToSelectableFields(persistentvolumeObj), nil
 }
 
-// MatchPersistentVolume returns a generic matcher for a given label and field selector.
+// MatchPersistentVolumes returns a generic matcher for a given label and field selector.
 func MatchPersistentVolumes(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
 		Label:    label,
@@ -125,8 +126,8 @@ func MatchPersistentVolumes(label labels.Selector, field fields.Selector) storag
 	}
 }
 
-// PersistentVolumeToSelectableFields returns a field set that represents the object
-func PersistentVolumeToSelectableFields(persistentvolume *api.PersistentVolume) fields.Set {
+// ToSelectableFields returns a field set that represents the object
+func ToSelectableFields(persistentvolume *api.PersistentVolume) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&persistentvolume.ObjectMeta, false)
 	specificFieldsSet := fields.Set{
 		// This is a bug, but we need to support it for backward compatibility.
