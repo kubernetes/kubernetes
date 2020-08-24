@@ -41,6 +41,11 @@ const (
 	// the metrics tracks maximal value over period making this
 	// longer will increase the metric value.
 	inflightUsageMetricUpdatePeriod = time.Second
+
+	// How often the observers should be updated. The periodical
+	// updates can ensure sampleAndWaterMarkHistograms do
+	// not fall far behind.
+	observationUpdatePeriod = 10 * time.Second
 )
 
 var nonMutatingRequestVerbs = sets.NewString("get", "list", "watch")
@@ -103,6 +108,13 @@ func startRecordingUsage(watermark *requestWatermark) {
 	}()
 }
 
+func startMaintainingObservation(watermark *requestWatermark) {
+	go wait.Forever(func() {
+		watermark.readOnlyObserver.Add(0)
+		watermark.mutatingObserver.Add(0)
+	}, observationUpdatePeriod)
+}
+
 var startOnce sync.Once
 
 // WithMaxInFlightLimit limits the number of in-flight requests to buffer size of the passed in channel.
@@ -112,7 +124,10 @@ func WithMaxInFlightLimit(
 	mutatingLimit int,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
 ) http.Handler {
-	startOnce.Do(func() { startRecordingUsage(watermark) })
+	startOnce.Do(func() {
+		startRecordingUsage(watermark)
+		startMaintainingObservation(watermark)
+	})
 	if nonMutatingLimit == 0 && mutatingLimit == 0 {
 		return handler
 	}
