@@ -809,9 +809,9 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 			shouldFail: true,
 		},
 		"prebound-pvc": {
-			podPVCs:    []*v1.PersistentVolumeClaim{preboundPVC},
-			pvs:        []*v1.PersistentVolume{pvNode1aBound},
-			shouldFail: true,
+			podPVCs: []*v1.PersistentVolumeClaim{preboundPVC},
+			pvs:     []*v1.PersistentVolume{pvNode1aBound},
+			reasons: ConflictReasons{ErrUnboundImmediatePVC},
 		},
 		"unbound-pvc,pv-same-node": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC},
@@ -850,9 +850,9 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 			reasons: ConflictReasons{ErrReasonBindConflict},
 		},
 		"one-prebound,one-unbound": {
-			podPVCs:    []*v1.PersistentVolumeClaim{unboundPVC, preboundPVC},
-			pvs:        []*v1.PersistentVolume{pvNode1a, pvNode1b},
-			shouldFail: true,
+			podPVCs: []*v1.PersistentVolumeClaim{unboundPVC, preboundPVC},
+			pvs:     []*v1.PersistentVolume{pvNode1a, pvNode1b},
+			reasons: ConflictReasons{ErrUnboundImmediatePVC},
 		},
 		"immediate-bound-pvc": {
 			podPVCs: []*v1.PersistentVolumeClaim{immediateBoundPVC},
@@ -864,17 +864,17 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 			reasons: ConflictReasons{ErrReasonNodeConflict},
 		},
 		"immediate-unbound-pvc": {
-			podPVCs:    []*v1.PersistentVolumeClaim{immediateUnboundPVC},
-			shouldFail: true,
+			podPVCs: []*v1.PersistentVolumeClaim{immediateUnboundPVC},
+			reasons: ConflictReasons{ErrUnboundImmediatePVC},
 		},
 		"immediate-unbound-pvc,delayed-mode-bound": {
-			podPVCs:    []*v1.PersistentVolumeClaim{immediateUnboundPVC, boundPVC},
-			pvs:        []*v1.PersistentVolume{pvBound},
-			shouldFail: true,
+			podPVCs: []*v1.PersistentVolumeClaim{immediateUnboundPVC, boundPVC},
+			pvs:     []*v1.PersistentVolume{pvBound},
+			reasons: ConflictReasons{ErrUnboundImmediatePVC},
 		},
 		"immediate-unbound-pvc,delayed-mode-unbound": {
-			podPVCs:    []*v1.PersistentVolumeClaim{immediateUnboundPVC, unboundPVC},
-			shouldFail: true,
+			podPVCs: []*v1.PersistentVolumeClaim{immediateUnboundPVC, unboundPVC},
+			reasons: ConflictReasons{ErrUnboundImmediatePVC},
 		},
 	}
 
@@ -965,8 +965,8 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 			expectedProvisions: []*v1.PersistentVolumeClaim{selectedNodePVC},
 		},
 		"immediate-unbound-pvc": {
-			podPVCs:    []*v1.PersistentVolumeClaim{immediateUnboundPVC},
-			shouldFail: true,
+			podPVCs: []*v1.PersistentVolumeClaim{immediateUnboundPVC},
+			reasons: ConflictReasons{ErrUnboundImmediatePVC},
 		},
 		"one-immediate-bound,one-provisioned": {
 			podPVCs:            []*v1.PersistentVolumeClaim{immediateBoundPVC, provisionedPVC},

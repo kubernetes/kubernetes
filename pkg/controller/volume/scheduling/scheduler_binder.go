@@ -61,6 +61,8 @@ const (
 	ErrReasonBindConflict ConflictReason = "node(s) didn't find available persistent volumes to bind"
 	// ErrReasonNodeConflict is used for VolumeNodeAffinityConflict predicate error.
 	ErrReasonNodeConflict ConflictReason = "node(s) had volume node affinity conflict"
+	// ErrUnboundImmediatePVC is used when the pod has an unbound PVC in immedate binding mode.
+	ErrUnboundImmediatePVC ConflictReason = "pod has unbound immediate PersistentVolumeClaims"
 )
 
 // InTreeToCSITranslator contains methods required to check migratable status
@@ -258,7 +260,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (reasons Confl
 
 	// Immediate claims should be bound
 	if len(unboundClaimsImmediate) > 0 {
-		return nil, fmt.Errorf("pod has unbound immediate PersistentVolumeClaims")
+		return ConflictReasons{ErrUnboundImmediatePVC}, nil
 	}
 
 	// Check PV node affinity on bound volumes
