@@ -18,7 +18,6 @@ package collectors
 
 import (
 	"k8s.io/component-base/metrics"
-	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
@@ -63,7 +62,6 @@ func (c *logMetricsCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
 func (c *logMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
 	podStats, err := c.podStats()
 	if err != nil {
-		klog.Errorf("failed to get pod stats: %v", err)
 		return
 	}
 
