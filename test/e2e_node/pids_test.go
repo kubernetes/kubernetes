@@ -118,14 +118,13 @@ func runPodPidsLimitTests(f *framework.Framework) {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("PodPidsLimit [Serial] [Feature:SupportPodPidsLimit][NodeFeature:SupportPodPidsLimit]", func() {
+var _ = SIGDescribe("PodPidsLimit [Serial]", func() {
 	f := framework.NewDefaultFramework("pids-limit-test")
 	ginkgo.Context("With config updated with pids feature enabled", func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = make(map[string]bool)
 			}
-			initialConfig.FeatureGates["SupportPodPidsLimit"] = true
 			initialConfig.PodPidsLimit = int64(1024)
 		})
 		runPodPidsLimitTests(f)
