@@ -226,6 +226,38 @@ var _ = SIGDescribe("Networking", func() {
 			config.DialFromEndpointContainer("udp", config.NodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
 		})
 
+		// This test ensures that in a situation where multiple services exist with the same selector,
+		// deleting one of the services does not affect the connectivity of the remaining service
+		ginkgo.It("should function for multiple endpoint-Services with same selector", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, false, false)
+			ginkgo.By("creating a second service with same selector")
+			svc2, httpPort := createSecondNodePortService(f, config)
+
+			// original service should work
+			ginkgo.By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.ClusterIP, e2enetwork.ClusterHTTPPort))
+			config.DialFromEndpointContainer("http", config.ClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (nodeIP)", config.EndpointPods[0].Name, config.NodeIP, config.NodeHTTPPort))
+			config.DialFromEndpointContainer("http", config.NodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			// Dial second service
+			ginkgo.By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (svc2.clusterIP)", config.EndpointPods[0].Name, svc2.Spec.ClusterIP, e2enetwork.ClusterHTTPPort))
+			config.DialFromEndpointContainer("http", svc2.Spec.ClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (nodeIP)", config.EndpointPods[0].Name, config.NodeIP, httpPort))
+			config.DialFromEndpointContainer("http", config.NodeIP, httpPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By("deleting the original node port service")
+			config.DeleteNodePortService()
+
+			// Second service should continue to function unaffected
+			ginkgo.By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (svc2.clusterIP)", config.EndpointPods[0].Name, svc2.Spec.ClusterIP, e2enetwork.ClusterHTTPPort))
+			config.DialFromEndpointContainer("http", svc2.Spec.ClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (nodeIP)", config.EndpointPods[0].Name, config.NodeIP, httpPort))
+			config.DialFromEndpointContainer("http", config.NodeIP, httpPort, config.MaxTries, 0, config.EndpointHostnames())
+		})
+
 		ginkgo.It("should update endpoints: http", func() {
 			config := e2enetwork.NewNetworkingTestConfig(f, false, false)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterHTTPPort))
