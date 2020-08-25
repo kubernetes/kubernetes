@@ -17,14 +17,18 @@ limitations under the License.
 package kubelet
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"sort"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/coreos/go-systemd/daemon"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -382,6 +386,102 @@ func newTestPods(count int) []*v1.Pod {
 		}
 	}
 	return pods
+}
+
+// For the watchdog test below we need something which blocks the sync loop for some time..
+// Use a SyncHandler which just sleeps when handling a pod addition
+type blockingAdditionHandler struct{}
+
+var blockDuration = 5 * time.Second
+
+func (f blockingAdditionHandler) HandlePodAdditions(pods []*v1.Pod) {
+	time.Sleep(blockDuration)
+}
+func (f blockingAdditionHandler) HandlePodUpdates(pods []*v1.Pod)   {}
+func (f blockingAdditionHandler) HandlePodRemoves(pods []*v1.Pod)   {}
+func (f blockingAdditionHandler) HandlePodReconcile(pods []*v1.Pod) {}
+func (f blockingAdditionHandler) HandlePodSyncs(pods []*v1.Pod)     {}
+func (f blockingAdditionHandler) HandlePodCleanups() error          { return nil }
+
+func TestWatchdog(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	kubelet.runtimeState.setRuntimeSync(time.Now())
+
+	// setup a fake systemd notify server
+	testDir, e := ioutil.TempDir("/tmp/", "test-")
+	if e != nil {
+		panic(e)
+	}
+	defer os.RemoveAll(testDir)
+	notifySocket := testDir + "/notify-socket.sock"
+	laddr := net.UnixAddr{
+		Name: notifySocket,
+		Net:  "unixgram",
+	}
+	listener, err := net.ListenUnixgram("unixgram", &laddr)
+	require.NoError(t, err, "Failed to setup fake systemd server")
+
+	// configure watchdog
+	wusec := 3000000 // 3 secs
+	os.Setenv("NOTIFY_SOCKET", notifySocket)
+	os.Setenv("WATCHDOG_USEC", fmt.Sprintf("%v", wusec))
+
+	// read notify messages in a loop
+	var msgCount int
+	lock := sync.RWMutex{}
+	incCount := func() {
+		lock.Lock()
+		defer lock.Unlock()
+		msgCount++
+	}
+	getCount := func() int {
+		lock.RLock()
+		defer lock.RUnlock()
+		return msgCount
+	}
+	go func() {
+		buf := make([]byte, 32)
+		for {
+			_, _, err := listener.ReadFromUnix(buf)
+			require.NoError(t, err, "Failed to read watchdog notification")
+			msg := string(bytes.Trim(buf, "\x00"))
+			require.Equal(t, daemon.SdNotifyWatchdog, msg, "Unexpected notification content")
+			incCount()
+		}
+	}()
+
+	// start kubelet with the blockingAdditionHandler
+	podCh := make(chan kubetypes.PodUpdate)
+	go kubelet.syncLoop(podCh, blockingAdditionHandler{})
+
+	// wait for 1st notification
+	for i := 0; getCount() == 0; i++ {
+		require.Less(t, i, 10, "Didn't get 1st notification in time")
+		time.Sleep(time.Duration(wusec) * time.Microsecond / 3)
+	}
+
+	// check that we get the expected nr of notifications during configured watchdog timeout (tolerating 1 more because of races)
+	time.Sleep(time.Duration(wusec) * time.Microsecond)
+	curCount := getCount()
+	require.GreaterOrEqual(t, curCount, 3, "Didn't get enough watchdog notifications")
+	require.Less(t, curCount, 5, "Got too many watchdog notifications")
+
+	// block the sync loop by "adding" pods
+	podCh <- kubetypes.PodUpdate{
+		Op: kubetypes.ADD,
+	}
+
+	// we shouldn't see notifications anymore after health timeout; adding a second letting things to settle
+	testKubelet.fakeClock.Step(2*kubelet.resyncInterval + time.Second)
+	curCount = getCount()
+	time.Sleep(time.Duration(wusec) * time.Microsecond)
+	require.Equal(t, curCount, getCount(), "Got unexpected notifications while being unhealthy")
+
+	// when the loop is unblocked, we should get notifications again
+	time.Sleep(blockDuration)
+	require.Greater(t, getCount(), curCount, "Expected notifications when back to healthy")
 }
 
 func TestSyncLoopAbort(t *testing.T) {
