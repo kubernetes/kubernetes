@@ -74,12 +74,14 @@ func TestSyncEndpoints(t *testing.T) {
 
 	testCases := []struct {
 		testName           string
+		service            *v1.Service
 		endpoints          *v1.Endpoints
 		endpointSlices     []*discovery.EndpointSlice
 		expectedNumActions int
 		expectedNumSlices  int
 	}{{
 		testName: "Endpoints with no addresses",
+		service:  &v1.Service{},
 		endpoints: &v1.Endpoints{
 			Subsets: []v1.EndpointSubset{{
 				Ports: []v1.EndpointPort{{Port: 80}},
@@ -90,6 +92,7 @@ func TestSyncEndpoints(t *testing.T) {
 		expectedNumSlices:  0,
 	}, {
 		testName: "Endpoints with skip label true",
+		service:  &v1.Service{},
 		endpoints: &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{discovery.LabelSkipMirror: "true"},
@@ -104,6 +107,7 @@ func TestSyncEndpoints(t *testing.T) {
 		expectedNumSlices:  0,
 	}, {
 		testName: "Endpoints with skip label false",
+		service:  &v1.Service{},
 		endpoints: &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{discovery.LabelSkipMirror: "false"},
@@ -117,7 +121,36 @@ func TestSyncEndpoints(t *testing.T) {
 		expectedNumActions: 1,
 		expectedNumSlices:  1,
 	}, {
+		testName: "Endpoints with missing Service",
+		service:  nil,
+		endpoints: &v1.Endpoints{
+			Subsets: []v1.EndpointSubset{{
+				Ports:     []v1.EndpointPort{{Port: 80}},
+				Addresses: []v1.EndpointAddress{{IP: "10.0.0.1"}},
+			}},
+		},
+		endpointSlices:     []*discovery.EndpointSlice{},
+		expectedNumActions: 0,
+		expectedNumSlices:  0,
+	}, {
+		testName: "Endpoints with Service with selector specified",
+		service: &v1.Service{
+			Spec: v1.ServiceSpec{
+				Selector: map[string]string{"foo": "bar"},
+			},
+		},
+		endpoints: &v1.Endpoints{
+			Subsets: []v1.EndpointSubset{{
+				Ports:     []v1.EndpointPort{{Port: 80}},
+				Addresses: []v1.EndpointAddress{{IP: "10.0.0.1"}},
+			}},
+		},
+		endpointSlices:     []*discovery.EndpointSlice{},
+		expectedNumActions: 0,
+		expectedNumSlices:  0,
+	}, {
 		testName: "Existing EndpointSlices that need to be cleaned up",
+		service:  &v1.Service{},
 		endpoints: &v1.Endpoints{
 			Subsets: []v1.EndpointSubset{{
 				Ports: []v1.EndpointPort{{Port: 80}},
@@ -136,6 +169,7 @@ func TestSyncEndpoints(t *testing.T) {
 		expectedNumSlices:  0,
 	}, {
 		testName: "Existing EndpointSlices managed by a different controller, no addresses to sync",
+		service:  &v1.Service{},
 		endpoints: &v1.Endpoints{
 			Subsets: []v1.EndpointSubset{{
 				Ports: []v1.EndpointPort{{Port: 80}},
@@ -154,6 +188,7 @@ func TestSyncEndpoints(t *testing.T) {
 		expectedNumSlices: 0,
 	}, {
 		testName: "Endpoints with 1000 addresses",
+		service:  &v1.Service{},
 		endpoints: &v1.Endpoints{
 			Subsets: []v1.EndpointSubset{{
 				Ports:     []v1.EndpointPort{{Port: 80}},
@@ -165,6 +200,7 @@ func TestSyncEndpoints(t *testing.T) {
 		expectedNumSlices:  1,
 	}, {
 		testName: "Endpoints with 1001 addresses - 1 should not be mirrored",
+		service:  &v1.Service{},
 		endpoints: &v1.Endpoints{
 			Subsets: []v1.EndpointSubset{{
 				Ports:     []v1.EndpointPort{{Port: 80}},
@@ -182,10 +218,11 @@ func TestSyncEndpoints(t *testing.T) {
 			tc.endpoints.Name = endpointsName
 			tc.endpoints.Namespace = namespace
 			esController.endpointsStore.Add(tc.endpoints)
-			esController.serviceStore.Add(&v1.Service{ObjectMeta: metav1.ObjectMeta{
-				Name:      endpointsName,
-				Namespace: namespace,
-			}})
+			if tc.service != nil {
+				tc.service.Name = endpointsName
+				tc.service.Namespace = namespace
+				esController.serviceStore.Add(tc.service)
+			}
 
 			for _, epSlice := range tc.endpointSlices {
 				epSlice.Namespace = namespace
@@ -214,45 +251,23 @@ func TestSyncEndpoints(t *testing.T) {
 }
 
 func TestShouldMirror(t *testing.T) {
-	svcWithSelector := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "with-selector",
-			Namespace: "example1",
-		},
-		Spec: v1.ServiceSpec{
-			Selector: map[string]string{"with": "selector"},
-		},
-	}
-	svcWithoutSelector := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "without-selector",
-			Namespace: "example1",
-		},
-		Spec: v1.ServiceSpec{},
-	}
-
 	testCases := []struct {
 		testName     string
 		endpoints    *v1.Endpoints
-		service      *v1.Service
 		shouldMirror bool
 	}{{
-		testName: "Service without selector with matching endpoints",
-		service:  svcWithoutSelector,
+		testName: "Standard Endpoints",
 		endpoints: &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      svcWithoutSelector.Name,
-				Namespace: svcWithoutSelector.Namespace,
+				Name: "test-endpoints",
 			},
 		},
 		shouldMirror: true,
 	}, {
-		testName: "Service without selector, matching Endpoints with skip-mirror=true",
-		service:  svcWithoutSelector,
+		testName: "Endpoints with skip-mirror=true",
 		endpoints: &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      svcWithSelector.Name,
-				Namespace: svcWithSelector.Namespace,
+				Name: "test-endpoints",
 				Labels: map[string]string{
 					discovery.LabelSkipMirror: "true",
 				},
@@ -260,12 +275,10 @@ func TestShouldMirror(t *testing.T) {
 		},
 		shouldMirror: false,
 	}, {
-		testName: "Service without selector, matching Endpoints with skip-mirror=invalid",
-		service:  svcWithoutSelector,
+		testName: "Endpoints with skip-mirror=invalid",
 		endpoints: &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      svcWithoutSelector.Name,
-				Namespace: svcWithoutSelector.Namespace,
+				Name: "test-endpoints",
 				Labels: map[string]string{
 					discovery.LabelSkipMirror: "invalid",
 				},
@@ -273,40 +286,13 @@ func TestShouldMirror(t *testing.T) {
 		},
 		shouldMirror: true,
 	}, {
-		testName: "Service without selector, matching Endpoints with leader election annotation",
-		service:  svcWithoutSelector,
+		testName: "Endpoints with leader election annotation",
 		endpoints: &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      svcWithSelector.Name,
-				Namespace: svcWithSelector.Namespace,
+				Name: "test-endpoints",
 				Annotations: map[string]string{
 					resourcelock.LeaderElectionRecordAnnotationKey: "",
 				},
-			},
-		},
-		shouldMirror: false,
-	}, {
-		testName: "Service without selector, matching Endpoints without skip label in different namespace",
-		service:  svcWithSelector,
-		endpoints: &v1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      svcWithSelector.Name,
-				Namespace: svcWithSelector.Namespace + "different",
-			},
-		},
-		shouldMirror: false,
-	}, {
-		testName:     "Service without selector or matching endpoints",
-		service:      svcWithoutSelector,
-		endpoints:    nil,
-		shouldMirror: false,
-	}, {
-		testName: "Endpoints without matching Service",
-		service:  nil,
-		endpoints: &v1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      svcWithoutSelector.Name,
-				Namespace: svcWithoutSelector.Namespace,
 			},
 		},
 		shouldMirror: false,
@@ -320,13 +306,6 @@ func TestShouldMirror(t *testing.T) {
 				err := c.endpointsStore.Add(tc.endpoints)
 				if err != nil {
 					t.Fatalf("Error adding Endpoints to store: %v", err)
-				}
-			}
-
-			if tc.service != nil {
-				err := c.serviceStore.Add(tc.service)
-				if err != nil {
-					t.Fatalf("Error adding Service to store: %v", err)
 				}
 			}
 
