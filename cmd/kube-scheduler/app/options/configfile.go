@@ -20,20 +20,55 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	kubeschedulerconfigv1beta1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
 )
 
-func loadConfigFromFile(file string) (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
+func loadConfigFromFile(file, instanceFile string) (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
 
+	// If instance configuration exists try to merge into the shared configuration
+	// before final object conversion.
+	if len(instanceFile) > 0 {
+		instanceData, err := ioutil.ReadFile(instanceFile)
+		if err != nil {
+			return nil, err
+		}
+
+		if data, err = mergeInstanceConfiguration(data, instanceData); err != nil {
+			return nil, err
+		}
+	}
+
 	return loadConfig(data)
+}
+
+// mergeInstanceConfiguration merge a shared and instance specific configuration.
+func mergeInstanceConfiguration(data, instanceData []byte) ([]byte, error) {
+	obj := &kubeschedulerconfig.KubeSchedulerConfiguration{}
+
+	// Convert the shared configuration from YAML to JSON.
+	jsonData, err := yaml.YAMLToJSON(data)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert the instance configuration from YAML to JSON.
+	jsonInstanceData, err := yaml.YAMLToJSON(instanceData)
+	if err != nil {
+		return nil, err
+	}
+
+	// Merge both configuration and returns the final patch.
+	return strategicpatch.StrategicMergePatch(jsonData, jsonInstanceData, obj)
 }
 
 func loadConfig(data []byte) (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {

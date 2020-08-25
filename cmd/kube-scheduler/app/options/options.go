@@ -66,7 +66,8 @@ type Options struct {
 	Deprecated              *DeprecatedOptions
 
 	// ConfigFile is the location of the scheduler server's configuration file.
-	ConfigFile string
+	ConfigFile         string
+	InstanceConfigFile string
 
 	// WriteConfigTo is the path where the default configuration will be written.
 	WriteConfigTo string
@@ -158,6 +159,7 @@ func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
   --policy-configmap
   --policy-config-file
   --algorithm-provider`)
+	fs.StringVar(&o.InstanceConfigFile, "instance-config", o.InstanceConfigFile, `The path to the configuration file. The following flags can overwrite fields in this file:`)
 	fs.StringVar(&o.WriteConfigTo, "write-config-to", o.WriteConfigTo, "If set, write the configuration values to this file and exit.")
 	fs.StringVar(&o.Master, "master", o.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 
@@ -177,7 +179,14 @@ func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
 
 // ApplyTo applies the scheduler options to the given scheduler app configuration.
 func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
+
 	if len(o.ConfigFile) == 0 {
+
+		// When the instance specific is used, the user should use the configuration directly.
+		if len(o.InstanceConfigFile) > 0 {
+			return fmt.Errorf("The parameter --instance-config is not allowed without the --config.")
+		}
+
 		c.ComponentConfig = o.ComponentConfig
 
 		// apply deprecated flags if no config file is loaded (this is the old behaviour).
@@ -186,7 +195,7 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 			return err
 		}
 	} else {
-		cfg, err := loadConfigFromFile(o.ConfigFile)
+		cfg, err := loadConfigFromFile(o.ConfigFile, o.InstanceConfigFile)
 		if err != nil {
 			return err
 		}

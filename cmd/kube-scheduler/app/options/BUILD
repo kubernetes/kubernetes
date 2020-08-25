@@ -22,6 +22,7 @@ go_library(
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
@@ -44,6 +45,7 @@ go_library(
         "//staging/src/k8s.io/kube-scheduler/config/v1beta1:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
@@ -64,6 +66,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
+        "configfile_test.go",
         "deprecated_test.go",
         "insecure_serving_test.go",
         "options_test.go",
