@@ -79,9 +79,12 @@ func TestRemoveContainer(t *testing.T) {
 
 	err = m.removeContainer(containerID)
 	assert.NoError(t, err)
-	// Verify container log is removed
 
-	assert.Equal(t, []string{expectedContainerLogPath, expectedContainerLogPathRotated, expectedContainerLogSymlink}, fakeOS.Removes)
+	// Verify container log is removed.
+	// We could not predict the order of `fakeOS.Removes`, so we use `assert.ElementsMatch` here.
+	assert.ElementsMatch(t,
+		[]string{expectedContainerLogSymlink, expectedContainerLogPath, expectedContainerLogPathRotated},
+		fakeOS.Removes)
 	// Verify container is removed
 	assert.Contains(t, fakeRuntime.Called, "RemoveContainer")
 	containers, err := fakeRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: containerID})
