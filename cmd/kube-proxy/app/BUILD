@@ -49,6 +49,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/selection:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/mux:go_default_library",
@@ -76,6 +77,7 @@ go_library(
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/mount:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:aix": [
             "//pkg/proxy/metrics:go_default_library",

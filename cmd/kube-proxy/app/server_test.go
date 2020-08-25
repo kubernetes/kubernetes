@@ -285,6 +285,64 @@ nodePortAddresses:
 	}
 }
 
+func TestMergeInstanceConfiguration(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "kube-proxy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	testCases := []struct {
+		name                string
+		configFile          string
+		instanceFile        string
+		bindAddress         string
+		instanceBindAddress string
+		expectedBindAddress string
+	}{
+		{
+			name:                "bind address without instance",
+			configFile:          filepath.Join(tmpDir, "config.yaml"),
+			bindAddress:         "0.0.0.0",
+			expectedBindAddress: "0.0.0.0",
+		},
+		{
+			name:                "bind address with instance overwrite",
+			configFile:          filepath.Join(tmpDir, "config.yaml"),
+			instanceFile:        filepath.Join(tmpDir, "instance-config.yaml"),
+			bindAddress:         "0.0.0.0",
+			instanceBindAddress: "127.0.0.1",
+			expectedBindAddress: "127.0.0.1",
+		},
+		{
+			name:                "empty bind instance address is ignored",
+			configFile:          filepath.Join(tmpDir, "config.yaml"),
+			instanceFile:        filepath.Join(tmpDir, "instance-config.yaml"),
+			bindAddress:         "0.0.0.0",
+			instanceBindAddress: "",
+			expectedBindAddress: "0.0.0.0",
+		},
+	}
+
+	for _, tc := range testCases {
+		if tc.configFile != "" {
+			createConfigurationFile(t, tc.configFile, tc.bindAddress)
+		}
+
+		if tc.instanceFile != "" {
+			createConfigurationFile(t, tc.instanceFile, tc.instanceBindAddress)
+		}
+
+		options := NewOptions()
+		config, err := options.loadConfigFromFile(tc.configFile, tc.instanceFile)
+		if err != nil {
+			t.Fatalf("unexpected error for %s: %v", tc.name, err)
+		}
+
+		assert.Equal(t, config.BindAddress, tc.expectedBindAddress, config.BindAddress)
+	}
+}
+
 // TestLoadConfigFailures tests failure modes for loadConfig()
 func TestLoadConfigFailures(t *testing.T) {
 	// TODO(phenixblue): Uncomment below template when v1alpha2+ of kube-proxy config is
@@ -624,4 +682,16 @@ func TestAddressFromDeprecatedFlags(t *testing.T) {
 		}
 
 	}
+}
+
+func createConfigurationFile(t *testing.T, file, bindAddress string) []byte {
+	data := []byte(fmt.Sprintf(`
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+bindAddress: %s`, bindAddress))
+	if err := ioutil.WriteFile(file, data, os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
+	return data
 }

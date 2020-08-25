@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	goruntime "runtime"
+	"sigs.k8s.io/yaml"
 	"strings"
 	"time"
 
@@ -41,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/selection"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
@@ -103,7 +105,9 @@ type proxyRun interface {
 // Options contains everything necessary to create and run a proxy server.
 type Options struct {
 	// ConfigFile is the location of the proxy server's configuration file.
-	ConfigFile string
+	ConfigFile         string
+	InstanceConfigFile string
+
 	// WriteConfigTo is the path where the default configuration will be written.
 	WriteConfigTo string
 	// CleanupAndExit, when true, makes the proxy server clean up iptables and ipvs rules, then exit.
@@ -143,6 +147,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	o.addOSFlags(fs)
 
 	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file.")
+	fs.StringVar(&o.InstanceConfigFile, "instance-config", o.InstanceConfigFile, "The path to the instance configuration file.")
 	fs.StringVar(&o.WriteConfigTo, "write-config-to", o.WriteConfigTo, "If set, write the default configuration values to this file and exit.")
 	fs.StringVar(&o.config.ClientConnection.Kubeconfig, "kubeconfig", o.config.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
 	fs.StringVar(&o.config.ClusterCIDR, "cluster-cidr", o.config.ClusterCIDR, "The CIDR range of pods in the cluster. When configured, traffic sent to a Service cluster IP from outside this range will be masqueraded and traffic sent from pods to an external LoadBalancer IP will be directed to the respective cluster IP instead")
@@ -223,14 +228,18 @@ func NewOptions() *Options {
 // Complete completes all the required options.
 func (o *Options) Complete() error {
 	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
-		klog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
+		klog.Warning("WARNING: all flags other than --config, --instance-config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
 		o.config.HealthzBindAddress = addressFromDeprecatedFlags(o.config.HealthzBindAddress, o.healthzPort)
 		o.config.MetricsBindAddress = addressFromDeprecatedFlags(o.config.MetricsBindAddress, o.metricsPort)
 	}
 
+	if len(o.InstanceConfigFile) > 0 && len(o.ConfigFile) == 0 {
+		return fmt.Errorf("The parameter --instance-config is not allowed without the --config.")
+	}
+
 	// Load the config file here in Complete, so that Validate validates the fully-resolved config.
 	if len(o.ConfigFile) > 0 {
-		c, err := o.loadConfigFromFile(o.ConfigFile)
+		c, err := o.loadConfigFromFile(o.ConfigFile, o.InstanceConfigFile)
 		if err != nil {
 			return err
 		}
@@ -400,13 +409,46 @@ func newLenientSchemeAndCodecs() (*runtime.Scheme, *serializer.CodecFactory, err
 
 // loadConfigFromFile loads the contents of file and decodes it as a
 // KubeProxyConfiguration object.
-func (o *Options) loadConfigFromFile(file string) (*kubeproxyconfig.KubeProxyConfiguration, error) {
+func (o *Options) loadConfigFromFile(file, instanceFile string) (*kubeproxyconfig.KubeProxyConfiguration, error) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
 
+	// If instance configuration exists try to merge into the shared configuration
+	// before final object conversion.
+	if len(instanceFile) > 0 {
+		instanceData, err := ioutil.ReadFile(instanceFile)
+		if err != nil {
+			return nil, err
+		}
+
+		if data, err = o.mergeInstanceConfiguration(data, instanceData); err != nil {
+			return nil, err
+		}
+	}
+
 	return o.loadConfig(data)
+}
+
+// mergeInstanceConfiguration merge a shared and instance specific configuration.
+func (o *Options) mergeInstanceConfiguration(data, instanceData []byte) ([]byte, error) {
+	obj := &kubeproxyconfig.KubeProxyConfiguration{}
+
+	// Convert shared configuration from YAML to JSON.
+	jsonData, err := yaml.YAMLToJSON(data)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert instance configuration from YAML to JSON.
+	jsonInstanceData, err := yaml.YAMLToJSON(instanceData)
+	if err != nil {
+		return nil, err
+	}
+
+	// Merge both configuration and returns the final patch.
+	return strategicpatch.StrategicMergePatch(jsonData, jsonInstanceData, obj)
 }
 
 // loadConfig decodes a serialized KubeProxyConfiguration to the internal type.
