@@ -84,13 +84,13 @@ type Controller struct {
 // probably just be natively extended to do what you need. Injecting flag precedence transformations
 // is something of an exception because the caller of this controller (cmd/) is aware of flags, but this
 // controller's tree (pkg/) is not.
-func NewController(dynamicConfigDir string, transform TransformFunc) *Controller {
+func NewController(dynamicConfigDir string, transform TransformFunc, instanceConfig string) *Controller {
 	return &Controller{
 		transform: transform,
 		// channels must have capacity at least 1, since we signal with non-blocking writes
 		pendingConfigSource: make(chan bool, 1),
 		configStatus:        status.NewNodeConfigStatus(),
-		checkpointStore:     store.NewFsStore(utilfs.DefaultFs{}, filepath.Join(dynamicConfigDir, storeDir)),
+		checkpointStore:     store.NewFsStore(utilfs.DefaultFs{}, filepath.Join(dynamicConfigDir, storeDir), instanceConfig),
 	}
 }
 

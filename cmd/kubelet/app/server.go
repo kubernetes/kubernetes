@@ -193,7 +193,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 
 			// load kubelet config file, if provided
 			if configFile := kubeletFlags.KubeletConfigFile; len(configFile) > 0 {
-				kubeletConfig, err = loadConfigFile(configFile)
+				kubeletConfig, err = loadConfigFile(configFile, kubeletFlags.KubeletInstanceConfigFile)
 				if err != nil {
 					klog.Fatal(err)
 				}
@@ -226,7 +226,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 						// This fixes the flag-precedence component of issue #63305.
 						// See issue #56171 for general details on flag precedence.
 						return kubeletConfigFlagPrecedence(kc, args)
-					})
+					}, kubeletFlags.KubeletInstanceConfigFile)
 				if err != nil {
 					klog.Fatal(err)
 				}
@@ -335,20 +335,22 @@ func kubeletConfigFlagPrecedence(kc *kubeletconfiginternal.KubeletConfiguration,
 	return nil
 }
 
-func loadConfigFile(name string) (*kubeletconfiginternal.KubeletConfiguration, error) {
+func loadConfigFile(configFile, instanceConfigFile string) (*kubeletconfiginternal.KubeletConfiguration, error) {
 	const errFmt = "failed to load Kubelet config file %s, error %v"
 	// compute absolute path based on current working dir
-	kubeletConfigFile, err := filepath.Abs(name)
+	kubeletConfigFile, err := filepath.Abs(configFile)
 	if err != nil {
-		return nil, fmt.Errorf(errFmt, name, err)
+		return nil, fmt.Errorf(errFmt, configFile, err)
 	}
-	loader, err := configfiles.NewFsLoader(utilfs.DefaultFs{}, kubeletConfigFile)
+
+	loader, err := configfiles.NewFsLoader(utilfs.DefaultFs{}, kubeletConfigFile, instanceConfigFile)
 	if err != nil {
-		return nil, fmt.Errorf(errFmt, name, err)
+		return nil, fmt.Errorf(errFmt, configFile, err)
 	}
+
 	kc, err := loader.Load()
 	if err != nil {
-		return nil, fmt.Errorf(errFmt, name, err)
+		return nil, fmt.Errorf(errFmt, configFile, err)
 	}
 	return kc, err
 }
@@ -1266,7 +1268,7 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 }
 
 // BootstrapKubeletConfigController constructs and bootstrap a configuration controller
-func BootstrapKubeletConfigController(dynamicConfigDir string, transform dynamickubeletconfig.TransformFunc) (*kubeletconfiginternal.KubeletConfiguration, *dynamickubeletconfig.Controller, error) {
+func BootstrapKubeletConfigController(dynamicConfigDir string, transform dynamickubeletconfig.TransformFunc, instanceConfig string) (*kubeletconfiginternal.KubeletConfiguration, *dynamickubeletconfig.Controller, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 		return nil, nil, fmt.Errorf("failed to bootstrap Kubelet config controller, you must enable the DynamicKubeletConfig feature gate")
 	}
@@ -1280,7 +1282,7 @@ func BootstrapKubeletConfigController(dynamicConfigDir string, transform dynamic
 		return nil, nil, fmt.Errorf("failed to get absolute path for --dynamic-config-dir=%s", dynamicConfigDir)
 	}
 	// get the latest KubeletConfiguration checkpoint from disk, or return the default config if no valid checkpoints exist
-	c := dynamickubeletconfig.NewController(dir, transform)
+	c := dynamickubeletconfig.NewController(dir, transform, instanceConfig)
 	kc, err := c.Bootstrap()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to determine a valid configuration, error: %v", err)

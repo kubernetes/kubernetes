@@ -43,15 +43,18 @@ type fsStore struct {
 	fs utilfs.Filesystem
 	// dir is the absolute path to the storage directory for fsStore
 	dir string
+	// the kubelet instance configuration file path
+	instanceConfig string
 }
 
 var _ Store = (*fsStore)(nil)
 
 // NewFsStore returns a Store that saves its data in dir
-func NewFsStore(fs utilfs.Filesystem, dir string) Store {
+func NewFsStore(fs utilfs.Filesystem, dir, instanceConfig string) Store {
 	return &fsStore{
-		fs:  fs,
-		dir: dir,
+		fs:             fs,
+		dir:            dir,
+		instanceConfig: instanceConfig,
 	}
 }
 
@@ -114,7 +117,7 @@ func (s *fsStore) Load(source checkpoint.RemoteConfigSource) (*kubeletconfig.Kub
 	}
 	// load the kubelet config file
 	utillog.Infof("loading Kubelet configuration checkpoint for source %s", sourceFmt)
-	loader, err := configfiles.NewFsLoader(s.fs, filepath.Join(s.checkpointPath(source.UID(), source.ResourceVersion()), source.KubeletFilename()))
+	loader, err := configfiles.NewFsLoader(s.fs, filepath.Join(s.checkpointPath(source.UID(), source.ResourceVersion()), source.KubeletFilename()), s.instanceConfig)
 	if err != nil {
 		return nil, err
 	}

@@ -59,7 +59,8 @@ func newInitializedFakeFsStore() (*fsStore, error) {
 		return nil, err
 	}
 
-	store := NewFsStore(fs, tmpdir)
+	// initiate a new file system store without instance
+	store := NewFsStore(fs, tmpdir, "")
 	if err := store.Initialize(); err != nil {
 		return nil, err
 	}

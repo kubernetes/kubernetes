@@ -16,6 +16,8 @@ go_library(
         "//pkg/kubelet/kubeletconfig/util/codec:go_default_library",
         "//pkg/util/filesystem:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
