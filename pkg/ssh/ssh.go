@@ -23,7 +23,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -344,8 +343,6 @@ func (l *SSHTunnelList) healthCheck(e sshTunnelEntry) error {
 	// GET the healthcheck path using the provided tunnel's dial function.
 	transport := utilnet.SetTransportDefaults(&http.Transport{
 		DialContext: e.Tunnel.Dial,
-		// TODO(cjcullen): Plumb real TLS options through.
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		// We don't reuse the clients, so disable the keep-alive to properly
 		// close the connection.
 		DisableKeepAlives: true,
