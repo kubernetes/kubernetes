@@ -171,6 +171,12 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 	if len(argsIn) > 0 && argsLenAtDash != 0 {
 		p.ResourceName = argsIn[0]
 	}
+
+	// Also respect inline [Container] argument.
+	// This behavior is very similar to `kubectl logs`.
+	if len(argsIn) > 1 && argsLenAtDash > 1 {
+		p.ContainerName = argsIn[1]
+	}
 	if argsLenAtDash > -1 {
 		p.Command = argsIn[argsLenAtDash:]
 	} else if len(argsIn) > 1 {
