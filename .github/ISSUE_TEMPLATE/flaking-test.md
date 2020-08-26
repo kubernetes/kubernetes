@@ -19,4 +19,4 @@ labels: kind/flake
 - links to go.k8s.io/triage appreciated
 - links to specific failures in spyglass appreciated
 
-<!-- Please see the deflaking doc (https://gist.github.com/liggitt/6a3a2217fa5f846b52519acfc0ffece0) for more guidance! -->
+<!-- Please see the deflaking doc (https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/flaky-tests.md) for more guidance! -->
