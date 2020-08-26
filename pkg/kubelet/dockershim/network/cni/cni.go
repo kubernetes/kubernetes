@@ -30,12 +30,14 @@ import (
 
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
+	machinerytypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utilslice "k8s.io/kubernetes/pkg/util/slice"
 	utilexec "k8s.io/utils/exec"
@@ -347,10 +349,6 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 	return plugin.deleteFromNetwork(cniTimeoutCtx, plugin.getDefaultNetwork(), name, namespace, id, netnsPath, nil)
 }
 
-func podDesc(namespace, name string, id kubecontainer.ContainerID) string {
-	return fmt.Sprintf("%s_%s/%s", namespace, name, id.ID)
-}
-
 func (plugin *cniNetworkPlugin) addToNetwork(ctx context.Context, network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations, options map[string]string) (cnitypes.Result, error) {
 	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations, options)
 	if err != nil {
@@ -358,7 +356,7 @@ func (plugin *cniNetworkPlugin) addToNetwork(ctx context.Context, network *cniNe
 		return nil, err
 	}
 
-	pdesc := podDesc(podNamespace, podName, podSandboxID)
+	pdesc := format.PodDesc(podName, podNamespace, machinerytypes.UID(podSandboxID.ID))
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
 	klog.V(4).Infof("Adding %s to network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
 	res, err := cniNet.AddNetworkList(ctx, netConf, rt)
@@ -377,7 +375,7 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(ctx context.Context, network *
 		return err
 	}
 
-	pdesc := podDesc(podNamespace, podName, podSandboxID)
+	pdesc := format.PodDesc(podName, podNamespace, machinerytypes.UID(podSandboxID.ID))
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
 	klog.V(4).Infof("Deleting %s from network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
 	err = cniNet.DelNetworkList(ctx, netConf, rt)
