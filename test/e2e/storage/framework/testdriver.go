@@ -17,12 +17,13 @@ limitations under the License.
 package framework
 
 import (
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
+	"time"
 )
 
 // TestDriver represents an interface for a driver to be tested in TestSuite.
@@ -205,6 +206,8 @@ type DriverInfo struct {
 	StressTestOptions *StressTestOptions
 	// [Optional] Scale parameters for volume snapshot stress tests.
 	VolumeSnapshotStressTestOptions *VolumeSnapshotStressTestOptions
+	// [Optional] Parameters for performance tests
+	PerformanceTestOptions *PerformanceTestOptions
 }
 
 // StressTestOptions contains parameters used for stress tests.
@@ -223,4 +226,25 @@ type VolumeSnapshotStressTestOptions struct {
 	NumPods int
 	// Number of snapshots to create for each volume.
 	NumSnapshots int
+}
+
+// Metrics to evaluate performance of an operation
+// TODO: Add metrics like median, mode, standard deviation, percentile
+type Metrics struct {
+	AvgLatency time.Duration
+	Throughput float64
+}
+
+// PerformanceTestProvisioningOptions contains parameters for
+// testing provisioning operation performance.
+type PerformanceTestProvisioningOptions struct {
+	VolumeSize string
+	Count      int
+	// Expected metrics from PVC creation till PVC being Bound.
+	ExpectedMetrics *Metrics
+}
+
+// PerformanceTestOptions contains parameters used for performance tests
+type PerformanceTestOptions struct {
+	ProvisioningOptions *PerformanceTestProvisioningOptions
 }
