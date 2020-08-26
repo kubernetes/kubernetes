@@ -174,7 +174,7 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 
 	// Also respect inline [Container] argument.
 	// This behavior is very similar to `kubectl logs`.
-	if len(argsIn) > 1 && argsLenAtDash > 1 {
+	if argsLenAtDash > 1 {
 		p.ContainerName = argsIn[1]
 	}
 	if argsLenAtDash > -1 {
