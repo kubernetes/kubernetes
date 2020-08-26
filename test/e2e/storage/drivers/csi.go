@@ -172,7 +172,6 @@ func (h *hostpathCSIDriver) GetSnapshotClass(config *testsuites.PerTestConfig) *
 func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
 	// Create secondary namespace which will be used for creating driver
 	driverNamespace := utils.CreateDriverNamespace(f)
-	ns2 := driverNamespace.Name
 
 	ginkgo.By(fmt.Sprintf("deploying %s driver", h.driverInfo.Name))
 	cancelLogging := testsuites.StartPodLogs(f, driverNamespace)
@@ -213,8 +212,6 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 		tryFunc(cleanup)
 		tryFunc(cancelLogging)
 
-		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", ns2))
-		tryFunc(deleteNamespaceFunc(f.ClientSet, ns2, framework.DefaultNamespaceDeletionTimeout))
 		// cleanup function has already ran and hence we don't need to run it again.
 		// We do this as very last action because in-case defer(or AfterEach) races
 		// with AfterSuite and test routine gets killed then this block still
@@ -416,8 +413,6 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 
 		tryFunc(cleanup)
 		tryFunc(cancelLogging)
-		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", ns2))
-		tryFunc(deleteNamespaceFunc(f.ClientSet, ns2, framework.DefaultNamespaceDeletionTimeout))
 		// cleanup function has already ran and hence we don't need to run it again.
 		// We do this as very last action because in-case defer(or AfterEach) races
 		// with AfterSuite and test routine gets killed then this block still
@@ -565,8 +560,6 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 		tryFunc(cleanup)
 		tryFunc(cancelLogging)
 
-		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", ns2))
-		tryFunc(deleteNamespaceFunc(f.ClientSet, ns2, framework.DefaultNamespaceDeletionTimeout))
 		// cleanup function has already ran and hence we don't need to run it again.
 		// We do this as very last action because in-case defer(or AfterEach) races
 		// with AfterSuite and test routine gets killed then this block still
@@ -624,19 +617,6 @@ func WaitForCSIDriverRegistrationOnNode(nodeName string, driverName string, cs c
 		return fmt.Errorf("error waiting for CSI driver %s registration on node %s: %v", driverName, nodeName, waitErr)
 	}
 	return nil
-}
-
-func deleteNamespaceFunc(cs clientset.Interface, ns string, timeout time.Duration) func() {
-	return func() {
-		err := cs.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			framework.Logf("error deleting namespace %s: %v", ns, err)
-		}
-		err = framework.WaitForNamespacesDeleted(cs, []string{ns}, timeout)
-		if err != nil {
-			framework.Logf("error deleting namespace %s: %v", ns, err)
-		}
-	}
 }
 
 func tryFunc(f func()) error {
