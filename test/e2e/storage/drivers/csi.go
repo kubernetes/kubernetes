@@ -173,7 +173,6 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 	// Create secondary namespace which will be used for creating driver
 	driverNamespace := utils.CreateDriverNamespace(f)
 	ns2 := driverNamespace.Name
-	ns1 := f.Namespace.Name
 
 	ginkgo.By(fmt.Sprintf("deploying %s driver", h.driverInfo.Name))
 	cancelLogging := testsuites.StartPodLogs(f, driverNamespace)
@@ -210,11 +209,6 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
 	// concurrently called from defer (or AfterEach) and AfterSuite action hooks.
 	cleanupFunc := func() {
-		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", ns1))
-		// Delete the primary namespace but its okay to fail here because this namespace will
-		// also be deleted by framework.Aftereach hook
-		tryFunc(deleteNamespaceFunc(f.ClientSet, ns1, framework.DefaultNamespaceDeletionTimeout))
-
 		ginkgo.By("uninstalling csi mock driver")
 		tryFunc(cleanup)
 		tryFunc(cancelLogging)
@@ -332,7 +326,6 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 	// Create secondary namespace which will be used for creating driver
 	driverNamespace := utils.CreateDriverNamespace(f)
 	ns2 := driverNamespace.Name
-	ns1 := f.Namespace.Name
 
 	ginkgo.By("deploying csi mock driver")
 	cancelLogging := testsuites.StartPodLogs(f, driverNamespace)
@@ -413,11 +406,6 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
 	// concurrently called from defer (or AfterEach) and AfterSuite action hooks.
 	cleanupFunc := func() {
-		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", ns1))
-		// Delete the primary namespace but its okay to fail here because this namespace will
-		// also be deleted by framework.Aftereach hook
-		tryFunc(deleteNamespaceFunc(f.ClientSet, ns1, framework.DefaultNamespaceDeletionTimeout))
-
 		ginkgo.By("uninstalling csi mock driver")
 		tryFunc(func() {
 			err := f.ClientSet.CoreV1().ConfigMaps(ns2).Delete(context.TODO(), hooksConfigMapName, metav1.DeleteOptions{})
@@ -537,7 +525,6 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 	// Create secondary namespace which will be used for creating driver
 	driverNamespace := utils.CreateDriverNamespace(f)
 	ns2 := driverNamespace.Name
-	ns1 := f.Namespace.Name
 
 	cancelLogging := testsuites.StartPodLogs(f, driverNamespace)
 	// It would be safer to rename the gcePD driver, but that
@@ -574,11 +561,6 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
 	// concurrently called from defer (or AfterEach) and AfterSuite action hooks.
 	cleanupFunc := func() {
-		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", ns1))
-		// Delete the primary namespace but its okay to fail here because this namespace will
-		// also be deleted by framework.Aftereach hook
-		tryFunc(deleteNamespaceFunc(f.ClientSet, ns1, framework.DefaultNamespaceDeletionTimeout))
-
 		ginkgo.By("uninstalling csi mock driver")
 		tryFunc(cleanup)
 		tryFunc(cancelLogging)

@@ -341,7 +341,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 	}
 	// Be robust about making the namespace creation call.
 	var got *v1.Namespace
-	if err := wait.PollImmediate(Poll, 30*time.Second, func() (bool, error) {
+	if err := wait.PollImmediate(Poll, wait.ForeverTestTimeout, func() (bool, error) {
 		var err error
 		got, err = c.CoreV1().Namespaces().Create(context.TODO(), namespaceObj, metav1.CreateOptions{})
 		if err != nil {
