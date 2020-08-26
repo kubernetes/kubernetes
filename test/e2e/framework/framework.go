@@ -393,6 +393,8 @@ func (f *Framework) AfterEach() {
 					} else {
 						Logf("Namespace %v was already deleted", ns.Name)
 					}
+				} else if err := WaitForNamespacesDeleted(f.ClientSet, []string{ns.Name}, DefaultNamespaceDeletionTimeout); err != nil {
+					Logf("Timed out waiting for namespace %s to be deleted: %v", ns.Name, err)
 				}
 			}
 		} else {
