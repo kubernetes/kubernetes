@@ -377,7 +377,8 @@ The new storage capacity tracking alpha feature is known to be affected by a lim
 
 ### (No, really, you MUST read this before you upgrade)
 
-- ACTION REQUIRED : Switch core master base images (kube-controller-manager) from debian to distroless. If you need Flex Volumes support using scripts, please build your own image with required packages (like bash) ([#91329](https://github.com/kubernetes/kubernetes/pull/91329), [@dims](https://github.com/dims)) [SIG Cloud Provider, Release, Storage and Testing]
+- ACTION REQUIRED: Switch core master base images (kube-controller-manager) from debian to distroless. If you need Flex Volumes support using scripts, please build your own image with required packages (like bash) ([#91329](https://github.com/kubernetes/kubernetes/pull/91329), [@dims](https://github.com/dims)) [SIG Cloud Provider, Release, Storage and Testing]
+- ACTION REQUIRED: Support for basic authentication via the --basic-auth-file flag has been removed.  Users should migrate to --token-auth-file for similar functionality. ([#89069](https://github.com/kubernetes/kubernetes/pull/89069), [@enj](https://github.com/enj)) [SIG API Machinery]
  - Azure blob disk feature(`kind`: `Shared`, `Dedicated`) has been deprecated, you should use `kind`: `Managed` in `kubernetes.io/azure-disk` storage class. ([#92905](https://github.com/kubernetes/kubernetes/pull/92905), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider and Storage]
  - CVE-2020-8559 (Medium): Privilege escalation from compromised node to cluster. See https://github.com/kubernetes/kubernetes/issues/92914 for more details.
   The API Server will no longer proxy non-101 responses for upgrade requests. This could break proxied backends (such as an extension API server) that respond to upgrade requests with a non-101 response code. ([#92941](https://github.com/kubernetes/kubernetes/pull/92941), [@tallclair](https://github.com/tallclair)) [SIG API Machinery]
