@@ -556,6 +556,10 @@ func (g *Cloud) ensureInternalInstanceGroup(name, zone string, nodes []string) (
 	}
 
 	gceNodes := sets.NewString(nodes...)
+	if len(gceNodes) > maxInstancesPerInstanceGroup {
+		klog.Warningf("Limiting number of VMs for InstanceGroup %s to %d", name, maxInstancesPerInstanceGroup)
+		gceNodes = sets.NewString(gceNodes.List()[:maxInstancesPerInstanceGroup]...)
+	}
 	igNodes := sets.NewString()
 	if ig == nil {
 		klog.V(2).Infof("ensureInternalInstanceGroup(%v, %v): creating instance group", name, zone)
@@ -616,29 +620,16 @@ func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]s
 		if err != nil {
 			return nil, err
 		}
-		instancesToInclude := sets.NewString(gceInstanceNames(instances)...)
-		instancesToSkip := sets.NewString()
-
-		igs, err := g.candidateExternalInstanceGroups(zone)
-		if err != nil {
-			return nil, err
-		}
-		for _, ig := range igs {
-			if strings.EqualFold(ig.Name, name) {
-				continue
-			}
-			shouldUse, igInstances, err := g.reuseInstanceGroupForInternalLoadbalancer(ig, instancesToInclude)
+		instanceNames := gceInstanceNames(instances)
+		if len(g.externalInstanceGroupsPrefix) > 0 {
+			reusedIgLinks, remaining, err := g.reuseInstanceGroupsForInternalLoadbalancer(zone, instanceNames)
 			if err != nil {
 				return nil, err
 			}
-			if shouldUse {
-				igLinks = append(igLinks, ig.SelfLink)
-				instancesToSkip.Insert(igInstances...)
-			}
+			igLinks = append(igLinks, reusedIgLinks...)
+			instanceNames = remaining
 		}
-		if remaining := instancesToInclude.Difference(instancesToSkip).UnsortedList(); len(remaining) > 0 {
-			gceZonedNodes[zone] = remaining
-		}
+		gceZonedNodes[zone] = instanceNames
 	}
 	for zone, gceNodes := range gceZonedNodes {
 		igLink, err := g.ensureInternalInstanceGroup(name, zone, gceNodes)
@@ -659,11 +650,37 @@ func gceInstanceNames(instances []*gceInstance) []string {
 	return ret
 }
 
-// reuseInstanceGroupForInternalLoadbalancer returns true if all the instances in the ig are part of the instancesToInclude and list of instances in the ig.
-// reuseInstanceGroupForInternalLoadbalancer returns true when all the instances in `instancesToInclude` are already part of the instance group `ig`
-// reuseInstanceGroupForInternalLoadbalancer also returns a list of all the instances in the instance group `ig`
-// reuseInstanceGroupForInternalLoadbalancer returns an error when it fails to list instances in the instance group `ig`
-func (g *Cloud) reuseInstanceGroupForInternalLoadbalancer(ig *compute.InstanceGroup, instancesToInclude sets.String) (bool, []string, error) {
+// reuseInstanceGroupsForInternalLoadbalancer returns a list of instance groups for the zone that can be re-used for a internal loadbalancer backend
+// as they already contain the required instances. It also returns a list of the remaining instances that were not part of selected instance groups.
+// The remaining instance groups should be put into the controller managed instance groups.
+func (g *Cloud) reuseInstanceGroupsForInternalLoadbalancer(zone string, instancesNames []string) ([]string, []string, error) {
+	var igLinks []string
+	igs, err := g.ListInstanceGroupsWithPrefix(zone, g.externalInstanceGroupsPrefix)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	usedInstanceNames := sets.NewString()
+	for _, ig := range igs {
+		shouldUse, igInstances, err := g.shouldReuseInstanceGroupForInternalLoadbalancer(ig, sets.NewString(instancesNames...))
+		if err != nil {
+			return nil, nil, err
+		}
+		if shouldUse {
+			igLinks = append(igLinks, ig.SelfLink)
+			usedInstanceNames.Insert(igInstances...)
+		}
+	}
+	if remaining := sets.NewString(instancesNames...).Difference(usedInstanceNames).List(); len(remaining) > 0 {
+		return igLinks, remaining, nil
+	}
+	return igLinks, nil, nil
+}
+
+// shouldReuseInstanceGroupForInternalLoadbalancer returns whether the given instance group, ig, should be used for the internal loadbalancer backend based on
+// if all the instances in the instance group are subset of the required instances, instancesToInclude, for the internal loadbalancer.
+// It also returns the list of instance names in the instance group and error if there was an error to find the instance group using cloud API.
+func (g *Cloud) shouldReuseInstanceGroupForInternalLoadbalancer(ig *compute.InstanceGroup, instancesToInclude sets.String) (bool, []string, error) {
 	igInstances, err := g.ListInstancesInInstanceGroup(ig.Name, ig.Zone, allInstances)
 	if err != nil {
 		return false, nil, err
@@ -677,13 +694,6 @@ func (g *Cloud) reuseInstanceGroupForInternalLoadbalancer(ig *compute.InstanceGr
 		return true, igInstanceNames, nil
 	}
 	return false, igInstanceNames, nil
-}
-
-func (g *Cloud) candidateExternalInstanceGroups(zone string) ([]*compute.InstanceGroup, error) {
-	if g.externalInstanceGroupsPrefix == "" {
-		return nil, nil
-	}
-	return g.ListInstanceGroupsWithPrefix(zone, g.externalInstanceGroupsPrefix)
 }
 
 func (g *Cloud) ensureInternalInstanceGroupsDeleted(name string) error {
