@@ -407,6 +407,9 @@ func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConf
 		ginkgo.By("deleting the snapshot and snapshot content") // TODO: test what happens when I have two snapshot content that refer to the same content
 		ginkgo.By("creating a snapshot content with the snapshot handle")
 		ginkgo.By("creating a snapshot with that snapshot content")
+	default:
+		err = fmt.Errorf("SnapshotType must be set to either DynamicCreatedSnapshot or PreprovisionedCreatedSnapshot")
+		framework.ExpectNoError(err)
 	}
 	return &r
 }

@@ -255,6 +255,7 @@ var (
 		FsType:                 "ntfs",
 		FeatureTag:             "[sig-windows]",
 		SnapshotDeletionPolicy: DeleteSnapshot,
+		SnapshotType:           DynamicCreatedSnapshot,
 	}
 
 	// Definitions for Filesystem volume mode
