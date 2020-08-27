@@ -155,6 +155,7 @@ type JobSpec struct {
 type JobStatus struct {
 
 	// The latest available observations of an object's current state.
+	// When a job fails, one of the conditions will have type == "Failed".
 	// +optional
 	Conditions []JobCondition
 
@@ -167,6 +168,7 @@ type JobStatus struct {
 	// Represents time when the job was completed. It is not guaranteed to
 	// be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
+	// The completion time is only set when the job finishes successfully.
 	// +optional
 	CompletionTime *metav1.Time
 
