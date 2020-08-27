@@ -71,6 +71,8 @@ const (
 	driverPodName = "csi-mockplugin-0"
 	// Name of CSI driver container name
 	driverContainerName = "mock"
+	// Prefix of the mock driver grpc log
+	grpcCallPrefix = "gRPCCall:"
 )
 
 // csiCall represents an expected call from Kubernetes to CSI mock driver and
@@ -1381,10 +1383,11 @@ func parseMockLogs(cs clientset.Interface, namespace, driverPodName, driverConta
 	logLines := strings.Split(log, "\n")
 	var calls []mockCSICall
 	for _, line := range logLines {
-		if !strings.HasPrefix(line, "gRPCCall:") {
+		index := strings.Index(line, grpcCallPrefix)
+		if index == -1 {
 			continue
 		}
-		line = strings.TrimPrefix(line, "gRPCCall:")
+		line = line[index+len(grpcCallPrefix):]
 		call := mockCSICall{
 			json: string(line),
 		}
