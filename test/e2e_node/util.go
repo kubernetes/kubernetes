@@ -387,7 +387,11 @@ func findRunningKubletServiceName() string {
 
 func restartKubelet() {
 	kubeletServiceName := findRunningKubletServiceName()
-	stdout, err := exec.Command("sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
+	// reset the kubelet service start-limit-hit
+	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
+	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %v", err, stdout)
+
+	stdout, err = exec.Command("sudo", "systemctl", "restart", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 }
 
