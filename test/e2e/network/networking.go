@@ -181,7 +181,7 @@ var _ = SIGDescribe("Networking", func() {
 
 		// Once basic tests checking for the sctp module not to be loaded are implemented, this
 		// needs to be marked as [Disruptive]
-		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity]", func() {
+		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func() {
 			config := e2enetwork.NewNetworkingTestConfig(f, false, true)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterSCTPPort))
 			config.DialFromTestContainer("sctp", config.ClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
@@ -325,7 +325,7 @@ var _ = SIGDescribe("Networking", func() {
 
 	// Once basic tests checking for the sctp module not to be loaded are implemented, this
 	// needs to be marked as [Disruptive]
-	ginkgo.It("should function for pod-pod: sctp [Feature:SCTPConnectivity]", func() {
+	ginkgo.It("should function for pod-pod: sctp [Feature:SCTPConnectivity][Disruptive]", func() {
 		config := e2enetwork.NewNetworkingTestConfig(f, false, true)
 		ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterSCTPPort))
 		message := "hello"
