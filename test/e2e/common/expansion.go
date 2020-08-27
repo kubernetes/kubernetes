@@ -181,11 +181,16 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		Description: Make sure a container's subpath can not be set using an expansion of environment variables when absolute path is supplied.
 	*/
 	framework.ConformanceIt("should fail substituting values in a volume subpath with absolute path [sig-storage][Slow]", func() {
+		absolutePath := "/tmp"
+		if framework.NodeOSDistroIs("windows") {
+			// Windows does not typically have a C:\tmp folder.
+			absolutePath = "C:\\Users"
+		}
 
 		envVars := []v1.EnvVar{
 			{
 				Name:  "POD_NAME",
-				Value: "/tmp",
+				Value: absolutePath,
 			},
 		}
 		mounts := []v1.VolumeMount{
@@ -367,8 +372,8 @@ func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
 		e2epod.DeletePodWithWait(f.ClientSet, pod)
 	}()
 
-	err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-	framework.ExpectError(err, "while waiting for pod to be running")
+	err := e2epod.WaitForPodContainerToFail(f.ClientSet, pod.Namespace, pod.Name, 0, "CreateContainerConfigError", framework.PodStartShortTimeout)
+	framework.ExpectNoError(err, "while waiting for the pod container to fail")
 }
 
 func newPod(command []string, envVars []v1.EnvVar, mounts []v1.VolumeMount, volumes []v1.Volume) *v1.Pod {
