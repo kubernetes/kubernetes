@@ -571,7 +571,7 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodT
 	if err != nil {
 		return err
 	}
-	if len(nodeName) != 0 {
+	if nodeName != "" {
 		pod.Spec.NodeName = nodeName
 	}
 	if len(labels.Set(pod.Labels)) == 0 {
