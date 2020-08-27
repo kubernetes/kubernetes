@@ -85,12 +85,8 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 			})
 	}
 	newVM := compute.VirtualMachineScaleSetVM{
-		Sku:      vm.Sku,
-		Location: vm.Location,
 		VirtualMachineScaleSetVMProperties: &compute.VirtualMachineScaleSetVMProperties{
-			HardwareProfile: vm.HardwareProfile,
 			StorageProfile: &compute.StorageProfile{
-				OsDisk:    vm.StorageProfile.OsDisk,
 				DataDisks: &disks,
 			},
 		},
@@ -159,12 +155,8 @@ func (ss *scaleSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName
 	}
 
 	newVM := compute.VirtualMachineScaleSetVM{
-		Sku:      vm.Sku,
-		Location: vm.Location,
 		VirtualMachineScaleSetVMProperties: &compute.VirtualMachineScaleSetVMProperties{
-			HardwareProfile: vm.HardwareProfile,
 			StorageProfile: &compute.StorageProfile{
-				OsDisk:    vm.StorageProfile.OsDisk,
 				DataDisks: &disks,
 			},
 		},
