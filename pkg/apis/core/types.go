@@ -1549,6 +1549,7 @@ type ServiceAccountTokenProjection struct {
 // ProjectedVolumeSource represents a projected volume source
 type ProjectedVolumeSource struct {
 	// list of volume projections
+	// +optional
 	Sources []VolumeProjection
 	// Mode bits to use on created files by default. Must be a value between
 	// 0 and 0777.
