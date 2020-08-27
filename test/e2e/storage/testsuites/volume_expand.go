@@ -64,7 +64,7 @@ func InitVolumeExpandTestSuite() TestSuite {
 				testpatterns.BlockVolModeDynamicPVAllowExpansion,
 			},
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "1Mi",
+				Min: "1Gi",
 			},
 		},
 	}
