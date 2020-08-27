@@ -215,7 +215,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	// TODO (soltysh): currently we don't support custom columns
 	// with server side print. So in these cases force the old behavior.
 	outputOption := cmd.Flags().Lookup("output").Value.String()
-	if outputOption == "custom-columns" {
+	if strings.Contains(outputOption, "custom-columns") || outputOption == "yaml" || strings.Contains(outputOption, "json") {
 		o.ServerPrint = false
 	}
 
