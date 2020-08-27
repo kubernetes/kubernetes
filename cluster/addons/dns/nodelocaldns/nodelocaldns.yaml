@@ -97,9 +97,7 @@ data:
         reload
         loop
         bind __PILLAR__LOCAL__DNS__ __PILLAR__DNS__SERVER__
-        forward . __PILLAR__UPSTREAM__SERVERS__ {
-                force_tcp
-        }
+        forward . __PILLAR__UPSTREAM__SERVERS__
         prometheus :9253
         }
 ---
