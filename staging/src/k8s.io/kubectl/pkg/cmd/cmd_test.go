@@ -65,6 +65,12 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			name:             "test that normal commands are able to be executed, when no plugin overshadows them",
 			args:             []string{"kubectl", "get", "foo"},
 			expectPlugin:     "",
+			expectPluginArgs: nil,
+		},
+		{
+			name:             "test that a plugin executable is found with no flags",
+			args:             []string{"kubectl", "foo"},
+			expectPlugin:     "plugin/testdata/kubectl-foo",
 			expectPluginArgs: []string{},
 		},
 		{
@@ -103,8 +109,8 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 				t.Fatalf("unexpected plugin execution: expected %q, got %q", test.expectPlugin, pluginsHandler.executedPlugin)
 			}
 
-			if len(pluginsHandler.withArgs) != len(test.expectPluginArgs) {
-				t.Fatalf("unexpected plugin execution args: expected %q, got %q", test.expectPluginArgs, pluginsHandler.withArgs)
+			if !reflect.DeepEqual(pluginsHandler.withArgs, test.expectPluginArgs) {
+				t.Fatalf("unexpected plugin execution args: expected %#v, got %#v", test.expectPluginArgs, pluginsHandler.withArgs)
 			}
 		})
 	}
