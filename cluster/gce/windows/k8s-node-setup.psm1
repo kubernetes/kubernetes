@@ -1143,9 +1143,20 @@ function Start-WorkerServices {
   $kubelet_args_str = ${kube_env}['KUBELET_ARGS']
   $kubelet_args = $kubelet_args_str.Split(" ")
   Log-Output "kubelet_args from metadata: ${kubelet_args}"
+
+  # To join GCE instances to AD, we need to shorten their names, as NetBIOS name
+  # must be <= 15 characters, and GKE generated names are longer than that.
+  # To perform the join in an automated way, it's preferable to apply the rename
+  # and domain join in the GCESysprep step. However, after sysprep is complete
+  # and the machine restarts, kubelet bootstrapping should not use the shortened
+  # computer name, and instead use the instance's name by using --hostname-override,
+  # otherwise kubelet and kube-proxy will not be able to run properly.
+  $instance_name = "$(Get-InstanceMetadata 'name' | Out-String)"
   $default_kubelet_args = @(`
-      "--pod-infra-container-image=${env:INFRA_CONTAINER}"
+      "--pod-infra-container-image=${env:INFRA_CONTAINER}",
+      "--hostname-override=${instance_name}"
   )
+
   $kubelet_args = ${default_kubelet_args} + ${kubelet_args}
   if (-not (Test-NodeUsesAuthPlugin ${kube_env})) {
     Log-Output 'Using bootstrap kubeconfig for authentication'
@@ -1170,8 +1181,10 @@ function Start-WorkerServices {
   # And also with various volumeMounts and "securityContext: privileged: true".
   $default_kubeproxy_args = @(`
       "--kubeconfig=${env:KUBEPROXY_KUBECONFIG}",
-      "--cluster-cidr=$(${kube_env}['CLUSTER_IP_RANGE'])"
+      "--cluster-cidr=$(${kube_env}['CLUSTER_IP_RANGE'])",
+      "--hostname-override=${instance_name}"
   )
+  
   $kubeproxy_args = ${default_kubeproxy_args} + ${kubeproxy_args}
   Log-Output "Final kubeproxy_args: ${kubeproxy_args}"
 
