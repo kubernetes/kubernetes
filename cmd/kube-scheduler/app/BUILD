@@ -13,7 +13,6 @@ go_library(
     deps = [
         "//cmd/kube-scheduler/app/config:go_default_library",
         "//cmd/kube-scheduler/app/options:go_default_library",
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework/runtime:go_default_library",
@@ -28,6 +27,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/mux:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/routes:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//staging/src/k8s.io/client-go/tools/events:go_default_library",
         "//staging/src/k8s.io/client-go/tools/leaderelection:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
