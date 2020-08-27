@@ -333,11 +333,11 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, prof *p
 				feasibleNodes[length-1] = nodeInfo.Node()
 			}
 		} else {
-			statusesLock.Lock()
 			if !status.IsSuccess() {
+				statusesLock.Lock()
 				statuses[nodeInfo.Node().Name] = status
+				statusesLock.Unlock()
 			}
-			statusesLock.Unlock()
 		}
 	}
 
