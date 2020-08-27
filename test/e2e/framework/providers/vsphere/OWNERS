@@ -7,15 +7,14 @@ approvers:
 - SandeepPissay
 - divyenpatel
 - BaluDontu
-- abrarshivani
 - imkin
 - frapposelli
 - dougm
 - sandeeppsunny
 emeritus_approvers:
 - matchstick
-reviewers:
 - abrarshivani
+reviewers:
 - saad-ali
 - justinsb
 - jsafrane
