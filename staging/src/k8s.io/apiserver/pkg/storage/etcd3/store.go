@@ -47,6 +47,11 @@ import (
 	utiltrace "k8s.io/utils/trace"
 )
 
+const (
+	// maxKeysFetchedInSingleList is a maximum number of elements fetched from etcd in a single list call.
+	maxKeysFetchedInSingleList = 50000
+)
+
 // authenticatedDataString satisfies the value.Context interface. It uses the key to
 // authenticate the stored data. This does not defend against reuse of previously
 // encrypted values under the same key, but will prevent an attacker from using an
@@ -642,6 +647,7 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 	var lastKey []byte
 	var hasMore bool
 	var getResp *clientv3.GetResponse
+	var allKeysCount int
 	for {
 		startTime := time.Now()
 		getResp, err = s.client.KV.Get(ctx, key, options...)
@@ -683,6 +689,7 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 				return err
 			}
 		}
+		allKeysCount += len(getResp.Kvs)
 
 		// indicate to the client which resource version was returned
 		if returnedRV == 0 {
@@ -695,6 +702,12 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 		}
 		// we're paging but we have filled our bucket
 		if int64(v.Len()) >= pred.Limit {
+			break
+		}
+		// There is still place in our bucket, but we have iterated too many elements not matching pred.
+		// To avoid returning timeout before we fill out the bucket, interrupt after maxKeysFetchedInSingleList elements
+		// and return continuation to resume scanning from the current position in the next request.
+		if allKeysCount >= maxKeysFetchedInSingleList {
 			break
 		}
 		key = string(lastKey) + "\x00"
