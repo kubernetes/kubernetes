@@ -18,7 +18,7 @@ limitations under the License.
  * expected.
  */
 
-package node
+package e2enode
 
 import (
 	"crypto/rand"

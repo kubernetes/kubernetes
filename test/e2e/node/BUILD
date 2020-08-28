@@ -12,7 +12,6 @@ go_library(
         "mount_propagation.go",
         "node_problem_detector.go",
         "pod_gc.go",
-        "pod_hostnamefqdn.go",
         "pods.go",
         "pre_stop.go",
         "recreate_node.go",
