@@ -390,6 +390,11 @@ func (p *Plugin) admitPVCStatus(nodeName string, a admission.Attributes) error {
 
 func (p *Plugin) admitNode(nodeName string, a admission.Attributes) error {
 	requestedName := a.GetName()
+
+	if requestedName != nodeName {
+		return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to modify node %q", nodeName, requestedName))
+	}
+
 	if a.GetOperation() == admission.Create {
 		node, ok := a.GetObject().(*api.Node)
 		if !ok {
@@ -408,9 +413,6 @@ func (p *Plugin) admitNode(nodeName string, a admission.Attributes) error {
 		if forbiddenLabels := p.getForbiddenLabels(modifiedLabels); len(forbiddenLabels) > 0 {
 			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to set the following labels: %s", nodeName, strings.Join(forbiddenLabels.List(), ", ")))
 		}
-	}
-	if requestedName != nodeName {
-		return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to modify node %q", nodeName, requestedName))
 	}
 
 	if a.GetOperation() == admission.Update {
