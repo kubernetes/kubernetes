@@ -206,7 +206,6 @@ rules:
       - k8s.io/kubernetes/pkg/util/config
       - k8s.io/kubernetes/pkg/util/configz
       - k8s.io/kubernetes/pkg/util/conntrack
-      - k8s.io/kubernetes/pkg/util/ebtables
       - k8s.io/kubernetes/pkg/util/env
       - k8s.io/kubernetes/pkg/util/filesystem
       - k8s.io/kubernetes/pkg/util/flag

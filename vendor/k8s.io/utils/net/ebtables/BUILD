@@ -2,14 +2,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "ipnet.go",
-        "net.go",
-        "port.go",
-    ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/utils/net",
-    importpath = "k8s.io/utils/net",
+    srcs = ["ebtables.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/utils/net/ebtables",
+    importpath = "k8s.io/utils/net/ebtables",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/k8s.io/utils/exec:go_default_library"],
 )
 
 filegroup(
@@ -21,10 +18,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//vendor/k8s.io/utils/net/ebtables:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
