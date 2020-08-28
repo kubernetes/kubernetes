@@ -3654,7 +3654,7 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 					w.Write(LEVEL_1, "(as a percentage of request):\t%s / %s\n", current, target)
 				}
 			default:
-				w.Write(LEVEL_1, "<unknown metric type %q>", string(metric.Type))
+				w.Write(LEVEL_1, "<unknown metric type %q>\n", string(metric.Type))
 			}
 		}
 		minReplicas := "<unset>"
