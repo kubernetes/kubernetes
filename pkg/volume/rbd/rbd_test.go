@@ -675,6 +675,7 @@ func TestGetAccessModes(t *testing.T) {
 
 func TestRequiresRemount(t *testing.T) {
 	tmpDir, _ := utiltesting.MkTmpdir("rbd_test")
+	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 	plug, _ := plugMgr.FindPluginByName("kubernetes.io/rbd")
