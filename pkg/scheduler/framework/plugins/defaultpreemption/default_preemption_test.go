@@ -51,7 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -216,7 +215,7 @@ func TestPostFilter(t *testing.T) {
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 				frameworkruntime.WithExtenders(extenders),
-				frameworkruntime.WithSnapshotSharedLister(cache.NewSnapshot(tt.pods, tt.nodes)),
+				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -649,7 +648,7 @@ func TestDryRunPreemption(t *testing.T) {
 				nodes[i] = nodeWrapper.Obj()
 				fakeFilterRCMap[nodeName] = tt.fakeFilterRC
 			}
-			snapshot := cache.NewSnapshot(tt.pods, nodes)
+			snapshot := internalcache.NewSnapshot(tt.pods, nodes)
 
 			// For each test, register a FakeFilterPlugin along with essential plugins and tt.registerPlugins.
 			fakePlugin := st.FakeFilterPlugin{
