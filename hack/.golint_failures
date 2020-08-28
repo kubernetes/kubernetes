@@ -98,7 +98,6 @@ pkg/kubelet/apis/config/v1beta1
 pkg/kubelet/cm
 pkg/kubelet/container
 pkg/kubelet/container/testing
-pkg/kubelet/cri/remote
 pkg/kubelet/dockershim/libdocker
 pkg/kubelet/dockershim/network
 pkg/kubelet/dockershim/network/cni/testing
@@ -435,7 +434,6 @@ staging/src/k8s.io/component-base/cli/flag
 staging/src/k8s.io/component-base/config/v1alpha1
 staging/src/k8s.io/component-base/featuregate
 staging/src/k8s.io/component-base/version/verflag
-staging/src/k8s.io/cri-api/pkg/apis/testing
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
 staging/src/k8s.io/kube-aggregator/pkg/apiserver
