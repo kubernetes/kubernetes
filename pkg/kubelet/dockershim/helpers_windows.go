@@ -32,6 +32,7 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
+// DefaultMemorySwap always returns 0 for no memory swap in a sandbox
 func DefaultMemorySwap() int64 {
 	return 0
 }
