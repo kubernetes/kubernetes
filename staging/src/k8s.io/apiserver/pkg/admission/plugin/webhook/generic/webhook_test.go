@@ -22,7 +22,10 @@ import (
 	"testing"
 
 	"k8s.io/api/admissionregistration/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
@@ -75,7 +78,7 @@ func TestShouldCallHook(t *testing.T) {
 	}{
 		{
 			name:       "no rules (just write)",
-			webhook:    &v1.ValidatingWebhook{Rules: []v1.RuleWithOperations{}},
+			webhook:    &v1.ValidatingWebhook{NamespaceSelector: &metav1.LabelSelector{}, Rules: []v1.RuleWithOperations{}},
 			attrs:      admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"apps", "v1", "Deployment"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectCall: false,
 		},
@@ -327,5 +330,230 @@ func TestShouldCallHook(t *testing.T) {
 				t.Fatalf("expected %#v, got %#v", testcase.expectCallSubresource, invocation.Subresource)
 			}
 		})
+	}
+}
+
+type fakeNamespaceLister struct {
+	namespaces map[string]*corev1.Namespace
+}
+
+func (f fakeNamespaceLister) List(selector labels.Selector) (ret []*corev1.Namespace, err error) {
+	return nil, nil
+}
+func (f fakeNamespaceLister) Get(name string) (*corev1.Namespace, error) {
+	ns, ok := f.namespaces[name]
+	if ok {
+		return ns, nil
+	}
+	return nil, errors.NewNotFound(corev1.Resource("namespaces"), name)
+}
+
+func BenchmarkShouldCallHookWithComplexSelector(b *testing.B) {
+	allScopes := v1.AllScopes
+	equivalentMatch := v1.Equivalent
+
+	namespace1Labels := map[string]string{"ns": "ns1"}
+	namespace1 := corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "ns1",
+			Labels: namespace1Labels,
+		},
+	}
+	namespaceLister := fakeNamespaceLister{map[string]*corev1.Namespace{"ns": &namespace1}}
+
+	mapper := runtime.NewEquivalentResourceRegistryWithIdentity(func(resource schema.GroupResource) string {
+		if resource.Resource == "deployments" {
+			// co-locate deployments in all API groups
+			return "/deployments"
+		}
+		return ""
+	})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"extensions", "v1beta1", "Deployment"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1", "Deployment"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1beta1", "Deployment"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1alpha1", "Deployment"})
+
+	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"extensions", "v1beta1", "Scale"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", schema.GroupVersionKind{"autoscaling", "v1", "Scale"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1alpha1", "Scale"})
+
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1", "StatefulSet"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta1", "StatefulSet"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta2", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta2", "StatefulSet"})
+
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1", "Scale"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha2", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta2", "Scale"})
+
+	nsSelector := make(map[string]string)
+	for i := 0; i < 100; i++ {
+		nsSelector[fmt.Sprintf("key-%d", i)] = fmt.Sprintf("val-%d", i)
+	}
+
+	wb := &v1.ValidatingWebhook{
+		MatchPolicy:       &equivalentMatch,
+		NamespaceSelector: &metav1.LabelSelector{MatchLabels: nsSelector},
+		ObjectSelector:    &metav1.LabelSelector{},
+		Rules: []v1.RuleWithOperations{
+			{
+				Operations: []v1.OperationType{"*"},
+				Rule:       v1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
+			},
+			{
+				Operations: []v1.OperationType{"*"},
+				Rule:       v1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
+			},
+		},
+	}
+
+	wbAccessor := webhook.NewValidatingWebhookAccessor("webhook", "webhook-cfg", wb)
+	attrs := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
+	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
+	a := &Webhook{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
+
+	for i := 0; i < b.N; i++ {
+		a.ShouldCallHook(wbAccessor, attrs, interfaces)
+	}
+}
+
+func BenchmarkShouldCallHookWithComplexRule(b *testing.B) {
+	allScopes := v1.AllScopes
+	equivalentMatch := v1.Equivalent
+
+	namespace1Labels := map[string]string{"ns": "ns1"}
+	namespace1 := corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "ns1",
+			Labels: namespace1Labels,
+		},
+	}
+	namespaceLister := fakeNamespaceLister{map[string]*corev1.Namespace{"ns": &namespace1}}
+
+	mapper := runtime.NewEquivalentResourceRegistryWithIdentity(func(resource schema.GroupResource) string {
+		if resource.Resource == "deployments" {
+			// co-locate deployments in all API groups
+			return "/deployments"
+		}
+		return ""
+	})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"extensions", "v1beta1", "Deployment"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1", "Deployment"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1beta1", "Deployment"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1alpha1", "Deployment"})
+
+	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"extensions", "v1beta1", "Scale"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", schema.GroupVersionKind{"autoscaling", "v1", "Scale"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1alpha1", "Scale"})
+
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1", "StatefulSet"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta1", "StatefulSet"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta2", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta2", "StatefulSet"})
+
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1", "Scale"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha2", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta2", "Scale"})
+
+	wb := &v1.ValidatingWebhook{
+		MatchPolicy:       &equivalentMatch,
+		NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+		ObjectSelector:    &metav1.LabelSelector{},
+		Rules:             []v1.RuleWithOperations{},
+	}
+
+	for i := 0; i < 100; i++ {
+		rule := v1.RuleWithOperations{
+			Operations: []v1.OperationType{"*"},
+			Rule: v1.Rule{
+				APIGroups:   []string{fmt.Sprintf("app-%d", i)},
+				APIVersions: []string{fmt.Sprintf("v%d", i)},
+				Resources:   []string{fmt.Sprintf("resource%d", i), fmt.Sprintf("resource%d/scale", i)},
+				Scope:       &allScopes,
+			},
+		}
+		wb.Rules = append(wb.Rules, rule)
+	}
+
+	wbAccessor := webhook.NewValidatingWebhookAccessor("webhook", "webhook-cfg", wb)
+	attrs := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
+	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
+	a := &Webhook{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
+
+	for i := 0; i < b.N; i++ {
+		a.ShouldCallHook(wbAccessor, attrs, interfaces)
+	}
+}
+
+func BenchmarkShouldCallHookWithComplexSelectorAndRule(b *testing.B) {
+	allScopes := v1.AllScopes
+	equivalentMatch := v1.Equivalent
+
+	namespace1Labels := map[string]string{"ns": "ns1"}
+	namespace1 := corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "ns1",
+			Labels: namespace1Labels,
+		},
+	}
+	namespaceLister := fakeNamespaceLister{map[string]*corev1.Namespace{"ns": &namespace1}}
+
+	mapper := runtime.NewEquivalentResourceRegistryWithIdentity(func(resource schema.GroupResource) string {
+		if resource.Resource == "deployments" {
+			// co-locate deployments in all API groups
+			return "/deployments"
+		}
+		return ""
+	})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"extensions", "v1beta1", "Deployment"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1", "Deployment"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1beta1", "Deployment"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "", schema.GroupVersionKind{"apps", "v1alpha1", "Deployment"})
+
+	mapper.RegisterKindFor(schema.GroupVersionResource{"extensions", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"extensions", "v1beta1", "Scale"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", schema.GroupVersionKind{"autoscaling", "v1", "Scale"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha1", "deployments"}, "scale", schema.GroupVersionKind{"apps", "v1alpha1", "Scale"})
+
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1", "StatefulSet"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta1", "StatefulSet"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta2", "statefulset"}, "", schema.GroupVersionKind{"apps", "v1beta2", "StatefulSet"})
+
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1", "Scale"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1beta1", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta1", "Scale"})
+	mapper.RegisterKindFor(schema.GroupVersionResource{"apps", "v1alpha2", "statefulset"}, "scale", schema.GroupVersionKind{"apps", "v1beta2", "Scale"})
+
+	nsSelector := make(map[string]string)
+	for i := 0; i < 100; i++ {
+		nsSelector[fmt.Sprintf("key-%d", i)] = fmt.Sprintf("val-%d", i)
+	}
+
+	wb := &v1.ValidatingWebhook{
+		MatchPolicy:       &equivalentMatch,
+		NamespaceSelector: &metav1.LabelSelector{MatchLabels: nsSelector},
+		ObjectSelector:    &metav1.LabelSelector{},
+		Rules:             []v1.RuleWithOperations{},
+	}
+
+	for i := 0; i < 100; i++ {
+		rule := v1.RuleWithOperations{
+			Operations: []v1.OperationType{"*"},
+			Rule: v1.Rule{
+				APIGroups:   []string{fmt.Sprintf("app-%d", i)},
+				APIVersions: []string{fmt.Sprintf("v%d", i)},
+				Resources:   []string{fmt.Sprintf("resource%d", i), fmt.Sprintf("resource%d/scale", i)},
+				Scope:       &allScopes,
+			},
+		}
+		wb.Rules = append(wb.Rules, rule)
+	}
+
+	wbAccessor := webhook.NewValidatingWebhookAccessor("webhook", "webhook-cfg", wb)
+	attrs := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{"autoscaling", "v1", "Scale"}, "ns", "name", schema.GroupVersionResource{"apps", "v1", "deployments"}, "scale", admission.Create, &metav1.CreateOptions{}, false, nil)
+	interfaces := &admission.RuntimeObjectInterfaces{EquivalentResourceMapper: mapper}
+	a := &Webhook{namespaceMatcher: &namespace.Matcher{NamespaceLister: namespaceLister}, objectMatcher: &object.Matcher{}}
+
+	for i := 0; i < b.N; i++ {
+		a.ShouldCallHook(wbAccessor, attrs, interfaces)
 	}
 }
