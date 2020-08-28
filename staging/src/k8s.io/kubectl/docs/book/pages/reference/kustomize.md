@@ -300,7 +300,7 @@ Definitions:
 | Name          | Type    | Desc                                |
 | :------------ | :------ | :---------------------------------- |
 | **name** | string  | Match all `image` fields with this value for the *name*|
-| **nameName** | string  | Replace the `image` field *name* with this value. |
+| **newName** | string  | Replace the `image` field *name* with this value. |
 | **newTag** | string  | Replace the `image` field *tag* with this tag value. |
 | **digest** | string  | Replace the `image` field *tag* with this digest value.  Includes the `sha256:` portion of the digest. |
 
