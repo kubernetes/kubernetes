@@ -195,7 +195,7 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVarP(&o.drainer.PodSelector, "pod-selector", "", o.drainer.PodSelector, "Label selector to filter pods on the node")
 	cmd.Flags().BoolVar(&o.drainer.DisableEviction, "disable-eviction", o.drainer.DisableEviction, "Force drain to use delete, even if eviction is supported. This will bypass checking PodDisruptionBudgets, use with caution.")
 	cmd.Flags().IntVar(&o.drainer.SkipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", o.drainer.SkipWaitForDeleteTimeoutSeconds, "If pod DeletionTimestamp older than N seconds, skip waiting for the pod.  Seconds must be greater than 0 to skip.")
-	cmd.Flags().BoolVar(&o.drainer.ParallelizeNodes, "parallelize-nodes", o.drainer.ParallelizeNodes, "Execute drains on multiple nodes in parallel")
+	cmd.Flags().BoolVar(&o.drainer.Parallel, "parallel", o.drainer.Parallel, "Execute drains on multiple nodes in parallel")
 
 	cmdutil.AddDryRunFlag(cmd)
 	return cmd
@@ -327,7 +327,7 @@ func (o *DrainCmdOptions) RunDrain() error {
 	drainWG.Add(len(o.nodeInfos))
 
 	for _, info := range o.nodeInfos {
-		if o.drainer.ParallelizeNodes {
+		if o.drainer.Parallel {
 			go o.drainNode(info, &drainResultMutex, &drainWG, &drainedNodes, &drainErrors, printObj)
 		} else {
 			o.drainNode(info, &drainResultMutex, &drainWG, &drainedNodes, &drainErrors, printObj)
