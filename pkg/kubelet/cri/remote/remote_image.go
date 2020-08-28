@@ -30,8 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote/util"
 )
 
-// RemoteImageService is a gRPC implementation of internalapi.ImageManagerService.
-type RemoteImageService struct {
+// remoteImageService is a gRPC implementation of internalapi.ImageManagerService.
+type remoteImageService struct {
 	timeout     time.Duration
 	imageClient runtimeapi.ImageServiceClient
 }
@@ -53,14 +53,14 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration) (in
 		return nil, err
 	}
 
-	return &RemoteImageService{
+	return &remoteImageService{
 		timeout:     connectionTimeout,
 		imageClient: runtimeapi.NewImageServiceClient(conn),
 	}, nil
 }
 
 // ListImages lists available images.
-func (r *RemoteImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
+func (r *remoteImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -76,7 +76,7 @@ func (r *RemoteImageService) ListImages(filter *runtimeapi.ImageFilter) ([]*runt
 }
 
 // ImageStatus returns the status of the image.
-func (r *RemoteImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
+func (r *remoteImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -100,7 +100,7 @@ func (r *RemoteImageService) ImageStatus(image *runtimeapi.ImageSpec) (*runtimea
 }
 
 // PullImage pulls an image with authentication config.
-func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (r *remoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
@@ -124,7 +124,7 @@ func (r *RemoteImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtim
 }
 
 // RemoveImage removes the image.
-func (r *RemoteImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
+func (r *remoteImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
@@ -140,7 +140,7 @@ func (r *RemoteImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
 }
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
-func (r *RemoteImageService) ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error) {
+func (r *remoteImageService) ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error) {
 	// Do not set timeout, because `ImageFsInfo` takes time.
 	// TODO(random-liu): Should we assume runtime should cache the result, and set timeout here?
 	ctx, cancel := getContextWithCancel()
