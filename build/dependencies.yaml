@@ -56,7 +56,7 @@ dependencies:
 
   # CRI Tools
   - name: "crictl"
-    version: 1.18.0
+    version: 1.19.0
     refPaths:
     - path: build/workspace.bzl
       match: CRI_TOOLS_VERSION =
