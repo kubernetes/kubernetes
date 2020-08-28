@@ -17,8 +17,9 @@ limitations under the License.
 package types
 
 import (
-	"k8s.io/api/core/v1"
 	"testing"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 func TestPodConditionByKubelet(t *testing.T) {
@@ -26,7 +27,7 @@ func TestPodConditionByKubelet(t *testing.T) {
 		v1.PodScheduled,
 		v1.PodReady,
 		v1.PodInitialized,
-		v1.PodReasonUnschedulable,
+		v1.ContainersReady,
 	}
 
 	for _, tc := range trueCases {
@@ -37,6 +38,7 @@ func TestPodConditionByKubelet(t *testing.T) {
 
 	falseCases := []v1.PodConditionType{
 		v1.PodConditionType("abcd"),
+		v1.PodConditionType(v1.PodReasonUnschedulable),
 	}
 
 	for _, tc := range falseCases {
