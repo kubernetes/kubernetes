@@ -4178,14 +4178,8 @@ func TestCreateInvokeAdmissionControl(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 
-		wg := sync.WaitGroup{}
-		wg.Add(1)
 		var response *http.Response
-		go func() {
-			response, err = client.Do(request)
-			wg.Done()
-		}()
-		wg.Wait()
+		response, err = client.Do(request)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
