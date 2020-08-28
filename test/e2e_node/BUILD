@@ -132,6 +132,7 @@ go_test(
         "node_container_manager_test.go",
         "node_perf_test.go",
         "pids_test.go",
+        "pod_hostnamefqdn_test.go",
         "pods_container_manager_test.go",
         "quota_lsci_test.go",
         "resource_metrics_test.go",
