@@ -211,7 +211,7 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String, diskName st
 
 	for _, path := range devicePaths {
 		if pathExists, err := mount.PathExists(path); err != nil {
-			return "", fmt.Errorf("Error checking if path exists: %v", err)
+			return "", fmt.Errorf("error checking if path exists: %v", err)
 		} else if pathExists {
 			// validate that the path actually resolves to the correct disk
 			serial, err := getScsiSerial(path, diskName)
@@ -301,7 +301,7 @@ func getCloudProvider(cloudProvider cloudprovider.Interface) (*gcecloud.Cloud, e
 		return gceCloudProvider, nil
 	}
 
-	return nil, fmt.Errorf("Failed to get GCE GCECloudProvider with error %v", err)
+	return nil, fmt.Errorf("failed to get GCE GCECloudProvider with error %v", err)
 }
 
 // Triggers the application of udev rules by calling "udevadm trigger
