@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -527,4 +528,100 @@ func TestRunValidations(t *testing.T) {
 		})
 	}
 
+}
+
+func TestExpose(t *testing.T) {
+	tests := []struct {
+		name      string
+		podName   string
+		imageName string
+		podLabels map[string]string
+		port      int
+	}{
+		{
+			name:      "test simple expose",
+			podName:   "test-pod",
+			imageName: "test-image",
+			podLabels: map[string]string{"color": "red", "shape": "square"},
+			port:      1234,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			tf := cmdtesting.NewTestFactory()
+			defer tf.Cleanup()
+
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			ns := scheme.Codecs.WithoutConversion()
+			tf.Client = &fake.RESTClient{
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					t.Logf("path: %v, method: %v", req.URL.Path, req.Method)
+					switch p, m := req.URL.Path, req.Method; {
+					case m == "POST" && p == "/namespaces/default/pods":
+						pod := &corev1.Pod{}
+						body := cmdtesting.ObjBody(codec, pod)
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+					case m == "POST" && p == "/namespaces/default/services":
+						data, err := ioutil.ReadAll(req.Body)
+						if err != nil {
+							t.Fatalf("unexpected error: %v", err)
+						}
+
+						service := &corev1.Service{}
+						if err := runtime.DecodeInto(codec, data, service); err != nil {
+							t.Fatalf("unexpected error: %v", err)
+						}
+
+						if service.ObjectMeta.Name != test.podName {
+							t.Errorf("Invalid name on service. Expected:%v, Actual:%v", test.podName, service.ObjectMeta.Name)
+						}
+
+						if !reflect.DeepEqual(service.Spec.Selector, test.podLabels) {
+							t.Errorf("Invalid selector on service. Expected:%v, Actual:%v", test.podLabels, service.Spec.Selector)
+						}
+
+						if len(service.Spec.Ports) != 1 && service.Spec.Ports[0].Port != int32(test.port) {
+							t.Errorf("Invalid port on service: %v", service.Spec.Ports)
+						}
+
+						body := cmdtesting.ObjBody(codec, service)
+
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+					default:
+						t.Errorf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+						return nil, fmt.Errorf("unexpected request")
+					}
+				}),
+			}
+
+			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
+			cmdutil.BehaviorOnFatal(func(str string, code int) {
+				bufErr.Write([]byte(str))
+			})
+
+			cmd := NewCmdRun(tf, streams)
+			cmd.Flags().Set("image", test.imageName)
+			cmd.Flags().Set("expose", "true")
+			cmd.Flags().Set("port", strconv.Itoa(test.port))
+
+			labels := []string{}
+			for k, v := range test.podLabels {
+				labels = append(labels, fmt.Sprintf("%s=%s", k, v))
+			}
+			cmd.Flags().Set("labels", strings.Join(labels, ","))
+
+			cmd.Run(cmd, []string{test.podName})
+
+			if bufErr.Len() > 0 {
+				err := fmt.Errorf("%v", bufErr.String())
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
+
+	}
 }
