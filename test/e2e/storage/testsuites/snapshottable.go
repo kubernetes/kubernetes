@@ -359,7 +359,7 @@ type SnapshotResource struct {
 // different test pattern snapshot provisioning and deletion policy
 func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConfig, pattern testpatterns.TestPattern, pvcName string, pvcNamespace string) *SnapshotResource {
 	var err error
-	if pattern.SnapshotType != testpatterns.DynamicCreatedSnapshot || pattern.SnapshotType != testpatterns.PreprovisionedCreatedSnapshot {
+	if pattern.SnapshotType != testpatterns.DynamicCreatedSnapshot && pattern.SnapshotType != testpatterns.PreprovisionedCreatedSnapshot {
 		err = fmt.Errorf("SnapshotType must be set to either DynamicCreatedSnapshot or PreprovisionedCreatedSnapshot")
 		framework.ExpectNoError(err)
 	}
