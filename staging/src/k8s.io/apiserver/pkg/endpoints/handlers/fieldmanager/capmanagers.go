@@ -67,7 +67,7 @@ func (f *capManagersManager) capUpdateManagers(managed Managed) (newManaged Mana
 	// Gather all entries from updates
 	updaters := []string{}
 	for manager, fields := range managed.Fields() {
-		if fields.Applied() == false {
+		if !fields.Applied() {
 			updaters = append(updaters, manager)
 		}
 	}
