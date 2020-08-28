@@ -345,7 +345,7 @@ type ReservePlugin interface {
 }
 
 // PreBindPlugin is an interface that must be implemented by "prebind" plugins.
-// These plugins are called before a pod being scheduled.
+// These plugins are called before a pod is bound.
 type PreBindPlugin interface {
 	Plugin
 	// PreBind is called before binding a pod. All prebind plugins must return
