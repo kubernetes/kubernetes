@@ -1,5 +1,4 @@
 cluster/images/etcd/migrate
-pkg/controller/garbagecollector
 pkg/controller/podautoscaler
 pkg/controller/replicaset
 pkg/controller/resourcequota
