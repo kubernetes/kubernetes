@@ -42,24 +42,25 @@ var (
 )
 
 const (
-	legacyGroup            = ""
-	appsGroup              = "apps"
-	authenticationGroup    = "authentication.k8s.io"
-	authorizationGroup     = "authorization.k8s.io"
-	autoscalingGroup       = "autoscaling"
-	batchGroup             = "batch"
-	certificatesGroup      = "certificates.k8s.io"
-	coordinationGroup      = "coordination.k8s.io"
-	discoveryGroup         = "discovery.k8s.io"
-	extensionsGroup        = "extensions"
-	policyGroup            = "policy"
-	rbacGroup              = "rbac.authorization.k8s.io"
-	storageGroup           = "storage.k8s.io"
-	resMetricsGroup        = "metrics.k8s.io"
-	customMetricsGroup     = "custom.metrics.k8s.io"
-	networkingGroup        = "networking.k8s.io"
-	eventsGroup            = "events.k8s.io"
-	internalAPIServerGroup = "internal.apiserver.k8s.io"
+	legacyGroup                = ""
+	appsGroup                  = "apps"
+	authenticationGroup        = "authentication.k8s.io"
+	authorizationGroup         = "authorization.k8s.io"
+	autoscalingGroup           = "autoscaling"
+	batchGroup                 = "batch"
+	certificatesGroup          = "certificates.k8s.io"
+	coordinationGroup          = "coordination.k8s.io"
+	discoveryGroup             = "discovery.k8s.io"
+	extensionsGroup            = "extensions"
+	policyGroup                = "policy"
+	rbacGroup                  = "rbac.authorization.k8s.io"
+	storageGroup               = "storage.k8s.io"
+	resMetricsGroup            = "metrics.k8s.io"
+	customMetricsGroup         = "custom.metrics.k8s.io"
+	networkingGroup            = "networking.k8s.io"
+	eventsGroup                = "events.k8s.io"
+	internalAPIServerGroup     = "internal.apiserver.k8s.io"
+	admissionRegistrationGroup = "admissionregistration.k8s.io"
 )
 
 func addDefaultMetadata(obj runtime.Object) {
@@ -389,6 +390,20 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				// These creates are non-mutating
 				rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
 				rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
+			},
+		},
+		{
+			// a role to use for allowing extension-apiserver's namespacelifecycle plugin to list-watch namespaces
+			ObjectMeta: metav1.ObjectMeta{Name: "extension-apiserver-generic-admission-namespacelifecycle"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
+			},
+		},
+		{
+			// a role to use for allowing extension-apiserver's admission-webhook plugin to list-watch webhook-configurations
+			ObjectMeta: metav1.ObjectMeta{Name: "extension-apiserver-generic-admission-webhooks"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("list", "watch").Groups(admissionRegistrationGroup).Resources("*").RuleOrDie(),
 			},
 		},
 		{
