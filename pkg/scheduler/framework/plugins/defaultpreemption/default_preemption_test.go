@@ -176,20 +176,20 @@ func TestPostFilter(t *testing.T) {
 			name: "preemption result filtered out by extenders",
 			pod:  st.MakePod().Name("p").UID("p").Priority(highPriority).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Node("machine1").Obj(),
-				st.MakePod().Name("p2").UID("p2").Node("machine2").Obj(),
+				st.MakePod().Name("p1").UID("p1").Node("node1").Obj(),
+				st.MakePod().Name("p2").UID("p2").Node("node2").Obj(),
 			},
 			nodes: []*v1.Node{
-				st.MakeNode().Name("machine1").Capacity(onePodRes).Obj(),
-				st.MakeNode().Name("machine2").Capacity(onePodRes).Obj(),
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+				st.MakeNode().Name("node2").Capacity(onePodRes).Obj(),
 			},
 			filteredNodesStatuses: framework.NodeToStatusMap{
-				"machine1": framework.NewStatus(framework.Unschedulable),
-				"machine2": framework.NewStatus(framework.Unschedulable),
+				"node1": framework.NewStatus(framework.Unschedulable),
+				"node2": framework.NewStatus(framework.Unschedulable),
 			},
-			extender: &st.FakeExtender{Predicates: []st.FitPredicate{st.Machine1PredicateExtender}},
+			extender: &st.FakeExtender{Predicates: []st.FitPredicate{st.Node1PredicateExtender}},
 			wantResult: &framework.PostFilterResult{
-				NominatedNodeName: "machine1",
+				NominatedNodeName: "node1",
 			},
 			wantStatus: framework.NewStatus(framework.Success),
 		},
@@ -258,7 +258,7 @@ func TestDryRunPreemption(t *testing.T) {
 		expectedNumFilterCalled int32
 	}{
 		{
-			name: "a pod that does not fit on any machine",
+			name: "a pod that does not fit on any node",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("FalseFilter", st.NewFalseFilterPlugin),
 			},
@@ -289,7 +289,7 @@ func TestDryRunPreemption(t *testing.T) {
 			expectedNumFilterCalled: 4,
 		},
 		{
-			name: "a pod that fits on one machine with no preemption",
+			name: "a pod that fits on one node with no preemption",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
 			},
@@ -306,7 +306,7 @@ func TestDryRunPreemption(t *testing.T) {
 			expectedNumFilterCalled: 3,
 		},
 		{
-			name: "a pod that fits on both machines when lower priority pods are preempted",
+			name: "a pod that fits on both nodes when lower priority pods are preempted",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
 			},
@@ -333,7 +333,7 @@ func TestDryRunPreemption(t *testing.T) {
 			expectedNumFilterCalled: 4,
 		},
 		{
-			name: "a pod that would fit on the machines, but other pods running are higher priority, no preemption would happen",
+			name: "a pod that would fit on the nodes, but other pods running are higher priority, no preemption would happen",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
 			},
@@ -741,7 +741,7 @@ func TestSelectBestCandidate(t *testing.T) {
 			expected: []string{"node1", "node2"},
 		},
 		{
-			name:           "machine with min highest priority pod is picked",
+			name:           "node with min highest priority pod is picked",
 			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
 			nodeNames:      []string{"node1", "node2", "node3"},
 			pod:            st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).Obj(),
@@ -829,7 +829,7 @@ func TestSelectBestCandidate(t *testing.T) {
 			expected: []string{"node1"},
 		},
 		{
-			name:           "same priority, same number of victims, different start time for each machine's pod",
+			name:           "same priority, same number of victims, different start time for each node's pod",
 			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
 			nodeNames:      []string{"node1", "node2", "node3"},
 			pod:            st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).Obj(),
@@ -1137,20 +1137,20 @@ func TestPreempt(t *testing.T) {
 			expectedPods:   []string{"p-b1"},
 		},
 		{
-			name: "Scheduler extenders allow only machine1, otherwise machine3 would have been chosen",
+			name: "Scheduler extenders allow only node1, otherwise node3 would have been chosen",
 			pod:  st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1.1").UID("p1.1").Node("machine1").Priority(midPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p1.2").UID("p1.2").Node("machine1").Priority(lowPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p2.1").UID("p2.1").Node("machine3").Priority(midPriority).Req(largeRes).Obj(),
+				st.MakePod().Name("p1.1").UID("p1.1").Node("node1").Priority(midPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p1.2").UID("p1.2").Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p2.1").UID("p2.1").Node("node3").Priority(midPriority).Req(largeRes).Obj(),
 			},
-			nodeNames: []string{"machine1", "machine2", "machine3"},
+			nodeNames: []string{"node1", "node2", "node3"},
 			extenders: []*st.FakeExtender{
 				{Predicates: []st.FitPredicate{st.TruePredicateExtender}},
-				{Predicates: []st.FitPredicate{st.Machine1PredicateExtender}},
+				{Predicates: []st.FitPredicate{st.Node1PredicateExtender}},
 			},
 			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
-			expectedNode:   "machine1",
+			expectedNode:   "node1",
 			expectedPods:   []string{"p1.1", "p1.2"},
 		},
 		{
@@ -1170,38 +1170,38 @@ func TestPreempt(t *testing.T) {
 			expectedPods:   []string{},
 		},
 		{
-			name: "One scheduler extender allows only machine1, the other returns error but ignorable. Only machine1 would be chosen",
+			name: "One scheduler extender allows only node1, the other returns error but ignorable. Only node1 would be chosen",
 			pod:  st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1.1").UID("p1.1").Node("machine1").Priority(midPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p1.2").UID("p1.2").Node("machine1").Priority(lowPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p2.1").UID("p2.1").Node("machine2").Priority(midPriority).Req(largeRes).Obj(),
+				st.MakePod().Name("p1.1").UID("p1.1").Node("node1").Priority(midPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p1.2").UID("p1.2").Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p2.1").UID("p2.1").Node("node2").Priority(midPriority).Req(largeRes).Obj(),
 			},
-			nodeNames: []string{"machine1", "machine2", "machine3"},
+			nodeNames: []string{"node1", "node2", "node3"},
 			extenders: []*st.FakeExtender{
 				{Predicates: []st.FitPredicate{st.ErrorPredicateExtender}, Ignorable: true},
-				{Predicates: []st.FitPredicate{st.Machine1PredicateExtender}},
+				{Predicates: []st.FitPredicate{st.Node1PredicateExtender}},
 			},
 			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
-			expectedNode:   "machine1",
+			expectedNode:   "node1",
 			expectedPods:   []string{"p1.1", "p1.2"},
 		},
 		{
-			name: "One scheduler extender allows only machine1, but it is not interested in given pod, otherwise machine1 would have been chosen",
+			name: "One scheduler extender allows only node1, but it is not interested in given pod, otherwise node1 would have been chosen",
 			pod:  st.MakePod().Name("p").UID("p").Priority(highPriority).Req(veryLargeRes).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("p1.1").UID("p1.1").Node("machine1").Priority(midPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p1.2").UID("p1.2").Node("machine1").Priority(lowPriority).Req(smallRes).Obj(),
-				st.MakePod().Name("p2.1").UID("p2.1").Node("machine2").Priority(midPriority).Req(largeRes).Obj(),
+				st.MakePod().Name("p1.1").UID("p1.1").Node("node1").Priority(midPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p1.2").UID("p1.2").Node("node1").Priority(lowPriority).Req(smallRes).Obj(),
+				st.MakePod().Name("p2.1").UID("p2.1").Node("node2").Priority(midPriority).Req(largeRes).Obj(),
 			},
-			nodeNames: []string{"machine1", "machine2"},
+			nodeNames: []string{"node1", "node2"},
 			extenders: []*st.FakeExtender{
-				{Predicates: []st.FitPredicate{st.Machine1PredicateExtender}, UnInterested: true},
+				{Predicates: []st.FitPredicate{st.Node1PredicateExtender}, UnInterested: true},
 				{Predicates: []st.FitPredicate{st.TruePredicateExtender}},
 			},
 			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
-			// sum of priorities of all victims on machine1 is larger than machine2, machine2 is chosen.
-			expectedNode: "machine2",
+			//sum of priorities of all victims on node1 is larger than node2, node2 is chosen.
+			expectedNode: "node2",
 			expectedPods: []string{"p2.1"},
 		},
 		{
