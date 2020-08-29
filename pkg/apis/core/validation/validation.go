@@ -1978,7 +1978,7 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 	} else if errs := ValidatePositiveQuantityValue(storageValue, fldPath.Child("resources").Key(string(core.ResourceStorage))); len(errs) > 0 {
 		allErrs = append(allErrs, errs...)
 	} else {
-		allErrs = append(allErrs, ValidateResourceQuantityValue(string(core.ResourceStorage), storageValue, fldPath.Child("resources").Key(string(core.ResourceStorage)))...)
+		allErrs = append(allErrs, ValidateStorageQuantityValue(string(core.ResourceStorage), storageValue, fldPath.Child("resources").Key(string(core.ResourceStorage)))...)
 	}
 
 	if spec.StorageClassName != nil && len(*spec.StorageClassName) > 0 {
@@ -5482,20 +5482,33 @@ func ValidateResourceQuota(resourceQuota *core.ResourceQuota) field.ErrorList {
 	return allErrs
 }
 
+func validateQuotaQuantityValue(key string, v resource.Quantity, resPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// could be "requests.storage" or "<storage-class>.storageclass.storage.k8s.io/requests.storage"
+	if strings.HasSuffix(key, string(core.ResourceRequestsStorage)) {
+		allErrs = append(allErrs, ValidateStorageQuantityValue(key, v, resPath)...)
+	} else {
+		allErrs = append(allErrs, ValidateResourceQuantityValue(key, v, resPath)...)
+	}
+	return allErrs
+}
+
 func ValidateResourceQuotaStatus(status *core.ResourceQuotaStatus, fld *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	fldPath := fld.Child("hard")
 	for k, v := range status.Hard {
-		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, ValidateResourceQuotaResourceName(string(k), resPath)...)
-		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
+		key := string(k)
+		resPath := fldPath.Key(key)
+		allErrs = append(allErrs, ValidateResourceQuotaResourceName(key, resPath)...)
+		allErrs = append(allErrs, validateQuotaQuantityValue(key, v, resPath)...)
 	}
 	fldPath = fld.Child("used")
 	for k, v := range status.Used {
-		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, ValidateResourceQuotaResourceName(string(k), resPath)...)
-		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
+		key := string(k)
+		resPath := fldPath.Key(key)
+		allErrs = append(allErrs, ValidateResourceQuotaResourceName(key, resPath)...)
+		allErrs = append(allErrs, validateQuotaQuantityValue(key, v, resPath)...)
 	}
 
 	return allErrs
@@ -5506,13 +5519,28 @@ func ValidateResourceQuotaSpec(resourceQuotaSpec *core.ResourceQuotaSpec, fld *f
 
 	fldPath := fld.Child("hard")
 	for k, v := range resourceQuotaSpec.Hard {
-		resPath := fldPath.Key(string(k))
-		allErrs = append(allErrs, ValidateResourceQuotaResourceName(string(k), resPath)...)
-		allErrs = append(allErrs, ValidateResourceQuantityValue(string(k), v, resPath)...)
+		key := string(k)
+		resPath := fldPath.Key(key)
+		allErrs = append(allErrs, ValidateResourceQuotaResourceName(key, resPath)...)
+		if strings.HasSuffix(key, string(core.ResourceRequestsStorage)) {
+			allErrs = append(allErrs, ValidateStorageQuantityValue(key, v, resPath)...)
+		} else {
+			allErrs = append(allErrs, ValidateResourceQuantityValue(key, v, resPath)...)
+		}
 	}
 	allErrs = append(allErrs, validateResourceQuotaScopes(resourceQuotaSpec, fld)...)
 	allErrs = append(allErrs, validateScopeSelector(resourceQuotaSpec, fld)...)
 
+	return allErrs
+}
+
+// ValidateStorageQuantityValue enforces that specified quantity is valid for storage resource
+func ValidateStorageQuantityValue(resource string, value resource.Quantity, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateNonnegativeQuantity(value, fldPath)...)
+	if value.MilliValue()%int64(1000) != int64(0) {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, isNotIntegerErrorMsg))
+	}
 	return allErrs
 }
 

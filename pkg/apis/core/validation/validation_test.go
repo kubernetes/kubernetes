@@ -1118,6 +1118,29 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				return claim
 			}(),
 		},
+		"invalid-claim-invalid-capacity": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
+				Selector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "key2",
+							Operator: "Exists",
+						},
+					},
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{
+					core.ReadWriteOnce,
+					core.ReadOnlyMany,
+				},
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceStorage: resource.MustParse("100m"),
+					},
+				},
+				StorageClassName: &validClassName,
+			}),
+		},
 		"invalid-claim-zero-capacity": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
@@ -1224,6 +1247,28 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				Resources: core.ResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceName(core.ResourceStorage): resource.MustParse("-10G"),
+					},
+				},
+			}),
+		},
+		"invalid-storage-request": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
+				Selector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "key2",
+							Operator: "Exists",
+						},
+					},
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{
+					core.ReadWriteOnce,
+					core.ReadOnlyMany,
+				},
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceStorage: resource.MustParse("10m"),
 					},
 				},
 			}),
@@ -13183,6 +13228,13 @@ func TestValidateResourceQuota(t *testing.T) {
 		},
 	}
 
+	invalidStorageSpec := core.ResourceQuotaSpec{
+		Hard: core.ResourceList{
+			"requests.storage": resource.MustParse("10m"),
+			"ebs.storageclass.storage.k8s.io/requests.storage": resource.MustParse("10m"),
+		},
+	}
+
 	negativeSpec := core.ResourceQuotaSpec{
 		Hard: core.ResourceList{
 			core.ResourceCPU:                    resource.MustParse("-100"),
@@ -13320,6 +13372,10 @@ func TestValidateResourceQuota(t *testing.T) {
 		"invalid-quota-resource": {
 			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidQuotaResourceSpec},
 			isInvalidQuotaResource,
+		},
+		"invalid-quota-storage-resource": {
+			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidStorageSpec},
+			isNotIntegerErrorMsg,
 		},
 		"invalid-quota-terminating-pair": {
 			core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidTerminatingScopePairsSpec},
