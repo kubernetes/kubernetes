@@ -125,6 +125,7 @@ type Config struct {
 
 	// WarningHandler handles warnings in server responses.
 	// If not set, the default warning handler is used.
+	// See documentation for SetDefaultWarningHandler() for details.
 	WarningHandler WarningHandler
 
 	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
