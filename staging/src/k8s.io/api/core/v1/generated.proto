@@ -3852,6 +3852,7 @@ message Probe {
 // Represents a projected volume source
 message ProjectedVolumeSource {
   // list of volume projections
+  // +optional
   repeated VolumeProjection sources = 1;
 
   // Mode bits used to set permissions on created files by default.

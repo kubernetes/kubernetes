@@ -1615,6 +1615,7 @@ type ServiceAccountTokenProjection struct {
 // Represents a projected volume source
 type ProjectedVolumeSource struct {
 	// list of volume projections
+	// +optional
 	Sources []VolumeProjection `json:"sources" protobuf:"bytes,1,rep,name=sources"`
 	// Mode bits used to set permissions on created files by default.
 	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
