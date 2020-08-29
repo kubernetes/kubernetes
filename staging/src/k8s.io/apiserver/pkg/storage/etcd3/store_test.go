@@ -1498,3 +1498,87 @@ func Test_growSlice(t *testing.T) {
 		})
 	}
 }
+
+// fancyTransformer creates next object on each call to
+// TransformFromStorage call.
+type fancyTransformer struct {
+	transformer value.Transformer
+	store       *store
+
+	lock  sync.Mutex
+	index int
+}
+
+func (t *fancyTransformer) TransformFromStorage(b []byte, ctx value.Context) ([]byte, bool, error) {
+	if err := t.createObject(); err != nil {
+		return nil, false, err
+	}
+	return t.transformer.TransformFromStorage(b, ctx)
+}
+
+func (t *fancyTransformer) TransformToStorage(b []byte, ctx value.Context) ([]byte, error) {
+	return t.transformer.TransformToStorage(b, ctx)
+}
+
+func (t *fancyTransformer) createObject() error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.index++
+	key := fmt.Sprintf("pod-%d", t.index)
+	obj := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: key,
+			Labels: map[string]string{
+				"even": strconv.FormatBool(t.index%2 == 0),
+			},
+		},
+	}
+	out := &example.Pod{}
+	return t.store.Create(context.TODO(), key, obj, out, 0)
+}
+
+func TestConsistentList(t *testing.T) {
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
+	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
+	defer cluster.Terminate(t)
+
+	transformer := &fancyTransformer{
+		transformer: &prefixTransformer{prefix: []byte(defaultTestPrefix)},
+	}
+	store := newStore(cluster.RandClient(), true, codec, "", transformer)
+	transformer.store = store
+
+	for i := 0; i < 5; i++ {
+		if err := transformer.createObject(); err != nil {
+			t.Fatalf("failed to create object: %v", err)
+		}
+	}
+
+	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, error) {
+		pod, ok := obj.(*example.Pod)
+		if !ok {
+			return nil, nil, fmt.Errorf("invalid object")
+		}
+		return labels.Set(pod.Labels), nil, nil
+	}
+	predicate := storage.SelectionPredicate{
+		Label:    labels.Set{"even": "true"}.AsSelector(),
+		GetAttrs: getAttrs,
+		Limit:    4,
+	}
+
+	result1 := example.PodList{}
+	if err := store.List(context.TODO(), "/", "", predicate, &result1); err != nil {
+		t.Fatalf("failed to list objects: %v", err)
+	}
+
+	result2 := example.PodList{}
+	if err := store.List(context.TODO(), "/", result1.ResourceVersion, predicate, &result2); err != nil {
+		t.Fatalf("failed to list objects: %v", err)
+	}
+
+	if !reflect.DeepEqual(result1, result2) {
+		t.Errorf("inconsistent lists: %#v, %#v", result1, result2)
+	}
+}
