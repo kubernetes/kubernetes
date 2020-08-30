@@ -37,12 +37,7 @@ func NewStatusStrategy(strategy customResourceStrategy) statusStrategy {
 // and should not be modified by the user.
 func (a statusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"apiextensions.k8s.io/v1": fieldpath.NewSet(
-			// TODO: this is not correct, we might need a way to specify an inverse,
-			// like ignore everything but status.
-			fieldpath.MakePathOrDie("spec"),
-		),
-		"apiextensions.k8s.io/v1beta1": fieldpath.NewSet(
+		fieldpath.APIVersion(a.customResourceStrategy.kind.GroupVersion().String()): fieldpath.NewSet(
 			// TODO: this is not correct, we might need a way to specify an inverse,
 			// like ignore everything but status.
 			fieldpath.MakePathOrDie("spec"),

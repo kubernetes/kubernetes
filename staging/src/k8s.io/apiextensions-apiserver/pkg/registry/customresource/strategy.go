@@ -50,6 +50,7 @@ type customResourceStrategy struct {
 	structuralSchemas map[string]*structuralschema.Structural
 	status            *apiextensions.CustomResourceSubresourceStatus
 	scale             *apiextensions.CustomResourceSubresourceScale
+	kind              schema.GroupVersionKind
 }
 
 func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator *validate.SchemaValidator, structuralSchemas map[string]*structuralschema.Structural, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
@@ -66,6 +67,7 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 			statusSchemaValidator: statusSchemaValidator,
 		},
 		structuralSchemas: structuralSchemas,
+		kind:              kind,
 	}
 }
 
@@ -79,10 +81,7 @@ func (a customResourceStrategy) GetResetFields() map[fieldpath.APIVersion]*field
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{}
 
 	if a.status != nil {
-		fields["apiextensions.k8s.io/v1"] = fieldpath.NewSet(
-			fieldpath.MakePathOrDie("status"),
-		)
-		fields["apiextensions.k8s.io/v1beta1"] = fieldpath.NewSet(
+		fields[fieldpath.APIVersion(a.kind.GroupVersion().String())] = fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		)
 	}
