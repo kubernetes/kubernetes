@@ -1,7 +1,6 @@
 cluster/images/etcd/migrate
 pkg/controller/podautoscaler
 pkg/controller/replicaset
-pkg/controller/resourcequota
 pkg/volume/azure_dd
 pkg/volume/testing
 test/e2e/autoscaling
