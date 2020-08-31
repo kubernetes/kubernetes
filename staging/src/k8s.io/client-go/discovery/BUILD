@@ -26,8 +26,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
-        "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/googleapis/gnostic/openapiv2:go_default_library",
+        "//vendor/google.golang.org/protobuf/proto:go_default_library",
     ],
 )
 

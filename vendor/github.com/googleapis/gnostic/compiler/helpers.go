@@ -16,10 +16,12 @@ package compiler
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"regexp"
 	"sort"
 	"strconv"
+
+	"github.com/googleapis/gnostic/jsonschema"
+	"gopkg.in/yaml.v2"
 )
 
 // compiler helper functions, usually called from generated code
@@ -194,4 +196,13 @@ func StringValue(item interface{}) (value string, ok bool) {
 		return strconv.Itoa(intValue), true
 	}
 	return "", false
+}
+
+// Description returns a human-readable represention of an item.
+func Description(item interface{}) string {
+	value, ok := item.(yaml.MapSlice)
+	if ok {
+		return jsonschema.Render(value)
+	}
+	return fmt.Sprintf("%+v", item)
 }

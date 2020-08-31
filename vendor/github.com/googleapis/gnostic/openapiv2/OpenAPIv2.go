@@ -52,6 +52,7 @@ func NewAdditionalPropertiesItem(in interface{}, context *compiler.Context) (*Ad
 	boolValue, ok := in.(bool)
 	if ok {
 		x.Oneof = &AdditionalPropertiesItem_Boolean{Boolean: boolValue}
+		matched = true
 	}
 	if matched {
 		// since the oneof matched one of its possibilities, discard any matching errors
@@ -2100,13 +2101,6 @@ func NewJsonReference(in interface{}, context *compiler.Context) (*JsonReference
 		missingKeys := compiler.MissingKeysInMap(m, requiredKeys)
 		if len(missingKeys) > 0 {
 			message := fmt.Sprintf("is missing required %s: %+v", compiler.PluralProperties(len(missingKeys)), strings.Join(missingKeys, ", "))
-			errors = append(errors, compiler.NewError(context, message))
-		}
-		allowedKeys := []string{"$ref", "description"}
-		var allowedPatterns []*regexp.Regexp
-		invalidKeys := compiler.InvalidKeysInMap(m, allowedKeys, allowedPatterns)
-		if len(invalidKeys) > 0 {
-			message := fmt.Sprintf("has invalid %s: %+v", compiler.PluralProperties(len(invalidKeys)), strings.Join(invalidKeys, ", "))
 			errors = append(errors, compiler.NewError(context, message))
 		}
 		// string _ref = 1;

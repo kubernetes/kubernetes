@@ -39,6 +39,9 @@ option java_package = "org.gnostic.v1";
 //
 option objc_class_prefix = "OAE"; // "OpenAPI Extension"
 
+// The Go package name.
+option go_package = "extensions;openapiextension_v1";
+
 // The version number of OpenAPI compiler.
 message Version {
   int32 major = 1;

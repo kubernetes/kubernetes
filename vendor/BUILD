@@ -189,6 +189,7 @@ filegroup(
         "//vendor/github.com/googleapis/gax-go/v2:all-srcs",
         "//vendor/github.com/googleapis/gnostic/compiler:all-srcs",
         "//vendor/github.com/googleapis/gnostic/extensions:all-srcs",
+        "//vendor/github.com/googleapis/gnostic/jsonschema:all-srcs",
         "//vendor/github.com/googleapis/gnostic/openapiv2:all-srcs",
         "//vendor/github.com/gophercloud/gophercloud:all-srcs",
         "//vendor/github.com/gorilla/websocket:all-srcs",

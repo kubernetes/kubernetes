@@ -577,11 +577,12 @@ github.com/google/uuid
 # github.com/googleapis/gax-go/v2 v2.0.5 => github.com/googleapis/gax-go/v2 v2.0.5
 github.com/googleapis/gax-go/v2
 # github.com/googleapis/gax-go/v2 => github.com/googleapis/gax-go/v2 v2.0.5
-# github.com/googleapis/gnostic v0.4.1 => github.com/googleapis/gnostic v0.4.1
+# github.com/googleapis/gnostic v0.4.2 => github.com/googleapis/gnostic v0.4.2
 ## explicit
-# github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
+# github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.2
 github.com/googleapis/gnostic/compiler
 github.com/googleapis/gnostic/extensions
+github.com/googleapis/gnostic/jsonschema
 github.com/googleapis/gnostic/openapiv2
 # github.com/gophercloud/gophercloud v0.1.0 => github.com/gophercloud/gophercloud v0.1.0
 github.com/gophercloud/gophercloud

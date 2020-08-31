@@ -10,7 +10,7 @@ require (
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/go-openapi/jsonreference v0.19.3 // indirect
 	github.com/go-openapi/spec v0.19.3 // indirect
-	github.com/googleapis/gnostic v0.4.1
+	github.com/googleapis/gnostic v0.4.2
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/mailru/easyjson v0.7.0 // indirect
 	github.com/pkg/errors v0.9.1

@@ -16,7 +16,7 @@ require (
 	github.com/google/go-cmp v0.4.0
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.1
-	github.com/googleapis/gnostic v0.4.1
+	github.com/googleapis/gnostic v0.4.2
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/json-iterator/go v1.1.10
 	github.com/modern-go/reflect2 v1.0.1

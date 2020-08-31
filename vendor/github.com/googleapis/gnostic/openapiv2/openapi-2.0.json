@@ -203,7 +203,7 @@
       "additionalProperties": {
         "$ref": "#/definitions/response"
       },
-      "description": "One or more JSON representations for parameters"
+      "description": "One or more JSON representations for responses"
     },
     "externalDocs": {
       "type": "object",
