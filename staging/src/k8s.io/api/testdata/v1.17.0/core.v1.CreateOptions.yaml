@@ -1,5 +1,0 @@
-apiVersion: v1
-dryRun:
-- "2"
-fieldManager: "3"
-kind: CreateOptions
