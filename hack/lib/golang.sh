@@ -392,30 +392,36 @@ kube::golang::set_platform_envs() {
 
   export GOOS=${platform%/*}
   export GOARCH=${platform##*/}
-
-  # Do not set CC when building natively on a platform, only if cross-compiling from linux/amd64
-  if [[ $(kube::golang::host_platform) == "linux/amd64" ]]; then
-    # Dynamic CGO linking for other server architectures than linux/amd64 goes here
-    # If you want to include support for more server platforms than these, add arch-specific gcc names here
-    case "${platform}" in
-      "linux/arm")
-        export CGO_ENABLED=1
-        export CC=arm-linux-gnueabihf-gcc
-        ;;
-      "linux/arm64")
-        export CGO_ENABLED=1
-        export CC=aarch64-linux-gnu-gcc
-        ;;
-      "linux/ppc64le")
-        export CGO_ENABLED=1
-        export CC=powerpc64le-linux-gnu-gcc
-        ;;
-      "linux/s390x")
-        export CGO_ENABLED=1
-        export CC=s390x-linux-gnu-gcc
-        ;;
-    esac
+  # Apply standard values for CGO_ENABLED and CC unless KUBE_BUILD_PLATFORMS is set.
+  if [ -z "${KUBE_BUILD_PLATFORMS:-}" ] ; then
+      export CGO_ENABLED=0
+      export CC=gcc
+      return
   fi
+  # Dynamic CGO linking for other server architectures goes here
+  # If you want to include support for more server platforms than these, add arch-specific gcc names here
+  case "${platform}" in
+    "linux/amd64")
+      export CGO_ENABLED=1
+      export CC=${LINUX_AMD64_CC:-gcc}
+      ;;
+    "linux/arm")
+      export CGO_ENABLED=1
+      export CC=${LINUX_ARM_CC:-arm-linux-gnueabihf-gcc}
+      ;;
+    "linux/arm64")
+      export CGO_ENABLED=1
+      export CC=${LINUX_ARM64_CC:-aarch64-linux-gnu-gcc}
+      ;;
+    "linux/ppc64le")
+      export CGO_ENABLED=1
+      export CC=${LINUX_PPC64LE_CC:-powerpc64le-linux-gnu-gcc}
+      ;;
+    "linux/s390x")
+      export CGO_ENABLED=1
+      export CC=${LINUX_S390X_CC:-s390x-linux-gnu-gcc}
+      ;;
+  esac
 }
 
 kube::golang::unset_platform_envs() {
