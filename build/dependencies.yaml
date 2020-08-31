@@ -26,7 +26,7 @@ dependencies:
 
   # CNI plugins
   - name: "cni"
-    version: 0.8.6
+    version: 0.8.7
     refPaths:
     - path: build/workspace.bzl
       match: CNI_VERSION =
