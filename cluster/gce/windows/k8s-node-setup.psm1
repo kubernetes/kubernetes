@@ -417,11 +417,13 @@ function DownloadAndInstall-CSIProxyBinaries {
   }
 }
 
-# TODO(jingxu97): Make csi-proxy.exe as a service similar to kubelet.exe
 function Start-CSIProxy {
   if (Test-IsTestCluster $kube_env) {
-    Log-Output 'Starting CSI Proxy'
-    Start-Process "${env:NODE_DIR}\csi-proxy.exe"
+    Log-Output "Creating CSI Proxy Service"
+    & sc.exe create csiproxy binPath= "${env:NODE_DIR}\csi-proxy.exe --windows-service"
+    & sc.exe failure csiproxy reset= 0 actions= restart/10000
+    Log-Output "Starting CSI Proxy Service"
+    & sc.exe start csiproxy
   }
 }
 
