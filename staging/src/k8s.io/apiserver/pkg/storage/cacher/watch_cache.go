@@ -381,6 +381,29 @@ func (w *watchCache) doCacheResizeLocked(capacity int) {
 	w.capacity = capacity
 }
 
+func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
+	rv, err := w.versioner.ParseResourceVersion(resourceVersion)
+	if err != nil {
+		klog.Errorf("Couldn't parse resourceVersion: %v", err)
+		return
+	}
+
+	w.Lock()
+	defer w.Unlock()
+	w.resourceVersion = rv
+
+	// Don't dispatch bookmarks coming from the storage layer.
+	// They can be very frequent (even to the level of subseconds)
+	// to allow efficient watch resumption on kube-apiserver restarts,
+	// and propagating them down may overload the whole system.
+	//
+	// TODO: If at some point we decide the performance and scalability
+	// footprint is acceptable, this is the place to hook them in.
+	// However, we then need to check if this was called as a result
+	// of a bookmark event or regular Add/Update/Delete operation by
+	// checking if resourceVersion here has changed.
+}
+
 // List returns list of pointers to <storeElement> objects.
 func (w *watchCache) List() []interface{} {
 	return w.store.List()

@@ -1098,7 +1098,14 @@ func (lw *cacherListerWatcher) List(options metav1.ListOptions) (runtime.Object,
 
 // Implements cache.ListerWatcher interface.
 func (lw *cacherListerWatcher) Watch(options metav1.ListOptions) (watch.Interface, error) {
-	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, storage.ListOptions{ResourceVersion: options.ResourceVersion, Predicate: storage.Everything})
+	opts := storage.ListOptions{
+		ResourceVersion: options.ResourceVersion,
+		Predicate:       storage.Everything,
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EfficientWatchResumption) {
+		opts.ProgressNotify = true
+	}
+	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, opts)
 }
 
 // errWatcher implements watch.Interface to return a single error
