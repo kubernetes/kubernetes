@@ -258,7 +258,7 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	if err != nil {
 		klog.Fatalf("Error determining service IP ranges: %v", err)
 	}
-	leaseStorage, _, err := storagefactory.Create(*config)
+	leaseStorage, _, err := storagefactory.Create(*config, nil)
 	if err != nil {
 		klog.Fatalf("Error creating storage factory: %v", err)
 	}

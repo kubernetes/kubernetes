@@ -54,7 +54,7 @@ func newStorage(t *testing.T) (*etcd3testing.EtcdTestServer, ipallocator.Interfa
 	if err != nil {
 		t.Fatalf("unexpected error creating etcd: %v", err)
 	}
-	s, d, err := generic.NewRawStorage(etcdStorage)
+	s, d, err := generic.NewRawStorage(etcdStorage, nil)
 	if err != nil {
 		t.Fatalf("Couldn't create storage: %v", err)
 	}
