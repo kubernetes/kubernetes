@@ -1,0 +1,229 @@
+apiVersion: storage.k8s.io/v1alpha1
+kind: VolumeAttachment
+metadata:
+  annotations:
+    "9": "10"
+  clusterName: "15"
+  creationTimestamp: null
+  deletionGracePeriodSeconds: -4955867275792137171
+  finalizers:
+  - "14"
+  generateName: "3"
+  generation: 8071137005907523419
+  labels:
+    "7": "8"
+  managedFields:
+  - apiVersion: "17"
+    fieldsType: "18"
+    manager: "16"
+    operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+  name: "2"
+  namespace: "4"
+  ownerReferences:
+  - apiVersion: "11"
+    blockOwnerDeletion: true
+    controller: false
+    kind: "12"
+    name: "13"
+    uid: Dz廔ȇ{sŊƏp
+  resourceVersion: "11042405498087606203"
+  selfLink: "5"
+  uid: "7"
+spec:
+  attacher: "19"
+  nodeName: "132"
+  source:
+    inlineVolumeSpec:
+      accessModes:
+      - d賑'üA謥ǣ偐圠=
+      awsElasticBlockStore:
+        fsType: "24"
+        partition: -387137265
+        volumeID: "23"
+      azureDisk:
+        cachingMode: x
+        diskName: "80"
+        diskURI: "81"
+        fsType: "82"
+        kind: a鯿rŎǀ朲^苣
+        readOnly: false
+      azureFile:
+        secretName: "68"
+        secretNamespace: "70"
+        shareName: "69"
+      capacity:
+        qJ枊a8衍`Ĩ: "652"
+      cephfs:
+        monitors:
+        - "51"
+        path: "52"
+        readOnly: true
+        secretFile: "54"
+        secretRef:
+          name: "55"
+          namespace: "56"
+        user: "53"
+      cinder:
+        fsType: "48"
+        readOnly: true
+        secretRef:
+          name: "49"
+          namespace: "50"
+        volumeID: "47"
+      claimRef:
+        apiVersion: "123"
+        fieldPath: "125"
+        kind: "120"
+        name: "122"
+        namespace: "121"
+        resourceVersion: "124"
+      csi:
+        controllerExpandSecretRef:
+          name: "118"
+          namespace: "119"
+        controllerPublishSecretRef:
+          name: "112"
+          namespace: "113"
+        driver: "107"
+        fsType: "109"
+        nodePublishSecretRef:
+          name: "116"
+          namespace: "117"
+        nodeStageSecretRef:
+          name: "114"
+          namespace: "115"
+        readOnly: true
+        volumeAttributes:
+          "110": "111"
+        volumeHandle: "108"
+      fc:
+        fsType: "58"
+        lun: -616291512
+        targetWWNs:
+        - "57"
+        wwids:
+        - "59"
+      flexVolume:
+        driver: "62"
+        fsType: "63"
+        options:
+          "66": "67"
+        secretRef:
+          name: "64"
+          namespace: "65"
+      flocker:
+        datasetName: "60"
+        datasetUUID: "61"
+      gcePersistentDisk:
+        fsType: "22"
+        partition: 1847377175
+        pdName: "21"
+      glusterfs:
+        endpoints: "26"
+        endpointsNamespace: "28"
+        path: "27"
+        readOnly: true
+      hostPath:
+        path: "25"
+        type: 夸eɑeʤ脽ěĂ凗蓏Ŋ蛊ĉy
+      iscsi:
+        fsType: "42"
+        initiatorName: "46"
+        iqn: "40"
+        iscsiInterface: "41"
+        lun: 2048967527
+        portals:
+        - "43"
+        readOnly: true
+        secretRef:
+          name: "44"
+          namespace: "45"
+        targetPortal: "39"
+      local:
+        fsType: "97"
+        path: "96"
+      mountOptions:
+      - "127"
+      nfs:
+        path: "30"
+        server: "29"
+      nodeAffinity:
+        required:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: "128"
+              operator: 檮Ǣ冖ž琔n宂¬轚9Ȏ瀮昃2
+              values:
+              - "129"
+            matchFields:
+            - key: "130"
+              operator: -议}ȧ外ĺ稥氹Ç|¶
+              values:
+              - "131"
+      persistentVolumeReclaimPolicy: 錕?øēƺ魋Ď儇击3ƆìQ喞艋
+      photonPersistentDisk:
+        fsType: "84"
+        pdID: "83"
+      portworxVolume:
+        fsType: "86"
+        readOnly: true
+        volumeID: "85"
+      quobyte:
+        group: "78"
+        readOnly: true
+        registry: "75"
+        tenant: "79"
+        user: "77"
+        volume: "76"
+      rbd:
+        fsType: "33"
+        image: "32"
+        keyring: "36"
+        monitors:
+        - "31"
+        pool: "34"
+        secretRef:
+          name: "37"
+          namespace: "38"
+        user: "35"
+      scaleIO:
+        fsType: "95"
+        gateway: "87"
+        protectionDomain: "91"
+        secretRef:
+          name: "89"
+          namespace: "90"
+        storageMode: "93"
+        storagePool: "92"
+        system: "88"
+        volumeName: "94"
+      storageClassName: "126"
+      storageos:
+        fsType: "100"
+        secretRef:
+          apiVersion: "104"
+          fieldPath: "106"
+          kind: "101"
+          name: "103"
+          namespace: "102"
+          resourceVersion: "105"
+          uid: ȮO励鹗塢ē ƕP
+        volumeName: "98"
+        volumeNamespace: "99"
+      volumeMode: ½
+      vsphereVolume:
+        fsType: "72"
+        storagePolicyID: "74"
+        storagePolicyName: "73"
+        volumePath: "71"
+    persistentVolumeName: "20"
+status:
+  attachError:
+    message: "135"
+    time: "2327-07-20T07:31:37Z"
+  attached: true
+  attachmentMetadata:
+    "133": "134"
+  detachError:
+    message: "136"
+    time: "2046-08-01T16:33:49Z"
