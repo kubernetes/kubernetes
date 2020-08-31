@@ -949,6 +949,11 @@ func TestGetPrimaryInterfaceID(t *testing.T) {
 			},
 			expectedErr: fmt.Errorf("failed to find a primary nic for the vm. vmname=\"vm\""),
 		},
+		{
+			description:       "GetPrimaryInterfaceID should report an error if there's no network interface on the VMSS VM",
+			existedInterfaces: []compute.NetworkInterfaceReference{},
+			expectedErr:       fmt.Errorf("failed to find the network interfaces for vm vm"),
+		},
 	}
 
 	for _, test := range testCases {
@@ -962,6 +967,9 @@ func TestGetPrimaryInterfaceID(t *testing.T) {
 					NetworkInterfaces: &test.existedInterfaces,
 				},
 			},
+		}
+		if len(test.existedInterfaces) == 0 {
+			vm.VirtualMachineScaleSetVMProperties.NetworkProfile = nil
 		}
 
 		id, err := ss.getPrimaryInterfaceID(vm)
