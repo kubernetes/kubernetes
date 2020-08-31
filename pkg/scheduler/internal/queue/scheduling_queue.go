@@ -463,7 +463,7 @@ func (p *PriorityQueue) Update(oldPod, newPod *v1.Pod) error {
 	return err
 }
 
-// Delete deletes the item from either of the two queues. It assumes the pod is
+// Delete deletes the item from either of the three queues. It assumes the pod is
 // only in one queue.
 func (p *PriorityQueue) Delete(pod *v1.Pod) error {
 	p.lock.Lock()

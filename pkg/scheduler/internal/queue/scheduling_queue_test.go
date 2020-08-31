@@ -359,16 +359,76 @@ func TestPriorityQueue_Delete(t *testing.T) {
 }
 
 func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
-	q := NewPriorityQueue(newDefaultQueueSort())
+	c := clock.NewFakeClock(time.Now())
+	q := NewPriorityQueue(newDefaultQueueSort(), WithClock(c))
 	q.Add(&medPriorityPod)
 	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&unschedulablePod), q.SchedulingCycle())
 	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&highPriorityPod), q.SchedulingCycle())
+	// Move clock by 1 second so that pods is guaranteed to be added into unschedulableQ first and
+	// then the move request is happened later, otherwise there is potential a test flake here, as
+	// the move request has a chance to be finished before the pods get into the unschedulableQ.
+	// In that case, the pods will be moved to backoffQ even `QueuedPodInfo.Attempts` is zero.
+	c.Step(time.Second)
+	// move the pods from unschedulableQ to activeQ.
 	q.MoveAllToActiveOrBackoffQueue("test")
+	if q.activeQ.Len() != 3 {
+		t.Error("Expected 3 item to be in activeQ")
+	}
+	if q.podBackoffQ.Len() != 0 {
+		t.Error("Expected 0 items to be in podBackoffQ")
+	}
+}
+
+// TestPriorityQueue_RaceConditionOnScheduling mimic a race condition could be found with preemption.
+// In this particular case, the high priority pod is stuck in the backoffQ and if new pod is coming,
+// regardless it's priority, the new pod will be scheduled first.
+// The preemption could happen again but there is a chance the pod will never got scheduled as long as
+// there is new pod coming for scheduling since the high priority pod could be able to moved from backoffQ
+// to activeQ only when the time for backoff expiration is up.
+// see https://github.com/kubernetes/kubernetes/issues/93505 for the details.
+func TestPriorityQueue_RaceConditionOnScheduling(t *testing.T) {
+	c := clock.NewFakeClock(time.Now())
+	q := NewPriorityQueue(newDefaultQueueSort(), WithClock(c))
+	// comes a lowPriority pod and is added to activeQ, this mimic a pod that is managed by
+	// replication controller is preempted by the `highPriorityPod` and a new pod is going to
+	// be re-scheduled.
+	q.Add(&unschedulablePod)
+	// events that make the move request is happen, pod deletion, service add etc.
+	// which will trigger the move request.
+	q.MoveAllToActiveOrBackoffQueue("test")
+	// Move the clock by 1 second in order to guarantee the move request is happened before the
+	// highPriorityPod wants to be added to unschedulableQ.
+	c.Step(time.Second)
+	// even the unschedulableQ is empty and `QueuedPodInfo.Attempts` is empty, the highPriorityPod
+	// is pushed to backoffQ instead of unschedulableQ.
+	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&highPriorityPod), q.SchedulingCycle())
 	if q.activeQ.Len() != 1 {
 		t.Error("Expected 1 item to be in activeQ")
 	}
-	if q.podBackoffQ.Len() != 2 {
-		t.Error("Expected 2 items to be in podBackoffQ")
+	if q.podBackoffQ.Len() != 1 {
+		t.Error("Expected 1 items to be in podBackoffQ")
+	}
+	// the lowPriority pod is popped and got scheduled while the highPriorityPod is stuck in the
+	// backoffQ.
+	q.Pop()
+	if q.activeQ.Len() != 0 {
+		t.Error("Expected 0 item to be in activeQ")
+	}
+	if q.podBackoffQ.Len() != 1 {
+		t.Error("Expected 1 items to be in podBackoffQ")
+	}
+	// another pod is added to activeQ.
+	q.Add(&unschedulablePod)
+	if q.activeQ.Len() != 1 {
+		t.Error("Expected 1 item to be in activeQ")
+	}
+	rawPodInfo := q.podBackoffQ.Peek()
+	if rawPodInfo == nil {
+		t.Errorf("Expected: %v in the backoffQ, but got nil", highPriorityPod.Name)
+	}
+	pod := rawPodInfo.(*framework.QueuedPodInfo).Pod
+	if pod.Name != highPriorityPod.Name {
+		t.Errorf("Expected: %v in the backoffQ, but got: %v", highPriorityPod.Name, pod.Name)
 	}
 }
 
