@@ -21,6 +21,7 @@ package hostport
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -54,6 +55,7 @@ type PodPortMapping struct {
 }
 
 type hostport struct {
+	ip       string
 	port     int32
 	protocol string
 }
@@ -78,15 +80,17 @@ func openLocalPort(hp *hostport) (closeable, error) {
 	// bind()ed but not listen()ed, and at least the default debian netcat
 	// has no way to avoid about 10 seconds of retries.
 	var socket closeable
+	// open the socket on the HostIP and HostPort specified
+	address := net.JoinHostPort(hp.ip, strconv.Itoa(int(hp.port)))
 	switch hp.protocol {
 	case "tcp":
-		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", hp.port))
+		listener, err := net.Listen("tcp", address)
 		if err != nil {
 			return nil, err
 		}
 		socket = listener
 	case "udp":
-		addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", hp.port))
+		addr, err := net.ResolveUDPAddr("udp", address)
 		if err != nil {
 			return nil, err
 		}
@@ -105,6 +109,7 @@ func openLocalPort(hp *hostport) (closeable, error) {
 // portMappingToHostport creates hostport structure based on input portmapping
 func portMappingToHostport(portMapping *PortMapping) hostport {
 	return hostport{
+		ip:       portMapping.HostIP,
 		port:     portMapping.HostPort,
 		protocol: strings.ToLower(string(portMapping.Protocol)),
 	}

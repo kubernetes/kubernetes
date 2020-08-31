@@ -27,6 +27,7 @@ import (
 )
 
 type fakeSocket struct {
+	ip       string
 	port     int32
 	protocol string
 	closed   bool
@@ -52,7 +53,7 @@ func (f *fakeSocketManager) openFakeSocket(hp *hostport) (closeable, error) {
 	if socket, ok := f.mem[*hp]; ok && !socket.closed {
 		return nil, fmt.Errorf("hostport is occupied")
 	}
-	fs := &fakeSocket{hp.port, hp.protocol, false}
+	fs := &fakeSocket{hp.ip, hp.port, hp.protocol, false}
 	f.mem[*hp] = fs
 	return fs, nil
 }
