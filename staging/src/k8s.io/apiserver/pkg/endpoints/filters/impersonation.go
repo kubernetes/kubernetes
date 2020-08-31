@@ -117,10 +117,37 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 			}
 		}
 
-		if !groupsSpecified && username != user.Anonymous {
-			// When impersonating a non-anonymous user, if no groups were specified
-			// include the system:authenticated group in the impersonated user info
-			groups = append(groups, user.AllAuthenticated)
+		if username != user.Anonymous {
+			// When impersonating a non-anonymous user, include the 'system:authenticated' group
+			// in the impersonated user info:
+			// - if no groups were specified
+			// - if a group has been specified other than 'system:authenticated'
+			//
+			// If 'system:unauthenticated' group has been specified we should not include
+			// the 'system:authenticated' group.
+			addAuthenticated := true
+			for _, group := range groups {
+				if group == user.AllAuthenticated || group == user.AllUnauthenticated {
+					addAuthenticated = false
+					break
+				}
+			}
+
+			if addAuthenticated {
+				groups = append(groups, user.AllAuthenticated)
+			}
+		} else {
+			addUnauthenticated := true
+			for _, group := range groups {
+				if group == user.AllUnauthenticated {
+					addUnauthenticated = false
+					break
+				}
+			}
+
+			if addUnauthenticated {
+				groups = append(groups, user.AllUnauthenticated)
+			}
 		}
 
 		newUser := &user.DefaultInfo{
