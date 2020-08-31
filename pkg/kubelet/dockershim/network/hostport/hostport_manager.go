@@ -152,10 +152,17 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 
 		// DNAT to the podIP:containerPort
 		hostPortBinding := net.JoinHostPort(podIP, strconv.Itoa(int(pm.ContainerPort)))
-		writeLine(natRules, "-A", string(chain),
-			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, podFullName, pm.HostPort),
-			"-m", protocol, "-p", protocol,
-			"-j", "DNAT", fmt.Sprintf("--to-destination=%s", hostPortBinding))
+		if pm.HostIP == "" || pm.HostIP == "0.0.0.0" || pm.HostIP == "::" {
+			writeLine(natRules, "-A", string(chain),
+				"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, podFullName, pm.HostPort),
+				"-m", protocol, "-p", protocol,
+				"-j", "DNAT", fmt.Sprintf("--to-destination=%s", hostPortBinding))
+		} else {
+			writeLine(natRules, "-A", string(chain),
+				"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, podFullName, pm.HostPort),
+				"-m", protocol, "-p", protocol, "-d", pm.HostIP,
+				"-j", "DNAT", fmt.Sprintf("--to-destination=%s", hostPortBinding))
+		}
 	}
 
 	// getHostportChain should be able to provide unique hostport chain name using hash
@@ -312,6 +319,8 @@ func (hm *hostportManager) closeHostports(hostportMappings []*PortMapping) error
 				continue
 			}
 			delete(hm.hostPortMap, hp)
+		} else {
+			klog.V(5).Infof("host port %s does not have an open socket", hp.String())
 		}
 	}
 	return utilerrors.NewAggregate(errList)
@@ -324,7 +333,7 @@ func (hm *hostportManager) closeHostports(hostportMappings []*PortMapping) error
 // WARNING: Please do not change this function. Otherwise, HostportManager may not be able to
 // identify existing iptables chains.
 func getHostportChain(id string, pm *PortMapping) utiliptables.Chain {
-	hash := sha256.Sum256([]byte(id + strconv.Itoa(int(pm.HostPort)) + string(pm.Protocol)))
+	hash := sha256.Sum256([]byte(id + strconv.Itoa(int(pm.HostPort)) + string(pm.Protocol) + pm.HostIP))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
 	return utiliptables.Chain(kubeHostportChainPrefix + encoded[:16])
 }
