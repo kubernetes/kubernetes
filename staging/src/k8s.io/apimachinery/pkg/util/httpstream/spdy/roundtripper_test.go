@@ -307,6 +307,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			}
 
 			for k, testCase := range testCases {
+				testCase := testCase
 				server := testCase.serverFunc(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 					if testCase.shouldError {
 						if e, a := httpstream.HeaderUpgrade, req.Header.Get(httpstream.HeaderConnection); e != a {
