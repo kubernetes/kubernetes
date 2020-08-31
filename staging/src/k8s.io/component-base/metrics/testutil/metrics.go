@@ -86,7 +86,7 @@ func ParseMetrics(data string, output *Metrics) error {
 			continue
 		}
 		for _, metric := range v {
-			name := string(metric.Metric[model.MetricNameLabel])
+			name := string(metric.Metric[MetricNameLabel])
 			(*output)[name] = append((*output)[name], metric)
 		}
 	}
@@ -99,28 +99,6 @@ func ParseMetrics(data string, output *Metrics) error {
 func TextToMetricFamilies(in io.Reader) (map[string]*dto.MetricFamily, error) {
 	var textParser expfmt.TextParser
 	return textParser.TextToMetricFamilies(in)
-}
-
-// ExtractMetricSamples parses the prometheus metric samples from the input string.
-func ExtractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
-	dec := expfmt.NewDecoder(strings.NewReader(metricsBlob), expfmt.FmtText)
-	decoder := expfmt.SampleDecoder{
-		Dec:  dec,
-		Opts: &expfmt.DecodeOptions{},
-	}
-
-	var samples []*model.Sample
-	for {
-		var v model.Vector
-		if err := decoder.Decode(&v); err != nil {
-			if err == io.EOF {
-				// Expected loop termination condition.
-				return samples, nil
-			}
-			return nil, err
-		}
-		samples = append(samples, v...)
-	}
 }
 
 // PrintSample returns formatted representation of metric Sample
