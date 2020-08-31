@@ -105,7 +105,7 @@ func (c *MetricConverter) ConvertResultToVersion(res rest.Result, gv schema.Grou
 	return metricObj, nil
 }
 
-// unsafeConvertToVersionVia is like Scheme.UnsafeConvertToVersion, but it does so via an internal version first.
+// UnsafeConvertToVersionVia is like Scheme.UnsafeConvertToVersion, but it does so via an internal version first.
 // We use it here to work with the v1beta2 client internally, while preserving backwards compatibility for existing custom metrics adapters
 func (c *MetricConverter) UnsafeConvertToVersionVia(obj runtime.Object, externalVersion schema.GroupVersion) (runtime.Object, error) {
 	objInt, err := c.scheme.UnsafeConvertToVersion(obj, schema.GroupVersion{Group: externalVersion.Group, Version: runtime.APIVersionInternal})
