@@ -31,6 +31,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/client-go/kubernetes/fake"
+	podapi "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
 )
@@ -219,6 +220,7 @@ func TestEvictionIngorePDB(t *testing.T) {
 		podName             string
 		expectedDeleteCount int
 		podTerminating      bool
+		prc                 *api.PodCondition
 	}{
 		{
 			name: "pdbs No disruptions allowed, pod pending, first delete conflict, pod still pending, pod deleted successfully",
@@ -301,6 +303,100 @@ func TestEvictionIngorePDB(t *testing.T) {
 			expectedDeleteCount: 1,
 			podTerminating:      true,
 		},
+		{
+			name: "matching pdbs with no disruptions allowed, pod running, pod healthy, unhealthy pod not ours",
+			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1beta1.PodDisruptionBudgetStatus{
+					// This simulates 3 pods desired, our pod healthy, unhealthy pod is not ours.
+					DisruptionsAllowed: 0,
+					CurrentHealthy:     2,
+					DesiredHealthy:     2,
+				},
+			}},
+			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t7", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError:         true,
+			podName:             "t7",
+			expectedDeleteCount: 0,
+			podTerminating:      false,
+			podPhase:            api.PodRunning,
+			prc: &api.PodCondition{
+				Type:   api.PodReady,
+				Status: api.ConditionTrue,
+			},
+		},
+		{
+			name: "matching pdbs with no disruptions allowed, pod running, pod unhealthy, unhealthy pod ours",
+			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1beta1.PodDisruptionBudgetStatus{
+					// This simulates 3 pods desired, our pod unhealthy
+					DisruptionsAllowed: 0,
+					CurrentHealthy:     2,
+					DesiredHealthy:     2,
+				},
+			}},
+			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t8", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError:         false,
+			podName:             "t8",
+			expectedDeleteCount: 1,
+			podTerminating:      false,
+			podPhase:            api.PodRunning,
+			prc: &api.PodCondition{
+				Type:   api.PodReady,
+				Status: api.ConditionFalse,
+			},
+		},
+		{
+			// This case should return the 529 retry error.
+			name: "matching pdbs with no disruptions allowed, pod running, pod unhealthy, unhealthy pod ours, resource version conflict",
+			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1beta1.PodDisruptionBudgetStatus{
+					// This simulates 3 pods desired, our pod unhealthy
+					DisruptionsAllowed: 0,
+					CurrentHealthy:     2,
+					DesiredHealthy:     2,
+				},
+			}},
+			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t9", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError:         true,
+			podName:             "t9",
+			expectedDeleteCount: 1,
+			podTerminating:      false,
+			podPhase:            api.PodRunning,
+			prc: &api.PodCondition{
+				Type:   api.PodReady,
+				Status: api.ConditionFalse,
+			},
+		},
+		{
+			// This case should return the 529 retry error.
+			name: "matching pdbs with no disruptions allowed, pod running, pod unhealthy, unhealthy pod ours, other error on delete",
+			pdbs: []runtime.Object{&policyv1beta1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1beta1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1beta1.PodDisruptionBudgetStatus{
+					// This simulates 3 pods desired, our pod unhealthy
+					DisruptionsAllowed: 0,
+					CurrentHealthy:     2,
+					DesiredHealthy:     2,
+				},
+			}},
+			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t10", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError:         true,
+			podName:             "t10",
+			expectedDeleteCount: 1,
+			podTerminating:      false,
+			podPhase:            api.PodRunning,
+			prc: &api.PodCondition{
+				Type:   api.PodReady,
+				Status: api.ConditionFalse,
+			},
+		},
 	}
 
 	for _, tc := range testcases {
@@ -321,6 +417,13 @@ func TestEvictionIngorePDB(t *testing.T) {
 			if tc.podTerminating {
 				currentTime := metav1.Now()
 				pod.ObjectMeta.DeletionTimestamp = &currentTime
+			}
+
+			// Setup pod condition
+			if tc.prc != nil {
+				if !podapi.UpdatePodCondition(&pod.Status, tc.prc) {
+					t.Fatalf("Unable to update pod ready condition")
+				}
 			}
 
 			client := fake.NewSimpleClientset(tc.pdbs...)
@@ -416,9 +519,13 @@ func (ms *mockStore) mutatorDeleteFunc(count int, options *metav1.DeleteOptions)
 		// Always return error for this pod
 		return nil, false, apierrors.NewConflict(resource("tests"), "2", errors.New("message"))
 	}
-	if ms.pod.Name == "t6" {
-		// This pod has a deletionTimestamp and should not raise conflict on delete
+	if ms.pod.Name == "t6" || ms.pod.Name == "t8" {
+		// t6: This pod has a deletionTimestamp and should not raise conflict on delete
+		// t8: This pod should not have a resource conflict.
 		return nil, true, nil
+	}
+	if ms.pod.Name == "t10" {
+		return nil, false, apierrors.NewBadRequest("test designed to error")
 	}
 	if count == 1 {
 		// This is a hack to ensure that some test pods don't change phase
