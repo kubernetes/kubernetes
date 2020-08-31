@@ -1517,6 +1517,17 @@ properties:
 			expectedViolations: []string{},
 		},
 		{
+			desc: "metadata with description",
+			globalSchema: `
+type: object
+properties:
+ metadata:
+   description: 'Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata'
+   type: object
+`,
+			expectedViolations: []string{},
+		},
+		{
 			desc: "metadata under junctors",
 			globalSchema: `
 type: object
