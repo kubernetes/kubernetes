@@ -321,8 +321,8 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 	if err != nil {
 		return true, errors.Wrapf(err, "failed comparing the current etcd version %q to the desired one %q", currentEtcdVersionStr, desiredEtcdVersion)
 	}
-	if cmpResult < 1 {
-		return false, errors.Errorf("the desired etcd version %q is not newer than the currently installed %q. Skipping etcd upgrade", desiredEtcdVersion, currentEtcdVersionStr)
+	if cmpResult < 0 {
+		return false, errors.Errorf("the desired etcd version %q is older than the currently installed %q. Skipping etcd upgrade", desiredEtcdVersion, currentEtcdVersionStr)
 	}
 
 	beforeEtcdPodHash, err := waiter.WaitForStaticPodSingleHash(cfg.NodeRegistration.Name, constants.Etcd)
