@@ -17,12 +17,12 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubemark",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/cluster/ports:go_default_library",
         "//pkg/kubelet/cadvisor/testing:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/cri/remote:go_default_library",
         "//pkg/kubelet/cri/remote/fake:go_default_library",
         "//pkg/kubemark:go_default_library",
-        "//pkg/master/ports:go_default_library",
         "//pkg/util/iptables/testing:go_default_library",
         "//pkg/util/sysctl/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

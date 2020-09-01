@@ -24,9 +24,9 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
+        "//pkg/cluster/ports:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/client:go_default_library",
-        "//pkg/master/ports:go_default_library",
         "//pkg/registry/core/componentstatus:go_default_library",
         "//pkg/registry/core/configmap/storage:go_default_library",
         "//pkg/registry/core/endpoint/storage:go_default_library",

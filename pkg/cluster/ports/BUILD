@@ -11,7 +11,7 @@ go_library(
         "doc.go",
         "ports.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/master/ports",
+    importpath = "k8s.io/kubernetes/pkg/cluster/ports",
     deps = [
         "//staging/src/k8s.io/cloud-provider:go_default_library",
     ],

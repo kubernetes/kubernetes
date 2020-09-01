@@ -79,7 +79,7 @@ rules:
       - k8s.io/kubernetes/pkg/features
       - k8s.io/kubernetes/pkg/fieldpath
       - k8s.io/kubernetes/pkg/kubelet/types
-      - k8s.io/kubernetes/pkg/master/ports
+      - k8s.io/kubernetes/pkg/cluster/ports
       - k8s.io/kubernetes/pkg/security/apparmor
       - k8s.io/kubernetes/pkg/securitycontext
       - k8s.io/kubernetes/pkg/serviceaccount
