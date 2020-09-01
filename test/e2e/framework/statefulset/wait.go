@@ -22,9 +22,16 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
+	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -155,4 +162,69 @@ func Saturate(c clientset.Interface, ss *appsv1.StatefulSet) {
 		framework.Logf("Resuming stateful pod at index %v", i)
 		ResumeNextPod(c, ss)
 	}
+}
+
+func WaitForCondition(ctx context.Context, c appsv1client.AppsV1Interface, namespace, name string, condition func(*appsv1.StatefulSet) (bool, error)) (*appsv1.StatefulSet, error) {
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", name).String()
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
+			return c.StatefulSets(namespace).List(ctx, options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+			return c.StatefulSets(namespace).Watch(ctx, options)
+		},
+	}
+	preconditionFunc := func(store cache.Store) (bool, error) {
+		_, exists, err := store.Get(&metav1.ObjectMeta{Namespace: namespace, Name: name})
+		if err != nil {
+			return true, err
+		}
+		if !exists {
+			// We need to make sure we see the object in the cache before we start waiting for events
+			// or we would be waiting for the timeout if such object didn't exist.
+			return true, apierrors.NewNotFound(appsv1.Resource("statefulsets"), name)
+		}
+
+		return false, nil
+	}
+	e, err := watchtools.UntilWithSync(
+		ctx,
+		lw,
+		&appsv1.StatefulSet{},
+		preconditionFunc,
+		func(e watch.Event) (bool, error) {
+			switch e.Type {
+			case watch.Added, watch.Modified:
+				statefulset := e.Object.(*appsv1.StatefulSet)
+				return condition(statefulset)
+
+			case watch.Deleted:
+				return true, fmt.Errorf("statefulset %s/%s was deleted", namespace, name)
+
+			case watch.Error:
+				return true, fmt.Errorf("watch failed: %w", apierrors.FromObject(e.Object))
+
+			default:
+				return true, fmt.Errorf("internal error: unexpected event %#v", e)
+			}
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return e.Object.(*appsv1.StatefulSet), nil
+}
+
+func WaitForReconciled(ctx context.Context, c appsv1client.AppsV1Interface, namespace, name string) (*appsv1.StatefulSet, error) {
+	return WaitForCondition(ctx, c, namespace, name, func(statefulset *appsv1.StatefulSet) (bool, error) {
+		if statefulset.Status.ObservedGeneration >= statefulset.Generation &&
+			statefulset.Status.UpdatedReplicas == *statefulset.Spec.Replicas &&
+			statefulset.Status.ReadyReplicas == statefulset.Status.Replicas {
+			return true, nil
+		}
+
+		return false, nil
+	})
 }

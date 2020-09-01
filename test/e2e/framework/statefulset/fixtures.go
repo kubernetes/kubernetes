@@ -33,6 +33,38 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
+func NewSimpleStatefulSet(name string, replicas int32) *appsv1.StatefulSet {
+	labels := map[string]string{
+		"app": name,
+	}
+
+	return &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Replicas: func(i int32) *int32 { return &i }(replicas),
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "sleep",
+							Image: imageutils.GetE2EImage(imageutils.Pause),
+						},
+					},
+				},
+			},
+			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{Type: appsv1.RollingUpdateStatefulSetStrategyType},
+		},
+	}
+}
+
 // NewStatefulSet creates a new Webserver StatefulSet for testing. The StatefulSet is named name, is in namespace ns,
 // statefulPodsMounts are the mounts that will be backed by PVs. podsMounts are the mounts that are mounted directly
 // to the Pod. labels are the labels that will be usd for the StatefulSet selector.

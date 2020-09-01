@@ -440,10 +440,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				replicas[i].Name)
 			return &status, nil
 		}
-		// If we have a Pod that has been created but is not running and ready we can not make progress.
+		// If we have a Pod that has been created but is not running and ready we can not make progress
+		// unless it is the first pod we are going to upgrade (highest ordinal).
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
 		// ordinal, are Running and Ready.
-		if !isRunningAndReady(replicas[i]) && monotonic {
+		if !isRunningAndReady(replicas[i]) && monotonic && i == len(replicas)-1 {
 			klog.V(4).Infof(
 				"StatefulSet %s/%s is waiting for Pod %s to be Running and Ready",
 				set.Namespace,
@@ -462,7 +463,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 	}
 
-	// At this point, all of the current Replicas are Running and Ready, we can consider termination.
+	// At this point, all of the current Replicas are Running and Ready or only the last one is failing,
+	// we can consider termination.
 	// We will wait for all predecessors to be Running and Ready prior to attempting a deletion.
 	// We will terminate Pods in a monotonically decreasing order over [len(pods),set.Spec.Replicas).
 	// Note that we do not resurrect Pods in this interval. Also note that scaling will take precedence over

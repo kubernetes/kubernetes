@@ -23,14 +23,17 @@ import (
 	"sync"
 	"time"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	klabels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -869,6 +872,88 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 			framework.ExpectEqual(*(ss.Spec.Replicas), int32(2))
 		})
+	})
+
+	/*
+		Release: v1.19
+		Testname: StatefulSet rollover from stuck rollout
+		Description: When StatefulSet is updated with invalid image or gets similarly failing
+		on the first updated pod (highest ordinal) it should be able to update when the podSpec is corrected.
+	*/
+	framework.ConformanceIt("should rollover from stuck rollout", func() {
+		const (
+			rolloutTimeout = 5 * time.Minute
+		)
+		ctx := context.TODO()
+
+		statefulset := e2estatefulset.NewSimpleStatefulSet("pause", 2)
+		gomega.Expect(*statefulset.Spec.Replicas).To(gomega.BeEquivalentTo(2))
+		gomega.Expect(statefulset.Spec.Template.Spec.Containers).To(gomega.HaveLen(1))
+
+		ginkgo.By("Creating a statefulset")
+		statefulset, err := c.AppsV1().StatefulSets(ns).Create(ctx, statefulset, metav1.CreateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		ginkgo.By("Waiting for statefulset to rollout")
+		rolloutCtx1, cancelRolloutCtx1 := context.WithTimeout(ctx, rolloutTimeout)
+		defer cancelRolloutCtx1()
+		statefulset, err = e2estatefulset.WaitForReconciled(rolloutCtx1, c.AppsV1(), statefulset.Namespace, statefulset.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		ginkgo.By("Triggering an update to the statefulset with a probe that never gets ready")
+		statefulsetCopy := statefulset.DeepCopy()
+		statefulsetCopy.Spec.Template.Spec.Containers[0].ReadinessProbe = &v1.Probe{
+			Handler: v1.Handler{
+				Exec: &v1.ExecAction{
+					Command: []string{"/usr/bin/false"},
+				},
+			},
+		}
+
+		originalJSON, err := runtime.Encode(unstructured.UnstructuredJSONScheme, statefulset)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		modifiedJSON, err := runtime.Encode(unstructured.UnstructuredJSONScheme, statefulsetCopy)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		patchBytes, err := jsonpatch.CreateMergePatch(originalJSON, modifiedJSON)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		statefulset, err = c.AppsV1().StatefulSets(statefulset.Namespace).Patch(ctx, statefulset.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		ginkgo.By("Waiting for statefulset to get stuck")
+		rolloutCtx2, cancelRolloutCtx2 := context.WithTimeout(ctx, rolloutTimeout)
+		defer cancelRolloutCtx2()
+		statefulset, err = e2estatefulset.WaitForCondition(rolloutCtx2, c.AppsV1(), statefulset.Namespace, statefulset.Name, func(s *appsv1.StatefulSet) (bool, error) {
+			if s.Status.ObservedGeneration < s.Generation {
+				return false, nil
+			}
+
+			if s.Status.UpdatedReplicas > 1 {
+				return true, fmt.Errorf("statufulset didn't get stuck")
+			}
+			return s.Status.UpdatedReplicas == 1, nil
+		})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		ginkgo.By("Repairing the statefulset")
+		statefulsetCopy = statefulset.DeepCopy()
+		statefulsetCopy.Spec.Template.Spec.Containers[0].ReadinessProbe = nil
+
+		originalJSON, err = runtime.Encode(unstructured.UnstructuredJSONScheme, statefulset)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		modifiedJSON, err = runtime.Encode(unstructured.UnstructuredJSONScheme, statefulsetCopy)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		patchBytes, err = jsonpatch.CreateMergePatch(originalJSON, modifiedJSON)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		statefulset, err = c.AppsV1().StatefulSets(statefulset.Namespace).Patch(ctx, statefulset.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		ginkgo.By("Waiting for statefulset to rollout")
+		rolloutCtx3, cancelRolloutCtx3 := context.WithTimeout(ctx, rolloutTimeout)
+		defer cancelRolloutCtx3()
+		statefulset, err = e2estatefulset.WaitForReconciled(rolloutCtx3, c.AppsV1(), statefulset.Namespace, statefulset.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 
 	framework.KubeDescribe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
