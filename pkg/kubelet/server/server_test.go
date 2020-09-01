@@ -1507,7 +1507,6 @@ func TestMetricBuckets(t *testing.T) {
 		"metrics":                         {url: "/metrics", bucket: "metrics"},
 		"metrics cadvisor sub":            {url: "/metrics/cadvisor", bucket: "metrics/cadvisor"},
 		"metrics probes sub":              {url: "/metrics/probes", bucket: "metrics/probes"},
-		"metrics resource v1alpha1":       {url: "/metrics/resource/v1alpha1", bucket: "metrics/resource"},
 		"metrics resource sub":            {url: "/metrics/resource", bucket: "metrics/resource"},
 		"pods":                            {url: "/pods/", bucket: "pods"},
 		"portForward":                     {url: "/portForward/podNamespace/podID", bucket: "portForward"},
