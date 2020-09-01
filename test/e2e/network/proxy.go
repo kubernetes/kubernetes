@@ -32,7 +32,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/transport"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
@@ -52,6 +54,8 @@ const (
 
 	// We have seen one of these calls take just over 15 seconds, so putting this at 30.
 	proxyHTTPCallTimeout = 30 * time.Second
+	podRetryPeriod       = 1 * time.Second
+	podRetryTimeout      = 1 * time.Minute
 )
 
 var _ = SIGDescribe("Proxy", func() {
@@ -258,8 +262,101 @@ var _ = SIGDescribe("Proxy", func() {
 				framework.Failf(strings.Join(errs, "\n"))
 			}
 		})
+
+		ginkgo.It("proxy connection returns a series of 301 redirections for a pod", func() {
+			ns := f.Namespace.Name
+			httpVerbs := []string{"DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"}
+			var statusCode int
+
+			ginkgo.By("Creating a Pod")
+			_, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "proxy-pod-target",
+					Labels: map[string]string{
+						"test": "redirect"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Name:  "agnhost",
+					}},
+					RestartPolicy: v1.RestartPolicyNever,
+				}}, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "failed to create pod")
+			framework.Logf("pod created")
+
+			err = wait.PollImmediate(podRetryPeriod, podRetryTimeout, checkPodStatus(f, "test=redirect"))
+			framework.ExpectNoError(err, "Pod didn't start within time out period")
+
+			transportCfg, err := f.ClientConfig().TransportConfig()
+			framework.ExpectNoError(err, "Error accessing TransportConfig")
+			tlsCfg, err := transport.TLSConfigFor(transportCfg)
+			framework.ExpectNoError(err, "Error accessing TLSConfigFor(transportCfg)")
+			// Disable 301 automatic follow
+			client := &http.Client{
+				CheckRedirect: func(req *http.Request, via []*http.Request) error {
+					return http.ErrUseLastResponse
+				},
+				Transport: &http.Transport{TLSClientConfig: tlsCfg},
+			}
+
+			for _, httpVerb := range httpVerbs {
+
+				// Using RESTClient doesn't work due to auto follow on 301
+				framework.Logf("Using http verb: %v", httpVerb)
+				r := f.ClientSet.CoreV1().RESTClient().Verb(httpVerb).
+					Namespace(ns).
+					Resource("pods").
+					SubResource("proxy").
+					Name("proxy-pod-target")
+				framework.Logf("Request String: %v", r.URL().String())
+				// Request returns 500 status - Can this be diabled?
+				_, err := r.Do(context.Background()).StatusCode(&statusCode).Raw()
+				framework.Logf("RESTClient() StatusCode: %d", statusCode)
+				framework.Logf("Error: %#v", err)
+
+				// Using http.Client to verify 301 redirect from .../proxy to .../proxy/
+				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/pods/proxy-pod-target/proxy"
+				framework.Logf("Starting http.Client for %s", urlString)
+
+				request, err := http.NewRequest(httpVerb, urlString, nil)
+				framework.ExpectNoError(err, "processing request")
+
+				if len(f.ClientConfig().BearerToken) != 0 {
+					request.Header.Set("Authorization", "Bearer "+f.ClientConfig().BearerToken)
+				}
+
+				resp, err := client.Do(request)
+				framework.ExpectNoError(err, "processing response")
+				defer resp.Body.Close()
+
+				framework.Logf("Processing %s request...", httpVerb)
+				framework.Logf("http.Client request:%s StatusCode:%d", httpVerb, resp.StatusCode)
+				framework.ExpectEqual(resp.StatusCode, 301, "The resp.StatusCode returned: %d", resp.StatusCode)
+			}
+		})
 	})
 })
+
+func checkPodStatus(f *framework.Framework, label string) func() (bool, error) {
+	return func() (bool, error) {
+		var err error
+
+		list, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: label})
+
+		if err != nil {
+			return false, err
+		}
+
+		if list.Items[0].Status.Phase == "Pending" {
+			framework.Logf("Pod Quantity: %d Status: %s", len(list.Items), list.Items[0].Status.Phase)
+			return false, err
+		}
+		framework.Logf("Pod Status: %v", list.Items[0].Status.Phase)
+		return true, nil
+	}
+}
 
 func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCode int, d time.Duration, err error) {
 	// About all of the proxy accesses in this file:
