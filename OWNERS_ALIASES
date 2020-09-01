@@ -261,6 +261,7 @@ aliases:
     - mattjmcnaughton
     - matthyx
     - odinuge
+    - andrewsykim
   sig-network-driver-approvers:
     - dcbw
     - freehan
