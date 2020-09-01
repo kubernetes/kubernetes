@@ -64,6 +64,11 @@ func (m *fakeManager) State() state.Reader {
 	return m.state
 }
 
+func (m *fakeManager) GetAllCPUs() []int64 {
+	klog.Infof("[fake cpumanager] Get All Cpus")
+	return []int64{}
+}
+
 // NewFakeManager creates empty/fake cpu manager
 func NewFakeManager() Manager {
 	return &fakeManager{

@@ -45,6 +45,97 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
+type AllocatableResourcesRequest struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *AllocatableResourcesRequest) Reset()      { *m = AllocatableResourcesRequest{} }
+func (*AllocatableResourcesRequest) ProtoMessage() {}
+func (*AllocatableResourcesRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{0}
+}
+func (m *AllocatableResourcesRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *AllocatableResourcesRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_AllocatableResourcesRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *AllocatableResourcesRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_AllocatableResourcesRequest.Merge(m, src)
+}
+func (m *AllocatableResourcesRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *AllocatableResourcesRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_AllocatableResourcesRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_AllocatableResourcesRequest proto.InternalMessageInfo
+
+// AllocatableResourcesResponses contains informations about all the devices known by the kubelet
+type AllocatableResourcesResponse struct {
+	Devices              []*ContainerDevices `protobuf:"bytes,1,rep,name=devices,proto3" json:"devices,omitempty"`
+	CpuIds               []int64             `protobuf:"varint,2,rep,packed,name=cpu_ids,json=cpuIds,proto3" json:"cpu_ids,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
+	XXX_sizecache        int32               `json:"-"`
+}
+
+func (m *AllocatableResourcesResponse) Reset()      { *m = AllocatableResourcesResponse{} }
+func (*AllocatableResourcesResponse) ProtoMessage() {}
+func (*AllocatableResourcesResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{1}
+}
+func (m *AllocatableResourcesResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *AllocatableResourcesResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_AllocatableResourcesResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *AllocatableResourcesResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_AllocatableResourcesResponse.Merge(m, src)
+}
+func (m *AllocatableResourcesResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *AllocatableResourcesResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_AllocatableResourcesResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_AllocatableResourcesResponse proto.InternalMessageInfo
+
+func (m *AllocatableResourcesResponse) GetDevices() []*ContainerDevices {
+	if m != nil {
+		return m.Devices
+	}
+	return nil
+}
+
+func (m *AllocatableResourcesResponse) GetCpuIds() []int64 {
+	if m != nil {
+		return m.CpuIds
+	}
+	return nil
+}
+
 // ListPodResourcesRequest is the request made to the PodResourcesLister service
 type ListPodResourcesRequest struct {
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -54,7 +145,7 @@ type ListPodResourcesRequest struct {
 func (m *ListPodResourcesRequest) Reset()      { *m = ListPodResourcesRequest{} }
 func (*ListPodResourcesRequest) ProtoMessage() {}
 func (*ListPodResourcesRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{0}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{2}
 }
 func (m *ListPodResourcesRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -93,7 +184,7 @@ type ListPodResourcesResponse struct {
 func (m *ListPodResourcesResponse) Reset()      { *m = ListPodResourcesResponse{} }
 func (*ListPodResourcesResponse) ProtoMessage() {}
 func (*ListPodResourcesResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{1}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{3}
 }
 func (m *ListPodResourcesResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -141,7 +232,7 @@ type PodResources struct {
 func (m *PodResources) Reset()      { *m = PodResources{} }
 func (*PodResources) ProtoMessage() {}
 func (*PodResources) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{2}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{4}
 }
 func (m *PodResources) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -203,7 +294,7 @@ type ContainerResources struct {
 func (m *ContainerResources) Reset()      { *m = ContainerResources{} }
 func (*ContainerResources) ProtoMessage() {}
 func (*ContainerResources) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{3}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{5}
 }
 func (m *ContainerResources) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -265,7 +356,7 @@ type ContainerDevices struct {
 func (m *ContainerDevices) Reset()      { *m = ContainerDevices{} }
 func (*ContainerDevices) ProtoMessage() {}
 func (*ContainerDevices) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{4}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{6}
 }
 func (m *ContainerDevices) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -325,7 +416,7 @@ type TopologyInfo struct {
 func (m *TopologyInfo) Reset()      { *m = TopologyInfo{} }
 func (*TopologyInfo) ProtoMessage() {}
 func (*TopologyInfo) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{5}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{7}
 }
 func (m *TopologyInfo) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -371,7 +462,7 @@ type NUMANode struct {
 func (m *NUMANode) Reset()      { *m = NUMANode{} }
 func (*NUMANode) ProtoMessage() {}
 func (*NUMANode) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{6}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{8}
 }
 func (m *NUMANode) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -408,6 +499,8 @@ func (m *NUMANode) GetID() int64 {
 }
 
 func init() {
+	proto.RegisterType((*AllocatableResourcesRequest)(nil), "v1alpha1.AllocatableResourcesRequest")
+	proto.RegisterType((*AllocatableResourcesResponse)(nil), "v1alpha1.AllocatableResourcesResponse")
 	proto.RegisterType((*ListPodResourcesRequest)(nil), "v1alpha1.ListPodResourcesRequest")
 	proto.RegisterType((*ListPodResourcesResponse)(nil), "v1alpha1.ListPodResourcesResponse")
 	proto.RegisterType((*PodResources)(nil), "v1alpha1.PodResources")
@@ -420,34 +513,38 @@ func init() {
 func init() { proto.RegisterFile("api.proto", fileDescriptor_00212fb1f9d3bf1c) }
 
 var fileDescriptor_00212fb1f9d3bf1c = []byte{
-	// 432 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x7c, 0x52, 0xc1, 0x6e, 0xd3, 0x40,
-	0x10, 0xcd, 0x26, 0xa5, 0x8d, 0x87, 0x04, 0xa1, 0x39, 0x50, 0x13, 0x05, 0x2b, 0x2c, 0x97, 0x5c,
-	0x70, 0xd5, 0xc0, 0x01, 0x09, 0x2e, 0x40, 0x2e, 0x96, 0x20, 0xa0, 0x15, 0x88, 0x63, 0xe4, 0x78,
-	0xb7, 0xae, 0xa5, 0xd6, 0xb3, 0x78, 0xed, 0x22, 0x2e, 0x88, 0x33, 0x27, 0x3e, 0xab, 0x47, 0x8e,
-	0x1c, 0xa9, 0xf9, 0x11, 0xe4, 0x35, 0xae, 0x5d, 0x5a, 0x7a, 0xf2, 0xcc, 0xbc, 0x37, 0x33, 0xcf,
-	0x3b, 0x0f, 0x9c, 0x50, 0x27, 0xbe, 0xce, 0x28, 0x27, 0x1c, 0x9e, 0xec, 0x87, 0x47, 0xfa, 0x30,
-	0xdc, 0x9f, 0x3c, 0x8c, 0x93, 0xfc, 0xb0, 0xd8, 0xf8, 0x11, 0x1d, 0xef, 0xc5, 0x14, 0xd3, 0x9e,
-	0x25, 0x6c, 0x8a, 0x03, 0x9b, 0xd9, 0xc4, 0x46, 0x75, 0x23, 0xbf, 0x0b, 0xbb, 0xaf, 0x12, 0x93,
-	0xbf, 0x25, 0x29, 0x94, 0xa1, 0x22, 0x8b, 0x94, 0x11, 0xea, 0x63, 0xa1, 0x4c, 0xce, 0x3f, 0x80,
-	0x7b, 0x19, 0x32, 0x9a, 0x52, 0xa3, 0xf0, 0x29, 0x8c, 0x35, 0xc9, 0x75, 0xd6, 0x00, 0x2e, 0x9b,
-	0x0d, 0xe6, 0x37, 0x17, 0x77, 0xfc, 0x46, 0x87, 0x7f, 0xa1, 0x6d, 0xa4, 0x3b, 0x19, 0xff, 0x02,
-	0xa3, 0x2e, 0x8a, 0x08, 0x5b, 0x69, 0x78, 0xac, 0x5c, 0x36, 0x63, 0x73, 0x47, 0xd8, 0x18, 0xa7,
-	0xe0, 0x54, 0x5f, 0xa3, 0xc3, 0x48, 0xb9, 0x7d, 0x0b, 0xb4, 0x05, 0x7c, 0x06, 0x10, 0x51, 0x9a,
-	0x87, 0x49, 0xaa, 0x32, 0xe3, 0x0e, 0xec, 0xee, 0x69, 0xbb, 0xfb, 0x65, 0x83, 0xb5, 0x0a, 0x3a,
-	0x7c, 0xfe, 0x09, 0xf0, 0x32, 0xe3, 0x4a, 0x15, 0x8f, 0x61, 0x47, 0xaa, 0x93, 0xa4, 0xfa, 0xc1,
-	0xbe, 0x5d, 0x32, 0xb9, 0x62, 0xc9, 0xb2, 0x66, 0x88, 0x86, 0x8a, 0xbb, 0xb0, 0x13, 0xe9, 0x62,
-	0x9d, 0xc8, 0x5a, 0xda, 0x58, 0x6c, 0x47, 0xba, 0x08, 0xa4, 0xe1, 0xdf, 0x18, 0xdc, 0xfe, 0xb7,
-	0x0d, 0x1f, 0xc0, 0xb8, 0x79, 0xc6, 0x75, 0x47, 0xc0, 0xa8, 0x29, 0xae, 0x2a, 0x21, 0xf7, 0x00,
-	0xea, 0xe9, 0x76, 0x6a, 0xa5, 0xc5, 0x11, 0x4e, 0x5d, 0x09, 0xa4, 0xc1, 0x05, 0x0c, 0x73, 0xd2,
-	0x74, 0x44, 0xf1, 0x67, 0x77, 0x30, 0x63, 0x17, 0x2f, 0xf1, 0xee, 0x2f, 0x12, 0xa4, 0x07, 0x24,
-	0xce, 0x79, 0xfc, 0x09, 0x8c, 0xba, 0x08, 0xce, 0xe1, 0x46, 0x4a, 0xf2, 0xfc, 0x94, 0xd8, 0x0e,
-	0x58, 0xbd, 0x7f, 0xfd, 0x7c, 0x45, 0x52, 0x89, 0x9a, 0xc0, 0x27, 0x30, 0x6c, 0x4a, 0x78, 0x0b,
-	0xfa, 0xc1, 0xd2, 0x4a, 0x1e, 0x88, 0x7e, 0xb2, 0x5c, 0x28, 0xc0, 0xee, 0x6d, 0x2b, 0x03, 0xa9,
-	0x0c, 0xdf, 0xc0, 0x56, 0x15, 0xe1, 0xfd, 0x76, 0xe8, 0x7f, 0x5c, 0x37, 0xe1, 0xd7, 0x51, 0x6a,
-	0xf7, 0xf1, 0xde, 0x8b, 0xe9, 0xe9, 0x99, 0xc7, 0x7e, 0x9e, 0x79, 0xbd, 0xaf, 0xa5, 0xc7, 0x4e,
-	0x4b, 0x8f, 0xfd, 0x28, 0x3d, 0xf6, 0xab, 0xf4, 0xd8, 0xf7, 0xdf, 0x5e, 0x6f, 0xb3, 0x6d, 0xbd,
-	0xfd, 0xe8, 0x4f, 0x00, 0x00, 0x00, 0xff, 0xff, 0xa9, 0xf5, 0x83, 0x3f, 0x21, 0x03, 0x00, 0x00,
+	// 491 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x53, 0x4f, 0x6f, 0xd3, 0x4e,
+	0x10, 0xcd, 0xda, 0xfd, 0xb5, 0xf1, 0xfc, 0x12, 0x84, 0xe6, 0x40, 0x8c, 0x49, 0xad, 0xb0, 0x08,
+	0x94, 0x0b, 0xa9, 0x1a, 0x38, 0x20, 0xc1, 0xa5, 0x10, 0x09, 0x45, 0x82, 0x80, 0x56, 0x20, 0x8e,
+	0x91, 0x63, 0x6f, 0x53, 0x23, 0xc7, 0xbb, 0x78, 0xed, 0x22, 0x2e, 0x88, 0x33, 0x27, 0x3e, 0x56,
+	0x8f, 0x70, 0xe3, 0x48, 0xc3, 0x17, 0x41, 0x5e, 0xc7, 0xb1, 0x4b, 0x42, 0x91, 0x38, 0x79, 0x66,
+	0xde, 0x9b, 0xd9, 0xe7, 0xf9, 0x03, 0x96, 0x27, 0xc3, 0x81, 0x4c, 0x44, 0x2a, 0xb0, 0x79, 0x7a,
+	0xe8, 0x45, 0xf2, 0xc4, 0x3b, 0x74, 0xee, 0xce, 0xc3, 0xf4, 0x24, 0x9b, 0x0d, 0x7c, 0xb1, 0x38,
+	0x98, 0x8b, 0xb9, 0x38, 0xd0, 0x84, 0x59, 0x76, 0xac, 0x3d, 0xed, 0x68, 0xab, 0x48, 0xa4, 0xfb,
+	0x70, 0xe3, 0x28, 0x8a, 0x84, 0xef, 0xa5, 0xde, 0x2c, 0xe2, 0x8c, 0x2b, 0x91, 0x25, 0x3e, 0x57,
+	0x8c, 0xbf, 0xcb, 0xb8, 0x4a, 0xe9, 0x02, 0xba, 0xdb, 0x61, 0x25, 0x45, 0xac, 0x38, 0xde, 0x87,
+	0xbd, 0x80, 0x9f, 0x86, 0x3e, 0x57, 0x36, 0xe9, 0x99, 0xfd, 0xff, 0x87, 0xce, 0xa0, 0x54, 0x32,
+	0x78, 0x22, 0xe2, 0xd4, 0x0b, 0x63, 0x9e, 0x8c, 0x0a, 0x06, 0x2b, 0xa9, 0xd8, 0x81, 0x3d, 0x5f,
+	0x66, 0xd3, 0x30, 0x50, 0xb6, 0xd1, 0x33, 0xfb, 0x26, 0xdb, 0xf5, 0x65, 0x36, 0x0e, 0x14, 0xbd,
+	0x0e, 0x9d, 0x67, 0xa1, 0x4a, 0x5f, 0x8a, 0x60, 0x43, 0xc9, 0x1b, 0xb0, 0x37, 0xa1, 0x95, 0x8a,
+	0x87, 0xd0, 0x96, 0x22, 0x98, 0x26, 0x25, 0xb0, 0xd2, 0x72, 0xad, 0xd2, 0x72, 0x21, 0xad, 0x25,
+	0x6b, 0x1e, 0xfd, 0x08, 0xad, 0x3a, 0x8a, 0x08, 0x3b, 0xb1, 0xb7, 0xe0, 0x36, 0xe9, 0x91, 0xbe,
+	0xc5, 0xb4, 0x8d, 0x5d, 0xb0, 0xf2, 0xaf, 0x92, 0x9e, 0xcf, 0x6d, 0x43, 0x03, 0x55, 0x00, 0x1f,
+	0x01, 0xf8, 0xe5, 0xbf, 0x2a, 0xdb, 0xd4, 0x6f, 0x77, 0xb7, 0xf4, 0xa1, 0x52, 0x50, 0xe3, 0xd3,
+	0xf7, 0x80, 0x9b, 0x8c, 0xad, 0x2a, 0x6a, 0xcd, 0x36, 0xfe, 0xa9, 0xd9, 0xb9, 0xb4, 0xf6, 0xba,
+	0xd9, 0x9f, 0x09, 0x5c, 0xfd, 0x3d, 0x0d, 0x6f, 0x41, 0xbb, 0x6c, 0xe3, 0xb4, 0x26, 0xa0, 0x55,
+	0x06, 0x27, 0xb9, 0x90, 0x7d, 0x80, 0xa2, 0xfa, 0x7a, 0x84, 0x16, 0xb3, 0x8a, 0xc8, 0x38, 0x50,
+	0x38, 0x84, 0x66, 0x2a, 0xa4, 0x88, 0xc4, 0xfc, 0x83, 0x6d, 0xf6, 0xc8, 0xc5, 0x49, 0xbc, 0x5a,
+	0x21, 0xe3, 0xf8, 0x58, 0xb0, 0x35, 0x8f, 0x3e, 0x80, 0x56, 0x1d, 0xc1, 0x3e, 0xfc, 0x17, 0x8b,
+	0x60, 0x3d, 0x4a, 0xac, 0x0a, 0x4c, 0x5e, 0x3f, 0x3f, 0x9a, 0x88, 0x80, 0xb3, 0x82, 0x40, 0x1d,
+	0x68, 0x96, 0x21, 0xbc, 0x02, 0xc6, 0x78, 0xa4, 0x25, 0x9b, 0xcc, 0x08, 0x47, 0xc3, 0x6f, 0x04,
+	0xb0, 0x3e, 0xdc, 0x7c, 0x83, 0x78, 0x82, 0x2f, 0x60, 0x27, 0xb7, 0xf0, 0x66, 0x55, 0xf5, 0x0f,
+	0x6b, 0xe7, 0xd0, 0xcb, 0x28, 0xc5, 0xfa, 0xd1, 0x06, 0xbe, 0x85, 0xce, 0x53, 0x9e, 0x6e, 0xbb,
+	0x14, 0xbc, 0x5d, 0x15, 0xb8, 0xe4, 0xd0, 0x9c, 0x3b, 0x7f, 0xa3, 0x95, 0x6f, 0x3d, 0xee, 0x9e,
+	0x9d, 0xbb, 0xe4, 0xfb, 0xb9, 0xdb, 0xf8, 0xb4, 0x74, 0xc9, 0xd9, 0xd2, 0x25, 0x5f, 0x97, 0x2e,
+	0xf9, 0xb1, 0x74, 0xc9, 0x97, 0x9f, 0x6e, 0x63, 0xb6, 0xab, 0xcf, 0xfa, 0xde, 0xaf, 0x00, 0x00,
+	0x00, 0xff, 0xff, 0xd2, 0xe1, 0x5c, 0x38, 0x1c, 0x04, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -463,6 +560,7 @@ const _ = grpc.SupportPackageIsVersion4
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type PodResourcesListerClient interface {
 	List(ctx context.Context, in *ListPodResourcesRequest, opts ...grpc.CallOption) (*ListPodResourcesResponse, error)
+	GetAllocatableResources(ctx context.Context, in *AllocatableResourcesRequest, opts ...grpc.CallOption) (*AllocatableResourcesResponse, error)
 }
 
 type podResourcesListerClient struct {
@@ -482,9 +580,19 @@ func (c *podResourcesListerClient) List(ctx context.Context, in *ListPodResource
 	return out, nil
 }
 
+func (c *podResourcesListerClient) GetAllocatableResources(ctx context.Context, in *AllocatableResourcesRequest, opts ...grpc.CallOption) (*AllocatableResourcesResponse, error) {
+	out := new(AllocatableResourcesResponse)
+	err := c.cc.Invoke(ctx, "/v1alpha1.PodResourcesLister/GetAllocatableResources", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PodResourcesListerServer is the server API for PodResourcesLister service.
 type PodResourcesListerServer interface {
 	List(context.Context, *ListPodResourcesRequest) (*ListPodResourcesResponse, error)
+	GetAllocatableResources(context.Context, *AllocatableResourcesRequest) (*AllocatableResourcesResponse, error)
 }
 
 // UnimplementedPodResourcesListerServer can be embedded to have forward compatible implementations.
@@ -493,6 +601,9 @@ type UnimplementedPodResourcesListerServer struct {
 
 func (*UnimplementedPodResourcesListerServer) List(ctx context.Context, req *ListPodResourcesRequest) (*ListPodResourcesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
+}
+func (*UnimplementedPodResourcesListerServer) GetAllocatableResources(ctx context.Context, req *AllocatableResourcesRequest) (*AllocatableResourcesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllocatableResources not implemented")
 }
 
 func RegisterPodResourcesListerServer(s *grpc.Server, srv PodResourcesListerServer) {
@@ -517,6 +628,24 @@ func _PodResourcesLister_List_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PodResourcesLister_GetAllocatableResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AllocatableResourcesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PodResourcesListerServer).GetAllocatableResources(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/v1alpha1.PodResourcesLister/GetAllocatableResources",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PodResourcesListerServer).GetAllocatableResources(ctx, req.(*AllocatableResourcesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _PodResourcesLister_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "v1alpha1.PodResourcesLister",
 	HandlerType: (*PodResourcesListerServer)(nil),
@@ -525,9 +654,92 @@ var _PodResourcesLister_serviceDesc = grpc.ServiceDesc{
 			MethodName: "List",
 			Handler:    _PodResourcesLister_List_Handler,
 		},
+		{
+			MethodName: "GetAllocatableResources",
+			Handler:    _PodResourcesLister_GetAllocatableResources_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "api.proto",
+}
+
+func (m *AllocatableResourcesRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *AllocatableResourcesRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *AllocatableResourcesRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
+func (m *AllocatableResourcesResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *AllocatableResourcesResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *AllocatableResourcesResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.CpuIds) > 0 {
+		dAtA2 := make([]byte, len(m.CpuIds)*10)
+		var j1 int
+		for _, num1 := range m.CpuIds {
+			num := uint64(num1)
+			for num >= 1<<7 {
+				dAtA2[j1] = uint8(uint64(num)&0x7f | 0x80)
+				num >>= 7
+				j1++
+			}
+			dAtA2[j1] = uint8(num)
+			j1++
+		}
+		i -= j1
+		copy(dAtA[i:], dAtA2[:j1])
+		i = encodeVarintApi(dAtA, i, uint64(j1))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Devices) > 0 {
+		for iNdEx := len(m.Devices) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Devices[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintApi(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *ListPodResourcesRequest) Marshal() (dAtA []byte, err error) {
@@ -662,20 +874,20 @@ func (m *ContainerResources) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	var l int
 	_ = l
 	if len(m.CpuIds) > 0 {
-		dAtA2 := make([]byte, len(m.CpuIds)*10)
-		var j1 int
+		dAtA4 := make([]byte, len(m.CpuIds)*10)
+		var j3 int
 		for _, num := range m.CpuIds {
 			for num >= 1<<7 {
-				dAtA2[j1] = uint8(uint64(num)&0x7f | 0x80)
+				dAtA4[j3] = uint8(uint64(num)&0x7f | 0x80)
 				num >>= 7
-				j1++
+				j3++
 			}
-			dAtA2[j1] = uint8(num)
-			j1++
+			dAtA4[j3] = uint8(num)
+			j3++
 		}
-		i -= j1
-		copy(dAtA[i:], dAtA2[:j1])
-		i = encodeVarintApi(dAtA, i, uint64(j1))
+		i -= j3
+		copy(dAtA[i:], dAtA4[:j3])
+		i = encodeVarintApi(dAtA, i, uint64(j3))
 		i--
 		dAtA[i] = 0x1a
 	}
@@ -830,6 +1042,37 @@ func encodeVarintApi(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+func (m *AllocatableResourcesRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *AllocatableResourcesResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Devices) > 0 {
+		for _, e := range m.Devices {
+			l = e.Size()
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	if len(m.CpuIds) > 0 {
+		l = 0
+		for _, e := range m.CpuIds {
+			l += sovApi(uint64(e))
+		}
+		n += 1 + sovApi(uint64(l)) + l
+	}
+	return n
+}
+
 func (m *ListPodResourcesRequest) Size() (n int) {
 	if m == nil {
 		return 0
@@ -959,6 +1202,31 @@ func sovApi(x uint64) (n int) {
 func sozApi(x uint64) (n int) {
 	return sovApi(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+func (this *AllocatableResourcesRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&AllocatableResourcesRequest{`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *AllocatableResourcesResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForDevices := "[]*ContainerDevices{"
+	for _, f := range this.Devices {
+		repeatedStringForDevices += strings.Replace(f.String(), "ContainerDevices", "ContainerDevices", 1) + ","
+	}
+	repeatedStringForDevices += "}"
+	s := strings.Join([]string{`&AllocatableResourcesResponse{`,
+		`Devices:` + repeatedStringForDevices + `,`,
+		`CpuIds:` + fmt.Sprintf("%v", this.CpuIds) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *ListPodResourcesRequest) String() string {
 	if this == nil {
 		return "nil"
@@ -1061,6 +1329,222 @@ func valueToStringApi(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
+}
+func (m *AllocatableResourcesRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AllocatableResourcesRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AllocatableResourcesRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *AllocatableResourcesResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AllocatableResourcesResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AllocatableResourcesResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Devices", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Devices = append(m.Devices, &ContainerDevices{})
+			if err := m.Devices[len(m.Devices)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType == 0 {
+				var v int64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowApi
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					v |= int64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				m.CpuIds = append(m.CpuIds, v)
+			} else if wireType == 2 {
+				var packedLen int
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowApi
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					packedLen |= int(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				if packedLen < 0 {
+					return ErrInvalidLengthApi
+				}
+				postIndex := iNdEx + packedLen
+				if postIndex < 0 {
+					return ErrInvalidLengthApi
+				}
+				if postIndex > l {
+					return io.ErrUnexpectedEOF
+				}
+				var elementCount int
+				var count int
+				for _, integer := range dAtA[iNdEx:postIndex] {
+					if integer < 128 {
+						count++
+					}
+				}
+				elementCount = count
+				if elementCount != 0 && len(m.CpuIds) == 0 {
+					m.CpuIds = make([]int64, 0, elementCount)
+				}
+				for iNdEx < postIndex {
+					var v int64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowApi
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						v |= int64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					m.CpuIds = append(m.CpuIds, v)
+				}
+			} else {
+				return fmt.Errorf("proto: wrong wireType = %d for field CpuIds", wireType)
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *ListPodResourcesRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)

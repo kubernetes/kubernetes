@@ -47,6 +47,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -1033,4 +1034,12 @@ func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 
 func (cm *containerManagerImpl) UpdateAllocatedDevices() {
 	cm.deviceManager.UpdateAllocatedDevices()
+}
+
+func (cm *containerManagerImpl) GetAllDevices() map[string]map[string]pluginapi.Device {
+	return cm.deviceManager.GetAllDevices()
+}
+
+func (cm *containerManagerImpl) GetAllCPUs() []int64 {
+	return cm.cpuManager.GetAllCPUs()
 }

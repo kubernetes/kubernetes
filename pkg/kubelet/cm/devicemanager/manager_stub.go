@@ -18,6 +18,7 @@ package devicemanager
 
 import (
 	v1 "k8s.io/api/core/v1"
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -87,4 +88,14 @@ func (h *ManagerStub) ShouldResetExtendedResourceCapacity() bool {
 // UpdateAllocatedDevices returns nothing
 func (h *ManagerStub) UpdateAllocatedDevices() {
 	return
+}
+
+// GetAllDevices returns nothing
+func (h *ManagerStub) GetAllDevices() map[string]map[string]pluginapi.Device {
+	return nil
+}
+
+// GetAllCPUs returns nothing
+func (h *ManagerStub) GetAllCPUs() []int64 {
+	return nil
 }

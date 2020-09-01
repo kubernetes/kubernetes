@@ -77,6 +77,9 @@ type Manager interface {
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
 	GetTopologyHints(*v1.Pod, *v1.Container) map[string][]topologymanager.TopologyHint
+
+	// GetAllCPUs returns the slice of online CPU Ids
+	GetAllCPUs() []int64
 }
 
 type manager struct {
@@ -116,6 +119,9 @@ type manager struct {
 
 	// stateFileDirectory holds the directory where the state file for checkpoints is held.
 	stateFileDirectory string
+
+	// TODO
+	topo *topology.CPUTopology
 }
 
 var _ Manager = &manager{}
@@ -129,6 +135,13 @@ func (s *sourcesReadyStub) AllReady() bool          { return true }
 func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
 	var topo *topology.CPUTopology
 	var policy Policy
+	var err error
+
+	topo, err = topology.Discover(machineInfo)
+	if err != nil {
+		return nil, err
+	}
+	klog.Infof("[cpumanager] detected CPU topology: %v", topo)
 
 	switch policyName(cpuPolicyName) {
 
@@ -136,12 +149,6 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		policy = NewNonePolicy()
 
 	case PolicyStatic:
-		var err error
-		topo, err = topology.Discover(machineInfo)
-		if err != nil {
-			return nil, err
-		}
-		klog.Infof("[cpumanager] detected CPU topology: %v", topo)
 		reservedCPUs, ok := nodeAllocatableReservation[v1.ResourceCPU]
 		if !ok {
 			// The static policy cannot initialize without this information.
@@ -175,6 +182,7 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		topology:                   topo,
 		nodeAllocatableReservation: nodeAllocatableReservation,
 		stateFileDirectory:         stateFileDirectory,
+		topo:                       topo,
 	}
 	manager.sourcesReady = &sourcesReadyStub{}
 	return manager, nil
@@ -298,6 +306,16 @@ func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[str
 	m.removeStaleState()
 	// Delegate to active policy
 	return m.policy.GetTopologyHints(m.state, pod, container)
+}
+
+func (m *manager) GetAllCPUs() []int64 {
+	cores := m.topo.CPUDetails.Cores()
+	cpus := cores.ToSlice()
+	cpuIds := make([]int64, len(cpus))
+	for idx, cpuId := range cpus {
+		cpuIds[idx] = int64(cpuId)
+	}
+	return cpuIds
 }
 
 type reconciledContainer struct {
