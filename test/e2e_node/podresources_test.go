@@ -60,20 +60,36 @@ func makePodResourcesTestPod(podName, cntName, devName, devCount string) *v1.Pod
 	}
 }
 
-func scanPodResources(podIdx int, pr *podresourcesapi.PodResources) int {
+func podActionToString(action podresourcesapi.WatchPodAction) string {
+	switch action {
+	case podresourcesapi.WatchPodAction_ADDED:
+		return "added"
+	case podresourcesapi.WatchPodAction_MODIFIED:
+		return "modified"
+	case podresourcesapi.WatchPodAction_DELETED:
+		return "deleted"
+	default:
+		return "unknown"
+	}
+}
+
+func scanPodResources(podIdx int, action podresourcesapi.WatchPodAction, pr *podresourcesapi.PodResources) map[string]int {
+	resources := make(map[string]int)
+
 	ns := pr.GetNamespace()
-	devCount := 0
-	for cntIdx, cnt := range pr.GetContainers() {
+	cnts := pr.GetContainers()
+	framework.Logf("#%02d %s (%s) - %d containers", podIdx, pr.GetName(), podActionToString(action), len(cnts))
+	for cntIdx, cnt := range cnts {
 		if len(cnt.Devices) > 0 {
 			for devIdx, dev := range cnt.Devices {
 				framework.Logf("#%02d/%02d/%02d - %s/%s/%s   %s -> %s", podIdx, cntIdx, devIdx, ns, pr.GetName(), cnt.Name, dev.ResourceName, strings.Join(dev.DeviceIds, ", "))
-				devCount++
+				resources[dev.ResourceName]++
 			}
 		} else {
 			framework.Logf("#%02d/%02d/%02d - %s/%s/%s   No resources", podIdx, cntIdx, 0, ns, pr.GetName(), cnt.Name)
 		}
 	}
-	return devCount
+	return resources
 }
 
 func getPodResources(cli podresourcesapi.PodResourcesListerClient) ([]*podresourcesapi.PodResources, []*podresourcesapi.PodResources) {
@@ -83,7 +99,7 @@ func getPodResources(cli podresourcesapi.PodResourcesListerClient) ([]*podresour
 	res := []*podresourcesapi.PodResources{}
 	noRes := []*podresourcesapi.PodResources{}
 	for idx, podResource := range resp.GetPodResources() {
-		if scanPodResources(idx, podResource) > 0 {
+		if len(scanPodResources(idx, podresourcesapi.WatchPodAction(-1), podResource)) > 0 {
 			res = append(res, podResource)
 		} else {
 			noRes = append(noRes, podResource)
@@ -111,9 +127,11 @@ func NewTestPodData() *testPodData {
 func (tpd *testPodData) createPodsForTest(f *framework.Framework, podReqs []podDesc) {
 	for _, podReq := range podReqs {
 		pod := makePodResourcesTestPod(podReq.podName, "cnt-0", podReq.resourceName, podReq.resourceAmount)
-		pod = f.PodClient().CreateSync(pod)
 
-		framework.Logf("created pod %s", podReq.podName)
+		framework.Logf("creating pod: %s", pod.Name)
+		pod = f.PodClient().CreateSync(pod)
+		framework.Logf("created pod: %s - %v", pod.Name, pod.Spec.Containers[0].Resources)
+
 		tpd.PodMap[podReq.podName] = pod
 	}
 }
@@ -138,13 +156,13 @@ func podresourcesListTests(f *framework.Framework, cli podresourcesapi.PodResour
 	var noResources []*podresourcesapi.PodResources
 	var tpd *testPodData
 
-	ginkgo.By("checking the output when no pods are present")
+	ginkgo.By("list: checking the output when no pods are present")
 	podResources, noResources = getPodResources(cli)
 	framework.ExpectEqual(len(podResources), 0)
 	framework.ExpectEqual(len(noResources), 1) // the sriovdp
 
 	tpd = NewTestPodData()
-	ginkgo.By("checking the output when only pods which don't require resources are present")
+	ginkgo.By("list: checking the output when only pods which don't require resources are present")
 	tpd.createPodsForTest(f, []podDesc{
 		{
 			podName: "pod-00",
@@ -159,7 +177,7 @@ func podresourcesListTests(f *framework.Framework, cli podresourcesapi.PodResour
 	tpd.deletePodsForTest(f)
 
 	tpd = NewTestPodData()
-	ginkgo.By("checking the output when only a subset of pods require resources")
+	ginkgo.By("list: checking the output when only a subset of pods require resources")
 	tpd.createPodsForTest(f, []podDesc{
 		{
 			podName: "pod-00",
@@ -185,7 +203,7 @@ func podresourcesListTests(f *framework.Framework, cli podresourcesapi.PodResour
 	tpd.deletePodsForTest(f)
 
 	tpd = NewTestPodData()
-	ginkgo.By("checking the output when creating pods which require resources between calls")
+	ginkgo.By("list: checking the output when creating pods which require resources between calls")
 	tpd.createPodsForTest(f, []podDesc{
 		{
 			podName: "pod-00",
@@ -218,7 +236,7 @@ func podresourcesListTests(f *framework.Framework, cli podresourcesapi.PodResour
 	tpd.deletePodsForTest(f)
 
 	tpd = NewTestPodData()
-	ginkgo.By("checking the output when deleting pods which require resources between calls")
+	ginkgo.By("list: checking the output when deleting pods which require resources between calls")
 	tpd.createPodsForTest(f, []podDesc{
 		{
 			podName: "pod-00",
@@ -250,6 +268,123 @@ func podresourcesListTests(f *framework.Framework, cli podresourcesapi.PodResour
 	tpd.deletePodsForTest(f)
 }
 
+func podresourcesWatchTests(f *framework.Framework, cli podresourcesapi.PodResourcesListerClient, sd *sriovData) {
+	var tpd *testPodData
+
+	tpd = NewTestPodData()
+	ginkgo.By("watch: checking the output when creating pods which require resources between calls")
+	tpd.createPodsForTest(f, []podDesc{
+		{
+			podName: "pod-00",
+		},
+		{
+			podName:        "pod-01",
+			resourceName:   sd.resourceName,
+			resourceAmount: "1",
+		},
+		{
+			podName: "pod-02",
+		},
+	})
+
+	watchCli, err := cli.Watch(context.TODO(), &podresourcesapi.WatchPodResourcesRequest{})
+	framework.ExpectNoError(err)
+
+	tpd.createPodsForTest(f, []podDesc{
+		{
+			podName:        "pod-03",
+			resourceName:   sd.resourceName,
+			resourceAmount: "1",
+		},
+	})
+
+	resp, err := watchCli.Recv()
+	framework.ExpectNoError(err)
+	framework.ExpectEqual(resp.Action, podresourcesapi.WatchPodAction_ADDED)
+	framework.ExpectEqual(len(resp.PodResources), 1)
+	framework.ExpectEqual(resp.PodResources[0].Name, "pod-03")
+	podRes := scanPodResources(0, resp.Action, resp.PodResources[0])
+	framework.ExpectEqual(len(podRes), 0)
+
+	resp, err = watchCli.Recv()
+	framework.ExpectNoError(err)
+	framework.ExpectEqual(resp.Action, podresourcesapi.WatchPodAction_MODIFIED)
+	framework.ExpectEqual(len(resp.PodResources), 1)
+	framework.ExpectEqual(resp.PodResources[0].Name, "pod-03")
+	podRes = scanPodResources(0, resp.Action, resp.PodResources[0])
+	framework.ExpectEqual(len(podRes), 1)
+	framework.ExpectEqual(podRes[sd.resourceName], 1)
+
+	// TODO check for specific pods
+	tpd.deletePodsForTest(f)
+
+	tpd = NewTestPodData()
+	ginkgo.By("watch: checking the output when deleting pods which require resources between calls")
+	tpd.createPodsForTest(f, []podDesc{
+		{
+			podName: "pod-00",
+		},
+		{
+			podName:        "pod-01",
+			resourceName:   sd.resourceName,
+			resourceAmount: "1",
+		},
+		{
+			podName: "pod-02",
+		},
+		{
+			podName:        "pod-03",
+			resourceName:   sd.resourceName,
+			resourceAmount: "1",
+		},
+	})
+
+	watchCli, err = cli.Watch(context.TODO(), &podresourcesapi.WatchPodResourcesRequest{})
+	framework.ExpectNoError(err)
+
+	tpd.deletePod(f, "pod-01")
+
+	resp, err = watchCli.Recv()
+	framework.ExpectNoError(err)
+	framework.ExpectEqual(resp.Action, podresourcesapi.WatchPodAction_MODIFIED)
+	framework.ExpectEqual(len(resp.PodResources), 1)
+	framework.ExpectEqual(resp.PodResources[0].Name, "pod-01")
+	podRes = scanPodResources(0, resp.Action, resp.PodResources[0])
+	framework.ExpectEqual(len(podRes), 1)
+	framework.ExpectEqual(podRes[sd.resourceName], 1)
+
+	resp, err = watchCli.Recv()
+	framework.ExpectNoError(err)
+	framework.ExpectEqual(resp.Action, podresourcesapi.WatchPodAction_DELETED)
+	framework.ExpectEqual(len(resp.PodResources), 1)
+	framework.ExpectEqual(resp.PodResources[0].Name, "pod-01")
+	podRes = scanPodResources(0, resp.Action, resp.PodResources[0])
+	framework.ExpectEqual(len(podRes), 1)
+	framework.ExpectEqual(podRes[sd.resourceName], 1)
+
+	tpd.deletePod(f, "pod-02")
+
+	resp, err = watchCli.Recv()
+	framework.ExpectNoError(err)
+	framework.ExpectEqual(resp.Action, podresourcesapi.WatchPodAction_MODIFIED)
+	framework.ExpectEqual(len(resp.PodResources), 1)
+	framework.ExpectEqual(resp.PodResources[0].Name, "pod-02")
+	podRes = scanPodResources(0, resp.Action, resp.PodResources[0])
+	framework.ExpectEqual(len(podRes), 0)
+
+	resp, err = watchCli.Recv()
+	framework.ExpectNoError(err)
+	framework.ExpectEqual(resp.Action, podresourcesapi.WatchPodAction_DELETED)
+	framework.ExpectEqual(len(resp.PodResources), 1)
+	framework.ExpectEqual(resp.PodResources[0].Name, "pod-02")
+	podRes = scanPodResources(0, resp.Action, resp.PodResources[0])
+	framework.ExpectEqual(len(podRes), 0)
+
+	tpd.deletePodsForTest(f)
+
+	// TODO: check we DO NOT receive unexpected events?
+}
+
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("POD Resources [Serial] [Feature:PODResources][NodeFeature:PODResources]", func() {
 	f := framework.NewDefaultFramework("podresources-test")
@@ -260,19 +395,19 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PODResources][NodeFeature:P
 			e2eskipper.Skipf("this test is meant to run on a system with at least one configured VF from SRIOV device")
 		}
 
-		ginkgo.It("should return the expected responses from List()", func() {
-			configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
-			sd := setupSRIOVConfigOrFail(f, configMap)
-
+		ginkgo.It("should return the expected responses from endpoints", func() {
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 			framework.ExpectNoError(err)
+
+			configMap := getSRIOVDevicePluginConfigMap(framework.TestContext.SriovdpConfigMapFile)
+			sd := setupSRIOVConfigOrFail(f, configMap)
+			defer teardownSRIOVConfigOrFail(f, sd)
 
 			cli, conn, err := podresources.GetClient(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 			defer conn.Close()
 
 			podresourcesListTests(f, cli, sd)
-
-			teardownSRIOVConfigOrFail(f, sd)
+			podresourcesWatchTests(f, cli, sd)
 		})
 	})
 })
