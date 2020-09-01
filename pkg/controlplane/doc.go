@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package master contains code for setting up and running a Kubernetes
-// cluster master.
+// Package controlplane contains code for setting up and running a Kubernetes
+// cluster control plane API server.
 package controlplane // import "k8s.io/kubernetes/pkg/controlplane"
