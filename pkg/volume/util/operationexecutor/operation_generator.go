@@ -342,7 +342,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 				uncertainNode = derr.CurrentNode
 			}
 			addErr := actualStateOfWorld.MarkVolumeAsUncertain(
-				v1.UniqueVolumeName(""),
+				volumeToAttach.VolumeName,
 				volumeToAttach.VolumeSpec,
 				uncertainNode)
 			if addErr != nil {
@@ -418,10 +418,9 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 	var err error
 
 	if volumeToDetach.VolumeSpec != nil {
-		attachableVolumePlugin, err =
-			og.volumePluginMgr.FindAttachablePluginBySpec(volumeToDetach.VolumeSpec)
+		attachableVolumePlugin, err = findDetachablePluginBySpec(volumeToDetach.VolumeSpec, og.volumePluginMgr)
 		if err != nil || attachableVolumePlugin == nil {
-			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginBySpec failed", err)
+			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.findDetachablePluginBySpec failed", err)
 		}
 
 		volumeName, err =
@@ -1730,4 +1729,26 @@ func isDeviceOpened(deviceToDetach AttachedVolume, hostUtil hostutil.HostUtils) 
 		}
 	}
 	return deviceOpened, nil
+}
+
+// findDetachablePluginBySpec is a variant of VolumePluginMgr.FindAttachablePluginByName() function.
+// The difference is that it bypass the CanAttach() check for CSI plugin, i.e. it assumes all CSI plugin supports detach.
+// The intention here is that a CSI plugin volume can end up in an Uncertain state,  so that a detach
+// operation will help it to detach no matter it actually has the ability to attach/detach.
+func findDetachablePluginBySpec(spec *volume.Spec, pm *volume.VolumePluginMgr) (volume.AttachableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	if attachableVolumePlugin, ok := volumePlugin.(volume.AttachableVolumePlugin); ok {
+		if attachableVolumePlugin.GetPluginName() == "kubernetes.io/csi" {
+			return attachableVolumePlugin, nil
+		}
+		if canAttach, err := attachableVolumePlugin.CanAttach(spec); err != nil {
+			return nil, err
+		} else if canAttach {
+			return attachableVolumePlugin, nil
+		}
+	}
+	return nil, nil
 }
