@@ -54,7 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
-	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	netutils "k8s.io/utils/net"
 )

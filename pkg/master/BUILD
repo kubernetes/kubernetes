@@ -201,7 +201,6 @@ filegroup(
         ":package-srcs",
         "//pkg/master/controller/clusterauthenticationtrust:all-srcs",
         "//pkg/master/controller/crdregistration:all-srcs",
-        "//pkg/master/ports:all-srcs",
         "//pkg/master/reconcilers:all-srcs",
         "//pkg/master/storageversionhashdata:all-srcs",
         "//pkg/master/tunneler:all-srcs",

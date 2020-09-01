@@ -41,7 +41,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
 	configmapstore "k8s.io/kubernetes/pkg/registry/core/configmap/storage"
 	endpointsstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"

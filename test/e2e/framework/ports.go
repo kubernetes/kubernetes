@@ -16,7 +16,7 @@ limitations under the License.
 
 package framework
 
-// NOTE: constants in this file are copied from pkg/master/ports/ports.go
+// NOTE: constants in this file are copied from pkg/cluster/ports/ports.go
 
 const (
 	// KubeletPort is the default port for the kubelet server on each host machine.

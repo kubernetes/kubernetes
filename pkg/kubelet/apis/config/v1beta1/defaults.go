@@ -26,7 +26,7 @@ import (
 	// TODO: Cut references to k8s.io/kubernetes, eventually there should be none from this package
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	utilpointer "k8s.io/utils/pointer"
 )
 

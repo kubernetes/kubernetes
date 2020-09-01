@@ -38,7 +38,7 @@ import (
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
 	"k8s.io/kubernetes/pkg/kubelet/config"
-	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )

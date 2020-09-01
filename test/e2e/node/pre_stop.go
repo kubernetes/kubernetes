@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
