@@ -624,12 +624,15 @@ func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 	// Map node's condition to Taints.
 	var taints []v1.Taint
 	for _, condition := range node.Status.Conditions {
-		if taintMap, found := nodeConditionToTaintKeyStatusMap[condition.Type]; found {
-			if taintKey, found := taintMap[condition.Status]; found {
-				taints = append(taints, v1.Taint{
-					Key:    taintKey,
-					Effect: v1.TaintEffectNoSchedule,
-				})
+		// ingnore nodeReady conditions as they're handled by the taint manager
+		if nc.runTaintManager && condition.Type != v1.NodeReady {
+			if taintMap, found := nodeConditionToTaintKeyStatusMap[condition.Type]; found {
+				if taintKey, found := taintMap[condition.Status]; found {
+					taints = append(taints, v1.Taint{
+						Key:    taintKey,
+						Effect: v1.TaintEffectNoSchedule,
+					})
+				}
 			}
 		}
 	}
