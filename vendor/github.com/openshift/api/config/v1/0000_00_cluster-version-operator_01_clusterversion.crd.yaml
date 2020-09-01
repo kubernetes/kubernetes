@@ -1,0 +1,332 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: clusterversions.config.openshift.io
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
+spec:
+  group: config.openshift.io
+  versions:
+  - name: v1
+    served: true
+    storage: true
+  scope: Cluster
+  subresources:
+    status: {}
+  names:
+    plural: clusterversions
+    singular: clusterversion
+    kind: ClusterVersion
+  preserveUnknownFields: false
+  additionalPrinterColumns:
+  - name: Version
+    type: string
+    JSONPath: .status.history[?(@.state=="Completed")].version
+  - name: Available
+    type: string
+    JSONPath: .status.conditions[?(@.type=="Available")].status
+  - name: Progressing
+    type: string
+    JSONPath: .status.conditions[?(@.type=="Progressing")].status
+  - name: Since
+    type: date
+    JSONPath: .status.conditions[?(@.type=="Progressing")].lastTransitionTime
+  - name: Status
+    type: string
+    JSONPath: .status.conditions[?(@.type=="Progressing")].message
+  validation:
+    openAPIV3Schema:
+      description: ClusterVersion is the configuration for the ClusterVersionOperator.
+        This is where parameters related to automatic updates can be set.
+      type: object
+      required:
+      - spec
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: spec is the desired state of the cluster version - the operator
+            will work to ensure that the desired version is applied to the cluster.
+          type: object
+          required:
+          - clusterID
+          properties:
+            channel:
+              description: channel is an identifier for explicitly requesting that
+                a non-default set of updates be applied to this cluster. The default
+                channel will be contain stable updates that are appropriate for production
+                clusters.
+              type: string
+            clusterID:
+              description: clusterID uniquely identifies this cluster. This is expected
+                to be an RFC4122 UUID value (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+                in hexadecimal values). This is a required field.
+              type: string
+            desiredUpdate:
+              description: "desiredUpdate is an optional field that indicates the
+                desired value of the cluster version. Setting this value will trigger
+                an upgrade (if the current version does not match the desired version).
+                The set of recommended update values is listed as part of available
+                updates in status, and setting values outside that range may cause
+                the upgrade to fail. You may specify the version field without setting
+                image if an update exists with that version in the availableUpdates
+                or history. \n If an upgrade fails the operator will halt and report
+                status about the failing component. Setting the desired update value
+                back to the previous version will cause a rollback to be attempted.
+                Not all rollbacks will succeed."
+              type: object
+              properties:
+                force:
+                  description: "force allows an administrator to update to an image
+                    that has failed verification, does not appear in the availableUpdates
+                    list, or otherwise would be blocked by normal protections on update.
+                    This option should only be used when the authenticity of the provided
+                    image has been verified out of band because the provided image
+                    will run with full administrative access to the cluster. Do not
+                    use this flag with images that comes from unknown or potentially
+                    malicious sources. \n This flag does not override other forms
+                    of consistency checking that are required before a new update
+                    is deployed."
+                  type: boolean
+                image:
+                  description: image is a container image location that contains the
+                    update. When this field is part of spec, image is optional if
+                    version is specified and the availableUpdates field contains a
+                    matching version.
+                  type: string
+                version:
+                  description: version is a semantic versioning identifying the update
+                    version. When this field is part of spec, version is optional
+                    if image is specified.
+                  type: string
+            overrides:
+              description: overrides is list of overides for components that are managed
+                by cluster version operator. Marking a component unmanaged will prevent
+                the operator from creating or updating the object.
+              type: array
+              items:
+                description: ComponentOverride allows overriding cluster version operator's
+                  behavior for a component.
+                type: object
+                required:
+                - group
+                - kind
+                - name
+                - namespace
+                - unmanaged
+                properties:
+                  group:
+                    description: group identifies the API group that the kind is in.
+                    type: string
+                  kind:
+                    description: kind indentifies which object to override.
+                    type: string
+                  name:
+                    description: name is the component's name.
+                    type: string
+                  namespace:
+                    description: namespace is the component's namespace. If the resource
+                      is cluster scoped, the namespace should be empty.
+                    type: string
+                  unmanaged:
+                    description: 'unmanaged controls if cluster version operator should
+                      stop managing the resources in this cluster. Default: false'
+                    type: boolean
+            upstream:
+              description: upstream may be used to specify the preferred update server.
+                By default it will use the appropriate update server for the cluster
+                and region.
+              type: string
+        status:
+          description: status contains information about the available updates and
+            any in-progress updates.
+          type: object
+          required:
+          - availableUpdates
+          - desired
+          - observedGeneration
+          - versionHash
+          properties:
+            availableUpdates:
+              description: availableUpdates contains the list of updates that are
+                appropriate for this cluster. This list may be empty if no updates
+                are recommended, if the update service is unavailable, or if an invalid
+                channel has been specified.
+              type: array
+              items:
+                description: Release represents an OpenShift release image and associated
+                  metadata.
+                type: object
+                properties:
+                  channels:
+                    description: channels is the set of Cincinnati channels to which
+                      the release currently belongs.
+                    type: array
+                    items:
+                      type: string
+                  image:
+                    description: image is a container image location that contains
+                      the update. When this field is part of spec, image is optional
+                      if version is specified and the availableUpdates field contains
+                      a matching version.
+                    type: string
+                  url:
+                    description: url contains information about this release. This
+                      URL is set by the 'url' metadata property on a release or the
+                      metadata returned by the update API and should be displayed
+                      as a link in user interfaces. The URL field may not be set for
+                      test or nightly releases.
+                    type: string
+                  version:
+                    description: version is a semantic versioning identifying the
+                      update version. When this field is part of spec, version is
+                      optional if image is specified.
+                    type: string
+              nullable: true
+            conditions:
+              description: conditions provides information about the cluster version.
+                The condition "Available" is set to true if the desiredUpdate has
+                been reached. The condition "Progressing" is set to true if an update
+                is being applied. The condition "Degraded" is set to true if an update
+                is currently blocked by a temporary or permanent error. Conditions
+                are only valid for the current desiredUpdate when metadata.generation
+                is equal to status.generation.
+              type: array
+              items:
+                description: ClusterOperatorStatusCondition represents the state of
+                  the operator's managed and monitored components.
+                type: object
+                required:
+                - lastTransitionTime
+                - status
+                - type
+                properties:
+                  lastTransitionTime:
+                    description: lastTransitionTime is the time of the last update
+                      to the current status property.
+                    type: string
+                    format: date-time
+                  message:
+                    description: message provides additional information about the
+                      current condition. This is only to be consumed by humans.
+                    type: string
+                  reason:
+                    description: reason is the CamelCase reason for the condition's
+                      current status.
+                    type: string
+                  status:
+                    description: status of the condition, one of True, False, Unknown.
+                    type: string
+                  type:
+                    description: type specifies the aspect reported by this condition.
+                    type: string
+            desired:
+              description: desired is the version that the cluster is reconciling
+                towards. If the cluster is not yet fully initialized desired will
+                be set with the information available, which may be an image or a
+                tag.
+              type: object
+              properties:
+                channels:
+                  description: channels is the set of Cincinnati channels to which
+                    the release currently belongs.
+                  type: array
+                  items:
+                    type: string
+                image:
+                  description: image is a container image location that contains the
+                    update. When this field is part of spec, image is optional if
+                    version is specified and the availableUpdates field contains a
+                    matching version.
+                  type: string
+                url:
+                  description: url contains information about this release. This URL
+                    is set by the 'url' metadata property on a release or the metadata
+                    returned by the update API and should be displayed as a link in
+                    user interfaces. The URL field may not be set for test or nightly
+                    releases.
+                  type: string
+                version:
+                  description: version is a semantic versioning identifying the update
+                    version. When this field is part of spec, version is optional
+                    if image is specified.
+                  type: string
+            history:
+              description: history contains a list of the most recent versions applied
+                to the cluster. This value may be empty during cluster startup, and
+                then will be updated when a new update is being applied. The newest
+                update is first in the list and it is ordered by recency. Updates
+                in the history have state Completed if the rollout completed - if
+                an update was failing or halfway applied the state will be Partial.
+                Only a limited amount of update history is preserved.
+              type: array
+              items:
+                description: UpdateHistory is a single attempted update to the cluster.
+                type: object
+                required:
+                - completionTime
+                - image
+                - startedTime
+                - state
+                - verified
+                properties:
+                  completionTime:
+                    description: completionTime, if set, is when the update was fully
+                      applied. The update that is currently being applied will have
+                      a null completion time. Completion time will always be set for
+                      entries that are not the current update (usually to the started
+                      time of the next update).
+                    type: string
+                    format: date-time
+                    nullable: true
+                  image:
+                    description: image is a container image location that contains
+                      the update. This value is always populated.
+                    type: string
+                  startedTime:
+                    description: startedTime is the time at which the update was started.
+                    type: string
+                    format: date-time
+                  state:
+                    description: state reflects whether the update was fully applied.
+                      The Partial state indicates the update is not fully applied,
+                      while the Completed state indicates the update was successfully
+                      rolled out at least once (all parts of the update successfully
+                      applied).
+                    type: string
+                  verified:
+                    description: verified indicates whether the provided update was
+                      properly verified before it was installed. If this is false
+                      the cluster may not be trusted.
+                    type: boolean
+                  version:
+                    description: version is a semantic versioning identifying the
+                      update version. If the requested image does not define a version,
+                      or if a failure occurs retrieving the image, this value may
+                      be empty.
+                    type: string
+            observedGeneration:
+              description: observedGeneration reports which version of the spec is
+                being synced. If this value is not equal to metadata.generation, then
+                the desired and conditions fields may represent a previous version.
+              type: integer
+              format: int64
+            versionHash:
+              description: versionHash is a fingerprint of the content that the cluster
+                will be updated with. It is used by the operator to avoid unnecessary
+                work and is for internal use only.
+              type: string
+  versions:
+  - name: v1
+    served: true
+    storage: true

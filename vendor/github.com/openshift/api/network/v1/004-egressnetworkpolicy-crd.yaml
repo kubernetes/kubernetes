@@ -1,0 +1,88 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  creationTimestamp: null
+  name: egressnetworkpolicies.network.openshift.io
+spec:
+  group: network.openshift.io
+  names:
+    kind: EgressNetworkPolicy
+    listKind: EgressNetworkPolicyList
+    plural: egressnetworkpolicies
+    singular: egressnetworkpolicy
+  scope: Namespaced
+  validation:
+    # This should be mostly equivalent to ValidateEgressNetworkPolicy
+    openAPIV3Schema:
+      description: EgressNetworkPolicy describes the current egress network policy
+        for a Namespace. When using the 'redhat/openshift-ovs-multitenant' network
+        plugin, traffic from a pod to an IP address outside the cluster will be checked
+        against each EgressNetworkPolicyRule in the pod's namespace's EgressNetworkPolicy,
+        in order. If no rule matches (or no EgressNetworkPolicy is present) then the
+        traffic will be allowed by default.
+      type: object
+      required:
+      - spec
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: spec is the specification of the current egress network policy
+          type: object
+          required:
+          - egress
+          properties:
+            egress:
+              description: egress contains the list of egress policy rules
+              type: array
+              items:
+                description: EgressNetworkPolicyRule contains a single egress network
+                  policy rule
+                type: object
+                required:
+                - to
+                - type
+                properties:
+                  to:
+                    description: to is the target that traffic is allowed/denied to
+                    type: object
+                    properties:
+                      cidrSelector:
+                        description: CIDRSelector is the CIDR range to allow/deny
+                          traffic to. If this is set, dnsName must be unset Ideally
+                          we would have liked to use the cidr openapi format for this
+                          property. But openshift-sdn only supports v4 while specifying
+                          the cidr format allows both v4 and v6 cidrs We are therefore
+                          using a regex pattern to validate instead.
+                        type: string
+                        pattern: ^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])/([0-9]|[12][0-9]|3[0-2])$
+                      dnsName:
+                        description: DNSName is the domain name to allow/deny traffic
+                          to. If this is set, cidrSelector must be unset
+                        type: string
+                        pattern: ^([A-Za-z0-9-]+\.)*[A-Za-z0-9-]+\.?$
+                  type:
+                    description: type marks this as an "Allow" or "Deny" rule
+                    type: string
+                    pattern: ^Allow|Deny$
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
