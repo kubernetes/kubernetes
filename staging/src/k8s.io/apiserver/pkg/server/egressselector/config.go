@@ -199,7 +199,7 @@ func validateTLSConfig(tlsConfig *apiserver.TLSConfig, fldPath *field.Path) fiel
 		return allErrs
 	}
 	if tlsConfig.CABundle != "" {
-		if exists, err := path.Exists(path.CheckFollowSymlink, tlsConfig.CABundle); exists == false || err != nil {
+		if exists, err := path.Exists(path.CheckFollowSymlink, tlsConfig.CABundle); !exists || err != nil {
 			allErrs = append(allErrs, field.Invalid(
 				fldPath.Child("tlsConfig", "caBundle"),
 				tlsConfig.CABundle,
@@ -211,7 +211,7 @@ func validateTLSConfig(tlsConfig *apiserver.TLSConfig, fldPath *field.Path) fiel
 			fldPath.Child("tlsConfig", "clientCert"),
 			"nil",
 			"Using TLS requires clientCert"))
-	} else if exists, err := path.Exists(path.CheckFollowSymlink, tlsConfig.ClientCert); exists == false || err != nil {
+	} else if exists, err := path.Exists(path.CheckFollowSymlink, tlsConfig.ClientCert); !exists || err != nil {
 		allErrs = append(allErrs, field.Invalid(
 			fldPath.Child("tlsConfig", "clientCert"),
 			tlsConfig.ClientCert,
@@ -222,7 +222,7 @@ func validateTLSConfig(tlsConfig *apiserver.TLSConfig, fldPath *field.Path) fiel
 			fldPath.Child("tlsConfig", "clientKey"),
 			"nil",
 			"Using TLS requires requires clientKey"))
-	} else if exists, err := path.Exists(path.CheckFollowSymlink, tlsConfig.ClientKey); exists == false || err != nil {
+	} else if exists, err := path.Exists(path.CheckFollowSymlink, tlsConfig.ClientKey); !exists || err != nil {
 		allErrs = append(allErrs, field.Invalid(
 			fldPath.Child("tlsConfig", "clientKey"),
 			tlsConfig.ClientKey,

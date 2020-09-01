@@ -262,8 +262,7 @@ type FilterPlugin interface {
 	// Filter is called by the scheduling framework.
 	// All FilterPlugins should return "Success" to declare that
 	// the given node fits the pod. If Filter doesn't return "Success",
-	// please refer scheduler/algorithm/predicates/error.go
-	// to set error message.
+	// it will return "Unschedulable", "UnschedulableAndUnresolvable" or "Error".
 	// For the node being evaluated, Filter plugins should look at the passed
 	// nodeInfo reference for this particular node's information (e.g., pods
 	// considered to be running on the node) instead of looking it up in the
@@ -345,7 +344,7 @@ type ReservePlugin interface {
 }
 
 // PreBindPlugin is an interface that must be implemented by "prebind" plugins.
-// These plugins are called before a pod being scheduled.
+// These plugins are called before a pod is bound.
 type PreBindPlugin interface {
 	Plugin
 	// PreBind is called before binding a pod. All prebind plugins must return

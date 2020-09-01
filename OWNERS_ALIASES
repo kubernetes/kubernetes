@@ -9,7 +9,6 @@ aliases:
     - sttts
     - tallclair
   sig-auth-audit-reviewers:
-    - CaoShuFeng
     - hzxuzhonghu
     - lavalamp
     - sttts
@@ -189,6 +188,7 @@ aliases:
     - alculquicondor
     - liu-cong
     - damemi
+    - chendave
 
   sig-cli-maintainers:
     - brendandburns
@@ -241,6 +241,8 @@ aliases:
     - derekwaynecarr
     - vishh
     - yujuhong
+    - dashpole
+    - sjenning
   sig-node-reviewers:
     - Random-Liu
     - dashpole
@@ -272,7 +274,6 @@ aliases:
     - freehan
     - johnbelamaric
     - mrhohn
-    - nicksardo
     - thockin
   sig-network-reviewers:
     - andrewsykim
@@ -286,7 +287,6 @@ aliases:
     - johnbelamaric
     - m1093782566
     - mrhohn
-    - nicksardo
     - rramkumar1
     - thockin
   sig-apps-approvers:

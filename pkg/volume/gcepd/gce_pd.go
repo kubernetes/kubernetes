@@ -128,11 +128,11 @@ func (plugin *gcePersistentDiskPlugin) GetVolumeLimits() (map[string]int64, erro
 	// default values from here will mean, no one can
 	// override them.
 	if cloud == nil {
-		return nil, fmt.Errorf("No cloudprovider present")
+		return nil, fmt.Errorf("no cloudprovider present")
 	}
 
 	if cloud.ProviderName() != gcecloud.ProviderName {
-		return nil, fmt.Errorf("Expected gce cloud got %s", cloud.ProviderName())
+		return nil, fmt.Errorf("expected gce cloud got %s", cloud.ProviderName())
 	}
 
 	instances, ok := cloud.Instances()
@@ -175,7 +175,7 @@ func getVolumeSource(
 		return spec.PersistentVolume.Spec.GCEPersistentDisk, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a GCE volume type")
+	return nil, false, fmt.Errorf("spec does not reference a GCE volume type")
 }
 
 func (plugin *gcePersistentDiskPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Mounter, error) {

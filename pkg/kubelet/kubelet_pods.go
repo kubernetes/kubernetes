@@ -468,8 +468,6 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	podName := volumeutil.GetUniquePodName(pod)
 	volumes := kl.volumeManager.GetMountedVolumesForPod(podName)
 
-	opts.PortMappings = kubecontainer.MakePortMappings(container)
-
 	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 	blkVolumes, err := kl.makeBlockVolumes(pod, container, volumes, blkutil)
 	if err != nil {

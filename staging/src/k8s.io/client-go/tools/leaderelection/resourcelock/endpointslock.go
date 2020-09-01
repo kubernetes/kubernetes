@@ -47,13 +47,14 @@ func (el *EndpointsLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte
 	if el.e.Annotations == nil {
 		el.e.Annotations = make(map[string]string)
 	}
-	recordBytes, found := el.e.Annotations[LeaderElectionRecordAnnotationKey]
+	recordStr, found := el.e.Annotations[LeaderElectionRecordAnnotationKey]
+	recordBytes := []byte(recordStr)
 	if found {
-		if err := json.Unmarshal([]byte(recordBytes), &record); err != nil {
+		if err := json.Unmarshal(recordBytes, &record); err != nil {
 			return nil, nil, err
 		}
 	}
-	return &record, []byte(recordBytes), nil
+	return &record, recordBytes, nil
 }
 
 // Create attempts to create a LeaderElectionRecord annotation

@@ -97,6 +97,9 @@ func (cqs *ctlrTestQueueSet) BeginConfigChange(qc fq.QueuingConfig) (fq.QueueSet
 	return ctlrTestQueueSetCompleter{cqs.cts, cqs, qc}, nil
 }
 
+func (cqs *ctlrTestQueueSet) UpdateObservations() {
+}
+
 func (cqs *ctlrTestQueueSet) Dump(bool) debug.QueueSetDump {
 	return debug.QueueSetDump{}
 }

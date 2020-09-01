@@ -57,19 +57,19 @@ func TruePredicateExtender(pod *v1.Pod, node *v1.Node) (bool, error) {
 	return true, nil
 }
 
-// Machine1PredicateExtender implements FitPredicate function to return true
-// when the given node's name is "machine1"; otherwise return false.
-func Machine1PredicateExtender(pod *v1.Pod, node *v1.Node) (bool, error) {
-	if node.Name == "machine1" {
+// Node1PredicateExtender implements FitPredicate function to return true
+// when the given node's name is "node1"; otherwise return false.
+func Node1PredicateExtender(pod *v1.Pod, node *v1.Node) (bool, error) {
+	if node.Name == "node1" {
 		return true, nil
 	}
 	return false, nil
 }
 
-// Machine2PredicateExtender implements FitPredicate function to return true
-// when the given node's name is "machine2"; otherwise return false.
-func Machine2PredicateExtender(pod *v1.Pod, node *v1.Node) (bool, error) {
-	if node.Name == "machine2" {
+// Node2PredicateExtender implements FitPredicate function to return true
+// when the given node's name is "node2"; otherwise return false.
+func Node2PredicateExtender(pod *v1.Pod, node *v1.Node) (bool, error) {
+	if node.Name == "node2" {
 		return true, nil
 	}
 	return false, nil
@@ -80,13 +80,13 @@ func ErrorPrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*framework.NodeSco
 	return &framework.NodeScoreList{}, fmt.Errorf("some error")
 }
 
-// Machine1PrioritizerExtender implements PriorityFunc function to give score 10
-// if the given node's name is "machine1"; otherwise score 1.
-func Machine1PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*framework.NodeScoreList, error) {
+// Node1PrioritizerExtender implements PriorityFunc function to give score 10
+// if the given node's name is "node1"; otherwise score 1.
+func Node1PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*framework.NodeScoreList, error) {
 	result := framework.NodeScoreList{}
 	for _, node := range nodes {
 		score := 1
-		if node.Name == "machine1" {
+		if node.Name == "node1" {
 			score = 10
 		}
 		result = append(result, framework.NodeScore{Name: node.Name, Score: int64(score)})
@@ -94,13 +94,13 @@ func Machine1PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*framework.Node
 	return &result, nil
 }
 
-// Machine2PrioritizerExtender implements PriorityFunc function to give score 10
-// if the given node's name is "machine2"; otherwise score 1.
-func Machine2PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*framework.NodeScoreList, error) {
+// Node2PrioritizerExtender implements PriorityFunc function to give score 10
+// if the given node's name is "node2"; otherwise score 1.
+func Node2PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*framework.NodeScoreList, error) {
 	result := framework.NodeScoreList{}
 	for _, node := range nodes {
 		score := 1
-		if node.Name == "machine2" {
+		if node.Name == "node2" {
 			score = 10
 		}
 		result = append(result, framework.NodeScore{Name: node.Name, Score: int64(score)})
@@ -108,31 +108,31 @@ func Machine2PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*framework.Node
 	return &result, nil
 }
 
-type machine2PrioritizerPlugin struct{}
+type node2PrioritizerPlugin struct{}
 
-// NewMachine2PrioritizerPlugin returns a factory function to build machine2PrioritizerPlugin.
-func NewMachine2PrioritizerPlugin() frameworkruntime.PluginFactory {
+// NewNode2PrioritizerPlugin returns a factory function to build node2PrioritizerPlugin.
+func NewNode2PrioritizerPlugin() frameworkruntime.PluginFactory {
 	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
-		return &machine2PrioritizerPlugin{}, nil
+		return &node2PrioritizerPlugin{}, nil
 	}
 }
 
 // Name returns name of the plugin.
-func (pl *machine2PrioritizerPlugin) Name() string {
-	return "Machine2Prioritizer"
+func (pl *node2PrioritizerPlugin) Name() string {
+	return "Node2Prioritizer"
 }
 
-// Score return score 100 if the given nodeName is "machine2"; otherwise return score 10.
-func (pl *machine2PrioritizerPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeName string) (int64, *framework.Status) {
+// Score return score 100 if the given nodeName is "node2"; otherwise return score 10.
+func (pl *node2PrioritizerPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeName string) (int64, *framework.Status) {
 	score := 10
-	if nodeName == "machine2" {
+	if nodeName == "node2" {
 		score = 100
 	}
 	return int64(score), nil
 }
 
 // ScoreExtensions returns nil.
-func (pl *machine2PrioritizerPlugin) ScoreExtensions() framework.ScoreExtensions {
+func (pl *node2PrioritizerPlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 

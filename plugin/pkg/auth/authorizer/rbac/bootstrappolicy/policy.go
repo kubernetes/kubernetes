@@ -196,7 +196,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			},
 		},
 		{
-			// a role which provides just enough power to determine if the server is ready and discover API versions for negotiation
+			// a role which provides just enough power to determine if the server is
+			// ready and discover API versions for negotiation
 			ObjectMeta: metav1.ObjectMeta{Name: "system:discovery"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get").URLs(
@@ -205,6 +206,20 @@ func ClusterRoles() []rbacv1.ClusterRole {
 					"/openapi", "/openapi/*",
 					"/api", "/api/*",
 					"/apis", "/apis/*",
+				).RuleOrDie(),
+			},
+		},
+		{
+			// a role which provides minimal read access to the monitoring endpoints
+			// (i.e. /metrics, /livez/*, /readyz/*, /healthz/*, /livez, /readyz, /healthz)
+			// The splatted health check endpoints allow read access to individual health check
+			// endpoints which may contain more sensitive cluster information information
+			ObjectMeta: metav1.ObjectMeta{Name: "system:monitoring"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get").URLs(
+					"/metrics",
+					"/livez", "/readyz", "/healthz",
+					"/livez/*", "/readyz/*", "/healthz/*",
 				).RuleOrDie(),
 			},
 		},
@@ -563,6 +578,7 @@ const systemNodeRoleName = "system:node"
 func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 	rolebindings := []rbacv1.ClusterRoleBinding{
 		rbacv1helpers.NewClusterBinding("cluster-admin").Groups(user.SystemPrivilegedGroup).BindingOrDie(),
+		rbacv1helpers.NewClusterBinding("system:monitoring").Groups(user.MonitoringGroup).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:discovery").Groups(user.AllAuthenticated).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:basic-user").Groups(user.AllAuthenticated).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:public-info-viewer").Groups(user.AllAuthenticated, user.AllUnauthenticated).BindingOrDie(),

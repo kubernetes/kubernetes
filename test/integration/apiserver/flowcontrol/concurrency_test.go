@@ -44,6 +44,7 @@ import (
 const (
 	sharedConcurrencyMetricsName      = "apiserver_flowcontrol_request_concurrency_limit"
 	dispatchedRequestCountMetricsName = "apiserver_flowcontrol_dispatched_requests_total"
+	rejectedRequestCountMetricsName   = "apiserver_flowcontrol_rejected_requests_total"
 	labelPriorityLevel                = "priorityLevel"
 	timeout                           = time.Second * 10
 )
@@ -122,13 +123,20 @@ func TestPriorityLevelIsolation(t *testing.T) {
 
 	time.Sleep(time.Second * 10) // running in background for a while
 
-	reqCounts, err := getRequestCountOfPriorityLevel(loopbackClient)
+	allDispatchedReqCounts, rejectedReqCounts, err := getRequestCountOfPriorityLevel(loopbackClient)
 	if err != nil {
 		t.Error(err)
 	}
 
-	noxu1RequestCount := reqCounts[priorityLevelNoxu1.Name]
-	noxu2RequestCount := reqCounts[priorityLevelNoxu2.Name]
+	noxu1RequestCount := allDispatchedReqCounts[priorityLevelNoxu1.Name]
+	noxu2RequestCount := allDispatchedReqCounts[priorityLevelNoxu2.Name]
+
+	if rejectedReqCounts[priorityLevelNoxu1.Name] > 0 {
+		t.Errorf(`%v requests from the "elephant" stream were rejected unexpectedly`, rejectedReqCounts[priorityLevelNoxu2.Name])
+	}
+	if rejectedReqCounts[priorityLevelNoxu2.Name] > 0 {
+		t.Errorf(`%v requests from the "mouse" stream were rejected unexpectedly`, rejectedReqCounts[priorityLevelNoxu2.Name])
+	}
 
 	// Theoretically, the actual expected value of request counts upon the two priority-level should be
 	// the equal. We're deliberately lax to make flakes super rare.
@@ -192,10 +200,10 @@ func getSharedConcurrencyOfPriorityLevel(c clientset.Interface) (map[string]int,
 	}
 }
 
-func getRequestCountOfPriorityLevel(c clientset.Interface) (map[string]int, error) {
+func getRequestCountOfPriorityLevel(c clientset.Interface) (map[string]int, map[string]int, error) {
 	resp, err := getMetrics(c)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	dec := expfmt.NewDecoder(strings.NewReader(string(resp)), expfmt.FmtText)
@@ -204,20 +212,23 @@ func getRequestCountOfPriorityLevel(c clientset.Interface) (map[string]int, erro
 		Opts: &expfmt.DecodeOptions{},
 	}
 
-	reqCounts := make(map[string]int)
+	allReqCounts := make(map[string]int)
+	rejectReqCounts := make(map[string]int)
 	for {
 		var v model.Vector
 		if err := decoder.Decode(&v); err != nil {
 			if err == io.EOF {
 				// Expected loop termination condition.
-				return reqCounts, nil
+				return allReqCounts, rejectReqCounts, nil
 			}
-			return nil, fmt.Errorf("failed decoding metrics: %v", err)
+			return nil, nil, fmt.Errorf("failed decoding metrics: %v", err)
 		}
 		for _, metric := range v {
 			switch name := string(metric.Metric[model.MetricNameLabel]); name {
 			case dispatchedRequestCountMetricsName:
-				reqCounts[string(metric.Metric[labelPriorityLevel])] = int(metric.Value)
+				allReqCounts[string(metric.Metric[labelPriorityLevel])] = int(metric.Value)
+			case rejectedRequestCountMetricsName:
+				rejectReqCounts[string(metric.Metric[labelPriorityLevel])] = int(metric.Value)
 			}
 		}
 	}

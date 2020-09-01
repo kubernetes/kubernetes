@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
@@ -149,50 +150,36 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	dInfo := driver.GetDriverInfo()
 	var isSupported bool
 
-	// 1. Check if Whether SnapshotType is supported by driver from its interface
-	// if isSupported, we still execute the driver and suite tests
-	if len(pattern.SnapshotType) > 0 {
-		switch pattern.SnapshotType {
-		case testpatterns.DynamicCreatedSnapshot:
-			_, isSupported = driver.(SnapshottableTestDriver)
-		default:
-			isSupported = false
-		}
-		if !isSupported {
-			e2eskipper.Skipf("Driver %s doesn't support snapshot type %v -- skipping", dInfo.Name, pattern.SnapshotType)
-		}
-	} else {
-		// 2. Check if Whether volType is supported by driver from its interface
-		switch pattern.VolType {
-		case testpatterns.InlineVolume:
-			_, isSupported = driver.(InlineVolumeTestDriver)
-		case testpatterns.PreprovisionedPV:
-			_, isSupported = driver.(PreprovisionedPVTestDriver)
-		case testpatterns.DynamicPV, testpatterns.GenericEphemeralVolume:
-			_, isSupported = driver.(DynamicPVTestDriver)
-		case testpatterns.CSIInlineVolume:
-			_, isSupported = driver.(EphemeralTestDriver)
-		default:
-			isSupported = false
-		}
-
-		if !isSupported {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
-		}
-
-		// 3. Check if fsType is supported
-		if !dInfo.SupportedFsType.Has(pattern.FsType) {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.FsType)
-		}
-		if pattern.FsType == "xfs" && framework.NodeOSDistroIs("gci", "cos", "windows") {
-			e2eskipper.Skipf("Distro doesn't support xfs -- skipping")
-		}
-		if pattern.FsType == "ntfs" && !framework.NodeOSDistroIs("windows") {
-			e2eskipper.Skipf("Distro %s doesn't support ntfs -- skipping", framework.TestContext.NodeOSDistro)
-		}
+	// 1. Check if Whether volType is supported by driver from its interface
+	switch pattern.VolType {
+	case testpatterns.InlineVolume:
+		_, isSupported = driver.(InlineVolumeTestDriver)
+	case testpatterns.PreprovisionedPV:
+		_, isSupported = driver.(PreprovisionedPVTestDriver)
+	case testpatterns.DynamicPV, testpatterns.GenericEphemeralVolume:
+		_, isSupported = driver.(DynamicPVTestDriver)
+	case testpatterns.CSIInlineVolume:
+		_, isSupported = driver.(EphemeralTestDriver)
+	default:
+		isSupported = false
 	}
 
-	// 4. Check with driver specific logic
+	if !isSupported {
+		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+	}
+
+	// 2. Check if fsType is supported
+	if !dInfo.SupportedFsType.Has(pattern.FsType) {
+		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.FsType)
+	}
+	if pattern.FsType == "xfs" && framework.NodeOSDistroIs("gci", "cos", "windows") {
+		e2eskipper.Skipf("Distro doesn't support xfs -- skipping")
+	}
+	if pattern.FsType == "ntfs" && !framework.NodeOSDistroIs("windows") {
+		e2eskipper.Skipf("Distro %s doesn't support ntfs -- skipping", framework.TestContext.NodeOSDistro)
+	}
+
+	// 3. Check with driver specific logic
 	driver.SkipUnsupportedTest(pattern)
 }
 
@@ -584,6 +571,57 @@ func getSnapshot(claimName string, ns, snapshotClassName string) *unstructured.U
 	}
 
 	return snapshot
+}
+func getPreProvisionedSnapshot(snapName, ns, snapshotContentName string) *unstructured.Unstructured {
+	snapshot := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "VolumeSnapshot",
+			"apiVersion": snapshotAPIVersion,
+			"metadata": map[string]interface{}{
+				"name":      snapName,
+				"namespace": ns,
+			},
+			"spec": map[string]interface{}{
+				"source": map[string]interface{}{
+					"volumeSnapshotContentName": snapshotContentName,
+				},
+			},
+		},
+	}
+
+	return snapshot
+}
+func getPreProvisionedSnapshotContent(snapcontentName, snapshotName, snapshotNamespace, snapshotHandle, deletionPolicy, csiDriverName string) *unstructured.Unstructured {
+	snapshotContent := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "VolumeSnapshotContent",
+			"apiVersion": snapshotAPIVersion,
+			"metadata": map[string]interface{}{
+				"name": snapcontentName,
+			},
+			"spec": map[string]interface{}{
+				"source": map[string]interface{}{
+					"snapshotHandle": snapshotHandle,
+				},
+				"volumeSnapshotRef": map[string]interface{}{
+					"name":      snapshotName,
+					"namespace": snapshotNamespace,
+				},
+				"driver":         csiDriverName,
+				"deletionPolicy": deletionPolicy,
+			},
+		},
+	}
+
+	return snapshotContent
+}
+
+func getPreProvisionedSnapshotContentName(uuid types.UID) string {
+	return fmt.Sprintf("pre-provisioned-snapcontent-%s", string(uuid))
+}
+
+func getPreProvisionedSnapshotName(uuid types.UID) string {
+	return fmt.Sprintf("pre-provisioned-snapshot-%s", string(uuid))
 }
 
 // StartPodLogs begins capturing log output and events from current

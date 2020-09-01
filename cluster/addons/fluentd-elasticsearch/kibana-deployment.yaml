@@ -15,9 +15,10 @@ spec:
     metadata:
       labels:
         k8s-app: kibana-logging
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: kibana-logging
         image: docker.elastic.co/kibana/kibana-oss:7.2.0

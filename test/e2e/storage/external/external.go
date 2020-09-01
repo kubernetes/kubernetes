@@ -251,7 +251,7 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern testpatterns.TestPattern)
 	switch pattern.SnapshotType {
 	case "":
 		supported = true
-	case testpatterns.DynamicCreatedSnapshot:
+	case testpatterns.DynamicCreatedSnapshot, testpatterns.PreprovisionedCreatedSnapshot:
 		if d.SnapshotClass.FromName || d.SnapshotClass.FromFile != "" || d.SnapshotClass.FromExistingClassName != "" {
 			supported = true
 		}

@@ -43,7 +43,7 @@ rules:
   verbs: ["update"]
 - apiGroups: ["extensions", "networking.k8s.io"]
   resources: ["ingresses/status"]
-  verbs: ["update"]
+  verbs: ["update", "patch"]
 # GLBC ensures that the `cloud.google.com/backendconfigs` CRD exists in a desired state:
 # https://github.com/kubernetes/ingress-gce/blob/4918eb2f0f484f09ac9e5a975907a9b16ed2b344/cmd/glbc/main.go#L93
 # TODO(rramkumar1): https://github.com/kubernetes/ingress-gce/issues/744

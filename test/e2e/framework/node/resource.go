@@ -41,9 +41,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientretry "k8s.io/client-go/util/retry"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-
-	// TODO remove the direct dependency for internal k8s.io/kubernetes
-	"k8s.io/kubernetes/test/e2e/system"
 )
 
 const (
@@ -361,25 +358,6 @@ func GetReadyNodesIncludingTainted(c clientset.Interface) (nodes *v1.NodeList, e
 		return IsNodeSchedulable(&node)
 	})
 	return nodes, nil
-}
-
-// DeprecatedGetMasterAndWorkerNodes will return a list masters and schedulable worker nodes
-// NOTE: This function has been deprecated because of calling DeprecatedMightBeMasterNode().
-func DeprecatedGetMasterAndWorkerNodes(c clientset.Interface) (sets.String, *v1.NodeList, error) {
-	nodes := &v1.NodeList{}
-	masters := sets.NewString()
-	all, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, nil, fmt.Errorf("get nodes error: %s", err)
-	}
-	for _, n := range all.Items {
-		if system.DeprecatedMightBeMasterNode(n.Name) {
-			masters.Insert(n.Name)
-		} else if isNodeSchedulableWithoutTaints(&n) {
-			nodes.Items = append(nodes.Items, n)
-		}
-	}
-	return masters, nodes, nil
 }
 
 // isNodeUntainted tests whether a fake pod can be scheduled on "node", given its current taints.

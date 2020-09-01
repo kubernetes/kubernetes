@@ -42,20 +42,20 @@ const (
 	// Filter is the name of the filter extension point.
 	Filter = "Filter"
 	// Specifies the maximum timeout a permit plugin can return.
-	maxTimeout                  time.Duration = 15 * time.Minute
-	preFilter                                 = "PreFilter"
-	preFilterExtensionAddPod                  = "PreFilterExtensionAddPod"
-	preFilterExtensionRemovePod               = "PreFilterExtensionRemovePod"
-	postFilter                                = "PostFilter"
-	preScore                                  = "PreScore"
-	score                                     = "Score"
-	scoreExtensionNormalize                   = "ScoreExtensionNormalize"
-	preBind                                   = "PreBind"
-	bind                                      = "Bind"
-	postBind                                  = "PostBind"
-	reserve                                   = "Reserve"
-	unreserve                                 = "Unreserve"
-	permit                                    = "Permit"
+	maxTimeout                  = 15 * time.Minute
+	preFilter                   = "PreFilter"
+	preFilterExtensionAddPod    = "PreFilterExtensionAddPod"
+	preFilterExtensionRemovePod = "PreFilterExtensionRemovePod"
+	postFilter                  = "PostFilter"
+	preScore                    = "PreScore"
+	score                       = "Score"
+	scoreExtensionNormalize     = "ScoreExtensionNormalize"
+	preBind                     = "PreBind"
+	bind                        = "Bind"
+	postBind                    = "PostBind"
+	reserve                     = "Reserve"
+	unreserve                   = "Unreserve"
+	permit                      = "Permit"
 )
 
 var configDecoder = scheme.Codecs.UniversalDecoder()
@@ -623,7 +623,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 			}
 			pluginToNodeScores[pl.Name()][index] = framework.NodeScore{
 				Name:  nodeName,
-				Score: int64(s),
+				Score: s,
 			}
 		}
 	})
@@ -662,7 +662,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 
 		for i, nodeScore := range nodeScoreList {
 			// return error if score plugin returns invalid score.
-			if nodeScore.Score > int64(framework.MaxNodeScore) || nodeScore.Score < int64(framework.MinNodeScore) {
+			if nodeScore.Score > framework.MaxNodeScore || nodeScore.Score < framework.MinNodeScore {
 				err := fmt.Errorf("score plugin %q returns an invalid score %v, it should in the range of [%v, %v] after normalizing", pl.Name(), nodeScore.Score, framework.MinNodeScore, framework.MaxNodeScore)
 				errCh.SendErrorWithCancel(err, cancel)
 				return

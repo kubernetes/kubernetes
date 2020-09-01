@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "bootime_util_linux_test.go",
         "util_test.go",
         "util_unix_test.go",
         "util_windows_test.go",

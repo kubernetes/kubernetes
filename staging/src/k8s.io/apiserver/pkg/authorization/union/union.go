@@ -88,7 +88,7 @@ func (authzHandler unionAuthzRulesHandler) RulesFor(user user.Info, namespace st
 	for _, currAuthzHandler := range authzHandler {
 		resourceRules, nonResourceRules, incomplete, err := currAuthzHandler.RulesFor(user, namespace)
 
-		if incomplete == true {
+		if incomplete {
 			incompleteStatus = true
 		}
 		if err != nil {

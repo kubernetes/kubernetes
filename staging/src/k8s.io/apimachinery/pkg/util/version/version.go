@@ -24,7 +24,7 @@ import (
 	"strings"
 )
 
-// Version is an opqaue representation of a version number
+// Version is an opaque representation of a version number
 type Version struct {
 	components    []uint
 	semver        bool

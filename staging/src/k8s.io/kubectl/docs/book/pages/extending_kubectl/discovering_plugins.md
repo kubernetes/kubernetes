@@ -3,13 +3,13 @@
 {% endpanel %}
 
 {% panel style="info", title="TL;DR" %}
-- [krew.dev](https://github.com/kubernetes-sigs/krew/#installation) is a kubernetes sub-project to discover and manage plugins
+- [krew.sigs.k8s.io](https://krew.sigs.k8s.io/docs/user-guide/setup/install/) is a kubernetes sub-project to discover and manage plugins
 {% endpanel %}
 
 # Krew
 
 By design, `kubectl` does not install plugins. This task is left to the kubernetes sub-project
-[krew.dev](https://github.com/kubernetes-sigs/krew/#installation) which needs to be installed separately.
+[krew.sigs.k8s.io](https://krew.sigs.k8s.io/docs/user-guide/setup/install/) which needs to be installed separately.
 Krew helps to
 
 - discover plugins
@@ -21,7 +21,7 @@ Krew helps to
 Krew should be used as a kubectl plugin. To set yourself up to using krew, you need to do two things:
 
 1. Install git
-1. Install krew as described on the project page [krew.dev](https://github.com/kubernetes-sigs/krew/#installation).
+1. Install krew as described on the project page [krew.sigs.k8s.io](https://krew.sigs.k8s.io/docs/user-guide/setup/install/).
 1. Add the krew bin folder to your `PATH` environment variable. For example, in bash `export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"`.
 
 ## Krew capabilities

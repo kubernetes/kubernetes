@@ -61,12 +61,10 @@ spec:
       labels:
         k8s-app: fluentd-es
         version: v3.0.2
-      # This annotation ensures that fluentd does not get evicted if the node
-      # supports critical pod annotation based priority scheme.
-      # Note that this does not guarantee admission on the nodes (#40573).
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       priorityClassName: system-node-critical
       serviceAccountName: fluentd-es
       containers:

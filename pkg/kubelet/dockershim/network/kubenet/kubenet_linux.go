@@ -41,10 +41,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
-	utilebtables "k8s.io/kubernetes/pkg/util/ebtables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
+	utilebtables "k8s.io/utils/net/ebtables"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -90,22 +90,17 @@ var requiredCNIPlugins = [...]string{"bridge", "host-local", "loopback"}
 type kubenetNetworkPlugin struct {
 	network.NoopNetworkPlugin
 
-	host            network.Host
-	netConfig       *libcni.NetworkConfig
-	loConfig        *libcni.NetworkConfig
-	cniConfig       libcni.CNI
-	bandwidthShaper bandwidth.Shaper
-	mu              sync.Mutex //Mutex for protecting podIPs map, netConfig, and shaper initialization
-	podIPs          map[kubecontainer.ContainerID]utilsets.String
-	mtu             int
-	execer          utilexec.Interface
-	nsenterPath     string
-	hairpinMode     kubeletconfig.HairpinMode
-	// kubenet can use either hostportSyncer and hostportManager to implement hostports
-	// Currently, if network host supports legacy features, hostportSyncer will be used,
-	// otherwise, hostportManager will be used.
-	hostportSyncer    hostport.HostportSyncer
-	hostportSyncerv6  hostport.HostportSyncer
+	host              network.Host
+	netConfig         *libcni.NetworkConfig
+	loConfig          *libcni.NetworkConfig
+	cniConfig         libcni.CNI
+	bandwidthShaper   bandwidth.Shaper
+	mu                sync.Mutex //Mutex for protecting podIPs map, netConfig, and shaper initialization
+	podIPs            map[kubecontainer.ContainerID]utilsets.String
+	mtu               int
+	execer            utilexec.Interface
+	nsenterPath       string
+	hairpinMode       kubeletconfig.HairpinMode
 	hostportManager   hostport.HostPortManager
 	hostportManagerv6 hostport.HostPortManager
 	iptables          utiliptables.Interface
@@ -131,8 +126,6 @@ func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugi
 		iptablesv6:        iptInterfacev6,
 		sysctl:            utilsysctl.New(),
 		binDirs:           append([]string{DefaultCNIDir}, networkPluginDirs...),
-		hostportSyncer:    hostport.NewHostportSyncer(iptInterface),
-		hostportSyncerv6:  hostport.NewHostportSyncer(iptInterfacev6),
 		hostportManager:   hostport.NewHostportManager(iptInterface),
 		hostportManagerv6: hostport.NewHostportManager(iptInterfacev6),
 		nonMasqueradeCIDR: "10.0.0.0/8",

@@ -332,13 +332,15 @@ func SelectCandidate(candidates []Candidate) Candidate {
 
 	// Same as candidatesToVictimsMap, this logic is not applicable for out-of-tree
 	// preemption plugins that exercise different candidates on the same nominated node.
-	for _, candidate := range candidates {
-		if candidateNode == candidate.Name() {
-			return candidate
+	if victims := victimsMap[candidateNode]; victims != nil {
+		return &candidate{
+			victims: victims,
+			name:    candidateNode,
 		}
 	}
+
 	// We shouldn't reach here.
-	klog.Errorf("None candidate can be picked from %v.", candidates)
+	klog.Errorf("should not reach here, no candidate selected from %v.", candidates)
 	// To not break the whole flow, return the first candidate.
 	return candidates[0]
 }

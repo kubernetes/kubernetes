@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -65,12 +66,25 @@ func TestRemoveContainer(t *testing.T) {
 
 	containerID := fakeContainers[0].Id
 	fakeOS := m.osInterface.(*containertest.FakeOS)
+	fakeOS.GlobFn = func(pattern, path string) bool {
+		pattern = strings.Replace(pattern, "*", ".*", -1)
+		return regexp.MustCompile(pattern).MatchString(path)
+	}
+	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "new_bar_12345678", "foo", "0.log")
+	expectedContainerLogPathRotated := filepath.Join(podLogsRootDirectory, "new_bar_12345678", "foo", "0.log.20060102-150405")
+	expectedContainerLogSymlink := legacyLogSymlink(containerID, "foo", "bar", "new")
+
+	fakeOS.Create(expectedContainerLogPath)
+	fakeOS.Create(expectedContainerLogPathRotated)
+
 	err = m.removeContainer(containerID)
 	assert.NoError(t, err)
-	// Verify container log is removed
-	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "new_bar_12345678", "foo", "0.log")
-	expectedContainerLogSymlink := legacyLogSymlink(containerID, "foo", "bar", "new")
-	assert.Equal(t, fakeOS.Removes, []string{expectedContainerLogPath, expectedContainerLogSymlink})
+
+	// Verify container log is removed.
+	// We could not predict the order of `fakeOS.Removes`, so we use `assert.ElementsMatch` here.
+	assert.ElementsMatch(t,
+		[]string{expectedContainerLogSymlink, expectedContainerLogPath, expectedContainerLogPathRotated},
+		fakeOS.Removes)
 	// Verify container is removed
 	assert.Contains(t, fakeRuntime.Called, "RemoveContainer")
 	containers, err := fakeRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: containerID})
