@@ -167,8 +167,22 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 				if err != nil {
 					t.Error(err)
 				}
-				if spec.APIServer != controlPlaneEndpoint {
-					t.Errorf("getKubeConfigSpecs didn't injected cfg.APIServer endpoint into spec for %s", assertion.kubeConfigFile)
+				localAPIEndpoint, err := kubeadmutil.GetLocalAPIEndpoint(&cfg.LocalAPIEndpoint)
+				if err != nil {
+					t.Error(err)
+				}
+
+				switch assertion.kubeConfigFile {
+				case kubeadmconstants.AdminKubeConfigFileName, kubeadmconstants.KubeletKubeConfigFileName:
+					if spec.APIServer != controlPlaneEndpoint {
+						t.Errorf("expected getKubeConfigSpecs for %s to set cfg.APIServer to %s, got %s",
+							assertion.kubeConfigFile, controlPlaneEndpoint, spec.APIServer)
+					}
+				case kubeadmconstants.ControllerManagerKubeConfigFileName, kubeadmconstants.SchedulerKubeConfigFileName:
+					if spec.APIServer != localAPIEndpoint {
+						t.Errorf("expected getKubeConfigSpecs for %s to set cfg.APIServer to %s, got %s",
+							assertion.kubeConfigFile, localAPIEndpoint, spec.APIServer)
+					}
 				}
 
 				// Asserts CA certs and CA keys loaded into specs
