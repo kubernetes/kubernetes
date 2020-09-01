@@ -2986,14 +2986,6 @@ func TestTaintsNodeByCondition(t *testing.T) {
 		Key:    v1.TaintNodeNetworkUnavailable,
 		Effect: v1.TaintEffectNoSchedule,
 	}
-	notReadyTaint := &v1.Taint{
-		Key:    v1.TaintNodeNotReady,
-		Effect: v1.TaintEffectNoSchedule,
-	}
-	unreachableTaint := &v1.Taint{
-		Key:    v1.TaintNodeUnreachable,
-		Effect: v1.TaintEffectNoSchedule,
-	}
 
 	tests := []struct {
 		Name           string
@@ -3088,7 +3080,7 @@ func TestTaintsNodeByCondition(t *testing.T) {
 					},
 				},
 			},
-			ExpectedTaints: []*v1.Taint{notReadyTaint},
+			ExpectedTaints: []*v1.Taint{},
 		},
 		{
 			Name: "Ready is unknown",
@@ -3114,7 +3106,7 @@ func TestTaintsNodeByCondition(t *testing.T) {
 					},
 				},
 			},
-			ExpectedTaints: []*v1.Taint{unreachableTaint},
+			ExpectedTaints: []*v1.Taint{},
 		},
 	}
 
