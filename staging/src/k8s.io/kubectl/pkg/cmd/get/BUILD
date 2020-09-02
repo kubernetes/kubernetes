@@ -55,12 +55,12 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/util/interrupt:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/openapi:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
+        "//vendor/github.com/fvbommel/sortorder:go_default_library",
         "//vendor/github.com/liggitt/tabwriter:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/integer:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
-        "//vendor/vbom.ml/util/sortorder:go_default_library",
     ],
 )
 
