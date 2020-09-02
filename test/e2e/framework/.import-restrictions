@@ -45,6 +45,7 @@ rules:
       - k8s.io/kubernetes/pkg/credentialprovider/secrets
       - k8s.io/kubernetes/pkg/features
       - k8s.io/kubernetes/pkg/fieldpath
+      - k8s.io/kubernetes/pkg/kubeapierver/ports
       - k8s.io/kubernetes/pkg/kubectl
       - k8s.io/kubernetes/pkg/kubectl/apps
       - k8s.io/kubernetes/pkg/kubectl/describe
@@ -160,7 +161,6 @@ rules:
       - k8s.io/kubernetes/pkg/kubelet/volumemanager/populator
       - k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler
       - k8s.io/kubernetes/pkg/kubemark
-      - k8s.io/kubernetes/pkg/master/ports
       - k8s.io/kubernetes/pkg/probe
       - k8s.io/kubernetes/pkg/probe/exec
       - k8s.io/kubernetes/pkg/probe/http

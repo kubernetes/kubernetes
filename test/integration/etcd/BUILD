@@ -65,6 +65,7 @@ go_library(
         "//cmd/kube-apiserver/app:go_default_library",
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/features:go_default_library",
+        "//pkg/kubeapiserver:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
@@ -84,7 +85,6 @@ go_library(
         "//test/integration/framework:go_default_library",
         "//vendor/go.etcd.io/etcd/clientv3:go_default_library",
         "//vendor/go.etcd.io/etcd/clientv3/concurrency:go_default_library",
-        "//vendor/k8s.io/kubernetes/pkg/master:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
