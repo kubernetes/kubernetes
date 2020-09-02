@@ -1,4 +1,4 @@
-= vendor/vbom.ml/util licensed under: =
+= vendor/github.com/fvbommel/sortorder licensed under: =
 
 The MIT License (MIT)
 Copyright (c) 2015 Frits van Bommel
@@ -18,4 +18,4 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-= vendor/vbom.ml/util/LICENSE 9f7e1d7e8f527330ebb5f4c32e0f3e40
+= vendor/github.com/fvbommel/sortorder/LICENSE 9f7e1d7e8f527330ebb5f4c32e0f3e40
