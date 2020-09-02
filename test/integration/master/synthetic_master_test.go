@@ -48,7 +48,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clienttypedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -143,13 +143,13 @@ func TestEmptyList(t *testing.T) {
 	}
 }
 
-func initStatusForbiddenMasterCongfig() *master.Config {
+func initStatusForbiddenMasterCongfig() *controlplane.Config {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
 	return masterConfig
 }
 
-func initUnauthorizedMasterCongfig() *master.Config {
+func initUnauthorizedMasterCongfig() *controlplane.Config {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	tokenAuthenticator := tokentest.New()
 	tokenAuthenticator.Tokens[AliceToken] = &user.DefaultInfo{Name: "alice", UID: "1"}
@@ -162,7 +162,7 @@ func initUnauthorizedMasterCongfig() *master.Config {
 func TestStatus(t *testing.T) {
 	testCases := []struct {
 		name         string
-		masterConfig *master.Config
+		masterConfig *controlplane.Config
 		statusCode   int
 		reqPath      string
 		reason       string
