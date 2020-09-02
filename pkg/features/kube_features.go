@@ -657,6 +657,12 @@ const (
 	//
 	// Enable Terminating condition in Endpoint Slices.
 	EndpointSliceTerminatingCondition featuregate.Feature = "EndpointSliceTerminatingCondition"
+
+	// owner: @derekwaynecarr
+	// alpha: v1.20
+	//
+	// Enables kubelet support to size memory backed volumes
+	SizeMemoryBackedVolumes featuregate.Feature = "SizeMemoryBackedVolumes"
 )
 
 func init() {
@@ -756,6 +762,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DisableAcceleratorUsageMetrics:                 {Default: true, PreRelease: featuregate.Beta},
 	HPAContainerMetrics:                            {Default: false, PreRelease: featuregate.Alpha},
 	RootCAConfigMap:                                {Default: true, PreRelease: featuregate.Beta},
+	SizeMemoryBackedVolumes:                        {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
