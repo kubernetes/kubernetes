@@ -23,6 +23,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/debugger"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
@@ -82,6 +83,7 @@ func getDefaultConfig() *schedulerapi.Plugins {
 				{Name: podtopologyspread.Name},
 				{Name: interpodaffinity.Name},
 				{Name: volumebinding.Name},
+				{Name: debugger.Name},
 			},
 		},
 		Filter: &schedulerapi.PluginSet{

@@ -1384,6 +1384,7 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 			{Name: "PodTopologySpread"},
 			{Name: "InterPodAffinity"},
 			{Name: "VolumeBinding"},
+			{Name: "Debugger"},
 		},
 		"FilterPlugin": {
 			{Name: "NodeUnschedulable"},
@@ -1454,6 +1455,7 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 					{Name: "VolumeBinding"},
+					{Name: "Debugger"},
 				},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -1544,6 +1546,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 			{Name: "PodTopologySpread"},
 			{Name: "InterPodAffinity"},
 			{Name: "VolumeBinding"},
+			{Name: "Debugger"},
 		},
 		"FilterPlugin": {
 			{Name: "NodeUnschedulable"},
@@ -1741,6 +1744,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 						{Name: "InterPodAffinity"},
 						{Name: "PodTopologySpread"},
 						{Name: "VolumeBinding"},
+						{Name: "Debugger"},
 					},
 				},
 				Filter: &config.PluginSet{
@@ -1827,6 +1831,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 						{Name: "InterPodAffinity"},
 						{Name: "NodePorts"},
 						{Name: "NodeResourcesFit"},
+						{Name: "Debugger"},
 					},
 					Disabled: []config.Plugin{
 						{Name: "*"},
@@ -1891,6 +1896,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 					{Name: "InterPodAffinity"},
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
+					{Name: "Debugger"},
 				},
 				"FilterPlugin": {
 					{Name: "InterPodAffinity"},
