@@ -278,7 +278,7 @@ func (s *store) GuaranteedUpdate(
 
 	transformContext := authenticatedDataString(key)
 	for {
-		if err := checkPreconditions(key, origState.obj, objFound, preconditions); err != nil {
+		if err := preconditions.SafeCheck(key, origState.obj, objFound); err != nil {
 			// If our data is already up to date, return the error
 			if !mustCheckData {
 				return err
