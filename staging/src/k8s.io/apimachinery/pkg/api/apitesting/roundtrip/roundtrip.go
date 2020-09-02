@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 	fuzz "github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
 
