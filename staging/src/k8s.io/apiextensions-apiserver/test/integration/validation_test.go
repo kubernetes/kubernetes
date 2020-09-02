@@ -814,8 +814,8 @@ spec:
 		t.Fatalf("unexpected error waiting for NonStructuralSchema condition: %v", cond)
 	}
 
-	// readd schema
-	t.Log("Readd schema")
+	// re-add schema
+	t.Log("Re-add schema")
 	for retry := 0; retry < 5; retry++ {
 		crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
