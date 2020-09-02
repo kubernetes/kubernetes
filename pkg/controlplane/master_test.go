@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package controlplane
 
 import (
 	"context"
@@ -51,9 +51,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
+	"k8s.io/kubernetes/pkg/controlplane/storageversionhashdata"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/master/reconcilers"
-	"k8s.io/kubernetes/pkg/master/storageversionhashdata"
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"

@@ -37,7 +37,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -53,7 +53,7 @@ func setup(t testing.TB) (*httptest.Server, *rest.Config, framework.CloseFunc) {
 	opts := framework.MasterConfigOptions{EtcdOptions: framework.DefaultEtcdOptions()}
 	opts.EtcdOptions.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
 	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(&opts)
-	resourceConfig := master.DefaultAPIResourceConfigSource()
+	resourceConfig := controlplane.DefaultAPIResourceConfigSource()
 	resourceConfig.EnableVersions(schema.GroupVersion{
 		Group:   "flowcontrol.apiserver.k8s.io",
 		Version: "v1alpha1",

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package controlplane
 
 import (
 	"context"
@@ -79,12 +79,12 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
+	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
+	"k8s.io/kubernetes/pkg/controlplane/tunneler"
 	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/master/controller/clusterauthenticationtrust"
-	"k8s.io/kubernetes/pkg/master/reconcilers"
-	"k8s.io/kubernetes/pkg/master/tunneler"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"

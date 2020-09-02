@@ -38,11 +38,11 @@ import (
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	kubectrlmgrconfigscheme "k8s.io/kubernetes/pkg/controller/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
-	"k8s.io/kubernetes/pkg/master/ports"
 
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"

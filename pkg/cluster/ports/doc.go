@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package master contains code for setting up and running a Kubernetes
-// cluster master.
-package master // import "k8s.io/kubernetes/pkg/master"
+// Package ports defines ports used by various pieces of the kubernetes
+// infrastructure.
+package ports // import "k8s.io/kubernetes/pkg/cluster/ports"

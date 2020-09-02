@@ -36,9 +36,9 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/metrics"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/master/reconcilers"
 )
 
 func TestAddFlags(t *testing.T) {
