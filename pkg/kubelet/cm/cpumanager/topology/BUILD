@@ -33,8 +33,5 @@ go_test(
     name = "go_default_test",
     srcs = ["topology_test.go"],
     embed = [":go_default_library"],
-    deps = [
-        "//pkg/kubelet/cm/cpuset:go_default_library",
-        "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
-    ],
+    deps = ["//vendor/github.com/google/cadvisor/info/v1:go_default_library"],
 )
