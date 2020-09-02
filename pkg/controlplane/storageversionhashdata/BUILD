@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["data.go"],
-    importpath = "k8s.io/kubernetes/pkg/master/storageversionhashdata",
+    importpath = "k8s.io/kubernetes/pkg/controlplane/storageversionhashdata",
     visibility = ["//visibility:public"],
     deps = ["//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library"],
 )

@@ -32,9 +32,9 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
-	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
