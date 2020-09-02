@@ -614,7 +614,7 @@ func TestFlowSchemaValidation(t *testing.T) {
 				},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("priorityLevelConfiguration").Child("name"), "system+++$$", `a DNS-1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`),
+				field.Invalid(field.NewPath("spec").Child("priorityLevelConfiguration").Child("name"), "system+++$$", `a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`),
 			},
 		},
 		{
@@ -857,7 +857,7 @@ func TestFlowSchemaValidation(t *testing.T) {
 				},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("resourceRules").Index(0).Child("namespaces").Index(0), "-foo", nsErrIntro+`a DNS-1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')`),
+				field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("resourceRules").Index(0).Child("namespaces").Index(0), "-foo", nsErrIntro+`a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')`),
 			},
 		},
 		{
