@@ -1307,7 +1307,7 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e
 	_, err = cs.StorageV1().StorageClasses().Get(context.TODO(), class.Name, metav1.GetOptions{})
 	if err != nil {
 		class, err = cs.StorageV1().StorageClasses().Create(context.TODO(), class, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "Failed to create class : %v", err)
+		framework.ExpectNoError(err, "Failed to create class: %v", err)
 	}
 
 	claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
@@ -1321,7 +1321,7 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e
 	if !t.DelayBinding {
 		pvcClaims := []*v1.PersistentVolumeClaim{claim}
 		_, err = e2epv.WaitForPVClaimBoundPhase(cs, pvcClaims, framework.ClaimProvisionTimeout)
-		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
+		framework.ExpectNoError(err, "Failed waiting for PVC to be bound: %v", err)
 	}
 
 	pod, err := startPausePodWithClaim(cs, claim, node, ns)
