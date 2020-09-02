@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package controlplane
 
 // This test file is separated from master_test.go so we would be able to disable
 // race check for it. TestValidOpenAPISpec will became extremely slow if -race
