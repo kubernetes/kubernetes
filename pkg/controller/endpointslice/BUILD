@@ -14,6 +14,7 @@ go_library(
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/apis/discovery/validation:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/endpointslice/metrics:go_default_library",
