@@ -19,16 +19,16 @@ package fuzzer
 import (
 	"time"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubelet/config/v1beta1"
+	"k8s.io/kubernetes/pkg/kubeapiserver/ports"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/master/ports"
 )
 
 // Funcs returns the fuzzer functions for the kubeletconfig apis.

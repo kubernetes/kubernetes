@@ -63,7 +63,6 @@ filegroup(
         "//pkg/kubectl:all-srcs",
         "//pkg/kubelet:all-srcs",
         "//pkg/kubemark:all-srcs",
-        "//pkg/master:all-srcs",
         "//pkg/printers:all-srcs",
         "//pkg/probe:all-srcs",
         "//pkg/proxy:all-srcs",

@@ -37,8 +37,8 @@ import (
 	"k8s.io/component-base/metrics"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
+	"k8s.io/kubernetes/pkg/kubeapiserver/reconcilers"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/master/reconcilers"
 )
 
 func TestAddFlags(t *testing.T) {

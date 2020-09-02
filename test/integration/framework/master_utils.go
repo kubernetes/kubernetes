@@ -26,6 +26,8 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/kubernetes/pkg/kubeapiserver/launchkubeapiserver"
+
 	"github.com/go-openapi/spec"
 	"github.com/google/uuid"
 
@@ -56,13 +58,12 @@ import (
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/master"
 )
 
 // Config is a struct of configuration directives for NewMasterComponents.
 type Config struct {
 	// If nil, a default is used, partially filled configs will not get populated.
-	MasterConfig            *master.Config
+	MasterConfig            *launchkubeapiserver.Config
 	StartReplicationManager bool
 	// Client throttling qps
 	QPS float32
@@ -89,17 +90,17 @@ func alwaysEmpty(req *http.Request) (*authauthenticator.Response, bool, error) {
 
 // MasterReceiver can be used to provide the master to a custom incoming server function
 type MasterReceiver interface {
-	SetMaster(m *master.Master)
+	SetMaster(m *launchkubeapiserver.Master)
 }
 
 // MasterHolder implements
 type MasterHolder struct {
 	Initialized chan struct{}
-	M           *master.Master
+	M           *launchkubeapiserver.Master
 }
 
 // SetMaster assigns the current master.
-func (h *MasterHolder) SetMaster(m *master.Master) {
+func (h *MasterHolder) SetMaster(m *launchkubeapiserver.Master) {
 	h.M = m
 	close(h.Initialized)
 }
@@ -124,8 +125,8 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 }
 
 // startMasterOrDie starts a kubernetes master and an httpserver to handle api requests
-func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server, CloseFunc) {
-	var m *master.Master
+func startMasterOrDie(masterConfig *launchkubeapiserver.Config, incomingServer *httptest.Server, masterReceiver MasterReceiver) (*launchkubeapiserver.Master, *httptest.Server, CloseFunc) {
+	var m *launchkubeapiserver.Master
 	var s *httptest.Server
 
 	// Ensure we log at least level 4
@@ -249,16 +250,16 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 }
 
 // NewIntegrationTestMasterConfig returns the master config appropriate for most integration tests.
-func NewIntegrationTestMasterConfig() *master.Config {
+func NewIntegrationTestMasterConfig() *launchkubeapiserver.Config {
 	return NewIntegrationTestMasterConfigWithOptions(&MasterConfigOptions{})
 }
 
 // NewIntegrationTestMasterConfigWithOptions returns the master config appropriate for most integration tests
 // configured with the provided options.
-func NewIntegrationTestMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
+func NewIntegrationTestMasterConfigWithOptions(opts *MasterConfigOptions) *launchkubeapiserver.Config {
 	masterConfig := NewMasterConfigWithOptions(opts)
 	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
-	masterConfig.ExtraConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
+	masterConfig.ExtraConfig.APIResourceConfigSource = launchkubeapiserver.DefaultAPIResourceConfigSource()
 
 	// TODO: get rid of these tests or port them to secure serving
 	masterConfig.GenericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
@@ -282,12 +283,12 @@ func DefaultEtcdOptions() *options.EtcdOptions {
 }
 
 // NewMasterConfig returns a basic master config.
-func NewMasterConfig() *master.Config {
+func NewMasterConfig() *launchkubeapiserver.Config {
 	return NewMasterConfigWithOptions(&MasterConfigOptions{})
 }
 
 // NewMasterConfigWithOptions returns a basic master config configured with the provided options.
-func NewMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
+func NewMasterConfigWithOptions(opts *MasterConfigOptions) *launchkubeapiserver.Config {
 	etcdOptions := DefaultEtcdOptions()
 	if opts.EtcdOptions != nil {
 		etcdOptions = opts.EtcdOptions
@@ -317,10 +318,10 @@ func NewMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
 		panic(err)
 	}
 
-	return &master.Config{
+	return &launchkubeapiserver.Config{
 		GenericConfig: genericConfig,
-		ExtraConfig: master.ExtraConfig{
-			APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
+		ExtraConfig: launchkubeapiserver.ExtraConfig{
+			APIResourceConfigSource: launchkubeapiserver.DefaultAPIResourceConfigSource(),
 			StorageFactory:          storageFactory,
 			KubeletClientConfig:     kubeletclient.KubeletClientConfig{Port: 10250},
 			APIServerServicePort:    443,
@@ -333,7 +334,7 @@ func NewMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
 type CloseFunc func()
 
 // RunAMaster starts a master with the provided config.
-func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server, CloseFunc) {
+func RunAMaster(masterConfig *launchkubeapiserver.Config) (*launchkubeapiserver.Master, *httptest.Server, CloseFunc) {
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
 		masterConfig.GenericConfig.EnableProfiling = true
@@ -342,7 +343,7 @@ func RunAMaster(masterConfig *master.Config) (*master.Master, *httptest.Server, 
 }
 
 // RunAMasterUsingServer starts up a master using the provided config on the specified server.
-func RunAMasterUsingServer(masterConfig *master.Config, s *httptest.Server, masterReceiver MasterReceiver) (*master.Master, *httptest.Server, CloseFunc) {
+func RunAMasterUsingServer(masterConfig *launchkubeapiserver.Config, s *httptest.Server, masterReceiver MasterReceiver) (*launchkubeapiserver.Master, *httptest.Server, CloseFunc) {
 	return startMasterOrDie(masterConfig, s, masterReceiver)
 }
 

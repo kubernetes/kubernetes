@@ -20,8 +20,8 @@ go_library(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
+        "//pkg/kubeapiserver/ports:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
-        "//pkg/master/ports:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/apis:go_default_library",
         "//pkg/proxy/apis/config:go_default_library",

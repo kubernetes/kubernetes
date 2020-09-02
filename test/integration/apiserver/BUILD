@@ -25,7 +25,7 @@ go_test(
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/master:go_default_library",
+        "//pkg/kubeapiserver/launchkubeapiserver:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",

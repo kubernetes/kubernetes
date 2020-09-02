@@ -24,7 +24,7 @@ go_library(
         "//pkg/capabilities:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/fieldpath:go_default_library",
-        "//pkg/master/ports:go_default_library",
+        "//pkg/kubeapiserver/ports:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/events/v1beta1:go_default_library",

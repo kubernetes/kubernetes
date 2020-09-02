@@ -31,9 +31,9 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/features" // add the kubernetes feature gates
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
+	"k8s.io/kubernetes/pkg/kubeapiserver/ports"
+	"k8s.io/kubernetes/pkg/kubeapiserver/reconcilers"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 

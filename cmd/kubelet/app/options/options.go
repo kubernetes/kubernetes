@@ -33,12 +33,12 @@ import (
 	"k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubeapiserver/ports"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
 	"k8s.io/kubernetes/pkg/kubelet/config"
-	"k8s.io/kubernetes/pkg/master/ports"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )

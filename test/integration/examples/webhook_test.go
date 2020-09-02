@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/kubeapiserver/launchkubeapiserver"
+
 	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,8 +31,7 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/master"
-	"k8s.io/kubernetes/pkg/master/reconcilers"
+	"k8s.io/kubernetes/pkg/kubeapiserver/reconcilers"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -45,7 +46,7 @@ func TestWebhookLoopback(t *testing.T) {
 	client, _ := framework.StartTestServer(t, stopCh, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 		},
-		ModifyServerConfig: func(config *master.Config) {
+		ModifyServerConfig: func(config *launchkubeapiserver.Config) {
 			// Avoid resolveable kubernetes service
 			config.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
 

@@ -28,6 +28,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/kubeapiserver/launchkubeapiserver"
+
 	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -45,7 +47,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -54,7 +55,7 @@ func setup(t testing.TB, groupVersions ...schema.GroupVersion) (*httptest.Server
 	opts.EtcdOptions.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
 	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(&opts)
 	if len(groupVersions) > 0 {
-		resourceConfig := master.DefaultAPIResourceConfigSource()
+		resourceConfig := launchkubeapiserver.DefaultAPIResourceConfigSource()
 		resourceConfig.EnableVersions(groupVersions...)
 		masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 	}

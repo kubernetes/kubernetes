@@ -32,6 +32,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/kubeapiserver/launchkubeapiserver"
+
 	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -48,7 +50,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clienttypedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -143,13 +144,13 @@ func TestEmptyList(t *testing.T) {
 	}
 }
 
-func initStatusForbiddenMasterCongfig() *master.Config {
+func initStatusForbiddenMasterCongfig() *launchkubeapiserver.Config {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
 	return masterConfig
 }
 
-func initUnauthorizedMasterCongfig() *master.Config {
+func initUnauthorizedMasterCongfig() *launchkubeapiserver.Config {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	tokenAuthenticator := tokentest.New()
 	tokenAuthenticator.Tokens[AliceToken] = &user.DefaultInfo{Name: "alice", UID: "1"}
@@ -162,7 +163,7 @@ func initUnauthorizedMasterCongfig() *master.Config {
 func TestStatus(t *testing.T) {
 	testCases := []struct {
 		name         string
-		masterConfig *master.Config
+		masterConfig *launchkubeapiserver.Config
 		statusCode   int
 		reqPath      string
 		reason       string

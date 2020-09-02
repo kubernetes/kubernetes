@@ -23,10 +23,11 @@ import (
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
+	"k8s.io/kubernetes/pkg/kubeapiserver/ports"
+
 	// TODO: Cut references to k8s.io/kubernetes, eventually there should be none from this package
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/master/ports"
 	utilpointer "k8s.io/utils/pointer"
 )
 

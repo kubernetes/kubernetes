@@ -19,22 +19,23 @@ package openshift
 import (
 	"testing"
 
+	"k8s.io/kubernetes/pkg/kubeapiserver/launchkubeapiserver"
+
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/kubernetes/pkg/master"
 )
 
 // This test references methods that OpenShift uses to customize the master on startup, that
 // are not referenced directly by a master.
 func TestMasterExportsSymbols(t *testing.T) {
-	_ = &master.Config{
+	_ = &launchkubeapiserver.Config{
 		GenericConfig: &genericapiserver.Config{
 			EnableMetrics: true,
 		},
-		ExtraConfig: master.ExtraConfig{
+		ExtraConfig: launchkubeapiserver.ExtraConfig{
 			EnableLogsSupport: false,
 		},
 	}
-	_ = &master.Master{
+	_ = &launchkubeapiserver.Master{
 		GenericAPIServer: &genericapiserver.GenericAPIServer{},
 	}
 }
