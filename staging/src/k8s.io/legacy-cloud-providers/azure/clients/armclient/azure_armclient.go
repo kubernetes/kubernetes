@@ -64,10 +64,11 @@ func New(authorizer autorest.Authorizer, baseURI, userAgent, apiVersion, clientR
 
 	backoff := clientBackoff
 	if backoff == nil {
+		backoff = &retry.Backoff{}
+	}
+	if backoff.Steps == 0 {
 		// 1 steps means no retry.
-		backoff = &retry.Backoff{
-			Steps: 1,
-		}
+		backoff.Steps = 1
 	}
 
 	return &Client{
