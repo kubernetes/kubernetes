@@ -21,11 +21,7 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
-
-	flag "github.com/spf13/pflag"
 )
-
-var fuzzIters = flag.Int("fuzz-iters", 50, "How many fuzzing iterations to do.")
 
 func testLogger(t *testing.T) DebugLogger {
 	// We don't set logger to eliminate rubbish logs in tests.
