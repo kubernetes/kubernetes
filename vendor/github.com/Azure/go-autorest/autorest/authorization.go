@@ -138,6 +138,11 @@ func (ba *BearerAuthorizer) WithAuthorization() PrepareDecorator {
 	}
 }
 
+// TokenProvider returns OAuthTokenProvider so that it can be used for authorization outside the REST.
+func (ba *BearerAuthorizer) TokenProvider() adal.OAuthTokenProvider {
+	return ba.tokenProvider
+}
+
 // BearerAuthorizerCallbackFunc is the authentication callback signature.
 type BearerAuthorizerCallbackFunc func(tenantID, resource string) (*BearerAuthorizer, error)
 
@@ -331,7 +336,7 @@ func (mt multiTenantSPTAuthorizer) WithAuthorization() PrepareDecorator {
 			for i := range auxTokens {
 				auxTokens[i] = fmt.Sprintf("Bearer %s", auxTokens[i])
 			}
-			return Prepare(r, WithHeader(headerAuxAuthorization, strings.Join(auxTokens, "; ")))
+			return Prepare(r, WithHeader(headerAuxAuthorization, strings.Join(auxTokens, ", ")))
 		})
 	}
 }
