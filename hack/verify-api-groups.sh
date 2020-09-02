@@ -95,7 +95,7 @@ packages_without_install=(
 	"k8s.io/kubernetes/pkg/apis/componentconfig" # TODO: Remove this package completely and from this list
 )
 known_version_files=(
-	"pkg/master/import_known_versions.go"
+	"pkg/controlplane/import_known_versions.go"
 )
 for expected_install_package in "${expected_install_packages[@]}"; do
 	found=0
