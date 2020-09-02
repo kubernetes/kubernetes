@@ -37,6 +37,7 @@ staging_repos = [
     "k8s.io/kubelet",
     "k8s.io/legacy-cloud-providers",
     "k8s.io/metrics",
+    "k8s.io/mount-utils",
     "k8s.io/sample-apiserver",
     "k8s.io/sample-cli-plugin",
     "k8s.io/sample-controller",

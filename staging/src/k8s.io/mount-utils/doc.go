@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package mount defines an interface to mounting filesystems.
-package mount // import "k8s.io/utils/mount"
+package mount // import "k8s.io/mount-utils"
