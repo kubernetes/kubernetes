@@ -102,7 +102,7 @@ func TestQuota(t *testing.T) {
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
 	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
 	informersStarted := make(chan struct{})
-	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
+	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               clientset.CoreV1(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
@@ -113,7 +113,7 @@ func TestQuota(t *testing.T) {
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}
-	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions)
+	resourceQuotaController, err := resourcequotacontroller.NewController(resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -300,7 +300,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
 	qc := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
 	informersStarted := make(chan struct{})
-	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
+	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               clientset.CoreV1(),
 		ResourceQuotaInformer:     informers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
@@ -311,7 +311,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 		InformersStarted:          informersStarted,
 		Registry:                  generic.NewRegistry(qc.Evaluators()),
 	}
-	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions)
+	resourceQuotaController, err := resourcequotacontroller.NewController(resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

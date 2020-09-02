@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
-	quota "k8s.io/kubernetes/pkg/quota/v1"
+	"k8s.io/kubernetes/pkg/quota/v1"
 	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
 	"k8s.io/kubernetes/pkg/quota/v1/generic"
 )
@@ -66,6 +66,7 @@ type event struct {
 	gvr       schema.GroupVersionResource
 }
 
+// QuotaMonitor contains all necessary information to track quotas and trigger replenishments
 type QuotaMonitor struct {
 	// each monitor list/watches a resource and determines if we should replenish quota
 	monitors    monitors
@@ -101,7 +102,8 @@ type QuotaMonitor struct {
 	registry quota.Registry
 }
 
-func NewQuotaMonitor(informersStarted <-chan struct{}, informerFactory controller.InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry) *QuotaMonitor {
+// NewMonitor creates a new instance of a QuotaMonitor
+func NewMonitor(informersStarted <-chan struct{}, informerFactory controller.InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry) *QuotaMonitor {
 	return &QuotaMonitor{
 		informersStarted:  informersStarted,
 		informerFactory:   informerFactory,
@@ -131,8 +133,6 @@ func (m *monitor) Run() {
 type monitors map[schema.GroupVersionResource]*monitor
 
 func (qm *QuotaMonitor) controllerFor(resource schema.GroupVersionResource) (cache.Controller, error) {
-	// TODO: pass this down
-	clock := clock.RealClock{}
 	handlers := cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			// TODO: leaky abstraction!  live w/ it for now, but should pass down an update filter func.
@@ -142,7 +142,7 @@ func (qm *QuotaMonitor) controllerFor(resource schema.GroupVersionResource) (cac
 			case schema.GroupResource{Resource: "pods"}:
 				oldPod := oldObj.(*v1.Pod)
 				newPod := newObj.(*v1.Pod)
-				notifyUpdate = core.QuotaV1Pod(oldPod, clock) && !core.QuotaV1Pod(newPod, clock)
+				notifyUpdate = core.QuotaV1Pod(oldPod, clock.RealClock{}) && !core.QuotaV1Pod(newPod, clock.RealClock{})
 			case schema.GroupResource{Resource: "services"}:
 				oldService := oldObj.(*v1.Service)
 				newService := newObj.(*v1.Service)
@@ -199,7 +199,7 @@ func (qm *QuotaMonitor) SyncMonitors(resources map[schema.GroupVersionResource]s
 		toRemove = monitors{}
 	}
 	current := monitors{}
-	errs := []error{}
+	var errs []error
 	kept := 0
 	added := 0
 	for resource := range resources {

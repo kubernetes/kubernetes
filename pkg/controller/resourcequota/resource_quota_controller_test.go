@@ -39,7 +39,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller"
-	quota "k8s.io/kubernetes/pkg/quota/v1"
+	"k8s.io/kubernetes/pkg/quota/v1"
 	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 )
@@ -102,7 +102,7 @@ func (errorLister) ByNamespace(namespace string) cache.GenericNamespaceLister {
 }
 
 type quotaController struct {
-	*ResourceQuotaController
+	*Controller
 	stop chan struct{}
 }
 
@@ -111,7 +111,7 @@ func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister 
 	quotaConfiguration := install.NewQuotaConfigurationForControllers(lister)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
+	resourceQuotaControllerOptions := &ControllerOptions{
 		QuotaClient:               kubeClient.CoreV1(),
 		ResourceQuotaInformer:     informerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
@@ -122,7 +122,7 @@ func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister 
 		InformersStarted:          alwaysStarted,
 		InformerFactory:           informerFactory,
 	}
-	qc, err := NewResourceQuotaController(resourceQuotaControllerOptions)
+	qc, err := NewController(resourceQuotaControllerOptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1156,15 +1156,15 @@ type fakeServerResources struct {
 	InterfaceUsedCount int
 }
 
-func (_ *fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+func (*fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
-func (_ *fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
+func (*fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
-func (_ *fakeServerResources) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+func (*fakeServerResources) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
 }
 
