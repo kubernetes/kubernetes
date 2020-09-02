@@ -89,6 +89,8 @@ pkg/controller/volume/attachdetach/testing
 pkg/controller/volume/expand
 pkg/controller/volume/persistentvolume
 pkg/controller/volume/persistentvolume/config/v1alpha1
+pkg/controlplane/controller/crdregistration
+pkg/controlplane/tunneler
 pkg/features
 pkg/kubeapiserver
 pkg/kubectl/cmd/convert
@@ -109,8 +111,6 @@ pkg/kubelet/stats
 pkg/kubelet/sysctl
 pkg/kubelet/types
 pkg/kubemark
-pkg/master/controller/crdregistration
-pkg/master/tunneler
 pkg/proxy/apis/config
 pkg/proxy/apis/config/v1alpha1
 pkg/proxy/userspace
