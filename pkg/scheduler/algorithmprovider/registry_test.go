@@ -27,6 +27,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/debugger"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
@@ -60,6 +61,7 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: podtopologyspread.Name},
 				{Name: interpodaffinity.Name},
 				{Name: volumebinding.Name},
+				{Name: debugger.Name},
 			},
 		},
 		Filter: &schedulerapi.PluginSet{
@@ -152,6 +154,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: podtopologyspread.Name},
 						{Name: interpodaffinity.Name},
 						{Name: volumebinding.Name},
+						{Name: debugger.Name},
 					},
 				},
 				Filter: &schedulerapi.PluginSet{
@@ -232,6 +235,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: podtopologyspread.Name},
 						{Name: interpodaffinity.Name},
 						{Name: volumebinding.Name},
+						{Name: debugger.Name},
 					},
 				},
 				Filter: &schedulerapi.PluginSet{
