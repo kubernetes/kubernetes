@@ -89,11 +89,14 @@ var (
 
 			// A fix is in progress: https://github.com/openshift/origin/pull/24709
 			`Multi-AZ Clusters should spread the pods of a replication controller across zones`,
+
+			`should check if kubectl diff finds a difference for Deployments`, // https://bugzilla.redhat.com/show_bug.cgi?id=1875194
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
-			`\[Driver: rbd\]`,  // OpenShift 4.x does not support Ceph RBD (use CSI instead)
-			`\[Driver: ceph\]`, // OpenShift 4.x does not support CephFS (use CSI instead)
+			`\[Driver: rbd\]`,               // OpenShift 4.x does not support Ceph RBD (use CSI instead)
+			`\[Driver: ceph\]`,              // OpenShift 4.x does not support CephFS (use CSI instead)
+			`\[Feature:PodSecurityPolicy\]`, // OpenShift 4.x does not enable PSP by default
 		},
 		// tests too slow to be part of conformance
 		"[Slow]": {
