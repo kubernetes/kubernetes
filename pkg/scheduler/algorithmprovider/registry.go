@@ -17,13 +17,13 @@ limitations under the License.
 package algorithmprovider
 
 import (
-	"sort"
-	"strings"
+	"fmt"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/debugger"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
@@ -66,13 +66,7 @@ func NewRegistry() Registry {
 
 // ListAlgorithmProviders lists registered algorithm providers.
 func ListAlgorithmProviders() string {
-	r := NewRegistry()
-	var providers []string
-	for k := range r {
-		providers = append(providers, k)
-	}
-	sort.Strings(providers)
-	return strings.Join(providers, " | ")
+	return fmt.Sprintf("%s | %s", ClusterAutoscalerProvider, schedulerapi.SchedulerDefaultProviderName)
 }
 
 func getDefaultConfig() *schedulerapi.Plugins {
@@ -89,6 +83,7 @@ func getDefaultConfig() *schedulerapi.Plugins {
 				{Name: podtopologyspread.Name},
 				{Name: interpodaffinity.Name},
 				{Name: volumebinding.Name},
+				{Name: debugger.Name},
 			},
 		},
 		Filter: &schedulerapi.PluginSet{
