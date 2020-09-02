@@ -136,7 +136,7 @@ func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source stri
 		// systemd-mount is not used because it's too new for older distros
 		// (CentOS 7, Debian Jessie).
 		mountCmd, mountArgs, mountArgsLogStr = AddSystemdScopeSensitive("systemd-run", target, mountCmd, mountArgs, mountArgsLogStr)
-	} else {
+		// } else {
 		// No systemd-run on the host (or we failed to check it), assume kubelet
 		// does not run as a systemd service.
 		// No code here, mountCmd and mountArgs are already populated.
