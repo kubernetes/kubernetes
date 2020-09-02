@@ -173,12 +173,6 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		return nil, err
 	}
 
-	bsDescription := makeBackendServiceDescription(nm, sharedBackend)
-	err = g.ensureInternalBackendService(backendServiceName, bsDescription, svc.Spec.SessionAffinity, scheme, protocol, igLinks, hc.SelfLink)
-	if err != nil {
-		return nil, err
-	}
-
 	fwdRuleDescription := &forwardingRuleDescription{ServiceName: nm.String()}
 	fwdRuleDescriptionString, err := fwdRuleDescription.marshal()
 	if err != nil {
@@ -200,8 +194,29 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	if options.AllowGlobalAccess {
 		newFwdRule.AllowGlobalAccess = options.AllowGlobalAccess
 	}
-	if err := g.ensureInternalForwardingRule(existingFwdRule, newFwdRule); err != nil {
+
+	fwdRuleDeleted := false
+	if existingFwdRule != nil && !forwardingRulesEqual(existingFwdRule, newFwdRule) {
+		// Delete existing forwarding rule before making changes to the backend service. For example - changing protocol
+		// of backend service without first deleting forwarding rule will throw an error since the linked forwarding
+		// rule would show the old protocol.
+		klog.V(2).Infof("ensureInternalLoadBalancer(%v): deleting existing forwarding rule with IP address %v", loadBalancerName, existingFwdRule.IPAddress)
+		if err = ignoreNotFound(g.DeleteRegionForwardingRule(loadBalancerName, g.region)); err != nil {
+			return nil, err
+		}
+		fwdRuleDeleted = true
+	}
+
+	bsDescription := makeBackendServiceDescription(nm, sharedBackend)
+	err = g.ensureInternalBackendService(backendServiceName, bsDescription, svc.Spec.SessionAffinity, scheme, protocol, igLinks, hc.SelfLink)
+	if err != nil {
 		return nil, err
+	}
+
+	if fwdRuleDeleted || existingFwdRule == nil {
+		if err := g.ensureInternalForwardingRule(existingFwdRule, newFwdRule); err != nil {
+			return nil, err
+		}
 	}
 
 	// Delete the previous internal load balancer resources if necessary
