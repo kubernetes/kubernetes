@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
-	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -77,7 +77,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 			opts.Authentication.ServiceAccounts.Issuer = iss
 			opts.Authentication.ServiceAccounts.KeyFiles = []string{tmpfile.Name()}
 		},
-		ModifyServerConfig: func(config *master.Config) {
+		ModifyServerConfig: func(config *controlplane.Config) {
 			config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 		},
 	})

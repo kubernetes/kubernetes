@@ -33,7 +33,7 @@ import (
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/cluster/ports"
-	"k8s.io/kubernetes/pkg/master/reconcilers"
+	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 

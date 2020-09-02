@@ -50,7 +50,7 @@ import (
 	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers/autoregister"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/master/controller/crdregistration"
+	"k8s.io/kubernetes/pkg/controlplane/controller/crdregistration"
 )
 
 func createAggregatorConfig(

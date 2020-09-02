@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package master contains code for setting up and running a Kubernetes
 // cluster master.
-package controlplane // import "k8s.io/kubernetes/pkg/master"
+package controlplane // import "k8s.io/kubernetes/pkg/controlplane"

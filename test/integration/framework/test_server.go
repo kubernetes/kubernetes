@@ -37,14 +37,14 @@ import (
 	"k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/utils"
 )
 
 // TestServerSetup holds configuration information for a kube-apiserver test server.
 type TestServerSetup struct {
 	ModifyServerRunOptions func(*options.ServerRunOptions)
-	ModifyServerConfig     func(*master.Config)
+	ModifyServerConfig     func(*controlplane.Config)
 }
 
 // StartTestServer runs a kube-apiserver, optionally calling out to the setup.ModifyServerRunOptions and setup.ModifyServerConfig functions
