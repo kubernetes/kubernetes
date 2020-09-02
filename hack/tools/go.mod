@@ -11,5 +11,5 @@ require (
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/gotestsum v0.3.5
 	honnef.co/go/tools v0.0.1-2020.1.4
-	k8s.io/repo-infra v0.0.12
+	k8s.io/repo-infra v0.1.1
 )
