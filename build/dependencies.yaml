@@ -99,7 +99,7 @@ dependencies:
 
   # Golang
   - name: "golang: upstream version"
-    version: 1.15
+    version: 1.15.2
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: build/root/WORKSPACE
@@ -108,7 +108,7 @@ dependencies:
       match: GOLANG_VERSION=\d+.\d+(alpha|beta|rc)?\.?\d+
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.15.0-1
+    version: v1.15.2-1
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: test/images/sample-apiserver/Dockerfile

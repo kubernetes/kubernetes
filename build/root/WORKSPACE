@@ -23,7 +23,7 @@ load("@io_k8s_repo_infra//:repos.bzl", repo_infra_configure = "configure", repo_
 #            'override_go_version': used to specify an alternate go version provided
 #                                   by kubernetes/repo-infra
 repo_infra_configure(
-    go_version = "1.15",
+    go_version = "1.15.2",
     minimum_bazel_version = "2.2.0",
 )
 

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 ARG BASEIMAGE
-FROM k8s.gcr.io/build-image/kube-cross:v1.15.0-1 as build_k8s_1_17_sample_apiserver
+FROM k8s.gcr.io/build-image/kube-cross:v1.15.2-1 as build_k8s_1_17_sample_apiserver
 
 ENV GOPATH /go
 RUN mkdir -p ${GOPATH}/src ${GOPATH}/bin
