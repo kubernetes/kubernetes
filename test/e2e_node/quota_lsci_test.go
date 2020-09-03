@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	"github.com/onsi/ginkgo"
 )

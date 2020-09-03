@@ -2429,6 +2429,9 @@ k8s.io/metrics/pkg/client/custom_metrics/fake
 k8s.io/metrics/pkg/client/custom_metrics/scheme
 k8s.io/metrics/pkg/client/external_metrics
 k8s.io/metrics/pkg/client/external_metrics/fake
+# k8s.io/mount-utils v0.0.0 => ./staging/src/k8s.io/mount-utils
+## explicit
+k8s.io/mount-utils
 # k8s.io/mount-utils => ./staging/src/k8s.io/mount-utils
 # k8s.io/sample-apiserver v0.0.0 => ./staging/src/k8s.io/sample-apiserver
 ## explicit

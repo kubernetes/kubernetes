@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 type fakeMounter struct {

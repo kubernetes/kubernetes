@@ -27,7 +27,7 @@ import (
 	"syscall"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 	"k8s.io/utils/nsenter"
 )
 

@@ -21,7 +21,7 @@ import (
 	"os"
 	"sync"
 
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 // FakeHostUtil is a fake HostUtils implementation for testing
