@@ -307,7 +307,8 @@ function upload-tars() {
   if which md5 > /dev/null 2>&1; then
     project_hash=$(md5 -q -s "$PROJECT")
   else
-    project_hash=$(echo -n "$PROJECT" | md5sum | awk '{ print $1 }')
+    project_hash=$(echo -n "$PROJECT" | md5sum)
+    project_hash=${project_hash%%[[:blank:]]*}
   fi
 
   # This requires 1 million projects before the probability of collision is 50%
@@ -526,12 +527,14 @@ function tars_from_version() {
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
     # TODO: Clean this up.
     KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
-    KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} --silent --show-error | ${sha512sum} | awk '{print $1}')
+    KUBE_MANIFESTS_TAR_HASH=$(curl "${KUBE_MANIFESTS_TAR_URL}" --silent --show-error | ${sha512sum})
+    KUBE_MANIFESTS_TAR_HASH=${KUBE_MANIFESTS_TAR_HASH%%[[:blank:]]*}
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release-dev/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
     # TODO: Clean this up.
     KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
-    KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} --silent --show-error | ${sha512sum} | awk '{print $1}')
+    KUBE_MANIFESTS_TAR_HASH=$(curl "${KUBE_MANIFESTS_TAR_URL}" --silent --show-error | ${sha512sum})
+    KUBE_MANIFESTS_TAR_HASH=${KUBE_MANIFESTS_TAR_HASH%%[[:blank:]]*}
   else
     echo "Version doesn't match regexp" >&2
     exit 1
@@ -568,7 +571,7 @@ function get-master-env() {
 # "strip out quotes", and we really should be using a YAML library for
 # this, but PyYAML isn't shipped by default, and *rant rant rant ... SIGH*
 function yaml-quote {
-  echo "'$(echo "${@:-}" | sed -e "s/'/''/g")'"
+  echo "${@:-}" | sed -e "s/'/''/g;s/^/'/i;s/$/'/i"
 }
 
 # Writes the cluster location into a temporary file.
@@ -1209,7 +1212,7 @@ ADVANCED_AUDIT_WEBHOOK_INITIAL_BACKOFF: $(yaml-quote "${ADVANCED_AUDIT_WEBHOOK_I
 GCE_API_ENDPOINT: $(yaml-quote "${GCE_API_ENDPOINT:-}")
 GCE_GLBC_IMAGE: $(yaml-quote "${GCE_GLBC_IMAGE:-}")
 CUSTOM_INGRESS_YAML: |
-$(echo "${CUSTOM_INGRESS_YAML:-}" | sed -e "s/'/''/g")
+${CUSTOM_INGRESS_YAML//\'/\'\'}
 ENABLE_NODE_JOURNAL: $(yaml-quote "${ENABLE_NODE_JOURNAL:-false}")
 PROMETHEUS_TO_SD_ENDPOINT: $(yaml-quote "${PROMETHEUS_TO_SD_ENDPOINT:-}")
 PROMETHEUS_TO_SD_PREFIX: $(yaml-quote "${PROMETHEUS_TO_SD_PREFIX:-}")
@@ -1228,15 +1231,15 @@ ZONE: $(yaml-quote "${ZONE}")
 REGION: $(yaml-quote "${REGION}")
 VOLUME_PLUGIN_DIR: $(yaml-quote "${VOLUME_PLUGIN_DIR}")
 KUBELET_ARGS: $(yaml-quote "${KUBELET_ARGS}")
-REQUIRE_METADATA_KUBELET_CONFIG_FILE: $(yaml-quote 'true')
+REQUIRE_METADATA_KUBELET_CONFIG_FILE: $(yaml-quote true)
 ENABLE_NETD: $(yaml-quote "${ENABLE_NETD:-false}")
 ENABLE_NODE_TERMINATION_HANDLER: $(yaml-quote "${ENABLE_NODE_TERMINATION_HANDLER:-false}")
 CUSTOM_NETD_YAML: |
-$(echo "${CUSTOM_NETD_YAML:-}" | sed -e "s/'/''/g")
+${CUSTOM_NETD_YAML//\'/\'\'}
 CUSTOM_CALICO_NODE_DAEMONSET_YAML: |
-$(echo "${CUSTOM_CALICO_NODE_DAEMONSET_YAML:-}" | sed -e "s/'/''/g")
+${CUSTOM_CALICO_NODE_DAEMONSET_YAML//\'/\'\'}
 CUSTOM_TYPHA_DEPLOYMENT_YAML: |
-$(echo "${CUSTOM_TYPHA_DEPLOYMENT_YAML:-}" | sed -e "s/'/''/g")
+${CUSTOM_TYPHA_DEPLOYMENT_YAML//\'/\'\'}
 CONCURRENT_SERVICE_SYNCS: $(yaml-quote "${CONCURRENT_SERVICE_SYNCS:-}")
 EOF
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] || \
@@ -1576,11 +1579,13 @@ EOF
 }
 
 function sha512sum-file() {
+  local shasum
   if which sha512sum >/dev/null 2>&1; then
-    sha512sum "$1" | awk '{ print $1 }'
+    shasum=$(sha512sum "$1")
   else
-    shasum -a512 "$1" | awk '{ print $1 }'
+    shasum=$(shasum -a512 "$1")
   fi
+  echo "${shasum%%[[:blank:]]*}"
 }
 
 # Create certificate pairs for the cluster.
@@ -1617,10 +1622,11 @@ function create-certs {
   local -r primary_cn="${1}"
 
   # Determine extra certificate names for master
-  local octets
-  read -r -a octets <<< "$(echo "${SERVICE_CLUSTER_IP_RANGE}" | sed -e 's|/.*||' -e 's/\./ /g')"
-  ((octets[3]+=1))
-  local -r service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
+
+  # Create service_ip by stripping the network mask part from
+  # SERVICE_CLUSTER_IP_RANGE and incrementing the host part with 1
+  service_ip=${SERVICE_CLUSTER_IP_RANGE%/*}
+  service_ip="${service_ip%.*}.$((${service_ip##*.} + 1))"
   local sans=""
   for extra in $@; do
     if [[ -n "${extra}" ]]; then
@@ -2267,7 +2273,7 @@ function check-existing() {
 function check-network-mode() {
   local mode="$(gcloud compute networks list --filter="name=('${NETWORK}')" --project ${NETWORK_PROJECT} --format='value(x_gcloud_subnet_mode)' || true)"
   # The deprecated field uses lower case. Convert to upper case for consistency.
-  echo "$(echo $mode | tr [a-z] [A-Z])"
+  echo "$mode" | tr '[:lower:]' '[:upper:]'
 }
 
 function create-network() {
@@ -2869,9 +2875,8 @@ function detach-internal-master-ip() {
   # Detach ${MASTER_NAME}-internal-ip from ${name}
   gcloud compute instances network-interfaces update "${name}" --project "${PROJECT}" --zone "${zone}" --aliases="${aliases}"
   gcloud compute instances remove-metadata "${name}" --zone "${zone}" --keys=kube-master-internal-ip
-  # We want ip route to be run in the cloud and not this host
-  # shellcheck disable=SC2016
-  run-gcloud-command "${name}" "${zone}" 'sudo ip route del to local '${ip}'/32 dev $(ip route | grep default | awk '\''{print $5}'\'')' || true
+  # We want `ip route` to be run in the cloud and not this host
+  run-gcloud-command "${name}" "${zone}" "sudo ip route del to local ${ip}/32 dev \$(ip route | grep default | while read -r _ _ _ _ dev _; do echo \$dev; done)" || true
   return $?
 }
 
