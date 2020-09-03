@@ -46,6 +46,9 @@
                     "requests": {
                         "cpu": "5m",
                         "memory": "300Mi"
+                    },
+                    "limits" : {
+                        "memory": "{{memory_limit}}"
                     }
                 }
             }

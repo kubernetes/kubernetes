@@ -111,6 +111,11 @@ function setup_pod_autoscaler_component {
     local uas_params_split
     uas_params_split=$(eval "for param in $uas_params; do echo -n ,\\\"\$param\\\"; done")
     sed -i -e "s@{{uas_params}}@${uas_params_split:-}@g" "${src_file}"
+
+    # set memory limit for vpa-recommender. Limit default value
+    # justification in http://b/163760835#comment8
+    local memory_limit="${POD_AUTOSCALER_MEMORY_LIMIT:-4Gi}"
+    sed -i -e "s@{{memory_limit}}@${memory_limit}@g" "${src_file}"
   fi
 
   sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
