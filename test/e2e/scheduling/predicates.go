@@ -25,6 +25,7 @@ import (
 	nodev1beta1 "k8s.io/api/node/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
@@ -675,13 +676,58 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		port := int32(54321)
 		ginkgo.By(fmt.Sprintf("Trying to create a pod(pod1) with hostport %v and hostIP 127.0.0.1 and expect scheduled", port))
-		createHostPortPodOnNode(f, "pod1", ns, "127.0.0.1", port, v1.ProtocolTCP, nodeSelector, true)
+		createHostPortPodOnNode(f, "pod1", "127.0.0.1", port, v1.ProtocolTCP, nodeSelector, true)
 
 		ginkgo.By(fmt.Sprintf("Trying to create another pod(pod2) with hostport %v but hostIP 127.0.0.2 on the node which pod1 resides and expect scheduled", port))
-		createHostPortPodOnNode(f, "pod2", ns, "127.0.0.2", port, v1.ProtocolTCP, nodeSelector, true)
+		createHostPortPodOnNode(f, "pod2", "127.0.0.2", port, v1.ProtocolTCP, nodeSelector, true)
 
 		ginkgo.By(fmt.Sprintf("Trying to create a third pod(pod3) with hostport %v, hostIP 127.0.0.2 but use UDP protocol on the node which pod2 resides", port))
-		createHostPortPodOnNode(f, "pod3", ns, "127.0.0.2", port, v1.ProtocolUDP, nodeSelector, true)
+		createHostPortPodOnNode(f, "pod3", "127.0.0.2", port, v1.ProtocolUDP, nodeSelector, true)
+
+		// check that the port is being actually exposed to each container
+
+		// create a pod on the host network
+		hostExecPod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "e2e-host-exec",
+				Namespace: f.Namespace.Name,
+			},
+			Spec: v1.PodSpec{
+				HostNetwork:  true,
+				NodeSelector: nodeSelector,
+				Containers: []v1.Container{
+					{
+						Name:  "e2e-host-exec",
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					},
+				},
+			},
+		}
+		f.PodClient().CreateSync(hostExecPod)
+
+		// poll each host port from the host
+		timeout := 5
+
+		// check pod1
+		ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d", hostExecPod.Name, "127.0.0.1", port))
+		cmd := []string{"/bin/sh", "-c", fmt.Sprintf("curl -g --connect-timeout %v http://127.0.0.1:%d/hostname", timeout, port)}
+		hostname1, _, err := f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmd...)
+		framework.ExpectNoError(err)
+		// check pod2
+		ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d", hostExecPod.Name, "127.0.0.2", port))
+		cmd = []string{"/bin/sh", "-c", fmt.Sprintf("curl -g --connect-timeout %v http://127.0.0.2:%d/hostname", timeout, port)}
+		hostname2, _, err := f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmd...)
+		framework.ExpectNoError(err)
+		// the hostname returned has to be different since we are exposing the same port to two different pods
+		framework.Logf("pod1 has hostname %s, pod2 has hostname %s", hostname1, hostname2)
+		if hostname1 == hostname2 {
+			framework.Failf("Exposed ports are forwarded to the same pod")
+		}
+		// check pod3
+		ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d UDP", hostExecPod.Name, "127.0.0.2", port))
+		cmd = []string{"/bin/sh", "-c", fmt.Sprintf("nc -vuz -w %v 127.0.0.2 %d", timeout, port)}
+		_, _, err = f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmd...)
+		framework.ExpectNoError(err)
 	})
 
 	/*
@@ -707,10 +753,10 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		port := int32(54322)
 		ginkgo.By(fmt.Sprintf("Trying to create a pod(pod4) with hostport %v and hostIP 0.0.0.0(empty string here) and expect scheduled", port))
-		createHostPortPodOnNode(f, "pod4", ns, "", port, v1.ProtocolTCP, nodeSelector, true)
+		createHostPortPodOnNode(f, "pod4", "", port, v1.ProtocolTCP, nodeSelector, true)
 
 		ginkgo.By(fmt.Sprintf("Trying to create another pod(pod5) with hostport %v but hostIP 127.0.0.1 on the node which pod4 resides and expect not scheduled", port))
-		createHostPortPodOnNode(f, "pod5", ns, "127.0.0.1", port, v1.ProtocolTCP, nodeSelector, false)
+		createHostPortPodOnNode(f, "pod5", "127.0.0.1", port, v1.ProtocolTCP, nodeSelector, false)
 	})
 
 	ginkgo.Context("PodTopologySpread Filtering", func() {
@@ -1011,25 +1057,46 @@ func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nod
 }
 
 // create pod which using hostport on the specified node according to the nodeSelector
-func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string, port int32, protocol v1.Protocol, nodeSelector map[string]string, expectScheduled bool) {
+// it starts an http server on the exposed port
+func createHostPortPodOnNode(f *framework.Framework, podName, hostIP string, port int32, protocol v1.Protocol, nodeSelector map[string]string, expectScheduled bool) {
 	hostIP = translateIPv4ToIPv6(hostIP)
-	createPausePod(f, pausePodConfig{
-		Name: podName,
-		Ports: []v1.ContainerPort{
-			{
-				HostPort:      port,
-				ContainerPort: 80,
-				Protocol:      protocol,
-				HostIP:        hostIP,
-			},
-		},
-		NodeSelector: nodeSelector,
-	})
 
-	err := e2epod.WaitForPodNotPending(f.ClientSet, ns, podName)
-	if expectScheduled {
-		framework.ExpectNoError(err)
+	hostPortPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "agnhost",
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"netexec", "--http-port=80", "--udp-port=80"},
+					Ports: []v1.ContainerPort{
+						{
+							HostPort:      port,
+							ContainerPort: 80,
+							Protocol:      protocol,
+							HostIP:        hostIP,
+						},
+					},
+					ReadinessProbe: &v1.Probe{
+						Handler: v1.Handler{
+							HTTPGet: &v1.HTTPGetAction{
+								Path: "/hostname",
+								Port: intstr.IntOrString{
+									IntVal: int32(80),
+								},
+								Scheme: v1.URISchemeHTTP,
+							},
+						},
+					},
+				},
+			},
+			NodeSelector: nodeSelector,
+		},
 	}
+
+	f.PodClient().CreateSync(hostPortPod)
 }
 
 // translateIPv4ToIPv6 maps an IPv4 address into a valid IPv6 address
