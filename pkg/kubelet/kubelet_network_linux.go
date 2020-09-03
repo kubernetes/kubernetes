@@ -41,21 +41,6 @@ func (kl *Kubelet) initNetworkUtil() {
 // 2. 	In nat table, KUBE-MARK-MASQ rule to mark connections for SNAT
 // 	Marked connection will get SNAT on POSTROUTING Chain in nat table
 func (kl *Kubelet) syncNetworkUtil() {
-	if kl.iptablesMasqueradeBit < 0 || kl.iptablesMasqueradeBit > 31 {
-		klog.Errorf("invalid iptables-masquerade-bit %v not in [0, 31]", kl.iptablesMasqueradeBit)
-		return
-	}
-
-	if kl.iptablesDropBit < 0 || kl.iptablesDropBit > 31 {
-		klog.Errorf("invalid iptables-drop-bit %v not in [0, 31]", kl.iptablesDropBit)
-		return
-	}
-
-	if kl.iptablesDropBit == kl.iptablesMasqueradeBit {
-		klog.Errorf("iptables-masquerade-bit %v and iptables-drop-bit %v must be different", kl.iptablesMasqueradeBit, kl.iptablesDropBit)
-		return
-	}
-
 	// Setup KUBE-MARK-DROP rules
 	dropMark := getIPTablesMark(kl.iptablesDropBit)
 	if _, err := kl.iptClient.EnsureChain(utiliptables.TableNAT, KubeMarkDropChain); err != nil {
