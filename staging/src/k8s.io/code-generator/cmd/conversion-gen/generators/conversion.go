@@ -828,11 +828,11 @@ func (g *genConversion) doMap(inType, outType *types.Type, sw *generator.Snippet
 			if conversionExists {
 				sw.Do("return err\n", nil)
 				sw.Do("}\n", nil)
-			}
-			if inType.Key == outType.Key {
-				sw.Do("(*out)[key] = *newVal\n", nil)
-			} else {
-				sw.Do("(*out)[$.|raw$(key)] = *newVal\n", outType.Key)
+				if inType.Key == outType.Key {
+					sw.Do("(*out)[key] = *newVal\n", nil)
+				} else {
+					sw.Do("(*out)[$.|raw$(key)] = *newVal\n", outType.Key)
+				}
 			}
 		}
 	} else {
