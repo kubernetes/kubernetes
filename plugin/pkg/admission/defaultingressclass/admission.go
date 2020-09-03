@@ -85,7 +85,10 @@ func (a *classDefaulterPlugin) SetExternalKubeInformerFactory(f informers.Shared
 // ValidateInitialization ensures lister is set.
 func (a *classDefaulterPlugin) ValidateInitialization() error {
 	if a.lister == nil {
-		return fmt.Errorf("missing lister")
+		return fmt.Errorf("missing IngressClass lister")
+	}
+	if a.client == nil {
+		return fmt.Errorf("missing IngressClass client")
 	}
 	return nil
 }
