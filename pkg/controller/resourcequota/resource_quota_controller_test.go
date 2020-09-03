@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -807,7 +807,7 @@ func TestSyncResourceQuota(t *testing.T) {
 			}
 		}
 		if usage == nil {
-			t.Errorf("test: %s,\nExpected update action usage, got none: actions:\n%v", testName, actions)
+			t.Fatalf("test: %s,\nExpected update action usage, got none: actions:\n%v", testName, actions)
 		}
 
 		// ensure usage is as expected
@@ -1138,7 +1138,7 @@ func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources, workerLock *
 	workerLockAcquired := make(chan struct{})
 	go func() {
 		workerLock.Lock()
-		workerLock.Unlock()
+		defer workerLock.Unlock()
 		close(workerLockAcquired)
 	}()
 	select {
