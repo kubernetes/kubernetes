@@ -686,11 +686,16 @@ func TestApplyManagedFields(t *testing.T) {
 		t.Fatalf("Failed to marshal object: %v", err)
 	}
 
+	selfLink := ""
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.RemoveSelfLink) {
+		selfLink = `
+			"selfLink": "` + accessor.GetSelfLink() + `",`
+	}
+
 	expected := []byte(`{
 		"metadata": {
 			"name": "test-cm",
-			"namespace": "default",
-			"selfLink": "` + accessor.GetSelfLink() + `",
+			"namespace": "default",` + selfLink + `
 			"uid": "` + string(accessor.GetUID()) + `",
 			"resourceVersion": "` + accessor.GetResourceVersion() + `",
 			"creationTimestamp": "` + accessor.GetCreationTimestamp().UTC().Format(time.RFC3339) + `",

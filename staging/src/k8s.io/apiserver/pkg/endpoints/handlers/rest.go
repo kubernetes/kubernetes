@@ -328,6 +328,12 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 //   interfaces
 func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Request, namer ScopeNamer) error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
+		// Ensure that for empty lists we don't return <nil> items.
+		if meta.IsListType(obj) && meta.LenList(obj) == 0 {
+			if err := meta.SetList(obj, []runtime.Object{}); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 
