@@ -47,12 +47,6 @@ type Converter struct {
 	ignoredConversions        map[typePair]struct{}
 	ignoredUntypedConversions map[typePair]struct{}
 
-	// Map from an input type to a function which can apply a key name mapping
-	inputFieldMappingFuncs map[reflect.Type]FieldMappingFunc
-
-	// Map from an input type to a set of default conversion flags.
-	inputDefaultFlags map[reflect.Type]FieldMatchingFlags
-
 	// nameFunc is called to retrieve the name of a type; this name is used for the
 	// purpose of deciding whether two types match or not (i.e., will we attempt to
 	// do a conversion). The default returns the go type name.
@@ -67,9 +61,6 @@ func NewConverter(nameFn NameFunc) *Converter {
 		ignoredConversions:        make(map[typePair]struct{}),
 		ignoredUntypedConversions: make(map[typePair]struct{}),
 		nameFunc:                  nameFn,
-
-		inputFieldMappingFuncs: make(map[reflect.Type]FieldMappingFunc),
-		inputDefaultFlags:      make(map[reflect.Type]FieldMatchingFlags),
 	}
 	c.RegisterUntypedConversionFunc(
 		(*[]byte)(nil), (*[]byte)(nil),
@@ -88,11 +79,9 @@ func (c *Converter) WithConversions(fns ConversionFuncs) *Converter {
 	return &copied
 }
 
-// DefaultMeta returns the conversion FieldMappingFunc and meta for a given type.
-func (c *Converter) DefaultMeta(t reflect.Type) (FieldMatchingFlags, *Meta) {
-	return c.inputDefaultFlags[t], &Meta{
-		KeyNameMapping: c.inputFieldMappingFuncs[t],
-	}
+// DefaultMeta returns meta for a given type.
+func (c *Converter) DefaultMeta(t reflect.Type) *Meta {
+	return &Meta{}
 }
 
 // Convert_Slice_byte_To_Slice_byte prevents recursing into every byte
@@ -112,18 +101,11 @@ func Convert_Slice_byte_To_Slice_byte(in *[]byte, out *[]byte, s Scope) error {
 type Scope interface {
 	// Call Convert to convert sub-objects. Note that if you call it with your own exact
 	// parameters, you'll run out of stack space before anything useful happens.
-	Convert(src, dest interface{}, flags FieldMatchingFlags) error
-
-	// Flags returns the flags with which the conversion was started.
-	Flags() FieldMatchingFlags
+	Convert(src, dest interface{}) error
 
 	// Meta returns any information originally passed to Convert.
 	Meta() *Meta
 }
-
-// FieldMappingFunc can convert an input field value into different values, depending on
-// the value of the source or destination struct tags.
-type FieldMappingFunc func(key string, sourceTag, destTag reflect.StructTag) (source string, dest string)
 
 func NewConversionFuncs() ConversionFuncs {
 	return ConversionFuncs{
@@ -165,9 +147,6 @@ func (c ConversionFuncs) Merge(other ConversionFuncs) ConversionFuncs {
 
 // Meta is supplied by Scheme, when it calls Convert.
 type Meta struct {
-	// KeyNameMapping is an optional function which may map the listed key (field name)
-	// into a source and destination value.
-	KeyNameMapping FieldMappingFunc
 	// Context is an optional field that callers may use to pass info to conversion functions.
 	Context interface{}
 }
@@ -176,17 +155,11 @@ type Meta struct {
 type scope struct {
 	converter *Converter
 	meta      *Meta
-	flags     FieldMatchingFlags
 }
 
 // Convert continues a conversion.
-func (s *scope) Convert(src, dest interface{}, flags FieldMatchingFlags) error {
-	return s.converter.Convert(src, dest, flags, s.meta)
-}
-
-// Flags returns the flags with which the current conversion was started.
-func (s *scope) Flags() FieldMatchingFlags {
-	return s.flags
+func (s *scope) Convert(src, dest interface{}) error {
+	return s.converter.Convert(src, dest, s.meta)
 }
 
 // Meta returns the meta object that was originally passed to Convert.
@@ -224,65 +197,16 @@ func (c *Converter) RegisterIgnoredConversion(from, to interface{}) error {
 	return nil
 }
 
-// RegisterInputDefaults registers a field name mapping function, used when converting
-// from maps to structs. Inputs to the conversion methods are checked for this type and a mapping
-// applied automatically if the input matches in. A set of default flags for the input conversion
-// may also be provided, which will be used when no explicit flags are requested.
-func (c *Converter) RegisterInputDefaults(in interface{}, fn FieldMappingFunc, defaultFlags FieldMatchingFlags) error {
-	fv := reflect.ValueOf(in)
-	ft := fv.Type()
-	if ft.Kind() != reflect.Ptr {
-		return fmt.Errorf("expected pointer 'in' argument, got: %v", ft)
-	}
-	c.inputFieldMappingFuncs[ft] = fn
-	c.inputDefaultFlags[ft] = defaultFlags
-	return nil
-}
-
-// FieldMatchingFlags contains a list of ways in which struct fields could be
-// copied. These constants may be | combined.
-type FieldMatchingFlags int
-
-const (
-	// Loop through destination fields, search for matching source
-	// field to copy it from. Source fields with no corresponding
-	// destination field will be ignored. If SourceToDest is
-	// specified, this flag is ignored. If neither is specified,
-	// or no flags are passed, this flag is the default.
-	DestFromSource FieldMatchingFlags = 0
-	// Loop through source fields, search for matching dest field
-	// to copy it into. Destination fields with no corresponding
-	// source field will be ignored.
-	SourceToDest FieldMatchingFlags = 1 << iota
-	// Don't treat it as an error if the corresponding source or
-	// dest field can't be found.
-	IgnoreMissingFields
-	// Don't require type names to match.
-	AllowDifferentFieldTypeNames
-)
-
-// IsSet returns true if the given flag or combination of flags is set.
-func (f FieldMatchingFlags) IsSet(flag FieldMatchingFlags) bool {
-	if flag == DestFromSource {
-		// The bit logic doesn't work on the default value.
-		return f&SourceToDest != SourceToDest
-	}
-	return f&flag == flag
-}
-
 // Convert will translate src to dest if it knows how. Both must be pointers.
 // If no conversion func is registered and the default copying mechanism
 // doesn't work on this type pair, an error will be returned.
-// Read the comments on the various FieldMatchingFlags constants to understand
-// what the 'flags' parameter does.
 // 'meta' is given to allow you to pass information to conversion functions,
 // it is not used by Convert() other than storing it in the scope.
 // Not safe for objects with cyclic references!
-func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, meta *Meta) error {
+func (c *Converter) Convert(src, dest interface{}, meta *Meta) error {
 	pair := typePair{reflect.TypeOf(src), reflect.TypeOf(dest)}
 	scope := &scope{
 		converter: c,
-		flags:     flags,
 		meta:      meta,
 	}
 
