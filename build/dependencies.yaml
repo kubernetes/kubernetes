@@ -106,6 +106,8 @@ dependencies:
       match: (override_)?go_version = "\d+.\d+(alpha|beta|rc)?\.?\d+"
     - path: test/images/Makefile
       match: GOLANG_VERSION=\d+.\d+(alpha|beta|rc)?\.?\d+
+    - path: staging/publishing/rules.yaml
+      match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
   - name: "k8s.gcr.io/kube-cross: dependents"
     version: v1.15.2-1
