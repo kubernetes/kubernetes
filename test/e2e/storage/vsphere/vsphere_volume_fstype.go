@@ -113,7 +113,7 @@ func invokeTestForFstype(f *framework.Framework, client clientset.Interface, nam
 	// Detach and delete volume
 	detachVolume(f, client, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
 	err = e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 }
 
 func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interface, namespace string, fstype string) {
@@ -137,7 +137,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 	// Detach and delete volume
 	detachVolume(f, client, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
 	err = e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 
 	gomega.Expect(eventList.Items).NotTo(gomega.BeEmpty())
 	errorMsg := `MountVolume.MountDevice failed for volume "` + persistentvolumes[0].Name + `" : executable file not found`
@@ -184,7 +184,7 @@ func createPodAndVerifyVolumeAccessible(client clientset.Interface, namespace st
 // detachVolume delete the volume passed in the argument and wait until volume is detached from the node,
 func detachVolume(f *framework.Framework, client clientset.Interface, pod *v1.Pod, volPath string) {
 	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 	nodeName := pod.Spec.NodeName
 	ginkgo.By("Deleting pod")
 	e2epod.DeletePodWithWait(client, pod)

@@ -48,7 +48,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
@@ -1064,7 +1063,7 @@ func testMutatingPodWebhook(f *framework.Framework) {
 	client := f.ClientSet
 	pod := toBeMutatedPod(f)
 	mutatedPod, err := client.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 	if len(mutatedPod.Spec.InitContainers) != 1 {
 		framework.Failf("expect pod to have 1 init container, got %#v", mutatedPod.Spec.InitContainers)
 	}
@@ -2211,9 +2210,9 @@ func testSlowWebhookTimeoutNoError(f *framework.Framework) {
 	client := f.ClientSet
 	name := "e2e-test-slow-webhook-configmap"
 	_, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name}}, metav1.CreateOptions{})
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 	err = client.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 }
 
 // createAdmissionWebhookMultiVersionTestCRDWithV1Storage creates a new CRD specifically
