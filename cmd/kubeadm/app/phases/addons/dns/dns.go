@@ -23,6 +23,7 @@ import (
 	"net"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/caddyserver/caddy/caddyfile"
 	"github.com/coredns/corefile-migration/migration"
@@ -34,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
@@ -398,29 +400,48 @@ var (
 )
 
 func isCoreDNSVersionSupported(client clientset.Interface) (bool, error) {
-	isValidVersion := true
-	coreDNSPodList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(
-		context.TODO(),
-		metav1.ListOptions{
-			LabelSelector: "k8s-app=kube-dns",
-		},
-	)
+	var lastError error
+	var pods []v1.Pod
+
+	pollTimeout := 10 * time.Second
+	err := wait.PollImmediate(kubeadmconstants.APICallRetryInterval, pollTimeout, func() (bool, error) {
+		coreDNSPodList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(
+			context.TODO(),
+			metav1.ListOptions{
+				LabelSelector: "k8s-app=kube-dns",
+			},
+		)
+		if err != nil {
+			lastError = err
+			return false, nil
+		}
+
+		for _, pod := range coreDNSPodList.Items {
+			if pod.Status.Phase != v1.PodRunning {
+				lastError = errors.New("found non-running CoreDNS pods")
+				return false, nil
+			}
+		}
+		pods = coreDNSPodList.Items
+		return true, nil
+	})
+
 	if err != nil {
-		return false, errors.Wrap(err, "unable to list CoreDNS pods")
+		return false, errors.Wrapf(lastError, "could not list the running CoreDNS pods after %v", pollTimeout)
 	}
 
-	for _, pod := range coreDNSPodList.Items {
+	for _, pod := range pods {
 		imageID := imageDigestMatcher.FindStringSubmatch(pod.Status.ContainerStatuses[0].ImageID)
 		if len(imageID) != 2 {
-			return false, errors.Errorf("unable to match SHA256 digest ID in %q", pod.Status.ContainerStatuses[0].ImageID)
+			return false, errors.Errorf("pod %s unable to match SHA256 digest ID in %q", pod.GetName(), pod.Status.ContainerStatuses[0].ImageID)
 		}
 		// The actual digest should be at imageID[1]
 		if !migration.Released(imageID[1]) {
-			isValidVersion = false
+			return false, errors.Errorf("unknown digest %q for pod %s", imageID[1], pod.GetName())
 		}
 	}
 
-	return isValidVersion, nil
+	return true, nil
 }
 
 func migrateCoreDNSCorefile(client clientset.Interface, cm *v1.ConfigMap, corefile, currentInstalledCoreDNSVersion string) error {
