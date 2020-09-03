@@ -23,12 +23,6 @@ import (
 	"testing"
 )
 
-func testLogger(t *testing.T) DebugLogger {
-	// We don't set logger to eliminate rubbish logs in tests.
-	// If you want to switch it, simply switch it to: "return t"
-	return nil
-}
-
 func TestConverter_byteSlice(t *testing.T) {
 	c := NewConverter(DefaultNameFunc)
 	src := []byte{1, 2, 3}
@@ -83,7 +77,6 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	}
 	type C struct{}
 	c := NewConverter(DefaultNameFunc)
-	c.Debug = testLogger(t)
 	convertFn1 := func(in *A, out *B, s Scope) error {
 		out.Bar = in.Foo
 		out.Baz = in.Baz
@@ -268,7 +261,6 @@ func TestConverter_meta(t *testing.T) {
 	type Foo struct{ A string }
 	type Bar struct{ A string }
 	c := NewConverter(DefaultNameFunc)
-	c.Debug = testLogger(t)
 	checks := 0
 	convertFn1 := func(in *Foo, out *Bar, s Scope) error {
 		if s.Meta() == nil {
