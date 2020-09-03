@@ -73,6 +73,7 @@ func addCadvisorFlags(fs *pflag.FlagSet) {
 	registerDeprecated(global, local, "storage_driver_table", deprecated)
 	registerDeprecated(global, local, "storage_driver_secure", deprecated)
 	registerDeprecated(global, local, "storage_driver_buffer_duration", deprecated)
+	registerDeprecated(global, local, "containerd-namespace", deprecated)
 
 	// finally, add cadvisor flags to the provided flagset
 	fs.AddFlagSet(local)
