@@ -164,14 +164,28 @@ func ValidateNetworkPolicyUpdate(update, old *networking.NetworkPolicy) field.Er
 	return allErrs
 }
 
-// ValidateIPBlock validates a cidr and the except fields of an IpBlock NetworkPolicyPeer
+// validateCIDRMask validates that a string is a valid CIDR string with no bits set in the masked-out part
+// (eg, "192.168.1.0/24" is allowed, but "192.168.1.1/24" is not)
+func validateCIDRMask(cidr string) (*net.IPNet, error) {
+	ip, net, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return nil, err
+	}
+	if !ip.Equal(net.IP) {
+		maskLen, addrLen := net.Mask.Size()
+		return nil, fmt.Errorf("%q is not in canonical form (should be %s/%d or %s/%d?)", cidr, ip.Mask(net.Mask).String(), maskLen, ip.String(), addrLen)
+	}
+	return net, nil
+}
+
+// ValidateIPBlock validates a cidr and the except fields of an IPBlock NetworkPolicyPeer
 func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(ipb.CIDR) == 0 || ipb.CIDR == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("cidr"), ""))
 		return allErrs
 	}
-	cidrIPNet, err := apivalidation.ValidateCIDR(ipb.CIDR)
+	cidrIPNet, err := validateCIDRMask(ipb.CIDR)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("cidr"), ipb.CIDR, "not a valid CIDR"))
 		return allErrs
@@ -179,7 +193,7 @@ func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorLi
 	exceptCIDR := ipb.Except
 	for i, exceptIP := range exceptCIDR {
 		exceptPath := fldPath.Child("except").Index(i)
-		exceptCIDR, err := apivalidation.ValidateCIDR(exceptIP)
+		exceptCIDR, err := validateCIDRMask(exceptIP)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(exceptPath, exceptIP, "not a valid CIDR"))
 			return allErrs

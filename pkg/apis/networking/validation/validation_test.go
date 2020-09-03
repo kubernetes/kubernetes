@@ -681,6 +681,26 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				},
 			},
 		},
+		"invalid ambiguous cidr": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "192.168.5.6/24",
+									Except: []string{"192.168.1.0/24", "192.168.2.0/24"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 		"except field is an empty string": {
 			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 			Spec: networking.NetworkPolicySpec{
@@ -713,7 +733,27 @@ func TestValidateNetworkPolicy(t *testing.T) {
 							{
 								IPBlock: &networking.IPBlock{
 									CIDR:   "192.168.8.0/24",
-									Except: []string{"192.168.9.1/24"},
+									Except: []string{"192.168.9.1/32"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"invalid ambiguous except CIDR": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{
+							{
+								IPBlock: &networking.IPBlock{
+									CIDR:   "192.168.8.0/24",
+									Except: []string{"192.168.8.1/24"},
 								},
 							},
 						},
