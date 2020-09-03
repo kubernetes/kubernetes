@@ -26,6 +26,7 @@ go_library(
     deps = [
         "//pkg/cluster/ports:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
+        "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/runtimeclass/testing:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
