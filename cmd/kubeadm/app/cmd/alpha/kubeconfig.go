@@ -99,6 +99,7 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 
 	// Add ClusterConfiguration backed flags to the command
 	cmd.Flags().StringVar(&clusterCfg.CertificatesDir, options.CertificatesDir, clusterCfg.CertificatesDir, "The path where certificates are stored")
+	cmd.Flags().StringVar(&clusterCfg.ClusterName, "cluster-name", clusterCfg.ClusterName, "Cluster name to be used in kubeconfig")
 
 	// Add InitConfiguration backed flags to the command
 	cmd.Flags().StringVar(&initCfg.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, initCfg.LocalAPIEndpoint.AdvertiseAddress, "The IP address the API server is accessible on")
