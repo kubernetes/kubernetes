@@ -8,7 +8,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
 	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
-	github.com/evanphx/json-patch v0.0.0-20200808040245-162e5629780b
+	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/protobuf v1.3.2
@@ -23,6 +23,7 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/onsi/ginkgo v1.11.0 // indirect
 	github.com/onsi/gomega v1.7.0 // indirect
+	github.com/pkg/errors v0.8.1 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
