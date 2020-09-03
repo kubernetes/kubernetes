@@ -142,7 +142,7 @@ dependencies:
       match: configs\[DebianIptables\] = Config{buildImageRegistry, "debian-iptables", "v\d+\.\d+.\d+"}
 
   - name: "k8s.gcr.io/go-runner: dependents"
-    version: buster-v2.0.0
+    version: buster-v2.0.1
     refPaths:
     - path: build/common.sh
       match: go_runner_version=
