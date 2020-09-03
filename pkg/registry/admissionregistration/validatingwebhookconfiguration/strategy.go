@@ -39,7 +39,7 @@ type validatingWebhookConfigurationStrategy struct {
 // Strategy is the default logic that applies when creating and updating validatingWebhookConfiguration objects.
 var Strategy = validatingWebhookConfigurationStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// NamespaceScoped returns true because all validatingWebhookConfiguration' need to be within a namespace.
+// NamespaceScoped returns false because ValidatingWebhookConfiguration is cluster-scoped resource.
 func (validatingWebhookConfigurationStrategy) NamespaceScoped() bool {
 	return false
 }
