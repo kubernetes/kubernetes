@@ -388,6 +388,9 @@ github.com/fatih/camelcase
 ## explicit
 github.com/fsnotify/fsnotify
 # github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.4.9
+# github.com/fvbommel/sortorder v1.0.1 => github.com/fvbommel/sortorder v1.0.1
+github.com/fvbommel/sortorder
+# github.com/fvbommel/sortorder => github.com/fvbommel/sortorder v1.0.1
 # github.com/ghodss/yaml v1.0.0 => github.com/ghodss/yaml v1.0.0
 github.com/ghodss/yaml
 # github.com/ghodss/yaml => github.com/ghodss/yaml v1.0.0
@@ -1088,7 +1091,6 @@ github.com/vmware/govmomi/vim25/xml
 # github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
 github.com/xiang90/probing
 # github.com/xiang90/probing => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
-# github.com/xlab/handysort => github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1
 # github.com/xordataexchange/crypt => github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77
 # github.com/yuin/goldmark => github.com/yuin/goldmark v1.1.27
 # go.etcd.io/bbolt v1.3.5 => go.etcd.io/bbolt v1.3.5
@@ -2516,6 +2518,3 @@ sigs.k8s.io/structured-merge-diff/v4/value
 ## explicit
 sigs.k8s.io/yaml
 # sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
-# vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc => vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc
-# vbom.ml/util => vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc
-vbom.ml/util/sortorder

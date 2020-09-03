@@ -57,7 +57,7 @@ func NaturalLess(str1, str2 string) bool {
 			if len1, len2 := idx1-nonZero1, idx2-nonZero2; len1 != len2 {
 				return len1 < len2
 			}
-			// If they're not equal, string comparison is correct.
+			// If they're equal, string comparison is correct.
 			if nr1, nr2 := str1[nonZero1:idx1], str2[nonZero2:idx2]; nr1 != nr2 {
 				return nr1 < nr2
 			}
