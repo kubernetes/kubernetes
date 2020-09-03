@@ -180,7 +180,7 @@ func (mfc *monitorFakeCmd) Stop() {
 
 func TestIPTablesMonitor(t *testing.T) {
 	mfe := newMonitorFakeExec()
-	ipt := New(mfe, ProtocolIPv4)
+	ipt, _ := New(mfe, ProtocolIPv4)
 
 	var reloads uint32
 	stopCh := make(chan struct{})

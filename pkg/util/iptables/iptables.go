@@ -207,11 +207,10 @@ type runner struct {
 
 // newInternal returns a new Interface which will exec iptables, and allows the
 // caller to change the iptables-restore lockfile path
-func newInternal(exec utilexec.Interface, protocol Protocol, lockfilePath14x, lockfilePath16x string) Interface {
+func newInternal(exec utilexec.Interface, protocol Protocol, lockfilePath14x, lockfilePath16x string) (Interface, error) {
 	version, err := getIPTablesVersion(exec, protocol)
 	if err != nil {
-		klog.Warningf("Error checking iptables version, assuming version at least %s: %v", MinCheckVersion, err)
-		version = MinCheckVersion
+		return nil, err
 	}
 
 	if lockfilePath16x == "" {
@@ -231,11 +230,13 @@ func newInternal(exec utilexec.Interface, protocol Protocol, lockfilePath14x, lo
 		lockfilePath14x: lockfilePath14x,
 		lockfilePath16x: lockfilePath16x,
 	}
-	return runner
+	return runner, nil
 }
 
-// New returns a new Interface which will exec iptables.
-func New(exec utilexec.Interface, protocol Protocol) Interface {
+// New returns a new Interface which will exec iptables. It will only return an error if the
+// iptables binary is unavailable. (In particular, if protocol is "IPv6" and the system only has
+// IPv4 iptables binaries, then this will return an error.)
+func New(exec utilexec.Interface, protocol Protocol) (Interface, error) {
 	return newInternal(exec, protocol, "", "")
 }
 
@@ -648,14 +649,17 @@ func getIPTablesVersion(exec utilexec.Interface, protocol Protocol) (*utilversio
 	if err != nil {
 		return nil, err
 	}
+
 	versionMatcher := regexp.MustCompile(iptablesVersionPattern)
 	match := versionMatcher.FindStringSubmatch(string(bytes))
 	if match == nil {
-		return nil, fmt.Errorf("no iptables version found in string: %s", bytes)
+		klog.Warningf("Unexpected \"iptables --version\" output %q. Assuming version at least %s", bytes, MinCheckVersion)
+		return MinCheckVersion, nil
 	}
 	version, err := utilversion.ParseGeneric(match[1])
 	if err != nil {
-		return nil, fmt.Errorf("iptables version %q is not a valid version string: %v", match[1], err)
+		klog.Warningf("Could not parse \"iptables --version\" output: %v. Assuming version at least %s", err, MinCheckVersion)
+		return MinCheckVersion, nil
 	}
 
 	return version, nil

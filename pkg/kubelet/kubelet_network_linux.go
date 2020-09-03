@@ -34,7 +34,11 @@ func (kl *Kubelet) initNetworkUtil() {
 	if utilnet.IsIPv6(kl.nodeIP) {
 		protocol = utiliptables.ProtocolIPv6
 	}
-	iptClient := utiliptables.New(utilexec.New(), protocol)
+	iptClient, err := utiliptables.New(utilexec.New(), protocol)
+	if err != nil {
+		klog.Errorf("Could not initialize iptables chains for %s: %v", protocol, err)
+		return
+	}
 
 	kl.syncNetworkUtil(iptClient)
 	go iptClient.Monitor(utiliptables.Chain("KUBE-KUBELET-CANARY"),

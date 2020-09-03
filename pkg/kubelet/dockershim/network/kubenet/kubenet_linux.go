@@ -117,8 +117,14 @@ type kubenetNetworkPlugin struct {
 
 func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugin {
 	execer := utilexec.New()
-	iptInterface := utiliptables.New(execer, utiliptables.ProtocolIPv4)
-	iptInterfacev6 := utiliptables.New(execer, utiliptables.ProtocolIPv6)
+	iptInterface, err := utiliptables.New(execer, utiliptables.ProtocolIPv4)
+	if err != nil {
+		klog.Warningf("Could not initialize IPv4 iptables: %v", err)
+	}
+	iptInterfacev6, err := utiliptables.New(execer, utiliptables.ProtocolIPv6)
+	if err != nil {
+		klog.Warningf("Could not initialize IPv6 iptables: %v", err)
+	}
 	return &kubenetNetworkPlugin{
 		podIPs:            make(map[kubecontainer.ContainerID]utilsets.String),
 		execer:            utilexec.New(),
@@ -192,6 +198,9 @@ func (plugin *kubenetNetworkPlugin) ensureMasqRule() error {
 		ipt := plugin.iptables
 		if netutils.IsIPv6CIDRString(plugin.nonMasqueradeCIDR) {
 			ipt = plugin.iptablesv6
+		}
+		if ipt == nil {
+			return fmt.Errorf("can't set up masquerade rule for %s; no iptables support for family", plugin.nonMasqueradeCIDR)
 		}
 
 		if _, err := ipt.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.ChainPostrouting,
