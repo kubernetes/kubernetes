@@ -52,7 +52,6 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 					framework.Logf("Now attempting to probe pod [[[ %v ]]]", endpointPod.Status.PodIP)
 					if err := config.DialFromTestContainer(protocol, endpointPod.Status.PodIP, port, config.MaxTries, 0, sets.NewString(endpointPod.Name)); err != nil {
 						errors = append(errors, err)
-						framework.Logf("Warning: Test failure (%v) will occur due to %v", len(errors), err) // convenient error message for diagnosis... how many pods failed, and on what hosts?
 					} else {
 						framework.Logf("Was able to reach %v on %v ", endpointPod.Status.PodIP, endpointPod.Status.HostIP)
 					}
