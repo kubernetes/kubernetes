@@ -254,6 +254,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodF
 	defer cancel()
 	for _, pod := range pods {
 		go func(pod corev1.Pod, returnCh chan error) {
+			refreshPod := false
 			for {
 				switch d.DryRunStrategy {
 				case cmdutil.DryRunServer:
@@ -268,17 +269,40 @@ func (d *Helper) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodF
 					return
 				default:
 				}
-				err := d.EvictPod(pod, policyGroupVersion)
+
+				// Create a temporary pod so we don't mutate the pod in the loop.
+				activePod := pod
+				if refreshPod {
+					freshPod, err := getPodFn(pod.Namespace, pod.Name)
+					// We ignore errors and let eviction sort it out with
+					// the original pod.
+					if err == nil {
+						activePod = *freshPod
+					}
+					refreshPod = false
+				}
+
+				err := d.EvictPod(activePod, policyGroupVersion)
 				if err == nil {
 					break
 				} else if apierrors.IsNotFound(err) {
 					returnCh <- nil
 					return
 				} else if apierrors.IsTooManyRequests(err) {
-					fmt.Fprintf(d.ErrOut, "error when evicting pods/%q -n %q (will retry after 5s): %v\n", pod.Name, pod.Namespace, err)
+					fmt.Fprintf(d.ErrOut, "error when evicting pods/%q -n %q (will retry after 5s): %v\n", activePod.Name, activePod.Namespace, err)
+					time.Sleep(5 * time.Second)
+				} else if !activePod.ObjectMeta.DeletionTimestamp.IsZero() && apierrors.IsForbidden(err) && apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+					// an eviction request in a deleting namespace will throw a forbidden error,
+					// if the pod is already marked deleted, we can ignore this error, an eviction
+					// request will never succeed, but we will waitForDelete for this pod.
+					break
+				} else if apierrors.IsForbidden(err) && apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+					// an eviction request in a deleting namespace will throw a forbidden error,
+					// if the pod is not marked deleted, we retry until it is.
+					fmt.Fprintf(d.ErrOut, "error when evicting pod %q (will retry after 5s): %v\n", activePod.Name, err)
 					time.Sleep(5 * time.Second)
 				} else {
-					returnCh <- fmt.Errorf("error when evicting pods/%q -n %q: %v", pod.Name, pod.Namespace, err)
+					returnCh <- fmt.Errorf("error when evicting pods/%q -n %q: %v", activePod.Name, activePod.Namespace, err)
 					return
 				}
 			}
