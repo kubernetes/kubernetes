@@ -198,7 +198,7 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 func (rsc *ReplicaSetController) getReplicaSetsWithSameController(rs *apps.ReplicaSet) []*apps.ReplicaSet {
 	controllerRef := metav1.GetControllerOf(rs)
 	if controllerRef == nil {
-		utilruntime.HandleError(fmt.Errorf("ReplicaSet has no controller: %v", rs))
+		utilruntime.HandleError(fmt.Errorf("ReplicaSet has no controller: %s[%v]", rs.Name, rs.Status))
 		return nil
 	}
 
