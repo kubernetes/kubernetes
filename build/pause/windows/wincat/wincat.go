@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// package wincat connects to the given host and port and redirects its stdin to the connection and
+// package main connects to the given host and port and redirects its stdin to the connection and
 // the connection's output to stdout. This is currently being used for port-forwarding for Windows Pods.
-package wincat
+package main
 
 import (
 	"fmt"
