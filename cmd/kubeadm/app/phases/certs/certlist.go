@@ -124,6 +124,9 @@ func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
 
 		caCert, err := pkiutil.TryLoadCertFromDisk(ic.CertificatesDir, ca.BaseName)
 		if err == nil {
+			// Validate period
+			CheckCertificatePeriodValidity(ca.BaseName, caCert)
+
 			// Cert exists already, make sure it's valid
 			if !caCert.IsCA {
 				return errors.Errorf("certificate %q is not a CA", ca.Name)
