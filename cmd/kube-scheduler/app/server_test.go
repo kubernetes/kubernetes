@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -363,6 +364,15 @@ profiles:
 		},
 	}
 
+	makeListener := func(t *testing.T) net.Listener {
+		t.Helper()
+		l, err := net.Listen("tcp", ":0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return l
+	}
+
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			fs := pflag.NewFlagSet("test", pflag.PanicOnError)
@@ -370,6 +380,15 @@ profiles:
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			// use listeners instead of static ports so parallel test runs don't conflict
+			opts.SecureServing.Listener = makeListener(t)
+			defer opts.SecureServing.Listener.Close()
+			opts.CombinedInsecureServing.Metrics.Listener = makeListener(t)
+			defer opts.CombinedInsecureServing.Metrics.Listener.Close()
+			opts.CombinedInsecureServing.Healthz.Listener = makeListener(t)
+			defer opts.CombinedInsecureServing.Healthz.Listener.Close()
+
 			for _, f := range opts.Flags().FlagSets {
 				fs.AddFlagSet(f)
 			}
@@ -379,12 +398,10 @@ profiles:
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			cc, sched, err := Setup(ctx, opts)
+			_, sched, err := Setup(ctx, opts)
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer cc.SecureServing.Listener.Close()
-			defer cc.InsecureServing.Listener.Close()
 
 			gotPlugins := make(map[string]map[string][]kubeschedulerconfig.Plugin)
 			for n, p := range sched.Profiles {
