@@ -539,6 +539,8 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap
 	}
 
 	sd := setupSRIOVConfigOrFail(f, configMap)
+	defer teardownSRIOVConfigOrFail(f, sd)
+
 	envInfo := &testEnvInfo{
 		numaNodes:         numaNodes,
 		sriovResourceName: sd.resourceName,
@@ -707,7 +709,6 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap
 		}
 		runTopologyManagerNegativeTest(f, 1, ctnAttrs, envInfo)
 	}
-	teardownSRIOVConfigOrFail(f, sd)
 }
 
 func runTopologyManagerTests(f *framework.Framework) {
