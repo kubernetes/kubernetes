@@ -19,15 +19,17 @@ package roundtrip
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"google.golang.org/protobuf/proto"
 	fuzz "github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
+	"google.golang.org/protobuf/encoding/prototext"
+	"google.golang.org/protobuf/runtime/protoimpl"
 
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -432,7 +434,16 @@ func dataAsString(data []byte) string {
 	dataString := string(data)
 	if !strings.HasPrefix(dataString, "{") {
 		dataString = "\n" + hex.Dump(data)
-		proto.NewBuffer(make([]byte, 0, 1024)).DebugPrint("decoded object", data)
+		debugPrint("decoded object", data)
 	}
 	return dataString
+}
+
+// debugPrint prints out a debug message pulled directly from protobuf apiv1. This is a temporary
+// function to keep the same behavior while updating to protobuf apiv2.
+func debugPrint(s string, b []byte) {
+	m := protoimpl.X.MessageOf(new(struct{ XXX_unrecognized protoimpl.UnknownFields }))
+	m.SetUnknown(b)
+	b, _ = prototext.MarshalOptions{AllowPartial: true, Indent: "\t"}.Marshal(m.Interface())
+	fmt.Printf("==== %s ====\n%s==== %s ====\n", s, b, s)
 }

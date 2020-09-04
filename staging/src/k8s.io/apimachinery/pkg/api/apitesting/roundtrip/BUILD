@@ -32,7 +32,8 @@ go_library(
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/google.golang.org/protobuf/proto:go_default_library",
+        "//vendor/google.golang.org/protobuf/encoding/prototext:go_default_library",
+        "//vendor/google.golang.org/protobuf/runtime/protoimpl:go_default_library",
     ],
 )
 
