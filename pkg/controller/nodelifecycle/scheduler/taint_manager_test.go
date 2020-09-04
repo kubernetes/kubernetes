@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 
@@ -82,10 +83,20 @@ func (p *podHolder) setPod(pod *v1.Pod) {
 }
 
 type nodeHolder struct {
+	lock sync.Mutex
+
 	node *v1.Node
 }
 
+func (n *nodeHolder) setNode(node *v1.Node) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+	n.node = node
+}
+
 func (n *nodeHolder) getNode(name string) (*v1.Node, error) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
 	return n.node, nil
 }
 
@@ -361,7 +372,7 @@ func TestCreateNode(t *testing.T) {
 	for _, item := range testCases {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
-		controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{item.node}).getNode, getPodsAssignedToNode(fakeClientset))
+		controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{node: item.node}).getNode, getPodsAssignedToNode(fakeClientset))
 		controller.recorder = testutil.NewFakeRecorder()
 		go controller.Run(stopCh)
 		controller.NodeUpdated(nil, item.node)
@@ -482,7 +493,7 @@ func TestUpdateNode(t *testing.T) {
 	for _, item := range testCases {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
-		controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
+		controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{node: item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
 		controller.recorder = testutil.NewFakeRecorder()
 		go controller.Run(stopCh)
 		controller.NodeUpdated(item.oldNode, item.newNode)
@@ -503,6 +514,74 @@ func TestUpdateNode(t *testing.T) {
 		}
 		close(stopCh)
 	}
+}
+
+func TestUpdateNodeWithMultipleTaints(t *testing.T) {
+	taint1 := createNoExecuteTaint(1)
+	taint2 := createNoExecuteTaint(2)
+
+	minute := int64(60)
+	pod := testutil.NewPod("pod1", "node1")
+	pod.Spec.Tolerations = []v1.Toleration{
+		{Key: taint1.Key, Operator: v1.TolerationOpExists, Effect: v1.TaintEffectNoExecute},
+		{Key: taint2.Key, Operator: v1.TolerationOpExists, Effect: v1.TaintEffectNoExecute, TolerationSeconds: &minute},
+	}
+	podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+
+	untaintedNode := testutil.NewNode("node1")
+
+	doubleTaintedNode := testutil.NewNode("node1")
+	doubleTaintedNode.Spec.Taints = []v1.Taint{taint1, taint2}
+
+	singleTaintedNode := testutil.NewNode("node1")
+	singleTaintedNode.Spec.Taints = []v1.Taint{taint1}
+
+	stopCh := make(chan struct{})
+	fakeClientset := fake.NewSimpleClientset(pod)
+	holder := &nodeHolder{node: untaintedNode}
+	controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (holder).getNode, getPodsAssignedToNode(fakeClientset))
+	controller.recorder = testutil.NewFakeRecorder()
+	go controller.Run(stopCh)
+
+	// no taint
+	holder.setNode(untaintedNode)
+	controller.handleNodeUpdate(nodeUpdateItem{"node1"})
+	// verify pod is not queued for deletion
+	if controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String()) != nil {
+		t.Fatalf("pod queued for deletion with no taints")
+	}
+
+	// no taint -> infinitely tolerated taint
+	holder.setNode(singleTaintedNode)
+	controller.handleNodeUpdate(nodeUpdateItem{"node1"})
+	// verify pod is not queued for deletion
+	if controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String()) != nil {
+		t.Fatalf("pod queued for deletion with permanently tolerated taint")
+	}
+
+	// infinitely tolerated taint -> temporarily tolerated taint
+	holder.setNode(doubleTaintedNode)
+	controller.handleNodeUpdate(nodeUpdateItem{"node1"})
+	// verify pod is queued for deletion
+	if controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String()) == nil {
+		t.Fatalf("pod not queued for deletion after addition of temporarily tolerated taint")
+	}
+
+	// temporarily tolerated taint -> infinitely tolerated taint
+	holder.setNode(singleTaintedNode)
+	controller.handleNodeUpdate(nodeUpdateItem{"node1"})
+	// verify pod is not queued for deletion
+	if controller.taintEvictionQueue.GetWorkerUnsafe(podNamespacedName.String()) != nil {
+		t.Fatalf("pod queued for deletion after removal of temporarily tolerated taint")
+	}
+
+	// verify pod is not deleted
+	for _, action := range fakeClientset.Actions() {
+		if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
+			t.Error("Unexpected deletion")
+		}
+	}
+	close(stopCh)
 }
 
 func TestUpdateNodeWithMultiplePods(t *testing.T) {
@@ -548,7 +627,7 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
 		sort.Sort(item.expectedDeleteTimes)
-		controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
+		controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{node: item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
 		controller.recorder = testutil.NewFakeRecorder()
 		go controller.Run(stopCh)
 		controller.NodeUpdated(item.oldNode, item.newNode)
@@ -748,7 +827,7 @@ func TestEventualConsistency(t *testing.T) {
 		stopCh := make(chan struct{})
 		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
 		holder := &podHolder{}
-		controller := NewNoExecuteTaintManager(fakeClientset, holder.getPod, (&nodeHolder{item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
+		controller := NewNoExecuteTaintManager(fakeClientset, holder.getPod, (&nodeHolder{node: item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
 		controller.recorder = testutil.NewFakeRecorder()
 		go controller.Run(stopCh)
 
