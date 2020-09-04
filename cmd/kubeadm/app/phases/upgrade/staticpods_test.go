@@ -325,7 +325,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			manifestShouldChange: true,
 		},
 		{
-			description: "any wait error should result in a rollback and an abort",
+			description: "any wait error should result in a rollback and an abort 1",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        errors.New("boo! failed"),
 				waitForHashChange:    nil,
@@ -338,7 +338,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			manifestShouldChange: false,
 		},
 		{
-			description: "any wait error should result in a rollback and an abort",
+			description: "any wait error should result in a rollback and an abort 2",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        nil,
 				waitForHashChange:    errors.New("boo! failed"),
@@ -351,7 +351,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			manifestShouldChange: false,
 		},
 		{
-			description: "any wait error should result in a rollback and an abort",
+			description: "any wait error should result in a rollback and an abort 3",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        nil,
 				waitForHashChange:    nil,
@@ -364,7 +364,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			manifestShouldChange: false,
 		},
 		{
-			description: "any path-moving error should result in a rollback and an abort",
+			description: "any path-moving error should result in a rollback and an abort 1",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        nil,
 				waitForHashChange:    nil,
@@ -381,7 +381,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			manifestShouldChange: false,
 		},
 		{
-			description: "any path-moving error should result in a rollback and an abort",
+			description: "any path-moving error should result in a rollback and an abort 2",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        nil,
 				waitForHashChange:    nil,
