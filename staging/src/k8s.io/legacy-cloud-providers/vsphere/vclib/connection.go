@@ -65,6 +65,7 @@ func (connection *VSphereConnection) Connect(ctx context.Context) error {
 			klog.Errorf("Failed to create govmomi client. err: %+v", err)
 			return err
 		}
+		setVCenterInfoMetric(connection)
 		return nil
 	}
 	m := session.NewManager(connection.Client)
@@ -83,6 +84,7 @@ func (connection *VSphereConnection) Connect(ctx context.Context) error {
 		klog.Errorf("Failed to create govmomi client. err: %+v", err)
 		return err
 	}
+	setVCenterInfoMetric(connection)
 	return nil
 }
 
