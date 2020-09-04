@@ -330,11 +330,13 @@ func satisfyExistingPodsAntiAffinity(state *preFilterState, nodeInfo *framework.
 
 //  Checks if the node satisifies the incoming pod's anti-affinity rules.
 func satisfyPodAntiAffinity(state *preFilterState, nodeInfo *framework.NodeInfo) bool {
-	for _, term := range state.podInfo.RequiredAntiAffinityTerms {
-		if topologyValue, ok := nodeInfo.Node().Labels[term.TopologyKey]; ok {
-			tp := topologyPair{key: term.TopologyKey, value: topologyValue}
-			if state.topologyToMatchedAntiAffinityTerms[tp] > 0 {
-				return false
+	if len(state.topologyToMatchedAntiAffinityTerms) > 0 {
+		for _, term := range state.podInfo.RequiredAntiAffinityTerms {
+			if topologyValue, ok := nodeInfo.Node().Labels[term.TopologyKey]; ok {
+				tp := topologyPair{key: term.TopologyKey, value: topologyValue}
+				if state.topologyToMatchedAntiAffinityTerms[tp] > 0 {
+					return false
+				}
 			}
 		}
 	}
