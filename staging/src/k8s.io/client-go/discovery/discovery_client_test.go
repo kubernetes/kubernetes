@@ -403,7 +403,7 @@ func TestGetServerResources(t *testing.T) {
 }
 
 func returnedOpenAPI() *openapi_v2.Document {
-	return &openapi_v2.Document{
+	d := &openapi_v2.Document{
 		Definitions: &openapi_v2.Definitions{
 			AdditionalProperties: []*openapi_v2.NamedSchema{
 				{
@@ -452,6 +452,11 @@ func returnedOpenAPI() *openapi_v2.Document {
 			},
 		},
 	}
+
+	// openapi_v2 uses unexported struct fields on Document which can be populated through
+	// ProtoReflect
+	d.ProtoReflect()
+	return d
 }
 
 func openapiSchemaDeprecatedFakeServer(status int, t *testing.T) (*httptest.Server, error) {
