@@ -593,13 +593,6 @@ const (
 	// Enables a feature to make secrets and configmaps data immutable.
 	ImmutableEphemeralVolumes featuregate.Feature = "ImmutableEphemeralVolumes"
 
-	// owner: @robscott
-	// beta: v1.18
-	// ga: v1.19
-	//
-	// Enables DefaultIngressClass admission controller.
-	DefaultIngressClass featuregate.Feature = "DefaultIngressClass"
-
 	// owner: @bart0sh
 	// alpha: v1.18
 	// beta: v1.19
@@ -736,7 +729,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
 	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.Beta},
 	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.Beta},
-	DefaultIngressClass:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	HugePageStorageMediumSize:                      {Default: true, PreRelease: featuregate.Beta},
 	ExternalPolicyForExternalIP:                    {Default: true, PreRelease: featuregate.GA}, // remove in 1.20
 	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
