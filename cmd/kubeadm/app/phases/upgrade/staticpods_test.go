@@ -513,15 +513,15 @@ func TestStaticPodControlPlane(t *testing.T) {
 			}
 
 			// create the kubeadm etcd certs
-			caCert, caKey, err := certsphase.KubeadmCertEtcdCA.CreateAsCA(newcfg)
+			caCert, caKey, err := certsphase.KubeadmCertEtcdCA().CreateAsCA(newcfg)
 			if err != nil {
 				t.Fatalf("couldn't create new CA certificate: %v", err)
 			}
 			for _, cert := range []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertEtcdServer,
-				&certsphase.KubeadmCertEtcdPeer,
-				&certsphase.KubeadmCertEtcdHealthcheck,
-				&certsphase.KubeadmCertEtcdAPIClient,
+				certsphase.KubeadmCertEtcdServer(),
+				certsphase.KubeadmCertEtcdPeer(),
+				certsphase.KubeadmCertEtcdHealthcheck(),
+				certsphase.KubeadmCertEtcdAPIClient(),
 			} {
 				if err := cert.CreateFromCA(newcfg, caCert, caKey); err != nil {
 					t.Fatalf("couldn't create certificate %s: %v", cert.Name, err)
@@ -685,33 +685,33 @@ func TestRenewCertsByComponent(t *testing.T) {
 			name:      "all CA exist, all certs should be rotated for etcd",
 			component: constants.Etcd,
 			certsShouldExist: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertEtcdServer,
-				&certsphase.KubeadmCertEtcdPeer,
-				&certsphase.KubeadmCertEtcdHealthcheck,
+				certsphase.KubeadmCertEtcdServer(),
+				certsphase.KubeadmCertEtcdPeer(),
+				certsphase.KubeadmCertEtcdHealthcheck(),
 			},
 		},
 		{
 			name:      "all CA exist, all certs should be rotated for apiserver",
 			component: constants.KubeAPIServer,
 			certsShouldExist: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertEtcdAPIClient,
-				&certsphase.KubeadmCertAPIServer,
-				&certsphase.KubeadmCertKubeletClient,
-				&certsphase.KubeadmCertFrontProxyClient,
+				certsphase.KubeadmCertEtcdAPIClient(),
+				certsphase.KubeadmCertAPIServer(),
+				certsphase.KubeadmCertKubeletClient(),
+				certsphase.KubeadmCertFrontProxyClient(),
 			},
 		},
 		{
 			name:      "external CA, renew only certificates not signed by CA for apiserver",
 			component: constants.KubeAPIServer,
 			certsShouldExist: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertEtcdAPIClient,
-				&certsphase.KubeadmCertFrontProxyClient,
-				&certsphase.KubeadmCertAPIServer,
-				&certsphase.KubeadmCertKubeletClient,
+				certsphase.KubeadmCertEtcdAPIClient(),
+				certsphase.KubeadmCertFrontProxyClient(),
+				certsphase.KubeadmCertAPIServer(),
+				certsphase.KubeadmCertKubeletClient(),
 			},
 			certsShouldBeRenewed: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertEtcdAPIClient,
-				&certsphase.KubeadmCertFrontProxyClient,
+				certsphase.KubeadmCertEtcdAPIClient(),
+				certsphase.KubeadmCertFrontProxyClient(),
 			},
 			externalCA: true,
 		},
@@ -719,15 +719,15 @@ func TestRenewCertsByComponent(t *testing.T) {
 			name:      "external front-proxy-CA, renew only certificates not signed by front-proxy-CA for apiserver",
 			component: constants.KubeAPIServer,
 			certsShouldExist: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertEtcdAPIClient,
-				&certsphase.KubeadmCertFrontProxyClient,
-				&certsphase.KubeadmCertAPIServer,
-				&certsphase.KubeadmCertKubeletClient,
+				certsphase.KubeadmCertEtcdAPIClient(),
+				certsphase.KubeadmCertFrontProxyClient(),
+				certsphase.KubeadmCertAPIServer(),
+				certsphase.KubeadmCertKubeletClient(),
 			},
 			certsShouldBeRenewed: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertEtcdAPIClient,
-				&certsphase.KubeadmCertAPIServer,
-				&certsphase.KubeadmCertKubeletClient,
+				certsphase.KubeadmCertEtcdAPIClient(),
+				certsphase.KubeadmCertAPIServer(),
+				certsphase.KubeadmCertKubeletClient(),
 			},
 			externalFrontProxyCA: true,
 		},
@@ -750,8 +750,8 @@ func TestRenewCertsByComponent(t *testing.T) {
 			component:          constants.Etcd,
 			shouldErrorOnRenew: true,
 			certsShouldExist: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertEtcdServer,
-				&certsphase.KubeadmCertEtcdPeer,
+				certsphase.KubeadmCertEtcdServer(),
+				certsphase.KubeadmCertEtcdPeer(),
 			},
 		},
 		{
