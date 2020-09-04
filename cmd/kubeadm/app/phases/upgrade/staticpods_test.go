@@ -444,8 +444,10 @@ func TestStaticPodControlPlane(t *testing.T) {
 		},
 	}
 
-	for _, rt := range tests {
+	for i := range tests {
+		rt := tests[i]
 		t.Run(rt.description, func(t *testing.T) {
+			t.Parallel()
 			waiter := NewFakeStaticPodWaiter(rt.waitErrsToReturn)
 			pathMgr, err := NewFakeStaticPodPathManager(rt.moveFileFunc)
 			if err != nil {
@@ -762,8 +764,11 @@ func TestRenewCertsByComponent(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for i := range tests {
+		test := tests[i]
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Setup up basic requities
 			tmpDir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(tmpDir)
