@@ -30,10 +30,9 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
@@ -46,6 +45,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2ealign "k8s.io/kubernetes/test/e2e_node/alignment"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -301,16 +301,25 @@ func findSRIOVResource(node *v1.Node) (string, int64) {
 	return "", 0
 }
 
+type testEnvInfo struct {
+	numaNodes         int
+	sriovResourceName string
+	policy            string
+}
+
 func validatePodAlignment(f *framework.Framework, pod *v1.Pod, envInfo *testEnvInfo) {
 	for _, cnt := range pod.Spec.Containers {
 		ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
 
 		logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
-
 		framework.Logf("got pod logs: %v", logs)
 
-		aligned, err := checkNUMAAlignment(f, pod, &cnt, logs, envInfo)
+		cntFileRead := func(podName, cntName, path string) string {
+			return f.ExecCommandInContainer(podName, cntName, "/bin/cat", path)
+		}
+
+		aligned, err := e2ealign.CheckNUMAAlignment(pod, &cnt, logs, envInfo.numaNodes, envInfo.sriovResourceName, cntFileRead)
 		framework.ExpectNoError(err, "NUMA alignment check failed for [%s] of pod [%s]", cnt.Name, pod.Name)
 		framework.ExpectEqual(aligned, true, "NUMA resources not aligned for [%s] of pod [%s] logs [%s]", cnt.Name, pod.Name, logs)
 	}
