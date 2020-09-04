@@ -26,8 +26,8 @@ import (
 	"sync"
 	"time"
 
-	"google.golang.org/protobuf/proto"
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	"google.golang.org/protobuf/proto"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
