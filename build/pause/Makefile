@@ -121,8 +121,8 @@ bin/${BIN.linux}-$(OS)-$(ARCH): $(SRCS)
 			$(TRIPLE)-gcc $(CFLAGS) -o $@ $^ && \
 			$(TRIPLE)-strip $(foreach binary, $@, ${binary}${EXTENSION})"
 
-bin/wincat-windows-${ARCH}:
-	CGO_ENABLED=0 GOOS=windows GOARCH=${ARCH} go build -o windows/wincat.exe windows/wincat/wincat.go
+bin/wincat-windows-${ARCH}: windows/wincat/wincat.go
+	CGO_ENABLED=0 GOOS=windows GOARCH=${ARCH} go build -o $@ $^
 
 container: .container-${OS}-$(ARCH)
 .container-linux-$(ARCH): bin/$(BIN)-$(OS)-$(ARCH)

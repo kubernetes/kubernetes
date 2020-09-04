@@ -16,7 +16,7 @@ ARG BASE
 FROM ${BASE}
 ARG ARCH
 ADD bin/pause-windows-${ARCH}.exe /pause.exe
-ADD windows/wincat.exe /Windows/System32/wincat.exe
+ADD bin/wincat-windows-amd64 /Windows/System32/wincat.exe
 
 # NOTE(claudiub): docker buildx sets the PATH env variable to a Linux-like PATH,
 # which is not desirable. See: https://github.com/moby/buildkit/issues/1560
