@@ -18,9 +18,6 @@ package e2enode
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -75,18 +72,6 @@ func (R *numaPodResources) String() string {
 		b.WriteString(fmt.Sprintf("PCI %s=%02d\n", k, nodeNum))
 	}
 	return b.String()
-}
-
-func getCPUsPerNUMANode(nodeNum int) ([]int, error) {
-	nodeCPUList, err := ioutil.ReadFile(fmt.Sprintf("/sys/devices/system/node/node%d/cpulist", nodeNum))
-	if err != nil {
-		return nil, err
-	}
-	cpus, err := cpuset.Parse(strings.TrimSpace(string(nodeCPUList)))
-	if err != nil {
-		return nil, err
-	}
-	return cpus.ToSlice(), nil
 }
 
 func getCPUToNUMANodeMapFromEnv(f *framework.Framework, pod *v1.Pod, cnt *v1.Container, environ map[string]string, numaNodes int) (map[int]int, error) {
@@ -217,53 +202,6 @@ func checkNUMAAlignment(f *framework.Framework, pod *v1.Pod, cnt *v1.Container, 
 		err = fmt.Errorf("NUMA resources not aligned")
 	}
 	return &numaRes, err
-}
-
-type pciDeviceInfo struct {
-	Address  string
-	NUMANode int
-	IsPhysFn bool
-	IsVFn    bool
-}
-
-func getPCIDeviceInfo(sysPCIDir string) ([]pciDeviceInfo, error) {
-	var pciDevs []pciDeviceInfo
-
-	entries, err := ioutil.ReadDir(sysPCIDir)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, entry := range entries {
-		isPhysFn := false
-		isVFn := false
-		if _, err := os.Stat(filepath.Join(sysPCIDir, entry.Name(), "sriov_numvfs")); err == nil {
-			isPhysFn = true
-		} else if !os.IsNotExist(err) {
-			// unexpected error. Bail out
-			return nil, err
-		}
-		if _, err := os.Stat(filepath.Join(sysPCIDir, entry.Name(), "physfn")); err == nil {
-			isVFn = true
-		} else if !os.IsNotExist(err) {
-			// unexpected error. Bail out
-			return nil, err
-		}
-
-		content, err := ioutil.ReadFile(filepath.Join(sysPCIDir, entry.Name(), "numa_node"))
-		if err != nil {
-			return nil, err
-		}
-
-		pciDevs = append(pciDevs, pciDeviceInfo{
-			Address:  entry.Name(),
-			NUMANode: numaNodeFromSysFsEntry(string(content)),
-			IsPhysFn: isPhysFn,
-			IsVFn:    isVFn,
-		})
-	}
-
-	return pciDevs, nil
 }
 
 func numaNodeFromSysFsEntry(content string) int {

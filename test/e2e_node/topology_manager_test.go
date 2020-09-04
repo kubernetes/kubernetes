@@ -21,7 +21,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	testutils "k8s.io/kubernetes/test/utils"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -35,8 +37,10 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -48,7 +52,7 @@ import (
 )
 
 const (
-	numalignCmd = `export CPULIST_ALLOWED=$( awk -F":\t*" '/Cpus_allowed_list/ { print $2 }' /proc/self/status); env; sleep 1d`
+	NUMAAlignmentSleepCommand = `export CPULIST_ALLOWED=$( awk -F":\t*" '/Cpus_allowed_list/ { print $2 }' /proc/self/status); env; sleep 1d`
 
 	minNumaNodes     = 2
 	minCoreCount     = 4
@@ -143,10 +147,10 @@ func findNUMANodeWithoutSRIOVDevicesFromConfigMap(configMap *v1.ConfigMap, numaN
 			framework.Failf("error getting the PCI device count on NUMA node %d: %v", nodeNum, err)
 		}
 		if v == 0 {
-			framework.Logf("NUMA node %d has no SRIOV devices attached", nodeNum)
+			framework.Logf("NUMA node %d/%d has no SRIOV devices attached", nodeNum, numaNodes)
 			return nodeNum, true
 		}
-		framework.Logf("NUMA node %d has %d SRIOV devices attached", nodeNum, v)
+		framework.Logf("NUMA node %d/%d has %d SRIOV devices attached", nodeNum, numaNodes, v)
 	}
 	return -1, false
 }
@@ -154,7 +158,7 @@ func findNUMANodeWithoutSRIOVDevicesFromConfigMap(configMap *v1.ConfigMap, numaN
 func findNUMANodeWithoutSRIOVDevicesFromSysfs(numaNodes int) (int, bool) {
 	pciDevs, err := getPCIDeviceInfo("/sys/bus/pci/devices")
 	if err != nil {
-		framework.Failf("error detecting the PCI device NUMA node: %v", err)
+		framework.Failf("sysfs: error detecting the PCI device NUMA node: %v", err)
 	}
 
 	pciPerNuma := make(map[int]int)
@@ -165,17 +169,17 @@ func findNUMANodeWithoutSRIOVDevicesFromSysfs(numaNodes int) (int, bool) {
 	}
 
 	if len(pciPerNuma) == 0 {
-		framework.Logf("failed to find any VF device from %v", pciDevs)
+		framework.Logf("sysfs: failed to find any VF device from %v", pciDevs)
 		return -1, false
 	}
 
 	for nodeNum := 0; nodeNum < numaNodes; nodeNum++ {
 		v := pciPerNuma[nodeNum]
 		if v == 0 {
-			framework.Logf("NUMA node %d has no SRIOV devices attached", nodeNum)
+			framework.Logf("sysfs: NUMA node %d/%d has no SRIOV devices attached", nodeNum, numaNodes)
 			return nodeNum, true
 		}
-		framework.Logf("NUMA node %d has %d SRIOV devices attached", nodeNum, v)
+		framework.Logf("sysfs: NUMA node %d/%s has %d SRIOV devices attached", nodeNum, numaNodes, v)
 	}
 	return -1, false
 }
@@ -305,11 +309,10 @@ func validatePodAlignment(f *framework.Framework, pod *v1.Pod, envInfo *testEnvI
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
 
 		framework.Logf("got pod logs: %v", logs)
-		numaRes, err := checkNUMAAlignment(f, pod, &cnt, logs, envInfo)
-		framework.ExpectNoError(err, "NUMA Alignment check failed for [%s] of pod [%s]", cnt.Name, pod.Name)
-		if numaRes != nil {
-			framework.Logf("NUMA resources for %s/%s: %s", pod.Name, cnt.Name, numaRes.String())
-		}
+
+		aligned, err := checkNUMAAlignment(f, pod, &cnt, logs, envInfo)
+		framework.ExpectNoError(err, "NUMA alignment check failed for [%s] of pod [%s]", cnt.Name, pod.Name)
+		framework.ExpectEqual(aligned, true, "NUMA resources not aligned for [%s] of pod [%s] logs [%s]", cnt.Name, pod.Name, logs)
 	}
 }
 
@@ -365,7 +368,7 @@ func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttr
 	for podID := 0; podID < numPods; podID++ {
 		podName := fmt.Sprintf("gu-pod-%d", podID)
 		framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
-		pod := makeTopologyManagerTestPod(podName, numalignCmd, ctnAttrs)
+		pod := makeTopologyManagerTestPod(podName, NUMAAlignmentSleepCommand, ctnAttrs)
 		pod = f.PodClient().CreateSync(pod)
 		framework.Logf("created pod %s", podName)
 		pods = append(pods, pod)
@@ -391,7 +394,7 @@ func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttr
 func runTopologyManagerNegativeTest(f *framework.Framework, numPods int, ctnAttrs []tmCtnAttribute, envInfo *testEnvInfo) {
 	podName := "gu-pod"
 	framework.Logf("creating pod %s attrs %v", podName, ctnAttrs)
-	pod := makeTopologyManagerTestPod(podName, numalignCmd, ctnAttrs)
+	pod := makeTopologyManagerTestPod(podName, NUMAAlignmentSleepCommand, ctnAttrs)
 
 	pod = f.PodClient().Create(pod)
 	err := e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
@@ -506,7 +509,7 @@ func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
 		GracePeriodSeconds: &gp,
 	}
 
-	ginkgo.By("Delete SRIOV device plugin pod %s/%s")
+	ginkgo.By(fmt.Sprintf("Delete SRIOV device plugin pod %v/%v", sd.pod.Namespace, sd.pod.Name))
 	err = f.ClientSet.CoreV1().Pods(sd.pod.Namespace).Delete(context.TODO(), sd.pod.Name, deleteOptions)
 	framework.ExpectNoError(err)
 	waitForContainerRemoval(sd.pod.Spec.Containers[0].Name, sd.pod.Name, sd.pod.Namespace)
@@ -777,3 +780,67 @@ var _ = SIGDescribe("Topology Manager [Serial] [Feature:TopologyManager][NodeFea
 	})
 
 })
+
+type pciDeviceInfo struct {
+	Address  string
+	NUMANode int
+	IsPhysFn bool
+	IsVFn    bool
+}
+
+func getPCIDeviceInfo(sysPCIDir string) ([]pciDeviceInfo, error) {
+	var pciDevs []pciDeviceInfo
+
+	entries, err := ioutil.ReadDir(sysPCIDir)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		isPhysFn := false
+		isVFn := false
+		if _, err := os.Stat(filepath.Join(sysPCIDir, entry.Name(), "sriov_numvfs")); err == nil {
+			isPhysFn = true
+		} else if !os.IsNotExist(err) {
+			// unexpected error. Bail out
+			return nil, err
+		}
+		if _, err := os.Stat(filepath.Join(sysPCIDir, entry.Name(), "physfn")); err == nil {
+			isVFn = true
+		} else if !os.IsNotExist(err) {
+			// unexpected error. Bail out
+			return nil, err
+		}
+
+		content, err := ioutil.ReadFile(filepath.Join(sysPCIDir, entry.Name(), "numa_node"))
+		if err != nil {
+			return nil, err
+		}
+
+		nodeNum, err := strconv.Atoi(strings.TrimSpace(string(content)))
+		if err != nil {
+			return nil, err
+		}
+
+		pciDevs = append(pciDevs, pciDeviceInfo{
+			Address:  entry.Name(),
+			NUMANode: nodeNum,
+			IsPhysFn: isPhysFn,
+			IsVFn:    isVFn,
+		})
+	}
+
+	return pciDevs, nil
+}
+
+func getCPUsPerNUMANode(nodeNum int) ([]int, error) {
+	nodeCPUList, err := ioutil.ReadFile(fmt.Sprintf("/sys/devices/system/node/node%d/cpulist", nodeNum))
+	if err != nil {
+		return nil, err
+	}
+	cpus, err := cpuset.Parse(strings.TrimSpace(string(nodeCPUList)))
+	if err != nil {
+		return nil, err
+	}
+	return cpus.ToSlice(), nil
+}
