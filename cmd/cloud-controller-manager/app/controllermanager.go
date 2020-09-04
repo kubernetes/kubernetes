@@ -220,8 +220,9 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 				klog.Fatalf("leaderelection lost")
 			},
 		},
-		WatchDog: electionChecker,
-		Name:     "cloud-controller-manager",
+		WatchDog:        electionChecker,
+		Name:            "cloud-controller-manager",
+		ReleaseOnCancel: true,
 	})
 	panic("unreachable")
 }

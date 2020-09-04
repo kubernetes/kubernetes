@@ -293,8 +293,9 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 				klog.Fatalf("leaderelection lost")
 			},
 		},
-		WatchDog: electionChecker,
-		Name:     "kube-controller-manager",
+		WatchDog:        electionChecker,
+		Name:            "kube-controller-manager",
+		ReleaseOnCancel: true,
 	})
 	panic("unreachable")
 }
