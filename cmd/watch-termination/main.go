@@ -51,12 +51,14 @@ func run() int {
 	// use special tee-like writer when termination log is set
 	termCh := make(chan struct{})
 	var stderr io.Writer = os.Stderr
+	var terminationLogger *terminationFileWriter
 	if len(*terminationLog) > 0 {
-		stderr = &terminationFileWriter{
+		terminationLogger = &terminationFileWriter{
 			Writer:             os.Stderr,
 			fn:                 *terminationLog,
 			startFileLoggingCh: termCh,
 		}
+		stderr = terminationLogger
 
 		// do the klog file writer dance: klog writes to all outputs of lower
 		// severity. No idea why. So we discard for anything other than info.
@@ -86,31 +88,49 @@ func run() int {
 		}
 
 		if st, err := os.Stat(*terminationLock); err == nil {
-			klog.Warningf("Previous pod did not terminate gracefully: %s", st.ModTime().String())
+			podName := "unknown"
+			if v := os.Getenv("POD_NAME"); len(v) > 0 {
+				podName = v // pod name is always the same for static pods
+			}
+			msg := fmt.Sprintf("Previous pod %s started at %s did not terminate gracefully", podName, st.ModTime().String())
+
+			klog.Warning(msg)
+			_, _ = terminationLogger.WriteToTerminationLog([]byte(msg + "\n"))
+
 			if client != nil {
 				go wait.PollUntil(5*time.Second, func() (bool, error) {
-					if err := eventf(client.CoreV1().Events(ref.Namespace), *ref, corev1.EventTypeWarning, "NonGracefulTermination", "Previous pod did not terminate gracefully: %s", st.ModTime().String()); err != nil {
+					if err := eventf(client.CoreV1().Events(ref.Namespace), *ref, corev1.EventTypeWarning, "NonGracefulTermination", msg); err != nil {
 						return false, nil
 					}
 
 					select {
 					case <-termCh:
 					default:
-						klog.Infof("Deleting old termination lock file %q", *terminationLock)
-						os.Remove(*terminationLock)
 					}
 					return true, nil
 				}, termCh)
 			}
+
+			klog.Infof("Deleting old termination lock file %q", *terminationLock)
+			if err := os.Remove(*terminationLock); err != nil {
+				klog.Errorf("Old termination lock file deletion failed: %v", err)
+			}
 		}
+
+		// separation to see where the new one is starting
+		_, _ = terminationLogger.WriteToTerminationLog([]byte("---\n"))
+
 		klog.Infof("Touching termination lock file %q", *terminationLock)
 		if err := touch(*terminationLock); err != nil {
-			klog.Infof("error touching %s: %v", *terminationLock, err)
+			klog.Infof("Error touching %s: %v", *terminationLock, err)
 			// keep going
 		}
+
 		defer func() {
 			klog.Infof("Deleting termination lock file %q", *terminationLock)
-			os.Remove(*terminationLock)
+			if err := os.Remove(*terminationLock); err != nil {
+				klog.Errorf("Termination lock file deletion failed: %v", err)
+			}
 		}()
 	}
 
@@ -169,6 +189,30 @@ type terminationFileWriter struct {
 	logger io.Writer
 }
 
+func (w *terminationFileWriter) WriteToTerminationLog(bs []byte) (int, error) {
+	if w == nil {
+		return len(bs), nil
+	}
+
+	if w.logger == nil {
+		l := &lumberjack.Logger{
+			Filename:   w.fn,
+			MaxSize:    100,
+			MaxBackups: 3,
+			MaxAge:     28,
+			Compress:   false,
+		}
+		w.logger = l
+		fmt.Fprintf(os.Stderr, "Copying termination logs to %q\n", w.fn)
+	}
+	if n, err := w.logger.Write(bs); err != nil {
+		return n, err
+	} else if n != len(bs) {
+		return n, io.ErrShortWrite
+	}
+	return len(bs), nil
+}
+
 func (w *terminationFileWriter) Write(bs []byte) (int, error) {
 	// temporary hack to avoid logging sensitive tokens.
 	// TODO: drop when we moved to a non-sensitive storage format
@@ -178,21 +222,8 @@ func (w *terminationFileWriter) Write(bs []byte) (int, error) {
 
 	select {
 	case <-w.startFileLoggingCh:
-		if w.logger == nil {
-			l := &lumberjack.Logger{
-				Filename:   w.fn,
-				MaxSize:    100,
-				MaxBackups: 3,
-				MaxAge:     28,
-				Compress:   false,
-			}
-			w.logger = l
-			fmt.Fprintf(os.Stderr, "Copying termination logs to %q\n", w.fn)
-		}
-		if n, err := w.logger.Write(bs); err != nil {
+		if n, err := w.WriteToTerminationLog(bs); err != nil {
 			return n, err
-		} else if n != len(bs) {
-			return n, io.ErrShortWrite
 		}
 	default:
 	}
