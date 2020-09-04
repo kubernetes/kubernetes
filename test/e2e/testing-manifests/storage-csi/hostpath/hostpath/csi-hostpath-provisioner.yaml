@@ -40,7 +40,7 @@ spec:
       serviceAccountName: csi-provisioner
       containers:
         - name: csi-provisioner
-          image: gcr.io/k8s-staging-csi/csi-provisioner:v1.6.0
+          image: k8s.gcr.io/sig-storage/csi-provisioner:v1.6.0
           args:
             - -v=5
             - --csi-address=/csi/csi.sock
