@@ -17,6 +17,7 @@ limitations under the License.
 package devicemanager
 
 import (
+	"fmt"
 	"path"
 	"testing"
 	"time"
@@ -26,12 +27,12 @@ import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
-var (
-	esocketName = "mock.sock"
-)
+func esocketName() string {
+	return fmt.Sprintf("mock%d.sock", time.Now().UnixNano())
+}
 
 func TestNewEndpoint(t *testing.T) {
-	socket := path.Join("/tmp", esocketName)
+	socket := path.Join("/tmp", esocketName())
 
 	devs := []*pluginapi.Device{
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
@@ -42,7 +43,7 @@ func TestNewEndpoint(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
-	socket := path.Join("/tmp", esocketName)
+	socket := path.Join("/tmp", esocketName())
 
 	devs := []*pluginapi.Device{
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
@@ -107,7 +108,7 @@ func TestRun(t *testing.T) {
 }
 
 func TestAllocate(t *testing.T) {
-	socket := path.Join("/tmp", esocketName)
+	socket := path.Join("/tmp", esocketName())
 	devs := []*pluginapi.Device{
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
 	}
@@ -160,7 +161,7 @@ func TestAllocate(t *testing.T) {
 }
 
 func TestGetPreferredAllocation(t *testing.T) {
-	socket := path.Join("/tmp", esocketName)
+	socket := path.Join("/tmp", esocketName())
 	callbackCount := 0
 	callbackChan := make(chan int)
 	p, e := esetup(t, []*pluginapi.Device{}, socket, "mock", func(n string, d []pluginapi.Device) {
