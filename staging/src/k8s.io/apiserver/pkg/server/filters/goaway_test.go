@@ -342,6 +342,7 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			var mu sync.Mutex
 			// localAddr indicates how many TCP connection set up
 			localAddr := make([]string, 0)
 
@@ -350,7 +351,10 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpect connection err: %v", err)
 				}
+
+				mu.Lock()
 				localAddr = append(localAddr, conn.LocalAddr().String())
+				mu.Unlock()
 				return
 			})
 			if err != nil {
