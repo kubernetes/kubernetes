@@ -319,12 +319,13 @@ func makeLeaderElectionConfig(config componentbaseconfig.LeaderElectionConfigura
 	}
 
 	return &leaderelection.LeaderElectionConfig{
-		Lock:          rl,
-		LeaseDuration: config.LeaseDuration.Duration,
-		RenewDeadline: config.RenewDeadline.Duration,
-		RetryPeriod:   config.RetryPeriod.Duration,
-		WatchDog:      leaderelection.NewLeaderHealthzAdaptor(time.Second * 20),
-		Name:          "kube-scheduler",
+		Lock:            rl,
+		LeaseDuration:   config.LeaseDuration.Duration,
+		RenewDeadline:   config.RenewDeadline.Duration,
+		RetryPeriod:     config.RetryPeriod.Duration,
+		WatchDog:        leaderelection.NewLeaderHealthzAdaptor(time.Second * 20),
+		Name:            "kube-scheduler",
+		ReleaseOnCancel: true,
 	}, nil
 }
 
