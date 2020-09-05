@@ -554,9 +554,9 @@ func renewCertsByComponent(cfg *kubeadmapi.InitConfiguration, component string, 
 	if component == constants.Etcd {
 		if cfg.Etcd.Local != nil {
 			certificates = []string{
-				certsphase.KubeadmCertEtcdServer.Name,
-				certsphase.KubeadmCertEtcdPeer.Name,
-				certsphase.KubeadmCertEtcdHealthcheck.Name,
+				certsphase.KubeadmCertEtcdServer().Name,
+				certsphase.KubeadmCertEtcdPeer().Name,
+				certsphase.KubeadmCertEtcdHealthcheck().Name,
 			}
 		}
 	}
@@ -565,12 +565,12 @@ func renewCertsByComponent(cfg *kubeadmapi.InitConfiguration, component string, 
 	//if local etcd, renew also the etcd client certificate
 	if component == constants.KubeAPIServer {
 		certificates = []string{
-			certsphase.KubeadmCertAPIServer.Name,
-			certsphase.KubeadmCertKubeletClient.Name,
-			certsphase.KubeadmCertFrontProxyClient.Name,
+			certsphase.KubeadmCertAPIServer().Name,
+			certsphase.KubeadmCertKubeletClient().Name,
+			certsphase.KubeadmCertFrontProxyClient().Name,
 		}
 		if cfg.Etcd.Local != nil {
-			certificates = append(certificates, certsphase.KubeadmCertEtcdAPIClient.Name)
+			certificates = append(certificates, certsphase.KubeadmCertEtcdAPIClient().Name)
 		}
 	}
 
