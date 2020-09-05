@@ -106,8 +106,6 @@ type Options struct {
 	ConfigFile string
 	// WriteConfigTo is the path where the default configuration will be written.
 	WriteConfigTo string
-	// CleanupAndExit, when true, makes the proxy server clean up iptables and ipvs rules, then exit.
-	CleanupAndExit bool
 	// CleanupIPVS, when true, makes the proxy server clean up ipvs rules before running.
 	CleanupIPVS bool
 	// WindowsService should be set to true if kube-proxy is running as a service on Windows.
@@ -161,7 +159,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&o.config.NodePortAddresses, "nodeport-addresses", o.config.NodePortAddresses,
 		"A string slice of values which specify the addresses to use for NodePorts. Values may be valid IP blocks (e.g. 1.2.3.0/24, 1.2.3.4/32). The default empty string slice ([]) means to use all local addresses.")
 
-	fs.BoolVar(&o.CleanupAndExit, "cleanup", o.CleanupAndExit, "If true cleanup iptables and ipvs rules and exit.")
+	fs.BoolVar(&o.config.CleanupAndExit, "cleanup", o.config.CleanupAndExit, "If true cleanup iptables and ipvs rules and exit.")
 	fs.BoolVar(&o.CleanupIPVS, "cleanup-ipvs", o.CleanupIPVS, "If true and --cleanup is specified, kube-proxy will also flush IPVS rules, in addition to normal cleanup.")
 	fs.MarkDeprecated("cleanup-ipvs", "In a future release, running --cleanup will always flush IPVS rules")
 
@@ -314,7 +312,7 @@ func (o *Options) Run() error {
 		return err
 	}
 
-	if o.CleanupAndExit {
+	if o.config.CleanupAndExit {
 		return proxyServer.CleanupAndExit()
 	}
 

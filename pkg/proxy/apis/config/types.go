@@ -168,6 +168,8 @@ type KubeProxyConfiguration struct {
 	ShowHiddenMetricsForVersion string
 	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
 	DetectLocalMode LocalMode
+	// CleanupAndExit, when true, makes the proxy server clean up iptables and ipvs rules, then exit.
+	CleanupAndExit bool
 }
 
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'

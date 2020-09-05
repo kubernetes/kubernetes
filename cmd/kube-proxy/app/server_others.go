@@ -73,7 +73,7 @@ var timeoutForNodePodCIDR = 5 * time.Minute
 
 // NewProxyServer returns a new ProxyServer.
 func NewProxyServer(o *Options) (*ProxyServer, error) {
-	return newProxyServer(o.config, o.CleanupAndExit, o.master)
+	return newProxyServer(o.config, o.config.CleanupAndExit, o.master)
 }
 
 func newProxyServer(
