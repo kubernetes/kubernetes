@@ -118,8 +118,6 @@ dependencies:
   - name: "k8s.gcr.io/debian-base: dependents"
     version: 2.1.3
     refPaths:
-    - path: build/common.sh
-      match: debian_base_version=
     - path: build/workspace.bzl
       match: tag =
     - path: cluster/images/etcd/Makefile
