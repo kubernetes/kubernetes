@@ -192,6 +192,8 @@ func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision in
 	})
 }
 
+// printHistory returns the podTemplate of the given revision if it is non-zero
+// else returns the overall revisions
 func printHistory(history []*appsv1.ControllerRevision, revision int64, getPodTemplate func(history *appsv1.ControllerRevision) (*corev1.PodTemplateSpec, error)) (string, error) {
 	historyInfo := make(map[int64]*appsv1.ControllerRevision)
 	for _, history := range history {
