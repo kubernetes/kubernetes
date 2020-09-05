@@ -180,11 +180,13 @@ type KubeProxyConfiguration struct {
 // insufficient, this always falls back to the userspace proxy. IPVS mode will be enabled when proxy mode is set to 'ipvs',
 // and the fall back path is firstly iptables and then userspace.
 
+// ProxyMode variable is used to hold the mode in which the proxy will run.
 // In Windows platform, if proxy mode is blank, use the best-available proxy (currently userspace, but may change in the
 // future). If winkernel proxy is selected, regardless of how, but the Windows kernel can't support this mode of proxy,
 // this always falls back to the userspace proxy.
 type ProxyMode string
 
+// Currently supported modes for ProxyMode
 const (
 	ProxyModeUserspace   ProxyMode = "userspace"
 	ProxyModeIPTables    ProxyMode = "iptables"
@@ -243,6 +245,7 @@ const (
 	NeverQueue IPVSSchedulerMethod = "nq"
 )
 
+// Set sets the mode of the proxy
 func (m *ProxyMode) Set(s string) error {
 	*m = ProxyMode(s)
 	return nil
@@ -255,10 +258,12 @@ func (m *ProxyMode) String() string {
 	return ""
 }
 
+// Type returns the name of type, which is "ProxyMode"
 func (m *ProxyMode) Type() string {
 	return "ProxyMode"
 }
 
+// Set sets the mode for detecting local traffic
 func (m *LocalMode) Set(s string) error {
 	*m = LocalMode(s)
 	return nil
@@ -271,10 +276,12 @@ func (m *LocalMode) String() string {
 	return ""
 }
 
+// Type returns the name of the type, which is "LocalMode"
 func (m *LocalMode) Type() string {
 	return "LocalMode"
 }
 
+// ConfigurationMap holds the config values of the proxt
 type ConfigurationMap map[string]string
 
 func (m *ConfigurationMap) String() string {
@@ -286,6 +293,7 @@ func (m *ConfigurationMap) String() string {
 	return strings.Join(pairs, ",")
 }
 
+// Set sets the config values into a ConfigurationMap object
 func (m *ConfigurationMap) Set(value string) error {
 	for _, s := range strings.Split(value, ",") {
 		if len(s) == 0 {
@@ -301,6 +309,7 @@ func (m *ConfigurationMap) Set(value string) error {
 	return nil
 }
 
+// Type returns the type of variable ConfigurationMap
 func (*ConfigurationMap) Type() string {
 	return "mapStringString"
 }
