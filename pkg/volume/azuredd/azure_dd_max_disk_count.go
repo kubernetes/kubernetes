@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package azure_dd
+package azuredd
 
 // about how to get all VM size list,
 // refer to https://github.com/kubernetes/kubernetes/issues/77461#issuecomment-492488756

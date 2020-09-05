@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package azure_dd
+package azuredd
 
 import (
 	"context"
@@ -39,21 +39,21 @@ import (
 // DiskController interface exposed by the cloud provider implementing Disk functionality
 type DiskController interface {
 	CreateBlobDisk(dataDiskName string, storageAccountType storage.SkuName, sizeGB int) (string, error)
-	DeleteBlobDisk(diskUri string) error
+	DeleteBlobDisk(diskURI string) error
 
 	CreateManagedDisk(options *azure.ManagedDiskOptions) (string, error)
 	DeleteManagedDisk(diskURI string) error
 
 	// Attaches the disk to the host machine.
-	AttachDisk(isManagedDisk bool, diskName, diskUri string, nodeName types.NodeName, cachingMode compute.CachingTypes) (int32, error)
+	AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, cachingMode compute.CachingTypes) (int32, error)
 	// Detaches the disk, identified by disk name or uri, from the host machine.
-	DetachDisk(diskName, diskUri string, nodeName types.NodeName) error
+	DetachDisk(diskName, diskURI string, nodeName types.NodeName) error
 
 	// Check if a list of volumes are attached to the node with the specified NodeName
 	DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error)
 
 	// Get the LUN number of the disk that is attached to the host
-	GetDiskLun(diskName, diskUri string, nodeName types.NodeName) (int32, error)
+	GetDiskLun(diskName, diskURI string, nodeName types.NodeName) (int32, error)
 	// Get the next available LUN number to attach a new VHD
 	GetNextDiskLun(nodeName types.NodeName) (int32, error)
 
@@ -93,6 +93,7 @@ const (
 	defaultAzureVolumeLimit = 16
 )
 
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&azureDataDiskPlugin{}}
 }

@@ -1,5 +1,8 @@
+// +build !providerless
+// +build !linux,!windows
+
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,4 +17,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package azure_dd
+package azuredd
+
+import "k8s.io/utils/exec"
+
+func scsiHostRescan(io ioHandler, exec exec.Interface) {
+}
+
+func findDiskByLun(lun int, io ioHandler, exec exec.Interface) (string, error) {
+	return "", nil
+}
