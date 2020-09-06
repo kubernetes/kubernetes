@@ -156,6 +156,14 @@ func TestEndpointSliceMirroring(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-123",
 			},
+			Subsets: []corev1.EndpointSubset{{
+				Ports: []corev1.EndpointPort{{
+					Port: 80,
+				}},
+				Addresses: []corev1.EndpointAddress{{
+					IP: "10.0.0.1",
+				}},
+			}},
 		},
 		expectEndpointSlice: false,
 	}}

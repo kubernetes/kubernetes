@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"regexp"
 	"time"
 
 	"strings"
@@ -81,7 +82,6 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters map[string]string
 		policyName   string
 		tagPolicy    string
-		masterNode   string
 	)
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("vsphere")
@@ -94,10 +94,6 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters = make(map[string]string)
 		_, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
 		framework.ExpectNoError(err)
-		masternodes, _, err := e2enode.DeprecatedGetMasterAndWorkerNodes(client)
-		framework.ExpectNoError(err)
-		gomega.Expect(masternodes).NotTo(gomega.BeEmpty())
-		masterNode = masternodes.List()[0]
 	})
 
 	// Valid policy.
@@ -211,7 +207,9 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters[Datastore] = vsanDatastore
 		framework.Logf("Invoking test for SPBM storage policy: %+v", scParameters)
 		kubernetesClusterName := GetAndExpectStringEnvVar(KubernetesClusterName)
-		invokeStaleDummyVMTestWithStoragePolicy(client, masterNode, namespace, kubernetesClusterName, scParameters)
+		controlPlaneNode, err := getControlPlaneNode(client)
+		framework.ExpectNoError(err)
+		invokeStaleDummyVMTestWithStoragePolicy(client, controlPlaneNode, namespace, kubernetesClusterName, scParameters)
 	})
 
 	ginkgo.It("verify if a SPBM policy is not honored on a non-compatible datastore for dynamically provisioned pvc using storageclass", func() {
@@ -309,7 +307,9 @@ func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, sc
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
 }
 
-func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, masterNode string, namespace string, clusterName string, scParameters map[string]string) {
+// invokeStaleDummyVMTestWithStoragePolicy assumes control plane node is present on the datacenter specified in the workspace section of vsphere.conf file.
+// With in-tree VCP, when the volume is created using storage policy, shadow (dummy) VM is getting created and deleted to apply SPBM policy on the volume.
+func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, controlPlaneNode string, namespace string, clusterName string, scParameters map[string]string) {
 	ginkgo.By("Creating Storage Class With storage policy params")
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("storagepolicysc", scParameters, nil, ""), metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
@@ -336,8 +336,27 @@ func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, masterN
 	fnvHash.Write([]byte(vmName))
 	dummyVMFullName := dummyVMPrefixName + "-" + fmt.Sprint(fnvHash.Sum32())
 	errorMsg := "Dummy VM - " + vmName + " is still present. Failing the test.."
-	nodeInfo := TestContext.NodeMapper.GetNodeInfo(masterNode)
+	nodeInfo := TestContext.NodeMapper.GetNodeInfo(controlPlaneNode)
 	isVMPresentFlag, err := nodeInfo.VSphere.IsVMPresent(dummyVMFullName, nodeInfo.DataCenterRef)
 	framework.ExpectNoError(err)
 	framework.ExpectEqual(isVMPresentFlag, false, errorMsg)
+}
+
+func getControlPlaneNode(client clientset.Interface) (string, error) {
+	regKubeScheduler := regexp.MustCompile("kube-scheduler-.*")
+	regKubeControllerManager := regexp.MustCompile("kube-controller-manager-.*")
+
+	podList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return "", err
+	}
+	if len(podList.Items) < 1 {
+		return "", fmt.Errorf("could not find any pods in namespace %s to grab metrics from", metav1.NamespaceSystem)
+	}
+	for _, pod := range podList.Items {
+		if regKubeScheduler.MatchString(pod.Name) || regKubeControllerManager.MatchString(pod.Name) {
+			return pod.Spec.NodeName, nil
+		}
+	}
+	return "", fmt.Errorf("could not find any nodes where control plane pods are running")
 }

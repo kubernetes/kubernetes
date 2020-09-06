@@ -135,9 +135,6 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 	terminatedPodCount := len(terminatedPods)
 	deleteCount := terminatedPodCount - gcc.terminatedPodThreshold
 
-	if deleteCount > terminatedPodCount {
-		deleteCount = terminatedPodCount
-	}
 	if deleteCount <= 0 {
 		return
 	}

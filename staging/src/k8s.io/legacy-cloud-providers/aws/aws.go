@@ -435,7 +435,7 @@ const (
 // Source: http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSVolumeTypes.html
 const (
 	MinTotalIOPS = 100
-	MaxTotalIOPS = 20000
+	MaxTotalIOPS = 64000
 )
 
 // VolumeOptions specifies capacity and tags for a volume.
@@ -3665,9 +3665,33 @@ func buildListener(port v1.ServicePort, annotations map[string]string, sslPorts 
 	return listener, nil
 }
 
+func (c *Cloud) getSubnetCidrs(subnetIDs []string) ([]string, error) {
+	request := &ec2.DescribeSubnetsInput{}
+	for _, subnetID := range subnetIDs {
+		request.SubnetIds = append(request.SubnetIds, aws.String(subnetID))
+	}
+
+	subnets, err := c.ec2.DescribeSubnets(request)
+	if err != nil {
+		return nil, fmt.Errorf("error querying Subnet for ELB: %q", err)
+	}
+	if len(subnets) != len(subnetIDs) {
+		return nil, fmt.Errorf("error querying Subnet for ELB, got %d subnets for %v", len(subnets), subnetIDs)
+	}
+
+	cidrs := make([]string, 0, len(subnets))
+	for _, subnet := range subnets {
+		cidrs = append(cidrs, aws.StringValue(subnet.CidrBlock))
+	}
+	return cidrs, nil
+}
+
 // EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
 func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	annotations := apiService.Annotations
+	if isLBExternal(annotations) {
+		return nil, cloudprovider.ImplementedElsewhere
+	}
 	klog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
 		clusterName, apiService.Namespace, apiService.Name, c.region, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, annotations)
 
@@ -3679,7 +3703,6 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	if len(apiService.Spec.Ports) == 0 {
 		return nil, fmt.Errorf("requested load balancer with no ports")
 	}
-
 	// Figure out what mappings we want on the load balancer
 	listeners := []*elb.Listener{}
 	v2Mappings := []nlbPortMapping{}
@@ -3794,6 +3817,12 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 			return nil, err
 		}
 
+		subnetCidrs, err := c.getSubnetCidrs(subnetIDs)
+		if err != nil {
+			klog.Errorf("Error getting subnet cidrs: %q", err)
+			return nil, err
+		}
+
 		sourceRangeCidrs := []string{}
 		for cidr := range sourceRanges {
 			sourceRangeCidrs = append(sourceRangeCidrs, cidr)
@@ -3802,7 +3831,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 			sourceRangeCidrs = append(sourceRangeCidrs, "0.0.0.0/0")
 		}
 
-		err = c.updateInstanceSecurityGroupsForNLB(loadBalancerName, instances, sourceRangeCidrs, v2Mappings)
+		err = c.updateInstanceSecurityGroupsForNLB(loadBalancerName, instances, subnetCidrs, sourceRangeCidrs, v2Mappings)
 		if err != nil {
 			klog.Warningf("Error opening ingress rules for the load balancer to the instances: %q", err)
 			return nil, err
@@ -4065,6 +4094,9 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
 func (c *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
+	if isLBExternal(service.Annotations) {
+		return nil, false, nil
+	}
 	loadBalancerName := c.GetLoadBalancerName(ctx, clusterName, service)
 
 	if isNLB(service.Annotations) {
@@ -4325,6 +4357,9 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 
 // EnsureLoadBalancerDeleted implements LoadBalancer.EnsureLoadBalancerDeleted.
 func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
+	if isLBExternal(service.Annotations) {
+		return nil
+	}
 	loadBalancerName := c.GetLoadBalancerName(ctx, clusterName, service)
 
 	if isNLB(service.Annotations) {
@@ -4373,7 +4408,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 			}
 		}
 
-		return c.updateInstanceSecurityGroupsForNLB(loadBalancerName, nil, nil, nil)
+		return c.updateInstanceSecurityGroupsForNLB(loadBalancerName, nil, nil, nil, nil)
 	}
 
 	lb, err := c.describeLoadBalancer(loadBalancerName)
@@ -4509,11 +4544,13 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 
 // UpdateLoadBalancer implements LoadBalancer.UpdateLoadBalancer
 func (c *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
+	if isLBExternal(service.Annotations) {
+		return cloudprovider.ImplementedElsewhere
+	}
 	instances, err := c.findInstancesForELB(nodes, service.Annotations)
 	if err != nil {
 		return err
 	}
-
 	loadBalancerName := c.GetLoadBalancerName(ctx, clusterName, service)
 	if isNLB(service.Annotations) {
 		lb, err := c.describeLoadBalancerv2(loadBalancerName)

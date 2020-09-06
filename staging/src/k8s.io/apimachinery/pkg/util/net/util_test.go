@@ -35,7 +35,7 @@ func TestIPNetEqual(t *testing.T) {
 		ipnet2 *net.IPNet
 		expect bool
 	}{
-		//null case
+		// null case
 		{
 			getIPNet("10.0.0.1/24"),
 			getIPNet(""),

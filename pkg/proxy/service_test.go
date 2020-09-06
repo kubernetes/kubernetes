@@ -413,28 +413,56 @@ func TestServiceToServiceMap(t *testing.T) {
 			},
 			isIPv6Mode: &trueVal,
 		},
+		{
+			desc: "service with extra space in LoadBalancerSourceRanges",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "extra-space",
+					Namespace: "test",
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIP:                testClusterIPv4,
+					LoadBalancerSourceRanges: []string{" 10.1.2.0/28"},
+					Ports: []v1.ServicePort{
+						{
+							Name:     "testPort",
+							Port:     int32(12345),
+							Protocol: v1.ProtocolTCP,
+						},
+					},
+				},
+			},
+			expected: map[ServicePortName]*BaseServiceInfo{
+				makeServicePortName("test", "extra-space", "testPort", v1.ProtocolTCP): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(info *BaseServiceInfo) {
+					info.loadBalancerSourceRanges = []string{"10.1.2.0/28"}
+				}),
+			},
+			isIPv6Mode: &falseVal,
+		},
 	}
 
 	for _, tc := range testCases {
-		svcTracker.isIPv6Mode = tc.isIPv6Mode
-		// outputs
-		newServices := svcTracker.serviceToServiceMap(tc.service)
+		t.Run(tc.desc, func(t *testing.T) {
+			svcTracker.isIPv6Mode = tc.isIPv6Mode
+			// outputs
+			newServices := svcTracker.serviceToServiceMap(tc.service)
 
-		if len(newServices) != len(tc.expected) {
-			t.Errorf("[%s] expected %d new, got %d: %v", tc.desc, len(tc.expected), len(newServices), spew.Sdump(newServices))
-		}
-		for svcKey, expectedInfo := range tc.expected {
-			svcInfo, _ := newServices[svcKey].(*BaseServiceInfo)
-			if !svcInfo.clusterIP.Equal(expectedInfo.clusterIP) ||
-				svcInfo.port != expectedInfo.port ||
-				svcInfo.protocol != expectedInfo.protocol ||
-				svcInfo.healthCheckNodePort != expectedInfo.healthCheckNodePort ||
-				!sets.NewString(svcInfo.externalIPs...).Equal(sets.NewString(expectedInfo.externalIPs...)) ||
-				!sets.NewString(svcInfo.loadBalancerSourceRanges...).Equal(sets.NewString(expectedInfo.loadBalancerSourceRanges...)) ||
-				!reflect.DeepEqual(svcInfo.loadBalancerStatus, expectedInfo.loadBalancerStatus) {
-				t.Errorf("[%s] expected new[%v]to be %v, got %v", tc.desc, svcKey, expectedInfo, *svcInfo)
+			if len(newServices) != len(tc.expected) {
+				t.Errorf("expected %d new, got %d: %v", len(tc.expected), len(newServices), spew.Sdump(newServices))
 			}
-		}
+			for svcKey, expectedInfo := range tc.expected {
+				svcInfo, _ := newServices[svcKey].(*BaseServiceInfo)
+				if !svcInfo.clusterIP.Equal(expectedInfo.clusterIP) ||
+					svcInfo.port != expectedInfo.port ||
+					svcInfo.protocol != expectedInfo.protocol ||
+					svcInfo.healthCheckNodePort != expectedInfo.healthCheckNodePort ||
+					!sets.NewString(svcInfo.externalIPs...).Equal(sets.NewString(expectedInfo.externalIPs...)) ||
+					!sets.NewString(svcInfo.loadBalancerSourceRanges...).Equal(sets.NewString(expectedInfo.loadBalancerSourceRanges...)) ||
+					!reflect.DeepEqual(svcInfo.loadBalancerStatus, expectedInfo.loadBalancerStatus) {
+					t.Errorf("expected new[%v]to be %v, got %v", svcKey, expectedInfo, *svcInfo)
+				}
+			}
+		})
 	}
 }
 

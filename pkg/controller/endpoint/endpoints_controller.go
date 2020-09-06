@@ -472,9 +472,18 @@ func (e *EndpointController) syncService(key string) error {
 
 	createEndpoints := len(currentEndpoints.ResourceVersion) == 0
 
+	// Compare the sorted subsets and labels
+	// Remove the HeadlessService label from the endpoints if it exists,
+	// as this won't be set on the service itself
+	// and will cause a false negative in this diff check.
+	// But first check if it has that label to avoid expensive copies.
+	compareLabels := currentEndpoints.Labels
+	if _, ok := currentEndpoints.Labels[v1.IsHeadlessService]; ok {
+		compareLabels = utillabels.CloneAndRemoveLabel(currentEndpoints.Labels, v1.IsHeadlessService)
+	}
 	if !createEndpoints &&
 		apiequality.Semantic.DeepEqual(currentEndpoints.Subsets, subsets) &&
-		apiequality.Semantic.DeepEqual(currentEndpoints.Labels, service.Labels) {
+		apiequality.Semantic.DeepEqual(compareLabels, service.Labels) {
 		klog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 		return nil
 	}

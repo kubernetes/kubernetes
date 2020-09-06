@@ -30,7 +30,7 @@ endif
 #   clean: Clean up.
 
 # It's necessary to set this because some environments don't link sh -> bash.
-SHELL := /bin/bash
+SHELL := /usr/bin/env bash
 
 # We don't need make's built-in rules.
 MAKEFLAGS += --no-builtin-rules

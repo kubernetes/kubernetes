@@ -1954,6 +1954,7 @@ func TestReconcileExtendedResource(t *testing.T) {
 	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used
 	testKubelet.kubelet.containerManager = cm.NewStubContainerManagerWithExtendedResource(true /* shouldResetExtendedResourceCapacity*/)
 	testKubeletNoReset := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubeletNoReset.Cleanup()
 	extendedResourceName1 := v1.ResourceName("test.com/resource1")
 	extendedResourceName2 := v1.ResourceName("test.com/resource2")
 

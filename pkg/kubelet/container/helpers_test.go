@@ -558,9 +558,8 @@ func TestMakePortMappings(t *testing.T) {
 			HostIP:        ip,
 		}
 	}
-	portMapping := func(name string, protocol v1.Protocol, containerPort, hostPort int, ip string) PortMapping {
+	portMapping := func(protocol v1.Protocol, containerPort, hostPort int, ip string) PortMapping {
 		return PortMapping{
-			Name:          name,
 			Protocol:      protocol,
 			ContainerPort: containerPort,
 			HostPort:      hostPort,
@@ -590,11 +589,11 @@ func TestMakePortMappings(t *testing.T) {
 				},
 			},
 			[]PortMapping{
-				portMapping("fooContainer-v4-TCP:80", v1.ProtocolTCP, 80, 8080, "127.0.0.1"),
-				portMapping("fooContainer-v4-TCP:443", v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
-				portMapping("fooContainer-foo", v1.ProtocolUDP, 555, 5555, ""),
-				portMapping("fooContainer-v6-TCP:80", v1.ProtocolTCP, 80, 8080, "::"),
-				portMapping("fooContainer-any-TCP:1234", v1.ProtocolTCP, 1234, 5678, ""),
+				portMapping(v1.ProtocolTCP, 80, 8080, "127.0.0.1"),
+				portMapping(v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
+				portMapping(v1.ProtocolUDP, 555, 5555, ""),
+				portMapping(v1.ProtocolTCP, 80, 8080, "::"),
+				portMapping(v1.ProtocolTCP, 1234, 5678, ""),
 			},
 		},
 	}

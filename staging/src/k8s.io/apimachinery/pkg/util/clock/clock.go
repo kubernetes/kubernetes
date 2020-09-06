@@ -348,7 +348,13 @@ func (f *fakeTimer) Stop() bool {
 // Reset conditionally updates the firing time of the timer.  If the
 // timer has neither fired nor been stopped then this call resets the
 // timer to the fake clock's "now" + d and returns true, otherwise
-// this call returns false.  This is like time.Timer::Reset.
+// it creates a new waiter, adds it to the clock, and returns true.
+//
+// It is not possible to return false, because a fake timer can be reset
+// from any state (waiting to fire, already fired, and stopped).
+//
+// See the GoDoc for time.Timer::Reset for more context on why
+// the return value of Reset() is not useful.
 func (f *fakeTimer) Reset(d time.Duration) bool {
 	f.fakeClock.lock.Lock()
 	defer f.fakeClock.lock.Unlock()
@@ -360,7 +366,15 @@ func (f *fakeTimer) Reset(d time.Duration) bool {
 			return true
 		}
 	}
-	return false
+	// No existing waiter, timer has already fired or been reset.
+	// We should still enable Reset() to succeed by creating a
+	// new waiter and adding it to the clock's waiters.
+	newWaiter := fakeClockWaiter{
+		targetTime: f.fakeClock.time.Add(d),
+		destChan:   seekChan,
+	}
+	f.fakeClock.waiters = append(f.fakeClock.waiters, newWaiter)
+	return true
 }
 
 // Ticker defines the Ticker interface

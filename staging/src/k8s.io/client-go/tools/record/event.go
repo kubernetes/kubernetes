@@ -270,7 +270,7 @@ func recordEvent(sink EventSink, event *v1.Event, patch []byte, updateExistingEv
 	default:
 		// This case includes actual http transport errors. Go ahead and retry.
 	}
-	klog.Errorf("Unable to write event: '%v' (may retry after sleeping)", err)
+	klog.Errorf("Unable to write event: '%#v': '%v'(may retry after sleeping)", event, err)
 	return false
 }
 

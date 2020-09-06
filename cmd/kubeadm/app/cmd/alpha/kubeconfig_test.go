@@ -56,6 +56,7 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 		command         string
 		withClientCert  bool
 		withToken       bool
+		withClusterName bool
 		additionalFlags []string
 	}{
 		{
@@ -64,10 +65,24 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 			withClientCert: true,
 		},
 		{
+			name:            "user subCommand withClientCert",
+			command:         "user",
+			withClientCert:  true,
+			withClusterName: true,
+			additionalFlags: []string{"--cluster-name=my-cluster"},
+		},
+		{
 			name:            "user subCommand withToken",
 			withToken:       true,
 			command:         "user",
 			additionalFlags: []string{"--token=123456"},
+		},
+		{
+			name:            "user subCommand withToken",
+			withToken:       true,
+			command:         "user",
+			withClusterName: true,
+			additionalFlags: []string{"--token=123456", "--cluster-name=my-cluster"},
 		},
 	}
 
@@ -103,6 +118,11 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 			if test.withToken {
 				// checks that kubeconfig files have expected token
 				kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithToken(t, config, "myUser", "123456")
+			}
+
+			if test.withClusterName {
+				// checks that kubeconfig files have expected cluster name
+				kubeconfigtestutil.AssertKubeConfigCurrentContextWithClusterName(t, config, "my-cluster")
 			}
 		})
 	}

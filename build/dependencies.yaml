@@ -26,7 +26,7 @@ dependencies:
 
   # CNI plugins
   - name: "cni"
-    version: 0.8.6
+    version: 0.8.7
     refPaths:
     - path: build/workspace.bzl
       match: CNI_VERSION =
@@ -56,7 +56,7 @@ dependencies:
 
   # CRI Tools
   - name: "crictl"
-    version: 1.18.0
+    version: 1.19.0
     refPaths:
     - path: build/workspace.bzl
       match: CRI_TOOLS_VERSION =
@@ -74,7 +74,7 @@ dependencies:
 
   # etcd
   - name: "etcd"
-    version: 3.4.9
+    version: 3.4.13
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
@@ -91,7 +91,7 @@ dependencies:
       match: const etcdImage
 
   - name: "etcd-image"
-    version: 3.4.9
+    version: 3.4.13
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
@@ -143,14 +143,8 @@ dependencies:
     - path: test/utils/image/manifest.go
       match: configs\[DebianIptables\] = Config{buildImageRegistry, "debian-iptables", "v\d+\.\d+.\d+"}
 
-  - name: "k8s.gcr.io/go-runner"
-    version: 0.1.1
-    refPaths:
-    - path: build/go-runner/Makefile
-      match: TAG \?=
-
   - name: "k8s.gcr.io/go-runner: dependents"
-    version: 0.1.1
+    version: buster-v2.0.0
     refPaths:
     - path: build/common.sh
       match: go_runner_version=

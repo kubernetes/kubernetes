@@ -174,3 +174,53 @@ func TestBroadcasterDropIfChannelFull(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func BenchmarkBroadCaster(b *testing.B) {
+	event1 := Event{Type: Added, Object: &myType{"foo", "hello world 1"}}
+	m := NewBroadcaster(0, WaitIfChannelFull)
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			m.Action(event1.Type, event1.Object)
+		}
+	})
+	b.StopTimer()
+}
+
+func TestBroadcasterWatchAfterShutdown(t *testing.T) {
+	event1 := Event{Type: Added, Object: &myType{"foo", "hello world 1"}}
+	event2 := Event{Type: Added, Object: &myType{"bar", "hello world 2"}}
+
+	m := NewBroadcaster(0, WaitIfChannelFull)
+	m.Shutdown()
+
+	watch := func() {
+		defer func() {
+			if err := recover(); err == nil {
+				t.Error("should cause panic")
+			}
+		}()
+		m.Watch()
+	}
+	watch()
+
+	watchWithPrefix := func() {
+		defer func() {
+			if err := recover(); err == nil {
+				t.Error("should cause panic")
+			}
+		}()
+		m.WatchWithPrefix([]Event{event1, event2})
+	}
+	watchWithPrefix()
+
+	action := func() {
+		defer func() {
+			if err := recover(); err == nil {
+				t.Error("should cause panic")
+			}
+		}()
+		m.Action(event1.Type, event1.Object)
+	}
+	action()
+}

@@ -97,7 +97,7 @@ type CrossVersionObjectReference struct {
 // (only `type` and one other matching field should be set at once).
 type MetricSpec struct {
 	// type is the type of metric source.  It should be one of "Object",
-	// "Pods" or "Resource", each mapping to a matching field in the object.
+	// "Pods", "Resource" or "External", each mapping to a matching field in the object.
 	Type MetricSourceType `json:"type" protobuf:"bytes,1,name=type"`
 
 	// object refers to a metric describing a single kubernetes object
@@ -169,7 +169,7 @@ type HPAScalingRules struct {
 	// - For scale up: 0 (i.e. no stabilization is done).
 	// - For scale down: 300 (i.e. the stabilization window is 300 seconds long).
 	// +optional
-	StabilizationWindowSeconds *int32 `json:"stabilizationWindowSeconds" protobuf:"varint,3,opt,name=stabilizationWindowSeconds"`
+	StabilizationWindowSeconds *int32 `json:"stabilizationWindowSeconds,omitempty" protobuf:"varint,3,opt,name=stabilizationWindowSeconds"`
 	// selectPolicy is used to specify which policy should be used.
 	// If not set, the default value MaxPolicySelect is used.
 	// +optional

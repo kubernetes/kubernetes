@@ -103,7 +103,7 @@ func TestRenameToAlreadyExistingContext(t *testing.T) {
 }
 
 func (test renameContextTest) run(t *testing.T) {
-	fakeKubeFile, _ := ioutil.TempFile("", "")
+	fakeKubeFile, _ := ioutil.TempFile(os.TempDir(), "")
 	defer os.Remove(fakeKubeFile.Name())
 	err := clientcmd.WriteToFile(test.initialConfig, fakeKubeFile.Name())
 	if err != nil {

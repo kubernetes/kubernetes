@@ -160,7 +160,7 @@ rules:
       - k8s.io/kubernetes/pkg/kubelet/volumemanager/populator
       - k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler
       - k8s.io/kubernetes/pkg/kubemark
-      - k8s.io/kubernetes/pkg/master/ports
+      - k8s.io/kubernetes/pkg/cluster/ports
       - k8s.io/kubernetes/pkg/probe
       - k8s.io/kubernetes/pkg/probe/exec
       - k8s.io/kubernetes/pkg/probe/http
@@ -206,7 +206,6 @@ rules:
       - k8s.io/kubernetes/pkg/util/config
       - k8s.io/kubernetes/pkg/util/configz
       - k8s.io/kubernetes/pkg/util/conntrack
-      - k8s.io/kubernetes/pkg/util/ebtables
       - k8s.io/kubernetes/pkg/util/env
       - k8s.io/kubernetes/pkg/util/filesystem
       - k8s.io/kubernetes/pkg/util/flag

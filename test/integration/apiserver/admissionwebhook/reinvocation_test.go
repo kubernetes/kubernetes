@@ -447,11 +447,9 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 				}
 			}
 
-			if tt.expectInvocations != nil {
-				for k, v := range tt.expectInvocations {
-					if recorder.GetCount(k) != v {
-						t.Errorf("expected %d invocations of %s, but got %d", v, k, recorder.GetCount(k))
-					}
+			for k, v := range tt.expectInvocations {
+				if recorder.GetCount(k) != v {
+					t.Errorf("expected %d invocations of %s, but got %d", v, k, recorder.GetCount(k))
 				}
 			}
 

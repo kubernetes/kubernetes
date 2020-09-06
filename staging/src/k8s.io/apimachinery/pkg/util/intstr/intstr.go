@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/gofuzz"
 	"k8s.io/klog/v2"
 )
 
@@ -128,21 +127,6 @@ func (IntOrString) OpenAPISchemaType() []string { return []string{"string"} }
 // OpenAPISchemaFormat is used by the kube-openapi generator when constructing
 // the OpenAPI spec of this type.
 func (IntOrString) OpenAPISchemaFormat() string { return "int-or-string" }
-
-func (intstr *IntOrString) Fuzz(c fuzz.Continue) {
-	if intstr == nil {
-		return
-	}
-	if c.RandBool() {
-		intstr.Type = Int
-		c.Fuzz(&intstr.IntVal)
-		intstr.StrVal = ""
-	} else {
-		intstr.Type = String
-		intstr.IntVal = 0
-		c.Fuzz(&intstr.StrVal)
-	}
-}
 
 func ValueOrDefault(intOrPercent *IntOrString, defaultValue IntOrString) *IntOrString {
 	if intOrPercent == nil {

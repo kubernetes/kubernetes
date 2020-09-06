@@ -88,6 +88,7 @@ func TestExistingDataDirWithoutVersionFile(t *testing.T) {
 func TestNonexistingDataDir(t *testing.T) {
 	targetVersion := &EtcdVersionPair{&EtcdVersion{latestVersion}, storageEtcd3}
 	path := newTestPath(t)
+	defer os.RemoveAll(path)
 	d, err := OpenOrCreateDataDirectory(filepath.Join(path, "data-dir"))
 	if err != nil {
 		t.Fatalf("Failed to open data dir: %v", err)
@@ -128,6 +129,7 @@ func TestNonexistingDataDir(t *testing.T) {
 
 func TestBackup(t *testing.T) {
 	path := newTestPath(t)
+	defer os.RemoveAll(path)
 	d, err := OpenOrCreateDataDirectory(filepath.Join(path, "data-dir"))
 	if err != nil {
 		t.Fatalf("Failed to open data dir: %v", err)

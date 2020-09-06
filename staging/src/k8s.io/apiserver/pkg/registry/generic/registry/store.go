@@ -683,10 +683,7 @@ func shouldOrphanDependents(ctx context.Context, e *Store, accessor metav1.Objec
 	}
 
 	// Get default orphan policy from this REST object type if it exists
-	if defaultGCPolicy == rest.OrphanDependents {
-		return true
-	}
-	return false
+	return defaultGCPolicy == rest.OrphanDependents
 }
 
 // shouldDeleteDependents returns true if the finalizer for foreground deletion should be set

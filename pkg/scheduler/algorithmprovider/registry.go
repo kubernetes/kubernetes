@@ -17,8 +17,7 @@ limitations under the License.
 package algorithmprovider
 
 import (
-	"sort"
-	"strings"
+	"fmt"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
@@ -66,13 +65,7 @@ func NewRegistry() Registry {
 
 // ListAlgorithmProviders lists registered algorithm providers.
 func ListAlgorithmProviders() string {
-	r := NewRegistry()
-	var providers []string
-	for k := range r {
-		providers = append(providers, k)
-	}
-	sort.Strings(providers)
-	return strings.Join(providers, " | ")
+	return fmt.Sprintf("%s | %s", ClusterAutoscalerProvider, schedulerapi.SchedulerDefaultProviderName)
 }
 
 func getDefaultConfig() *schedulerapi.Plugins {

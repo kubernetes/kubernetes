@@ -26,9 +26,11 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 )
@@ -1109,11 +1111,23 @@ func TestRestoreAllGrabOldLock(t *testing.T) {
 	runner := newInternal(&fexec, ProtocolIPv4, TestLockfilePath)
 	defer os.Remove(TestLockfilePath)
 
-	// Grab the abstract @xtables socket
-	runLock, err := net.ListenUnix("unix", &net.UnixAddr{Name: "@xtables", Net: "unix"})
+	var runLock *net.UnixListener
+	// Grab the abstract @xtables socket, will retry if the socket exists
+	err := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
+		runLock, err = net.ListenUnix("unix", &net.UnixAddr{Name: "@xtables", Net: "unix"})
+		if err != nil {
+			t.Logf("Failed to lock @xtables: %v, will retry.", err)
+			return false, nil
+		}
+		return true, nil
+	})
 	if err != nil {
-		t.Fatalf("expected to lock @xtables, got %v", err)
+		t.Fatal("Timed out locking @xtables")
 	}
+	if runLock == nil {
+		t.Fatal("Unexpected nil runLock")
+	}
+
 	defer runLock.Close()
 
 	err = runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)

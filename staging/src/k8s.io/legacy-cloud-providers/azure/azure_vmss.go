@@ -534,17 +534,21 @@ func (ss *scaleSet) GetPrivateIPsByNodeName(nodeName string) ([]string, error) {
 
 // This returns the full identifier of the primary NIC for the given VM.
 func (ss *scaleSet) getPrimaryInterfaceID(machine compute.VirtualMachineScaleSetVM) (string, error) {
+	if machine.NetworkProfile == nil || machine.NetworkProfile.NetworkInterfaces == nil {
+		return "", fmt.Errorf("failed to find the network interfaces for vm %s", to.String(machine.Name))
+	}
+
 	if len(*machine.NetworkProfile.NetworkInterfaces) == 1 {
 		return *(*machine.NetworkProfile.NetworkInterfaces)[0].ID, nil
 	}
 
 	for _, ref := range *machine.NetworkProfile.NetworkInterfaces {
-		if *ref.Primary {
+		if to.Bool(ref.Primary) {
 			return *ref.ID, nil
 		}
 	}
 
-	return "", fmt.Errorf("failed to find a primary nic for the vm. vmname=%q", *machine.Name)
+	return "", fmt.Errorf("failed to find a primary nic for the vm. vmname=%q", to.String(machine.Name))
 }
 
 // getVmssMachineID returns the full identifier of a vmss virtual machine.
@@ -1406,16 +1410,15 @@ func (ss *scaleSet) ensureBackendPoolDeletedFromVMSS(service *v1.Service, backen
 
 	for vmssName := range vmssNamesMap {
 		vmss, err := ss.getVMSS(vmssName, azcache.CacheReadTypeDefault)
+		if err != nil {
+			return err
+		}
 
 		// When vmss is being deleted, CreateOrUpdate API would report "the vmss is being deleted" error.
 		// Since it is being deleted, we shouldn't send more CreateOrUpdate requests for it.
 		if vmss.ProvisioningState != nil && strings.EqualFold(*vmss.ProvisioningState, virtualMachineScaleSetsDeallocating) {
 			klog.V(3).Infof("ensureVMSSInPool: found vmss %s being deleted, skipping", vmssName)
 			continue
-		}
-
-		if err != nil {
-			return err
 		}
 		if vmss.VirtualMachineProfile.NetworkProfile.NetworkInterfaceConfigurations == nil {
 			klog.V(4).Infof("EnsureHostInPool: cannot obtain the primary network interface configuration, of vmss %s", vmssName)

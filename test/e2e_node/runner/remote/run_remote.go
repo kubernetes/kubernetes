@@ -665,8 +665,7 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 		if len(externalIP) > 0 {
 			remote.AddHostnameIP(name, externalIP)
 		}
-		// TODO(random-liu): Remove the docker version check. Use some other command to check
-		// instance readiness.
+
 		var output string
 		output, err = remote.SSH(name, "sh", "-c",
 			"'systemctl list-units  --type=service  --state=running | grep -e docker -e containerd'")

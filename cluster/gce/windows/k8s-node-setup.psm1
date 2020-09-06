@@ -57,8 +57,8 @@ $GCE_METADATA_SERVER = "169.254.169.254"
 # exist until an initial HNS network has been created on the Windows node - see
 # Add_InitialHnsNetwork().
 $MGMT_ADAPTER_NAME = "vEthernet (Ethernet*"
-$CRICTL_VERSION = 'v1.18.0'
-$CRICTL_SHA256 = '5045bcc6d8b0e6004be123ab99ea06e5b1b2ae1e586c968fcdf85fccd4d67ae1'
+$CRICTL_VERSION = 'v1.19.0'
+$CRICTL_SHA256 = 'df60ff65ab71c5cf1d8c38f51db6f05e3d60a45d3a3293c3248c925c25375921'
 
 Import-Module -Force C:\common.psm1
 
@@ -417,11 +417,13 @@ function DownloadAndInstall-CSIProxyBinaries {
   }
 }
 
-# TODO(jingxu97): Make csi-proxy.exe as a service similar to kubelet.exe
 function Start-CSIProxy {
   if (Test-IsTestCluster $kube_env) {
-    Log-Output 'Starting CSI Proxy'
-    Start-Process "${env:NODE_DIR}\csi-proxy.exe"
+    Log-Output "Creating CSI Proxy Service"
+    & sc.exe create csiproxy binPath= "${env:NODE_DIR}\csi-proxy.exe --windows-service"
+    & sc.exe failure csiproxy reset= 0 actions= restart/10000
+    Log-Output "Starting CSI Proxy Service"
+    & sc.exe start csiproxy
   }
 }
 

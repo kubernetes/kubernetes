@@ -299,20 +299,17 @@ func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInf
 		requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
 	}
 	scope := CleanScope(requestInfo)
-	// We don't use verb from <requestInfo>, as for the healthy path
-	// MonitorRequest is called from InstrumentRouteFunc which is registered
-	// in installer.go with predefined list of verbs (different than those
-	// translated to RequestInfo).
+
+	// We don't use verb from <requestInfo>, as this may be propagated from
+	// InstrumentRouteFunc which is registered in installer.go with predefined
+	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
-	verb := canonicalVerb(strings.ToUpper(req.Method), scope)
-	// set verbs to a bounded set of known and expected verbs
-	if !validRequestMethods.Has(verb) {
-		verb = OtherRequestMethod
-	}
+	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
+
 	if requestInfo.IsResourceRequest {
-		requestTerminationsTotal.WithLabelValues(cleanVerb(verb, req), requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
+		requestTerminationsTotal.WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
 	} else {
-		requestTerminationsTotal.WithLabelValues(cleanVerb(verb, req), "", "", "", requestInfo.Path, scope, component, codeToString(code)).Inc()
+		requestTerminationsTotal.WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component, codeToString(code)).Inc()
 	}
 }
 
@@ -324,12 +321,13 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 	}
 	var g compbasemetrics.GaugeMetric
 	scope := CleanScope(requestInfo)
-	// We don't use verb from <requestInfo>, as for the healthy path
-	// MonitorRequest is called from InstrumentRouteFunc which is registered
-	// in installer.go with predefined list of verbs (different than those
-	// translated to RequestInfo).
+
+	// We don't use verb from <requestInfo>, as this may be propagated from
+	// InstrumentRouteFunc which is registered in installer.go with predefined
+	// list of verbs (different than those translated to RequestInfo).
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
 	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
+
 	if requestInfo.IsResourceRequest {
 		g = longRunningRequestGauge.WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
 	} else {
@@ -343,7 +341,12 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 // MonitorRequest handles standard transformations for client and the reported verb and then invokes Monitor to record
 // a request. verb must be uppercase to be backwards compatible with existing monitoring tooling.
 func MonitorRequest(req *http.Request, verb, group, version, resource, subresource, scope, component string, deprecated bool, removedRelease string, contentType string, httpCode, respSize int, elapsed time.Duration) {
-	reportedVerb := cleanVerb(verb, req)
+	// We don't use verb from <requestInfo>, as this may be propagated from
+	// InstrumentRouteFunc which is registered in installer.go with predefined
+	// list of verbs (different than those translated to RequestInfo).
+	// However, we need to tweak it e.g. to differentiate GET from LIST.
+	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
+
 	dryRun := cleanDryRun(req.URL)
 	elapsedSeconds := elapsed.Seconds()
 	cleanContentType := cleanContentType(contentType)
@@ -440,7 +443,7 @@ func CleanScope(requestInfo *request.RequestInfo) string {
 func canonicalVerb(verb string, scope string) string {
 	switch verb {
 	case "GET", "HEAD":
-		if scope != "resource" {
+		if scope != "resource" && scope != "" {
 			return "LIST"
 		}
 		return "GET"

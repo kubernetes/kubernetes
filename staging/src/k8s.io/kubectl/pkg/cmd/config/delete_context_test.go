@@ -53,7 +53,7 @@ func TestDeleteContext(t *testing.T) {
 }
 
 func (test deleteContextTest) run(t *testing.T) {
-	fakeKubeFile, err := ioutil.TempFile("", "")
+	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

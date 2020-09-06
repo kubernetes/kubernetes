@@ -1083,12 +1083,12 @@ No Known Issues Reported
 #### kubelet:
 - The StreamingProxyRedirects feature and `--redirect-container-streaming` flag are deprecated, and will be removed in a future release. The default behavior (proxy streaming requests through the kubelet) will be the only supported option. If you are setting `--redirect-container-streaming=true`, then you must migrate off this configuration. The flag will no longer be able to be enabled starting in v1.20. If you are not setting the flag, no action is necessary. ([#88290](https://github.com/kubernetes/kubernetes/pull/88290), [@tallclair](https://github.com/tallclair)) [SIG API Machinery and Node]
 - resource metrics endpoint `/metrics/resource/v1alpha1` as well as all metrics under this endpoint have been deprecated. Please convert to the following metrics emitted by endpoint `/metrics/resource`:
-      - scrape_error --> scrape_error
-      - node_cpu_usage_seconds_total --> node_cpu_usage_seconds
-      - node_memory_working_set_bytes --> node_memory_working_set_bytes
-      - container_cpu_usage_seconds_total --> container_cpu_usage_seconds
-      - container_memory_working_set_bytes --> container_memory_working_set_bytes
-      - scrape_error --> scrape_error 
+  - scrape_error --> scrape_error
+  - node_cpu_usage_seconds_total --> node_cpu_usage_seconds
+  - node_memory_working_set_bytes --> node_memory_working_set_bytes
+  - container_cpu_usage_seconds_total --> container_cpu_usage_seconds
+  - container_memory_working_set_bytes --> container_memory_working_set_bytes
+  - scrape_error --> scrape_error 
       ([#86282](https://github.com/kubernetes/kubernetes/pull/86282), [@RainbowMango](https://github.com/RainbowMango)) [SIG Node]
 - In a future release, kubelet will no longer create the CSI NodePublishVolume target directory, in accordance with the CSI specification. CSI drivers may need to be updated accordingly to properly create and process the target path. ([#75535](https://github.com/kubernetes/kubernetes/issues/75535)) [SIG Storage]
 

@@ -36,6 +36,7 @@ import (
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog/v2"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
+	"k8s.io/legacy-cloud-providers/azure/retry"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -216,7 +217,7 @@ func (az *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName stri
 	klog.V(5).Infof("Delete service (%s): START clusterName=%q", serviceName, clusterName)
 
 	serviceIPToCleanup, err := az.findServiceIPAddress(ctx, clusterName, service, isInternal)
-	if err != nil {
+	if err != nil && !retry.HasStatusForbiddenOrIgnoredError(err) {
 		return err
 	}
 
@@ -225,7 +226,7 @@ func (az *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName stri
 		return err
 	}
 
-	if _, err := az.reconcileLoadBalancer(clusterName, service, nil, false /* wantLb */); err != nil {
+	if _, err := az.reconcileLoadBalancer(clusterName, service, nil, false /* wantLb */); err != nil && !retry.HasStatusForbiddenOrIgnoredError(err) {
 		return err
 	}
 
@@ -258,7 +259,7 @@ func (az *Cloud) getLoadBalancerResourceGroup() string {
 func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string, nodes []*v1.Node, wantLb bool) (lb *network.LoadBalancer, status *v1.LoadBalancerStatus, exists bool, err error) {
 	isInternal := requiresInternalLoadBalancer(service)
 	var defaultLB *network.LoadBalancer
-	primaryVMSetName := az.vmSet.GetPrimaryVMSetName()
+	primaryVMSetName := az.VMSet.GetPrimaryVMSetName()
 	defaultLBName := az.getAzureLoadBalancerName(clusterName, primaryVMSetName, isInternal)
 
 	existingLBs, err := az.ListLB(service)
@@ -329,7 +330,7 @@ func (az *Cloud) selectLoadBalancer(clusterName string, service *v1.Service, exi
 	isInternal := requiresInternalLoadBalancer(service)
 	serviceName := getServiceName(service)
 	klog.V(2).Infof("selectLoadBalancer for service (%s): isInternal(%v) - start", serviceName, isInternal)
-	vmSetNames, err := az.vmSet.GetVMSetNames(service, nodes)
+	vmSetNames, err := az.VMSet.GetVMSetNames(service, nodes)
 	if err != nil {
 		klog.Errorf("az.selectLoadBalancer: cluster(%s) service(%s) isInternal(%t) - az.GetVMSetNames failed, err=(%v)", clusterName, serviceName, isInternal, err)
 		return nil, false, err
@@ -935,7 +936,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 				// Remove backend pools from vmSets. This is required for virtual machine scale sets before removing the LB.
 				vmSetName := az.mapLoadBalancerNameToVMSet(lbName, clusterName)
 				klog.V(10).Infof("EnsureBackendPoolDeleted(%s,%s) for service %s: start", lbBackendPoolID, vmSetName, serviceName)
-				err := az.vmSet.EnsureBackendPoolDeleted(service, lbBackendPoolID, vmSetName, lb.BackendAddressPools)
+				err := az.VMSet.EnsureBackendPoolDeleted(service, lbBackendPoolID, vmSetName, lb.BackendAddressPools)
 				if err != nil {
 					klog.Errorf("EnsureBackendPoolDeleted(%s) for service %s failed: %v", lbBackendPoolID, serviceName, err)
 					return nil, err
@@ -979,7 +980,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 		vmSetName := az.mapLoadBalancerNameToVMSet(lbName, clusterName)
 		// Etag would be changed when updating backend pools, so invalidate lbCache after it.
 		defer az.lbCache.Delete(lbName)
-		err := az.vmSet.EnsureHostsInPool(service, nodes, lbBackendPoolID, vmSetName, isInternal)
+		err := az.VMSet.EnsureHostsInPool(service, nodes, lbBackendPoolID, vmSetName, isInternal)
 		if err != nil {
 			return nil, err
 		}

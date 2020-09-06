@@ -348,9 +348,7 @@ func ClockWait(clk *testclock.FakeEventClock, counter counter.GoRoutineCounter, 
 		close(dunch)
 	}, duration)
 	counter.Add(-1)
-	select {
-	case <-dunch:
-	}
+	<-dunch
 }
 
 func init() {

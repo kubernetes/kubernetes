@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -237,6 +238,7 @@ func TestRunInitNodeChecks(t *testing.T) {
 			expected: false,
 		},
 		{
+			name: "Test APIEndpoint exists if exists",
 			cfg: &kubeadmapi.InitConfiguration{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "2001:1234::1:15"},
 			},
@@ -248,7 +250,8 @@ func TestRunInitNodeChecks(t *testing.T) {
 		actual := RunInitNodeChecks(exec.New(), rt.cfg, sets.NewString(), rt.isSecondaryControlPlane, rt.downloadCerts)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
-				"failed RunInitNodeChecks:\n\texpected: %t\n\t  actual: %t\n\t error: %v",
+				"failed RunInitNodeChecks:%v\n\texpected: %t\n\t  actual: %t\n\t error: %v",
+				rt.name,
 				rt.expected,
 				(actual == nil),
 				actual,
@@ -259,14 +262,17 @@ func TestRunInitNodeChecks(t *testing.T) {
 
 func TestRunJoinNodeChecks(t *testing.T) {
 	var tests = []struct {
+		name     string
 		cfg      *kubeadmapi.JoinConfiguration
 		expected bool
 	}{
 		{
+			name:     "Check empty JoinConfiguration",
 			cfg:      &kubeadmapi.JoinConfiguration{},
 			expected: false,
 		},
 		{
+			name: "Check TLS Bootstrap APIServerEndpoint IPv4 addr",
 			cfg: &kubeadmapi.JoinConfiguration{
 				Discovery: kubeadmapi.Discovery{
 					BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
@@ -277,6 +283,7 @@ func TestRunJoinNodeChecks(t *testing.T) {
 			expected: false,
 		},
 		{
+			name: "Check TLS Bootstrap APIServerEndpoint IPv6 addr",
 			cfg: &kubeadmapi.JoinConfiguration{
 				Discovery: kubeadmapi.Discovery{
 					BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
@@ -292,7 +299,8 @@ func TestRunJoinNodeChecks(t *testing.T) {
 		actual := RunJoinNodeChecks(exec.New(), rt.cfg, sets.NewString())
 		if (actual == nil) != rt.expected {
 			t.Errorf(
-				"failed RunJoinNodeChecks:\n\texpected: %t\n\t  actual: %t",
+				"failed RunJoinNodeChecks:%v\n\texpected: %t\n\t  actual: %t",
+				rt.name,
 				rt.expected,
 				(actual != nil),
 			)
@@ -845,6 +853,32 @@ func TestNumCPUCheck(t *testing.T) {
 			}
 			if len(errors) != rt.numErrors {
 				t.Errorf("expected %d warning(s) but got %d: %q", rt.numErrors, len(errors), errors)
+			}
+		})
+	}
+}
+
+func TestMemCheck(t *testing.T) {
+	// skip this test, if OS in not Linux, since it will ONLY pass on Linux.
+	if runtime.GOOS != "linux" {
+		t.Skip("unsupported OS for memory check test ")
+	}
+
+	var tests = []struct {
+		minimum        uint64
+		expectedErrors int
+	}{
+		{0, 0},
+		{9999999999999999, 1},
+	}
+
+	for _, rt := range tests {
+		t.Run(fmt.Sprintf("MemoryCheck{%d}", rt.minimum), func(t *testing.T) {
+			warnings, errors := MemCheck{Mem: rt.minimum}.Check()
+			if len(warnings) > 0 {
+				t.Errorf("expected 0 warnings but got %d: %q", len(warnings), warnings)
+			} else if len(errors) != rt.expectedErrors {
+				t.Errorf("expected %d error(s) but got %d: %q", rt.expectedErrors, len(errors), errors)
 			}
 		})
 	}

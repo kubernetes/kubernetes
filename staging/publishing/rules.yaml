@@ -1645,3 +1645,11 @@ rules:
       dir: staging/src/k8s.io/controller-manager
     name: release-1.19
     go: 1.15
+
+- destination: mount-utils
+  library: true
+  branches:
+  - source:
+      branch: master
+      dir: staging/src/k8s.io/mount-utils
+    name: master

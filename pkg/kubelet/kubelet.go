@@ -1235,7 +1235,6 @@ func (kl *Kubelet) StartGarbageCollection() {
 func (kl *Kubelet) initializeModules() error {
 	// Prometheus metrics.
 	metrics.Register(
-		kl.runtimeCache,
 		collectors.NewVolumeStatsCollector(kl),
 		collectors.NewLogMetricsCollector(kl.StatsProvider.ListPodStats),
 	)
@@ -1526,6 +1525,8 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		if !pcm.Exists(pod) && !firstSync {
 			if err := kl.killPod(pod, nil, podStatus, nil); err == nil {
 				podKilled = true
+			} else {
+				klog.Errorf("killPod for pod %q (podStatus=%v) failed: %v", format.Pod(pod), podStatus, err)
 			}
 		}
 		// Create and Update pod's Cgroups

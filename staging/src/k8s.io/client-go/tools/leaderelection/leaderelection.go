@@ -193,7 +193,9 @@ type LeaderElector struct {
 	name string
 }
 
-// Run starts the leader election loop
+// Run starts the leader election loop. Run will not return
+// before leader election loop is stopped by ctx or it has
+// stopped holding the leader lease
 func (le *LeaderElector) Run(ctx context.Context) {
 	defer runtime.HandleCrash()
 	defer func() {
@@ -210,7 +212,8 @@ func (le *LeaderElector) Run(ctx context.Context) {
 }
 
 // RunOrDie starts a client with the provided config or panics if the config
-// fails to validate.
+// fails to validate. RunOrDie blocks until leader election loop is
+// stopped by ctx or it has stopped holding the leader lease
 func RunOrDie(ctx context.Context, lec LeaderElectionConfig) {
 	le, err := NewLeaderElector(lec)
 	if err != nil {
@@ -240,7 +243,7 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 	defer cancel()
 	succeeded := false
 	desc := le.config.Lock.Describe()
-	klog.Infof("attempting to acquire leader lease  %v...", desc)
+	klog.Infof("attempting to acquire leader lease %v...", desc)
 	wait.JitterUntil(func() {
 		succeeded = le.tryAcquireOrRenew(ctx)
 		le.maybeReportTransition()

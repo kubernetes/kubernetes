@@ -98,9 +98,9 @@ func TestRunRenewCommands(t *testing.T) {
 	CACerts := map[string]*x509.Certificate{}
 	CAKeys := map[string]crypto.Signer{}
 	for _, ca := range []*certsphase.KubeadmCert{
-		&certsphase.KubeadmCertRootCA,
-		&certsphase.KubeadmCertFrontProxyCA,
-		&certsphase.KubeadmCertEtcdCA,
+		certsphase.KubeadmCertRootCA(),
+		certsphase.KubeadmCertFrontProxyCA(),
+		certsphase.KubeadmCertEtcdCA(),
 	} {
 		caCert, caKey, err := ca.CreateAsCA(cfg)
 		if err != nil {
@@ -112,13 +112,13 @@ func TestRunRenewCommands(t *testing.T) {
 
 	// Generate all the signed certificates
 	for _, cert := range []*certsphase.KubeadmCert{
-		&certsphase.KubeadmCertAPIServer,
-		&certsphase.KubeadmCertKubeletClient,
-		&certsphase.KubeadmCertFrontProxyClient,
-		&certsphase.KubeadmCertEtcdAPIClient,
-		&certsphase.KubeadmCertEtcdServer,
-		&certsphase.KubeadmCertEtcdPeer,
-		&certsphase.KubeadmCertEtcdHealthcheck,
+		certsphase.KubeadmCertAPIServer(),
+		certsphase.KubeadmCertKubeletClient(),
+		certsphase.KubeadmCertFrontProxyClient(),
+		certsphase.KubeadmCertEtcdAPIClient(),
+		certsphase.KubeadmCertEtcdServer(),
+		certsphase.KubeadmCertEtcdPeer(),
+		certsphase.KubeadmCertEtcdHealthcheck(),
 	} {
 		caCert := CACerts[cert.CAName]
 		caKey := CAKeys[cert.CAName]
@@ -146,13 +146,13 @@ func TestRunRenewCommands(t *testing.T) {
 		{
 			command: "all",
 			Certs: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertAPIServer,
-				&certsphase.KubeadmCertKubeletClient,
-				&certsphase.KubeadmCertFrontProxyClient,
-				&certsphase.KubeadmCertEtcdAPIClient,
-				&certsphase.KubeadmCertEtcdServer,
-				&certsphase.KubeadmCertEtcdPeer,
-				&certsphase.KubeadmCertEtcdHealthcheck,
+				certsphase.KubeadmCertAPIServer(),
+				certsphase.KubeadmCertKubeletClient(),
+				certsphase.KubeadmCertFrontProxyClient(),
+				certsphase.KubeadmCertEtcdAPIClient(),
+				certsphase.KubeadmCertEtcdServer(),
+				certsphase.KubeadmCertEtcdPeer(),
+				certsphase.KubeadmCertEtcdHealthcheck(),
 			},
 			KubeconfigFiles: []string{
 				kubeadmconstants.AdminKubeConfigFileName,
@@ -163,43 +163,43 @@ func TestRunRenewCommands(t *testing.T) {
 		{
 			command: "apiserver",
 			Certs: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertAPIServer,
+				certsphase.KubeadmCertAPIServer(),
 			},
 		},
 		{
 			command: "apiserver-kubelet-client",
 			Certs: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertKubeletClient,
+				certsphase.KubeadmCertKubeletClient(),
 			},
 		},
 		{
 			command: "apiserver-etcd-client",
 			Certs: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertEtcdAPIClient,
+				certsphase.KubeadmCertEtcdAPIClient(),
 			},
 		},
 		{
 			command: "front-proxy-client",
 			Certs: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertFrontProxyClient,
+				certsphase.KubeadmCertFrontProxyClient(),
 			},
 		},
 		{
 			command: "etcd-server",
 			Certs: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertEtcdServer,
+				certsphase.KubeadmCertEtcdServer(),
 			},
 		},
 		{
 			command: "etcd-peer",
 			Certs: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertEtcdPeer,
+				certsphase.KubeadmCertEtcdPeer(),
 			},
 		},
 		{
 			command: "etcd-healthcheck-client",
 			Certs: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertEtcdHealthcheck,
+				certsphase.KubeadmCertEtcdHealthcheck(),
 			},
 		},
 		{
@@ -271,14 +271,14 @@ func TestRunRenewCommands(t *testing.T) {
 func TestRenewUsingCSR(t *testing.T) {
 	tmpDir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpDir)
-	cert := &certsphase.KubeadmCertEtcdServer
+	cert := certsphase.KubeadmCertEtcdServer()
 
 	cfg := testutil.GetDefaultInternalConfig(t)
 	cfg.CertificatesDir = tmpDir
 
-	caCert, caKey, err := certsphase.KubeadmCertEtcdCA.CreateAsCA(cfg)
+	caCert, caKey, err := certsphase.KubeadmCertEtcdCA().CreateAsCA(cfg)
 	if err != nil {
-		t.Fatalf("couldn't write out CA %s: %v", certsphase.KubeadmCertEtcdCA.Name, err)
+		t.Fatalf("couldn't write out CA %s: %v", certsphase.KubeadmCertEtcdCA().Name, err)
 	}
 
 	if err := cert.CreateFromCA(cfg, caCert, caKey); err != nil {

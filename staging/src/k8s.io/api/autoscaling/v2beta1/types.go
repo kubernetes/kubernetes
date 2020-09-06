@@ -88,7 +88,7 @@ const (
 // (only `type` and one other matching field should be set at once).
 type MetricSpec struct {
 	// type is the type of metric source.  It should be one of "Object",
-	// "Pods" or "Resource", each mapping to a matching field in the object.
+	// "Pods", "Resource" or "External", each mapping to a matching field in the object.
 	Type MetricSourceType `json:"type" protobuf:"bytes,1,name=type"`
 
 	// object refers to a metric describing a single kubernetes object

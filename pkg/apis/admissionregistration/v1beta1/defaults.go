@@ -27,6 +27,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
+// SetDefaults_ValidatingWebhook sets defaults for webhook validating
 func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1beta1.ValidatingWebhook) {
 	if obj.FailurePolicy == nil {
 		policy := admissionregistrationv1beta1.Ignore
@@ -59,6 +60,7 @@ func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1beta1.ValidatingW
 	}
 }
 
+// SetDefaults_MutatingWebhook sets defaults for webhook mutating
 func SetDefaults_MutatingWebhook(obj *admissionregistrationv1beta1.MutatingWebhook) {
 	if obj.FailurePolicy == nil {
 		policy := admissionregistrationv1beta1.Ignore
@@ -95,6 +97,7 @@ func SetDefaults_MutatingWebhook(obj *admissionregistrationv1beta1.MutatingWebho
 	}
 }
 
+// SetDefaults_Rule sets defaults for webhook rule
 func SetDefaults_Rule(obj *admissionregistrationv1beta1.Rule) {
 	if obj.Scope == nil {
 		s := admissionregistrationv1beta1.AllScopes

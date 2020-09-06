@@ -62,7 +62,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 
-	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -82,7 +82,7 @@ func setupWithResources(t *testing.T, groupVersions []schema.GroupVersion, resou
 func setupWithResourcesWithOptions(t *testing.T, opts *framework.MasterConfigOptions, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(opts)
 	if len(groupVersions) > 0 || len(resources) > 0 {
-		resourceConfig := master.DefaultAPIResourceConfigSource()
+		resourceConfig := controlplane.DefaultAPIResourceConfigSource()
 		resourceConfig.EnableVersions(groupVersions...)
 		resourceConfig.EnableResources(resources...)
 		masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig

@@ -298,6 +298,29 @@ func podsRunning(c clientset.Interface, pods *v1.PodList) []error {
 	return e
 }
 
+func podContainerFailed(c clientset.Interface, namespace, podName string, containerIndex int, reason string) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		switch pod.Status.Phase {
+		case v1.PodPending:
+			if len(pod.Status.ContainerStatuses) == 0 {
+				return false, nil
+			}
+			containerStatus := pod.Status.ContainerStatuses[containerIndex]
+			if containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == reason {
+				return true, nil
+			}
+			return false, nil
+		case v1.PodFailed, v1.PodRunning, v1.PodSucceeded:
+			return false, fmt.Errorf("pod was expected to be pending, but it is in the state: %s", pod.Status.Phase)
+		}
+		return false, nil
+	}
+}
+
 // LogPodStates logs basic info of provided pods for debugging.
 func LogPodStates(pods []v1.Pod) {
 	// Find maximum widths for pod, node, and phase strings for column printing.

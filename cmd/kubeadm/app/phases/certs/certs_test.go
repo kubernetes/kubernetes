@@ -685,7 +685,7 @@ func TestValidateMethods(t *testing.T) {
 }
 
 func TestNewCSR(t *testing.T) {
-	kubeadmCert := KubeadmCertAPIServer
+	kubeadmCert := KubeadmCertAPIServer()
 	cfg := testutil.GetDefaultInternalConfig(t)
 
 	certConfig, err := kubeadmCert.GetConfig(cfg)
@@ -693,7 +693,7 @@ func TestNewCSR(t *testing.T) {
 		t.Fatalf("couldn't get cert config: %v", err)
 	}
 
-	csr, _, err := NewCSR(&kubeadmCert, cfg)
+	csr, _, err := NewCSR(kubeadmCert, cfg)
 
 	if err != nil {
 		t.Errorf("invalid signature on CSR: %v", err)

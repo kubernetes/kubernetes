@@ -119,7 +119,7 @@ func TestCreateRoute(t *testing.T) {
 
 	cloud := &Cloud{
 		RouteTablesClient: routeTableClient,
-		vmSet:             mockVMSet,
+		VMSet:             mockVMSet,
 		Config: Config{
 			RouteTableResourceGroup: "foo",
 			RouteTableName:          "bar",
@@ -526,7 +526,7 @@ func TestListRoutes(t *testing.T) {
 
 	cloud := &Cloud{
 		RouteTablesClient: routeTableClient,
-		vmSet:             mockVMSet,
+		VMSet:             mockVMSet,
 		Config: Config{
 			RouteTableResourceGroup: "foo",
 			RouteTableName:          "bar",

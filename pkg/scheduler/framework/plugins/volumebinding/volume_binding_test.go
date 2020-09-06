@@ -252,10 +252,7 @@ func TestVolumeBinding(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// Start informer factory after initialization
-			informerFactory.Start(ctx.Done())
-
-			// Feed testing data and wait for them to be synced
+			t.Log("Feed testing data and wait for them to be synced")
 			client.StorageV1().StorageClasses().Create(ctx, immediateSC, metav1.CreateOptions{})
 			client.StorageV1().StorageClasses().Create(ctx, waitSC, metav1.CreateOptions{})
 			if item.node != nil {
@@ -267,19 +264,21 @@ func TestVolumeBinding(t *testing.T) {
 			for _, pv := range item.pvs {
 				client.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
 			}
-			caches := informerFactory.WaitForCacheSync(ctx.Done())
-			for _, synced := range caches {
-				if !synced {
-					t.Errorf("error waiting for informer cache sync")
-				}
-			}
 
-			// Verify
+			t.Log("Start informer factory after initialization")
+			informerFactory.Start(ctx.Done())
+
+			t.Log("Wait for all started informers' cache were synced")
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			t.Log("Verify")
+
 			p := pl.(*VolumeBinding)
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(item.node)
 			state := framework.NewCycleState()
-			t.Logf("call PreFilter and check status")
+
+			t.Logf("Verify: call PreFilter and check status")
 			gotPreFilterStatus := p.PreFilter(ctx, state, item.pod)
 			if !reflect.DeepEqual(gotPreFilterStatus, item.wantPreFilterStatus) {
 				t.Errorf("filter prefilter status does not match: %v, want: %v", gotPreFilterStatus, item.wantPreFilterStatus)
@@ -288,7 +287,8 @@ func TestVolumeBinding(t *testing.T) {
 				// scheduler framework will skip Filter if PreFilter fails
 				return
 			}
-			t.Logf("check state after prefilter phase")
+
+			t.Logf("Verify: check state after prefilter phase")
 			stateData, err := getStateData(state)
 			if err != nil {
 				t.Fatal(err)
@@ -296,7 +296,8 @@ func TestVolumeBinding(t *testing.T) {
 			if !reflect.DeepEqual(stateData, item.wantStateAfterPreFilter) {
 				t.Errorf("state got after prefilter does not match: %v, want: %v", stateData, item.wantStateAfterPreFilter)
 			}
-			t.Logf("call Filter and check status")
+
+			t.Logf("Verify: call Filter and check status")
 			gotStatus := p.Filter(ctx, state, item.pod, nodeInfo)
 			if !reflect.DeepEqual(gotStatus, item.wantFilterStatus) {
 				t.Errorf("filter status does not match: %v, want: %v", gotStatus, item.wantFilterStatus)

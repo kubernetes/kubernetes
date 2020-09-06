@@ -179,6 +179,3 @@ I0326 14:35:05.607211   12099 serve_hostnames.go:269] Iteration 0 took 1.7748564
 I0326 14:35:05.607236   12099 serve_hostnames.go:182] Cleaning up pods
 I0326 14:35:05.797893   12099 serve_hostnames.go:130] Cleaning up service serve-hostnames-1631/server-hostnames
 ```
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/soak/serve_hostnames/README.md?pixel)]()

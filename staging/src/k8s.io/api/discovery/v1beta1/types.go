@@ -88,8 +88,8 @@ type Endpoint struct {
 	// hostname of this endpoint. This field may be used by consumers of
 	// endpoints to distinguish endpoints from each other (e.g. in DNS names).
 	// Multiple endpoints which use the same hostname should be considered
-	// fungible (e.g. multiple A values in DNS). Must pass DNS Label (RFC 1123)
-	// validation.
+	// fungible (e.g. multiple A values in DNS). Must be lowercase and pass DNS
+	// Label (RFC 1123) validation.
 	// +optional
 	Hostname *string `json:"hostname,omitempty" protobuf:"bytes,3,opt,name=hostname"`
 	// targetRef is a reference to a Kubernetes object that represents this

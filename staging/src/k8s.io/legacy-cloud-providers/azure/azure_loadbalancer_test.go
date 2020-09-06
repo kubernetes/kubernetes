@@ -366,6 +366,7 @@ func TestEnsureLoadBalancerDeleted(t *testing.T) {
 		service           v1.Service
 		isInternalSvc     bool
 		expectCreateError bool
+		wrongRGAtDelete   bool
 	}{
 		{
 			desc:    "external service should be created and deleted successfully",
@@ -384,6 +385,12 @@ func TestEnsureLoadBalancerDeleted(t *testing.T) {
 			desc:              "annotated service with different resourceGroup shouldn't be created but should be deleted successfully",
 			service:           getResourceGroupTestService("service4", "random-rg", "1.2.3.4", 80),
 			expectCreateError: true,
+		},
+		{
+			desc:              "annotated service with different resourceGroup shouldn't be created but should be deleted successfully",
+			service:           getResourceGroupTestService("service5", "random-rg", "", 80),
+			expectCreateError: true,
+			wrongRGAtDelete:   true,
 		},
 	}
 
@@ -419,6 +426,9 @@ func TestEnsureLoadBalancerDeleted(t *testing.T) {
 		expectedLBs = make([]network.LoadBalancer, 0)
 		setMockLBs(az, ctrl, &expectedLBs, "service", 1, i+1, c.isInternalSvc)
 		// finally, delete it.
+		if c.wrongRGAtDelete {
+			az.LoadBalancerResourceGroup = "nil"
+		}
 		err = az.EnsureLoadBalancerDeleted(context.TODO(), testClusterName, &c.service)
 		expectedLBs = make([]network.LoadBalancer, 0)
 		mockLBsClient := mockloadbalancerclient.NewMockInterface(ctrl)

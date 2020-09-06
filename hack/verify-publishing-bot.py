@@ -86,6 +86,11 @@ def main():
         if branch["source"]["branch"] != "master":
             raise Exception("cannot find master source branch for destination %s" % rule["destination"])
 
+        # we specify the go version for all master branches through `default-go-version`
+        # so ensure we don't specify explicit go version for master branch in rules
+        if "go" in branch:
+            raise Exception("go version must not be specified for master branch for destination %s" % rule["destination"])
+
         print("processing : %s" % rule["destination"])
         if rule["destination"] not in gomod_dependencies:
             raise Exception("missing go.mod for %s" % rule["destination"])

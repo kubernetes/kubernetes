@@ -220,7 +220,7 @@ func getDiskID(pdName string, exec utilexec.Interface) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("Could not found disk number for disk %q", pdName)
+	return "", fmt.Errorf("could not found disk number for disk %q", pdName)
 }
 
 func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, _ *v1.Pod, timeout time.Duration) (string, error) {

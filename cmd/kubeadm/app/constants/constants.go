@@ -265,7 +265,7 @@ const (
 	MinExternalEtcdVersion = "3.2.18"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.4.9-1"
+	DefaultEtcdVersion = "3.4.13-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -349,6 +349,10 @@ const (
 
 	// ControlPlaneNumCPU is the number of CPUs required on control-plane
 	ControlPlaneNumCPU = 2
+
+	// ControlPlaneMem is the number of megabytes of memory required on the control-plane
+	// Below that amount of RAM running a stable control plane would be difficult.
+	ControlPlaneMem = 1700
 
 	// KubeadmCertsSecret specifies in what Secret in the kube-system namespace the certificates should be stored
 	KubeadmCertsSecret = "kubeadm-certs"
@@ -434,7 +438,7 @@ var (
 		17: "3.4.3-0",
 		18: "3.4.3-0",
 		19: "3.4.9-1",
-		20: "3.4.9-1",
+		20: "3.4.13-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
