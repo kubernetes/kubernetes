@@ -27,11 +27,13 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	"k8s.io/klog/v2"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/probe/exec"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
-	utilexec "k8s.io/utils/exec"
 )
 
 // ExecHandler knows how to execute a command in a running Docker container.
@@ -112,8 +114,9 @@ func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container 
 		return err
 	}
 
+	// if ExecProbeTimeout feature gate is disabled, preserve existing behavior to ignore exec timeouts
 	var execTimeout <-chan time.Time
-	if timeout > 0 {
+	if timeout > 0 && utilfeature.DefaultFeatureGate.Enabled(features.ExecProbeTimeout) {
 		execTimeout = time.After(timeout)
 	} else {
 		// skip exec timeout if provided timeout is 0
@@ -126,13 +129,7 @@ func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container 
 	for {
 		select {
 		case <-execTimeout:
-			// If exec timed out, return utilexec.CodeExitError with an exit status as expected
-			// from prober for failed probes.
-			// TODO: utilexec should have a TimedoutError type and we should return it here once available.
-			return utilexec.CodeExitError{
-				Err:  fmt.Errorf("command %q timed out", strings.Join(cmd, " ")),
-				Code: 1, // exit code here doesn't really matter, as long as it's not 0
-			}
+			return exec.NewTimeoutError(fmt.Errorf("command %q timed out", strings.Join(cmd, " ")), timeout)
 		// need to use "default" here instead of <-ticker.C, otherwise we delay the initial InspectExec by 2 seconds.
 		default:
 			inspect, inspectErr := client.InspectExec(execObj.ID)

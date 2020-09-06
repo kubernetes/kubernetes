@@ -17,6 +17,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/cri/remote",
     deps = [
         "//pkg/kubelet/cri/remote/util:go_default_library",
+        "//pkg/probe/exec:go_default_library",
         "//staging/src/k8s.io/component-base/logs/logreduction:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
