@@ -101,7 +101,7 @@ func (ssc *defaultStatefulSetControl) performUpdate(
 
 	// perform the main update function and get the status
 	status, err := ssc.updateStatefulSet(set, currentRevision, updateRevision, collisionCount, pods)
-	if err != nil {
+	if err != nil && status == nil {
 		return currentRevision, updateRevision, err
 	}
 
@@ -528,9 +528,11 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				set.Namespace,
 				set.Name,
 				replicas[target].Name)
-			err := ssc.podControl.DeleteStatefulPod(set, replicas[target])
+			if err := ssc.podControl.DeleteStatefulPod(set, replicas[target]); err != nil {
+				return &status, err
+			}
 			status.CurrentReplicas--
-			return &status, err
+			return &status, nil
 		}
 
 		// wait for unhealthy Pods on update
