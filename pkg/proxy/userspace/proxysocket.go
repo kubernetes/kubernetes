@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 )
 
-// Abstraction over TCP/UDP sockets which are proxied.
+// ProxySocket is an abstraction over TCP/UDP sockets which are proxied.
 type ProxySocket interface {
 	// Addr gets the net.Addr for a ProxySocket.
 	Addr() net.Addr
@@ -74,7 +74,7 @@ func newProxySocket(protocol v1.Protocol, ip net.IP, port int) (ProxySocket, err
 	return nil, fmt.Errorf("unknown protocol %q", protocol)
 }
 
-// How long we wait for a connection to a backend in seconds
+// EndpointDialTimeouts determines how long we wait for a connection to a backend in seconds
 var EndpointDialTimeouts = []time.Duration{250 * time.Millisecond, 500 * time.Millisecond, 1 * time.Second, 2 * time.Second}
 
 // tcpProxySocket implements ProxySocket.  Close() is implemented by net.Listener.  When Close() is called,
@@ -112,7 +112,7 @@ func TryConnectEndpoints(service proxy.ServicePortName, srcAddr net.Addr, protoc
 		}
 		return outConn, nil
 	}
-	return nil, fmt.Errorf("failed to connect to an endpoint.")
+	return nil, fmt.Errorf("failed to connect to an endpoint")
 }
 
 func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *ServiceInfo, loadBalancer LoadBalancer) {
@@ -191,7 +191,7 @@ func (udp *udpProxySocket) Addr() net.Addr {
 	return udp.LocalAddr()
 }
 
-// Holds all the known UDP clients that have not timed out.
+// ClientCache holds all the known UDP clients that have not timed out.
 type ClientCache struct {
 	Mu      sync.Mutex
 	Clients map[string]net.Conn // addr string -> connection

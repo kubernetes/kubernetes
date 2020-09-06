@@ -81,6 +81,7 @@ func (info *ServiceInfo) setStarted() {
 	atomic.StoreInt32(&info.isStartedAtomic, 1)
 }
 
+// IsStarted checks if the service has started accepting requests
 func (info *ServiceInfo) IsStarted() bool {
 	return atomic.LoadInt32(&info.isStartedAtomic) != 0
 }
@@ -89,6 +90,7 @@ func (info *ServiceInfo) setFinished() {
 	atomic.StoreInt32(&info.isFinishedAtomic, 1)
 }
 
+// IsFinished checks if the service has shut down
 func (info *ServiceInfo) IsFinished() bool {
 	return atomic.LoadInt32(&info.isFinishedAtomic) != 0
 }
@@ -101,6 +103,7 @@ func (info *ServiceInfo) setAlive(b bool) {
 	atomic.StoreInt32(&info.isAliveAtomic, i)
 }
 
+// IsAlive checks if the service is accepting requests
 func (info *ServiceInfo) IsAlive() bool {
 	return atomic.LoadInt32(&info.isAliveAtomic) != 0
 }

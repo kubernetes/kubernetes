@@ -31,6 +31,7 @@ var (
 	errPortRangeNoPortsRemaining = errors.New("port allocation failed; there are no remaining ports left to allocate in the accepted range")
 )
 
+// PortAllocator interface shall be implemented to define how the ports must be allocated
 type PortAllocator interface {
 	AllocateNext() (int, error)
 	Release(int)

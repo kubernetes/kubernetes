@@ -306,7 +306,6 @@ func (lb *LoadBalancerRR) resetService(svcPort proxy.ServicePortName) {
 	}
 }
 
-// OnEndpointsDelete is called when endpoints are deleted from the LoadBalancer
 func (lb *LoadBalancerRR) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	portsToEndpoints := util.BuildPortsToEndpointsMap(endpoints)
 
@@ -319,7 +318,6 @@ func (lb *LoadBalancerRR) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	}
 }
 
-// OnEndpointsSynced is called when endpoints are being synced
 func (lb *LoadBalancerRR) OnEndpointsSynced() {
 }
 
@@ -334,7 +332,6 @@ func slicesEquiv(lhs, rhs []string) bool {
 	return false
 }
 
-// CleanupStaleStickySessions refreshes the state and clears stale sessions
 func (lb *LoadBalancerRR) CleanupStaleStickySessions(svcPort proxy.ServicePortName) {
 	lb.lock.Lock()
 	defer lb.lock.Unlock()

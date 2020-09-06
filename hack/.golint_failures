@@ -111,7 +111,6 @@ pkg/kubelet/stats
 pkg/kubelet/sysctl
 pkg/kubelet/types
 pkg/kubemark
-pkg/proxy/userspace
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
 pkg/registry/admissionregistration/rest
