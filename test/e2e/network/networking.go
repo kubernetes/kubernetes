@@ -42,8 +42,6 @@ import (
 //
 // An empty nodeName will use the schedule to choose where the pod is executed.
 func checkConnectivityToHost(f *framework.Framework, nodeName, podName, host string, port, timeout int) error {
-	contName := fmt.Sprintf("%s-container", podName)
-
 	command := []string{
 		"nc",
 		"-vz",
@@ -52,22 +50,11 @@ func checkConnectivityToHost(f *framework.Framework, nodeName, podName, host str
 		strconv.Itoa(port),
 	}
 
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: podName,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    contName,
-					Image:   agnHostImage,
-					Command: command,
-				},
-			},
-			NodeName:      nodeName,
-			RestartPolicy: v1.RestartPolicyNever,
-		},
-	}
+	pod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, nil)
+	pod.Spec.Containers[0].Command = command
+	pod.Spec.NodeName = nodeName
+	pod.Spec.RestartPolicy = v1.RestartPolicyNever
+
 	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 	_, err := podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
@@ -76,7 +63,7 @@ func checkConnectivityToHost(f *framework.Framework, nodeName, podName, host str
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, podName, f.Namespace.Name)
 
 	if err != nil {
-		logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, contName)
+		logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		if logErr != nil {
 			framework.Logf("Warning: Failed to get logs from pod %q: %v", pod.Name, logErr)
 		} else {

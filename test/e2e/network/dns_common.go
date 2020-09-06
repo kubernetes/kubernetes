@@ -199,29 +199,9 @@ func (t *dnsTestCommon) deleteConfigMap() {
 func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
 	// Actual port # doesn't matter, just needs to exist.
 	const servicePort = 10101
-
-	t.utilPod = &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "Pod",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:    t.f.Namespace.Name,
-			Labels:       map[string]string{"app": baseName},
-			GenerateName: baseName + "-",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    "util",
-					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
-					Command: []string{"sleep", "10000"},
-					Ports: []v1.ContainerPort{
-						{ContainerPort: servicePort, Protocol: v1.ProtocolTCP},
-					},
-				},
-			},
-		},
-	}
+	podName := fmt.Sprintf("%s-%s", baseName, string(uuid.NewUUID()))
+	ports := []v1.ContainerPort{{ContainerPort: servicePort, Protocol: v1.ProtocolTCP}}
+	t.utilPod = e2epod.NewAgnhostPod(t.f.Namespace.Name, podName, nil, nil, ports)
 
 	var err error
 	t.utilPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(context.TODO(), t.utilPod, metav1.CreateOptions{})
@@ -280,46 +260,31 @@ func (t *dnsTestCommon) deleteCoreDNSPods() {
 }
 
 func generateCoreDNSServerPod(corednsConfig *v1.ConfigMap) *v1.Pod {
-	return &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "Pod",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "e2e-dns-configmap-dns-server-",
-		},
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					Name: "coredns-config",
-					VolumeSource: v1.VolumeSource{
-						ConfigMap: &v1.ConfigMapVolumeSource{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: corednsConfig.Name,
-							},
-						},
+	podName := fmt.Sprintf("e2e-configmap-dns-server-%s", string(uuid.NewUUID()))
+	volumes := []v1.Volume{
+		{
+			Name: "coredns-config",
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: corednsConfig.Name,
 					},
 				},
 			},
-			Containers: []v1.Container{
-				{
-					Name:  "dns",
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Command: []string{
-						"/coredns",
-						"-conf", "/etc/coredns/Corefile",
-					},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      "coredns-config",
-							MountPath: "/etc/coredns",
-							ReadOnly:  true,
-						},
-					},
-				},
-			},
-			DNSPolicy: "Default",
 		},
 	}
+	mounts := []v1.VolumeMount{
+		{
+			Name:      "coredns-config",
+			MountPath: "/etc/coredns",
+			ReadOnly:  true,
+		},
+	}
+
+	pod := e2epod.NewAgnhostPod("", podName, volumes, mounts, nil, "-conf", "/etc/coredns/Corefile")
+	pod.Spec.Containers[0].Command = []string{"/coredns"}
+	pod.Spec.DNSPolicy = "Default"
+	return pod
 }
 
 func generateCoreDNSConfigmap(namespaceName string, aRecords map[string]string) *v1.ConfigMap {
@@ -390,69 +355,37 @@ func (t *dnsTestCommon) deleteDNSServerPod() {
 }
 
 func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd, podHostName, serviceName string) *v1.Pod {
-	dnsPod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "dns-test-" + string(uuid.NewUUID()),
-			Namespace: namespace,
-		},
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					Name: "results",
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{},
-					},
-				},
-			},
-			Containers: []v1.Container{
-				// TODO: Consider scraping logs instead of running a webserver.
-				{
-					Name:  "webserver",
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"test-webserver"},
-					Ports: []v1.ContainerPort{
-						{
-							Name:          "http",
-							ContainerPort: 80,
-						},
-					},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      "results",
-							MountPath: "/results",
-						},
-					},
-				},
-				{
-					Name:    "querier",
-					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
-					Command: []string{"sh", "-c", wheezyProbeCmd},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      "results",
-							MountPath: "/results",
-						},
-					},
-				},
-				{
-					Name:    "jessie-querier",
-					Image:   imageutils.GetE2EImage(imageutils.JessieDnsutils),
-					Command: []string{"sh", "-c", jessieProbeCmd},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      "results",
-							MountPath: "/results",
-						},
-					},
-				},
+	podName := "dns-test-" + string(uuid.NewUUID())
+	volumes := []v1.Volume{
+		{
+			Name: "results",
+			VolumeSource: v1.VolumeSource{
+				EmptyDir: &v1.EmptyDirVolumeSource{},
 			},
 		},
 	}
+	mounts := []v1.VolumeMount{
+		{
+			Name:      "results",
+			MountPath: "/results",
+		},
+	}
 
+	// TODO: Consider scraping logs instead of running a webserver.
+	dnsPod := e2epod.NewAgnhostPod(namespace, podName, volumes, mounts, nil, "test-webserver")
+	dnsPod.Spec.Containers[0].Name = "webserver"
+
+	querier := e2epod.NewAgnhostContainer("querier", mounts, nil, wheezyProbeCmd)
+	querier.Command = []string{"sh", "-c"}
+
+	jessieQuerier := v1.Container{
+		Name:         "jessie-querier",
+		Image:        imageutils.GetE2EImage(imageutils.JessieDnsutils),
+		Command:      []string{"sh", "-c", jessieProbeCmd},
+		VolumeMounts: mounts,
+	}
+
+	dnsPod.Spec.Containers = append(dnsPod.Spec.Containers, querier, jessieQuerier)
 	dnsPod.Spec.Hostname = podHostName
 	dnsPod.Spec.Subdomain = serviceName
 
@@ -624,24 +557,4 @@ func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames 
 	assertFilesContain(fileNames, "results", pod, f.ClientSet, true, value)
 
 	framework.Logf("DNS probes using %s succeeded\n", pod.Name)
-}
-
-func generateDNSUtilsPod() *v1.Pod {
-	return &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "Pod",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "e2e-dns-utils-",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    "util",
-					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
-					Command: []string{"sleep", "10000"},
-				},
-			},
-		},
-	}
 }
