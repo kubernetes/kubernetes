@@ -394,7 +394,7 @@ func (h *HTTPExtender) Bind(binding *v1.Binding) error {
 		PodUID:       binding.UID,
 		Node:         binding.Target.Name,
 	}
-	if err := h.send(h.bindVerb, &req, &result); err != nil {
+	if err := h.send(h.bindVerb, req, &result); err != nil {
 		return err
 	}
 	if result.Error != "" {
