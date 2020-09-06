@@ -32,6 +32,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote/util"
+	"k8s.io/kubernetes/pkg/probe/exec"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -390,14 +391,9 @@ func (r *remoteRuntimeService) ExecSync(containerID string, cmd []string, timeou
 	if err != nil {
 		klog.Errorf("ExecSync %s '%s' from runtime service failed: %v", containerID, strings.Join(cmd, " "), err)
 
-		// If exec timed out, return utilexec.CodeExitError with an exit status as expected
-		// from prober for failed probes.
-		// TODO: utilexec should have a TimedoutError type and we should return it here once available.
+		// interpret DeadlineExceeded gRPC errors as timedout probes
 		if status.Code(err) == codes.DeadlineExceeded {
-			err = utilexec.CodeExitError{
-				Err:  fmt.Errorf("command %q timed out", strings.Join(cmd, " ")),
-				Code: 1, // exit code here doesn't really matter, as long as it's not 0
-			}
+			err = exec.NewTimeoutError(fmt.Errorf("command %q timed out", strings.Join(cmd, " ")), timeout)
 		}
 
 		return nil, nil, err
