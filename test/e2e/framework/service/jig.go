@@ -813,99 +813,6 @@ func (j *TestJig) waitForPodsReady(pods []string) error {
 	return nil
 }
 
-func testReachabilityOverServiceName(serviceName string, sp v1.ServicePort, execPod *v1.Pod) error {
-	return testEndpointReachability(serviceName, sp.Port, sp.Protocol, execPod)
-}
-
-func testReachabilityOverClusterIP(clusterIP string, sp v1.ServicePort, execPod *v1.Pod) error {
-	// If .spec.clusterIP is set to "" or "None" for service, ClusterIP is not created, so reachability can not be tested over clusterIP:servicePort
-	isClusterIPV46, err := regexp.MatchString(e2enetwork.RegexIPv4+"||"+e2enetwork.RegexIPv6, clusterIP)
-	if err != nil {
-		return fmt.Errorf("unable to parse ClusterIP: %s", clusterIP)
-	}
-	if isClusterIPV46 {
-		return testEndpointReachability(clusterIP, sp.Port, sp.Protocol, execPod)
-	}
-	return nil
-}
-
-func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod, clusterIP string) error {
-	internalAddrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
-	externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
-	isClusterIPV4 := net.ParseIP(clusterIP).To4() != nil
-
-	for _, internalAddr := range internalAddrs {
-		// If the node's internal address points to localhost, then we are not
-		// able to test the service reachability via that address
-		if isInvalidOrLocalhostAddress(internalAddr) {
-			framework.Logf("skipping testEndpointReachability() for internal adddress %s", internalAddr)
-			continue
-		}
-		isNodeInternalIPV4 := net.ParseIP(internalAddr).To4() != nil
-		// Check service reachability on the node internalIP which is same family
-		// as clusterIP
-		if isClusterIPV4 != isNodeInternalIPV4 {
-			framework.Logf("skipping testEndpointReachability() for internal adddress %s as it does not match clusterIP (%s) family", internalAddr, clusterIP)
-			continue
-		}
-
-		err := testEndpointReachability(internalAddr, sp.NodePort, sp.Protocol, pod)
-		if err != nil {
-			return err
-		}
-	}
-	for _, externalAddr := range externalAddrs {
-		isNodeExternalIPV4 := net.ParseIP(externalAddr).To4() != nil
-		if isClusterIPV4 != isNodeExternalIPV4 {
-			framework.Logf("skipping testEndpointReachability() for external adddress %s as it does not match clusterIP (%s) family", externalAddr, clusterIP)
-			continue
-		}
-		err := testEndpointReachability(externalAddr, sp.NodePort, sp.Protocol, pod)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// isInvalidOrLocalhostAddress returns `true` if the provided `ip` is either not
-// parsable or the loopback address. Otherwise it will return `false`.
-func isInvalidOrLocalhostAddress(ip string) bool {
-	parsedIP := net.ParseIP(ip)
-	if parsedIP == nil || parsedIP.IsLoopback() {
-		return true
-	}
-	return false
-}
-
-// testEndpointReachability tests reachability to endpoints (i.e. IP, ServiceName) and ports. Test request is initiated from specified execPod.
-// TCP and UDP protocol based service are supported at this moment
-// TODO: add support to test SCTP Protocol based services.
-func testEndpointReachability(endpoint string, port int32, protocol v1.Protocol, execPod *v1.Pod) error {
-	ep := net.JoinHostPort(endpoint, strconv.Itoa(int(port)))
-	cmd := ""
-	switch protocol {
-	case v1.ProtocolTCP:
-		cmd = fmt.Sprintf("nc -zv -t -w 2 %s %v", endpoint, port)
-	case v1.ProtocolUDP:
-		cmd = fmt.Sprintf("nc -zv -u -w 2 %s %v", endpoint, port)
-	default:
-		return fmt.Errorf("service reachablity check is not supported for %v", protocol)
-	}
-
-	err := wait.PollImmediate(1*time.Second, ServiceReachabilityShortPollTimeout, func() (bool, error) {
-		if _, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd); err != nil {
-			framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		return fmt.Errorf("service is not reachable within %v timeout on endpoint %s over %s protocol", ServiceReachabilityShortPollTimeout, ep, protocol)
-	}
-	return nil
-}
-
 // checkClusterIPServiceReachability ensures that service of type ClusterIP is reachable over
 // - ServiceName:ServicePort, ClusterIP:ServicePort
 func (j *TestJig) checkClusterIPServiceReachability(svc *v1.Service, pod *v1.Pod) error {
@@ -918,11 +825,11 @@ func (j *TestJig) checkClusterIPServiceReachability(svc *v1.Service, pod *v1.Pod
 	}
 
 	for _, servicePort := range servicePorts {
-		err = testReachabilityOverServiceName(svc.Name, servicePort, pod)
+		err = j.testReachabilityOverServiceName(svc.Name, servicePort, pod)
 		if err != nil {
 			return err
 		}
-		err = testReachabilityOverClusterIP(clusterIP, servicePort, pod)
+		err = j.testReachabilityOverClusterIP(clusterIP, servicePort, pod)
 		if err != nil {
 			return err
 		}
@@ -951,15 +858,15 @@ func (j *TestJig) checkNodePortServiceReachability(svc *v1.Service, pod *v1.Pod)
 	}
 
 	for _, servicePort := range servicePorts {
-		err = testReachabilityOverServiceName(svc.Name, servicePort, pod)
+		err = j.testReachabilityOverServiceName(svc.Name, servicePort, pod)
 		if err != nil {
 			return err
 		}
-		err = testReachabilityOverClusterIP(clusterIP, servicePort, pod)
+		err = j.testReachabilityOverClusterIP(clusterIP, servicePort, pod)
 		if err != nil {
 			return err
 		}
-		err = testReachabilityOverNodePorts(nodes, servicePort, pod, clusterIP)
+		err = j.testReachabilityOverNodePorts(nodes, servicePort, pod, clusterIP)
 		if err != nil {
 			return err
 		}
@@ -1050,4 +957,122 @@ func (j *TestJig) CreateSCTPServiceWithPort(tweak func(svc *v1.Service), port in
 		return nil, fmt.Errorf("failed to create SCTP Service %q: %v", svc.Name, err)
 	}
 	return j.sanityCheckService(result, svc.Spec.Type)
+}
+
+// The following test functions build on top of the 'jig', but are still methods of it because so that
+// they can reuse some of the fixtures (i.e. the client).
+
+func (j *TestJig) testReachabilityOverServiceName(serviceName string, sp v1.ServicePort, execPod *v1.Pod) error {
+	return j.testEndpointReachability(serviceName, sp.Port, sp.Protocol, execPod)
+}
+
+func (j *TestJig) testReachabilityOverClusterIP(clusterIP string, sp v1.ServicePort, execPod *v1.Pod) error {
+	// If .spec.clusterIP is set to "" or "None" for service, ClusterIP is not created, so reachability can not be tested over clusterIP:servicePort
+	isClusterIPV46, err := regexp.MatchString(e2enetwork.RegexIPv4+"||"+e2enetwork.RegexIPv6, clusterIP)
+	if err != nil {
+		return fmt.Errorf("unable to parse ClusterIP: %s", clusterIP)
+	}
+	if isClusterIPV46 {
+		return j.testEndpointReachability(clusterIP, sp.Port, sp.Protocol, execPod)
+	}
+	return nil
+}
+
+func (j *TestJig) testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod, clusterIP string) error {
+	internalAddrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
+	externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
+	isClusterIPV4 := net.ParseIP(clusterIP).To4() != nil
+
+	for _, internalAddr := range internalAddrs {
+		// If the node's internal address points to localhost, then we are not
+		// able to test the service reachability via that address
+		if isInvalidOrLocalhostAddress(internalAddr) {
+			framework.Logf("skipping testEndpointReachability() for internal adddress %s", internalAddr)
+			continue
+		}
+		isNodeInternalIPV4 := net.ParseIP(internalAddr).To4() != nil
+		// Check service reachability on the node internalIP which is same family
+		// as clusterIP
+		if isClusterIPV4 != isNodeInternalIPV4 {
+			framework.Logf("skipping testEndpointReachability() for internal adddress %s as it does not match clusterIP (%s) family", internalAddr, clusterIP)
+			continue
+		}
+
+		err := j.testEndpointReachability(internalAddr, sp.NodePort, sp.Protocol, pod)
+		if err != nil {
+			return err
+		}
+	}
+	for _, externalAddr := range externalAddrs {
+		isNodeExternalIPV4 := net.ParseIP(externalAddr).To4() != nil
+		if isClusterIPV4 != isNodeExternalIPV4 {
+			framework.Logf("skipping testEndpointReachability() for external adddress %s as it does not match clusterIP (%s) family", externalAddr, clusterIP)
+			continue
+		}
+		err := j.testEndpointReachability(externalAddr, sp.NodePort, sp.Protocol, pod)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// isInvalidOrLocalhostAddress returns `true` if the provided `ip` is either not
+// parsable or the loopback address. Otherwise it will return `false`.
+func isInvalidOrLocalhostAddress(ip string) bool {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil || parsedIP.IsLoopback() {
+		return true
+	}
+	return false
+}
+
+// testEndpointReachability tests reachability to endpoints (i.e. IP, ServiceName) and ports.  Note that the execPod
+// must have nc installed.
+func (j *TestJig) testEndpointReachability(endpoint string, port int32, protocol v1.Protocol, execPod *v1.Pod) error {
+	// 1) Wait for the pod to come up before we test endpoints
+	e2epod.WaitForPodCondition(j.Client, execPod.ObjectMeta.Namespace, execPod.ObjectMeta.Name, "", ServiceReachabilityShortPollTimeout,
+		func(pod *v1.Pod) (bool, error) {
+			framework.Logf("Waiting for pod %v to be running, current state %v", execPod.ObjectMeta.Name, pod.Status.Phase)
+			return pod.Status.Phase == v1.PodRunning, nil
+		})
+
+	// 2) make sure the exec pod is valid before attempting to poll nc, otherwise when misusing this function
+	// alot of spam can get created.
+	err := wait.PollImmediate(1*time.Second, ServiceReachabilityShortPollTimeout, func() (bool, error) {
+		if _, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, "which nc"); err != nil {
+			framework.Logf("verifying execPod can run 'nc': %v", err)
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("nc must be installed on the target pod for testEndpointReachability to work properly")
+	}
+
+	// 3) Finally take care of the polling
+	ep := net.JoinHostPort(endpoint, strconv.Itoa(int(port)))
+	cmd := ""
+	switch protocol {
+	case v1.ProtocolTCP:
+		cmd = fmt.Sprintf("nc -zv -t -w 2 %s %v", endpoint, port)
+	case v1.ProtocolUDP:
+		cmd = fmt.Sprintf("nc -zv -u -w 2 %s %v", endpoint, port)
+	case v1.ProtocolSCTP:
+		cmd = fmt.Sprintf("nc -zv --sctp -w 2 %s %v", endpoint, port)
+	default:
+		return fmt.Errorf("service reachablity check is not supported for %v", protocol)
+	}
+
+	err = wait.PollImmediate(1*time.Second, ServiceReachabilityShortPollTimeout, func() (bool, error) {
+		if _, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd); err != nil {
+			framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("service is not reachable within %v timeout on endpoint %s over %s protocol", ServiceReachabilityShortPollTimeout, ep, protocol)
+	}
+	return nil
 }
