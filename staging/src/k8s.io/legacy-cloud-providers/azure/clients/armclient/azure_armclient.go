@@ -110,6 +110,11 @@ func (c *Client) sendRequest(ctx context.Context, request *http.Request) (*http.
 		request,
 		retry.DoExponentialBackoffRetry(&sendBackoff),
 	)
+
+	if response == nil && err == nil {
+		return response, retry.NewError(false, fmt.Errorf("Empty response and no HTTP code"))
+	}
+
 	return response, retry.GetError(response, err)
 }
 
