@@ -347,7 +347,7 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 }
 
 // Creates a volume with accessMode ReadWriteMany
-// Populates desiredStateOfWorld cache with two ode/volume/pod tuples pointing to the created volume
+// Populates desiredStateOfWorld cache with two node/volume/pod tuples pointing to the created volume
 // Calls Run()
 // Verifies there are two attach calls and no detach calls.
 // Deletes the first node/volume/pod tuple from desiredStateOfWorld cache without first marking the node/volume as unmounted.
@@ -536,7 +536,7 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 // Creates a volume with accessMode ReadWriteOnce
 // First create a pod which will try to attach the volume to the a node named "uncertain-node". The attach call for this node will
 // fail for timeout, but the volume will be actually attached to the node after the call.
-// Secondly, delete the this pod.
+// Secondly, delete this pod.
 // Lastly, create a pod scheduled to a normal node which will trigger attach volume to the node. The attach should return successfully.
 func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing.T) {
 	// Arrange
