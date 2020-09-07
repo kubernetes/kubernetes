@@ -98,7 +98,8 @@ type ActualStateOfWorld interface {
 
 	// IsVolumeAttachedToNode returns true if the specified volume/node combo exists
 	// in the underlying store indicating the specified volume is attached to
-	// the specified node.
+	// the specified node, and false if either the combo does not exist, or the
+	// attached state is marked as uncertain.
 	IsVolumeAttachedToNode(volumeName v1.UniqueVolumeName, nodeName types.NodeName) bool
 
 	// GetAttachedVolumes generates and returns a list of volumes/node pairs
