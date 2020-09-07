@@ -120,6 +120,7 @@ var _ = SIGDescribe("Conntrack", func() {
 		// TODO(#91236): Remove once the test is debugged and fixed.
 		// dump conntrack table for debugging
 		defer dumpConntrack(cs)
+		defer dumpIptables(cs)
 
 		// Create a NodePort service
 		udpJig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -139,23 +140,33 @@ var _ = SIGDescribe("Conntrack", func() {
 		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, serverNodeInfo.nodeIP, udpService.Spec.Ports[0].NodePort)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
-		fr.PodClient().CreateSync(clientPod)
+		pod := fr.PodClient().CreateSync(clientPod)
 
 		// Read the client pod logs
 		logs, err := e2epod.GetPodLogs(cs, ns, podClient, podClient)
 		framework.ExpectNoError(err)
 		framework.Logf("Pod client logs: %s", logs)
 
+		framework.Logf("Pod client connection %s:%d --> %s:%d", pod.Status.PodIP, srcPort, serverNodeInfo.nodeIP, udpService.Spec.Ports[0].NodePort)
+		// TODO(#91236): Remove once the test is debugged and fixed.
+		// dump conntrack table for debugging
+		dumpConntrack(cs)
+
 		// Add a backend pod to the service in the other node
 		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
 		serverPod1 := newAgnhostPod(podBackend1, "netexec", fmt.Sprintf("--udp-port=%d", 80))
 		serverPod1.Labels = udpJig.Labels
 		serverPod1.Spec.NodeName = serverNodeInfo.name
-		fr.PodClient().CreateSync(serverPod1)
+		pod1 := fr.PodClient().CreateSync(serverPod1)
 
 		// Waiting for service to expose endpoint.
 		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+
+		framework.Logf("Pod client connection to backend1 after NAT %s:%d --> %s:80", pod.Status.PodIP, srcPort, pod1.Status.PodIP)
+		// TODO(#91236): Remove once the test is debugged and fixed.
+		// dump conntrack table for debugging
+		dumpConntrack(cs)
 
 		// Note that the fact that Endpoints object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
@@ -175,7 +186,7 @@ var _ = SIGDescribe("Conntrack", func() {
 		serverPod2 := newAgnhostPod(podBackend2, "netexec", fmt.Sprintf("--udp-port=%d", 80))
 		serverPod2.Labels = udpJig.Labels
 		serverPod2.Spec.NodeName = serverNodeInfo.name
-		fr.PodClient().CreateSync(serverPod2)
+		pod2 := fr.PodClient().CreateSync(serverPod2)
 
 		// and delete the first pod
 		framework.Logf("Cleaning up %s pod", podBackend1)
@@ -184,6 +195,11 @@ var _ = SIGDescribe("Conntrack", func() {
 		// Waiting for service to expose endpoint.
 		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{podBackend2: {80}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+
+		framework.Logf("Pod client connection to backend2 after NAT %s:%d --> %s:80", pod.Status.PodIP, srcPort, pod2.Status.PodIP)
+		// TODO(#91236): Remove once the test is debugged and fixed.
+		// dump conntrack table for debugging
+		dumpConntrack(cs)
 
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
@@ -200,6 +216,7 @@ var _ = SIGDescribe("Conntrack", func() {
 		// TODO(#91236): Remove once the test is debugged and fixed.
 		// dump conntrack table for debugging
 		defer dumpConntrack(cs)
+		defer dumpIptables(cs)
 
 		// Create a ClusterIP service
 		udpJig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -219,23 +236,31 @@ var _ = SIGDescribe("Conntrack", func() {
 		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 		clientPod.Spec.Containers[0].Name = podClient
-		fr.PodClient().CreateSync(clientPod)
-
+		pod := fr.PodClient().CreateSync(clientPod)
 		// Read the client pod logs
 		logs, err := e2epod.GetPodLogs(cs, ns, podClient, podClient)
 		framework.ExpectNoError(err)
 		framework.Logf("Pod client logs: %s", logs)
+
+		framework.Logf("Pod client connection %s:%d --> %s:%d", pod.Status.PodIP, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
+		// TODO(#91236): Remove once the test is debugged and fixed.
+		// dump conntrack table for debugging
+		dumpConntrack(cs)
 
 		// Add a backend pod to the service in the other node
 		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
 		serverPod1 := newAgnhostPod(podBackend1, "netexec", fmt.Sprintf("--udp-port=%d", 80))
 		serverPod1.Labels = udpJig.Labels
 		serverPod1.Spec.NodeName = serverNodeInfo.name
-		fr.PodClient().CreateSync(serverPod1)
-
+		pod1 := fr.PodClient().CreateSync(serverPod1)
 		// Waiting for service to expose endpoint.
 		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+
+		framework.Logf("Pod client connection to backend1 after NAT %s:%d --> %s:80", pod.Status.PodIP, srcPort, pod1.Status.PodIP)
+		// TODO(#91236): Remove once the test is debugged and fixed.
+		// dump conntrack table for debugging
+		dumpConntrack(cs)
 
 		// Note that the fact that Endpoints object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
@@ -255,7 +280,7 @@ var _ = SIGDescribe("Conntrack", func() {
 		serverPod2 := newAgnhostPod(podBackend2, "netexec", fmt.Sprintf("--udp-port=%d", 80))
 		serverPod2.Labels = udpJig.Labels
 		serverPod2.Spec.NodeName = serverNodeInfo.name
-		fr.PodClient().CreateSync(serverPod2)
+		pod2 := fr.PodClient().CreateSync(serverPod2)
 
 		// and delete the first pod
 		framework.Logf("Cleaning up %s pod", podBackend1)
@@ -264,6 +289,11 @@ var _ = SIGDescribe("Conntrack", func() {
 		// Waiting for service to expose endpoint.
 		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{podBackend2: {80}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+
+		framework.Logf("Pod client connection to backend2 after NAT %s:%d --> %s:80", pod.Status.PodIP, srcPort, pod2.Status.PodIP)
+		// TODO(#91236): Remove once the test is debugged and fixed.
+		// dump conntrack table for debugging
+		dumpConntrack(cs)
 
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
@@ -285,7 +315,8 @@ func dumpConntrack(cs clientset.Interface) {
 		framework.Logf("failed to list kube-proxy pods in namespace: %s", namespace)
 		return
 	}
-	cmd := "conntrack -L"
+	// don't print DNS related entries
+	cmd := `conntrack -L -p udp | grep -v dport=53`
 	for _, pod := range pods.Items {
 		if strings.Contains(pod.Name, "kube-proxy") {
 			stdout, err := framework.RunHostCmd(namespace, pod.Name, cmd)
@@ -294,6 +325,28 @@ func dumpConntrack(cs clientset.Interface) {
 				continue
 			}
 			framework.Logf("conntrack table of node %s: %s", pod.Spec.NodeName, stdout)
+		}
+	}
+}
+
+func dumpIptables(cs clientset.Interface) {
+	// Dump iptabes rules of each node for troubleshooting using the kube-proxy pods
+	namespace := "kube-system"
+	pods, err := cs.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil || len(pods.Items) == 0 {
+		framework.Logf("failed to list kube-proxy pods in namespace: %s", namespace)
+		return
+	}
+
+	cmd := "iptables-save"
+	for _, pod := range pods.Items {
+		if strings.Contains(pod.Name, "kube-proxy") {
+			stdout, err := framework.RunHostCmd(namespace, pod.Name, cmd)
+			if err != nil {
+				framework.Logf("Failed to dump iptables rules of node %s: %v", pod.Spec.NodeName, err)
+				continue
+			}
+			framework.Logf("iptables rules of node %s: %s", pod.Spec.NodeName, stdout)
 		}
 	}
 }
