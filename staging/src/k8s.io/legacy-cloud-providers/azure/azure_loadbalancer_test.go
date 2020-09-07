@@ -1058,9 +1058,10 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 			wantLb:  false,
 		},
 		{
-			desc:    "reconcileLoadBalancerRule shall return corresponding probe and lbRule(blb)",
-			service: getTestService("test1", v1.ProtocolTCP, map[string]string{"service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset": "true"}, false, 80),
-			wantLb:  true,
+			desc:            "reconcileLoadBalancerRule shall return corresponding probe and lbRule(blb)",
+			service:         getTestService("test1", v1.ProtocolTCP, map[string]string{"service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset": "true"}, false, 80),
+			loadBalancerSku: "basic",
+			wantLb:          true,
 			expectedProbes: []network.Probe{
 				{
 					Name: to.StringPtr("atest1-TCP-80"),
@@ -1135,7 +1136,7 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 							ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/" +
 								"Microsoft.Network/loadBalancers/lbname/probes/atest1-TCP-80"),
 						},
-						EnableTCPReset: to.BoolPtr(false),
+						EnableTCPReset: to.BoolPtr(true),
 					},
 				},
 			},
@@ -1361,7 +1362,7 @@ func TestReconcileLoadBalancer(t *testing.T) {
 
 	expectedSLb := getTestLoadBalancer(to.StringPtr("testCluster"), to.StringPtr("rg"), to.StringPtr("testCluster"), to.StringPtr("aservice1"), service4, "Standard")
 	(*expectedSLb.LoadBalancerPropertiesFormat.LoadBalancingRules)[0].DisableOutboundSnat = to.BoolPtr(true)
-	(*expectedSLb.LoadBalancerPropertiesFormat.LoadBalancingRules)[0].EnableTCPReset = to.BoolPtr(false)
+	(*expectedSLb.LoadBalancerPropertiesFormat.LoadBalancingRules)[0].EnableTCPReset = to.BoolPtr(true)
 	expectedSLb.FrontendIPConfigurations = &[]network.FrontendIPConfiguration{
 		{
 			Name: to.StringPtr("aservice1"),
@@ -1410,7 +1411,7 @@ func TestReconcileLoadBalancer(t *testing.T) {
 		},
 	}
 
-	//change to false to test that reconciliation will fix it
+	//change to false to test that reconciliation will fix it (despite the fact that disable-tcp-reset was removed in 1.20)
 	(*slb5.LoadBalancerPropertiesFormat.LoadBalancingRules)[0].EnableTCPReset = to.BoolPtr(false)
 
 	expectedSLb5 := getTestLoadBalancer(to.StringPtr("testCluster"), to.StringPtr("rg"), to.StringPtr("testCluster"), to.StringPtr("aservice1"), service5, "Standard")
@@ -1561,7 +1562,7 @@ func TestReconcileLoadBalancer(t *testing.T) {
 			expectedError:   nil,
 		},
 		{
-			desc:                "reconcileLoadBalancer shall remove and reconstruct the correspoind field of lb and set enableTcpReset to false in lbRule",
+			desc:                "reconcileLoadBalancer shall remove and reconstruct the correspoind field of lb and set enableTcpReset to true in lbRule",
 			loadBalancerSku:     "standard",
 			service:             service4,
 			disableOutboundSnat: to.BoolPtr(true),
@@ -1571,7 +1572,7 @@ func TestReconcileLoadBalancer(t *testing.T) {
 			expectedError:       nil,
 		},
 		{
-			desc:                "reconcileLoadBalancer shall remove and reconstruct the correspoind field of lb and set enableTcpReset to true in lbRule",
+			desc:                "reconcileLoadBalancer shall remove and reconstruct the correspoind field of lb and set enableTcpReset (false => true) in lbRule",
 			loadBalancerSku:     "standard",
 			service:             service5,
 			disableOutboundSnat: to.BoolPtr(true),

@@ -1025,10 +1025,8 @@ func (az *Cloud) reconcileLoadBalancerRule(
 	var enableTCPReset *bool
 	if az.useStandardLoadBalancer() {
 		enableTCPReset = to.BoolPtr(true)
-		if v, ok := service.Annotations[ServiceAnnotationLoadBalancerDisableTCPReset]; ok {
-			klog.Warning("annotation service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset has been depracated, it would be removed in a future release")
-			klog.V(2).Infof("reconcileLoadBalancerRule lb name (%s) flag(%s) is set to %s", lbName, ServiceAnnotationLoadBalancerDisableTCPReset, v)
-			enableTCPReset = to.BoolPtr(!strings.EqualFold(v, "true"))
+		if _, ok := service.Annotations[ServiceAnnotationLoadBalancerDisableTCPReset]; ok {
+			klog.Warning("annotation service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset has been removed as of Kubernetes 1.20. TCP Resets are always enabled on Standard SKU load balancers.")
 		}
 	}
 
