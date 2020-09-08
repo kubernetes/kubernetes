@@ -46,11 +46,6 @@ func (pl *InterPodAffinity) Name() string {
 	return Name
 }
 
-// BuildArgs returns the args that were used to build the plugin.
-func (pl *InterPodAffinity) BuildArgs() interface{} {
-	return pl.args
-}
-
 // New initializes a new plugin and returns it.
 func New(plArgs runtime.Object, h framework.FrameworkHandle) (framework.Plugin, error) {
 	if h.SnapshotSharedLister() == nil {
