@@ -437,6 +437,7 @@ function install-kube-manifests {
 
 # Installs hurl to ${KUBE_HOME}/bin/hurl if not already installed.
 function install-hurl {
+  cd "${KUBE_HOME}"
   if [[ -f "${KUBE_HOME}/bin/hurl" ]]; then
     echo "install-hurl: hurl already installed"
     return
