@@ -93,8 +93,6 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 #
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
-  local arch=$1
-  local debian_base_version=v2.1.3
   local debian_iptables_version=v12.1.2
   local go_runner_version=buster-v2.0.0
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
@@ -103,7 +101,7 @@ kube::build::get_docker_wrapped_binaries() {
     "kube-apiserver,${KUBE_BASE_IMAGE_REGISTRY}/go-runner:${go_runner_version}"
     "kube-controller-manager,${KUBE_BASE_IMAGE_REGISTRY}/go-runner:${go_runner_version}"
     "kube-scheduler,${KUBE_BASE_IMAGE_REGISTRY}/go-runner:${go_runner_version}"
-    "kube-proxy,${KUBE_BASE_IMAGE_REGISTRY}/debian-iptables-${arch}:${debian_iptables_version}"
+    "kube-proxy,${KUBE_BASE_IMAGE_REGISTRY}/debian-iptables:${debian_iptables_version}"
   )
 
   echo "${targets[@]}"
