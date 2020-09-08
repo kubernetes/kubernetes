@@ -65,6 +65,11 @@ type Helper struct {
 	// won't drain otherwise
 	SkipWaitForDeleteTimeoutSeconds int
 
+	// AdditionalFilters are applied sequentially after base drain filters to
+	// exclude pods using custom logic.  Any filter that returns PodDeleteStatus
+	// with Delete == false will immediately stop execution of further filters.
+	AdditionalFilters []PodFilter
+
 	Out    io.Writer
 	ErrOut io.Writer
 
@@ -172,7 +177,7 @@ func (d *Helper) EvictPod(pod corev1.Pod, policyGroupVersion string) error {
 // or error if it cannot list pods. All pods that are ready to be deleted can be obtained with .Pods(),
 // and string with all warning can be obtained with .Warnings(), and .Errors() for all errors that
 // occurred during deletion.
-func (d *Helper) GetPodsForDeletion(nodeName string) (*podDeleteList, []error) {
+func (d *Helper) GetPodsForDeletion(nodeName string) (*PodDeleteList, []error) {
 	labelSelector, err := labels.Parse(d.PodSelector)
 	if err != nil {
 		return nil, []error{err}
@@ -185,35 +190,37 @@ func (d *Helper) GetPodsForDeletion(nodeName string) (*podDeleteList, []error) {
 		return nil, []error{err}
 	}
 
-	pods := []podDelete{}
+	list := filterPods(podList, d.makeFilters())
+	if errs := list.errors(); len(errs) > 0 {
+		return list, errs
+	}
 
+	return list, nil
+}
+
+func filterPods(podList *corev1.PodList, filters []PodFilter) *PodDeleteList {
+	pods := []PodDelete{}
 	for _, pod := range podList.Items {
-		var status podDeleteStatus
-		for _, filter := range d.makeFilters() {
+		var status PodDeleteStatus
+		for _, filter := range filters {
 			status = filter(pod)
-			if !status.delete {
+			if !status.Delete {
 				// short-circuit as soon as pod is filtered out
 				// at that point, there is no reason to run pod
 				// through any additional filters
 				break
 			}
 		}
-		// Add the pod to podDeleteList no matter what podDeleteStatus is,
-		// those pods whose podDeleteStatus is false like DaemonSet will
+		// Add the pod to PodDeleteList no matter what PodDeleteStatus is,
+		// those pods whose PodDeleteStatus is false like DaemonSet will
 		// be catched by list.errors()
-		pods = append(pods, podDelete{
-			pod:    pod,
-			status: status,
+		pods = append(pods, PodDelete{
+			Pod:    pod,
+			Status: status,
 		})
 	}
-
-	list := &podDeleteList{items: pods}
-
-	if errs := list.errors(); len(errs) > 0 {
-		return list, errs
-	}
-
-	return list, nil
+	list := &PodDeleteList{items: pods}
+	return list
 }
 
 // DeleteOrEvictPods deletes or evicts the pods on the api server
