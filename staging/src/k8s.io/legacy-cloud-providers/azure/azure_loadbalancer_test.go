@@ -23,8 +23,10 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -515,8 +517,8 @@ func TestServiceOwnsPublicIP(t *testing.T) {
 	}
 
 	for i, c := range tests {
-		owns := serviceOwnsPublicIP(c.pip, c.clusterName, c.serviceName)
-		assert.Equal(t, owns, c.expected, "TestCase[%d]: %s", i, c.desc)
+		actual := serviceOwnsPublicIP(c.pip, c.clusterName, c.serviceName)
+		assert.Equal(t, c.expected, actual, "TestCase[%d]: %s", i, c.desc)
 	}
 }
 
@@ -551,6 +553,478 @@ func TestGetPublicIPAddressResourceGroup(t *testing.T) {
 			real := az.getPublicIPAddressResourceGroup(s)
 			assert.Equal(t, c.expected, real, "TestCase[%d]: %s", i, c.desc)
 		})
+	}
+}
+
+func TestShouldReleaseExistingOwnedPublicIP(t *testing.T) {
+	existingPipWithTag := network.PublicIPAddress{
+		ID:   to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses/testPIP"),
+		Name: to.StringPtr("testPIP"),
+		Tags: map[string]*string{"service": to.StringPtr("default/test1")},
+		PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+			PublicIPAddressVersion:   network.IPv4,
+			PublicIPAllocationMethod: network.Static,
+			IPTags: &[]network.IPTag{
+				{
+					IPTagType: to.StringPtr("tag1"),
+					Tag:       to.StringPtr("tag1value"),
+				},
+			},
+		},
+	}
+
+	existingPipWithNoPublicIPAddressFormatProperties := network.PublicIPAddress{
+		ID:                              to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses/testPIP"),
+		Name:                            to.StringPtr("testPIP"),
+		Tags:                            map[string]*string{"service": to.StringPtr("default/test1")},
+		PublicIPAddressPropertiesFormat: nil,
+	}
+
+	tests := []struct {
+		desc                  string
+		existingPip           network.PublicIPAddress
+		lbShouldExist         bool
+		lbIsInternal          bool
+		desiredPipName        string
+		ipTagRequest          serviceIPTagRequest
+		expectedShouldRelease bool
+	}{
+		{
+			desc:           "Everything matches, no release",
+			existingPip:    existingPipWithTag,
+			lbShouldExist:  true,
+			lbIsInternal:   false,
+			desiredPipName: *existingPipWithTag.Name,
+			ipTagRequest: serviceIPTagRequest{
+				IPTagsRequestedByAnnotation: true,
+				IPTags:                      existingPipWithTag.PublicIPAddressPropertiesFormat.IPTags,
+			},
+			expectedShouldRelease: false,
+		},
+		{
+			desc:           "nil tags (none-specified by annotation, some are present on object), no release",
+			existingPip:    existingPipWithTag,
+			lbShouldExist:  true,
+			lbIsInternal:   false,
+			desiredPipName: *existingPipWithTag.Name,
+			ipTagRequest: serviceIPTagRequest{
+				IPTagsRequestedByAnnotation: false,
+				IPTags:                      nil,
+			},
+			expectedShouldRelease: false,
+		},
+		{
+			desc:           "existing public ip with no format properties (unit test only?), tags required by annotation, no release",
+			existingPip:    existingPipWithNoPublicIPAddressFormatProperties,
+			lbShouldExist:  true,
+			lbIsInternal:   false,
+			desiredPipName: *existingPipWithTag.Name,
+			ipTagRequest: serviceIPTagRequest{
+				IPTagsRequestedByAnnotation: true,
+				IPTags:                      existingPipWithTag.PublicIPAddressPropertiesFormat.IPTags,
+			},
+			expectedShouldRelease: true,
+		},
+		{
+			desc:           "LB no longer desired, expect release",
+			existingPip:    existingPipWithTag,
+			lbShouldExist:  false,
+			lbIsInternal:   false,
+			desiredPipName: *existingPipWithTag.Name,
+			ipTagRequest: serviceIPTagRequest{
+				IPTagsRequestedByAnnotation: true,
+				IPTags:                      existingPipWithTag.PublicIPAddressPropertiesFormat.IPTags,
+			},
+			expectedShouldRelease: true,
+		},
+		{
+			desc:           "LB now internal, expect release",
+			existingPip:    existingPipWithTag,
+			lbShouldExist:  true,
+			lbIsInternal:   true,
+			desiredPipName: *existingPipWithTag.Name,
+			ipTagRequest: serviceIPTagRequest{
+				IPTagsRequestedByAnnotation: true,
+				IPTags:                      existingPipWithTag.PublicIPAddressPropertiesFormat.IPTags,
+			},
+			expectedShouldRelease: true,
+		},
+		{
+			desc:           "Alternate desired name, expect release",
+			existingPip:    existingPipWithTag,
+			lbShouldExist:  true,
+			lbIsInternal:   false,
+			desiredPipName: "otherName",
+			ipTagRequest: serviceIPTagRequest{
+				IPTagsRequestedByAnnotation: true,
+				IPTags:                      existingPipWithTag.PublicIPAddressPropertiesFormat.IPTags,
+			},
+			expectedShouldRelease: true,
+		},
+		{
+			desc:           "mismatching, expect release",
+			existingPip:    existingPipWithTag,
+			lbShouldExist:  true,
+			lbIsInternal:   false,
+			desiredPipName: *existingPipWithTag.Name,
+			ipTagRequest: serviceIPTagRequest{
+				IPTagsRequestedByAnnotation: true,
+				IPTags: &[]network.IPTag{
+					{
+						IPTagType: to.StringPtr("tag2"),
+						Tag:       to.StringPtr("tag2value"),
+					},
+				},
+			},
+			expectedShouldRelease: true,
+		},
+	}
+
+	for i, c := range tests {
+
+		actualShouldRelease := shouldReleaseExistingOwnedPublicIP(&c.existingPip, c.lbShouldExist, c.lbIsInternal, c.desiredPipName, c.ipTagRequest)
+		assert.Equal(t, c.expectedShouldRelease, actualShouldRelease, "TestCase[%d]: %s", i, c.desc)
+	}
+}
+
+func TestgetIPTagMap(t *testing.T) {
+	tests := []struct {
+		desc     string
+		input    string
+		expected map[string]string
+	}{
+		{
+			desc:     "empty map should be returned when service has blank annotations",
+			input:    "",
+			expected: map[string]string{},
+		},
+		{
+			desc:  "a single tag should be returned when service has set one tag pair in the annotation",
+			input: "tag1=tagvalue1",
+			expected: map[string]string{
+				"tag1": "tagvalue1",
+			},
+		},
+		{
+			desc:  "a single tag should be returned when service has set one tag pair in the annotation (and spaces are trimmed)",
+			input: " tag1 = tagvalue1 ",
+			expected: map[string]string{
+				"tag1": "tagvalue1",
+			},
+		},
+		{
+			desc:  "a single tag should be returned when service has set two tag pairs in the annotation with the same key (last write wins - according to appearance order in the string)",
+			input: "tag1=tagvalue1,tag1=tagvalue1new",
+			expected: map[string]string{
+				"tag1": "tagvalue1new",
+			},
+		},
+		{
+			desc:  "two tags should be returned when service has set two tag pairs in the annotation",
+			input: "tag1=tagvalue1,tag2=tagvalue2",
+			expected: map[string]string{
+				"tag1": "tagvalue1",
+				"tag2": "tagvalue2",
+			},
+		},
+		{
+			desc:  "two tags should be returned when service has set two tag pairs (and one malformation) in the annotation",
+			input: "tag1=tagvalue1,tag2=tagvalue2,tag3malformed",
+			expected: map[string]string{
+				"tag1": "tagvalue1",
+				"tag2": "tagvalue2",
+			},
+		},
+		{
+			// We may later decide not to support blank values.  The Azure contract is not entirely clear here.
+			desc:  "two tags should be returned when service has set two tag pairs (and one has a blank value) in the annotation",
+			input: "tag1=tagvalue1,tag2=",
+			expected: map[string]string{
+				"tag1": "tagvalue1",
+				"tag2": "",
+			},
+		},
+		{
+			// We may later decide not to support blank keys.  The Azure contract is not entirely clear here.
+			desc:  "two tags should be returned when service has set two tag pairs (and one has a blank key) in the annotation",
+			input: "tag1=tagvalue1,=tag2value",
+			expected: map[string]string{
+				"tag1": "tagvalue1",
+				"":     "tag2value",
+			},
+		},
+	}
+
+	for i, c := range tests {
+		actual := getIPTagMap(c.input)
+		assert.Equal(t, c.expected, actual, "TestCase[%d]: %s", i, c.desc)
+	}
+}
+
+func TestConvertIPTagMapToSlice(t *testing.T) {
+	tests := []struct {
+		desc     string
+		input    map[string]string
+		expected *[]network.IPTag
+	}{
+		{
+			desc:     "nil slice should be returned when the map is nil",
+			input:    nil,
+			expected: nil,
+		},
+		{
+			desc:     "empty slice should be returned when the map is empty",
+			input:    map[string]string{},
+			expected: &[]network.IPTag{},
+		},
+		{
+			desc: "one tag should be returned when the map has one tag",
+			input: map[string]string{
+				"tag1": "tag1value",
+			},
+			expected: &[]network.IPTag{
+				{
+					IPTagType: to.StringPtr("tag1"),
+					Tag:       to.StringPtr("tag1value"),
+				},
+			},
+		},
+		{
+			desc: "two tags should be returned when the map has two tags",
+			input: map[string]string{
+				"tag1": "tag1value",
+				"tag2": "tag2value",
+			},
+			expected: &[]network.IPTag{
+				{
+					IPTagType: to.StringPtr("tag1"),
+					Tag:       to.StringPtr("tag1value"),
+				},
+				{
+					IPTagType: to.StringPtr("tag2"),
+					Tag:       to.StringPtr("tag2value"),
+				},
+			},
+		},
+	}
+
+	for i, c := range tests {
+		actual := convertIPTagMapToSlice(c.input)
+
+		// Sort output to provide stability of return from map for test comparison
+		// The order doesn't matter at runtime.
+		if actual != nil {
+			sort.Slice(*actual, func(i, j int) bool {
+				ipTagSlice := *actual
+				return to.String(ipTagSlice[i].IPTagType) < to.String(ipTagSlice[j].IPTagType)
+			})
+		}
+		if c.expected != nil {
+			sort.Slice(*c.expected, func(i, j int) bool {
+				ipTagSlice := *c.expected
+				return to.String(ipTagSlice[i].IPTagType) < to.String(ipTagSlice[j].IPTagType)
+			})
+
+		}
+
+		assert.Equal(t, c.expected, actual, "TestCase[%d]: %s", i, c.desc)
+	}
+}
+
+func TestGetserviceIPTagRequestForPublicIP(t *testing.T) {
+	tests := []struct {
+		desc     string
+		input    *v1.Service
+		expected serviceIPTagRequest
+	}{
+		{
+			desc:  "Annotation should be false when service is absent",
+			input: nil,
+			expected: serviceIPTagRequest{
+				IPTagsRequestedByAnnotation: false,
+				IPTags:                      nil,
+			},
+		},
+		{
+			desc: "Annotation should be false when service is present, without annotation",
+			input: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+			},
+			expected: serviceIPTagRequest{
+				IPTagsRequestedByAnnotation: false,
+				IPTags:                      nil,
+			},
+		},
+		{
+			desc: "Annotation should be true, tags slice empty, when annotation blank",
+			input: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ServiceAnnotationIPTagsForPublicIP: "",
+					},
+				},
+			},
+			expected: serviceIPTagRequest{
+				IPTagsRequestedByAnnotation: true,
+				IPTags:                      &[]network.IPTag{},
+			},
+		},
+		{
+			desc: "two tags should be returned when service has set two tag pairs (and one malformation) in the annotation",
+			input: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ServiceAnnotationIPTagsForPublicIP: "tag1=tag1value,tag2=tag2value,tag3malformed",
+					},
+				},
+			},
+			expected: serviceIPTagRequest{
+				IPTagsRequestedByAnnotation: true,
+				IPTags: &[]network.IPTag{
+					{
+						IPTagType: to.StringPtr("tag1"),
+						Tag:       to.StringPtr("tag1value"),
+					},
+					{
+						IPTagType: to.StringPtr("tag2"),
+						Tag:       to.StringPtr("tag2value"),
+					},
+				},
+			},
+		},
+	}
+	for i, c := range tests {
+		actual := getServiceIPTagRequestForPublicIP(c.input)
+
+		// Sort output to provide stability of return from map for test comparison
+		// The order doesn't matter at runtime.
+		if actual.IPTags != nil {
+			sort.Slice(*actual.IPTags, func(i, j int) bool {
+				ipTagSlice := *actual.IPTags
+				return to.String(ipTagSlice[i].IPTagType) < to.String(ipTagSlice[j].IPTagType)
+			})
+		}
+		if c.expected.IPTags != nil {
+			sort.Slice(*c.expected.IPTags, func(i, j int) bool {
+				ipTagSlice := *c.expected.IPTags
+				return to.String(ipTagSlice[i].IPTagType) < to.String(ipTagSlice[j].IPTagType)
+			})
+
+		}
+
+		assert.Equal(t, actual, c.expected, "TestCase[%d]: %s", i, c.desc)
+	}
+}
+
+func TestAreIpTagsEquivalent(t *testing.T) {
+	tests := []struct {
+		desc     string
+		input1   *[]network.IPTag
+		input2   *[]network.IPTag
+		expected bool
+	}{
+		{
+			desc:     "nils should be considered equal",
+			input1:   nil,
+			input2:   nil,
+			expected: true,
+		},
+		{
+			desc:     "nils should be considered to empty arrays (case 1)",
+			input1:   nil,
+			input2:   &[]network.IPTag{},
+			expected: true,
+		},
+		{
+			desc:     "nils should be considered to empty arrays (case 1)",
+			input1:   &[]network.IPTag{},
+			input2:   nil,
+			expected: true,
+		},
+		{
+			desc: "nil should not be considered equal to anything (case 1)",
+			input1: &[]network.IPTag{
+				{
+					IPTagType: to.StringPtr("tag1"),
+					Tag:       to.StringPtr("tag1value"),
+				},
+				{
+					IPTagType: to.StringPtr("tag2"),
+					Tag:       to.StringPtr("tag2value"),
+				},
+			},
+			input2:   nil,
+			expected: false,
+		},
+		{
+			desc: "nil should not be considered equal to anything (case 2)",
+			input2: &[]network.IPTag{
+				{
+					IPTagType: to.StringPtr("tag1"),
+					Tag:       to.StringPtr("tag1value"),
+				},
+				{
+					IPTagType: to.StringPtr("tag2"),
+					Tag:       to.StringPtr("tag2value"),
+				},
+			},
+			input1:   nil,
+			expected: false,
+		},
+		{
+			desc: "exactly equal should be treated as equal",
+			input1: &[]network.IPTag{
+				{
+					IPTagType: to.StringPtr("tag1"),
+					Tag:       to.StringPtr("tag1value"),
+				},
+				{
+					IPTagType: to.StringPtr("tag2"),
+					Tag:       to.StringPtr("tag2value"),
+				},
+			},
+			input2: &[]network.IPTag{
+				{
+					IPTagType: to.StringPtr("tag1"),
+					Tag:       to.StringPtr("tag1value"),
+				},
+				{
+					IPTagType: to.StringPtr("tag2"),
+					Tag:       to.StringPtr("tag2value"),
+				},
+			},
+			expected: true,
+		},
+		{
+			desc: "equal but out of order should be treated as equal",
+			input1: &[]network.IPTag{
+				{
+					IPTagType: to.StringPtr("tag1"),
+					Tag:       to.StringPtr("tag1value"),
+				},
+				{
+					IPTagType: to.StringPtr("tag2"),
+					Tag:       to.StringPtr("tag2value"),
+				},
+			},
+			input2: &[]network.IPTag{
+				{
+					IPTagType: to.StringPtr("tag2"),
+					Tag:       to.StringPtr("tag2value"),
+				},
+				{
+					IPTagType: to.StringPtr("tag1"),
+					Tag:       to.StringPtr("tag1value"),
+				},
+			},
+			expected: true,
+		},
+	}
+	for i, c := range tests {
+		actual := areIPTagsEquivalent(c.input1, c.input2)
+		assert.Equal(t, actual, c.expected, "TestCase[%d]: %s", i, c.desc)
 	}
 }
 
@@ -2035,17 +2509,19 @@ func TestReconcilePublicIP(t *testing.T) {
 	defer ctrl.Finish()
 
 	testCases := []struct {
-		desc          string
-		wantLb        bool
-		annotations   map[string]string
-		existingPIPs  []network.PublicIPAddress
-		expectedID    string
-		expectedPIP   *network.PublicIPAddress
-		expectedError bool
+		desc                        string
+		wantLb                      bool
+		annotations                 map[string]string
+		existingPIPs                []network.PublicIPAddress
+		expectedID                  string
+		expectedPIP                 *network.PublicIPAddress
+		expectedError               bool
+		expectedCreateOrUpdateCount int
 	}{
 		{
-			desc:   "reconcilePublicIP shall return nil if there's no pip in service",
-			wantLb: false,
+			desc:                        "reconcilePublicIP shall return nil if there's no pip in service",
+			wantLb:                      false,
+			expectedCreateOrUpdateCount: 0,
 		},
 		{
 			desc:   "reconcilePublicIP shall return nil if no pip is owned by service",
@@ -2055,6 +2531,7 @@ func TestReconcilePublicIP(t *testing.T) {
 					Name: to.StringPtr("pip1"),
 				},
 			},
+			expectedCreateOrUpdateCount: 0,
 		},
 		{
 			desc:   "reconcilePublicIP shall delete unwanted pips and create a new one",
@@ -2067,6 +2544,7 @@ func TestReconcilePublicIP(t *testing.T) {
 			},
 			expectedID: "/subscriptions/subscription/resourceGroups/rg/providers/" +
 				"Microsoft.Network/publicIPAddresses/testCluster-atest1",
+			expectedCreateOrUpdateCount: 1,
 		},
 		{
 			desc:        "reconcilePublicIP shall report error if the given PIP name doesn't exist in the resource group",
@@ -2082,7 +2560,8 @@ func TestReconcilePublicIP(t *testing.T) {
 					Tags: map[string]*string{"service": to.StringPtr("default/test1")},
 				},
 			},
-			expectedError: true,
+			expectedError:               true,
+			expectedCreateOrUpdateCount: 0,
 		},
 		{
 			desc:        "reconcilePublicIP shall delete unwanted PIP when given the name of desired PIP",
@@ -2107,6 +2586,85 @@ func TestReconcilePublicIP(t *testing.T) {
 				Name: to.StringPtr("testPIP"),
 				Tags: map[string]*string{"service": to.StringPtr("default/test1")},
 			},
+			expectedCreateOrUpdateCount: 0,
+		},
+		{
+			desc:   "reconcilePublicIP shall delete unwanted pips and existing pips, when the existing pips IP tags do not match",
+			wantLb: true,
+			annotations: map[string]string{
+				ServiceAnnotationPIPName:           "testPIP",
+				ServiceAnnotationIPTagsForPublicIP: "tag1=tag1value",
+			},
+			existingPIPs: []network.PublicIPAddress{
+				{
+					Name: to.StringPtr("pip1"),
+					Tags: map[string]*string{"service": to.StringPtr("default/test1")},
+				},
+				{
+					Name: to.StringPtr("pip2"),
+					Tags: map[string]*string{"service": to.StringPtr("default/test1")},
+				},
+				{
+					Name: to.StringPtr("testPIP"),
+					Tags: map[string]*string{"service": to.StringPtr("default/test1")},
+				},
+			},
+			expectedPIP: &network.PublicIPAddress{
+				ID:   to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses/testPIP"),
+				Name: to.StringPtr("testPIP"),
+				Tags: map[string]*string{"service": to.StringPtr("default/test1")},
+				PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+					PublicIPAddressVersion:   network.IPv4,
+					PublicIPAllocationMethod: network.Static,
+					IPTags: &[]network.IPTag{
+						{
+							IPTagType: to.StringPtr("tag1"),
+							Tag:       to.StringPtr("tag1value"),
+						},
+					},
+				},
+			},
+			expectedCreateOrUpdateCount: 1,
+		},
+		{
+			desc:   "reconcilePublicIP shall preserve existing pips, when the existing pips IP tags do match",
+			wantLb: true,
+			annotations: map[string]string{
+				ServiceAnnotationPIPName:           "testPIP",
+				ServiceAnnotationIPTagsForPublicIP: "tag1=tag1value",
+			},
+			existingPIPs: []network.PublicIPAddress{
+				{
+					Name: to.StringPtr("testPIP"),
+					Tags: map[string]*string{"service": to.StringPtr("default/test1")},
+					PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+						PublicIPAddressVersion:   network.IPv4,
+						PublicIPAllocationMethod: network.Static,
+						IPTags: &[]network.IPTag{
+							{
+								IPTagType: to.StringPtr("tag1"),
+								Tag:       to.StringPtr("tag1value"),
+							},
+						},
+					},
+				},
+			},
+			expectedPIP: &network.PublicIPAddress{
+				ID:   to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses/testPIP"),
+				Name: to.StringPtr("testPIP"),
+				Tags: map[string]*string{"service": to.StringPtr("default/test1")},
+				PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+					PublicIPAddressVersion:   network.IPv4,
+					PublicIPAllocationMethod: network.Static,
+					IPTags: &[]network.IPTag{
+						{
+							IPTagType: to.StringPtr("tag1"),
+							Tag:       to.StringPtr("tag1value"),
+						},
+					},
+				},
+			},
+			expectedCreateOrUpdateCount: 0,
 		},
 		{
 			desc:        "reconcilePublicIP shall find the PIP by given name and shall not delete the PIP which is not owned by service",
@@ -2128,13 +2686,27 @@ func TestReconcilePublicIP(t *testing.T) {
 				ID:   to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses/testPIP"),
 				Name: to.StringPtr("testPIP"),
 			},
+			expectedCreateOrUpdateCount: 0,
 		},
 	}
 
 	for i, test := range testCases {
+		deletedPips := make(map[string]bool)
+		savedPips := make(map[string]network.PublicIPAddress)
+		createOrUpdateCount := 0
+		var m sync.Mutex
 		az := GetTestCloud(ctrl)
 		mockPIPsClient := az.PublicIPAddressesClient.(*mockpublicipclient.MockInterface)
-		mockPIPsClient.EXPECT().CreateOrUpdate(gomock.Any(), "rg", gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		creator := mockPIPsClient.EXPECT().CreateOrUpdate(gomock.Any(), "rg", gomock.Any(), gomock.Any()).AnyTimes()
+		creator.DoAndReturn(func(ctx context.Context, resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress) *retry.Error {
+			m.Lock()
+			deletedPips[publicIPAddressName] = false
+			savedPips[publicIPAddressName] = parameters
+			createOrUpdateCount++
+			m.Unlock()
+			return nil
+		})
+
 		mockPIPsClient.EXPECT().List(gomock.Any(), "rg").Return(test.existingPIPs, nil).AnyTimes()
 		if i == 2 {
 			mockPIPsClient.EXPECT().Get(gomock.Any(), "rg", "testCluster-atest1", gomock.Any()).Return(network.PublicIPAddress{}, &retry.Error{HTTPStatusCode: http.StatusNotFound}).Times(1)
@@ -2143,19 +2715,58 @@ func TestReconcilePublicIP(t *testing.T) {
 		service := getTestService("test1", v1.ProtocolTCP, nil, false, 80)
 		service.Annotations = test.annotations
 		for _, pip := range test.existingPIPs {
-			mockPIPsClient.EXPECT().Get(gomock.Any(), "rg", *pip.Name, gomock.Any()).Return(pip, nil).AnyTimes()
-			mockPIPsClient.EXPECT().Delete(gomock.Any(), "rg", *pip.Name).Return(nil).AnyTimes()
+			savedPips[*pip.Name] = pip
+			getter := mockPIPsClient.EXPECT().Get(gomock.Any(), "rg", *pip.Name, gomock.Any()).AnyTimes()
+			getter.DoAndReturn(func(ctx context.Context, resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, rerr *retry.Error) {
+				m.Lock()
+				deletedValue, deletedContains := deletedPips[publicIPAddressName]
+				savedPipValue, savedPipContains := savedPips[publicIPAddressName]
+				m.Unlock()
+
+				if (!deletedContains || !deletedValue) && savedPipContains {
+					return savedPipValue, nil
+				}
+
+				return network.PublicIPAddress{}, &retry.Error{HTTPStatusCode: http.StatusNotFound}
+
+			})
+			deleter := mockPIPsClient.EXPECT().Delete(gomock.Any(), "rg", *pip.Name).Return(nil).AnyTimes()
+			deleter.Do(func(ctx context.Context, resourceGroupName string, publicIPAddressName string) *retry.Error {
+				m.Lock()
+				deletedPips[publicIPAddressName] = true
+				m.Unlock()
+				return nil
+			})
+
 			err := az.PublicIPAddressesClient.CreateOrUpdate(context.TODO(), "rg", to.String(pip.Name), pip)
 			if err != nil {
 				t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
 			}
+
+			// Clear create or update count to prepare for main execution
+			createOrUpdateCount = 0
 		}
 		pip, err := az.reconcilePublicIP("testCluster", &service, "", test.wantLb)
+		if !test.expectedError {
+			assert.Equal(t, nil, err, "TestCase[%d]: %s", i, test.desc)
+		}
 		if test.expectedID != "" {
 			assert.Equal(t, test.expectedID, to.String(pip.ID), "TestCase[%d]: %s", i, test.desc)
 		} else if test.expectedPIP != nil && test.expectedPIP.Name != nil {
 			assert.Equal(t, *test.expectedPIP.Name, *pip.Name, "TestCase[%d]: %s", i, test.desc)
+
+			if test.expectedPIP.PublicIPAddressPropertiesFormat != nil {
+				sortIPTags(test.expectedPIP.PublicIPAddressPropertiesFormat.IPTags)
+			}
+
+			if pip.PublicIPAddressPropertiesFormat != nil {
+				sortIPTags(pip.PublicIPAddressPropertiesFormat.IPTags)
+			}
+
+			assert.Equal(t, test.expectedPIP.PublicIPAddressPropertiesFormat, pip.PublicIPAddressPropertiesFormat, "TestCase[%d]: %s", i, test.desc)
+
 		}
+		assert.Equal(t, test.expectedCreateOrUpdateCount, createOrUpdateCount, "TestCase[%d]: %s", i, test.desc)
 		assert.Equal(t, test.expectedError, err != nil, "TestCase[%d]: %s", i, test.desc)
 	}
 }
@@ -2169,6 +2780,7 @@ func TestEnsurePublicIPExists(t *testing.T) {
 		existingPIPs            []network.PublicIPAddress
 		inputDNSLabel           string
 		foundDNSLabelAnnotation bool
+		additionalAnnotations   map[string]string
 		expectedPIP             *network.PublicIPAddress
 		expectedID              string
 		isIPv6                  bool
@@ -2287,6 +2899,7 @@ func TestEnsurePublicIPExists(t *testing.T) {
 	for i, test := range testCases {
 		az := GetTestCloud(ctrl)
 		service := getTestService("test1", v1.ProtocolTCP, nil, test.isIPv6, 80)
+		service.ObjectMeta.Annotations = test.additionalAnnotations
 		mockPIPsClient := az.PublicIPAddressesClient.(*mockpublicipclient.MockInterface)
 		mockPIPsClient.EXPECT().CreateOrUpdate(gomock.Any(), "rg", gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 		mockPIPsClient.EXPECT().Get(gomock.Any(), "rg", "pip1", gomock.Any()).DoAndReturn(func(ctx context.Context, resourceGroupName string, publicIPAddressName string, expand string) (network.PublicIPAddress, *retry.Error) {
