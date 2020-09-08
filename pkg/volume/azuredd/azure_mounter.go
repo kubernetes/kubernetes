@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package azure_dd
+package azuredd
 
 import (
 	"fmt"
@@ -151,7 +151,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 			}
 			if !mountPoint {
 				// not cool. leave for next sync loop.
-				return fmt.Errorf("azureDisk - SetupAt:Mount:Failure:cleanup disk %s is still mounted on %s during cleanup original-mountErr:%v, despite call to unmount(). Will try again next sync loop.", diskName, dir, mountErr)
+				return fmt.Errorf("azureDisk - SetupAt:Mount:Failure:cleanup disk %s is still mounted on %s during cleanup original-mountErr:%v, despite call to unmount() - will try again next sync loop", diskName, dir, mountErr)
 			}
 		}
 

@@ -21,7 +21,7 @@ go_library(
         "azure_provision.go",
         "doc.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/volume/azure_dd",
+    importpath = "k8s.io/kubernetes/pkg/volume/azuredd",
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/volume:go_default_library",

@@ -96,8 +96,8 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/volume/awsebs:all-srcs",
-        "//pkg/volume/azure_dd:all-srcs",
         "//pkg/volume/azure_file:all-srcs",
+        "//pkg/volume/azuredd:all-srcs",
         "//pkg/volume/cephfs:all-srcs",
         "//pkg/volume/cinder:all-srcs",
         "//pkg/volume/configmap:all-srcs",
