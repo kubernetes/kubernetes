@@ -12,6 +12,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/apiserverinternal/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta2:go_default_library",
@@ -51,6 +52,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/client-go/informers/admissionregistration:go_default_library",
+        "//staging/src/k8s.io/client-go/informers/apiserverinternal:go_default_library",
         "//staging/src/k8s.io/client-go/informers/apps:go_default_library",
         "//staging/src/k8s.io/client-go/informers/autoscaling:go_default_library",
         "//staging/src/k8s.io/client-go/informers/batch:go_default_library",
@@ -86,6 +88,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/client-go/informers/admissionregistration:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/apiserverinternal:all-srcs",
         "//staging/src/k8s.io/client-go/informers/apps:all-srcs",
         "//staging/src/k8s.io/client-go/informers/autoscaling:all-srcs",
         "//staging/src/k8s.io/client-go/informers/batch:all-srcs",

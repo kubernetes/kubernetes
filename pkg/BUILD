@@ -26,6 +26,7 @@ filegroup(
         "//pkg/apis/abac:all-srcs",
         "//pkg/apis/admission:all-srcs",
         "//pkg/apis/admissionregistration:all-srcs",
+        "//pkg/apis/apiserverinternal:all-srcs",
         "//pkg/apis/apps:all-srcs",
         "//pkg/apis/authentication:all-srcs",
         "//pkg/apis/authorization:all-srcs",

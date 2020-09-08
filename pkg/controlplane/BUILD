@@ -15,6 +15,7 @@ go_library(
     deps = [
         "//pkg/apis/admission/install:go_default_library",
         "//pkg/apis/admissionregistration/install:go_default_library",
+        "//pkg/apis/apiserverinternal/install:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
         "//pkg/apis/authentication/install:go_default_library",
         "//pkg/apis/authorization/install:go_default_library",
