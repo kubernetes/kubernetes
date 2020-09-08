@@ -99,10 +99,17 @@ func TestViewHistory(t *testing.T) {
 		t.Fatalf("error getting ViewHistory for a StatefulSets moons: %v", err)
 	}
 
-	expected := `REVISION
-1
+	expected := `Pod Template:
+  Labels:	foo=bar
+  Containers:
+   test:
+    Image:	nginx
+    Port:	<none>
+    Host Port:	<none>
+    Environment:	<none>
+    Mounts:	<none>
+  Volumes:	<none>
 `
-
 	if result != expected {
 		t.Fatalf("unexpected output  (%v was expected but got %v)", expected, result)
 	}
