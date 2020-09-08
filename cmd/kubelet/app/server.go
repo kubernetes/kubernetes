@@ -215,6 +215,10 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				klog.Fatal(err)
 			}
 
+			if (kubeletConfig.KubeletCgroups != "" && kubeletConfig.KubeReservedCgroup != "") && (0 != strings.Index(kubeletConfig.KubeletCgroups, kubeletConfig.KubeReservedCgroup)) {
+				klog.Warning("unsupported configuration:KubeletCgroups is not within KubeReservedCgroup")
+			}
+
 			// use dynamic kubelet config, if enabled
 			var kubeletConfigController *dynamickubeletconfig.Controller
 			if dynamicConfigDir := kubeletFlags.DynamicConfigDir.Value(); len(dynamicConfigDir) > 0 {
