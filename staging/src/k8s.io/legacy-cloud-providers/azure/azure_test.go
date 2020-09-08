@@ -2779,3 +2779,20 @@ func TestGetNodeResourceGroup(t *testing.T) {
 		assert.Equal(t, test.expected, actual, test.name)
 	}
 }
+
+func TestInitializeCloudFromConfig(t *testing.T) {
+	az := getTestCloud()
+
+	err := az.InitializeCloudFromConfig(nil, false)
+	assert.NoError(t, err)
+
+	config := Config{
+		AzureAuthConfig: auth.AzureAuthConfig{
+			Cloud: "AZUREPUBLICCLOUD",
+		},
+		CloudConfigType: cloudConfigTypeFile,
+	}
+	err = az.InitializeCloudFromConfig(&config, false)
+	expectedErr := fmt.Errorf("useInstanceMetadata must be enabled without Azure credentials")
+	assert.Equal(t, expectedErr, err)
+}
