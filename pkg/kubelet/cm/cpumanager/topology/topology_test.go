@@ -17,6 +17,8 @@ limitations under the License.
 package topology
 
 import (
+	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 
@@ -195,6 +197,66 @@ func Test_Discover(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Discover() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_OnlineCPUs(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    []int
+	}{
+		{
+			name:    "Empty",
+			content: "",
+			want:    []int{},
+		},
+		{
+			name:    "Range",
+			content: "0-15\n",
+			want:    []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+		},
+		{
+			name:    "List",
+			content: "0,1,2,3\n",
+			want:    []int{0, 1, 2, 3},
+		},
+		{
+			name:    "Skip",
+			content: "0-2,5-7",
+			want:    []int{0, 1, 2, 5, 6, 7},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content := []byte(tt.content)
+			tmpfile, err := ioutil.TempFile("", "cpu_manager_topology")
+			if err != nil {
+				t.Errorf("GetOnlineCPUs() tmpfile create error = %v", err)
+				return
+			}
+			defer os.Remove(tmpfile.Name())
+
+			if _, err := tmpfile.Write(content); err != nil {
+				t.Errorf("GetOnlineCPUs() tmpfile write error = %v", err)
+				return
+			}
+			if err := tmpfile.Close(); err != nil {
+				t.Errorf("GetOnlineCPUs() tmpfile close error = %v", err)
+				return
+			}
+
+			cpus, err := getOnlineCPUsFromSysFS(tmpfile.Name())
+			if err != nil {
+				t.Errorf("GetOnlineCPUs() error = %v", err)
+				return
+			}
+
+			got := cpus.ToSlice()
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetOnlineCPUs() = %v, want %v", got, tt.want)
 			}
 		})
 	}

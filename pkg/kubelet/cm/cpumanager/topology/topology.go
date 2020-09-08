@@ -18,10 +18,16 @@ package topology
 
 import (
 	"fmt"
+	"io/ioutil"
+	"strings"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+)
+
+const (
+	sysfsOnlineCPUs = "/sys/devices/system/cpu/online"
 )
 
 // NUMANodeInfo is a map from NUMANode ID to a list of CPU IDs associated with
@@ -271,4 +277,18 @@ func getUniqueCoreID(threads []int) (coreID int, err error) {
 	}
 
 	return min, nil
+}
+
+// getOnlineCPUsFromSysFS returns the online cpu set reading the data from a sysfs file
+func getOnlineCPUsFromSysFS(sysfsPath string) (cpuset.CPUSet, error) {
+	onlineCPUList, err := ioutil.ReadFile(sysfsPath)
+	if err != nil {
+		return cpuset.CPUSet{}, err
+	}
+	return cpuset.Parse(strings.TrimSpace(string(onlineCPUList)))
+}
+
+// OnlineCPUs returns the online cpu set
+func OnlineCPUs() (cpuset.CPUSet, error) {
+	return getOnlineCPUsFromSysFS(sysfsOnlineCPUs)
 }
