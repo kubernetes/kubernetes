@@ -1338,7 +1338,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			sched, err := scheduler.New(
 				client,
 				informerFactory,
-				informerFactory.Core().V1().Pods(),
 				recorderFactory,
 				make(chan struct{}),
 				scheduler.WithAlgorithmSource(algorithmSrc),
@@ -1514,7 +1513,6 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 			sched, err := scheduler.New(
 				client,
 				informerFactory,
-				informerFactory.Core().V1().Pods(),
 				recorderFactory,
 				make(chan struct{}),
 				opts...,
@@ -1943,7 +1941,6 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 			sched, err := scheduler.New(
 				client,
 				informerFactory,
-				informerFactory.Core().V1().Pods(),
 				recorderFactory,
 				make(chan struct{}),
 				scheduler.WithProfiles(config.KubeSchedulerProfile{
