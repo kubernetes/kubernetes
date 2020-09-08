@@ -245,6 +245,12 @@ func (nodes NodeInfoLister) HavePodsWithAffinityList() ([]*framework.NodeInfo, e
 	return nodes, nil
 }
 
+// HavePodsWithRequiredAntiAffinityList is supposed to list nodes with at least one pod with
+// required anti-affinity. For the fake lister we just return everything.
+func (nodes NodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]*framework.NodeInfo, error) {
+	return nodes, nil
+}
+
 // NewNodeInfoLister create a new fake NodeInfoLister from a slice of v1.Nodes.
 func NewNodeInfoLister(nodes []*v1.Node) framework.NodeInfoLister {
 	nodeInfoList := make([]*framework.NodeInfo, len(nodes))

@@ -22,6 +22,8 @@ type NodeInfoLister interface {
 	List() ([]*NodeInfo, error)
 	// Returns the list of NodeInfos of nodes with pods with affinity terms.
 	HavePodsWithAffinityList() ([]*NodeInfo, error)
+	// Returns the list of NodeInfos of nodes with pods with required anti-affinity terms.
+	HavePodsWithRequiredAntiAffinityList() ([]*NodeInfo, error)
 	// Returns the NodeInfo of the given node name.
 	Get(nodeName string) (*NodeInfo, error)
 }
