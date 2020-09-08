@@ -27,22 +27,22 @@ import (
 
 func TestMutationAnnotationValue(t *testing.T) {
 	tcs := []struct {
-		config   string
-		webhook  string
-		mutated  bool
-		expected string
+		config        string
+		webhook       string
+		mutated       bool
+		expected      string
 	}{
 		{
-			config:   "test-config",
-			webhook:  "test-webhook",
-			mutated:  true,
-			expected: `{"configuration":"test-config","webhook":"test-webhook","mutated":true}`,
+			config:        "test-config",
+			webhook:       "test-webhook",
+			mutated:       true,
+			expected:      `{"configuration":"test-config","webhook":"test-webhook","mutated":true}`,
 		},
 		{
-			config:   "test-config",
-			webhook:  "test-webhook",
-			mutated:  false,
-			expected: `{"configuration":"test-config","webhook":"test-webhook","mutated":false}`,
+			config:        "test-config",
+			webhook:       "test-webhook",
+			mutated:       false,
+			expected:      `{"configuration":"test-config","webhook":"test-webhook","mutated":false}`,
 		},
 	}
 
@@ -57,11 +57,11 @@ func TestMutationAnnotationValue(t *testing.T) {
 
 func TestJSONPatchAnnotationValue(t *testing.T) {
 	tcs := []struct {
-		name     string
-		config   string
-		webhook  string
-		patch    []byte
-		expected string
+		name          string
+		config        string
+		webhook       string
+		patch         []byte
+		expected      string
 	}{
 		{
 			name:     "valid patch annotation",

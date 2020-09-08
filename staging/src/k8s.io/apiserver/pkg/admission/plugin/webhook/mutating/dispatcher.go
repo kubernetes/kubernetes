@@ -152,6 +152,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 				admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "admit", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionAPIServerInternalError, 0)
 			}
 		}
+		admissionmetrics.Metrics.ObserveWebhookMetadata(hook.Name, string(generic.MutatingWebhook), invocation.Webhook.IsManifestBased())
 		admissionmetrics.Metrics.ObserveWebhook(time.Since(t), rejected, versionedAttr.Attributes, "admit", hook.Name)
 		if changed {
 			// Patch had changed the object. Prepare to reinvoke all previous webhooks that are eligible for re-invocation.

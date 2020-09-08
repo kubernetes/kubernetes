@@ -29,6 +29,8 @@ import (
 type Source interface {
 	Webhooks() []webhook.WebhookAccessor
 	HasSynced() bool
+	WebhookType() WebhookType
+	Generation() uint64
 }
 
 // VersionedAttributes is a wrapper around the original admission attributes, adding versioned

@@ -119,6 +119,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 					admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "validating", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionAPIServerInternalError, 0)
 				}
 			}
+			admissionmetrics.Metrics.ObserveWebhookMetadata(hook.Name, string(generic.MutatingWebhook), invocation.Webhook.IsManifestBased())
 			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), rejected, versionedAttr.Attributes, "validating", hook.Name)
 			if err == nil {
 				return

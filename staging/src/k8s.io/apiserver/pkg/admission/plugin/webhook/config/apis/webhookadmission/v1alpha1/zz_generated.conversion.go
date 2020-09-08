@@ -48,6 +48,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 
 func autoConvert_v1alpha1_WebhookAdmission_To_webhookadmission_WebhookAdmission(in *WebhookAdmission, out *webhookadmission.WebhookAdmission, s conversion.Scope) error {
 	out.KubeConfigFile = in.KubeConfigFile
+	out.ManifestFile = in.ManifestFile
 	return nil
 }
 
@@ -58,6 +59,7 @@ func Convert_v1alpha1_WebhookAdmission_To_webhookadmission_WebhookAdmission(in *
 
 func autoConvert_webhookadmission_WebhookAdmission_To_v1alpha1_WebhookAdmission(in *webhookadmission.WebhookAdmission, out *WebhookAdmission, s conversion.Scope) error {
 	out.KubeConfigFile = in.KubeConfigFile
+	out.ManifestFile = in.ManifestFile
 	return nil
 }
 

@@ -26,4 +26,8 @@ type WebhookAdmission struct {
 
 	// KubeConfigFile is the path to the kubeconfig file.
 	KubeConfigFile string `json:"kubeConfigFile"`
+
+	// ManifestFile is the path to the manifest file containing
+	// webhook configurations.
+	ManifestFile string `json:"manifestFile"`
 }

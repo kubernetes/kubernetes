@@ -19,6 +19,7 @@ package admission
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	quota "k8s.io/kubernetes/pkg/quota/v1"
 )
 
@@ -40,11 +41,19 @@ type WantsQuotaConfiguration interface {
 	admission.InitializationValidator
 }
 
+// WantsDefaulterAndValidator defines a function which sets the validator and defaulter for admission plugins
+// that need it.
+type WantsDefaulterAndValidator interface {
+	SetDefaulterAndValidator(d generic.WebhookDefaulter, v generic.WebhookValidator)
+}
+
 // PluginInitializer is used for initialization of the Kubernetes specific admission plugins.
 type PluginInitializer struct {
 	cloudConfig        []byte
 	restMapper         meta.RESTMapper
 	quotaConfiguration quota.Configuration
+	defaulter          generic.WebhookDefaulter
+	validator          generic.WebhookValidator
 }
 
 var _ admission.PluginInitializer = &PluginInitializer{}
@@ -61,6 +70,8 @@ func NewPluginInitializer(
 		cloudConfig:        cloudConfig,
 		restMapper:         restMapper,
 		quotaConfiguration: quotaConfiguration,
+		defaulter:          NewWebhookDefaulter(),
+		validator:          NewWebhookValidator(),
 	}
 }
 
@@ -77,5 +88,9 @@ func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(WantsQuotaConfiguration); ok {
 		wants.SetQuotaConfiguration(i.quotaConfiguration)
+	}
+
+	if wants, ok := plugin.(WantsDefaulterAndValidator); ok {
+		wants.SetDefaulterAndValidator(i.defaulter, i.validator)
 	}
 }

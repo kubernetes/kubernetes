@@ -80,6 +80,7 @@ func TestObserveAdmissionController(t *testing.T) {
 func TestObserveWebhook(t *testing.T) {
 	Metrics.reset()
 	Metrics.ObserveWebhook(2*time.Second, false, attr, stepAdmit, "x")
+	Metrics.ObserveWebhook(2*time.Second, true, attr, stepAdmit, "x")
 	wantLabels := map[string]string{
 		"name":      "x",
 		"operation": string(admission.Create),

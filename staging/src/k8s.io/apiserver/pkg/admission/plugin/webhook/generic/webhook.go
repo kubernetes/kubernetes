@@ -49,6 +49,17 @@ type Webhook struct {
 	namespaceMatcher *namespace.Matcher
 	objectMatcher    *object.Matcher
 	dispatcher       Dispatcher
+
+	// Manifest file can contain any combination of
+	// * `admissionregistration.k8s.io/v1.ValidatingWebhookConfigurationList`
+	// * `admissionregistration.k8s.io/v1.MutatingWebhookConfigurationList`
+	// * v1.List with items of admissionregistration.k8s.io/v1.ValidatingWebhookConfiguration
+	// * v1.List  with items of admissionregistration.k8s.io/v1.MutatingWebhookConfiguration.
+	manifestFile    string
+	wrapper         ManifestWebhookWrapper
+	hooksWrapped    bool
+	webhookType     WebhookType
+	manifestInitErr error
 }
 
 var (
@@ -61,7 +72,7 @@ type dispatcherFactory func(cm *webhookutil.ClientManager) Dispatcher
 
 // NewWebhook creates a new generic admission webhook.
 func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory sourceFactory, dispatcherFactory dispatcherFactory) (*Webhook, error) {
-	kubeconfigFile, err := config.LoadConfig(configFile)
+	kubeconfigFile, manifestFile, err := config.LoadManifestAndKubeConfig(configFile)
 	if err != nil {
 		return nil, err
 	}
@@ -87,6 +98,7 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 
 	return &Webhook{
 		Handler:          handler,
+		manifestFile:     manifestFile,
 		sourceFactory:    sourceFactory,
 		clientManager:    &cm,
 		namespaceMatcher: &namespace.Matcher{},
@@ -108,6 +120,13 @@ func (a *Webhook) SetServiceResolver(sr webhookutil.ServiceResolver) {
 	a.clientManager.SetServiceResolver(sr)
 }
 
+// SetDefaulterAndValidator sets a validator and defaulter for manifest based webhooks
+// for the webhook admission plugin.
+func (a *Webhook) SetDefaulterAndValidator(d WebhookDefaulter, v WebhookValidator) {
+	a.wrapper = NewManifestHookWrapper(a.manifestFile, d, v)
+	a.wrapSourceIfNeeded()
+}
+
 // SetExternalKubeClientSet implements the WantsExternalKubeInformerFactory interface.
 // It sets external ClientSet for admission plugins that need it
 func (a *Webhook) SetExternalKubeClientSet(client clientset.Interface) {
@@ -119,9 +138,19 @@ func (a *Webhook) SetExternalKubeInformerFactory(f informers.SharedInformerFacto
 	namespaceInformer := f.Core().V1().Namespaces()
 	a.namespaceMatcher.NamespaceLister = namespaceInformer.Lister()
 	a.hookSource = a.sourceFactory(f)
+	a.webhookType = a.hookSource.WebhookType()
+	a.wrapSourceIfNeeded()
 	a.SetReadyFunc(func() bool {
 		return namespaceInformer.Informer().HasSynced() && a.hookSource.HasSynced()
 	})
+}
+
+func (a *Webhook) wrapSourceIfNeeded() {
+	if a.wrapper != nil && a.hookSource != nil && !a.hooksWrapped {
+		a.hookSource = a.wrapper.WrapHookSource(a.hookSource)
+		a.hooksWrapped = true
+		a.manifestInitErr = a.wrapper.Initialize(a.webhookType)
+	}
 }
 
 // ValidateInitialization implements the InitializationValidator interface.
@@ -134,6 +163,12 @@ func (a *Webhook) ValidateInitialization() error {
 	}
 	if err := a.clientManager.Validate(); err != nil {
 		return fmt.Errorf("clientManager is not properly setup: %v", err)
+	}
+	if !knownWebhookType(a.webhookType) {
+		return fmt.Errorf("unknown webhook type: %v", a.webhookType)
+	}
+	if a.manifestInitErr != nil {
+		return fmt.Errorf("manifestWrapper is not properly setup: %v", a.manifestInitErr)
 	}
 	return nil
 }

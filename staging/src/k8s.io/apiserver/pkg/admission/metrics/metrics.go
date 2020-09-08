@@ -119,6 +119,8 @@ type AdmissionMetrics struct {
 	controller       *metricSet
 	webhook          *metricSet
 	webhookRejection *metrics.CounterVec
+	webhookMetadata  *metrics.GaugeVec
+	manifestError    *metrics.Gauge
 }
 
 // newAdmissionMetrics create a new AdmissionMetrics, configured with default metric names.
@@ -149,11 +151,34 @@ func newAdmissionMetrics() *AdmissionMetrics {
 		},
 		[]string{"name", "type", "operation", "error_type", "rejection_code"})
 
+	webhookMetadata := metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "webhook_metadata",
+			Help:           "Metadata for admission webhooks",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"name", "type", "manifest_based"},
+	)
+
+	manifestError := metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "webhook_manifest_error",
+			Help:           "Indicates if there were errors encountered while loading manifest based webhooks",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
 	step.mustRegister()
 	controller.mustRegister()
 	webhook.mustRegister()
 	legacyregistry.MustRegister(webhookRejection)
-	return &AdmissionMetrics{step: step, controller: controller, webhook: webhook, webhookRejection: webhookRejection}
+	legacyregistry.MustRegister(webhookMetadata)
+	legacyregistry.MustRegister(manifestError)
+	return &AdmissionMetrics{step: step, controller: controller, webhook: webhook, webhookRejection: webhookRejection, webhookMetadata: webhookMetadata, manifestError: manifestError}
 }
 
 func (m *AdmissionMetrics) reset() {
@@ -185,6 +210,20 @@ func (m *AdmissionMetrics) ObserveWebhookRejection(name, stepType, operation str
 		rejectionCode = 600
 	}
 	m.webhookRejection.WithLabelValues(name, stepType, operation, string(errorType), strconv.Itoa(rejectionCode)).Inc()
+}
+
+// ObserveWebhookMetadata records metadata for a admission webhook.
+func (m *AdmissionMetrics) ObserveWebhookMetadata(name, webhookType string, manifestBased bool) {
+	m.webhookMetadata.WithLabelValues(name, webhookType, strconv.FormatBool(manifestBased)).Set(1)
+}
+
+// ObserveManifestLoadingError records removal for a manifest based webhook
+func (m *AdmissionMetrics) ObserveManifestLoadingError(errorEncountered bool) {
+	if errorEncountered {
+		m.manifestError.Set(1)
+	} else {
+		m.manifestError.Set(0)
+	}
 }
 
 type metricSet struct {

@@ -68,11 +68,18 @@ type WebhookAccessor interface {
 	GetMutatingWebhook() (*v1.MutatingWebhook, bool)
 	// GetValidatingWebhook if the accessor contains a ValidatingWebhook, returns it and true, else returns false.
 	GetValidatingWebhook() (*v1.ValidatingWebhook, bool)
+	// IsManifestBased returns true if the webhook was loaded from a manifest.
+	IsManifestBased() bool
 }
 
 // NewMutatingWebhookAccessor creates an accessor for a MutatingWebhook.
 func NewMutatingWebhookAccessor(uid, configurationName string, h *v1.MutatingWebhook) WebhookAccessor {
 	return &mutatingWebhookAccessor{uid: uid, configurationName: configurationName, MutatingWebhook: h}
+}
+
+// NewManifestBasedMutatingWebhookAccessor creates an accessor for a manifest based MutatingWebhook.
+func NewManifestBasedMutatingWebhookAccessor(uid, configurationName string, h *v1.MutatingWebhook) WebhookAccessor {
+	return &mutatingWebhookAccessor{uid: uid, configurationName: configurationName, MutatingWebhook: h, isManifestBased: true}
 }
 
 type mutatingWebhookAccessor struct {
@@ -91,6 +98,8 @@ type mutatingWebhookAccessor struct {
 	initClient sync.Once
 	client     *rest.RESTClient
 	clientErr  error
+
+	isManifestBased bool
 }
 
 func (m *mutatingWebhookAccessor) GetUID() string {
@@ -170,9 +179,18 @@ func (m *mutatingWebhookAccessor) GetValidatingWebhook() (*v1.ValidatingWebhook,
 	return nil, false
 }
 
+func (m *mutatingWebhookAccessor) IsManifestBased() bool {
+	return m.isManifestBased
+}
+
 // NewValidatingWebhookAccessor creates an accessor for a ValidatingWebhook.
 func NewValidatingWebhookAccessor(uid, configurationName string, h *v1.ValidatingWebhook) WebhookAccessor {
 	return &validatingWebhookAccessor{uid: uid, configurationName: configurationName, ValidatingWebhook: h}
+}
+
+// NewManifestBasedValidatingWebhookAccessor creates an accessor for a manifest based ValidatingWebhook.
+func NewManifestBasedValidatingWebhookAccessor(uid, configurationName string, h *v1.ValidatingWebhook) WebhookAccessor {
+	return &validatingWebhookAccessor{uid: uid, configurationName: configurationName, ValidatingWebhook: h, isManifestBased: true}
 }
 
 type validatingWebhookAccessor struct {
@@ -191,6 +209,8 @@ type validatingWebhookAccessor struct {
 	initClient sync.Once
 	client     *rest.RESTClient
 	clientErr  error
+
+	isManifestBased bool
 }
 
 func (v *validatingWebhookAccessor) GetUID() string {
@@ -268,6 +288,10 @@ func (v *validatingWebhookAccessor) GetMutatingWebhook() (*v1.MutatingWebhook, b
 
 func (v *validatingWebhookAccessor) GetValidatingWebhook() (*v1.ValidatingWebhook, bool) {
 	return v.ValidatingWebhook, true
+}
+
+func (v *validatingWebhookAccessor) IsManifestBased() bool {
+	return v.isManifestBased
 }
 
 // hookClientConfigForWebhook construct a webhookutil.ClientConfig using a WebhookAccessor to access
