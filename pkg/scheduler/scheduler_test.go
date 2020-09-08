@@ -178,7 +178,6 @@ func TestSchedulerCreation(t *testing.T) {
 			defer close(stopCh)
 			s, err := New(client,
 				informerFactory,
-				NewPodInformer(client, 0),
 				profile.NewRecorderFactory(eventBroadcaster),
 				stopCh,
 				tc.opts...,
@@ -457,7 +456,6 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	sched, err := New(client,
 		informerFactory,
-		informerFactory.Core().V1().Pods(),
 		profile.NewRecorderFactory(broadcaster),
 		ctx.Done(),
 		WithProfiles(

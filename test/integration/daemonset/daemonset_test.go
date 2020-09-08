@@ -91,7 +91,6 @@ func setupScheduler(
 	sched, err := scheduler.New(
 		cs,
 		informerFactory,
-		informerFactory.Core().V1().Pods(),
 		profile.NewRecorderFactory(eventBroadcaster),
 		ctx.Done(),
 	)
@@ -102,7 +101,6 @@ func setupScheduler(
 	eventBroadcaster.StartRecordingToSink(ctx.Done())
 
 	go sched.Run(ctx)
-	return
 }
 
 func testLabels() map[string]string {

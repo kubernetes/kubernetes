@@ -27,14 +27,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
-	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -66,8 +63,6 @@ type Configurator struct {
 	recorderFactory profile.RecorderFactory
 
 	informerFactory informers.SharedInformerFactory
-
-	podInformer coreinformers.PodInformer
 
 	// Close this to stop all reflectors
 	StopEverything <-chan struct{}
@@ -179,7 +174,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	// Setup cache debugger.
 	debugger := cachedebugger.New(
 		c.informerFactory.Core().V1().Nodes().Lister(),
-		c.podInformer.Lister(),
+		c.informerFactory.Core().V1().Pods().Lister(),
 		c.schedulerCache,
 		podQueue,
 	)
@@ -414,29 +409,6 @@ func getPredicateConfigs(keys sets.String, lr *frameworkplugins.LegacyRegistry, 
 	}
 
 	return &plugins, pluginConfig, nil
-}
-
-type podInformer struct {
-	informer cache.SharedIndexInformer
-}
-
-func (i *podInformer) Informer() cache.SharedIndexInformer {
-	return i.informer
-}
-
-func (i *podInformer) Lister() corelisters.PodLister {
-	return corelisters.NewPodLister(i.informer.GetIndexer())
-}
-
-// NewPodInformer creates a shared index informer that returns only non-terminal pods.
-func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) coreinformers.PodInformer {
-	selector := fields.ParseSelectorOrDie(
-		"status.phase!=" + string(v1.PodSucceeded) +
-			",status.phase!=" + string(v1.PodFailed))
-	lw := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), string(v1.ResourcePods), metav1.NamespaceAll, selector)
-	return &podInformer{
-		informer: cache.NewSharedIndexInformer(lw, &v1.Pod{}, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}),
-	}
 }
 
 // MakeDefaultErrorFunc construct a function to handle pod scheduler error

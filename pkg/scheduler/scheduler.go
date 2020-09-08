@@ -27,10 +27,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
-	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -83,8 +83,6 @@ type Scheduler struct {
 
 	// Profiles are the scheduling profiles.
 	Profiles profile.Map
-
-	scheduledPodsHasSynced func() bool
 
 	client clientset.Interface
 }
@@ -186,7 +184,6 @@ var defaultSchedulerOptions = schedulerOptions{
 // New returns a Scheduler
 func New(client clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
-	podInformer coreinformers.PodInformer,
 	recorderFactory profile.RecorderFactory,
 	stopCh <-chan struct{},
 	opts ...Option) (*Scheduler, error) {
@@ -214,7 +211,6 @@ func New(client clientset.Interface,
 		client:                   client,
 		recorderFactory:          recorderFactory,
 		informerFactory:          informerFactory,
-		podInformer:              podInformer,
 		schedulerCache:           schedulerCache,
 		StopEverything:           stopEverything,
 		percentageOfNodesToScore: options.percentageOfNodesToScore,
@@ -267,9 +263,8 @@ func New(client clientset.Interface,
 	// Additional tweaks to the config produced by the configurator.
 	sched.StopEverything = stopEverything
 	sched.client = client
-	sched.scheduledPodsHasSynced = podInformer.Informer().HasSynced
 
-	addAllEventHandlers(sched, informerFactory, podInformer)
+	addAllEventHandlers(sched, informerFactory)
 	return sched, nil
 }
 
@@ -311,9 +306,6 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *schedulerapi
 
 // Run begins watching and scheduling. It waits for cache to be synced, then starts scheduling and blocked until the context is done.
 func (sched *Scheduler) Run(ctx context.Context) {
-	if !cache.WaitForCacheSync(ctx.Done(), sched.scheduledPodsHasSynced) {
-		return
-	}
 	sched.SchedulingQueue.Run()
 	wait.UntilWithContext(ctx, sched.scheduleOne, 0)
 	sched.SchedulingQueue.Close()
@@ -657,4 +649,21 @@ func (sched *Scheduler) skipPodSchedule(prof *profile.Profile, pod *v1.Pod) bool
 func defaultAlgorithmSourceProviderName() *string {
 	provider := schedulerapi.SchedulerDefaultProviderName
 	return &provider
+}
+
+// NewInformerFactory creates a SharedInformerFactory and initializes a scheduler specific
+// in-place podInformer.
+func NewInformerFactory(cs clientset.Interface, resyncPeriod time.Duration) informers.SharedInformerFactory {
+	informerFactory := informers.NewSharedInformerFactory(cs, resyncPeriod)
+	informerFactory.InformerFor(&v1.Pod{}, newPodInformer)
+	return informerFactory
+}
+
+// newPodInformer creates a shared index informer that returns only non-terminal pods.
+func newPodInformer(cs clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	selector := fields.ParseSelectorOrDie(
+		"status.phase!=" + string(v1.PodSucceeded) +
+			",status.phase!=" + string(v1.PodFailed))
+	lw := cache.NewListWatchFromClient(cs.CoreV1().RESTClient(), string(v1.ResourcePods), metav1.NamespaceAll, selector)
+	return cache.NewSharedIndexInformer(lw, &v1.Pod{}, resyncPeriod, nil)
 }
