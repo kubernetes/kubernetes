@@ -299,6 +299,8 @@ func requestGOAWAYServer(client *http.Client, serverBaseURL, url string) (<-chan
 // TestClientReceivedGOAWAY tests the in-flight watch requests will not be affected and new requests use a new
 // connection after client received GOAWAY.
 func TestClientReceivedGOAWAY(t *testing.T) {
+	t.Skip("disabled because of https://github.com/kubernetes/kubernetes/issues/94622")
+
 	s, err := newTestGOAWAYServer()
 	if err != nil {
 		t.Fatalf("failed to set-up test GOAWAY http server, err: %v", err)
