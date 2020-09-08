@@ -77,6 +77,12 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 		StorageClassName: &classGold,
 	})
 
+	validClaimWithNonIntegerStorage := validClaim.DeepCopy()
+	validClaimWithNonIntegerStorage.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)] = resource.MustParse("1001m")
+
+	validClaimByStorageClassWithNonIntegerStorage := validClaimByStorageClass.DeepCopy()
+	validClaimByStorageClassWithNonIntegerStorage.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)] = resource.MustParse("1001m")
+
 	evaluator := NewPersistentVolumeClaimEvaluator(nil)
 	testCases := map[string]struct {
 		pvc   *api.PersistentVolumeClaim
@@ -100,6 +106,25 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
 			},
 		},
+
+		"pvc-usage-rounded": {
+			pvc: validClaimWithNonIntegerStorage,
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsStorage:        resource.MustParse("2"), // 1001m -> 2
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
+			},
+		},
+		"pvc-usage-by-class-rounded": {
+			pvc: validClaimByStorageClassWithNonIntegerStorage,
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsStorage:                                                                    resource.MustParse("2"), // 1001m -> 2
+				corev1.ResourcePersistentVolumeClaims:                                                             resource.MustParse("1"),
+				V1ResourceByStorageClass(classGold, corev1.ResourceRequestsStorage):                               resource.MustParse("2"), // 1001m -> 2
+				V1ResourceByStorageClass(classGold, corev1.ResourcePersistentVolumeClaims):                        resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
+			},
+		},
 	}
 	for testName, testCase := range testCases {
 		actual, err := evaluator.Usage(testCase.pvc)
@@ -107,7 +132,7 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 			t.Errorf("%s unexpected error: %v", testName, err)
 		}
 		if !quota.Equals(testCase.usage, actual) {
-			t.Errorf("%s expected: %v, actual: %v", testName, testCase.usage, actual)
+			t.Errorf("%s expected:\n%v\n, actual:\n%v", testName, testCase.usage, actual)
 		}
 	}
 }

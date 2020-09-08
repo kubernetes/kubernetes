@@ -161,6 +161,13 @@ func (p *pvcEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
 
 	// charge for storage
 	if request, found := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; found {
+		roundedRequest := request.DeepCopy()
+		if !roundedRequest.RoundUp(0) {
+			// Ensure storage requests are counted as whole byte values, to pass resourcequota validation.
+			// See http://issue.k8s.io/94313
+			request = roundedRequest
+		}
+
 		result[corev1.ResourceRequestsStorage] = request
 		// charge usage to the storage class (if present)
 		if len(storageClassRef) > 0 {
