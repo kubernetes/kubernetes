@@ -86,6 +86,9 @@ func (tk *TestKubeconfig) KubectlCmd(args ...string) *exec.Cmd {
 				fmt.Sprintf("--client-key=%s", filepath.Join(tk.CertDir, "kubecfg.key")))
 		}
 	}
+	if tk.Namespace != "" {
+		defaultArgs = append(defaultArgs, fmt.Sprintf("--namespace=%s", tk.Namespace))
+	}
 	kubectlArgs := append(defaultArgs, args...)
 
 	//We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
