@@ -169,15 +169,8 @@ func (rc *reconciler) reconcile() {
 			// Check the ActualStateOfWorld again to avoid issuing an unnecessary
 			// detach.
 			// See https://github.com/kubernetes/kubernetes/issues/93902
-			attachedVolumesForNode := rc.actualStateOfWorld.GetAttachedVolumesForNode(attachedVolume.NodeName)
-			stillAttached := false
-			for _, volForNode := range attachedVolumesForNode {
-				if volForNode.VolumeName == attachedVolume.VolumeName {
-					stillAttached = true
-					break
-				}
-			}
-			if !stillAttached {
+			attachState := rc.actualStateOfWorld.GetAttachState(attachedVolume.VolumeName, attachedVolume.NodeName)
+			if attachState == cache.AttachStateDetached {
 				if klog.V(5).Enabled() {
 					klog.Infof(attachedVolume.GenerateMsgDetailed("Volume detached--skipping", ""))
 				}
@@ -269,10 +262,11 @@ func (rc *reconciler) attachDesiredVolumes() {
 
 		// Because the attach operation updates the ActualStateOfWorld before
 		// marking itself complete, IsOperationPending() must be checked before
-		// IsVolumeAttachedToNode() to guarantee the ActualStateOfWorld is
+		// GetAttachState() to guarantee the ActualStateOfWorld is
 		// up-to-date when it's read.
 		// See https://github.com/kubernetes/kubernetes/issues/93902
-		if rc.actualStateOfWorld.IsVolumeAttachedToNode(volumeToAttach.VolumeName, volumeToAttach.NodeName) {
+		attachState := rc.actualStateOfWorld.GetAttachState(volumeToAttach.VolumeName, volumeToAttach.NodeName)
+		if attachState == cache.AttachStateAttached {
 			// Volume/Node exists, touch it to reset detachRequestedTime
 			if klog.V(5).Enabled() {
 				klog.Infof(volumeToAttach.GenerateMsgDetailed("Volume attached--touching", ""))
