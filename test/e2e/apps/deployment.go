@@ -560,7 +560,7 @@ func testIterativeDeployments(f *framework.Framework) {
 			// trigger a new deployment
 			framework.Logf("%02d: triggering a new rollout for deployment %q", i, deployment.Name)
 			deployment, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *appsv1.Deployment) {
-				newEnv := v1.EnvVar{Name: "A", Value: fmt.Sprintf("%d", i)}
+				newEnv := v1.EnvVar{Name: fmt.Sprintf("A%d", i), Value: fmt.Sprintf("%d", i)}
 				update.Spec.Template.Spec.Containers[0].Env = append(update.Spec.Template.Spec.Containers[0].Env, newEnv)
 				randomScale(update, i)
 			})
