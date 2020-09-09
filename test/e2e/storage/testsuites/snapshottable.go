@@ -335,7 +335,7 @@ func DeleteAndWaitSnapshot(dc dynamic.Interface, ns string, snapshotName string,
 	var err error
 	ginkgo.By("deleting the snapshot")
 	err = dc.Resource(SnapshotGVR).Namespace(ns).Delete(context.TODO(), snapshotName, metav1.DeleteOptions{})
-	if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
@@ -427,6 +427,9 @@ func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConf
 		// We exploit this to create a snapshot resource from which we can create a preprovisioned snapshot
 		ginkgo.By("deleting the snapshot and snapshot content")
 		err = dc.Resource(SnapshotGVR).Namespace(r.Vs.GetNamespace()).Delete(context.TODO(), r.Vs.GetName(), metav1.DeleteOptions{})
+		if apierrors.IsNotFound(err) {
+			err = nil
+		}
 		framework.ExpectNoError(err)
 
 		ginkgo.By("checking the Snapshot has been deleted")
@@ -434,6 +437,9 @@ func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConf
 		framework.ExpectNoError(err)
 
 		err = dc.Resource(SnapshotContentGVR).Delete(context.TODO(), r.Vscontent.GetName(), metav1.DeleteOptions{})
+		if apierrors.IsNotFound(err) {
+			err = nil
+		}
 		framework.ExpectNoError(err)
 
 		ginkgo.By("checking the Snapshot content has been deleted")
@@ -498,13 +504,22 @@ func (sr *SnapshotResource) CleanupResource() error {
 					framework.ExpectNoError(err)
 				}
 				err = dc.Resource(SnapshotGVR).Namespace(sr.Vs.GetNamespace()).Delete(context.TODO(), sr.Vs.GetName(), metav1.DeleteOptions{})
+				if apierrors.IsNotFound(err) {
+					err = nil
+				}
 				framework.ExpectNoError(err)
+
 				err = utils.WaitForGVRDeletion(dc, SnapshotContentGVR, boundVsContent.GetName(), framework.Poll, framework.SnapshotDeleteTimeout)
 				framework.ExpectNoError(err)
+
 			case apierrors.IsNotFound(err):
 				// the volume snapshot is not bound to snapshot content yet
 				err = dc.Resource(SnapshotGVR).Namespace(sr.Vs.GetNamespace()).Delete(context.TODO(), sr.Vs.GetName(), metav1.DeleteOptions{})
+				if apierrors.IsNotFound(err) {
+					err = nil
+				}
 				framework.ExpectNoError(err)
+
 				err = utils.WaitForNamespacedGVRDeletion(dc, SnapshotGVR, sr.Vs.GetName(), sr.Vs.GetNamespace(), framework.Poll, framework.SnapshotDeleteTimeout)
 				framework.ExpectNoError(err)
 			default:
@@ -531,6 +546,9 @@ func (sr *SnapshotResource) CleanupResource() error {
 				framework.ExpectNoError(err)
 			}
 			err = dc.Resource(SnapshotContentGVR).Delete(context.TODO(), sr.Vscontent.GetName(), metav1.DeleteOptions{})
+			if apierrors.IsNotFound(err) {
+				err = nil
+			}
 			framework.ExpectNoError(err)
 
 			err = utils.WaitForGVRDeletion(dc, SnapshotContentGVR, sr.Vscontent.GetName(), framework.Poll, framework.SnapshotDeleteTimeout)
