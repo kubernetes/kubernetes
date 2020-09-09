@@ -1,0 +1,60 @@
+# This file holds configuration for taint propagation analysis of Kubernetes source via go-flow-levee.
+# It defines sources which may contain credentials and sinks where these should not be logged.
+# Sources may be identified by the FieldTags element, or by matching package, type, and field explicitly in the Sources element.
+# Sanitizers permit sources to safely reach a sink.
+# False positives may be suppressed in the Exclude block.
+# Note that `*RE` keys have regexp values.
+---
+# These field tags were introduced by KEP-1753 to fields which may contain credentials
+FieldTags:
+  - Key: "datapolicy"
+    Val: "security-key"
+  - Key: "datapolicy"
+    Val: "token"
+  - Key: "datapolicy"
+    Val: "password"
+
+# This preliminary collection of source types should be removed once
+# KEP-1753 adds tags to the relevant fields.
+Sources:
+  - PackageRE: ""
+    TypeRE: "^(?:admin)?Secret$|Token"
+    FieldRE: ""
+  - PackageRE: "k8s.io/client-go/tools/clientcmd/api(?:/v1)?"
+    TypeRE: "^(?:Named)?AuthInfo$"
+    FieldRE: ""
+  - PackageRE: "k8s.io/kubernetes/pkg/credentialprovider"
+    TypeRE: "DockerConfigEntry"
+    FieldRE: "Password"
+  - PackageRE: "k8s.io/client-go/transport"
+    TypeRE: "requestInfo"
+    FieldRE: "RequestHeaders"
+  - PackageRE: "k8s.io/kubernetes/pkg/volume/rbd"
+    TypeRE: "rbdMounter"
+    FieldRE: "adminSecret"
+  - PackageRE: "^k8s.io/client-go/rest$"
+    TypeRE: "^TLSClientConfig$"
+    FieldRE: "Password|BearerToken$|"
+  - PackageRE: "^k8s.io/client-go/rest$"
+    TypeRE: "^Config$"
+    FieldRE: "Password|BearerToken$|"
+
+# Sinks are functions that should not be called with source or source-tainted arguments.
+# This configuration should capture all log unfiltered log calls.
+Sinks:
+  - PackageRE: "\bk?log\b"
+    ReceiverRE: ""
+    MethodRE: "Info|Warning|Error|Fatal|Exit"
+  - PackageRE: "\bk?log\b"
+    ReceiverRE: "Verbose"
+    MethodRE: "Info|Error"
+
+# Sanitizers permit a source to reach a sink by explicitly removing the source data.
+Sanitizers:
+  - PackageRE: "k8s.io/client-go/transport"
+    MethodRE: "maskValue"
+
+# False positives may be suppressed here.
+# Exclude reporting within a given function by specifying it similar to Sinks, i.e.,
+# PackageRE | ReceiverRE | MethodRE regexp
+Exclude: []
