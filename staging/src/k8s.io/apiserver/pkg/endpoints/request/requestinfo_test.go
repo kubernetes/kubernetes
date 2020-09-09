@@ -55,6 +55,8 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{"GET", "/api/v1/namespaces/other/pods/foo", "get", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
 		{"GET", "/api/v1/namespaces/other/pods", "list", "api", "", "v1", "other", "pods", "", "", []string{"pods"}},
 
+		{"PATCH", "/api/v1/namespaces/new-namespace", "patch", "api", "", "v1", "", "namespaces", "", "new-namespace", []string{"namespaces", "new-namespace"}},
+
 		// special verbs
 		{"GET", "/api/v1/proxy/namespaces/other/pods/foo", "proxy", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo"}},
 		{"GET", "/api/v1/proxy/namespaces/other/pods/foo/subpath/not/a/subresource", "proxy", "api", "", "v1", "other", "pods", "", "foo", []string{"pods", "foo", "subpath", "not", "a", "subresource"}},

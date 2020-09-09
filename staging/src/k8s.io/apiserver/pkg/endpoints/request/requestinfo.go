@@ -178,7 +178,12 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 
 	// URL forms: /namespaces/{namespace}/{kind}/*, where parts are adjusted to be relative to kind
 	if currentParts[0] == "namespaces" {
-		if len(currentParts) > 1 {
+		// When creating a new namespace using server-side apply a PATCH request is
+		// sent at /namespaces/new-namespace.  In this case, we don't want to add
+		// the namespace to the request.
+		if len(currentParts) == 2 && requestInfo.Verb == "patch" {
+			requestInfo.Namespace = metav1.NamespaceNone
+		} else if len(currentParts) > 1 {
 			requestInfo.Namespace = currentParts[1]
 
 			// if there is another step after the namespace name and it is not a known namespace subresource
