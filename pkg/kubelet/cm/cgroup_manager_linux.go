@@ -36,8 +36,6 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
@@ -275,11 +273,8 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 	// scoped to the set control groups it understands.  this is being discussed
 	// in https://github.com/opencontainers/runc/issues/1440
 	// once resolved, we can remove this code.
-	whitelistControllers := sets.NewString("cpu", "cpuacct", "cpuset", "memory", "systemd")
+	whitelistControllers := sets.NewString("cpu", "cpuacct", "cpuset", "memory", "systemd", "pids")
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportNodePidsLimit) {
-		whitelistControllers.Insert("pids")
-	}
 	if _, ok := m.subsystems.MountPoints["hugetlb"]; ok {
 		whitelistControllers.Insert("hugetlb")
 	}
@@ -348,13 +343,10 @@ func getSupportedSubsystems() map[subsystem]bool {
 	supportedSubsystems := map[subsystem]bool{
 		&cgroupfs.MemoryGroup{}: true,
 		&cgroupfs.CpuGroup{}:    true,
-		&cgroupfs.PidsGroup{}:   false,
+		&cgroupfs.PidsGroup{}:   true,
 	}
 	// not all hosts support hugetlb cgroup, and in the absent of hugetlb, we will fail silently by reporting no capacity.
 	supportedSubsystems[&cgroupfs.HugetlbGroup{}] = false
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportNodePidsLimit) {
-		supportedSubsystems[&cgroupfs.PidsGroup{}] = true
-	}
 	return supportedSubsystems
 }
 
@@ -413,10 +405,7 @@ var (
 // getSupportedUnifiedControllers returns a set of supported controllers when running on cgroup v2
 func getSupportedUnifiedControllers() sets.String {
 	// This is the set of controllers used by the Kubelet
-	supportedControllers := sets.NewString("cpu", "cpuset", "memory", "hugetlb")
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportNodePidsLimit) {
-		supportedControllers.Insert("pids")
-	}
+	supportedControllers := sets.NewString("cpu", "cpuset", "memory", "hugetlb", "pids")
 	// Memoize the set of controllers that are present in the root cgroup
 	availableRootControllersOnce.Do(func() {
 		var err error
@@ -540,10 +529,8 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	if resourceConfig.CpuPeriod != nil {
 		resources.CpuPeriod = *resourceConfig.CpuPeriod
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportNodePidsLimit) {
-		if resourceConfig.PidsLimit != nil {
-			resources.PidsLimit = *resourceConfig.PidsLimit
-		}
+	if resourceConfig.PidsLimit != nil {
+		resources.PidsLimit = *resourceConfig.PidsLimit
 	}
 	// if huge pages are enabled, we set them in libcontainer
 	// for each page size enumerated, set that value
@@ -601,7 +588,7 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 		updateSystemdCgroupInfo(libcontainerCgroupConfig, cgroupConfig.Name)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && cgroupConfig.ResourceParameters != nil && cgroupConfig.ResourceParameters.PidsLimit != nil {
+	if cgroupConfig.ResourceParameters != nil && cgroupConfig.ResourceParameters.PidsLimit != nil {
 		libcontainerCgroupConfig.PidsLimit = *cgroupConfig.ResourceParameters.PidsLimit
 	}
 
@@ -637,7 +624,7 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 		libcontainerCgroupConfig.Path = cgroupConfig.Name.ToCgroupfs()
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && cgroupConfig.ResourceParameters != nil && cgroupConfig.ResourceParameters.PidsLimit != nil {
+	if cgroupConfig.ResourceParameters != nil && cgroupConfig.ResourceParameters.PidsLimit != nil {
 		libcontainerCgroupConfig.PidsLimit = *cgroupConfig.ResourceParameters.PidsLimit
 	}
 

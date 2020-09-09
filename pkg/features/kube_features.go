@@ -203,6 +203,7 @@ const (
 	// owner: @dims, @derekwaynecarr
 	// alpha: v1.10
 	// beta: v1.14
+	// GA: v1.20
 	//
 	// Implement support for limiting pids in pods
 	SupportPodPidsLimit featuregate.Feature = "SupportPodPidsLimit"
@@ -447,8 +448,9 @@ const (
 	// a volume in a Pod.
 	ConfigurableFSGroupPolicy featuregate.Feature = "ConfigurableFSGroupPolicy"
 
-	// owner: @RobertKrawitz
+	// owner: @RobertKrawitz, @derekwaynecarr
 	// beta: v1.15
+	// GA: v1.20
 	//
 	// Implement support for limiting pids in nodes
 	SupportNodePidsLimit featuregate.Feature = "SupportNodePidsLimit"
@@ -681,8 +683,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	BlockVolume:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	StorageObjectInUseProtection:   {Default: true, PreRelease: featuregate.GA},
 	SupportIPVSProxyMode:           {Default: true, PreRelease: featuregate.GA},
-	SupportPodPidsLimit:            {Default: true, PreRelease: featuregate.Beta},
-	SupportNodePidsLimit:           {Default: true, PreRelease: featuregate.Beta},
+	SupportPodPidsLimit:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
+	SupportNodePidsLimit:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	HyperVContainer:                {Default: false, PreRelease: featuregate.Alpha},
 	TokenRequest:                   {Default: true, PreRelease: featuregate.Beta},
 	TokenRequestProjection:         {Default: true, PreRelease: featuregate.Beta},
