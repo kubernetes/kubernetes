@@ -381,7 +381,6 @@ staging/src/k8s.io/client-go/discovery
 staging/src/k8s.io/client-go/discovery/fake
 staging/src/k8s.io/client-go/dynamic
 staging/src/k8s.io/client-go/dynamic/fake
-staging/src/k8s.io/client-go/examples/workqueue
 staging/src/k8s.io/client-go/kubernetes/typed/certificates/v1beta1
 staging/src/k8s.io/client-go/kubernetes/typed/certificates/v1beta1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/core/v1

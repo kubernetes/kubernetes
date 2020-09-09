@@ -34,12 +34,14 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
+// Controller demonstrates how to implement a controller with client-go.
 type Controller struct {
 	indexer  cache.Indexer
 	queue    workqueue.RateLimitingInterface
 	informer cache.Controller
 }
 
+// NewController creates a new Controller.
 func NewController(queue workqueue.RateLimitingInterface, indexer cache.Indexer, informer cache.Controller) *Controller {
 	return &Controller{
 		informer: informer,
@@ -113,6 +115,7 @@ func (c *Controller) handleErr(err error, key interface{}) {
 	klog.Infof("Dropping pod %q out of the queue: %v", key, err)
 }
 
+// Run begins watching and syncing.
 func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
 	defer runtime.HandleCrash()
 
