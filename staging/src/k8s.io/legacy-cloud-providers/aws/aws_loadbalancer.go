@@ -34,7 +34,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -296,18 +295,64 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 								Type:           aws.String("forward"),
 							}},
 						}
+
+						if mapping.SSLPolicy != "" {
+							modifyListenerInput.SslPolicy = aws.String(mapping.SSLPolicy)
+						}
+						elbCertificates := []*elbv2.Certificate{}
 						if mapping.FrontendProtocol == elbv2.ProtocolEnumTls {
 							if mapping.SSLPolicy != "" {
 								modifyListenerInput.SslPolicy = aws.String(mapping.SSLPolicy)
 							}
-							modifyListenerInput.Certificates = []*elbv2.Certificate{
-								{
-									CertificateArn: aws.String(mapping.SSLCertificateARN),
-								},
+							if mapping.SSLCertificateARN != "" {
+								for _, ARN := range strings.Split(mapping.SSLCertificateARN, ",") {
+									elbCertificates = append(elbCertificates, &elbv2.Certificate{CertificateArn: aws.String(ARN)})
+								}
+								if len(elbCertificates) > 1 {
+									elbCertificates[0] = elbCertificates[0].SetIsDefault(true)
+									modifyListenerInput.Certificates = []*elbv2.Certificate{elbCertificates[0]}
+									elbCertificates = append(elbCertificates[:0], elbCertificates[1:]...)
+								}
 							}
 						}
+
 						if _, err := c.elbv2.ModifyListener(modifyListenerInput); err != nil {
 							return nil, fmt.Errorf("error updating load balancer listener: %q", err)
+						}
+
+						if len(elbCertificates) > 0 {
+							output, err := c.elbv2.DescribeListenerCertificates(&elbv2.DescribeListenerCertificatesInput{
+								ListenerArn: listener.ListenerArn,
+							})
+							if err != nil {
+								return nil, fmt.Errorf("error updating load balancer certificates: %q", err)
+							}
+							for _, cert := range output.Certificates {
+								if !aws.BoolValue(cert.IsDefault) {
+									cert.IsDefault = nil
+									if _, err := c.elbv2.RemoveListenerCertificates(&elbv2.RemoveListenerCertificatesInput{
+										ListenerArn:  listener.ListenerArn,
+										Certificates: []*elbv2.Certificate{cert},
+									}); err != nil {
+										return nil, fmt.Errorf("error updating load balancer certificates: %q", err)
+									}
+								}
+							}
+							if mapping.SSLCertificateARN != "" {
+								for _, ARN := range strings.Split(mapping.SSLCertificateARN, ",") {
+									addListenerCertificatesInput := &elbv2.AddListenerCertificatesInput{
+										ListenerArn: listener.ListenerArn,
+										Certificates: []*elbv2.Certificate{
+											{
+												CertificateArn: aws.String(ARN),
+											},
+										},
+									}
+									if _, err := c.elbv2.AddListenerCertificates(addListenerCertificatesInput); err != nil {
+										return nil, fmt.Errorf("error updating load balancer certificates: %q", err)
+									}
+								}
+							}
 						}
 					}
 
@@ -525,14 +570,20 @@ func (c *Cloud) createListenerV2(loadBalancerArn *string, mapping nlbPortMapping
 			Type:           aws.String(elbv2.ActionTypeEnumForward),
 		}},
 	}
-	if mapping.FrontendProtocol == "TLS" {
+
+	elbCertificates := []*elbv2.Certificate{}
+	if mapping.FrontendProtocol == elbv2.ProtocolEnumTls {
 		if mapping.SSLPolicy != "" {
 			createListernerInput.SslPolicy = aws.String(mapping.SSLPolicy)
 		}
-		createListernerInput.Certificates = []*elbv2.Certificate{
-			{
-				CertificateArn: aws.String(mapping.SSLCertificateARN),
-			},
+		if mapping.SSLCertificateARN != "" {
+			for _, ARN := range strings.Split(mapping.SSLCertificateARN, ",") {
+				elbCertificates = append(elbCertificates, &elbv2.Certificate{CertificateArn: aws.String(ARN)})
+			}
+			if len(elbCertificates) > 1 {
+				createListernerInput.Certificates = []*elbv2.Certificate{elbCertificates[0]}
+				elbCertificates = append(elbCertificates[:0], elbCertificates[1:]...)
+			}
 		}
 	}
 
@@ -541,6 +592,19 @@ func (c *Cloud) createListenerV2(loadBalancerArn *string, mapping nlbPortMapping
 	if err != nil {
 		return nil, fmt.Errorf("error creating load balancer listener: %q", err)
 	}
+
+	if len(elbCertificates) > 0 {
+		for _, cert := range elbCertificates {
+			addListenerCertificatesInput := &elbv2.AddListenerCertificatesInput{
+				ListenerArn:  createListenerOutput.Listeners[0].ListenerArn,
+				Certificates: []*elbv2.Certificate{cert},
+			}
+			if _, err := c.elbv2.AddListenerCertificates(addListenerCertificatesInput); err != nil {
+				return nil, fmt.Errorf("error updating load balancer certificates: %q", err)
+			}
+		}
+	}
+
 	return createListenerOutput.Listeners[0], nil
 }
 

@@ -607,6 +607,21 @@ func (elb *FakeELBV2) ModifyListener(*elbv2.ModifyListenerInput) (*elbv2.ModifyL
 	panic("Not implemented")
 }
 
+// AddListenerCertificates is not implemented but is required for interface conformance
+func (elb *FakeELBV2) AddListenerCertificates(*elbv2.AddListenerCertificatesInput) (*elbv2.AddListenerCertificatesOutput, error) {
+	panic("Not implemented")
+}
+
+// DescribeListenerCertificates is not implemented but is required for interface conformance
+func (elb *FakeELBV2) DescribeListenerCertificates(*elbv2.DescribeListenerCertificatesInput) (*elbv2.DescribeListenerCertificatesOutput, error) {
+	panic("Not implemented")
+}
+
+// RemoveListenerCertificates is not implemented but is required for interface conformance
+func (elb *FakeELBV2) RemoveListenerCertificates(*elbv2.RemoveListenerCertificatesInput) (*elbv2.RemoveListenerCertificatesOutput, error) {
+	panic("Not implemented")
+}
+
 // WaitUntilLoadBalancersDeleted is not implemented but is required for
 // interface conformance
 func (elb *FakeELBV2) WaitUntilLoadBalancersDeleted(*elbv2.DescribeLoadBalancersInput) error {
