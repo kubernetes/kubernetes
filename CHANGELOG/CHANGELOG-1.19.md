@@ -1,10 +1,24 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
+- [v1.19.1](#v1191)
+  - [Downloads for v1.19.1](#downloads-for-v1191)
+    - [Source Code](#source-code)
+    - [Client binaries](#client-binaries)
+    - [Server binaries](#server-binaries)
+    - [Node binaries](#node-binaries)
+  - [Changelog since v1.19.0](#changelog-since-v1190)
+  - [Changes by Kind](#changes-by-kind)
+    - [Bug or Regression](#bug-or-regression)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake)
+  - [Dependencies](#dependencies)
+    - [Added](#added)
+    - [Changed](#changed)
+    - [Removed](#removed)
 - [v1.19.0](#v1190)
   - [Downloads for v1.19.0](#downloads-for-v1190)
-    - [Client Binaries](#client-binaries)
-    - [Server Binaries](#server-binaries)
-    - [Node Binaries](#node-binaries)
+    - [Client Binaries](#client-binaries-1)
+    - [Server Binaries](#server-binaries-1)
+    - [Node Binaries](#node-binaries-1)
   - [Changelog since v1.18.0](#changelog-since-v1180)
   - [What’s New (Major Themes)](#what’s-new-major-themes)
     - [Deprecation warnings](#deprecation-warnings)
@@ -28,178 +42,277 @@
   - [Known Issues](#known-issues)
   - [Urgent Upgrade Notes ](#urgent-upgrade-notes-)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade)
-  - [Changes by Kind](#changes-by-kind)
+  - [Changes by Kind](#changes-by-kind-1)
     - [Deprecation](#deprecation)
     - [API Change](#api-change)
     - [Feature](#feature)
     - [Documentation](#documentation)
     - [Failing Test](#failing-test)
-    - [Bug or Regression](#bug-or-regression)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake)
-  - [Dependencies](#dependencies)
-    - [Added](#added)
-    - [Changed](#changed)
-    - [Removed](#removed)
+    - [Bug or Regression](#bug-or-regression-1)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-1)
   - [Dependencies](#dependencies-1)
     - [Added](#added-1)
     - [Changed](#changed-1)
     - [Removed](#removed-1)
-- [v1.19.0-rc.4](#v1190-rc4)
-  - [Downloads for v1.19.0-rc.4](#downloads-for-v1190-rc4)
-    - [Source Code](#source-code)
-    - [Client binaries](#client-binaries-1)
-    - [Server binaries](#server-binaries-1)
-    - [Node binaries](#node-binaries-1)
-  - [Changelog since v1.19.0-rc.3](#changelog-since-v1190-rc3)
-  - [Changes by Kind](#changes-by-kind-1)
-    - [Deprecation](#deprecation-1)
-    - [Bug or Regression](#bug-or-regression-1)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-1)
   - [Dependencies](#dependencies-2)
     - [Added](#added-2)
     - [Changed](#changed-2)
     - [Removed](#removed-2)
-- [v1.19.0-rc.3](#v1190-rc3)
-  - [Downloads for v1.19.0-rc.3](#downloads-for-v1190-rc3)
+- [v1.19.0-rc.4](#v1190-rc4)
+  - [Downloads for v1.19.0-rc.4](#downloads-for-v1190-rc4)
     - [Source Code](#source-code-1)
     - [Client binaries](#client-binaries-2)
     - [Server binaries](#server-binaries-2)
     - [Node binaries](#node-binaries-2)
-  - [Changelog since v1.19.0-rc.2](#changelog-since-v1190-rc2)
+  - [Changelog since v1.19.0-rc.3](#changelog-since-v1190-rc3)
   - [Changes by Kind](#changes-by-kind-2)
-    - [API Change](#api-change-1)
+    - [Deprecation](#deprecation-1)
     - [Bug or Regression](#bug-or-regression-2)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-2)
   - [Dependencies](#dependencies-3)
     - [Added](#added-3)
     - [Changed](#changed-3)
     - [Removed](#removed-3)
-- [v1.19.0-rc.2](#v1190-rc2)
-  - [Downloads for v1.19.0-rc.2](#downloads-for-v1190-rc2)
+- [v1.19.0-rc.3](#v1190-rc3)
+  - [Downloads for v1.19.0-rc.3](#downloads-for-v1190-rc3)
     - [Source Code](#source-code-2)
     - [Client binaries](#client-binaries-3)
     - [Server binaries](#server-binaries-3)
     - [Node binaries](#node-binaries-3)
-  - [Changelog since v1.19.0-rc.1](#changelog-since-v1190-rc1)
+  - [Changelog since v1.19.0-rc.2](#changelog-since-v1190-rc2)
   - [Changes by Kind](#changes-by-kind-3)
-    - [API Change](#api-change-2)
-    - [Feature](#feature-1)
+    - [API Change](#api-change-1)
     - [Bug or Regression](#bug-or-regression-3)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-2)
   - [Dependencies](#dependencies-4)
     - [Added](#added-4)
     - [Changed](#changed-4)
     - [Removed](#removed-4)
-- [v1.19.0-rc.1](#v1190-rc1)
-  - [Downloads for v1.19.0-rc.1](#downloads-for-v1190-rc1)
+- [v1.19.0-rc.2](#v1190-rc2)
+  - [Downloads for v1.19.0-rc.2](#downloads-for-v1190-rc2)
     - [Source Code](#source-code-3)
     - [Client binaries](#client-binaries-4)
     - [Server binaries](#server-binaries-4)
     - [Node binaries](#node-binaries-4)
-  - [Changelog since v1.19.0-rc.0](#changelog-since-v1190-rc0)
-  - [Urgent Upgrade Notes](#urgent-upgrade-notes)
-    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-1)
+  - [Changelog since v1.19.0-rc.1](#changelog-since-v1190-rc1)
   - [Changes by Kind](#changes-by-kind-4)
-    - [Deprecation](#deprecation-2)
-    - [API Change](#api-change-3)
-    - [Feature](#feature-2)
-    - [Failing Test](#failing-test-1)
+    - [API Change](#api-change-2)
+    - [Feature](#feature-1)
     - [Bug or Regression](#bug-or-regression-4)
     - [Other (Cleanup or Flake)](#other-cleanup-or-flake-3)
   - [Dependencies](#dependencies-5)
     - [Added](#added-5)
     - [Changed](#changed-5)
     - [Removed](#removed-5)
-- [v1.19.0-beta.2](#v1190-beta2)
-  - [Downloads for v1.19.0-beta.2](#downloads-for-v1190-beta2)
+- [v1.19.0-rc.1](#v1190-rc1)
+  - [Downloads for v1.19.0-rc.1](#downloads-for-v1190-rc1)
     - [Source Code](#source-code-4)
     - [Client binaries](#client-binaries-5)
     - [Server binaries](#server-binaries-5)
     - [Node binaries](#node-binaries-5)
-  - [Changelog since v1.19.0-beta.1](#changelog-since-v1190-beta1)
+  - [Changelog since v1.19.0-rc.0](#changelog-since-v1190-rc0)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes)
+    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-1)
   - [Changes by Kind](#changes-by-kind-5)
-    - [Deprecation](#deprecation-3)
-    - [API Change](#api-change-4)
-    - [Feature](#feature-3)
+    - [Deprecation](#deprecation-2)
+    - [API Change](#api-change-3)
+    - [Feature](#feature-2)
+    - [Failing Test](#failing-test-1)
     - [Bug or Regression](#bug-or-regression-5)
     - [Other (Cleanup or Flake)](#other-cleanup-or-flake-4)
   - [Dependencies](#dependencies-6)
     - [Added](#added-6)
     - [Changed](#changed-6)
     - [Removed](#removed-6)
-- [v1.19.0-beta.1](#v1190-beta1)
-  - [Downloads for v1.19.0-beta.1](#downloads-for-v1190-beta1)
+- [v1.19.0-beta.2](#v1190-beta2)
+  - [Downloads for v1.19.0-beta.2](#downloads-for-v1190-beta2)
     - [Source Code](#source-code-5)
     - [Client binaries](#client-binaries-6)
     - [Server binaries](#server-binaries-6)
     - [Node binaries](#node-binaries-6)
-  - [Changelog since v1.19.0-alpha.3](#changelog-since-v1190-alpha3)
-  - [Urgent Upgrade Notes](#urgent-upgrade-notes-1)
-    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-2)
+  - [Changelog since v1.19.0-beta.1](#changelog-since-v1190-beta1)
   - [Changes by Kind](#changes-by-kind-6)
-    - [API Change](#api-change-5)
-    - [Feature](#feature-4)
+    - [Deprecation](#deprecation-3)
+    - [API Change](#api-change-4)
+    - [Feature](#feature-3)
     - [Bug or Regression](#bug-or-regression-6)
     - [Other (Cleanup or Flake)](#other-cleanup-or-flake-5)
   - [Dependencies](#dependencies-7)
     - [Added](#added-7)
     - [Changed](#changed-7)
     - [Removed](#removed-7)
-- [v1.19.0-beta.0](#v1190-beta0)
-  - [Downloads for v1.19.0-beta.0](#downloads-for-v1190-beta0)
+- [v1.19.0-beta.1](#v1190-beta1)
+  - [Downloads for v1.19.0-beta.1](#downloads-for-v1190-beta1)
     - [Source Code](#source-code-6)
     - [Client binaries](#client-binaries-7)
     - [Server binaries](#server-binaries-7)
     - [Node binaries](#node-binaries-7)
-  - [Changelog since v1.19.0-alpha.3](#changelog-since-v1190-alpha3-1)
+  - [Changelog since v1.19.0-alpha.3](#changelog-since-v1190-alpha3)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes-1)
+    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-2)
   - [Changes by Kind](#changes-by-kind-7)
-    - [API Change](#api-change-6)
-    - [Feature](#feature-5)
+    - [API Change](#api-change-5)
+    - [Feature](#feature-4)
     - [Bug or Regression](#bug-or-regression-7)
     - [Other (Cleanup or Flake)](#other-cleanup-or-flake-6)
   - [Dependencies](#dependencies-8)
     - [Added](#added-8)
     - [Changed](#changed-8)
     - [Removed](#removed-8)
-- [v1.19.0-alpha.3](#v1190-alpha3)
-  - [Downloads for v1.19.0-alpha.3](#downloads-for-v1190-alpha3)
-    - [Client Binaries](#client-binaries-8)
-    - [Server Binaries](#server-binaries-8)
-    - [Node Binaries](#node-binaries-8)
-  - [Changelog since v1.19.0-alpha.2](#changelog-since-v1190-alpha2)
-  - [Urgent Upgrade Notes](#urgent-upgrade-notes-2)
-    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-3)
+- [v1.19.0-beta.0](#v1190-beta0)
+  - [Downloads for v1.19.0-beta.0](#downloads-for-v1190-beta0)
+    - [Source Code](#source-code-7)
+    - [Client binaries](#client-binaries-8)
+    - [Server binaries](#server-binaries-8)
+    - [Node binaries](#node-binaries-8)
+  - [Changelog since v1.19.0-alpha.3](#changelog-since-v1190-alpha3-1)
   - [Changes by Kind](#changes-by-kind-8)
-    - [Deprecation](#deprecation-4)
-    - [API Change](#api-change-7)
-    - [Feature](#feature-6)
+    - [API Change](#api-change-6)
+    - [Feature](#feature-5)
     - [Bug or Regression](#bug-or-regression-8)
     - [Other (Cleanup or Flake)](#other-cleanup-or-flake-7)
-- [v1.19.0-alpha.2](#v1190-alpha2)
-  - [Downloads for v1.19.0-alpha.2](#downloads-for-v1190-alpha2)
+  - [Dependencies](#dependencies-9)
+    - [Added](#added-9)
+    - [Changed](#changed-9)
+    - [Removed](#removed-9)
+- [v1.19.0-alpha.3](#v1190-alpha3)
+  - [Downloads for v1.19.0-alpha.3](#downloads-for-v1190-alpha3)
     - [Client Binaries](#client-binaries-9)
     - [Server Binaries](#server-binaries-9)
     - [Node Binaries](#node-binaries-9)
-  - [Changelog since v1.19.0-alpha.1](#changelog-since-v1190-alpha1)
-  - [Urgent Upgrade Notes](#urgent-upgrade-notes-3)
-    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-4)
+  - [Changelog since v1.19.0-alpha.2](#changelog-since-v1190-alpha2)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes-2)
+    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-3)
   - [Changes by Kind](#changes-by-kind-9)
-    - [API Change](#api-change-8)
-    - [Feature](#feature-7)
+    - [Deprecation](#deprecation-4)
+    - [API Change](#api-change-7)
+    - [Feature](#feature-6)
     - [Bug or Regression](#bug-or-regression-9)
     - [Other (Cleanup or Flake)](#other-cleanup-or-flake-8)
-- [v1.19.0-alpha.1](#v1190-alpha1)
-  - [Downloads for v1.19.0-alpha.1](#downloads-for-v1190-alpha1)
+- [v1.19.0-alpha.2](#v1190-alpha2)
+  - [Downloads for v1.19.0-alpha.2](#downloads-for-v1190-alpha2)
     - [Client Binaries](#client-binaries-10)
     - [Server Binaries](#server-binaries-10)
     - [Node Binaries](#node-binaries-10)
+  - [Changelog since v1.19.0-alpha.1](#changelog-since-v1190-alpha1)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes-3)
+    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-4)
+  - [Changes by Kind](#changes-by-kind-10)
+    - [API Change](#api-change-8)
+    - [Feature](#feature-7)
+    - [Bug or Regression](#bug-or-regression-10)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-9)
+- [v1.19.0-alpha.1](#v1190-alpha1)
+  - [Downloads for v1.19.0-alpha.1](#downloads-for-v1190-alpha1)
+    - [Client Binaries](#client-binaries-11)
+    - [Server Binaries](#server-binaries-11)
+    - [Node Binaries](#node-binaries-11)
   - [Changelog since v1.19.0-alpha.0](#changelog-since-v1190-alpha0)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes-4)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-5)
-  - [Changes by Kind](#changes-by-kind-10)
+  - [Changes by Kind](#changes-by-kind-11)
     - [Deprecation](#deprecation-5)
     - [API Change](#api-change-9)
 
 <!-- END MUNGE: GENERATED_TOC -->
+
+# v1.19.1
+
+
+## Downloads for v1.19.1
+
+### Source Code
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes.tar.gz) | cbcac78b122cfe7301247c935efdfe0ad42ca8b1229f35d4ba2feb3286eca86f7996bfcbbd810e611f6efa37a74ece7d46eac585f2b7a9fda5e9461f8bf5dbac
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-src.tar.gz) | 00ea5562087bfc902f3081385bd8200e003038f86cd62e02da20b70583c33c8b8ec2f4d46268ea7278d447cbddb1ab6840b2174ee71a4c68e2306ed416159c35
+
+### Client binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-client-darwin-amd64.tar.gz) | e2926509570d772816de6dd23dc31c23833ed777be924abfb6d14901bd8b653fa8d7345b21b91f005e748813d5cbdb26168b6065a31219dfb6cc2686b4e878ac
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-client-linux-386.tar.gz) | 0a2b4cb64ed7f1e6ac107ee3fdea911d90fa5d7cc907c3fefc9da732cc5a8082f18a8167d7ece68f1e15f6f400e6b4b7a6ad0986205965acc8fc403ce22613b2
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-client-linux-amd64.tar.gz) | 424ba5a094947e62c935ad7049efc13762f2f232ed05872e4f3945b3c39d6e6c82d1e3f60d0970fdc8f01cf4886ef5de77224df7e481774c04d86429dbfb2055
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-client-linux-arm.tar.gz) | 48ac4e600ff914f307fc4c194cdf925c3d9ca077d54d4e09d32941079e610f1d42333e1e31f334c4ae758e4957dc5dad2e6bcb026a3ed5befed2dcb942bf3d75
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-client-linux-arm64.tar.gz) | 765446ed59124fef6ff3aff0b2221935d1554b095144f9af37ea7da20a11ce328f7a60fd18f9d75ca3649c02667f0e1334cdec22f39f81fb6992c0071447a5e9
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-client-linux-ppc64le.tar.gz) | e220220fb48adb79258ca803b172a7dcc5ac4ced079aea73c4b172c57738840c59dda9f6ef207ef70e937a6599d748d2d0d2b02f7814281a56eb91dbfc55f59a
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-client-linux-s390x.tar.gz) | 9c15feb128348df0e843af439a6c5b7058a31b815da973829da8140021c0e3f1d1ac881f6e9357737a9244b58fbd7f34664903fe34414d802df67e901e57742a
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-client-windows-386.tar.gz) | 3404e4c903715e37ad501cf51d405e636827059a76e00960629ded4479174fdda8148166c751e240e94048a2408e6b94b964436879f7764be2f3e618556eda6e
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-client-windows-amd64.tar.gz) | a3b219ffeb432ecefd64f7734207b51e048c631cb28e989f86ce75815a5cc9927b9d3e7ee06d0f02c5f5a299c0e3b21d62c9c462c52d80810fb3a8424087c445
+
+### Server binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-server-linux-amd64.tar.gz) | 70f0389c8c5f35eaa67736aebb857f0b26ca777a77662c21ebd2b719608c16663e888b8e1b93e90564c206f179524ff421dbb5cb1f3289a71f27eca388087451
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-server-linux-arm.tar.gz) | 214372f65ea6f9c90d54d8b9e531e1f6cc2a0a828dffab7e6cda0a747926580509930d25e44354b27a4933df49c016e4a0ae51439228cd31cc582a6996bd1615
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-server-linux-arm64.tar.gz) | 4ce4f599057e1f86a37f070f91e9e8e624b0fd73dd8a4d79bae60097734a0ed2a9855bf1f5795be76ade5815d1f97ca06b764ba9efe5af11afe420cdc659fa84
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-server-linux-ppc64le.tar.gz) | 47d788d472585857cb7dec42ccd5d1eaec06970c4257617a53a6b1dc774ee07b33c7b5d87d741486800ffbed82b6ff3505504c1ea03de68bce0382ed44829473
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-server-linux-s390x.tar.gz) | d911a7345a114b769a8ef9f26eb6d06c321220da07d8d6094f5e4c1dff6394b24ddd2859f55986ff87397c3f59355cd9c28f243c96da432ea385ec09631de223
+
+### Node binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-node-linux-amd64.tar.gz) | 16d32f85594ca6b3f26ac6827be2ea927b79966efa55edcab1f3d5628744759a1e1f7c04e50dfe47da17a2d63f70cc5989ae47f057bc958c6f4c52461406090c
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-node-linux-arm.tar.gz) | b73af373e504fadbff9ef88c2fee4fe1d449c9343ed73d37a0c6b39bef0038c5bf15783062cc3fa50ca63969f5e8062517e9e0b5ce7a6db633eb5555a4611276
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-node-linux-arm64.tar.gz) | 842e5687d1c99f655431732974289825986425949d2cc0a1c35326c8e6c446cc5ffaeef69d9efdb9bba16c7f6aa8c8ae59e9575929747bff1238a47c8d04e959
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-node-linux-ppc64le.tar.gz) | 222e9e10f2f38fdc160ddb73f01d106788d4b9863f8aef2ad427a965187ebc90f1cbce3985d9197db2512a0918b59e7dd79e20c783cb95a06c40ce6afe0594a9
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-node-linux-s390x.tar.gz) | 7edf2e03726ff3a340fdb09d8c2fc9aaff8e48a06499cdfb9956879552d18cb12e9ea846296c3d2c7237f6941967d3fed7548caef3ce65fcd7ec06736a9a494a
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.19.1/kubernetes-node-windows-amd64.tar.gz) | 09997c6edc473964f1d2ebf2fa4c8287e9146088f26257fc29277c5a1ad6794ff251c33fb4777919440beee0d46ea45cd42a0f18721bc38d4a8b5c65d57cece2
+
+## Changelog since v1.19.0
+
+## Changes by Kind
+
+### Bug or Regression
+
+- Azure: fix a bug that kube-controller-manager would panic if wrong Azure VMSS name is configured ([#94306](https://github.com/kubernetes/kubernetes/pull/94306), [@knight42](https://github.com/knight42)) [SIG Cloud Provider]
+- Build/lib/release: Explicitly use '--platform' in building server images
+  
+  When we switched to go-runner for building the apiserver,
+  controller-manager, and scheduler server components, we no longer
+  reference the individual architectures in the image names, specifically
+  in the 'FROM' directive of the server image Dockerfiles.
+  
+  As a result, server images for non-amd64 images copy in the go-runner
+  amd64 binary instead of the go-runner that matches that architecture.
+  
+  This commit explicitly sets the '--platform=linux/${arch}' to ensure
+  we're pulling the correct go-runner arch from the manifest list.
+  
+  Before:
+  `FROM ${base_image}`
+  
+  After:
+  `FROM --platform=linux/${arch} ${base_image}` ([#94613](https://github.com/kubernetes/kubernetes/pull/94613), [@justaugustus](https://github.com/justaugustus)) [SIG Release]
+- Fix a concurrent map writes error in kubelet ([#93773](https://github.com/kubernetes/kubernetes/pull/93773), [@knight42](https://github.com/knight42)) [SIG Node]
+- Fix a regression where kubeadm bails out with a fatal error when an optional version command line argument is supplied to the "kubeadm upgrade plan" command ([#94421](https://github.com/kubernetes/kubernetes/pull/94421), [@rosti](https://github.com/rosti)) [SIG Cluster Lifecycle]
+- Fixed bug in reflector that couldn't recover from "Too large resource version" errors with API servers 1.17.0-1.18.5 ([#94316](https://github.com/kubernetes/kubernetes/pull/94316), [@janeczku](https://github.com/janeczku)) [SIG API Machinery]
+- Kubeadm: make the kubeconfig files for the kube-controller-manager and kube-scheduler use the LocalAPIEndpoint instead of the ControlPlaneEndpoint. This makes kubeadm clusters more reseliant to version skew problems during immutable upgrades: https://kubernetes.io/docs/setup/release/version-skew-policy/&#35;kube-controller-manager-kube-scheduler-and-cloud-controller-manager ([#94398](https://github.com/kubernetes/kubernetes/pull/94398), [@neolit123](https://github.com/neolit123)) [SIG Cluster Lifecycle]
+- Update default etcd server version to 3.4.13 ([#94536](https://github.com/kubernetes/kubernetes/pull/94536), [@jingyih](https://github.com/jingyih)) [SIG API Machinery, Cloud Provider, Cluster Lifecycle and Testing]
+- Upon successful authorization check, an impersonated user is added to the system:authenticated group.
+  system:anonymous when impersonated is added to the system:unauthenticated group. ([#94408](https://github.com/kubernetes/kubernetes/pull/94408), [@tkashem](https://github.com/tkashem)) [SIG API Machinery and Testing]
+- Use NLB Subnet CIDRs instead of VPC CIDRs in Health Check SG Rules ([#93515](https://github.com/kubernetes/kubernetes/pull/93515), [@t0rr3sp3dr0](https://github.com/t0rr3sp3dr0)) [SIG Cloud Provider]
+
+### Other (Cleanup or Flake)
+
+- Fixes the flooding warning messages about setting volume ownership for configmap/secret volumes ([#92878](https://github.com/kubernetes/kubernetes/pull/92878), [@jvanz](https://github.com/jvanz)) [SIG Instrumentation, Node and Storage]
+- Kubeadm: remove the CoreDNS check for known image digests when applying the addon ([#94506](https://github.com/kubernetes/kubernetes/pull/94506), [@neolit123](https://github.com/neolit123)) [SIG Cluster Lifecycle]
+
+## Dependencies
+
+### Added
+_Nothing has changed._
+
+### Changed
+_Nothing has changed._
+
+### Removed
+_Nothing has changed._
+
+
 
 # v1.19.0
 
