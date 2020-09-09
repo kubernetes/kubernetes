@@ -484,8 +484,6 @@ func dropDisabledFields(
 		})
 	}
 
-	dropDisabledRunAsGroupField(podSpec, oldPodSpec)
-
 	dropDisabledFSGroupFields(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) && !overheadInUse(oldPodSpec) {
@@ -510,22 +508,6 @@ func dropDisabledFields(
 		podSpec.SetHostnameAsFQDN = nil
 	}
 
-}
-
-// dropDisabledRunAsGroupField removes disabled fields from PodSpec related
-// to RunAsGroup
-func dropDisabledRunAsGroupField(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) && !runAsGroupInUse(oldPodSpec) {
-		if podSpec.SecurityContext != nil {
-			podSpec.SecurityContext.RunAsGroup = nil
-		}
-		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-			if c.SecurityContext != nil {
-				c.SecurityContext.RunAsGroup = nil
-			}
-			return true
-		})
-	}
 }
 
 // dropDisabledProcMountField removes disabled fields from PodSpec related
@@ -689,28 +671,6 @@ func emptyDirSizeLimitInUse(podSpec *api.PodSpec) bool {
 		}
 	}
 	return false
-}
-
-// runAsGroupInUse returns true if the pod spec is non-nil and has a SecurityContext's RunAsGroup field set
-func runAsGroupInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-
-	if podSpec.SecurityContext != nil && podSpec.SecurityContext.RunAsGroup != nil {
-		return true
-	}
-
-	var inUse bool
-	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-		if c.SecurityContext != nil && c.SecurityContext.RunAsGroup != nil {
-			inUse = true
-			return false
-		}
-		return true
-	})
-
-	return inUse
 }
 
 // subpathExprInUse returns true if the pod spec is non-nil and has a volume mount that makes use of the subPathExpr feature

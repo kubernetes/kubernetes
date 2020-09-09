@@ -28,9 +28,6 @@ func DropDisabledFields(pspSpec, oldPSPSpec *policy.PodSecurityPolicySpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) && !allowedProcMountTypesInUse(oldPSPSpec) {
 		pspSpec.AllowedProcMountTypes = nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) && (oldPSPSpec == nil || oldPSPSpec.RunAsGroup == nil) {
-		pspSpec.RunAsGroup = nil
-	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) && !sysctlsInUse(oldPSPSpec) {
 		pspSpec.AllowedUnsafeSysctls = nil
 		pspSpec.ForbiddenSysctls = nil
