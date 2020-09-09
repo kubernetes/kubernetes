@@ -27,6 +27,9 @@ func BindLeaderElectionFlags(l *config.LeaderElectionConfiguration, fs *pflag.Fl
 		"Start a leader election client and gain leadership before "+
 		"executing the main loop. Enable this when running replicated "+
 		"components for high availability.")
+	fs.DurationVar(&l.ClientTimeout.Duration, "leader-elect-client-timeout", l.ClientTimeout.Duration, ""+
+		"Timeout used by kube-apiserver's client."+
+		"This is only applicable if leader election is enabled.")
 	fs.DurationVar(&l.LeaseDuration.Duration, "leader-elect-lease-duration", l.LeaseDuration.Duration, ""+
 		"The duration that non-leader candidates will wait after observing a leadership "+
 		"renewal until attempting to acquire leadership of a led but unrenewed leader "+

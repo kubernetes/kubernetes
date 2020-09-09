@@ -51,6 +51,11 @@ func RecommendedDefaultLeaderElectionConfiguration(obj *LeaderElectionConfigurat
 	if obj.LeaderElect == nil {
 		obj.LeaderElect = utilpointer.BoolPtr(true)
 	}
+	// ClientTimeout is an additional config parameter that was added.
+	// It will be ignored by library consumers that are using old path to construct Lock instance.
+	if obj.ClientTimeout == zero {
+		obj.ClientTimeout = metav1.Duration{Duration: 2 * time.Second}
+	}
 }
 
 // RecommendedDefaultClientConnectionConfiguration defaults a pointer to a

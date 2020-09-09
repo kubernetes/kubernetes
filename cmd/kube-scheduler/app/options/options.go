@@ -267,7 +267,11 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	}
 
 	// Prepare kube clients.
-	client, leaderElectionClient, eventClient, err := createClients(c.ComponentConfig.ClientConnection, o.Master, c.ComponentConfig.LeaderElection.RenewDeadline.Duration)
+	kubeconfig, err := createKubeconfig(c.ComponentConfig.ClientConnection, o.Master)
+	if err != nil {
+		return nil, err
+	}
+	client, eventClient, err := createClients(kubeconfig, c.ComponentConfig.LeaderElection.RenewDeadline.Duration)
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +283,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	if c.ComponentConfig.LeaderElection.LeaderElect {
 		// Use the scheduler name in the first profile to record leader election.
 		coreRecorder := c.EventBroadcaster.DeprecatedNewLegacyRecorder(c.ComponentConfig.Profiles[0].SchedulerName)
-		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, leaderElectionClient, coreRecorder)
+		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, kubeconfig, coreRecorder)
 		if err != nil {
 			return nil, err
 		}
@@ -294,7 +298,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 
 // makeLeaderElectionConfig builds a leader election configuration. It will
 // create a new resource lock associated with the configuration.
-func makeLeaderElectionConfig(config componentbaseconfig.LeaderElectionConfiguration, client clientset.Interface, recorder record.EventRecorder) (*leaderelection.LeaderElectionConfig, error) {
+func makeLeaderElectionConfig(config componentbaseconfig.LeaderElectionConfiguration, kubeconfig *restclient.Config, recorder record.EventRecorder) (*leaderelection.LeaderElectionConfig, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get hostname: %v", err)
@@ -302,15 +306,15 @@ func makeLeaderElectionConfig(config componentbaseconfig.LeaderElectionConfigura
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id := hostname + "_" + string(uuid.NewUUID())
 
-	rl, err := resourcelock.New(config.ResourceLock,
+	rl, err := resourcelock.NewFromKubeconfig(config.ResourceLock,
 		config.ResourceNamespace,
 		config.ResourceName,
-		client.CoreV1(),
-		client.CoordinationV1(),
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorder,
-		})
+		},
+		kubeconfig,
+		config.ClientTimeout.Duration)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create resource lock: %v", err)
 	}
@@ -327,7 +331,25 @@ func makeLeaderElectionConfig(config componentbaseconfig.LeaderElectionConfigura
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
-func createClients(config componentbaseconfig.ClientConnectionConfiguration, masterOverride string, timeout time.Duration) (clientset.Interface, clientset.Interface, clientset.Interface, error) {
+func createClients(kubeConfig *restclient.Config, timeout time.Duration) (clientset.Interface, clientset.Interface, error) {
+	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeConfig, "scheduler"))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// shallow copy, do not modify the kubeConfig.Timeout.
+	restConfig := *kubeConfig
+	restConfig.Timeout = timeout
+
+	eventClient, err := clientset.NewForConfig(kubeConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return client, eventClient, nil
+}
+
+func createKubeconfig(config componentbaseconfig.ClientConnectionConfiguration, masterOverride string) (*restclient.Config, error) {
 	if len(config.Kubeconfig) == 0 && len(masterOverride) == 0 {
 		klog.Warningf("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
 	}
@@ -338,32 +360,14 @@ func createClients(config componentbaseconfig.ClientConnectionConfiguration, mas
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: config.Kubeconfig},
 		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterOverride}}).ClientConfig()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	kubeConfig.DisableCompression = true
 	kubeConfig.AcceptContentTypes = config.AcceptContentTypes
 	kubeConfig.ContentType = config.ContentType
 	kubeConfig.QPS = config.QPS
+	//TODO make config struct use int instead of int32?
 	kubeConfig.Burst = int(config.Burst)
-
-	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeConfig, "scheduler"))
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	// shallow copy, do not modify the kubeConfig.Timeout.
-	restConfig := *kubeConfig
-	restConfig.Timeout = timeout
-	leaderElectionClient, err := clientset.NewForConfig(restclient.AddUserAgent(&restConfig, "leader-election"))
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	eventClient, err := clientset.NewForConfig(kubeConfig)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return client, leaderElectionClient, eventClient, nil
+	return kubeConfig, nil
 }

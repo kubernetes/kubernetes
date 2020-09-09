@@ -476,6 +476,7 @@ clientConnection:
   qps: 0
 kind: KubeSchedulerConfiguration
 leaderElection:
+  clientTimeout: 0s
   leaderElect: null
   leaseDuration: 0s
   renewDeadline: 0s
@@ -573,6 +574,7 @@ enableProfiling: false
 healthzBindAddress: ""
 kind: KubeSchedulerConfiguration
 leaderElection:
+  clientTimeout: 0s
   leaderElect: false
   leaseDuration: 0s
   renewDeadline: 0s

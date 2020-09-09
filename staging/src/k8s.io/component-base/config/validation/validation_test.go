@@ -72,6 +72,7 @@ func TestValidateLeaderElectionConfiguration(t *testing.T) {
 	validConfig := &config.LeaderElectionConfiguration{
 		ResourceLock:      "configmap",
 		LeaderElect:       true,
+		ClientTimeout:     metav1.Duration{Duration: 5 * time.Second},
 		LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
 		RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
 		RetryPeriod:       metav1.Duration{Duration: 5 * time.Second},
@@ -79,14 +80,12 @@ func TestValidateLeaderElectionConfiguration(t *testing.T) {
 		ResourceName:      "name",
 	}
 
+	LeaderElectButLeaderElectNotEnabled := validConfig.DeepCopy()
+	LeaderElectButLeaderElectNotEnabled.LeaderElect = false
+	LeaderElectButLeaderElectNotEnabled.LeaseDuration = metav1.Duration{Duration: -45 * time.Second}
+
 	renewDeadlineExceedsLeaseDuration := validConfig.DeepCopy()
 	renewDeadlineExceedsLeaseDuration.RenewDeadline = metav1.Duration{Duration: 45 * time.Second}
-
-	renewDeadlineZero := validConfig.DeepCopy()
-	renewDeadlineZero.RenewDeadline = metav1.Duration{Duration: 0 * time.Second}
-
-	leaseDurationZero := validConfig.DeepCopy()
-	leaseDurationZero.LeaseDuration = metav1.Duration{Duration: 0 * time.Second}
 
 	negativeValForRetryPeriod := validConfig.DeepCopy()
 	negativeValForRetryPeriod.RetryPeriod = metav1.Duration{Duration: -45 * time.Second}
@@ -97,9 +96,17 @@ func TestValidateLeaderElectionConfiguration(t *testing.T) {
 	negativeValForRenewDeadline := validConfig.DeepCopy()
 	negativeValForRenewDeadline.RenewDeadline = metav1.Duration{Duration: -45 * time.Second}
 
-	LeaderElectButLeaderElectNotEnabled := validConfig.DeepCopy()
-	LeaderElectButLeaderElectNotEnabled.LeaderElect = false
-	LeaderElectButLeaderElectNotEnabled.LeaseDuration = metav1.Duration{Duration: -45 * time.Second}
+	negativeValForClientTimeout := validConfig.DeepCopy()
+	negativeValForClientTimeout.ClientTimeout = metav1.Duration{Duration: -45 * time.Second}
+
+	renewDeadlineZero := validConfig.DeepCopy()
+	renewDeadlineZero.RenewDeadline = metav1.Duration{Duration: 0 * time.Second}
+
+	leaseDurationZero := validConfig.DeepCopy()
+	leaseDurationZero.LeaseDuration = metav1.Duration{Duration: 0 * time.Second}
+
+	clientTimeoutZero := validConfig.DeepCopy()
+	clientTimeoutZero.ClientTimeout = metav1.Duration{Duration: 0 * time.Second}
 
 	resourceLockNotDefined := validConfig.DeepCopy()
 	resourceLockNotDefined.ResourceLock = ""
@@ -138,6 +145,10 @@ func TestValidateLeaderElectionConfiguration(t *testing.T) {
 			expectedToFail: true,
 			config:         negativeValForRenewDeadline,
 		},
+		"bad-negative-value-for-client-timeout": {
+			expectedToFail: true,
+			config:         negativeValForClientTimeout,
+		},
 		"bad-renew-deadline-zero": {
 			expectedToFail: true,
 			config:         renewDeadlineZero,
@@ -149,6 +160,10 @@ func TestValidateLeaderElectionConfiguration(t *testing.T) {
 		"bad-resource-lock-not-defined": {
 			expectedToFail: true,
 			config:         resourceLockNotDefined,
+		},
+		"bad-zero-for-client-timeout": {
+			expectedToFail: true,
+			config:         clientTimeoutZero,
 		},
 		"bad-resource-name-not-defined": {
 			expectedToFail: true,

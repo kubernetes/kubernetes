@@ -115,6 +115,7 @@ var args = []string{
 	"--kubeconfig=/kubeconfig",
 	"--large-cluster-size-threshold=100",
 	"--leader-elect=false",
+	"--leader-elect-client-timeout=5s",
 	"--leader-elect-lease-duration=30s",
 	"--leader-elect-renew-deadline=15s",
 	"--leader-elect-resource-lock=configmap",
@@ -180,6 +181,7 @@ func TestAddFlags(t *testing.T) {
 				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
 					ResourceLock:      "configmap",
 					LeaderElect:       false,
+					ClientTimeout:     metav1.Duration{Duration: 5 * time.Second},
 					LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 5 * time.Second},
@@ -461,6 +463,7 @@ func TestApplyTo(t *testing.T) {
 				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
 					ResourceLock:      "configmap",
 					LeaderElect:       false,
+					ClientTimeout:     metav1.Duration{Duration: 5 * time.Second},
 					LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 5 * time.Second},

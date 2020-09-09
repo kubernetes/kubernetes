@@ -116,6 +116,7 @@ func autoConvert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguratio
 }
 
 func autoConvert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(in *LeaderElectionConfiguration, out *config.LeaderElectionConfiguration, s conversion.Scope) error {
+	out.ClientTimeout = in.ClientTimeout
 	if err := v1.Convert_Pointer_bool_To_bool(&in.LeaderElect, &out.LeaderElect, s); err != nil {
 		return err
 	}
@@ -129,6 +130,7 @@ func autoConvert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionCo
 }
 
 func autoConvert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(in *config.LeaderElectionConfiguration, out *LeaderElectionConfiguration, s conversion.Scope) error {
+	out.ClientTimeout = in.ClientTimeout
 	if err := v1.Convert_bool_To_Pointer_bool(&in.LeaderElect, &out.LeaderElect, s); err != nil {
 		return err
 	}

@@ -50,6 +50,7 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
 			ResourceLock:      "configmap",
 			LeaderElect:       true,
+			ClientTimeout:     metav1.Duration{Duration: 5 * time.Second},
 			LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
 			RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
 			RetryPeriod:       metav1.Duration{Duration: 5 * time.Second},

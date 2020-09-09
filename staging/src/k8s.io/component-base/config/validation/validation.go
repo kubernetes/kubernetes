@@ -36,6 +36,9 @@ func ValidateLeaderElectionConfiguration(cc *config.LeaderElectionConfiguration,
 	if !cc.LeaderElect {
 		return allErrs
 	}
+	if cc.ClientTimeout.Duration <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("clientTimeout"), cc.ClientTimeout, "must be greater than zero"))
+	}
 	if cc.LeaseDuration.Duration <= 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("leaseDuration"), cc.LeaseDuration, "must be greater than zero"))
 	}

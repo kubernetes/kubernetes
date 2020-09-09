@@ -25,6 +25,9 @@ const EndpointsResourceLock = "endpoints"
 // LeaderElectionConfiguration defines the configuration of leader election
 // clients for components that can run with leader election enabled.
 type LeaderElectionConfiguration struct {
+	// clientTimeout indicates the timeout set for client used to communicate
+	// with kube-apiserver.
+	ClientTimeout metav1.Duration `json:"clientTimeout"`
 	// leaderElect enables a leader election client to gain leadership
 	// before executing the main loop. Enable this when running replicated
 	// components for high availability.
