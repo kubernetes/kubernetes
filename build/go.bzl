@@ -14,41 +14,22 @@
 
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_test")
 
-# Defines several go_binary rules to work around a Bazel issue which makes
-# the pure attribute on go_binary not configurable.
-# The name provided will have cgo enabled if targeting Linux, and will
-# be a pure go binary otherwise. Additionally, if targeting Windows, the
-# output filename will have a .exe suffix.
-def go_binary_conditional_pure(name, tags = None, **kwargs):
-    tags = tags or []
-    tags.append("manual")
+# Defines a go_binary rule that enables cgo on platform builds targeting Linux,
+# and otherwise builds a pure go binary. Additionally, if targeting Windows,
+# the output filename will have a .exe suffix.
+def go_binary_conditional_pure(name, tags = [], **kwargs):
     go_binary(
-        name = "_%s-cgo" % name,
-        out = name,
-        pure = "off",
-        tags = tags,
-        **kwargs
-    )
-
-    # Define a rule for both Unix and Windows exe suffixes.
-    [go_binary(
-        name = "_%s-pure" % out,
-        out = out,
-        pure = "on",
-        tags = tags,
-        **kwargs
-    ) for out in [name, name + ".exe"]]
-
-    # The real magic, where we work around the pure attribute not being
-    # configurable: select the appropriate go_binary rule above based on the
-    # configured platform.
-    native.alias(
         name = name,
-        actual = select({
-            "@io_bazel_rules_go//go/platform:linux": ":_%s-cgo" % name,
-            "@io_bazel_rules_go//go/platform:windows": ":_%s.exe-pure" % name,
-            "//conditions:default": ":_%s-pure" % name,
+        out = select({
+            "@io_bazel_rules_go//go/platform:windows": ":_%s.exe" % name,
+            "//conditions:default": None,
         }),
+        pure = select({
+            "@io_bazel_rules_go//go/platform:linux": "off",
+            "//conditions:default": "on",
+        }),
+        tags = ["manual"] + tags,
+        **kwargs
     )
 
 # Defines several go_test rules to work around a Bazel issue which makes
