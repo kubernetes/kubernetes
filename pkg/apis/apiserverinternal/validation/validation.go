@@ -25,10 +25,42 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
+	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // ValidateStorageVersion validate the storage version object.
 func ValidateStorageVersion(sv *apiserverinternal.StorageVersion) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&sv.ObjectMeta, false, ValidateStorageVersionName, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, validateStorageVersionStatus(sv.Status, field.NewPath("status"))...)
+	return allErrs
+}
+
+// ValidateStorageVersionName is a ValidateNameFunc for storage version names
+func ValidateStorageVersionName(name string, prefix bool) []string {
+	var allErrs []string
+	idx := strings.LastIndex(name, ".")
+	if idx < 0 {
+		allErrs = append(allErrs, "name must be in the form of <group>.<resource>")
+	} else {
+		for _, msg := range utilvalidation.IsDNS1123Subdomain(name[:idx]) {
+			allErrs = append(allErrs, "the group segment "+msg)
+		}
+		for _, msg := range utilvalidation.IsDNS1035Label(name[idx+1:]) {
+			allErrs = append(allErrs, "the resource segment "+msg)
+		}
+	}
+	return allErrs
+}
+
+// ValidateStorageVersionUpdate tests if an update to a StorageVersion is valid.
+func ValidateStorageVersionUpdate(sv, oldSV *apiserverinternal.StorageVersion) field.ErrorList {
+	// no error since StorageVersionSpec is an empty spec
+	return field.ErrorList{}
+}
+
+// ValidateStorageVersionStatusUpdate tests if an update to a StorageVersionStatus is valid.
+func ValidateStorageVersionStatusUpdate(sv, oldSV *apiserverinternal.StorageVersion) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateStorageVersionStatus(sv.Status, field.NewPath("status"))...)
 	return allErrs

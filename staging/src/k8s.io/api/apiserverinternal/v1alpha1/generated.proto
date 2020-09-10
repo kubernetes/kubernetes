@@ -102,7 +102,7 @@ message StorageVersionStatus {
   // The reported versions per API server instance.
   // +optional
   // +listType=map
-  // +listMapKey=apiserverID
+  // +listMapKey=apiServerID
   repeated ServerStorageVersion storageVersions = 1;
 
   // If all API server instances agree on the same encoding storage version,

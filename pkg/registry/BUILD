@@ -25,6 +25,8 @@ filegroup(
         "//pkg/registry/admissionregistration/mutatingwebhookconfiguration:all-srcs",
         "//pkg/registry/admissionregistration/rest:all-srcs",
         "//pkg/registry/admissionregistration/validatingwebhookconfiguration:all-srcs",
+        "//pkg/registry/apiserverinternal/rest:all-srcs",
+        "//pkg/registry/apiserverinternal/storageversion:all-srcs",
         "//pkg/registry/apps/controllerrevision:all-srcs",
         "//pkg/registry/apps/daemonset:all-srcs",
         "//pkg/registry/apps/deployment:all-srcs",

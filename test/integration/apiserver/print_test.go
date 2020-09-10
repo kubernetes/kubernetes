@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
@@ -172,6 +173,7 @@ func TestServerSidePrint(t *testing.T) {
 			extensionsv1beta1.SchemeGroupVersion,
 			nodev1alpha1.SchemeGroupVersion,
 			flowcontrolv1alpha1.SchemeGroupVersion,
+			apiserverinternalv1alpha1.SchemeGroupVersion,
 		},
 		[]schema.GroupVersionResource{},
 	)

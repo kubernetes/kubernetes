@@ -21,9 +21,14 @@ package install
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal/v1alpha1"
 )
+
+func init() {
+	Install(legacyscheme.Scheme)
+}
 
 // Install registers the API group and adds types to a scheme
 func Install(scheme *runtime.Scheme) {
