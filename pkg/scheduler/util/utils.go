@@ -142,11 +142,6 @@ func PatchPod(cs kubernetes.Interface, old *v1.Pod, new *v1.Pod) error {
 	return err
 }
 
-// GetUpdatedPod returns the latest version of <pod> from API server.
-func GetUpdatedPod(cs kubernetes.Interface, pod *v1.Pod) (*v1.Pod, error) {
-	return cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-}
-
 // DeletePod deletes the given <pod> from API server
 func DeletePod(cs kubernetes.Interface, pod *v1.Pod) error {
 	return cs.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
