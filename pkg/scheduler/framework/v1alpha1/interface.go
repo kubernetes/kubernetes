@@ -21,7 +21,6 @@ package v1alpha1
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -149,7 +148,7 @@ func (s *Status) AsError() error {
 	if s.err != nil {
 		return s.err
 	}
-	return fmt.Errorf("%s: %s", s.code.String(), s.Message())
+	return errors.New(s.Message())
 }
 
 // NewStatus makes a Status out of the given arguments and returns its pointer.
