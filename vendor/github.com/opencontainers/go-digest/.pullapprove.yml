@@ -1,12 +1,28 @@
-approve_by_comment: true
-approve_regex: '^(Approved|lgtm|LGTM|:shipit:|:star:|:\+1:|:ship:)'
-reject_regex: ^Rejected
-reset_on_push: true
-author_approval: ignored
-signed_off_by:
-  required: true
-reviewers:
-  teams:
-  - go-digest-maintainers
-  name: default
+version: 2
+
+requirements:
+  signed_off_by:
+    required: true
+
+always_pending:
+  title_regex: '^WIP'
+  explanation: 'Work in progress...'
+
+group_defaults:
   required: 2
+  approve_by_comment:
+    enabled: true
+    approve_regex: '^LGTM'
+    reject_regex: '^Rejected'
+  reset_on_push:
+    enabled: true
+  author_approval:
+    ignored: true
+  conditions:
+    branches:
+      - master
+
+groups:
+  go-digest:
+    teams:
+      - go-digest-maintainers

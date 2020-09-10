@@ -27,7 +27,7 @@ require (
 	github.com/moby/term v0.0.0-20200312100748-672ec06f55cd
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.7.0
-	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
+	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/russross/blackfriday v1.5.2
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5
