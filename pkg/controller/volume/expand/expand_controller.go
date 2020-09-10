@@ -17,6 +17,7 @@ limitations under the License.
 package expand
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
@@ -28,6 +29,7 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -224,7 +226,7 @@ func (expc *expandController) syncHandler(key string) error {
 		return err
 	}
 
-	pv, err := getPersistentVolume(pvc, expc.pvLister)
+	pv, err := expc.getPersistentVolume(pvc)
 	if err != nil {
 		klog.V(5).Infof("Error getting Persistent Volume for PVC %q (uid: %q) from informer : %v", util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, err)
 		return err
@@ -335,12 +337,12 @@ func (expc *expandController) runWorker() {
 	}
 }
 
-func getPersistentVolume(pvc *v1.PersistentVolumeClaim, pvLister corelisters.PersistentVolumeLister) (*v1.PersistentVolume, error) {
+func (expc *expandController) getPersistentVolume(pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
 	volumeName := pvc.Spec.VolumeName
-	pv, err := pvLister.Get(volumeName)
+	pv, err := expc.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), volumeName, metav1.GetOptions{})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to find PV %q in PV informer cache with error : %v", volumeName, err)
+		return nil, fmt.Errorf("failed to get PV %q: %v", volumeName, err)
 	}
 
 	return pv.DeepCopy(), nil
