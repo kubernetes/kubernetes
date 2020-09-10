@@ -293,6 +293,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			}
 
 			var devicePath string
+			waitForAttachDone := make(chan interface{})
 			if attachPlug != nil {
 				t.Log("csiTest.VolumeAll attacher.Attach starting")
 
@@ -306,6 +307,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				// creates VolumeAttachment and blocks until it is marked attached (done by external attacher)
 				go func(spec *volume.Spec, nodeName types.NodeName) {
 					attachID, err := volAttacher.Attach(spec, nodeName)
+					close(waitForAttachDone)
 					if err != nil {
 						t.Errorf("csiTest.VolumeAll attacher.Attach failed: %s", err)
 						return
@@ -316,6 +318,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 
 				// Simulates external-attacher and marks VolumeAttachment.Status.Attached = true
 				markVolumeAttached(t, host.GetKubeClient(), fakeWatcher, attachName, storage.VolumeAttachmentStatus{Attached: true})
+				<-waitForAttachDone
 
 				devicePath, err = volAttacher.WaitForAttach(volSpec, "", pod, 500*time.Millisecond)
 				if err != nil {
