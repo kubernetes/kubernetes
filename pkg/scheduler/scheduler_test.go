@@ -825,7 +825,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		internalcache.NewEmptySnapshot(),
 		[]framework.Extender{},
 		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
-		false,
 		schedulerapi.DefaultPercentageOfNodesToScore,
 	)
 
@@ -1174,7 +1173,6 @@ func TestSchedulerBinding(t *testing.T) {
 				nil,
 				test.extenders,
 				nil,
-				false,
 				0,
 			)
 			sched := Scheduler{

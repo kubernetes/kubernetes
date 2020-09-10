@@ -120,7 +120,6 @@ type genericScheduler struct {
 	extenders                []framework.Extender
 	nodeInfoSnapshot         *internalcache.Snapshot
 	pvcLister                corelisters.PersistentVolumeClaimLister
-	disablePreemption        bool
 	percentageOfNodesToScore int32
 	nextStartNodeIndex       int
 }
@@ -630,14 +629,12 @@ func NewGenericScheduler(
 	nodeInfoSnapshot *internalcache.Snapshot,
 	extenders []framework.Extender,
 	pvcLister corelisters.PersistentVolumeClaimLister,
-	disablePreemption bool,
 	percentageOfNodesToScore int32) ScheduleAlgorithm {
 	return &genericScheduler{
 		cache:                    cache,
 		extenders:                extenders,
 		nodeInfoSnapshot:         nodeInfoSnapshot,
 		pvcLister:                pvcLister,
-		disablePreemption:        disablePreemption,
 		percentageOfNodesToScore: percentageOfNodesToScore,
 	}
 }

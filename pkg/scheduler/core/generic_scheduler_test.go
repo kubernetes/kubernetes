@@ -750,7 +750,6 @@ func TestGenericScheduler(t *testing.T) {
 				snapshot,
 				[]framework.Extender{},
 				pvcLister,
-				false,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 			result, err := scheduler.Schedule(context.Background(), prof, framework.NewCycleState(), test.pod)
 			if !reflect.DeepEqual(err, test.wErr) {
@@ -776,7 +775,7 @@ func makeScheduler(nodes []*v1.Node) *genericScheduler {
 	s := NewGenericScheduler(
 		cache,
 		emptySnapshot,
-		nil, nil, false,
+		nil, nil,
 		schedulerapi.DefaultPercentageOfNodesToScore)
 	cache.UpdateSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
 	return s.(*genericScheduler)
@@ -1071,7 +1070,6 @@ func TestZeroRequest(t *testing.T) {
 				emptySnapshot,
 				[]framework.Extender{},
 				nil,
-				false,
 				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
 			scheduler.nodeInfoSnapshot = snapshot
 
