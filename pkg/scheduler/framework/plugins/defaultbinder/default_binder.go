@@ -55,7 +55,7 @@ func (b DefaultBinder) Bind(ctx context.Context, state *framework.CycleState, p 
 	}
 	err := b.handle.ClientSet().CoreV1().Pods(binding.Namespace).Bind(ctx, binding, metav1.CreateOptions{})
 	if err != nil {
-		return framework.NewStatus(framework.Error, err.Error())
+		return framework.AsStatus(err)
 	}
 	return nil
 }
