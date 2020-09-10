@@ -207,22 +207,28 @@ kube::util::find-binary-for-platform() {
       "${KUBE_ROOT}/_output/dockerized/go/bin/${lookfor}"
     );
   fi
-  # Also search for binary in bazel build tree.
-  # The bazel go rules place some binaries in subtrees like
-  # "bazel-bin/source/path/linux_amd64_pure_stripped/binaryname", so make sure
-  # the platform name is matched in the path.
-  while IFS=$'\n' read -r location; do
-    locations+=("$location");
-  done < <(find "${KUBE_ROOT}/bazel-bin/" -type f -executable \
-    \( -path "*/${platform/\//_}*/${lookfor}" -o -path "*/${lookfor}" \) 2>/dev/null || true)
-  # search for executables for non-GNU versions of find (eg. BSD)
-  while IFS=$'\n' read -r location; do
-    locations+=("$location");
-  done < <(find "${KUBE_ROOT}/bazel-bin/" -type f -perm -111 \
-    \( -path "*/${platform/\//_}*/${lookfor}" -o -path "*/${lookfor}" \) 2>/dev/null || true)
+
+  # Also search for binary in bazel build tree if bazel is installed.
+  set -x
+  if command -v bazel &>/dev/null; then
+    # Query the action graph to get the path of the binary.
+    local aquery_cmd=("bazel" "aquery" "--keep_going")
+    if [[ "${platform}" != "$(kube::util::host_platform)" ]]; then
+      aquery_cmd+="--platforms=@io_bazel_rules_go//go/toolchain:${platform/\//_}"
+    fi
+
+    local bzl_location=$(2>/dev/null "${aquery_cmd[@]}" \
+        'outputs(".*'"${lookfor}"'", attr($is_executable, 1, //...))' \
+        | grep '^  Outputs: \[.*\]$' \
+        | sed 's/^  Outputs: \[\(.*\)\]$/\1/')
+    if [[ -n "${KUBE_ROOT}/${bzl_location}" ]]; then
+      locations+=("${KUBE_ROOT}/${bzl_location}")
+    fi
+  fi
 
   # List most recently-updated location.
   local -r bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+  set +x
   echo -n "${bin}"
 }
 
