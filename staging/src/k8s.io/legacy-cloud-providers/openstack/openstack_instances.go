@@ -227,7 +227,7 @@ func (i *Instances) InstanceID(ctx context.Context, name types.NodeName) (string
 	}
 	localName := types.NodeName(md.Name)
 	if localName == name {
-		return md.UUID, nil
+		return "/" + md.UUID, nil
 	}
 
 	srv, err := getServerByName(i.compute, name)
