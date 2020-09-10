@@ -33,6 +33,14 @@ fs.inotify.max_user_instances: "8192"
 # Override the OS default value (8192), which is too small for most use cases.
 fs.inotify.max_user_watches: "12288"
 
+# Override the TCP keepalive time to align with GCP's default reply-allowed
+# rule (10 minutes) and defaults in COS-M85. See b/153915988 and
+# https://github.com/kubernetes/kubernetes/issues/32457
+# 300 + 60 * 5 = 600 secs = 10 minutes before claiming a connection is broken.
+net.ipv4.tcp_keepalive_time: "300"
+net.ipv4.tcp_keepalive_intvl: "60"
+net.ipv4.tcp_keepalive_probes: "5"
+
 # Enforce the following OS default values.
 net.core.netdev_budget: "300"
 net.core.netdev_budget_usecs: "2000"
@@ -49,9 +57,6 @@ net.core.somaxconn: "1024"
 net.ipv4.tcp_rmem: "4096 87380 6291456"
 net.ipv4.tcp_wmem: "4096 16384 4194304"
 net.ipv4.tcp_fin_timeout: "60"
-net.ipv4.tcp_keepalive_intvl: "75"
-net.ipv4.tcp_keepalive_probes: "9"
-net.ipv4.tcp_keepalive_time: "7200"
 net.ipv4.tcp_syn_retries: "6"
 net.ipv4.tcp_tw_reuse: "0"
 net.ipv4.udp_rmem_min: "4096"
