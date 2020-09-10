@@ -451,7 +451,6 @@ func (c *Converter) doConversion(src, dest interface{}, flags FieldMatchingFlags
 	if err != nil {
 		return err
 	}
-	return fmt.Errorf("converting (%s) to (%s): unknown conversion", sv.Type(), dv.Type())
 
 	// TODO: Everything past this point is deprecated.
 	//  Remove in 1.20 once we're sure it didn't break anything.
