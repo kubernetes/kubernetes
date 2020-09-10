@@ -1077,8 +1077,8 @@ EOF
 
 function build-kube-master-certs {
   local file=$1
-  rm -f ${file}
-  cat >$file <<EOF
+  rm -f "$file"
+  cat >"$file" <<EOF
 KUBEAPISERVER_CERT: $(yaml-quote ${KUBEAPISERVER_CERT_BASE64:-})
 KUBEAPISERVER_KEY: $(yaml-quote ${KUBEAPISERVER_KEY_BASE64:-})
 CA_KEY: $(yaml-quote ${CA_KEY_BASE64:-})
@@ -1109,8 +1109,8 @@ function build-linux-kube-env {
     kube_manifests_tar_url=$(split_csv "${KUBE_MANIFESTS_TAR_URL}")
   fi
 
-  rm -f ${file}
-  cat >$file <<EOF
+  rm -f "$file"
+  cat >"$file" <<EOF
 CLUSTER_NAME: $(yaml-quote ${CLUSTER_NAME})
 ENV_TIMESTAMP: $(yaml-quote $(date -u +%Y-%m-%dT%T%z))
 INSTANCE_PREFIX: $(yaml-quote ${INSTANCE_PREFIX})
@@ -1235,63 +1235,63 @@ EOF
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]  || \
      [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "cos" ]] || \
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
-    cat >>$file <<EOF
+    cat >>"$file" <<EOF
 REMOUNT_VOLUME_PLUGIN_DIR: $(yaml-quote ${REMOUNT_VOLUME_PLUGIN_DIR:-true})
 EOF
   fi
   if [[ "${master}" == "false" ]]; then
-    cat >>$file <<EOF
+    cat >>"$file" <<EOF
 EOF
   fi
   if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
-    cat >>$file <<EOF
+    cat >>"$file" <<EOF
 KUBE_APISERVER_REQUEST_TIMEOUT: $(yaml-quote ${KUBE_APISERVER_REQUEST_TIMEOUT})
 EOF
   fi
   if [ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]; then
-    cat >>$file <<EOF
+    cat >>"$file" <<EOF
 TERMINATED_POD_GC_THRESHOLD: $(yaml-quote ${TERMINATED_POD_GC_THRESHOLD})
 EOF
   fi
   if [[ "${master}" == "true" && ("${MASTER_OS_DISTRIBUTION}" == "trusty" || "${MASTER_OS_DISTRIBUTION}" == "gci" || "${MASTER_OS_DISTRIBUTION}" == "ubuntu") ]] || \
      [[ "${master}" == "false" && ("${NODE_OS_DISTRIBUTION}" == "trusty" || "${NODE_OS_DISTRIBUTION}" == "gci" || "${NODE_OS_DISTRIBUTION}" = "ubuntu" || "${NODE_OS_DISTRIBUTION}" = "custom") ]] ; then
-    cat >>$file <<EOF
+    cat >>"$file" <<EOF
 KUBE_MANIFESTS_TAR_URL: $(yaml-quote ${kube_manifests_tar_url})
 KUBE_MANIFESTS_TAR_HASH: $(yaml-quote ${KUBE_MANIFESTS_TAR_HASH})
 EOF
   fi
   if [ -n "${TEST_CLUSTER:-}" ]; then
-    cat >>$file <<EOF
+    cat >>"$file" <<EOF
 TEST_CLUSTER: $(yaml-quote ${TEST_CLUSTER})
 EOF
   fi
   if [ -n "${DOCKER_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 DOCKER_TEST_LOG_LEVEL: $(yaml-quote ${DOCKER_TEST_LOG_LEVEL})
 EOF
   fi
   if [ -n "${DOCKER_LOG_DRIVER:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 DOCKER_LOG_DRIVER: $(yaml-quote ${DOCKER_LOG_DRIVER})
 EOF
   fi
   if [ -n "${DOCKER_LOG_MAX_SIZE:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 DOCKER_LOG_MAX_SIZE: $(yaml-quote ${DOCKER_LOG_MAX_SIZE})
 EOF
   fi
   if [ -n "${DOCKER_LOG_MAX_FILE:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 DOCKER_LOG_MAX_FILE: $(yaml-quote ${DOCKER_LOG_MAX_FILE})
 EOF
   fi
   if [ -n "${FEATURE_GATES:-}" ]; then
-    cat >>$file <<EOF
+    cat >>"$file" <<EOF
 FEATURE_GATES: $(yaml-quote ${FEATURE_GATES})
 EOF
   fi
   if [ -n "${RUN_CONTROLLERS:-}" ]; then
-    cat >>$file <<EOF
+    cat >>"$file" <<EOF
 RUN_CONTROLLERS: $(yaml-quote ${RUN_CONTROLLERS})
 EOF
   fi
@@ -1301,7 +1301,7 @@ EOF
 
     for var_name in ${PROVIDER_VARS}; do
       eval "local var_value=\$(yaml-quote \${${var_name}})"
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 ${var_name}: ${var_value}
 EOF
     done
@@ -1309,7 +1309,7 @@ EOF
 
   if [[ "${master}" == "true" ]]; then
     # Master-only env vars.
-    cat >>$file <<EOF
+    cat >>"$file" <<EOF
 KUBERNETES_MASTER: $(yaml-quote "true")
 KUBE_USER: $(yaml-quote ${KUBE_USER})
 KUBE_PASSWORD: $(yaml-quote ${KUBE_PASSWORD})
@@ -1335,19 +1335,19 @@ EOF
     # KUBE_APISERVER_REQUEST_TIMEOUT_SEC (if set) controls the --request-timeout
     # flag
     if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT_SEC:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 KUBE_APISERVER_REQUEST_TIMEOUT_SEC: $(yaml-quote ${KUBE_APISERVER_REQUEST_TIMEOUT_SEC})
 EOF
     fi
     # ETCD_IMAGE (if set) allows to use a custom etcd image.
     if [ -n "${ETCD_IMAGE:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 ETCD_IMAGE: $(yaml-quote ${ETCD_IMAGE})
 EOF
     fi
     # ETCD_DOCKER_REPOSITORY (if set) allows to use a custom etcd docker repository to pull the etcd image from.
     if [ -n "${ETCD_DOCKER_REPOSITORY:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 ETCD_DOCKER_REPOSITORY: $(yaml-quote ${ETCD_DOCKER_REPOSITORY})
 EOF
     fi
@@ -1355,130 +1355,130 @@ EOF
     # The main purpose of using it may be rollback of etcd v3 API,
     # where we need 3.0.* image, but are rolling back to 2.3.7.
     if [ -n "${ETCD_VERSION:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 ETCD_VERSION: $(yaml-quote ${ETCD_VERSION})
 EOF
     fi
     if [ -n "${ETCD_HOSTNAME:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 ETCD_HOSTNAME: $(yaml-quote ${ETCD_HOSTNAME})
 EOF
     fi
     if [ -n "${ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC: $(yaml-quote ${ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC})
 EOF
     fi
     if [ -n "${KUBE_APISERVER_LIVENESS_PROBE_INITIAL_DELAY_SEC:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 KUBE_APISERVER_LIVENESS_PROBE_INITIAL_DELAY_SEC: $(yaml-quote ${KUBE_APISERVER_LIVENESS_PROBE_INITIAL_DELAY_SEC})
 EOF
     fi
     if [ -n "${ETCD_COMPACTION_INTERVAL_SEC:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 ETCD_COMPACTION_INTERVAL_SEC: $(yaml-quote ${ETCD_COMPACTION_INTERVAL_SEC})
 EOF
     fi
     if [ -n "${ETCD_QUOTA_BACKEND_BYTES:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 ETCD_QUOTA_BACKEND_BYTES: $(yaml-quote ${ETCD_QUOTA_BACKEND_BYTES})
 EOF
     fi
     if [ -n "${ETCD_EXTRA_ARGS:-}" ]; then
-    cat >>$file <<EOF
+    cat >>"$file" <<EOF
 ETCD_EXTRA_ARGS: $(yaml-quote ${ETCD_EXTRA_ARGS})
 EOF
     fi
     if [ -n "${ETCD_SERVERS:-}" ]; then
-    cat >>$file <<EOF
+    cat >>"$file" <<EOF
 ETCD_SERVERS: $(yaml-quote ${ETCD_SERVERS})
 EOF
     fi
     if [ -n "${ETCD_SERVERS_OVERRIDES:-}" ]; then
-    cat >>$file <<EOF
+    cat >>"$file" <<EOF
 ETCD_SERVERS_OVERRIDES: $(yaml-quote ${ETCD_SERVERS_OVERRIDES})
 EOF
     fi
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 APISERVER_TEST_ARGS: $(yaml-quote ${APISERVER_TEST_ARGS})
 EOF
     fi
     if [ -n "${CONTROLLER_MANAGER_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 CONTROLLER_MANAGER_TEST_ARGS: $(yaml-quote ${CONTROLLER_MANAGER_TEST_ARGS})
 EOF
     fi
     if [ -n "${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 CONTROLLER_MANAGER_TEST_LOG_LEVEL: $(yaml-quote ${CONTROLLER_MANAGER_TEST_LOG_LEVEL})
 EOF
     fi
     if [ -n "${SCHEDULER_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 SCHEDULER_TEST_ARGS: $(yaml-quote ${SCHEDULER_TEST_ARGS})
 EOF
     fi
     if [ -n "${SCHEDULER_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 SCHEDULER_TEST_LOG_LEVEL: $(yaml-quote ${SCHEDULER_TEST_LOG_LEVEL})
 EOF
     fi
     if [ -n "${INITIAL_ETCD_CLUSTER:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 INITIAL_ETCD_CLUSTER: $(yaml-quote ${INITIAL_ETCD_CLUSTER})
 EOF
     fi
     if [ -n "${INITIAL_ETCD_CLUSTER_STATE:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 INITIAL_ETCD_CLUSTER_STATE: $(yaml-quote ${INITIAL_ETCD_CLUSTER_STATE})
 EOF
     fi
     if [ -n "${CLUSTER_SIGNING_DURATION:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 CLUSTER_SIGNING_DURATION: $(yaml-quote ${CLUSTER_SIGNING_DURATION})
 EOF
     fi
     if [[ "${NODE_ACCELERATORS:-}" == *"type=nvidia"* ]]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 ENABLE_NVIDIA_GPU_DEVICE_PLUGIN: $(yaml-quote "true")
 EOF
     fi
     if [ -n "${ADDON_MANAGER_LEADER_ELECTION:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 ADDON_MANAGER_LEADER_ELECTION: $(yaml-quote ${ADDON_MANAGER_LEADER_ELECTION})
 EOF
     fi
     if [ -n "${API_SERVER_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 API_SERVER_TEST_LOG_LEVEL: $(yaml-quote ${API_SERVER_TEST_LOG_LEVEL})
 EOF
     fi
     if [ -n "${ETCD_LISTEN_CLIENT_IP:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 ETCD_LISTEN_CLIENT_IP: $(yaml-quote ${ETCD_LISTEN_CLIENT_IP})
 EOF
     fi
 
   else
     # Node-only env vars.
-    cat >>$file <<EOF
+    cat >>"$file" <<EOF
 KUBERNETES_MASTER: $(yaml-quote "false")
 EXTRA_DOCKER_OPTS: $(yaml-quote ${EXTRA_DOCKER_OPTS:-})
 EOF
     if [ -n "${KUBEPROXY_TEST_ARGS:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 KUBEPROXY_TEST_ARGS: $(yaml-quote ${KUBEPROXY_TEST_ARGS})
 EOF
     fi
     if [ -n "${KUBEPROXY_TEST_LOG_LEVEL:-}" ]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 KUBEPROXY_TEST_LOG_LEVEL: $(yaml-quote ${KUBEPROXY_TEST_LOG_LEVEL})
 EOF
     fi
   fi
   if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 ENABLE_CLUSTER_AUTOSCALER: $(yaml-quote ${ENABLE_CLUSTER_AUTOSCALER})
 AUTOSCALER_MIG_CONFIG: $(yaml-quote ${AUTOSCALER_MIG_CONFIG})
 AUTOSCALER_EXPANDER_CONFIG: $(yaml-quote ${AUTOSCALER_EXPANDER_CONFIG})
@@ -1490,28 +1490,28 @@ EOF
           local node_labels="$(build-linux-node-labels node)"
           local node_taints="${NODE_TAINTS:-}"
           local autoscaler_env_vars="node_labels=${node_labels};node_taints=${node_taints}"
-          cat >>$file <<EOF
+          cat >>"$file" <<EOF
 AUTOSCALER_ENV_VARS: $(yaml-quote ${autoscaler_env_vars})
 EOF
       fi
   fi
   if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
-    cat >>$file <<EOF
+    cat >>"$file" <<EOF
 SCHEDULING_ALGORITHM_PROVIDER: $(yaml-quote ${SCHEDULING_ALGORITHM_PROVIDER})
 EOF
   fi
   if [ -n "${MAX_PODS_PER_NODE:-}" ]; then
-    cat >>$file <<EOF
+    cat >>"$file" <<EOF
 MAX_PODS_PER_NODE: $(yaml-quote ${MAX_PODS_PER_NODE})
 EOF
   fi
   if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE: $(yaml-quote ${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE})
 EOF
   fi
   if [[ -n "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-}" ]]; then
-      cat >>$file <<EOF
+      cat >>"$file" <<EOF
 KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE: $(yaml-quote ${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE})
 EOF
   fi
@@ -1521,9 +1521,9 @@ EOF
 function build-windows-kube-env {
   local file="$1"
   # For now the Windows kube-env is a superset of the Linux kube-env.
-  build-linux-kube-env false $file
+  build-linux-kube-env false "$file"
 
-  cat >>$file <<EOF
+  cat >>"$file" <<EOF
 WINDOWS_NODE_INSTANCE_PREFIX: $(yaml-quote ${WINDOWS_NODE_INSTANCE_PREFIX})
 NODE_BINARY_TAR_URL: $(yaml-quote ${NODE_BINARY_TAR_URL})
 NODE_BINARY_TAR_HASH: $(yaml-quote ${NODE_BINARY_TAR_HASH})
