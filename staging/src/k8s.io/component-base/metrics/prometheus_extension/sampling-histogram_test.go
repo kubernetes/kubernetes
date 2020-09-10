@@ -49,7 +49,7 @@ func TestSamplingHistogram(t *testing.T) {
 	clk.Step(1 * time.Nanosecond)
 	expectHistogram(t, "Barely into second sampling period", sh, 0, 0, 1, 1)
 	sh.Set(-0.5)
-	sh.Set(0.5)
+	sh.Add(1)
 	clk.Step(999999998 * time.Nanosecond)
 	expectHistogram(t, "Just before the end of second sampling period", sh, 0, 0, 1, 1)
 	clk.Step(1 * time.Nanosecond)

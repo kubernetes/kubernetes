@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	promext "k8s.io/component-base/metrics/prometheus_extension"
 )
 
 // KubeOpts is superset struct for prometheus.Opts. The prometheus Opts structure
@@ -177,6 +178,57 @@ func (o *HistogramOpts) toPromHistogramOpts() prometheus.HistogramOpts {
 		Help:        o.Help,
 		ConstLabels: o.ConstLabels,
 		Buckets:     o.Buckets,
+	}
+}
+
+// SamplingHistogramOpts bundles the options for creating a SamplingHistogram metric. It is
+// mandatory to set Name to a non-empty string. All other fields are optional
+// and can safely be left at their zero value, although it is strongly
+// encouraged to set a Help string.
+type SamplingHistogramOpts struct {
+	Namespace         string
+	Subsystem         string
+	Name              string
+	Help              string
+	ConstLabels       map[string]string
+	Buckets           []float64
+	InitialValue      float64
+	SamplingPeriod    time.Duration
+	DeprecatedVersion string
+	deprecateOnce     sync.Once
+	annotateOnce      sync.Once
+	StabilityLevel    StabilityLevel
+}
+
+// Modify help description on the metric description.
+func (o *SamplingHistogramOpts) markDeprecated() {
+	o.deprecateOnce.Do(func() {
+		o.Help = fmt.Sprintf("(Deprecated since %v) %v", o.DeprecatedVersion, o.Help)
+	})
+}
+
+// annotateStabilityLevel annotates help description on the metric description with the stability level
+// of the metric
+func (o *SamplingHistogramOpts) annotateStabilityLevel() {
+	o.annotateOnce.Do(func() {
+		o.Help = fmt.Sprintf("[%v] %v", o.StabilityLevel, o.Help)
+	})
+}
+
+// convenience function to allow easy transformation to the prometheus
+// counterpart. This will do more once we have a proper label abstraction
+func (o *SamplingHistogramOpts) toPromSamplingHistogramOpts() promext.SamplingHistogramOpts {
+	return promext.SamplingHistogramOpts{
+		HistogramOpts: prometheus.HistogramOpts{
+			Namespace:   o.Namespace,
+			Subsystem:   o.Subsystem,
+			Name:        o.Name,
+			Help:        o.Help,
+			ConstLabels: o.ConstLabels,
+			Buckets:     o.Buckets,
+		},
+		InitialValue:   o.InitialValue,
+		SamplingPeriod: o.SamplingPeriod,
 	}
 }
 

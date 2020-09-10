@@ -55,12 +55,17 @@ type CounterVecMetric interface {
 	With(prometheus.Labels) CounterMetric
 }
 
+// SimpleGaugeMetric is an interface which defines a small subset of the interface provided by prometheus.Gauge
+type SimpleGaugeMetric interface {
+	Set(float64)
+	Add(float64)
+}
+
 // GaugeMetric is an interface which defines a subset of the interface provided by prometheus.Gauge
 type GaugeMetric interface {
-	Set(float64)
+	SimpleGaugeMetric
 	Inc()
 	Dec()
-	Add(float64)
 	Write(out *dto.Metric) error
 	SetToCurrentTime()
 }

@@ -31,8 +31,11 @@ type SamplingHistogram interface {
 	prometheus.Metric
 	prometheus.Collector
 
-	// Sets the variable to the given value.
+	// Set the variable to the given value.
 	Set(float64)
+
+	// Add the given change to the variable
+	Add(float64)
 }
 
 type SamplingHistogramOpts struct {
@@ -86,6 +89,10 @@ func (sh *samplingHistogram) Set(newValue float64) {
 	sh.Update(func(float64) float64 { return newValue })
 }
 
+func (sh *samplingHistogram) Add(delta float64) {
+	sh.Update(func(oldValue float64) float64 { return oldValue + delta })
+}
+
 func (sh *samplingHistogram) Update(updateFn func(float64) float64) {
 	oldValue, numSamples := func() (float64, int64) {
 		sh.lock.Lock()
@@ -115,6 +122,6 @@ func (sh *samplingHistogram) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (sh *samplingHistogram) Collect(ch chan<- prometheus.Metric) {
-	sh.Update(func(value float64) float64 { return value })
+	sh.Add(0)
 	sh.histogram.Collect(ch)
 }
