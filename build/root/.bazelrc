@@ -28,7 +28,7 @@ test:unit --features=race
 
 test:unit --build_tests_only
 test:unit --test_tag_filters=-e2e,-integration
-test:unit --runs_per_test=3
+test:unit --runs_per_test=2
 
 test:integration --local_test_jobs 4
 test:integration --test_tag_filters=integration
