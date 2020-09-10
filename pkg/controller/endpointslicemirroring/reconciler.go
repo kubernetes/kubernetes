@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -231,7 +230,6 @@ func (r *reconciler) finalize(endpoints *corev1.Endpoints, slices slicesByAction
 	// be deleted.
 	recycleSlices(&slices)
 
-	var errs []error
 	epsClient := r.client.DiscoveryV1beta1().EndpointSlices(endpoints.Namespace)
 
 	// Don't create more EndpointSlices if corresponding Endpoints resource is
@@ -244,35 +242,32 @@ func (r *reconciler) finalize(endpoints *corev1.Endpoints, slices slicesByAction
 				if errors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
 					return nil
 				}
-				errs = append(errs, fmt.Errorf("Error creating EndpointSlice for Endpoints %s/%s: %v", endpoints.Namespace, endpoints.Name, err))
-			} else {
-				r.endpointSliceTracker.update(createdSlice)
-				metrics.EndpointSliceChanges.WithLabelValues("create").Inc()
+				return fmt.Errorf("failed to create EndpointSlice for Endpoints %s/%s: %v", endpoints.Namespace, endpoints.Name, err)
 			}
+			r.endpointSliceTracker.Update(createdSlice)
+			metrics.EndpointSliceChanges.WithLabelValues("create").Inc()
 		}
 	}
 
 	for _, endpointSlice := range slices.toUpdate {
 		updatedSlice, err := epsClient.Update(context.TODO(), endpointSlice, metav1.UpdateOptions{})
 		if err != nil {
-			errs = append(errs, fmt.Errorf("Error updating %s EndpointSlice for Endpoints %s/%s: %v", endpointSlice.Name, endpoints.Namespace, endpoints.Name, err))
-		} else {
-			r.endpointSliceTracker.update(updatedSlice)
-			metrics.EndpointSliceChanges.WithLabelValues("update").Inc()
+			return fmt.Errorf("failed to update %s EndpointSlice for Endpoints %s/%s: %v", endpointSlice.Name, endpoints.Namespace, endpoints.Name, err)
 		}
+		r.endpointSliceTracker.Update(updatedSlice)
+		metrics.EndpointSliceChanges.WithLabelValues("update").Inc()
 	}
 
 	for _, endpointSlice := range slices.toDelete {
 		err := epsClient.Delete(context.TODO(), endpointSlice.Name, metav1.DeleteOptions{})
 		if err != nil {
-			errs = append(errs, fmt.Errorf("Error deleting %s EndpointSlice for Endpoints %s/%s: %v", endpointSlice.Name, endpoints.Namespace, endpoints.Name, err))
-		} else {
-			r.endpointSliceTracker.delete(endpointSlice)
-			metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
+			return fmt.Errorf("failed to delete %s EndpointSlice for Endpoints %s/%s: %v", endpointSlice.Name, endpoints.Namespace, endpoints.Name, err)
 		}
+		r.endpointSliceTracker.Delete(endpointSlice)
+		metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
 	}
 
-	return utilerrors.NewAggregate(errs)
+	return nil
 }
 
 // deleteEndpoints deletes any associated EndpointSlices and cleans up any

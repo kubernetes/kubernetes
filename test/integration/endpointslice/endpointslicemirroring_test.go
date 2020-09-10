@@ -84,7 +84,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 	testCases := []struct {
 		testName                     string
 		service                      *corev1.Service
-		endpoints                    *corev1.Endpoints
+		customEndpoints              *corev1.Endpoints
 		expectEndpointSlice          bool
 		expectEndpointSliceManagedBy string
 	}{{
@@ -102,11 +102,6 @@ func TestEndpointSliceMirroring(t *testing.T) {
 				},
 			},
 		},
-		endpoints: &corev1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-123",
-			},
-		},
 		expectEndpointSlice:          true,
 		expectEndpointSliceManagedBy: "endpointslice-controller.k8s.io",
 	}, {
@@ -121,7 +116,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 				}},
 			},
 		},
-		endpoints: &corev1.Endpoints{
+		customEndpoints: &corev1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-123",
 			},
@@ -151,16 +146,24 @@ func TestEndpointSliceMirroring(t *testing.T) {
 				},
 			},
 		},
-		endpoints:                    nil,
+		customEndpoints:              nil,
 		expectEndpointSlice:          true,
 		expectEndpointSliceManagedBy: "endpointslice-controller.k8s.io",
 	}, {
 		testName: "Endpoints without Service",
 		service:  nil,
-		endpoints: &corev1.Endpoints{
+		customEndpoints: &corev1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-123",
 			},
+			Subsets: []corev1.EndpointSubset{{
+				Ports: []corev1.EndpointPort{{
+					Port: 80,
+				}},
+				Addresses: []corev1.EndpointAddress{{
+					IP: "10.0.0.1",
+				}},
+			}},
 		},
 		expectEndpointSlice: false,
 	}}
@@ -180,16 +183,16 @@ func TestEndpointSliceMirroring(t *testing.T) {
 				}
 			}
 
-			if tc.endpoints != nil {
-				resourceName = tc.endpoints.Name
-				tc.endpoints.Namespace = ns.Name
-				_, err = client.CoreV1().Endpoints(ns.Name).Create(context.TODO(), tc.endpoints, metav1.CreateOptions{})
+			if tc.customEndpoints != nil {
+				resourceName = tc.customEndpoints.Name
+				tc.customEndpoints.Namespace = ns.Name
+				_, err = client.CoreV1().Endpoints(ns.Name).Create(context.TODO(), tc.customEndpoints, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error creating endpoints: %v", err)
 				}
 			}
 
-			err = wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+			err = wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 				lSelector := discovery.LabelServiceName + "=" + resourceName
 				esList, err := client.DiscoveryV1beta1().EndpointSlices(ns.Name).List(context.TODO(), metav1.ListOptions{LabelSelector: lSelector})
 				if err != nil {

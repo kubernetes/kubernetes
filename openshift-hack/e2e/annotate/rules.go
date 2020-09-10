@@ -19,7 +19,6 @@ var (
 
 			// BETA features in 1.19, enabled by default
 			// Their enablement is tracked via bz's targeted at 4.6.
-			`\[Feature:ExpandCSIVolumes\]`, // https://bugzilla.redhat.com/show_bug.cgi?id=1861218
 			`\[Feature:SCTPConnectivity\]`, // https://bugzilla.redhat.com/show_bug.cgi?id=1861606
 		},
 		// tests for features that are not implemented in openshift
@@ -91,23 +90,13 @@ var (
 			// A fix is in progress: https://github.com/openshift/origin/pull/24709
 			`Multi-AZ Clusters should spread the pods of a replication controller across zones`,
 
-			// Fix is in progress upstream and tracked via https://bugzilla.redhat.com/show_bug.cgi?id=1861215
-			`Secret should create a pod that reads a secret`,
-
-			// disabled until oc and origin are on k8s 1.19 - workloads team
-			`should return command exit codes`,
-
-			// Disabled as per networking team. Follow-up tracked via https://bugzilla.redhat.com/show_bug.cgi?id=1861214
-			`EndpointSliceMirroring should mirror a custom Endpoints resource through create update and delete`,
-
-			// Test passes but container it uses exits with non-zero.
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1861526
-			`ServiceAccounts should set ownership and permission when RunAsUser or FsGroup is present`,
+			`should check if kubectl diff finds a difference for Deployments`, // https://bugzilla.redhat.com/show_bug.cgi?id=1875194
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
-			`\[Driver: rbd\]`,  // OpenShift 4.x does not support Ceph RBD (use CSI instead)
-			`\[Driver: ceph\]`, // OpenShift 4.x does not support CephFS (use CSI instead)
+			`\[Driver: rbd\]`,               // OpenShift 4.x does not support Ceph RBD (use CSI instead)
+			`\[Driver: ceph\]`,              // OpenShift 4.x does not support CephFS (use CSI instead)
+			`\[Feature:PodSecurityPolicy\]`, // OpenShift 4.x does not enable PSP by default
 		},
 		// tests too slow to be part of conformance
 		"[Slow]": {
@@ -145,10 +134,6 @@ var (
 		},
 		"[Skipped:azure]": {
 			"Networking should provide Internet connection for containers", // Azure does not allow ICMP traffic to internet.
-
-			// openshift-tests cannot access Azure API to create in-line or pre-provisioned volumes, https://bugzilla.redhat.com/show_bug.cgi?id=1723603
-			`\[sig-storage\] In-tree Volumes \[Driver: azure\] \[Testpattern: Inline-volume`,
-			`\[sig-storage\] In-tree Volumes \[Driver: azure\] \[Testpattern: Pre-provisioned PV`,
 		},
 		"[Skipped:gce]": {
 			// Requires creation of a different compute instance in a different zone and is not compatible with volumeBindingMode of WaitForFirstConsumer which we use in 4.x

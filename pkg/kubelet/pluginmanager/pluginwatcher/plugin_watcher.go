@@ -21,7 +21,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/klog/v2"
@@ -36,7 +35,6 @@ type Watcher struct {
 	path                string
 	fs                  utilfs.Filesystem
 	fsWatcher           *fsnotify.Watcher
-	stopped             chan struct{}
 	desiredStateOfWorld cache.DesiredStateOfWorld
 }
 
@@ -52,8 +50,6 @@ func NewWatcher(sockDir string, desiredStateOfWorld cache.DesiredStateOfWorld) *
 // Start watches for the creation and deletion of plugin sockets at the path
 func (w *Watcher) Start(stopCh <-chan struct{}) error {
 	klog.V(2).Infof("Plugin Watcher Start at %s", w.path)
-
-	w.stopped = make(chan struct{})
 
 	// Creating the directory to be watched if it doesn't exist yet,
 	// and walks through the directory to discover the existing plugins.
@@ -73,7 +69,6 @@ func (w *Watcher) Start(stopCh <-chan struct{}) error {
 	}
 
 	go func(fsWatcher *fsnotify.Watcher) {
-		defer close(w.stopped)
 		for {
 			select {
 			case event := <-fsWatcher.Events:
@@ -93,14 +88,6 @@ func (w *Watcher) Start(stopCh <-chan struct{}) error {
 				}
 				continue
 			case <-stopCh:
-				// In case of plugin watcher being stopped by plugin manager, stop
-				// probing the creation/deletion of plugin sockets.
-				// Also give all pending go routines a chance to complete
-				select {
-				case <-w.stopped:
-				case <-time.After(11 * time.Second):
-					klog.Errorf("timeout on stopping watcher")
-				}
 				w.fsWatcher.Close()
 				return
 			}
@@ -123,6 +110,12 @@ func (w *Watcher) init() error {
 // Walks through the plugin directory discover any existing plugin sockets.
 // Ignore all errors except root dir not being walkable
 func (w *Watcher) traversePluginDir(dir string) error {
+	// watch the new dir
+	err := w.fsWatcher.Add(dir)
+	if err != nil {
+		return fmt.Errorf("failed to watch %s, err: %v", w.path, err)
+	}
+	// traverse existing children in the dir
 	return w.fs.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			if path == dir {
@@ -130,6 +123,11 @@ func (w *Watcher) traversePluginDir(dir string) error {
 			}
 
 			klog.Errorf("error accessing path: %s error: %v", path, err)
+			return nil
+		}
+
+		// do not call fsWatcher.Add twice on the root dir to avoid potential problems.
+		if path == dir {
 			return nil
 		}
 

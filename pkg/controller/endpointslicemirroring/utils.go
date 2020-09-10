@@ -88,10 +88,7 @@ func newEndpointSlice(endpoints *corev1.Endpoints, ports []discovery.EndpointPor
 	ownerRef := metav1.NewControllerRef(endpoints, gvk)
 	epSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{
-				discovery.LabelServiceName: endpoints.Name,
-				discovery.LabelManagedBy:   controllerName,
-			},
+			Labels:          map[string]string{},
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Namespace:       endpoints.Namespace,
 		},
@@ -99,6 +96,13 @@ func newEndpointSlice(endpoints *corev1.Endpoints, ports []discovery.EndpointPor
 		AddressType: addrType,
 		Endpoints:   []discovery.Endpoint{},
 	}
+
+	for label, val := range endpoints.Labels {
+		epSlice.Labels[label] = val
+	}
+
+	epSlice.Labels[discovery.LabelServiceName] = endpoints.Name
+	epSlice.Labels[discovery.LabelManagedBy] = controllerName
 
 	if sliceName == "" {
 		epSlice.GenerateName = getEndpointSlicePrefix(endpoints.Name)
@@ -181,14 +185,35 @@ func objectRefPtrEqual(ref1, ref2 *corev1.ObjectReference) bool {
 	return true
 }
 
+// getServiceFromDeleteAction parses a Service resource from a delete
+// action.
+func getServiceFromDeleteAction(obj interface{}) *corev1.Service {
+	if service, ok := obj.(*corev1.Service); ok {
+		return service
+	}
+	// If we reached here it means the Service was deleted but its final state
+	// is unrecorded.
+	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+		return nil
+	}
+	service, ok := tombstone.Obj.(*corev1.Service)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a Service resource: %#v", obj))
+		return nil
+	}
+	return service
+}
+
 // getEndpointsFromDeleteAction parses an Endpoints resource from a delete
 // action.
 func getEndpointsFromDeleteAction(obj interface{}) *corev1.Endpoints {
-	if endpointSlice, ok := obj.(*corev1.Endpoints); ok {
-		return endpointSlice
+	if endpoints, ok := obj.(*corev1.Endpoints); ok {
+		return endpoints
 	}
-	// If we reached here it means the EndpointSlice was deleted but its final
-	// state is unrecorded.
+	// If we reached here it means the Endpoints resource was deleted but its
+	// final state is unrecorded.
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))

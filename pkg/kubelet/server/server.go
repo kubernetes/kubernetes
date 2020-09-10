@@ -55,6 +55,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/server/routes"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
@@ -63,6 +64,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
@@ -350,16 +352,22 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 	r := compbasemetrics.NewKubeRegistry()
 
 	includedMetrics := cadvisormetrics.MetricSet{
-		cadvisormetrics.CpuUsageMetrics:         struct{}{},
-		cadvisormetrics.MemoryUsageMetrics:      struct{}{},
-		cadvisormetrics.CpuLoadMetrics:          struct{}{},
-		cadvisormetrics.DiskIOMetrics:           struct{}{},
-		cadvisormetrics.DiskUsageMetrics:        struct{}{},
-		cadvisormetrics.NetworkUsageMetrics:     struct{}{},
-		cadvisormetrics.AcceleratorUsageMetrics: struct{}{},
-		cadvisormetrics.AppMetrics:              struct{}{},
-		cadvisormetrics.ProcessMetrics:          struct{}{},
+		cadvisormetrics.CpuUsageMetrics:     struct{}{},
+		cadvisormetrics.MemoryUsageMetrics:  struct{}{},
+		cadvisormetrics.CpuLoadMetrics:      struct{}{},
+		cadvisormetrics.DiskIOMetrics:       struct{}{},
+		cadvisormetrics.DiskUsageMetrics:    struct{}{},
+		cadvisormetrics.NetworkUsageMetrics: struct{}{},
+		cadvisormetrics.AppMetrics:          struct{}{},
+		cadvisormetrics.ProcessMetrics:      struct{}{},
 	}
+
+	// Only add the Accelerator metrics if the feature is inactive
+	// Note: Accelerator metrics will be removed in the future, hence the feature gate.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAcceleratorUsageMetrics) {
+		includedMetrics.Add(cadvisormetrics.MetricKind(cadvisormetrics.AcceleratorUsageMetrics))
+	}
+
 	cadvisorOpts := cadvisorv2.RequestOptions{
 		IdType:    cadvisorv2.TypeName,
 		Count:     1,

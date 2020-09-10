@@ -38,7 +38,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -49,7 +48,7 @@ var _ = SIGDescribe("LimitRange", func() {
 	f := framework.NewDefaultFramework("limitrange")
 
 	/*
-		Release : v1.18
+		Release: v1.18
 		Testname: LimitRange, resources
 		Description: Creating a Limitrange and verifying the creation of Limitrange, updating the Limitrange and validating the Limitrange. Creating Pods with resources and validate the pod resources are applied to the Limitrange
 	*/
@@ -206,10 +205,8 @@ var _ = SIGDescribe("LimitRange", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying the LimitRange was deleted")
-		gomega.Expect(wait.Poll(time.Second*5, e2eservice.RespondingTimeout, func() (bool, error) {
-			selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": limitRange.Name}))
-			options := metav1.ListOptions{LabelSelector: selector.String()}
-			limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(context.TODO(), options)
+		err = wait.Poll(time.Second*5, e2eservice.RespondingTimeout, func() (bool, error) {
+			limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 
 			if err != nil {
 				framework.Logf("Unable to retrieve LimitRanges: %v", err)
@@ -221,19 +218,14 @@ var _ = SIGDescribe("LimitRange", func() {
 				return true, nil
 			}
 
-			if len(limitRanges.Items) > 0 {
-				if limitRanges.Items[0].ObjectMeta.DeletionTimestamp == nil {
-					framework.Logf("deletion has not yet been observed")
-					return false, nil
-				}
-				return true, nil
+			for i := range limitRanges.Items {
+				lr := limitRanges.Items[i]
+				framework.Logf("LimitRange %v/%v has not yet been deleted", lr.Namespace, lr.Name)
 			}
 
 			return false, nil
-
-		}))
-
-		framework.ExpectNoError(err, "kubelet never observed the termination notice")
+		})
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating a Pod with more than former max resources")
 		pod = newTestPod(podName+"2", getResourceList("600m", "600Mi", "600Gi"), v1.ResourceList{})

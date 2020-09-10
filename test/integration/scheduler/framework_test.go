@@ -19,6 +19,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -45,7 +46,7 @@ type PreFilterPlugin struct {
 
 type ScorePlugin struct {
 	failScore      bool
-	numScoreCalled int
+	numScoreCalled int32
 	highScoreNode  string
 }
 
@@ -170,13 +171,13 @@ func (sp *ScorePlugin) reset() {
 
 // Score returns the score of scheduling a pod on a specific node.
 func (sp *ScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
-	sp.numScoreCalled++
+	curCalled := atomic.AddInt32(&sp.numScoreCalled, 1)
 	if sp.failScore {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", p.Name))
 	}
 
 	score := int64(1)
-	if sp.numScoreCalled == 1 {
+	if curCalled == 1 {
 		// The first node is scored the highest, the rest is scored lower.
 		sp.highScoreNode = nodeName
 		score = framework.MaxNodeScore
@@ -661,17 +662,22 @@ func TestPostFilterPlugin(t *testing.T) {
 				if err = wait.Poll(10*time.Millisecond, 10*time.Second, podUnschedulable(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled.")
 				}
+				if filterPlugin.numFilterCalled < tt.expectFilterNumCalled {
+					t.Errorf("Expected the filter plugin to be called at least %v times, but got %v.", tt.expectFilterNumCalled, filterPlugin.numFilterCalled)
+				}
+				if postFilterPlugin.numPostFilterCalled < tt.expectPostFilterNumCalled {
+					t.Errorf("Expected the postfilter plugin to be called at least %v times, but got %v.", tt.expectPostFilterNumCalled, postFilterPlugin.numPostFilterCalled)
+				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				}
-			}
-
-			if filterPlugin.numFilterCalled != tt.expectFilterNumCalled {
-				t.Errorf("Expected the filter plugin to be called %v times, but got %v.", tt.expectFilterNumCalled, filterPlugin.numFilterCalled)
-			}
-			if postFilterPlugin.numPostFilterCalled != tt.expectPostFilterNumCalled {
-				t.Errorf("Expected the postfilter plugin to be called %v times, but got %v.", tt.expectPostFilterNumCalled, postFilterPlugin.numPostFilterCalled)
+				if filterPlugin.numFilterCalled != tt.expectFilterNumCalled {
+					t.Errorf("Expected the filter plugin to be called %v times, but got %v.", tt.expectFilterNumCalled, filterPlugin.numFilterCalled)
+				}
+				if postFilterPlugin.numPostFilterCalled != tt.expectPostFilterNumCalled {
+					t.Errorf("Expected the postfilter plugin to be called %v times, but got %v.", tt.expectPostFilterNumCalled, postFilterPlugin.numPostFilterCalled)
+				}
 			}
 		})
 	}
@@ -956,57 +962,6 @@ func TestPrebindPlugin(t *testing.T) {
 // tests that the order of invocation of Unreserve operation is executed in the
 // reverse order of invocation of the Reserve operation.
 func TestReservePluginUnreserve(t *testing.T) {
-	numReservePlugins := 3
-	pluginInvokeEventChan := make(chan pluginInvokeEvent, numReservePlugins)
-
-	preBindPlugin := &PreBindPlugin{
-		failPreBind: true,
-	}
-	var reservePlugins []*ReservePlugin
-	for i := 0; i < numReservePlugins; i++ {
-		reservePlugins = append(reservePlugins, &ReservePlugin{
-			name:                  fmt.Sprintf("%s-%d", reservePluginName, i),
-			pluginInvokeEventChan: pluginInvokeEventChan,
-		})
-	}
-
-	registry := frameworkruntime.Registry{
-		// TODO(#92229): test more failure points that would trigger Unreserve in
-		// reserve plugins than just one pre-bind plugin.
-		preBindPluginName: newPlugin(preBindPlugin),
-	}
-	for _, pl := range reservePlugins {
-		registry[pl.Name()] = newPlugin(pl)
-	}
-
-	// Setup initial reserve and prebind plugin for testing.
-	prof := schedulerconfig.KubeSchedulerProfile{
-		SchedulerName: v1.DefaultSchedulerName,
-		Plugins: &schedulerconfig.Plugins{
-			Reserve: &schedulerconfig.PluginSet{
-				// filled by looping over reservePlugins
-			},
-			PreBind: &schedulerconfig.PluginSet{
-				Enabled: []schedulerconfig.Plugin{
-					{
-						Name: preBindPluginName,
-					},
-				},
-			},
-		},
-	}
-	for _, pl := range reservePlugins {
-		prof.Plugins.Reserve.Enabled = append(prof.Plugins.Reserve.Enabled, schedulerconfig.Plugin{
-			Name: pl.Name(),
-		})
-	}
-
-	// Create the master and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "reserve-plugin-unreserve", nil), 2,
-		scheduler.WithProfiles(prof),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	defer testutils.CleanupTest(t, testCtx)
-
 	tests := []struct {
 		name             string
 		failReserve      bool
@@ -1029,6 +984,57 @@ func TestReservePluginUnreserve(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			numReservePlugins := 3
+			pluginInvokeEventChan := make(chan pluginInvokeEvent, numReservePlugins)
+
+			preBindPlugin := &PreBindPlugin{
+				failPreBind: true,
+			}
+			var reservePlugins []*ReservePlugin
+			for i := 0; i < numReservePlugins; i++ {
+				reservePlugins = append(reservePlugins, &ReservePlugin{
+					name:                  fmt.Sprintf("%s-%d", reservePluginName, i),
+					pluginInvokeEventChan: pluginInvokeEventChan,
+				})
+			}
+
+			registry := frameworkruntime.Registry{
+				// TODO(#92229): test more failure points that would trigger Unreserve in
+				// reserve plugins than just one pre-bind plugin.
+				preBindPluginName: newPlugin(preBindPlugin),
+			}
+			for _, pl := range reservePlugins {
+				registry[pl.Name()] = newPlugin(pl)
+			}
+
+			// Setup initial reserve and prebind plugin for testing.
+			prof := schedulerconfig.KubeSchedulerProfile{
+				SchedulerName: v1.DefaultSchedulerName,
+				Plugins: &schedulerconfig.Plugins{
+					Reserve: &schedulerconfig.PluginSet{
+						// filled by looping over reservePlugins
+					},
+					PreBind: &schedulerconfig.PluginSet{
+						Enabled: []schedulerconfig.Plugin{
+							{
+								Name: preBindPluginName,
+							},
+						},
+					},
+				},
+			}
+			for _, pl := range reservePlugins {
+				prof.Plugins.Reserve.Enabled = append(prof.Plugins.Reserve.Enabled, schedulerconfig.Plugin{
+					Name: pl.Name(),
+				})
+			}
+
+			// Create the master and the scheduler with the test plugin set.
+			testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "reserve-plugin-unreserve", nil), 2,
+				scheduler.WithProfiles(prof),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			defer testutils.CleanupTest(t, testCtx)
+
 			preBindPlugin.failPreBind = test.failPreBind
 			if test.failReserve {
 				reservePlugins[test.failReserveIndex].failReserve = true
@@ -1064,11 +1070,6 @@ func TestReservePluginUnreserve(t *testing.T) {
 						t.Errorf("reservePlugins[%d].numUnreserveCalled = %d, want 0", i, pl.numUnreserveCalled)
 					}
 				}
-			}
-
-			preBindPlugin.reset()
-			for _, pl := range reservePlugins {
-				pl.reset()
 			}
 			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
@@ -1261,45 +1262,9 @@ func TestBindPlugin(t *testing.T) {
 
 // TestPostBindPlugin tests invocation of postbind plugins.
 func TestPostBindPlugin(t *testing.T) {
-	// Create a plugin registry for testing. Register a prebind and a postbind plugin.
-	preBindPlugin := &PreBindPlugin{}
-	postBindPlugin := &PostBindPlugin{name: postBindPluginName}
-	registry := frameworkruntime.Registry{
-		preBindPluginName:  newPlugin(preBindPlugin),
-		postBindPluginName: newPlugin(postBindPlugin),
-	}
-
-	// Setup initial prebind and postbind plugin for testing.
-	prof := schedulerconfig.KubeSchedulerProfile{
-		SchedulerName: v1.DefaultSchedulerName,
-		Plugins: &schedulerconfig.Plugins{
-			PreBind: &schedulerconfig.PluginSet{
-				Enabled: []schedulerconfig.Plugin{
-					{
-						Name: preBindPluginName,
-					},
-				},
-			},
-			PostBind: &schedulerconfig.PluginSet{
-				Enabled: []schedulerconfig.Plugin{
-					{
-						Name: postBindPluginName,
-					},
-				},
-			},
-		},
-	}
-
-	// Create the master and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "postbind-plugin", nil), 2,
-		scheduler.WithProfiles(prof),
-		scheduler.WithFrameworkOutOfTreeRegistry(registry))
-	defer testutils.CleanupTest(t, testCtx)
-
 	tests := []struct {
-		name          string
-		preBindFail   bool
-		preBindReject bool
+		name        string
+		preBindFail bool
 	}{
 		{
 			name:        "plugin preBind fail",
@@ -1313,7 +1278,46 @@ func TestPostBindPlugin(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			preBindPlugin.failPreBind = test.preBindFail
+			// Create a plugin registry for testing. Register a prebind and a postbind plugin.
+			preBindPlugin := &PreBindPlugin{
+				failPreBind: test.preBindFail,
+			}
+			postBindPlugin := &PostBindPlugin{
+				name:                  postBindPluginName,
+				pluginInvokeEventChan: make(chan pluginInvokeEvent, 1),
+			}
+			registry := frameworkruntime.Registry{
+				preBindPluginName:  newPlugin(preBindPlugin),
+				postBindPluginName: newPlugin(postBindPlugin),
+			}
+
+			// Setup initial prebind and postbind plugin for testing.
+			prof := schedulerconfig.KubeSchedulerProfile{
+				SchedulerName: v1.DefaultSchedulerName,
+				Plugins: &schedulerconfig.Plugins{
+					PreBind: &schedulerconfig.PluginSet{
+						Enabled: []schedulerconfig.Plugin{
+							{
+								Name: preBindPluginName,
+							},
+						},
+					},
+					PostBind: &schedulerconfig.PluginSet{
+						Enabled: []schedulerconfig.Plugin{
+							{
+								Name: postBindPluginName,
+							},
+						},
+					},
+				},
+			}
+
+			// Create the master and the scheduler with the test plugin set.
+			testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "postbind-plugin", nil), 2,
+				scheduler.WithProfiles(prof),
+				scheduler.WithFrameworkOutOfTreeRegistry(registry))
+			defer testutils.CleanupTest(t, testCtx)
+
 			// Create a best effort pod.
 			pod, err := createPausePod(testCtx.ClientSet,
 				initPausePod(&pausePodConfig{Name: "test-pod", Namespace: testCtx.NS.Name}))
@@ -1332,13 +1336,16 @@ func TestPostBindPlugin(t *testing.T) {
 				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				}
+				select {
+				case <-postBindPlugin.pluginInvokeEventChan:
+				case <-time.After(time.Second * 15):
+					t.Errorf("pluginInvokeEventChan timed out")
+				}
 				if postBindPlugin.numPostBindCalled == 0 {
 					t.Errorf("Expected the postbind plugin to be called, was called %d times.", postBindPlugin.numPostBindCalled)
 				}
 			}
 
-			postBindPlugin.reset()
-			preBindPlugin.reset()
 			testutils.CleanupPods(testCtx.ClientSet, t, []*v1.Pod{pod})
 		})
 	}
@@ -1678,14 +1685,16 @@ func TestFilterPlugin(t *testing.T) {
 				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podUnschedulable(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled.")
 				}
+				if filterPlugin.numFilterCalled < 1 {
+					t.Errorf("Expected the filter plugin to be called at least 1 time, but got %v.", filterPlugin.numFilterCalled)
+				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				}
-			}
-
-			if filterPlugin.numFilterCalled != 1 {
-				t.Errorf("Expected the filter plugin to be called 1 time, but got %v.", filterPlugin.numFilterCalled)
+				if filterPlugin.numFilterCalled != 1 {
+					t.Errorf("Expected the filter plugin to be called 1 time, but got %v.", filterPlugin.numFilterCalled)
+				}
 			}
 
 			filterPlugin.reset()

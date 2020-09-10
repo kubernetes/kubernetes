@@ -10,8 +10,10 @@ import (
 )
 
 // ImageStreamLister helps list ImageStreams.
+// All objects returned here must be treated as read-only.
 type ImageStreamLister interface {
 	// List lists all ImageStreams in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ImageStream, err error)
 	// ImageStreams returns an object that can list and get ImageStreams.
 	ImageStreams(namespace string) ImageStreamNamespaceLister
@@ -42,10 +44,13 @@ func (s *imageStreamLister) ImageStreams(namespace string) ImageStreamNamespaceL
 }
 
 // ImageStreamNamespaceLister helps list and get ImageStreams.
+// All objects returned here must be treated as read-only.
 type ImageStreamNamespaceLister interface {
 	// List lists all ImageStreams in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ImageStream, err error)
 	// Get retrieves the ImageStream from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ImageStream, error)
 	ImageStreamNamespaceListerExpansion
 }

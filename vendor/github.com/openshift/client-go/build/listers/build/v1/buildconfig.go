@@ -10,8 +10,10 @@ import (
 )
 
 // BuildConfigLister helps list BuildConfigs.
+// All objects returned here must be treated as read-only.
 type BuildConfigLister interface {
 	// List lists all BuildConfigs in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.BuildConfig, err error)
 	// BuildConfigs returns an object that can list and get BuildConfigs.
 	BuildConfigs(namespace string) BuildConfigNamespaceLister
@@ -42,10 +44,13 @@ func (s *buildConfigLister) BuildConfigs(namespace string) BuildConfigNamespaceL
 }
 
 // BuildConfigNamespaceLister helps list and get BuildConfigs.
+// All objects returned here must be treated as read-only.
 type BuildConfigNamespaceLister interface {
 	// List lists all BuildConfigs in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.BuildConfig, err error)
 	// Get retrieves the BuildConfig from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.BuildConfig, error)
 	BuildConfigNamespaceListerExpansion
 }

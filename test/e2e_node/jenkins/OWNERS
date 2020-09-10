@@ -2,7 +2,8 @@
 
 approvers:
 - dashpole
-- krzyzacy
 - Random-Liu
 - yguo0905
 - yujuhong
+emeritus_approvers:
+- krzyzacy

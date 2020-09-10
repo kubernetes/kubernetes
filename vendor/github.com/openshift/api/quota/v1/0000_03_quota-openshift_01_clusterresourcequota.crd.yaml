@@ -1,6 +1,8 @@
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
   name: clusterresourcequotas.quota.openshift.io
 spec:
   group: quota.openshift.io
@@ -39,6 +41,10 @@ spec:
               properties:
                 hard:
                   additionalProperties:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     type: ""
                     x-kubernetes-int-or-string: true
                   description: 'hard is the set of desired hard limits for each named
@@ -174,13 +180,21 @@ spec:
                     properties:
                       hard:
                         additionalProperties:
-                          type: string
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
                         description: 'Hard is the set of enforced hard limits for
                           each named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/'
                         type: object
                       used:
                         additionalProperties:
-                          type: string
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
                         description: Used is the current observed total usage of the
                           resource in the namespace.
                         type: object
@@ -197,13 +211,21 @@ spec:
               properties:
                 hard:
                   additionalProperties:
-                    type: string
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
                   description: 'Hard is the set of enforced hard limits for each named
                     resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/'
                   type: object
                 used:
                   additionalProperties:
-                    type: string
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
                   description: Used is the current observed total usage of the resource
                     in the namespace.
                   type: object

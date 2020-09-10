@@ -38,16 +38,22 @@ import (
 type Interface interface {
 	// Handle takes care of queuing and dispatching a request
 	// characterized by the given digest.  The given `noteFn` will be
-	// invoked with the results of request classification.  If Handle
-	// decides that the request should be executed then `execute()`
-	// will be invoked once to execute the request; otherwise
-	// `execute()` will not be invoked.
+	// invoked with the results of request classification.  If the
+	// request is queued then `queueNoteFn` will be called twice,
+	// first with `true` and then with `false`; otherwise
+	// `queueNoteFn` will not be called at all.  If Handle decides
+	// that the request should be executed then `execute()` will be
+	// invoked once to execute the request; otherwise `execute()` will
+	// not be invoked.
 	Handle(ctx context.Context,
 		requestDigest RequestDigest,
 		noteFn func(fs *fctypesv1a1.FlowSchema, pl *fctypesv1a1.PriorityLevelConfiguration),
 		queueNoteFn fq.QueueNoteFn,
 		execFn func(),
 	)
+
+	// MaintainObservations is a helper for maintaining statistics.
+	MaintainObservations(stopCh <-chan struct{})
 
 	// Run monitors config objects from the main apiservers and causes
 	// any needed changes to local behavior.  This method ceases

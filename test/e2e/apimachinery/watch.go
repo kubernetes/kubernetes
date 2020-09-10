@@ -22,7 +22,7 @@ import (
 	"math/rand"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,6 +46,7 @@ var _ = SIGDescribe("Watchers", func() {
 	f := framework.NewDefaultFramework("watch")
 
 	/*
+		    Release: v1.11
 		    Testname: watch-configmaps-with-multiple-watchers
 		    Description: Ensure that multiple watchers are able to receive all add,
 			update, and delete notifications on configmaps that match a label selector and do
@@ -132,6 +133,7 @@ var _ = SIGDescribe("Watchers", func() {
 	})
 
 	/*
+		    Release: v1.11
 		    Testname: watch-configmaps-from-resource-version
 		    Description: Ensure that a watch can be opened from a particular resource version
 			in the past and only notifications happening after that resource version are observed.
@@ -179,6 +181,7 @@ var _ = SIGDescribe("Watchers", func() {
 	})
 
 	/*
+		    Release: v1.11
 		    Testname: watch-configmaps-closed-and-restarted
 		    Description: Ensure that a watch can be reopened from the last resource version
 			observed by the previous watch, and it will continue delivering notifications from
@@ -244,6 +247,7 @@ var _ = SIGDescribe("Watchers", func() {
 	})
 
 	/*
+		    Release: v1.11
 		    Testname: watch-configmaps-label-changed
 		    Description: Ensure that a watched object stops meeting the requirements of
 			a watch's selector, the watch will observe a delete, and will not observe
@@ -320,8 +324,8 @@ var _ = SIGDescribe("Watchers", func() {
 	})
 
 	/*
+	   Release: v1.15
 	   Testname: watch-consistency
-	   Release : v1.15
 	   Description: Ensure that concurrent watches are consistent with each other by initiating an additional watch
 	   for events received from the first watch, initiated at the resource version of the event, and checking that all
 	   resource versions of all events match. Events are produced from writes on a background goroutine.

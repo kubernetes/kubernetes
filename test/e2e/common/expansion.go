@@ -34,7 +34,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	f := framework.NewDefaultFramework("var-expansion")
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Environment variables, expansion
 		Description: Create a Pod with environment variables. Environment variables defined using previously defined environment variables MUST expand to proper values.
 	*/
@@ -63,7 +63,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Environment variables, command expansion
 		Description: Create a Pod with environment variables and container command using them. Container command using the  defined environment variables MUST expand to proper values.
 	*/
@@ -82,7 +82,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Environment variables, command argument expansion
 		Description: Create a Pod with environment variables and container command arguments using them. Container command arguments using the  defined environment variables MUST expand to proper values.
 	*/
@@ -102,7 +102,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	/*
-		Release : v1.19
+		Release: v1.19
 		Testname: VolumeSubpathEnvExpansion, subpath expansion
 		Description: Make sure a container's subpath can be set using an expansion of environment variables.
 	*/
@@ -142,7 +142,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	/*
-		Release : v1.19
+		Release: v1.19
 		Testname: VolumeSubpathEnvExpansion, subpath with backticks
 		Description: Make sure a container's subpath can not be set using an expansion of environment variables when backticks are supplied.
 	*/
@@ -176,7 +176,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	/*
-		Release : v1.19
+		Release: v1.19
 		Testname: VolumeSubpathEnvExpansion, subpath with absolute path
 		Description: Make sure a container's subpath can not be set using an expansion of environment variables when absolute path is supplied.
 	*/
@@ -210,7 +210,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	/*
-		Release : v1.19
+		Release: v1.19
 		Testname: VolumeSubpathEnvExpansion, subpath ready from failed state
 		Description: Verify that a failing subpath expansion can be modified during the lifecycle of a container.
 	*/
@@ -275,7 +275,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	/*
-		Release : v1.19
+		Release: v1.19
 		Testname: VolumeSubpathEnvExpansion, subpath test writes
 		Description: Verify that a subpath expansion can be used to write files into subpaths.
 		1.	valid subpathexpr starts a container running

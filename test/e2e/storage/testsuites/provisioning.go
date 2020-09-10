@@ -712,6 +712,38 @@ func StopPod(c clientset.Interface, pod *v1.Pod) {
 	e2epod.DeletePodWithWait(c, pod)
 }
 
+// StopPodAndDependents first tries to log the output of the pod's container,
+// then deletes the pod and waits for that to succeed. Also waits for all owned
+// resources to be deleted.
+func StopPodAndDependents(c clientset.Interface, pod *v1.Pod) {
+	if pod == nil {
+		return
+	}
+	body, err := c.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &v1.PodLogOptions{}).Do(context.TODO()).Raw()
+	if err != nil {
+		framework.Logf("Error getting logs for pod %s: %v", pod.Name, err)
+	} else {
+		framework.Logf("Pod %s has the following logs: %s", pod.Name, body)
+	}
+	framework.Logf("Deleting pod %q in namespace %q", pod.Name, pod.Namespace)
+	deletionPolicy := metav1.DeletePropagationForeground
+	err = c.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name,
+		metav1.DeleteOptions{
+			// If the pod is the owner of some resources (like ephemeral inline volumes),
+			// then we want to be sure that those are also gone before we return.
+			// Blocking pod deletion via metav1.DeletePropagationForeground achieves that.
+			PropagationPolicy: &deletionPolicy,
+		})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return // assume pod was already deleted
+		}
+		framework.Logf("pod Delete API error: %v", err)
+	}
+	framework.Logf("Wait up to %v for pod %q to be fully deleted", e2epod.PodDeleteTimeout, pod.Name)
+	e2epod.WaitForPodNotFoundInNamespace(c, pod.Name, pod.Namespace, e2epod.PodDeleteTimeout)
+}
+
 func verifyPVCsPending(client clientset.Interface, pvcs []*v1.PersistentVolumeClaim) {
 	for _, claim := range pvcs {
 		// Get new copy of the claim

@@ -56,7 +56,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pod readiness probe, with initial delay
 		Description: Create a Pod that is configured with a initial delay set on the readiness probe. Check the Pod Start time to compare to the initial delay. The Pod MUST be ready only after the specified initial delay.
 	*/
@@ -89,7 +89,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pod readiness probe, failure
 		Description: Create a Pod with a readiness probe that fails consistently. When this Pod is created,
 			then the Pod MUST never be ready, never be running and restart count MUST be zero.
@@ -115,7 +115,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pod liveness probe, using local file, restart
 		Description: Create a Pod with liveness probe that uses ExecAction handler to cat /temp/health file. The Container deletes the file /temp/health after 10 second, triggering liveness probe to fail. The Pod MUST now be killed and restarted incrementing restart count to 1.
 	*/
@@ -131,7 +131,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pod liveness probe, using local file, no restart
 		Description:  Pod is created with liveness probe that uses 'exec' command to cat /temp/health file. Liveness probe MUST not fail to check health and the restart count should remain 0.
 	*/
@@ -147,7 +147,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pod liveness probe, using http endpoint, restart
 		Description: A Pod is created with liveness probe on http endpoint /healthz. The http handler on the /healthz will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1.
 	*/
@@ -162,7 +162,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		Release : v1.18
+		Release: v1.18
 		Testname: Pod liveness probe, using tcp socket, no restart
 		Description: A Pod is created with liveness probe on tcp socket 8080. The http handler on port 8080 will return http errors after 10 seconds, but the socket will remain open. Liveness probe MUST not fail to check health and the restart count should remain 0.
 	*/
@@ -177,7 +177,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pod liveness probe, using http endpoint, multiple restarts (slow)
 		Description: A Pod is created with liveness probe on http endpoint /healthz. The http handler on the /healthz will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1. The liveness probe must fail again after restart once the http handler for /healthz enpoind on the Pod returns an http error after 10 seconds from the start. Restart counts MUST increment everytime health check fails, measure upto 5 restart.
 	*/
@@ -192,7 +192,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pod liveness probe, using http endpoint, failure
 		Description: A Pod is created with liveness probe on http endpoint '/'. Liveness probe on this endpoint will not fail. When liveness probe does not fail then the restart count MUST remain zero.
 	*/
@@ -208,7 +208,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pod liveness probe, docker exec, restart
 		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call  does not return within the timeout specified, liveness probe MUST restart the Pod.
 	*/
@@ -227,7 +227,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		Release : v1.14
+		Release: v1.14
 		Testname: Pod http liveness probe, redirected to a local address
 		Description: A Pod is created with liveness probe on http endpoint /redirect?loc=healthz. The http handler on the /redirect will redirect to the /healthz endpoint, which will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1.
 	*/
@@ -242,7 +242,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
-		Release : v1.14
+		Release: v1.14
 		Testname: Pod http liveness probe, redirected to a non-local address
 		Description: A Pod is created with liveness probe on http endpoint /redirect with a redirect to http://0.0.0.0/. The http handler on the /redirect should not follow the redirect, but instead treat it as a success and generate an event.
 	*/

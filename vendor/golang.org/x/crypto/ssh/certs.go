@@ -414,8 +414,8 @@ func (c *CertChecker) CheckCert(principal string, cert *Certificate) error {
 	return nil
 }
 
-// SignCert sets c.SignatureKey to the authority's public key and stores a
-// Signature, by authority, in the certificate.
+// SignCert signs the certificate with an authority, setting the Nonce,
+// SignatureKey, and Signature fields.
 func (c *Certificate) SignCert(rand io.Reader, authority Signer) error {
 	c.Nonce = make([]byte, 32)
 	if _, err := io.ReadFull(rand, c.Nonce); err != nil {

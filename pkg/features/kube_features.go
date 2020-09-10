@@ -639,6 +639,12 @@ const (
 	//
 	// Allows kube-proxy to create DSR loadbalancers for Windows
 	WinDSR featuregate.Feature = "WinDSR"
+
+	// owner: @RenaudWasTaken @dashpole
+	// alpha: v1.19
+	//
+	// Disables Accelerator Metrics Collected by Kubelet
+	DisableAcceleratorUsageMetrics featuregate.Feature = "DisableAcceleratorUsageMetrics"
 )
 
 func init() {
@@ -737,6 +743,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SetHostnameAsFQDN:                              {Default: false, PreRelease: featuregate.Alpha},
 	WinOverlay:                                     {Default: false, PreRelease: featuregate.Alpha},
 	WinDSR:                                         {Default: false, PreRelease: featuregate.Alpha},
+	DisableAcceleratorUsageMetrics:                 {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

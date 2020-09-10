@@ -681,23 +681,6 @@ func TestNodeAddressesWithMetadata(t *testing.T) {
 	}
 }
 
-func TestInstanceMetadataByProviderID(t *testing.T) {
-	instance0 := makeInstance(0, "192.168.0.1", "1.2.3.4", "instance-same.ec2.internal", "instance-same.ec2.external", true)
-	aws1, _ := mockInstancesResp(&instance0, []*ec2.Instance{&instance0})
-	// change node name so it uses the instance instead of metadata
-	aws1.selfAWSInstance.nodeName = "foo"
-
-	md, err := aws1.InstanceMetadataByProviderID(context.TODO(), "/us-east-1a/i-0")
-	if err != nil {
-		t.Errorf("should not error when instance found")
-	}
-	if md.ProviderID != "/us-east-1a/i-0" || md.Type != "c3.large" {
-		t.Errorf("expect providerID %s get %s, expect type %s get %s", "/us-east-1a/i-0", md.ProviderID, "c3.large", md.Type)
-	}
-	testHasNodeAddress(t, md.NodeAddresses, v1.NodeInternalIP, "192.168.0.1")
-	testHasNodeAddress(t, md.NodeAddresses, v1.NodeExternalIP, "1.2.3.4")
-}
-
 func TestParseMetadataLocalHostname(t *testing.T) {
 	tests := []struct {
 		name        string

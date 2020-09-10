@@ -67,7 +67,7 @@ var _ = SIGDescribe("Hostname of Pod [Feature:SetHostnameAsFQDN]", func() {
 	f := framework.NewDefaultFramework("hostfqdn")
 
 	/*
-	   Release : v1.19
+	   Release: v1.19
 	   Testname: Create Pod without fully qualified domain name (FQDN)
 	   Description: A Pod that does not define the subdomain field in it spec, does not have FQDN.
 	*/
@@ -80,7 +80,7 @@ var _ = SIGDescribe("Hostname of Pod [Feature:SetHostnameAsFQDN]", func() {
 	})
 
 	/*
-	   Release : v1.19
+	   Release: v1.19
 	   Testname: Create Pod without FQDN, setHostnameAsFQDN field set to true
 	   Description: A Pod that does not define the subdomain field in it spec, does not have FQDN.
 	                Hence, SetHostnameAsFQDN feature has no effect.
@@ -97,7 +97,7 @@ var _ = SIGDescribe("Hostname of Pod [Feature:SetHostnameAsFQDN]", func() {
 	})
 
 	/*
-	   Release : v1.19
+	   Release: v1.19
 	   Testname: Create Pod with FQDN, setHostnameAsFQDN field not defined.
 	   Description: A Pod that defines the subdomain field in it spec has FQDN.
 	                hostname command returns shortname (pod name in this case), and hostname -f returns FQDN.
@@ -116,7 +116,7 @@ var _ = SIGDescribe("Hostname of Pod [Feature:SetHostnameAsFQDN]", func() {
 	})
 
 	/*
-	   Release : v1.19
+	   Release: v1.19
 	   Testname: Create Pod with FQDN, setHostnameAsFQDN field set to true.
 	   Description: A Pod that defines the subdomain field in it spec has FQDN. When setHostnameAsFQDN: true, the
 	                hostname is set to be the FQDN. In this case, both commands hostname and hostname -f return the FQDN of the Pod.

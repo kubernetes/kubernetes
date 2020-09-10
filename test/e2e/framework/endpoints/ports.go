@@ -14,12 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/*
-This soak tests places a specified number of pods on each node and then
-repeatedly sends queries to a service running on these pods via
-a serivce
-*/
-
 package endpoints
 
 import (

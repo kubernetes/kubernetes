@@ -257,6 +257,14 @@ const (
 	filterNodeLimit = 150
 )
 
+const (
+	// represents expected attachment status of a volume after attach
+	volumeAttachedStatus = "attached"
+
+	// represents expected attachment status of a volume after detach
+	volumeDetachedStatus = "detached"
+)
+
 // awsTagNameMasterRoles is a set of well-known AWS tag names that indicate the instance is a master
 // The major consequence is that it is then not considered for AWS zone discovery for dynamic volume creation.
 var awsTagNameMasterRoles = sets.NewString("kubernetes.io/role/master", "k8s.io/role/master")
@@ -1395,6 +1403,7 @@ func (c *Cloud) Instances() (cloudprovider.Instances, bool) {
 }
 
 // InstancesV2 returns an implementation of InstancesV2 for Amazon Web Services.
+// TODO: implement ONLY for external cloud provider
 func (c *Cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
 	return nil, false
 }
@@ -1670,31 +1679,6 @@ func (c *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID str
 	return false, nil
 }
 
-// InstanceMetadataByProviderID returns metadata of the specified instance.
-func (c *Cloud) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
-	instanceID, err := KubernetesInstanceID(providerID).MapToAWSInstanceID()
-	if err != nil {
-		return nil, err
-	}
-
-	instance, err := describeInstance(c.ec2, instanceID)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO ignore checking whether `*instance.State.Name == ec2.InstanceStateNameTerminated` here.
-	// If not behave as expected, add it.
-	addresses, err := extractNodeAddresses(instance)
-	if err != nil {
-		return nil, err
-	}
-	return &cloudprovider.InstanceMetadata{
-		ProviderID:    providerID,
-		Type:          aws.StringValue(instance.InstanceType),
-		NodeAddresses: addresses,
-	}, nil
-}
-
 // InstanceID returns the cloud provider ID of the node with the specified nodeName.
 func (c *Cloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	// In the future it is possible to also return an endpoint as:
@@ -1967,7 +1951,6 @@ func (c *Cloud) getMountDevice(
 				// AWS API returns consistent result next time (i.e. the volume is detached).
 				status := volumeStatus[mappingVolumeID]
 				klog.Warningf("Got assignment call for already-assigned volume: %s@%s, volume status: %s", mountDevice, mappingVolumeID, status)
-				return mountDevice, false, fmt.Errorf("volume is still being detached from the node")
 			}
 			return mountDevice, true, nil
 		}
@@ -2168,7 +2151,7 @@ func (c *Cloud) applyUnSchedulableTaint(nodeName types.NodeName, reason string) 
 
 // waitForAttachmentStatus polls until the attachment status is the expected value
 // On success, it returns the last attachment state.
-func (d *awsDisk) waitForAttachmentStatus(status string, expectedInstance, expectedDevice string) (*ec2.VolumeAttachment, error) {
+func (d *awsDisk) waitForAttachmentStatus(status string, expectedInstance, expectedDevice string, alreadyAttached bool) (*ec2.VolumeAttachment, error) {
 	backoff := wait.Backoff{
 		Duration: volumeAttachmentStatusPollDelay,
 		Factor:   volumeAttachmentStatusFactor,
@@ -2193,7 +2176,7 @@ func (d *awsDisk) waitForAttachmentStatus(status string, expectedInstance, expec
 		if err != nil {
 			// The VolumeNotFound error is special -- we don't need to wait for it to repeat
 			if isAWSErrorVolumeNotFound(err) {
-				if status == "detached" {
+				if status == volumeDetachedStatus {
 					// The disk doesn't exist, assume it's detached, log warning and stop waiting
 					klog.Warningf("Waiting for volume %q to be detached but the volume does not exist", d.awsID)
 					stateStr := "detached"
@@ -2202,7 +2185,7 @@ func (d *awsDisk) waitForAttachmentStatus(status string, expectedInstance, expec
 					}
 					return true, nil
 				}
-				if status == "attached" {
+				if status == volumeAttachedStatus {
 					// The disk doesn't exist, complain, give up waiting and report error
 					klog.Warningf("Waiting for volume %q to be attached but the volume does not exist", d.awsID)
 					return false, err
@@ -2237,7 +2220,7 @@ func (d *awsDisk) waitForAttachmentStatus(status string, expectedInstance, expec
 			}
 		}
 		if attachmentStatus == "" {
-			attachmentStatus = "detached"
+			attachmentStatus = volumeDetachedStatus
 		}
 		if attachment != nil {
 			// AWS eventual consistency can go back in time.
@@ -2264,6 +2247,13 @@ func (d *awsDisk) waitForAttachmentStatus(status string, expectedInstance, expec
 				}
 				return false, nil
 			}
+		}
+
+		// if we expected volume to be attached and it was reported as already attached via DescribeInstance call
+		// but DescribeVolume told us volume is detached, we will short-circuit this long wait loop and return error
+		// so as AttachDisk can be retried without waiting for 20 minutes.
+		if (status == volumeAttachedStatus) && alreadyAttached && (attachmentStatus != status) {
+			return false, fmt.Errorf("attachment of disk %q failed, expected device to be attached but was %s", d.name, attachmentStatus)
 		}
 
 		if attachmentStatus == status {
@@ -2411,7 +2401,7 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 		klog.V(2).Infof("AttachVolume volume=%q instance=%q request returned %v", disk.awsID, awsInstance.awsID, attachResponse)
 	}
 
-	attachment, err := disk.waitForAttachmentStatus("attached", awsInstance.awsID, ec2Device)
+	attachment, err := disk.waitForAttachmentStatus("attached", awsInstance.awsID, ec2Device, alreadyAttached)
 
 	if err != nil {
 		if err == wait.ErrWaitTimeout {
@@ -2489,7 +2479,7 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 		return "", errors.New("no response from DetachVolume")
 	}
 
-	attachment, err := diskInfo.disk.waitForAttachmentStatus("detached", awsInstance.awsID, "")
+	attachment, err := diskInfo.disk.waitForAttachmentStatus("detached", awsInstance.awsID, "", false)
 	if err != nil {
 		return "", err
 	}
@@ -4797,7 +4787,7 @@ func setNodeDisk(
 }
 
 func getInitialAttachDetachDelay(status string) time.Duration {
-	if status == "detached" {
+	if status == volumeDetachedStatus {
 		return volumeDetachmentStatusInitialDelay
 	}
 	return volumeAttachmentStatusInitialDelay

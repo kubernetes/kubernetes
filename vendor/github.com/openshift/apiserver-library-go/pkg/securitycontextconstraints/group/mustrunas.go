@@ -45,17 +45,17 @@ func (s *mustRunAs) GenerateSingle(_ *api.Pod) (*int64, error) {
 // Validate ensures that the specified values fall within the range of the strategy.
 // Groups are passed in here to allow this strategy to support multiple group fields (fsgroup and
 // supplemental groups).
-func (s *mustRunAs) Validate(_ *api.Pod, groups []int64) field.ErrorList {
+func (s *mustRunAs) Validate(fldPath *field.Path, _ *api.Pod, groups []int64) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(groups) == 0 && len(s.ranges) > 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath(s.field), groups, "unable to validate empty groups against required ranges"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child(s.field), groups, "unable to validate empty groups against required ranges"))
 	}
 
 	for _, group := range groups {
 		if !s.isGroupValid(group) {
 			detail := fmt.Sprintf("%d is not an allowed group", group)
-			allErrs = append(allErrs, field.Invalid(field.NewPath(s.field), groups, detail))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child(s.field), groups, detail))
 		}
 	}
 

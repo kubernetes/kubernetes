@@ -159,6 +159,8 @@ type ServerConfig struct {
 
 	EnableGRPCGateway bool
 
+	WatchProgressNotifyInterval time.Duration
+
 	// UnsafeNoFsync disables all uses of fsync.
 	// Setting this is unsafe and will cause data loss.
 	UnsafeNoFsync bool `json:"unsafe-no-fsync"`

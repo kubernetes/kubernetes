@@ -10,8 +10,10 @@ import (
 )
 
 // TemplateInstanceLister helps list TemplateInstances.
+// All objects returned here must be treated as read-only.
 type TemplateInstanceLister interface {
 	// List lists all TemplateInstances in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.TemplateInstance, err error)
 	// TemplateInstances returns an object that can list and get TemplateInstances.
 	TemplateInstances(namespace string) TemplateInstanceNamespaceLister
@@ -42,10 +44,13 @@ func (s *templateInstanceLister) TemplateInstances(namespace string) TemplateIns
 }
 
 // TemplateInstanceNamespaceLister helps list and get TemplateInstances.
+// All objects returned here must be treated as read-only.
 type TemplateInstanceNamespaceLister interface {
 	// List lists all TemplateInstances in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.TemplateInstance, err error)
 	// Get retrieves the TemplateInstance from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.TemplateInstance, error)
 	TemplateInstanceNamespaceListerExpansion
 }

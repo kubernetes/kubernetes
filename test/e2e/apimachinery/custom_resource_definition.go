@@ -47,7 +47,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 
 	ginkgo.Context("Simple CustomResourceDefinition", func() {
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Custom Resource Definition, create
 			Description: Create a API extension client and define a random custom resource definition.
 			Create the custom resource definition and then delete it. The creation and deletion MUST
@@ -73,7 +73,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		})
 
 		/*
-			Release : v1.16
+			Release: v1.16
 			Testname: Custom Resource Definition, list
 			Description: Create a API extension client, define 10 labeled custom resource definitions and list them using
 			a label selector; the list result MUST contain only the labeled custom resource definitions. Delete the labeled
@@ -135,7 +135,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		})
 
 		/*
-			Release : v1.16
+			Release: v1.16
 			Testname: Custom Resource Definition, status sub-resource
 			Description: Create a custom resource definition. Attempt to read, update and patch its status sub-resource;
 			all mutating sub-resource operations MUST be visible to subsequent reads.
@@ -258,7 +258,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 	})
 
 	/*
-		Release : v1.17
+		Release: v1.17
 		Testname: Custom Resource Definition, defaulting
 		Description: Create a custom resource definition without default. Create CR. Add default and read CR until
 		the default is applied. Create another CR. Remove default, add default for another field and read CR until

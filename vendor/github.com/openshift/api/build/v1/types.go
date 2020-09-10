@@ -713,6 +713,7 @@ type DockerBuildStrategy struct {
 
 	// dockerfilePath is the path of the Dockerfile that will be used to build the container image,
 	// relative to the root of the context (contextDir).
+	// Defaults to `Dockerfile` if unset.
 	DockerfilePath string `json:"dockerfilePath,omitempty" protobuf:"bytes,6,opt,name=dockerfilePath"`
 
 	// buildArgs contains build arguments that will be resolved in the Dockerfile.  See

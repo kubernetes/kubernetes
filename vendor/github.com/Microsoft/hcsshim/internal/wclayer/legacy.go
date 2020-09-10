@@ -341,7 +341,7 @@ type legacyLayerWriter struct {
 	backupWriter    *winio.BackupFileWriter
 	Tombstones      []string
 	HasUtilityVM    bool
-	uvmDi           []dirInfo
+	changedDi       []dirInfo
 	addedFiles      map[string]bool
 	PendingLinks    []pendingLink
 	pendingDirs     []pendingDir
@@ -555,7 +555,7 @@ func cloneTree(srcRoot *os.File, destRoot *os.File, subPath string, mutatedFiles
 			if err != nil {
 				return err
 			}
-			if isDir && !isReparsePoint {
+			if isDir {
 				di = append(di, dirInfo{path: relPath, fileInfo: *fi})
 			}
 		} else {
@@ -581,6 +581,10 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 
 	if name == utilityVMPath {
 		return w.initUtilityVM()
+	}
+
+	if (fileInfo.FileAttributes & syscall.FILE_ATTRIBUTE_DIRECTORY) != 0 {
+		w.changedDi = append(w.changedDi, dirInfo{path: name, fileInfo: *fileInfo})
 	}
 
 	name = filepath.Clean(name)
@@ -611,9 +615,6 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 				if err = safefile.MkdirRelative(name, w.destRoot); err != nil {
 					return err
 				}
-			}
-			if fileInfo.FileAttributes&syscall.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
-				w.uvmDi = append(w.uvmDi, dirInfo{path: name, fileInfo: *fileInfo})
 			}
 		} else {
 			// Overwrite any existing hard link.
@@ -801,12 +802,6 @@ func (w *legacyLayerWriter) Close() error {
 	}
 	for _, pd := range w.pendingDirs {
 		err := safefile.MkdirRelative(pd.Path, pd.Root)
-		if err != nil {
-			return err
-		}
-	}
-	if w.HasUtilityVM {
-		err := reapplyDirectoryTimes(w.destRoot, w.uvmDi)
 		if err != nil {
 			return err
 		}

@@ -248,12 +248,13 @@ var (
 		FsType:     "ntfs",
 		FeatureTag: "[sig-windows]",
 	}
-	// NtfsDynamicPV is TestPattern for "Dynamic PV (xfs)"
+	// NtfsDynamicPV is TestPattern for "Dynamic PV (ntfs)"
 	NtfsDynamicPV = TestPattern{
-		Name:       "Dynamic PV (ntfs)",
-		VolType:    DynamicPV,
-		FsType:     "ntfs",
-		FeatureTag: "[sig-windows]",
+		Name:                   "Dynamic PV (ntfs)",
+		VolType:                DynamicPV,
+		FsType:                 "ntfs",
+		FeatureTag:             "[sig-windows]",
+		SnapshotDeletionPolicy: DeleteSnapshot,
 	}
 
 	// Definitions for Filesystem volume mode

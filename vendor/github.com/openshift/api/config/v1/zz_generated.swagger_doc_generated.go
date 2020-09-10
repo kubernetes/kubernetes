@@ -285,10 +285,19 @@ var map_APIServerSpec = map[string]string{
 	"additionalCORSAllowedOrigins": "additionalCORSAllowedOrigins lists additional, user-defined regular expressions describing hosts for which the API server allows access using the CORS headers. This may be needed to access the API and the integrated OAuth server from JavaScript applications. The values are regular expressions that correspond to the Golang regular expression language.",
 	"encryption":                   "encryption allows the configuration of encryption of resources at the datastore layer.",
 	"tlsSecurityProfile":           "tlsSecurityProfile specifies settings for TLS connections for externally exposed servers.\n\nIf unset, a default (which may change between releases) is chosen. Note that only Old and Intermediate profiles are currently supported, and the maximum available MinTLSVersions is VersionTLS12.",
+	"audit":                        "audit specifies the settings for audit configuration to be applied to all OpenShift-provided API servers in the cluster.",
 }
 
 func (APIServerSpec) SwaggerDoc() map[string]string {
 	return map_APIServerSpec
+}
+
+var map_Audit = map[string]string{
+	"profile": "profile specifies the name of the desired audit policy configuration to be deployed to all OpenShift-provided API servers in the cluster.\n\nThe following profiles are provided: - Default: the existing default policy. - WriteRequestBodies: like 'Default', but logs request and response HTTP payloads for write requests (create, update, patch). - AllRequestBodies: like 'WriteRequestBodies', but also logs request and response HTTP payloads for read requests (get, list).\n\nIf unset, the 'Default' profile is used as the default.",
+}
+
+func (Audit) SwaggerDoc() map[string]string {
+	return map_Audit
 }
 
 var map_Authentication = map[string]string{
@@ -520,8 +529,20 @@ func (ComponentOverride) SwaggerDoc() map[string]string {
 	return map_ComponentOverride
 }
 
+var map_Release = map[string]string{
+	"":         "Release represents an OpenShift release image and associated metadata.",
+	"version":  "version is a semantic versioning identifying the update version. When this field is part of spec, version is optional if image is specified.",
+	"image":    "image is a container image location that contains the update. When this field is part of spec, image is optional if version is specified and the availableUpdates field contains a matching version.",
+	"url":      "url contains information about this release. This URL is set by the 'url' metadata property on a release or the metadata returned by the update API and should be displayed as a link in user interfaces. The URL field may not be set for test or nightly releases.",
+	"channels": "channels is the set of Cincinnati channels to which the release currently belongs.",
+}
+
+func (Release) SwaggerDoc() map[string]string {
+	return map_Release
+}
+
 var map_Update = map[string]string{
-	"":        "Update represents a release of the ClusterVersionOperator, referenced by the Image member.",
+	"":        "Update represents an administrator update request.",
 	"version": "version is a semantic versioning identifying the update version. When this field is part of spec, version is optional if image is specified.",
 	"image":   "image is a container image location that contains the update. When this field is part of spec, image is optional if version is specified and the availableUpdates field contains a matching version.",
 	"force":   "force allows an administrator to update to an image that has failed verification, does not appear in the availableUpdates list, or otherwise would be blocked by normal protections on update. This option should only be used when the authenticity of the provided image has been verified out of band because the provided image will run with full administrative access to the cluster. Do not use this flag with images that comes from unknown or potentially malicious sources.\n\nThis flag does not override other forms of consistency checking that are required before a new update is deployed.",
@@ -949,7 +970,7 @@ func (IngressSpec) SwaggerDoc() map[string]string {
 var map_ClusterNetworkEntry = map[string]string{
 	"":           "ClusterNetworkEntry is a contiguous block of IP addresses from which pod IPs are allocated.",
 	"cidr":       "The complete block for pod IPs.",
-	"hostPrefix": "The size (prefix) of block to allocate to each node.",
+	"hostPrefix": "The size (prefix) of block to allocate to each node. If this field is not used by the plugin, it can be left unset.",
 }
 
 func (ClusterNetworkEntry) SwaggerDoc() map[string]string {

@@ -10,10 +10,13 @@ import (
 )
 
 // SecurityContextConstraintsLister helps list SecurityContextConstraints.
+// All objects returned here must be treated as read-only.
 type SecurityContextConstraintsLister interface {
 	// List lists all SecurityContextConstraints in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.SecurityContextConstraints, err error)
 	// Get retrieves the SecurityContextConstraints from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.SecurityContextConstraints, error)
 	SecurityContextConstraintsListerExpansion
 }

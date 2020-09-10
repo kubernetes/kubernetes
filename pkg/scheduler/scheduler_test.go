@@ -36,7 +36,6 @@ import (
 	eventsv1 "k8s.io/api/events/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -214,17 +213,57 @@ func TestSchedulerScheduleOne(t *testing.T) {
 	errB := errors.New("binder")
 
 	table := []struct {
-		name             string
-		injectBindError  error
-		sendPod          *v1.Pod
-		algo             core.ScheduleAlgorithm
-		expectErrorPod   *v1.Pod
-		expectForgetPod  *v1.Pod
-		expectAssumedPod *v1.Pod
-		expectError      error
-		expectBind       *v1.Binding
-		eventReason      string
+		name                string
+		injectBindError     error
+		sendPod             *v1.Pod
+		algo                core.ScheduleAlgorithm
+		registerPluginFuncs []st.RegisterPluginFunc
+		expectErrorPod      *v1.Pod
+		expectForgetPod     *v1.Pod
+		expectAssumedPod    *v1.Pod
+		expectError         error
+		expectBind          *v1.Binding
+		eventReason         string
 	}{
+		{
+			name:    "error reserve pod",
+			sendPod: podWithID("foo", ""),
+			algo:    mockScheduler{core.ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
+			registerPluginFuncs: []st.RegisterPluginFunc{
+				st.RegisterReservePlugin("FakeReserve", st.NewFakeReservePlugin(framework.NewStatus(framework.Error, "reserve error"))),
+			},
+			expectErrorPod:   podWithID("foo", testNode.Name),
+			expectForgetPod:  podWithID("foo", testNode.Name),
+			expectAssumedPod: podWithID("foo", testNode.Name),
+			expectError:      errors.New(`error while running Reserve in "FakeReserve" reserve plugin for pod "foo": reserve error`),
+			eventReason:      "FailedScheduling",
+		},
+		{
+			name:    "error permit pod",
+			sendPod: podWithID("foo", ""),
+			algo:    mockScheduler{core.ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
+			registerPluginFuncs: []st.RegisterPluginFunc{
+				st.RegisterPermitPlugin("FakePermit", st.NewFakePermitPlugin(framework.NewStatus(framework.Error, "permit error"), time.Minute)),
+			},
+			expectErrorPod:   podWithID("foo", testNode.Name),
+			expectForgetPod:  podWithID("foo", testNode.Name),
+			expectAssumedPod: podWithID("foo", testNode.Name),
+			expectError:      errors.New(`error while running "FakePermit" permit plugin for pod "foo": permit error`),
+			eventReason:      "FailedScheduling",
+		},
+		{
+			name:    "error prebind pod",
+			sendPod: podWithID("foo", ""),
+			algo:    mockScheduler{core.ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
+			registerPluginFuncs: []st.RegisterPluginFunc{
+				st.RegisterPreBindPlugin("FakePreBind", st.NewFakePreBindPlugin(framework.NewStatus(framework.Error, "prebind error"))),
+			},
+			expectErrorPod:   podWithID("foo", testNode.Name),
+			expectForgetPod:  podWithID("foo", testNode.Name),
+			expectAssumedPod: podWithID("foo", testNode.Name),
+			expectError:      errors.New(`error while running "FakePreBind" prebind plugin for pod "foo": prebind error`),
+			eventReason:      "FailedScheduling",
+		},
 		{
 			name:             "bind assumed pod scheduled",
 			sendPod:          podWithID("foo", ""),
@@ -252,7 +291,8 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			expectErrorPod:   podWithID("foo", testNode.Name),
 			expectForgetPod:  podWithID("foo", testNode.Name),
 			eventReason:      "FailedScheduling",
-		}, {
+		},
+		{
 			name:        "deleting pod",
 			sendPod:     deletingPod("foo"),
 			algo:        mockScheduler{core.ScheduleResult{}, nil},
@@ -296,10 +336,11 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				gotBinding = action.(clienttesting.CreateAction).GetObject().(*v1.Binding)
 				return true, gotBinding, item.injectBindError
 			})
-			fwk, err := st.NewFramework([]st.RegisterPluginFunc{
+			registerPluginFuncs := append(item.registerPluginFuncs,
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			}, frameworkruntime.WithClientSet(client))
+			)
+			fwk, err := st.NewFramework(registerPluginFuncs, frameworkruntime.WithClientSet(client))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -381,8 +422,6 @@ func (s *fakeNodeSelector) Filter(_ context.Context, _ *framework.CycleState, _ 
 }
 
 func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
-	t.Skip("test skipped temporarily to enable 1.19 rebase to merge more quickly")
-
 	nodes := []runtime.Object{
 		st.MakeNode().Name("machine1").UID("machine1").Obj(),
 		st.MakeNode().Name("machine2").UID("machine2").Obj(),
@@ -482,6 +521,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 
 	// Run scheduler.
 	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
 	go sched.Run(ctx)
 
 	// Send pods to be scheduled.
@@ -529,12 +569,12 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 				return
 			default:
 			}
-			pods, err := scache.ListPods(labels.Everything())
+			pods, err := scache.PodCount()
 			if err != nil {
 				errChan <- fmt.Errorf("cache.List failed: %v", err)
 				return
 			}
-			if len(pods) == 0 {
+			if pods == 0 {
 				close(waitPodExpireChan)
 				return
 			}

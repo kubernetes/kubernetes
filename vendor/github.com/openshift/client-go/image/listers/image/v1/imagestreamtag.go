@@ -10,8 +10,10 @@ import (
 )
 
 // ImageStreamTagLister helps list ImageStreamTags.
+// All objects returned here must be treated as read-only.
 type ImageStreamTagLister interface {
 	// List lists all ImageStreamTags in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ImageStreamTag, err error)
 	// ImageStreamTags returns an object that can list and get ImageStreamTags.
 	ImageStreamTags(namespace string) ImageStreamTagNamespaceLister
@@ -42,10 +44,13 @@ func (s *imageStreamTagLister) ImageStreamTags(namespace string) ImageStreamTagN
 }
 
 // ImageStreamTagNamespaceLister helps list and get ImageStreamTags.
+// All objects returned here must be treated as read-only.
 type ImageStreamTagNamespaceLister interface {
 	// List lists all ImageStreamTags in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ImageStreamTag, err error)
 	// Get retrieves the ImageStreamTag from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ImageStreamTag, error)
 	ImageStreamTagNamespaceListerExpansion
 }

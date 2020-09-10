@@ -19,6 +19,7 @@ package network
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"regexp"
 	"strings"
 	"time"
@@ -51,6 +52,23 @@ func GetHTTPContent(host string, port int, timeout time.Duration, url string) by
 		framework.Failf("Could not reach HTTP service through %v:%v%v after %v: %v", host, port, url, timeout, pollErr)
 	}
 	return body
+}
+
+// GetHTTPContentFromTestContainer returns the content of the given url by HTTP via a test container.
+func GetHTTPContentFromTestContainer(config *e2enetwork.NetworkingTestConfig, host string, port int, timeout time.Duration, dialCmd string) (string, error) {
+	var body string
+	pollFn := func() (bool, error) {
+		resp, err := config.GetResponseFromTestContainer("http", dialCmd, host, port)
+		if err != nil || len(resp.Errors) > 0 || len(resp.Responses) == 0 {
+			return false, nil
+		}
+		body = resp.Responses[0]
+		return true, nil
+	}
+	if pollErr := wait.PollImmediate(framework.Poll, timeout, pollFn); pollErr != nil {
+		return "", pollErr
+	}
+	return body, nil
 }
 
 // DescribeSvc logs the output of kubectl describe svc for the given namespace
@@ -107,4 +125,40 @@ func CheckSCTPModuleLoadedOnNodes(f *framework.Framework, nodes *v1.NodeList) bo
 		framework.Logf("the sctp module is not loaded on node: %v", node.Name)
 	}
 	return false
+}
+
+// execSourceIPTest executes curl to access "/clientip" endpoint on target address
+// from given Pod to check if source ip is preserved.
+func execSourceIPTest(sourcePod v1.Pod, targetAddr string) (string, string) {
+	var (
+		err     error
+		stdout  string
+		timeout = 2 * time.Minute
+	)
+
+	framework.Logf("Waiting up to %v to get response from %s", timeout, targetAddr)
+	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/clientip`, targetAddr)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
+		stdout, err = framework.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
+		if err != nil {
+			framework.Logf("got err: %v, retry until timeout", err)
+			continue
+		}
+		// Need to check output because it might omit in case of error.
+		if strings.TrimSpace(stdout) == "" {
+			framework.Logf("got empty stdout, retry until timeout")
+			continue
+		}
+		break
+	}
+
+	framework.ExpectNoError(err)
+
+	// The stdout return from RunHostCmd is in this format: x.x.x.x:port or [xx:xx:xx::x]:port
+	host, _, err := net.SplitHostPort(stdout)
+	if err != nil {
+		// ginkgo.Fail the test if output format is unexpected.
+		framework.Failf("exec pod returned unexpected stdout: [%v]\n", stdout)
+	}
+	return sourcePod.Status.PodIP, host
 }

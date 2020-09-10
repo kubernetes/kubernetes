@@ -203,6 +203,16 @@ func NodeOSDistroIs(supportedNodeOsDistros ...string) bool {
 	return false
 }
 
+// NodeOSArchIs returns true if the node OS arch is included in the supportedNodeOsArchs. Otherwise false.
+func NodeOSArchIs(supportedNodeOsArchs ...string) bool {
+	for _, arch := range supportedNodeOsArchs {
+		if strings.EqualFold(arch, TestContext.NodeOSArch) {
+			return true
+		}
+	}
+	return false
+}
+
 // DeleteNamespaces deletes all namespaces that match the given delete and skip filters.
 // Filter is by simple strings.Contains; first skip filter, then delete filter.
 // Returns the list of deleted namespaces or an error.

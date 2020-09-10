@@ -183,7 +183,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pods, assigned hostip
 		Description: Create a Pod. Pod status MUST return successfully and contains a valid IP address.
 	*/
@@ -205,7 +205,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pods, lifecycle
 		Description: A Pod is created with a unique label. Pod MUST be accessible when queried using the label selector upon creation. Add a watch, check if the Pod is running. Pod then deleted, The pod deletion timestamp is observed. The watch MUST return the pod deleted event. Query with the original selector for the Pod MUST return empty list.
 	*/
@@ -336,7 +336,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pods, update
 		Description: Create a Pod with a unique label. Query for the Pod with the label as selector MUST be successful. Update the pod to change the value of the Label. Query for the Pod with the new value for the label MUST be successful.
 		Behaviors:
@@ -393,7 +393,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pods, ActiveDeadlineSeconds
 		Description: Create a Pod with a unique label. Query for the Pod with the label as selector MUST be successful. The Pod is updated with ActiveDeadlineSeconds set on the Pod spec. Pod MUST terminate of the specified time elapses.
 	*/
@@ -439,7 +439,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pods, service environment variables
 		Description: Create a server Pod listening on port 9376. A Service called fooservice is created for the server Pod listening on port 8765 targeting port 8080. If a new Pod is created in the cluster then the Pod MUST have the fooservice environment variables available from this new Pod. The new create Pod MUST have environment variables such as FOOSERVICE_SERVICE_HOST, FOOSERVICE_SERVICE_PORT, FOOSERVICE_PORT, FOOSERVICE_PORT_8765_TCP_PORT, FOOSERVICE_PORT_8765_TCP_PROTO, FOOSERVICE_PORT_8765_TCP and FOOSERVICE_PORT_8765_TCP_ADDR that are populated with proper values.
 	*/
@@ -530,7 +530,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	/*
-		Release : v1.13
+		Release: v1.13
 		Testname: Pods, remote command execution over websocket
 		Description: A Pod is created. Websocket is created to retrieve exec command output from this pod.
 		Message retrieved form Websocket MUST match with expected exec command output.
@@ -612,7 +612,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	/*
-		Release : v1.13
+		Release: v1.13
 		Testname: Pods, logs from websockets
 		Description: A Pod is created. Websocket is created to retrieve log of a container from this pod.
 		Message retrieved form Websocket MUST match with container's output.
@@ -832,8 +832,16 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 	})
 
-	ginkgo.It("should delete a collection of pods", func() {
+	/*
+		Release: v1.19
+		Testname: Pods, delete a collection
+		Description: A set of pods is created with a label selector which MUST be found when listed.
+		The set of pods is deleted and MUST NOT show up when listed by its label selector.
+	*/
+	framework.ConformanceIt("should delete a collection of pods", func() {
 		podTestNames := []string{"test-pod-1", "test-pod-2", "test-pod-3"}
+
+		zero := int64(0)
 
 		ginkgo.By("Create set of pods")
 		// create a set of pods in test namespace
@@ -845,6 +853,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 						"type": "Testing"},
 				},
 				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: &zero,
 					Containers: []v1.Container{{
 						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 						Name:  "token-test",
@@ -861,7 +870,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.ExpectNoError(err, "3 pods not found")
 
 		// delete Collection of pods with a label in the current namespace
-		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &zero}, metav1.ListOptions{
 			LabelSelector: "type=Testing"})
 		framework.ExpectNoError(err, "failed to delete collection of pods")
 

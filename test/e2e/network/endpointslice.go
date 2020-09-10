@@ -18,6 +18,7 @@ package network
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -49,14 +51,14 @@ var _ = SIGDescribe("EndpointSlice", func() {
 		namespace := "default"
 		name := "kubernetes"
 		endpoints, err := cs.CoreV1().Endpoints(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "error creating Endpoints resource")
 		if len(endpoints.Subsets) != 1 {
 			framework.Failf("Expected 1 subset in endpoints, got %d: %#v", len(endpoints.Subsets), endpoints.Subsets)
 		}
 
 		endpointSubset := endpoints.Subsets[0]
 		endpointSlice, err := cs.DiscoveryV1beta1().EndpointSlices(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "error creating EndpointSlice resource")
 		if len(endpointSlice.Ports) != len(endpointSubset.Ports) {
 			framework.Failf("Expected EndpointSlice to have %d ports, got %d: %#v", len(endpointSubset.Ports), len(endpointSlice.Ports), endpointSlice.Ports)
 		}
@@ -85,7 +87,7 @@ var _ = SIGDescribe("EndpointSlice", func() {
 		})
 
 		// Expect Endpoints resource to be created.
-		if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
+		if err := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 			_, err := cs.CoreV1().Endpoints(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
@@ -97,7 +99,7 @@ var _ = SIGDescribe("EndpointSlice", func() {
 
 		// Expect EndpointSlice resource to be created.
 		var endpointSlice discoveryv1beta1.EndpointSlice
-		if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
+		if err := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 			endpointSliceList, err := cs.DiscoveryV1beta1().EndpointSlices(svc.Namespace).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: "kubernetes.io/service-name=" + svc.Name,
 			})
@@ -126,10 +128,10 @@ var _ = SIGDescribe("EndpointSlice", func() {
 		}
 
 		err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "error deleting Service")
 
 		// Expect Endpoints resource to be deleted when Service is.
-		if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
+		if err := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 			_, err := cs.CoreV1().Endpoints(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
@@ -143,7 +145,7 @@ var _ = SIGDescribe("EndpointSlice", func() {
 		}
 
 		// Expect EndpointSlice resource to be deleted when Service is.
-		if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
+		if err := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 			endpointSliceList, err := cs.DiscoveryV1beta1().EndpointSlices(svc.Namespace).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: "kubernetes.io/service-name=" + svc.Name,
 			})
@@ -218,7 +220,8 @@ var _ = SIGDescribe("EndpointSlice", func() {
 				Name: "example-int-port",
 			},
 			Spec: v1.ServiceSpec{
-				Selector: map[string]string{labelPod1: labelValue},
+				Selector:                 map[string]string{labelPod1: labelValue},
+				PublishNotReadyAddresses: true,
 				Ports: []v1.ServicePort{{
 					Name:       "example",
 					Port:       80,
@@ -233,7 +236,8 @@ var _ = SIGDescribe("EndpointSlice", func() {
 				Name: "example-named-port",
 			},
 			Spec: v1.ServiceSpec{
-				Selector: map[string]string{labelShared12: labelValue},
+				Selector:                 map[string]string{labelShared12: labelValue},
+				PublishNotReadyAddresses: true,
 				Ports: []v1.ServicePort{{
 					Name:       "http",
 					Port:       80,
@@ -248,7 +252,8 @@ var _ = SIGDescribe("EndpointSlice", func() {
 				Name: "example-no-match",
 			},
 			Spec: v1.ServiceSpec{
-				Selector: map[string]string{labelPod3: labelValue},
+				Selector:                 map[string]string{labelPod3: labelValue},
+				PublishNotReadyAddresses: true,
 				Ports: []v1.ServicePort{{
 					Name:       "example-no-match",
 					Port:       80,
@@ -259,30 +264,26 @@ var _ = SIGDescribe("EndpointSlice", func() {
 		})
 
 		err := wait.Poll(5*time.Second, 3*time.Minute, func() (bool, error) {
-			if !podClient.PodIsReady(pod1.Name) {
-				framework.Logf("Pod 1 not ready yet")
-				return false, nil
-			}
-
-			if !podClient.PodIsReady(pod2.Name) {
-				framework.Logf("Pod 2 not ready yet")
-				return false, nil
-			}
-
 			var err error
 			pod1, err = podClient.Get(context.TODO(), pod1.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
+			}
+			if len(pod1.Status.PodIPs) == 0 {
+				return false, nil
 			}
 
 			pod2, err = podClient.Get(context.TODO(), pod2.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
+			if len(pod2.Status.PodIPs) == 0 {
+				return false, nil
+			}
 
 			return true, nil
 		})
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "timed out waiting for Pods to have IPs assigned")
 
 		ginkgo.By("referencing a single matching pod")
 		expectEndpointsAndSlices(cs, f.Namespace.Name, svc1, []*v1.Pod{pod1}, 1, 1, false)
@@ -312,13 +313,12 @@ func expectEndpointsAndSlices(cs clientset.Interface, ns string, svc *v1.Service
 	if err := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
 		endpointSlicesFound, hasMatchingSlices := hasMatchingEndpointSlices(cs, ns, svc.Name, len(pods), numSlices)
 		if !hasMatchingSlices {
-			framework.Logf("Matching EndpointSlices not found")
 			return false, nil
 		}
 		endpointSlices = endpointSlicesFound
 		return true, nil
 	}); err != nil {
-		framework.Failf("Timed out waiting for matching EndpointSlices to exist: %v", err)
+		framework.Failf("Timed out waiting for EndpointSlices to match expectations: %v", err)
 	}
 
 	endpoints := &v1.Endpoints{}
@@ -331,7 +331,7 @@ func expectEndpointsAndSlices(cs clientset.Interface, ns string, svc *v1.Service
 		endpoints = endpointsFound
 		return true, nil
 	}); err != nil {
-		framework.Failf("Timed out waiting for matching Endpoints to exist: %v", err)
+		framework.Failf("Timed out waiting for Endpoints to match expectations: %v", err)
 	}
 
 	podsByIP := map[string]*v1.Pod{}
@@ -407,9 +407,13 @@ func expectEndpointsAndSlices(cs clientset.Interface, ns string, svc *v1.Service
 		framework.Failf("Expected 1 EndpointSlice, got %d", len(endpointSlices))
 	}
 
-	totalEndpointSliceAddresses := 0
+	// Use a set for deduping values. Duplicate addresses are technically valid
+	// here although rare.
+	esAddresses := sets.NewString()
 	for _, endpointSlice := range endpointSlices {
-		totalEndpointSliceAddresses += len(endpointSlice.Endpoints)
+		for _, endpoint := range endpointSlice.Endpoints {
+			esAddresses.Insert(endpoint.Addresses[0])
+		}
 		if len(pods) == 0 && len(endpointSlice.Ports) != 0 {
 			framework.Failf("Expected EndpointSlice to have 0 ports, got %d", len(endpointSlice.Ports))
 		}
@@ -464,8 +468,8 @@ func expectEndpointsAndSlices(cs clientset.Interface, ns string, svc *v1.Service
 		}
 	}
 
-	if len(pods) != totalEndpointSliceAddresses {
-		framework.Failf("Expected %d addresses, got %d", len(pods), totalEndpointSliceAddresses)
+	if len(pods) != esAddresses.Len() {
+		framework.Failf("Expected %d addresses, got %d", len(pods), esAddresses.Len())
 	}
 }
 
@@ -493,9 +497,21 @@ func hasMatchingEndpointSlices(cs clientset.Interface, ns, svcName string, numEn
 		framework.Logf("EndpointSlice for Service %s/%s not found", ns, svcName)
 		return []discoveryv1beta1.EndpointSlice{}, false
 	}
-	if len(esList.Items) != numSlices {
-		framework.Logf("Expected %d EndpointSlices for Service %s/%s, got %d", numSlices, ns, svcName, len(esList.Items))
-		return []discoveryv1beta1.EndpointSlice{}, false
+	// In some cases the EndpointSlice controller will create more
+	// EndpointSlices than necessary resulting in some duplication. This is
+	// valid and tests should only fail here if less EndpointSlices than
+	// expected are added.
+	if len(esList.Items) < numSlices {
+		framework.Logf("Expected at least %d EndpointSlices for Service %s/%s, got %d", numSlices, ns, svcName, len(esList.Items))
+		for i, epSlice := range esList.Items {
+			epsData, err := json.Marshal(epSlice)
+			if err != nil {
+				framework.Logf("Error marshaling JSON for EndpointSlice: %v", err)
+			} else {
+				framework.Logf("%d - %v", i, string(epsData))
+			}
+		}
+		return esList.Items, false
 	}
 
 	actualNumEndpoints := 0
@@ -504,7 +520,7 @@ func hasMatchingEndpointSlices(cs clientset.Interface, ns, svcName string, numEn
 	}
 	if actualNumEndpoints != numEndpoints {
 		framework.Logf("EndpointSlices for %s/%s Service have %d/%d endpoints", ns, svcName, actualNumEndpoints, numEndpoints)
-		return []discoveryv1beta1.EndpointSlice{}, false
+		return esList.Items, false
 	}
 
 	return esList.Items, true
@@ -560,6 +576,6 @@ func ensurePodTargetRef(pod *v1.Pod, targetRef *v1.ObjectReference) {
 // createServiceReportErr creates a Service and reports any associated error.
 func createServiceReportErr(cs clientset.Interface, ns string, service *v1.Service) *v1.Service {
 	svc, err := cs.CoreV1().Services(ns).Create(context.TODO(), service, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "error deleting Service")
 	return svc
 }

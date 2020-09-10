@@ -10,10 +10,13 @@ import (
 )
 
 // IdentityLister helps list Identities.
+// All objects returned here must be treated as read-only.
 type IdentityLister interface {
 	// List lists all Identities in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.Identity, err error)
 	// Get retrieves the Identity from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.Identity, error)
 	IdentityListerExpansion
 }

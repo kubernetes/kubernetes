@@ -10,10 +10,13 @@ import (
 )
 
 // BrokerTemplateInstanceLister helps list BrokerTemplateInstances.
+// All objects returned here must be treated as read-only.
 type BrokerTemplateInstanceLister interface {
 	// List lists all BrokerTemplateInstances in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.BrokerTemplateInstance, err error)
 	// Get retrieves the BrokerTemplateInstance from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.BrokerTemplateInstance, error)
 	BrokerTemplateInstanceListerExpansion
 }

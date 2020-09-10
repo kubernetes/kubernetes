@@ -42,12 +42,7 @@ func (pl *VolumeRestrictions) Name() string {
 	return Name
 }
 
-func isVolumeConflict(volume v1.Volume, pod *v1.Pod) bool {
-	// fast path if there is no conflict checking targets.
-	if volume.GCEPersistentDisk == nil && volume.AWSElasticBlockStore == nil && volume.RBD == nil && volume.ISCSI == nil {
-		return false
-	}
-
+func isVolumeConflict(volume *v1.Volume, pod *v1.Pod) bool {
 	for _, existingVolume := range pod.Spec.Volumes {
 		// Same GCE disk mounted by multiple pods conflicts unless all pods mount it read-only.
 		if volume.GCEPersistentDisk != nil && existingVolume.GCEPersistentDisk != nil {
@@ -118,7 +113,13 @@ func haveOverlap(a1, a2 []string) bool {
 // - Ceph RBD forbids if any two pods share at least same monitor, and match pool and image, and the image is read-only
 // - ISCSI forbids if any two pods share at least same IQN and ISCSI volume is read-only
 func (pl *VolumeRestrictions) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	for _, v := range pod.Spec.Volumes {
+	for i := range pod.Spec.Volumes {
+		v := &pod.Spec.Volumes[i]
+		// fast path if there is no conflict checking targets.
+		if v.GCEPersistentDisk == nil && v.AWSElasticBlockStore == nil && v.RBD == nil && v.ISCSI == nil {
+			continue
+		}
+
 		for _, ev := range nodeInfo.Pods {
 			if isVolumeConflict(v, ev.Pod) {
 				return framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)

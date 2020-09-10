@@ -21,6 +21,7 @@ go_library(
         "annotation_key_constants.go",
         "doc.go",
         "generated.pb.go",
+        "lifecycle.go",
         "objectreference.go",
         "register.go",
         "resource.go",

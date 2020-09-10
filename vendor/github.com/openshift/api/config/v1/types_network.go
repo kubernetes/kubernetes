@@ -84,9 +84,11 @@ type ClusterNetworkEntry struct {
 	// The complete block for pod IPs.
 	CIDR string `json:"cidr"`
 
-	// The size (prefix) of block to allocate to each node.
+	// The size (prefix) of block to allocate to each node. If this
+	// field is not used by the plugin, it can be left unset.
 	// +kubebuilder:validation:Minimum=0
-	HostPrefix uint32 `json:"hostPrefix"`
+	// +optional
+	HostPrefix uint32 `json:"hostPrefix,omitempty"`
 }
 
 // ExternalIPConfig specifies some IP blocks relevant for the ExternalIP field

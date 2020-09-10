@@ -41,8 +41,6 @@ func quantityMustParse(value string) *resource.Quantity {
 }
 
 func TestGetReclaimableThreshold(t *testing.T) {
-	t.Skip("test skipped temporarily to enable 1.19 rebase to merge more quickly")
-
 	testCases := map[string]struct {
 		thresholds []evictionapi.Threshold
 	}{

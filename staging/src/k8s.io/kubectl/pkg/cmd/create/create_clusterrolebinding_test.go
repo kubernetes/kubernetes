@@ -17,11 +17,12 @@ limitations under the License.
 package create
 
 import (
+	"strconv"
 	"testing"
 
 	rbac "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestCreateClusterRoleBinding(t *testing.T) {
@@ -72,7 +73,7 @@ func TestCreateClusterRoleBinding(t *testing.T) {
 	}
 
 	for i, tc := range tests {
-		t.Run(string(i), func(t *testing.T) {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			clusterRoleBinding, err := tc.options.createClusterRoleBinding()
 			if err != nil {
 				t.Errorf("unexpected error:\n%#v\n", err)

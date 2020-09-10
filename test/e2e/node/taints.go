@@ -282,7 +282,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Taint, Pod Eviction on taint removal
 		Description: The Pod with toleration timeout scheduled on a tainted Node MUST not be
 		evicted if the taint is removed before toleration time ends.
@@ -412,7 +412,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Pod Eviction, Toleration limits
 		Description: In a multi-pods scenario with tolerationSeconds, the pods MUST be evicted as per
 		the toleration time limit.

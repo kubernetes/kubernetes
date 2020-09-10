@@ -2,6 +2,8 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: networks.config.openshift.io
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
 spec:
   group: config.openshift.io
   names:
@@ -60,6 +62,7 @@ spec:
                     type: string
                   hostPrefix:
                     description: The size (prefix) of block to allocate to each node.
+                      If this field is not used by the plugin, it can be left unset.
                     type: integer
                     format: int32
                     minimum: 0
@@ -132,6 +135,7 @@ spec:
                     type: string
                   hostPrefix:
                     description: The size (prefix) of block to allocate to each node.
+                      If this field is not used by the plugin, it can be left unset.
                     type: integer
                     format: int32
                     minimum: 0

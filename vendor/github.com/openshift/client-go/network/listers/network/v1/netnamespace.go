@@ -10,10 +10,13 @@ import (
 )
 
 // NetNamespaceLister helps list NetNamespaces.
+// All objects returned here must be treated as read-only.
 type NetNamespaceLister interface {
 	// List lists all NetNamespaces in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.NetNamespace, err error)
 	// Get retrieves the NetNamespace from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.NetNamespace, error)
 	NetNamespaceListerExpansion
 }

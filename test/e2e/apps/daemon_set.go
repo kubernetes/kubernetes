@@ -146,6 +146,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	/*
+	  Release: v1.10
 	  Testname: DaemonSet-Creation
 	  Description: A conformant Kubernetes distribution MUST support the creation of DaemonSets. When a DaemonSet
 	  Pod is deleted, the DaemonSet controller MUST create a replacement Pod.
@@ -173,6 +174,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	/*
+	  Release: v1.10
 	  Testname: DaemonSet-NodeSelection
 	  Description: A conformant Kubernetes distribution MUST support DaemonSet Pod node selection via label
 	  selectors.
@@ -273,6 +275,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	/*
+	  Release: v1.10
 	  Testname: DaemonSet-FailedPodCreation
 	  Description: A conformant Kubernetes distribution MUST create new DaemonSet Pods when they fail.
 	*/
@@ -352,6 +355,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	/*
+	  Release: v1.10
 	  Testname: DaemonSet-RollingUpdate
 	  Description: A conformant Kubernetes distribution MUST support DaemonSet RollingUpdates.
 	*/
@@ -408,6 +412,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	/*
+	  Release: v1.10
 	  Testname: DaemonSet-Rollback
 	  Description: A conformant Kubernetes distribution MUST support automated, minimally disruptive
 	  rollback of updates to a DaemonSet.

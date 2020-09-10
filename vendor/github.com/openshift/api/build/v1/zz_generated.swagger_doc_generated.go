@@ -347,7 +347,7 @@ var map_DockerBuildStrategy = map[string]string{
 	"noCache":                 "noCache if set to true indicates that the container image build must be executed with the --no-cache=true flag",
 	"env":                     "env contains additional environment variables you want to pass into a builder container.",
 	"forcePull":               "forcePull describes if the builder should pull the images from registry prior to building.",
-	"dockerfilePath":          "dockerfilePath is the path of the Dockerfile that will be used to build the container image, relative to the root of the context (contextDir).",
+	"dockerfilePath":          "dockerfilePath is the path of the Dockerfile that will be used to build the container image, relative to the root of the context (contextDir). Defaults to `Dockerfile` if unset.",
 	"buildArgs":               "buildArgs contains build arguments that will be resolved in the Dockerfile.  See https://docs.docker.com/engine/reference/builder/#/arg for more details.",
 	"imageOptimizationPolicy": "imageOptimizationPolicy describes what optimizations the system can use when building images to reduce the final size or time spent building the image. The default policy is 'None' which means the final build image will be equivalent to an image created by the container image build API. The experimental policy 'SkipLayers' will avoid commiting new layers in between each image step, and will fail if the Dockerfile cannot provide compatibility with the 'None' policy. An additional experimental policy 'SkipLayersAndWarn' is the same as 'SkipLayers' but simply warns if compatibility cannot be preserved.",
 }

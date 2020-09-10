@@ -10,8 +10,10 @@ import (
 )
 
 // RoleBindingRestrictionLister helps list RoleBindingRestrictions.
+// All objects returned here must be treated as read-only.
 type RoleBindingRestrictionLister interface {
 	// List lists all RoleBindingRestrictions in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.RoleBindingRestriction, err error)
 	// RoleBindingRestrictions returns an object that can list and get RoleBindingRestrictions.
 	RoleBindingRestrictions(namespace string) RoleBindingRestrictionNamespaceLister
@@ -42,10 +44,13 @@ func (s *roleBindingRestrictionLister) RoleBindingRestrictions(namespace string)
 }
 
 // RoleBindingRestrictionNamespaceLister helps list and get RoleBindingRestrictions.
+// All objects returned here must be treated as read-only.
 type RoleBindingRestrictionNamespaceLister interface {
 	// List lists all RoleBindingRestrictions in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.RoleBindingRestriction, err error)
 	// Get retrieves the RoleBindingRestriction from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.RoleBindingRestriction, error)
 	RoleBindingRestrictionNamespaceListerExpansion
 }

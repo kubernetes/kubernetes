@@ -10,10 +10,13 @@ import (
 )
 
 // HostSubnetLister helps list HostSubnets.
+// All objects returned here must be treated as read-only.
 type HostSubnetLister interface {
 	// List lists all HostSubnets in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.HostSubnet, err error)
 	// Get retrieves the HostSubnet from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.HostSubnet, error)
 	HostSubnetListerExpansion
 }

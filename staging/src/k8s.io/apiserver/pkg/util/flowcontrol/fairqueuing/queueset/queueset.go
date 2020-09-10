@@ -743,6 +743,11 @@ func (qs *queueSet) goroutineDoneOrBlocked() {
 	qs.counter.Add(-1)
 }
 
+func (qs *queueSet) UpdateObservations() {
+	qs.obsPair.RequestsWaiting.Add(0)
+	qs.obsPair.RequestsExecuting.Add(0)
+}
+
 func (qs *queueSet) Dump(includeRequestDetails bool) debug.QueueSetDump {
 	qs.lock.Lock()
 	defer qs.lock.Unlock()

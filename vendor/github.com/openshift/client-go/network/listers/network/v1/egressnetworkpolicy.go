@@ -10,8 +10,10 @@ import (
 )
 
 // EgressNetworkPolicyLister helps list EgressNetworkPolicies.
+// All objects returned here must be treated as read-only.
 type EgressNetworkPolicyLister interface {
 	// List lists all EgressNetworkPolicies in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.EgressNetworkPolicy, err error)
 	// EgressNetworkPolicies returns an object that can list and get EgressNetworkPolicies.
 	EgressNetworkPolicies(namespace string) EgressNetworkPolicyNamespaceLister
@@ -42,10 +44,13 @@ func (s *egressNetworkPolicyLister) EgressNetworkPolicies(namespace string) Egre
 }
 
 // EgressNetworkPolicyNamespaceLister helps list and get EgressNetworkPolicies.
+// All objects returned here must be treated as read-only.
 type EgressNetworkPolicyNamespaceLister interface {
 	// List lists all EgressNetworkPolicies in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.EgressNetworkPolicy, err error)
 	// Get retrieves the EgressNetworkPolicy from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.EgressNetworkPolicy, error)
 	EgressNetworkPolicyNamespaceListerExpansion
 }

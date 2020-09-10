@@ -40,7 +40,7 @@ For example, let's consider the following `pod.yaml` file:
       containers:
       - args:
         - dns-suffix
-        image: us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.14
+        image: k8s.gcr.io/e2e-test-images/agnhost:2.14
         name: agnhost
       dnsConfig:
         nameservers:
@@ -209,7 +209,7 @@ Usage:
 
 ```console
 guestbook="test/e2e/testing-manifests/guestbook"
-sed_expr="s|{{.AgnhostImage}}|us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.14|"
+sed_expr="s|{{.AgnhostImage}}|k8s.gcr.io/e2e-test-images/agnhost:2.14|"
 
 # create the services.
 kubectl create -f ${guestbook}/frontend-service.yaml
@@ -292,14 +292,14 @@ Examples:
 
 ```console
 docker run -i \
-  us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.14 \
+  k8s.gcr.io/e2e-test-images/agnhost:2.14 \
   logs-generator --log-lines-total 10 --run-duration 1s
 ```
 
 ```console
 kubectl run logs-generator \
   --generator=run-pod/v1 \
-  --image=us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.14 \
+  --image=k8s.gcr.io/e2e-test-images/agnhost:2.14 \
   --restart=Never \
   -- logs-generator -t 10 -d 1s
 ```
@@ -476,7 +476,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.14 \
+      --image=k8s.gcr.io/e2e-test-images/agnhost:2.14 \
       --restart=Never \
       --env "POD_IP=<POD_IP>" \
       --env "NODE_IP=<NODE_IP>" \
@@ -531,7 +531,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.14 \
+      --image=k8s.gcr.io/e2e-test-images/agnhost:2.14 \
       --restart=Never \
       --env "BIND_ADDRESS=localhost" \
       --env "BIND_PORT=8080" \
@@ -659,6 +659,6 @@ The Windows `agnhost` image includes a `nc` binary that is 100% compliant with i
 
 ## Image
 
-The image can be found at `us.gcr.io/k8s-artifacts-prod/e2e-test-images/agnhost:2.14` for both Linux and
+The image can be found at `k8s.gcr.io/e2e-test-images/agnhost:2.14` for both Linux and
 Windows containers (based on `mcr.microsoft.com/windows/servercore:ltsc2019`,
 `mcr.microsoft.com/windows/servercore:1903`, and `mcr.microsoft.com/windows/servercore:1909`).

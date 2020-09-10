@@ -315,7 +315,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	// 4. Create another pod with no affinity to any node that need 50% of the largest node CPU.
 	// 5. Make sure this additional pod is not scheduled.
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Scheduler, resource limits
 		Description: Scheduling Pods MUST fail if the resource requests exceed Machine capacity.
 	*/
@@ -425,7 +425,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
 	// nonempty Selector set.
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Scheduler, node selector not matching
 		Description: Create a Pod with a NodeSelector set to a value that does not match a node in the cluster. Since there are no nodes matching the criteria the Pod MUST not be scheduled.
 	*/
@@ -448,7 +448,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Scheduler, node selector matching
 		Description: Create a label on the node {k: v}. Then create a Pod with a NodeSelector set to {k: v}. Check to see if the Pod is scheduled. When the NodeSelector matches then Pod MUST be scheduled on that node.
 	*/
@@ -652,7 +652,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
 		Description: Pods with the same HostPort value MUST be able to be scheduled to the same node
 		if the HostIP or Protocol is different.
@@ -685,7 +685,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Scheduling, HostPort and Protocol match, HostIPs different but one is default HostIP (0.0.0.0)
 		Description: Pods with the same HostPort and Protocol, but different HostIPs, MUST NOT schedule to the
 		same node if one of those IPs is the default HostIP of 0.0.0.0, which represents all IPs on the host.

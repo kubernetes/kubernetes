@@ -10,10 +10,13 @@ import (
 )
 
 // OAuthClientAuthorizationLister helps list OAuthClientAuthorizations.
+// All objects returned here must be treated as read-only.
 type OAuthClientAuthorizationLister interface {
 	// List lists all OAuthClientAuthorizations in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.OAuthClientAuthorization, err error)
 	// Get retrieves the OAuthClientAuthorization from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.OAuthClientAuthorization, error)
 	OAuthClientAuthorizationListerExpansion
 }

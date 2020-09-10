@@ -144,6 +144,18 @@ run_kubectl_apply_tests() {
 }
 __EOF__
 
+  # Ensure the API server has recognized and started serving the associated CR API
+  local tries=5
+  for i in $(seq 1 $tries); do
+      local output
+      output=$(kubectl "${kube_flags[@]:?}" api-resources --api-group mygroup.example.com -oname)
+      if kube::test::if_has_string "$output" resources.mygroup.example.com; then
+          break
+      fi
+      echo "${i}: Waiting for CR API to be available"
+      sleep "$i"
+  done
+
   # Dry-run create the CR
   kubectl "${kube_flags[@]:?}" apply --dry-run=server -f hack/testdata/CRD/resource.yaml "${kube_flags[@]:?}"
   # Make sure that the CR doesn't exist
@@ -443,6 +455,18 @@ run_kubectl_server_side_apply_tests() {
   }
 }
 __EOF__
+
+  # Ensure the API server has recognized and started serving the associated CR API
+  local tries=5
+  for i in $(seq 1 $tries); do
+      local output
+      output=$(kubectl "${kube_flags[@]:?}" api-resources --api-group mygroup.example.com -oname)
+      if kube::test::if_has_string "$output" resources.mygroup.example.com; then
+          break
+      fi
+      echo "${i}: Waiting for CR API to be available"
+      sleep "$i"
+  done
 
   # Dry-run create the CR
   kubectl "${kube_flags[@]:?}" apply --server-side --dry-run=server -f hack/testdata/CRD/resource.yaml "${kube_flags[@]:?}"

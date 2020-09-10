@@ -10,10 +10,13 @@ import (
 )
 
 // OAuthAuthorizeTokenLister helps list OAuthAuthorizeTokens.
+// All objects returned here must be treated as read-only.
 type OAuthAuthorizeTokenLister interface {
 	// List lists all OAuthAuthorizeTokens in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.OAuthAuthorizeToken, err error)
 	// Get retrieves the OAuthAuthorizeToken from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.OAuthAuthorizeToken, error)
 	OAuthAuthorizeTokenListerExpansion
 }

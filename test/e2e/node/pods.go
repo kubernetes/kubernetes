@@ -53,7 +53,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 		})
 
 		/*
-			Release : v1.15
+			Release: v1.15
 			Testname: Pods, delete grace period
 			Description: Create a pod, make sure it is running. Using the http client send a 'delete' with gracePeriodSeconds=30. Pod SHOULD get terminated within gracePeriodSeconds and removed from API server within a window.
 		*/
@@ -163,7 +163,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 		})
 
 		/*
-			Release : v1.9
+			Release: v1.9
 			Testname: Pods, QOS
 			Description:  Create a Pod with CPU and Memory request and limits. Pod status MUST have QOSClass set to PodQOSGuaranteed.
 			Behaviors:

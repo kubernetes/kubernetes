@@ -160,6 +160,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				eventsRule(),
 			},
 		})
+
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "endpointslicemirroring-controller"},
 			Rules: []rbacv1.PolicyRule{

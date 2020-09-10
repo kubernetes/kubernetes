@@ -57,7 +57,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Replication Controller, run basic image
 		Description: Replication Controller MUST create a Pod with Basic Image and MUST run the service with the provided image. Image MUST be tested by dialing into the service listening through TCP, UDP and HTTP.
 	*/
@@ -73,7 +73,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 	})
 
 	/*
-		Release : v1.15
+		Release: v1.15
 		Testname: Replication Controller, check for issues like exceeding allocated quota
 		Description: Attempt to create a Replication Controller with pods exceeding the namespace quota. The creation MUST fail
 	*/
@@ -82,7 +82,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 	})
 
 	/*
-		Release : v1.13
+		Release: v1.13
 		Testname: Replication Controller, adopt matching pods
 		Description: An ownerless Pod is created, then a Replication Controller (RC) is created whose label selector will match the Pod. The RC MUST either adopt the Pod or delete and replace it with a new Pod
 	*/
@@ -91,7 +91,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 	})
 
 	/*
-		Release : v1.13
+		Release: v1.13
 		Testname: Replication Controller, release pods
 		Description: A Replication Controller (RC) is created, and its Pods are created. When the labels on one of the Pods change to no longer match the RC's label selector, the RC MUST release the Pod and update the Pod's owner references.
 	*/

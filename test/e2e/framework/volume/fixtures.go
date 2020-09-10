@@ -173,6 +173,23 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config TestCo
 	}
 	pod, ip = CreateStorageServer(cs, config)
 
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: config.Prefix + "-server",
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolTCP,
+					Port:     24007,
+				},
+			},
+		},
+	}
+
+	_, err := cs.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "failed to create service for Gluster server")
+
 	ginkgo.By("creating Gluster endpoints")
 	endpoints := &v1.Endpoints{
 		TypeMeta: metav1.TypeMeta{
@@ -199,7 +216,7 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config TestCo
 			},
 		},
 	}
-	_, err := cs.CoreV1().Endpoints(namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
+	_, err = cs.CoreV1().Endpoints(namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create endpoints for Gluster server")
 
 	return config, pod, ip

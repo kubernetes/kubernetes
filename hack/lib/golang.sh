@@ -49,7 +49,6 @@ readonly KUBE_SUPPORTED_CLIENT_PLATFORMS=(
   linux/s390x
   linux/ppc64le
   darwin/amd64
-  darwin/386
   windows/amd64
   windows/386
 )
@@ -467,8 +466,9 @@ EOF
   fi
 
   local go_version
-  IFS=" " read -ra go_version <<< "$(go version)"
+  IFS=" " read -ra go_version <<< "$(GOFLAGS='' go version)"
   local minimum_go_version
+  # Temporarily build with 1.14 to simplify transition to 1.15
   minimum_go_version=go1.14.4
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
@@ -779,7 +779,7 @@ kube::golang::build_binaries() {
   (
     # Check for `go` binary and set ${GOPATH}.
     kube::golang::setup_env
-    V=2 kube::log::info "Go version: $(go version)"
+    V=2 kube::log::info "Go version: $(GOFLAGS='' go version)"
 
     local host_platform
     host_platform=$(kube::golang::host_platform)

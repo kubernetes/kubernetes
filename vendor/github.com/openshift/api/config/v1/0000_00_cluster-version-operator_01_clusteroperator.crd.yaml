@@ -2,6 +2,8 @@ kind: CustomResourceDefinition
 apiVersion: apiextensions.k8s.io/v1beta1
 metadata:
   name: clusteroperators.config.openshift.io
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
 spec:
   additionalPrinterColumns:
   - JSONPath: .status.versions[?(@.name=="operator")].version

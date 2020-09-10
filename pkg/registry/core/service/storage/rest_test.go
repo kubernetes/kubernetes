@@ -1182,10 +1182,10 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 			}},
 		},
 	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	svc := obj.(*api.Service)
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
+	svc := obj.(*api.Service)
 
 	// Test dry run update request external name to node port
 	updatedSvc, created, err := storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
@@ -1251,6 +1251,7 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeNodePort,
+			ClusterIP:       "1.2.3.5",
 			Ports: []api.ServicePort{{
 				NodePort:   30020,
 				Port:       6502,
@@ -1259,10 +1260,11 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 			}},
 		},
 	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	svc = obj.(*api.Service)
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
+	svc = obj.(*api.Service)
+
 	_, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            svc.Name,
@@ -1301,10 +1303,10 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 			}},
 		},
 	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	svc = obj.(*api.Service)
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
+	svc = obj.(*api.Service)
 	_, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            svc.Name,

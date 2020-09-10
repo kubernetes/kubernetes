@@ -2,6 +2,8 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: builds.config.openshift.io
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
 spec:
   group: config.openshift.io
   scope: Cluster
@@ -193,7 +195,11 @@ spec:
                               divisor:
                                 description: Specifies the output format of the exposed
                                   resources, defaults to "1"
-                                type: string
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                x-kubernetes-int-or-string: true
                               resource:
                                 description: 'Required: resource to select'
                                 type: string
@@ -292,7 +298,11 @@ spec:
                         resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                       type: object
                       additionalProperties:
-                        type: string
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        x-kubernetes-int-or-string: true
                     requests:
                       description: 'Requests describes the minimum amount of compute
                         resources required. If Requests is omitted for a container,
@@ -300,7 +310,11 @@ spec:
                         to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                       type: object
                       additionalProperties:
-                        type: string
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        x-kubernetes-int-or-string: true
             buildOverrides:
               description: BuildOverrides controls override settings for builds
               type: object

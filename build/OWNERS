@@ -3,6 +3,7 @@
 reviewers:
   - bentheelder
   - cblecker
+  - dims
   - fejta
   - justaugustus
   - lavalamp
@@ -11,8 +12,10 @@ approvers:
   - bentheelder
   - cblecker
   - fejta
+  - justaugustus
   - lavalamp
   - mikedanese
+  - spiffxp
 emeritus_approvers:
   - jbeda
   - zmerlynn

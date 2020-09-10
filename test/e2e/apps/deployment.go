@@ -44,13 +44,13 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutil "k8s.io/kubernetes/test/utils"
-	"k8s.io/utils/integer"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -84,6 +84,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testDeleteDeployment(f)
 	})
 	/*
+	  Release: v1.12
 	  Testname: Deployment RollingUpdate
 	  Description: A conformant Kubernetes distribution MUST support the Deployment with RollingUpdate strategy.
 	*/
@@ -91,6 +92,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testRollingUpdateDeployment(f)
 	})
 	/*
+	  Release: v1.12
 	  Testname: Deployment Recreate
 	  Description: A conformant Kubernetes distribution MUST support the Deployment with Recreate strategy.
 	*/
@@ -98,6 +100,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testRecreateDeployment(f)
 	})
 	/*
+	  Release: v1.12
 	  Testname: Deployment RevisionHistoryLimit
 	  Description: A conformant Kubernetes distribution MUST clean up Deployment's ReplicaSets based on
 	  the Deployment's `.spec.revisionHistoryLimit`.
@@ -106,6 +109,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testDeploymentCleanUpPolicy(f)
 	})
 	/*
+	  Release: v1.12
 	  Testname: Deployment Rollover
 	  Description: A conformant Kubernetes distribution MUST support Deployment rollover,
 	    i.e. allow arbitrary number of changes to desired state during rolling update
@@ -121,6 +125,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testDeploymentsControllerRef(f)
 	})
 	/*
+	  Release: v1.12
 	  Testname: Deployment Proportional Scaling
 	  Description: A conformant Kubernetes distribution MUST support Deployment
 	    proportional scaling, i.e. proportionally scale a Deployment's ReplicaSets
@@ -130,8 +135,10 @@ var _ = SIGDescribe("Deployment", func() {
 		testProportionalScalingDeployment(f)
 	})
 	ginkgo.It("should not disrupt a cloud load-balancer's connectivity during rollout", func() {
-		e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 		e2eskipper.SkipUnlessProviderIs("aws", "azure", "gce", "gke")
+		nodes, err := e2enode.GetReadySchedulableNodes(c)
+		framework.ExpectNoError(err)
+		e2eskipper.SkipUnlessAtLeast(len(nodes.Items), 3, "load-balancer test requires at least 3 schedulable nodes")
 		testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f)
 	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
@@ -874,7 +881,7 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f *framework.Framew
 	name := "test-rolling-update-with-lb"
 	framework.Logf("Creating Deployment %q", name)
 	podLabels := map[string]string{"name": name}
-	replicas := int32(integer.IntMin(5, framework.TestContext.CloudConfig.NumNodes))
+	replicas := int32(3)
 	d := e2edeployment.NewDeployment(name, replicas, podLabels, AgnhostImageName, AgnhostImage, appsv1.RollingUpdateDeploymentStrategyType)
 	// NewDeployment assigned the same value to both d.Spec.Selector and
 	// d.Spec.Template.Labels, so mutating the one would mutate the other.
