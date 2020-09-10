@@ -480,6 +480,8 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
 		// force enable all resources so we can check storage.
 		"--runtime-config=api/all=true",
+		// enable feature-gates that protect resources to check their storage, too.
+		"--feature-gates=EphemeralContainers=true",
 	}, etcdConfig)
 	defer server.TearDownFn()
 
