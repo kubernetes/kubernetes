@@ -25,7 +25,6 @@ CLEAN_PATTERNS=(
   "_tmp"
   "doc_tmp"
   "((?!staging\/src\/k8s\.io\/apiextensions-apiserver\/pkg\/generated\/openapi).)*/zz_generated.openapi.go"
-  "test/e2e/generated/bindata.go"
 )
 
 for pattern in "${CLEAN_PATTERNS[@]}"; do
