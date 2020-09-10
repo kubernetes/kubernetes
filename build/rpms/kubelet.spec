@@ -11,7 +11,7 @@ Requires: ebtables
 Requires: ethtool
 Requires: iproute
 Requires: iptables >= 1.4.21
-Requires: kubernetes-cni >= 0.8.6
+Requires: kubernetes-cni >= 0.8.7
 Requires: socat
 Requires: util-linux
 

@@ -1,6 +1,6 @@
 dependencies:
   - name: "cni"
-    version: 0.8.6
+    version: 0.8.7
     refPaths:
     - path: build/rpms/kubeadm.spec
       match: kubernetes-cni
