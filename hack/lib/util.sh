@@ -223,6 +223,12 @@ kube::util::find-binary-for-platform() {
 
   # List most recently-updated location.
   local -r bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+
+  if [[ -z "${bin}" ]]; then
+    kube::log::error "Failed to find binary ${lookfor} for platform ${platform}"
+    return 1
+  fi
+
   echo -n "${bin}"
 }
 
@@ -242,11 +248,6 @@ kube::util::gen-docs() {
   genkubedocs=$(kube::util::find-binary "genkubedocs")
   genman=$(kube::util::find-binary "genman")
   genyaml=$(kube::util::find-binary "genyaml")
-  genfeddocs=$(kube::util::find-binary "genfeddocs")
-
-  # TODO: If ${genfeddocs} is not used from anywhere (it isn't used at
-  # least from k/k tree), remove it completely.
-  kube::util::sourced_variable "${genfeddocs}"
 
   mkdir -p "${dest}/docs/user-guide/kubectl/"
   "${gendocs}" "${dest}/docs/user-guide/kubectl/"
@@ -764,7 +765,7 @@ function kube::util::check-file-in-alphabetical-order {
 # Checks whether jq is installed.
 function kube::util::require-jq {
   if ! command -v jq &>/dev/null; then
-    echo "jq not found. Please install." 1>&2
+    kube::log::error  "jq not found. Please install."
     return 1
   fi
 }
