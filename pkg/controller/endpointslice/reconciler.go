@@ -70,7 +70,7 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 	existingSlicesByPortMap := map[endpointutil.PortMapKey][]*discovery.EndpointSlice{}
 	numExistingEndpoints := 0
 	for _, existingSlice := range existingSlices {
-		if existingSlice.AddressType == addressType {
+		if existingSlice.AddressType == addressType && ownedBy(existingSlice, service) {
 			epHash := endpointutil.NewPortMapKey(existingSlice.Ports)
 			existingSlicesByPortMap[epHash] = append(existingSlicesByPortMap[epHash], existingSlice)
 			numExistingEndpoints += len(existingSlice.Endpoints)
@@ -187,13 +187,15 @@ func (r *reconciler) finalize(
 		}
 		sliceToDelete := slicesToDelete[i]
 		slice := slicesToCreate[len(slicesToCreate)-1]
-		// Only update EndpointSlices that have the same AddressType as this
-		// field is considered immutable. Since Services also consider IPFamily
-		// immutable, the only case where this should matter will be the
-		// migration from IP to IPv4 and IPv6 AddressTypes, where there's a
+		// Only update EndpointSlices that are owned by this Service and have
+		// the same AddressType. We need to avoid updating EndpointSlices that
+		// are being garbage collected for an old Service with the same name.
+		// The AddressType field is immutable. Since Services also consider
+		// IPFamily immutable, the only case where this should matter will be
+		// the migration from IP to IPv4 and IPv6 AddressTypes, where there's a
 		// chance EndpointSlices with an IP AddressType would otherwise be
 		// updated to IPv4 or IPv6 without this check.
-		if sliceToDelete.AddressType == slice.AddressType {
+		if sliceToDelete.AddressType == slice.AddressType && ownedBy(sliceToDelete, service) {
 			slice.Name = sliceToDelete.Name
 			slicesToCreate = slicesToCreate[:len(slicesToCreate)-1]
 			slicesToUpdate = append(slicesToUpdate, slice)
