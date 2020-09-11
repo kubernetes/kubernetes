@@ -27,6 +27,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -612,7 +613,7 @@ func (jm *JobController) deleteJobPods(job *batch.Job, pods []*v1.Pod, errCh cha
 	for i := int32(0); i < int32(nbPods); i++ {
 		go func(ix int32) {
 			defer wait.Done()
-			if err := jm.podControl.DeletePod(job.Namespace, pods[ix].Name, job); err != nil {
+			if err := jm.podControl.DeletePod(job.Namespace, pods[ix].Name, job); err != nil && !apierrors.IsNotFound(err) {
 				defer utilruntime.HandleError(err)
 				klog.V(2).Infof("Failed to delete %v, job %q/%q deadline exceeded", pods[ix].Name, job.Namespace, job.Name)
 				errCh <- err
@@ -709,14 +710,17 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 			go func(ix int32) {
 				defer wait.Done()
 				if err := jm.podControl.DeletePod(job.Namespace, activePods[ix].Name, job); err != nil {
-					defer utilruntime.HandleError(err)
 					// Decrement the expected number of deletes because the informer won't observe this deletion
-					klog.V(2).Infof("Failed to delete %v, decrementing expectations for job %q/%q", activePods[ix].Name, job.Namespace, job.Name)
 					jm.expectations.DeletionObserved(jobKey)
-					activeLock.Lock()
-					active++
-					activeLock.Unlock()
-					errCh <- err
+					if !apierrors.IsNotFound(err) {
+						klog.V(2).Infof("Failed to delete %v, decremented expectations for job %q/%q", activePods[ix].Name, job.Namespace, job.Name)
+						activeLock.Lock()
+						active++
+						activeLock.Unlock()
+						errCh <- err
+						utilruntime.HandleError(err)
+					}
+
 				}
 			}(i)
 		}

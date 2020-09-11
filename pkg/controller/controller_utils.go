@@ -601,7 +601,11 @@ func (r RealPodControl) DeletePod(namespace string, podID string, object runtime
 		return fmt.Errorf("object does not have ObjectMeta, %v", err)
 	}
 	klog.V(2).Infof("Controller %v deleting pod %v/%v", accessor.GetName(), namespace, podID)
-	if err := r.KubeClient.CoreV1().Pods(namespace).Delete(podID, nil); err != nil && !apierrors.IsNotFound(err) {
+	if err := r.KubeClient.CoreV1().Pods(namespace).Delete(podID, nil); err != nil {
+		if apierrors.IsNotFound(err) {
+			klog.V(4).Infof("pod %v/%v has already been deleted.", namespace, podID)
+			return err
+		}
 		r.Recorder.Eventf(object, v1.EventTypeWarning, FailedDeletePodReason, "Error deleting: %v", err)
 		return fmt.Errorf("unable to delete pods: %v", err)
 	}
