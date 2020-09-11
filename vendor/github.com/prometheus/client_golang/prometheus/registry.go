@@ -37,6 +37,7 @@ const (
 	// Capacity for the channel to collect metrics and descriptors.
 	capMetricChan = 1000
 	capDescChan   = 10
+	maxWritePbTimes = 5
 )
 
 // DefaultRegisterer and DefaultGatherer are the implementations of the
@@ -401,6 +402,24 @@ func (r *Registry) MustRegister(cs ...Collector) {
 	}
 }
 
+func RunWithTimeout(handler func(collector Collector, wg sync.WaitGroup, checkedMetricChan chan Metric, uncheckedMetricChan chan Metric), collector Collector, wg sync.WaitGroup, checkedMetricChan chan Metric,uncheckedMetricChan chan Metric, timeout time.Duration) error {
+	done := make(chan bool, 1)
+	go func(collector Collector, wg sync.WaitGroup, checkedMetricChan chan Metric, uncheckedMetricChan chan Metric) {
+		handler(collector, wg, checkedMetricChan, uncheckedMetricChan)
+		done <- true
+		close(done)
+	}(collector, wg, checkedMetricChan, uncheckedMetricChan)
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return errors.New("timeout")
+	case <-done:
+		return nil
+	}
+}
+
 // Gather implements Gatherer.
 func (r *Registry) Gather() ([]*dto.MetricFamily, error) {
 	var (
@@ -435,7 +454,8 @@ func (r *Registry) Gather() ([]*dto.MetricFamily, error) {
 
 	wg.Add(goroutineBudget)
 
-	collectWorker := func() {
+	errTimes := 0
+	collectWorker := func(collector Collector, wg sync.WaitGroup, checkedMetricChan chan Metric, uncheckedMetricChan chan Metric) {
 		for {
 			select {
 			case collector := <-checkedCollectors:
@@ -450,7 +470,15 @@ func (r *Registry) Gather() ([]*dto.MetricFamily, error) {
 	}
 
 	// Start the first worker now to make sure at least one is running.
-	go collectWorker()
+
+	err := RunWithTimeout(collectWorker, collector, wg, checkedMetricChan,uncheckedMetricChan, 3*time.Second)
+	if err != nil {
+		errTimes++
+		if errTimes > maxWritePbTimes {
+			return fmt.Errorf("error collecting metric , %v", collector)
+		}
+	}
+
 	goroutineBudget--
 
 	// Close checkedMetricChan and uncheckedMetricChan once all collectors
@@ -531,7 +559,13 @@ func (r *Registry) Gather() ([]*dto.MetricFamily, error) {
 				break
 			}
 			// Start more workers.
-			go collectWorker()
+			err := RunWithTimeout(collectWorker, collector, wg, checkedMetricChan,uncheckedMetricChan, 3*time.Second)
+			if err != nil {
+				errTimes++
+				if errTimes > maxWritePbTimes {
+					return fmt.Errorf("error collecting metric , %v", collector)
+				}
+			}
 			goroutineBudget--
 			runtime.Gosched()
 		}
