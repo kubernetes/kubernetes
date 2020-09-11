@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/fake"
@@ -455,7 +456,11 @@ func newServiceAndEndpointMeta(name, namespace string) (v1.Service, endpointMeta
 	}
 
 	svc := v1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			UID:       types.UID(namespace + "-" + name),
+		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{{
 				TargetPort: portNameIntStr,
@@ -477,10 +482,14 @@ func newServiceAndEndpointMeta(name, namespace string) (v1.Service, endpointMeta
 }
 
 func newEmptyEndpointSlice(n int, namespace string, endpointMeta endpointMeta, svc v1.Service) *discovery.EndpointSlice {
+	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
+	ownerRef := metav1.NewControllerRef(&svc, gvk)
+
 	return &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s.%d", svc.Name, n),
-			Namespace: namespace,
+			Name:            fmt.Sprintf("%s-%d", svc.Name, n),
+			Namespace:       namespace,
+			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 		},
 		Ports:       endpointMeta.Ports,
 		AddressType: endpointMeta.AddressType,
