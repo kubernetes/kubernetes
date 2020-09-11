@@ -1096,9 +1096,9 @@ github.com/xiang90/probing
 # go.etcd.io/bbolt v1.3.5 => go.etcd.io/bbolt v1.3.5
 go.etcd.io/bbolt
 # go.etcd.io/bbolt => go.etcd.io/bbolt v1.3.5
-# go.etcd.io/etcd v0.5.0-alpha.5.0.20200824191128-ae9734ed278b => go.etcd.io/etcd v0.5.0-alpha.5.0.20200824191128-ae9734ed278b
+# go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489 => go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489
 ## explicit
-# go.etcd.io/etcd => go.etcd.io/etcd v0.5.0-alpha.5.0.20200824191128-ae9734ed278b
+# go.etcd.io/etcd => go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489
 go.etcd.io/etcd/auth
 go.etcd.io/etcd/auth/authpb
 go.etcd.io/etcd/client
