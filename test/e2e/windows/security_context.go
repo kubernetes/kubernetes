@@ -31,7 +31,7 @@ import (
 
 const runAsUserNameContainerName = "run-as-username-container"
 
-var _ = SIGDescribe("[Feature:Windows] SecurityContext RunAsUserName", func() {
+var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 	f := framework.NewDefaultFramework("windows-run-as-username")
 
 	ginkgo.It("should be able create pods and run containers with a given username", func() {
@@ -71,6 +71,29 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext RunAsUserName", func() {
 		f.TestContainerOutput("check overridden username", pod, 0, []string{"ContainerUser"})
 		f.TestContainerOutput("check pod SecurityContext username", pod, 1, []string{"ContainerAdministrator"})
 	})
+	ginkgo.It("should ignore Linux Specific SecurityContext if set", func() {
+		ginkgo.By("Creating a pod with SELinux options")
+		// It is sufficient to show that the pod comes up here. Since we're stripping the SELinux and other linux
+		// security contexts in apiserver and not updating the pod object in the apiserver, we cannot validate the
+		// the pod object to not have those security contexts. However the pod coming to running state is a sufficient
+		// enough condition for us to validate since prior to https://github.com/kubernetes/kubernetes/pull/93475
+		// the pod would have failed to come up.
+		windowsPodWithSELinux := createTestPod(f, windowsBusyBoximage, windowsOS)
+		windowsPodWithSELinux.Spec.Containers[0].Args = []string{"test-webserver-with-selinux"}
+		windowsPodWithSELinux.Spec.SecurityContext = &v1.PodSecurityContext{}
+		containerUserName := "ContainerAdministrator"
+		windowsPodWithSELinux.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{Level: "s0:c24,c9"}
+		windowsPodWithSELinux.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
+			SELinuxOptions: &v1.SELinuxOptions{Level: "s0:c24,c9"},
+			WindowsOptions: &v1.WindowsSecurityContextOptions{RunAsUserName: &containerUserName}}
+		windowsPodWithSELinux.Spec.Tolerations = []v1.Toleration{{Key: "os", Value: "Windows"}}
+		windowsPodWithSELinux, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(),
+			windowsPodWithSELinux, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		framework.Logf("Created pod %v", windowsPodWithSELinux)
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, windowsPodWithSELinux.Name,
+			f.Namespace.Name), "failed to wait for pod %s to be running", windowsPodWithSELinux.Name)
+	})
 })
 
 func runAsUserNamePod(username *string) *v1.Pod {
@@ -80,6 +103,7 @@ func runAsUserNamePod(username *string) *v1.Pod {
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
+			NodeSelector: map[string]string{"kubernetes.io/os": "windows"},
 			Containers: []v1.Container{
 				{
 					Name:    runAsUserNameContainerName,

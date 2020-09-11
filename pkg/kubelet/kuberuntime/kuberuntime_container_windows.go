@@ -19,7 +19,6 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"fmt"
 	"runtime"
 
 	"k8s.io/api/core/v1"
@@ -125,10 +124,7 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 
 	// setup security context
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
-	// RunAsUser only supports int64 from Kubernetes API, but Windows containers only support username.
-	if effectiveSc.RunAsUser != nil {
-		return nil, fmt.Errorf("run as uid (%d) is not supported on Windows", *effectiveSc.RunAsUser)
-	}
+
 	if username != "" {
 		wc.SecurityContext.RunAsUsername = username
 	}
