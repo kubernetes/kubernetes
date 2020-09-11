@@ -5,8 +5,8 @@ go_library(
     srcs = [
         "doc.go",
         "endpointsadapter.go",
+        "instancecount.go",
         "lease.go",
-        "mastercount.go",
         "none.go",
         "reconcilers.go",
     ],
