@@ -862,13 +862,14 @@ func setupTestSchedulerWithVolumeBinding(volumeBinder scheduling.SchedulerVolume
 	testPVC := v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "testPVC", Namespace: pod.Namespace, UID: types.UID("testPVC")}}
 	client := clientsetfake.NewSimpleClientset(&testNode, &testPVC)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	informerFactory.Core().V1().PersistentVolumeClaims().Informer().GetStore().Add(&testPVC)
+	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
+	pvcInformer.Informer().GetStore().Add(&testPVC)
 
 	fns := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		st.RegisterPluginAsExtensions(volumebinding.Name, func(plArgs runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
-			return &volumebinding.VolumeBinding{Binder: volumeBinder}, nil
+			return &volumebinding.VolumeBinding{Binder: volumeBinder, PVCLister: pvcInformer.Lister()}, nil
 		}, "PreFilter", "Filter", "Reserve", "PreBind"),
 	}
 	s, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, broadcaster, fns...)

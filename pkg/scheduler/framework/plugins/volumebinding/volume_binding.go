@@ -23,8 +23,10 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/features"
@@ -62,6 +64,7 @@ func (d *stateData) Clone() framework.StateData {
 // Reserve and PreBind phases.
 type VolumeBinding struct {
 	Binder                               scheduling.SchedulerVolumeBinder
+	PVCLister                            corelisters.PersistentVolumeClaimLister
 	GenericEphemeralVolumeFeatureEnabled bool
 }
 
@@ -78,14 +81,40 @@ func (pl *VolumeBinding) Name() string {
 	return Name
 }
 
-func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) bool {
+// podHasPVCs returns 2 values:
+// - the first one to denote if the given "pod" has any PVC defined.
+// - the second one to return any error if the requested PVC is illegal.
+func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
+	hasPVC := false
 	for _, vol := range pod.Spec.Volumes {
-		if vol.PersistentVolumeClaim != nil ||
-			pl.GenericEphemeralVolumeFeatureEnabled && vol.Ephemeral != nil {
-			return true
+		var pvcName string
+		ephemeral := false
+		switch {
+		case vol.PersistentVolumeClaim != nil:
+			pvcName = vol.PersistentVolumeClaim.ClaimName
+		case vol.Ephemeral != nil && pl.GenericEphemeralVolumeFeatureEnabled:
+			pvcName = pod.Name + "-" + vol.Name
+			ephemeral = true
+		default:
+			// Volume is not using a PVC, ignore
+			continue
+		}
+		hasPVC = true
+		pvc, err := pl.PVCLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
+		if err != nil {
+			// The error has already enough context ("persistentvolumeclaim "myclaim" not found")
+			return hasPVC, err
+		}
+
+		if pvc.DeletionTimestamp != nil {
+			return hasPVC, fmt.Errorf("persistentvolumeclaim %q is being deleted", pvc.Name)
+		}
+
+		if ephemeral && !metav1.IsControlledBy(pvc, pod) {
+			return hasPVC, fmt.Errorf("persistentvolumeclaim %q was not created for the pod", pvc.Name)
 		}
 	}
-	return false
+	return hasPVC, nil
 }
 
 // PreFilter invoked at the prefilter extension point to check if pod has all
@@ -93,7 +122,9 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) bool {
 // UnschedulableAndUnresolvable is returned.
 func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
 	// If pod does not reference any PVC, we don't need to do anything.
-	if !pl.podHasPVCs(pod) {
+	if hasPVC, err := pl.podHasPVCs(pod); err != nil {
+		return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+	} else if !hasPVC {
 		state.Write(stateKey, &stateData{skip: true})
 		return nil
 	}
@@ -271,6 +302,7 @@ func New(plArgs runtime.Object, fh framework.FrameworkHandle) (framework.Plugin,
 	binder := scheduling.NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
 	return &VolumeBinding{
 		Binder:                               binder,
+		PVCLister:                            pvcInformer.Lister(),
 		GenericEphemeralVolumeFeatureEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume),
 	}, nil
 }

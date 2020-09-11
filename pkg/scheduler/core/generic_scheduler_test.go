@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,12 +34,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/selectorspread"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -416,11 +419,17 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with existing PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterPreFilterPlugin(volumebinding.Name, volumebinding.New),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
-			pvcs:  []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault}}},
+			pvcs: []v1.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault},
+					Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "existingPV"},
+				},
+			},
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore"), Namespace: v1.NamespaceDefault},
 				Spec: v1.PodSpec{
@@ -443,6 +452,7 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with non existing PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterPreFilterPlugin(volumebinding.Name, volumebinding.New),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -468,6 +478,7 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with deleting PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterPreFilterPlugin(volumebinding.Name, volumebinding.New),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -726,10 +737,16 @@ func TestGenericScheduler(t *testing.T) {
 				cache.AddNode(node)
 			}
 
+			ctx := context.Background()
 			cs := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
-			for i := range test.pvcs {
-				informerFactory.Core().V1().PersistentVolumeClaims().Informer().GetStore().Add(&test.pvcs[i])
+			for _, pvc := range test.pvcs {
+				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnBindCompleted, "true")
+				cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, &pvc, metav1.CreateOptions{})
+				if pvName := pvc.Spec.VolumeName; pvName != "" {
+					pv := v1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: pvName}}
+					cs.CoreV1().PersistentVolumes().Create(ctx, &pv, metav1.CreateOptions{})
+				}
 			}
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
 			fwk, err := st.NewFramework(
@@ -749,9 +766,13 @@ func TestGenericScheduler(t *testing.T) {
 				cache,
 				snapshot,
 				[]framework.Extender{},
-				schedulerapi.DefaultPercentageOfNodesToScore)
-			result, err := scheduler.Schedule(context.Background(), prof, framework.NewCycleState(), test.pod)
-			if err != test.wErr && err.Error() != test.wErr.Error() {
+				schedulerapi.DefaultPercentageOfNodesToScore,
+			)
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			result, err := scheduler.Schedule(ctx, prof, framework.NewCycleState(), test.pod)
+			if err != test.wErr && !strings.Contains(err.Error(), test.wErr.Error()) {
 				t.Errorf("Unexpected error: %v, expected: %v", err.Error(), test.wErr)
 			}
 			if test.expectedHosts != nil && !test.expectedHosts.Has(result.SuggestedHost) {
