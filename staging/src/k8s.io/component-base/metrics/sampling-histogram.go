@@ -64,7 +64,8 @@ func (h *SamplingHistogram) DeprecatedVersion() *semver.Version {
 func (h *SamplingHistogram) initializeMetric() {
 	h.SamplingHistogramOpts.annotateStabilityLevel()
 	// this actually creates the underlying prometheus gauge.
-	h.setPrometheusSamplingHistogram(promext.NewSamplingHistogram(h.SamplingHistogramOpts.toPromSamplingHistogramOpts()))
+	sh, _ := promext.NewSamplingHistogram(h.SamplingHistogramOpts.toPromSamplingHistogramOpts())
+	h.setPrometheusSamplingHistogram(sh)
 }
 
 // initializeDeprecatedMetric invokes the actual prometheus.SamplingHistogram object instantiation
