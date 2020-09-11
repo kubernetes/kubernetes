@@ -323,7 +323,7 @@ func (vm *volumeManager) GetVolumesInUse() []v1.UniqueVolumeName {
 	desiredVolumesMap := make(map[v1.UniqueVolumeName]bool, len(desiredVolumes)+len(allAttachedVolumes))
 
 	for _, volume := range desiredVolumes {
-		if volume.PluginIsAttachable {
+		if volume.PluginIsAttachable || volume.PluginIsDeviceMountable {
 			if _, exists := desiredVolumesMap[volume.VolumeName]; !exists {
 				desiredVolumesMap[volume.VolumeName] = true
 				volumesToReportInUse = append(volumesToReportInUse, volume.VolumeName)
@@ -332,7 +332,7 @@ func (vm *volumeManager) GetVolumesInUse() []v1.UniqueVolumeName {
 	}
 
 	for _, volume := range allAttachedVolumes {
-		if volume.PluginIsAttachable {
+		if volume.PluginIsAttachable || volume.DeviceMountState != operationexecutor.DeviceNotMounted {
 			if _, exists := desiredVolumesMap[volume.VolumeName]; !exists {
 				volumesToReportInUse = append(volumesToReportInUse, volume.VolumeName)
 			}

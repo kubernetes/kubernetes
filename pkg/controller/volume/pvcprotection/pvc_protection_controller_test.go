@@ -18,6 +18,7 @@ package pvcprotection
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -46,12 +47,32 @@ type reaction struct {
 }
 
 const (
-	defaultNS       = "default"
-	defaultPVCName  = "pvc1"
-	defaultPodName  = "pod1"
-	defaultNodeName = "node1"
-	defaultUID      = "uid1"
+	defaultNS           = "default"
+	defaultPVCName      = "pvc1"
+	defaultPodName      = "pod1"
+	defaultNodeName     = "node1"
+	defaultUID          = "uid1"
+	defaultVolumeName   = "test-vol"
+	otherVolumeName     = "other-vol"
+	defaultPVName       = "test-vol"
+	defaultCSIDriver    = "test-csi-driver"
+	testCSIVolumePrefix = volumeHandleCSIPrefix + defaultCSIDriver + volumeHandleSep
 )
+
+func withVolInUse(n *v1.Node, volumeInUse string) *v1.Node {
+	n.Status = v1.NodeStatus{
+		VolumesInUse: []v1.UniqueVolumeName{v1.UniqueVolumeName(volumeInUse)},
+	}
+	return n
+}
+
+func node() *v1.Node {
+	return &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: defaultNodeName,
+		},
+	}
+}
 
 func pod() *v1.Pod {
 	return &v1.Pod{
@@ -108,13 +129,35 @@ func withUID(uid types.UID, pod *v1.Pod) *v1.Pod {
 	return pod
 }
 
+func pv(withCsiSource bool) *v1.PersistentVolume {
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: defaultPVName,
+		},
+		Spec: v1.PersistentVolumeSpec{},
+	}
+	if withCsiSource {
+		pv.Spec.CSI = &v1.CSIPersistentVolumeSource{
+			VolumeHandle: defaultVolumeName,
+			Driver:       defaultCSIDriver,
+		}
+	}
+	return pv
+}
+
 func pvc() *v1.PersistentVolumeClaim {
 	return &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      defaultPVCName,
 			Namespace: defaultNS,
 		},
+		Spec: v1.PersistentVolumeClaimSpec{},
 	}
+}
+
+func pvcWithVolumeName(pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
+	pvc.Spec.VolumeName = "test-vol"
+	return pvc
 }
 
 func withProtectionFinalizer(pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
@@ -146,6 +189,16 @@ func generateUpdateErrorFunc(t *testing.T, failures int) clienttesting.ReactionF
 	}
 }
 
+func generateNodeListErrorFunc(t *testing.T) clienttesting.ReactionFunc {
+	return func(action clienttesting.Action) (bool, runtime.Object, error) {
+		_, ok := action.(clienttesting.ListAction)
+		if !ok {
+			t.Fatalf("Reactor got non-list action: %+v", action)
+		}
+		return true, nil, fmt.Errorf("mock error")
+	}
+}
+
 func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnabled bool) {
 	pvcGVR := schema.GroupVersionResource{
 		Group:    v1.GroupName,
@@ -161,6 +214,21 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 		Group:   v1.GroupName,
 		Version: "v1",
 		Kind:    "Pod",
+	}
+	nodeGVR := schema.GroupVersionResource{
+		Group:    v1.GroupName,
+		Version:  "v1",
+		Resource: "nodes",
+	}
+	nodeGVK := schema.GroupVersionKind{
+		Group:   v1.GroupName,
+		Version: "v1",
+		Kind:    "Node",
+	}
+	pvGVR := schema.GroupVersionResource{
+		Group:    v1.GroupName,
+		Version:  "v1",
+		Resource: "persistentvolumes",
 	}
 
 	tests := []struct {
@@ -179,17 +247,21 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 		// Pod event to simulate. This Pod will be automatically added to
 		// initialObjects.
 		updatedPod *v1.Pod
+		// Node event to simulate. This Node will be automatically added to
+		// initialObjects.
+		updatedNode *v1.Node
 		// Pod event to simulate. This Pod is *not* added to
 		// initialObjects.
 		deletedPod *v1.Pod
+		// PV event to simulate. This PV will be automatically added to
+		// initialObjects.
+		updatedPV *v1.PersistentVolume
 		// List of expected kubeclient actions that should happen during the
 		// test.
 		expectedActions                     []clienttesting.Action
 		storageObjectInUseProtectionEnabled bool
 	}{
-		//
 		// PVC events
-		//
 		{
 			name:       "StorageObjectInUseProtection Enabled, PVC without finalizer -> finalizer is added",
 			updatedPVC: pvc(),
@@ -312,9 +384,7 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 			},
 			storageObjectInUseProtectionEnabled: true,
 		},
-		//
 		// Pod events
-		//
 		{
 			name: "updated running Pod -> no action",
 			initialObjects: []runtime.Object{
@@ -400,6 +470,174 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 			expectedActions:                     []clienttesting.Action{},
 			storageObjectInUseProtectionEnabled: true,
 		},
+		{
+			name:       "StorageObjectInUseProtection Enabled, deleted PVC with a volume name with finalizer, non CSI PV -> finalizer is removed",
+			updatedPVC: deleted(withProtectionFinalizer(pvcWithVolumeName(pvc()))),
+			updatedPV:  pv(false /* with CSI source */),
+			expectedActions: []clienttesting.Action{
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvcWithVolumeName(pvc()))),
+			},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
+			name:           "StorageObjectInUseProtection Enabled, initial node object without volume in use, deleted PVC with finalizer and without a volume name -> node query skipped, finalizer is removed",
+			initialObjects: []runtime.Object{node()},
+			// node informer not yet updated.
+			informersAreLate: true,
+			updatedPVC:       deleted(withProtectionFinalizer(pvc())),
+			expectedActions: []clienttesting.Action{
+				// Pods listed, no pod found referencing the pvc
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				// PVC finalizer removed.
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
+			},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
+			name:           "StorageObjectInUseProtection Enabled, initial node object without volume in use, deleted PVC with finalizer and without a volume name -> node query skipped, finalizer is removed",
+			initialObjects: []runtime.Object{node()},
+			updatedPVC:     deleted(withProtectionFinalizer(pvc())),
+			expectedActions: []clienttesting.Action{
+				// Pods listed, no pod found referencing the pvc
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				// PVC finalizer removed.
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
+			},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		// Node queries
+		{
+			name:           "StorageObjectInUseProtection Enabled, initial node object without volume in use, deleted PVC with a volume name and finalizer, pv not found, node queries skipped -> finalizer is removed",
+			initialObjects: []runtime.Object{node()},
+			// node informer not yet updated.
+			informersAreLate: true,
+			updatedPVC:       deleted(withProtectionFinalizer(pvcWithVolumeName(pvc()))),
+			//updatedPV:        pv(true /* with csi source */),
+			expectedActions: []clienttesting.Action{
+				// Get PV from API server.
+				clienttesting.NewGetAction(pvGVR, "", defaultPVName),
+				// Pods listed, no pod found referencing the pvc
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				// PVC finalizer removed.
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvcWithVolumeName(pvc()))),
+			},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
+			name:           "StorageObjectInUseProtection Enabled, initial node object without volume in use, deleted PVC with a volume name and finalizer, node informer empty, node queried from API server, node.status.volumesInUse is empty -> finalizer is removed",
+			initialObjects: []runtime.Object{node()},
+			// node informer not yet updated.
+			informersAreLate: true,
+			updatedPVC:       deleted(withProtectionFinalizer(pvcWithVolumeName(pvc()))),
+			updatedPV:        pv(true /* with csi source */),
+			expectedActions: []clienttesting.Action{
+				// Pods listed, no pod found referencing the pvc
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				// node informer is empty, hence nodes listed from API server
+				clienttesting.NewListAction(nodeGVR, nodeGVK, "", metav1.ListOptions{}),
+				// PVC finalizer removed.
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvcWithVolumeName(pvc()))),
+			},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
+			name: "StorageObjectInUseProtection Enabled, initial node object with volume in use, deleted PVC with a volume name and finalizer, node informer empty, node queried from API server, volume found in the node.status.volumesInUse -> finalizer is not removed",
+			initialObjects: []runtime.Object{
+				withVolInUse(node(), testCSIVolumePrefix+defaultVolumeName),
+			},
+			// node informer not yet updated with the node object.
+			informersAreLate: true,
+			updatedPVC:       deleted(withProtectionFinalizer(pvcWithVolumeName(pvc()))),
+			updatedPV:        pv(true /* with csi source */),
+			expectedActions: []clienttesting.Action{
+				// Pods listed, no pod found referencing the pvc
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				// node informer is empty, hence nodes listed from API server
+				clienttesting.NewListAction(nodeGVR, nodeGVK, "", metav1.ListOptions{}),
+			},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
+			name: "StorageObjectInUseProtection Enabled, initial node object without volume in use, initial pv object with csi source, deleted PVC with a volume name and finalizer, node informer empty, node queried from API server, node.status.volumesInUse is empty -> finalizer is removed",
+			initialObjects: []runtime.Object{
+				node(),
+				pv(true /* with csi source */),
+			},
+			// node informer not yet updated.
+			informersAreLate: true,
+			updatedPVC:       deleted(withProtectionFinalizer(pvcWithVolumeName(pvc()))),
+			expectedActions: []clienttesting.Action{
+				// Get PV from API server.
+				clienttesting.NewGetAction(pvGVR, "", defaultPVName),
+				// Pods listed, no pod found referencing the pvc
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				// node informer is empty, hence nodes listed from API server
+				clienttesting.NewListAction(nodeGVR, nodeGVK, "", metav1.ListOptions{}),
+				// PVC finalizer removed.
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvcWithVolumeName(pvc()))),
+			},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
+			name: "StorageObjectInUseProtection Enabled, initial node object with volume in use, initial pv object with csi source, deleted PVC with a volume name and finalizer, node informer empty, node queried from API server, volume found in the node.status.volumesInUse -> finalizer is not removed",
+			initialObjects: []runtime.Object{
+				withVolInUse(node(), testCSIVolumePrefix+defaultVolumeName),
+				pv(true /* with csi source */),
+			},
+			// node informer not yet updated with the node object.
+			informersAreLate: true,
+			updatedPVC:       deleted(withProtectionFinalizer(pvcWithVolumeName(pvc()))),
+			expectedActions: []clienttesting.Action{
+				// Get PV from API server.
+				clienttesting.NewGetAction(pvGVR, "", defaultPVName),
+				// Pods listed, no pod found referencing the pvc
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				// node informer is empty, hence nodes listed from API server
+				clienttesting.NewListAction(nodeGVR, nodeGVK, "", metav1.ListOptions{}),
+			},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
+			name: "StorageObjectInUseProtection Enabled, deleted PVC with a volume name, finalizer, node informer contains node, different volume found in the node.status.volumesInUse, API server node list invoked -> finalizer is removed",
+			initialObjects: []runtime.Object{
+				withVolInUse(node(), otherVolumeName),
+			},
+			updatedPVC: deleted(withProtectionFinalizer(pvcWithVolumeName(pvc()))),
+			updatedPV:  pv(true /* with csi source */),
+			expectedActions: []clienttesting.Action{
+				// Pods listed, no pod found referencing the pvc
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				// node informer is did not report a node with the given volume, hence nodes listed from API server
+				clienttesting.NewListAction(nodeGVR, nodeGVK, "", metav1.ListOptions{}),
+				//PVC finalizer removed.
+				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvcWithVolumeName(pvc()))),
+			},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
+			name: "StorageObjectInUseProtection Enabled, deleted PVC with volume name, finalizer, node list from API server returns error -> finalizer is not removed",
+			initialObjects: []runtime.Object{
+				withVolInUse(node(), testCSIVolumePrefix+defaultVolumeName),
+			},
+			informersAreLate: true,
+			updatedPVC:       deleted(withProtectionFinalizer(pvcWithVolumeName(pvc()))),
+			updatedPV:        pv(true /* with csi source */),
+			reactors: []reaction{
+				{
+					verb:      "list",
+					resource:  "nodes",
+					reactorfn: generateNodeListErrorFunc(t),
+				},
+			},
+			expectedActions: []clienttesting.Action{
+				// Pods listed, no pod found referencing the pvc
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				// nodes listed from API server, and node list failed
+				clienttesting.NewListAction(nodeGVR, nodeGVK, "", metav1.ListOptions{}),
+			},
+			storageObjectInUseProtectionEnabled: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -416,6 +654,14 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 			clientObjs = append(clientObjs, test.updatedPod)
 			informersObjs = append(informersObjs, test.updatedPod)
 		}
+		if test.updatedNode != nil {
+			clientObjs = append(clientObjs, test.updatedNode)
+			informersObjs = append(informersObjs, test.updatedNode)
+		}
+		if test.updatedPV != nil {
+			clientObjs = append(clientObjs, test.updatedPV)
+			informersObjs = append(informersObjs, test.updatedPV)
+		}
 		clientObjs = append(clientObjs, test.initialObjects...)
 		if !test.informersAreLate {
 			informersObjs = append(informersObjs, test.initialObjects...)
@@ -428,9 +674,10 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		pvcInformer := informers.Core().V1().PersistentVolumeClaims()
 		podInformer := informers.Core().V1().Pods()
-
+		nodeInformer := informers.Core().V1().Nodes()
+		pvInformer := informers.Core().V1().PersistentVolumes()
 		// Create the controller
-		ctrl, err := NewPVCProtectionController(pvcInformer, podInformer, client, test.storageObjectInUseProtectionEnabled, genericEphemeralVolumeFeatureEnabled)
+		ctrl, err := NewPVCProtectionController(pvcInformer, podInformer, nodeInformer, pvInformer, client, test.storageObjectInUseProtectionEnabled, genericEphemeralVolumeFeatureEnabled)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -443,6 +690,11 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 				pvcInformer.Informer().GetStore().Add(obj)
 			case *v1.Pod:
 				podInformer.Informer().GetStore().Add(obj)
+			case *v1.Node:
+				nodeInformer.Informer().GetStore().Add(obj)
+			case *v1.PersistentVolume:
+				t.Logf("adding pv %v to informer", obj)
+				pvInformer.Informer().GetStore().Add(obj)
 			default:
 				t.Fatalf("Unknown initalObject type: %+v", obj)
 			}

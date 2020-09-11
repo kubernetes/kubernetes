@@ -19,11 +19,13 @@ package pvcprotection
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -51,6 +53,12 @@ type Controller struct {
 	podListerSynced cache.InformerSynced
 	podIndexer      cache.Indexer
 
+	nodeLister       corelisters.NodeLister
+	nodeListerSynced cache.InformerSynced
+
+	pvLister       corelisters.PersistentVolumeLister
+	pvListerSynced cache.InformerSynced
+
 	queue workqueue.RateLimitingInterface
 
 	// allows overriding of StorageObjectInUseProtection feature Enabled/Disabled for testing
@@ -60,8 +68,13 @@ type Controller struct {
 	genericEphemeralVolumeFeatureEnabled bool
 }
 
+const (
+	volumeHandleCSIPrefix = "kubernetes.io/csi/"
+	volumeHandleSep       = "^"
+)
+
 // NewPVCProtectionController returns a new instance of PVCProtectionController.
-func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled, genericEphemeralVolumeFeatureEnabled bool) (*Controller, error) {
+func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, nodeInformer coreinformers.NodeInformer, pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled, genericEphemeralVolumeFeatureEnabled bool) (*Controller, error) {
 	e := &Controller{
 		client:                               cl,
 		queue:                                workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcprotection"),
@@ -99,6 +112,11 @@ func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimI
 		},
 	})
 
+	e.nodeLister = nodeInformer.Lister()
+	e.nodeListerSynced = nodeInformer.Informer().HasSynced
+
+	e.pvLister = pvInformer.Lister()
+	e.pvListerSynced = pvInformer.Informer().HasSynced
 	return e, nil
 }
 
@@ -110,7 +128,7 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting PVC protection controller")
 	defer klog.Infof("Shutting down PVC protection controller")
 
-	if !cache.WaitForNamedCacheSync("PVC protection", stopCh, c.pvcListerSynced, c.podListerSynced) {
+	if !cache.WaitForNamedCacheSync("PVC protection", stopCh, c.pvcListerSynced, c.podListerSynced, c.nodeListerSynced, c.pvListerSynced) {
 		return
 	}
 
@@ -140,19 +158,32 @@ func (c *Controller) processNextWorkItem() bool {
 		return true
 	}
 
-	err = c.processPVC(pvcNamespace, pvcName)
-	if err == nil {
+	// 'needsReque' is set to true in two cases:
+	// 1. Errors (other than NotFound error) while retrieving PVC from cache.
+	// 2. if PV is detected to be in use by a node, and there is no Pod referencing the
+	// PVC(which is marked for delete). We expect the condition to be short lived as the
+	// volume should be detached from the node soon.
+	// For the above cases, we retry without any exponential backup. Even if we do not use
+	// exponential backoff, default ratelimiter still uses the BucketRateLimiter to control
+	// the overall rate at which keys are added to the queue.
+	needsReque, err := c.processPVC(pvcNamespace, pvcName)
+	if err == nil && !needsReque {
 		c.queue.Forget(pvcKey)
 		return true
+	} else if needsReque {
+		c.queue.Forget(pvcKey)
 	}
 
-	utilruntime.HandleError(fmt.Errorf("PVC %v failed with : %v", pvcKey, err))
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("PVC %v failed with : %v", pvcKey, err))
+	}
+	klog.V(4).Infof("Reque PVC key %v", pvcKey)
 	c.queue.AddRateLimited(pvcKey)
-
 	return true
 }
 
-func (c *Controller) processPVC(pvcNamespace, pvcName string) error {
+// This function processes a PVC, and returns error encountered (if any), and a bool indicating if the PVC needs to be requeued.
+func (c *Controller) processPVC(pvcNamespace, pvcName string) (bool, error) {
 	klog.V(4).Infof("Processing PVC %s/%s", pvcNamespace, pvcName)
 	startTime := time.Now()
 	defer func() {
@@ -162,23 +193,25 @@ func (c *Controller) processPVC(pvcNamespace, pvcName string) error {
 	pvc, err := c.pvcLister.PersistentVolumeClaims(pvcNamespace).Get(pvcName)
 	if apierrors.IsNotFound(err) {
 		klog.V(4).Infof("PVC %s/%s not found, ignoring", pvcNamespace, pvcName)
-		return nil
+		return false, nil
 	}
 	if err != nil {
-		return err
+		// We expect this error to be resolved soon, hence requeue the PVC key.
+		return true, err
 	}
 
 	if protectionutil.IsDeletionCandidate(pvc, volumeutil.PVCProtectionFinalizer) {
 		// PVC should be deleted. Check if it's used and remove finalizer if
 		// it's not.
-		isUsed, err := c.isBeingUsed(pvc)
+		isUsed, needsRequeue, err := c.isBeingUsed(pvc)
 		if err != nil {
-			return err
+			return needsRequeue, err
 		}
 		if !isUsed {
-			return c.removeFinalizer(pvc)
+			return needsRequeue, c.removeFinalizer(pvc)
 		}
 		klog.V(2).Infof("Keeping PVC %s/%s because it is still being used", pvc.Namespace, pvc.Name)
+		return needsRequeue, nil
 	}
 
 	if protectionutil.NeedToAddFinalizer(pvc, volumeutil.PVCProtectionFinalizer) {
@@ -186,9 +219,9 @@ func (c *Controller) processPVC(pvcNamespace, pvcName string) error {
 		// finalizer should be added by admission plugin, this is just to add
 		// the finalizer to old PVCs that were created before the admission
 		// plugin was enabled.
-		return c.addFinalizer(pvc)
+		return false, c.addFinalizer(pvc)
 	}
-	return nil
+	return false, nil
 }
 
 func (c *Controller) addFinalizer(pvc *v1.PersistentVolumeClaim) error {
@@ -219,25 +252,92 @@ func (c *Controller) removeFinalizer(pvc *v1.PersistentVolumeClaim) error {
 	return nil
 }
 
-func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, error) {
+// This function checks if a PVC is in use and returns values inUse,
+// needsRequeue and error.
+// isUse: This value indicates if a PVC is in use by any pod or node
+// needsRequeue: This value indicates that the controller loop should
+// requeue the PVC in the controller, instead of waiting for a new event
+// handler call on the PVC. This is an optimization to react faster to a
+// change in state where no pod references the PVC.
+func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, bool, error) {
+	// If PVC is marked for delete, before the PVC.Spec.Volume is populated,
+	// we should not block PVC deletion. By the time PVC is deleted, if PV
+	// creation was already triggered and the volume plugin is in the process
+	// of creation of the volume, then after the PV is created, the PV controller
+	// will trigger a delete for the PV (if it has a reclaim policy of delete),
+	// since the claim will not be found.
+	var pv *v1.PersistentVolume
+	if pvc.Spec.VolumeName != "" {
+		var err error
+		pv, err = c.getPV(pvc)
+		// If PV is not found, then node check for volumes in use will be skipped.
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, false, err
+		}
+	}
+
 	// Look for a Pod using pvc in the Informer's cache. If one is found the
 	// correct decision to keep pvc is taken without doing an expensive live
-	// list.
-	if inUse, err := c.askInformer(pvc); err != nil {
+	// list. No requeue is needed as we will wait for a Pod event.
+	if inUse, err := c.askPodInformer(pvc); err != nil {
 		// No need to return because a live list will follow.
 		klog.Error(err)
 	} else if inUse {
-		return true, nil
+		// If we reach here, this means, the the PVC is still in use by a Pod, hence no
+		// reque is needed. We will wait for an event to process the PVC.
+		return true, false, nil
+	}
+
+	// Check for volumes in use by nodes for CSI volume plugins.
+	// In-tree volume plugins need investigation on how to map a pvc.Spec.VolumeName
+	// to node.Status.VolumesInUse.
+	if pv != nil && pv.Spec.CSI != nil {
+		uniqueVolHandle, err := c.generateUniqueCSIVolumeHandle(pv.Spec.CSI)
+		if err != nil {
+			return false, false, err
+		}
+		if inUse, err := c.askNodeInformer(uniqueVolHandle, pvc); err != nil {
+			// No need to return because a live list will follow.
+			klog.Error(err)
+		} else if inUse {
+			// If we reach here, this means we have not found any Pod , referencing this PVC,
+			// in the informer cache, and the volume is still in use by a node. So we reque
+			// the PVC again to process it faster.
+			return true, true, nil
+		}
 	}
 
 	// Even if no Pod using pvc was found in the Informer's cache it doesn't
 	// mean such a Pod doesn't exist: it might just not be in the cache yet. To
 	// be 100% confident that it is safe to delete pvc make sure no Pod is using
 	// it among those returned by a live list.
-	return c.askAPIServer(pvc)
+	if inUse, err := c.askAPIServerForPod(pvc); err != nil {
+		return false, false, err
+	} else if inUse {
+		// If we reach here, this means, the the PVC is still in use by a Pod, hence no
+		// reque is needed. We will wait for an event to process the PVC.
+		return true, false, nil
+	}
+
+	if pv != nil && pv.Spec.CSI != nil {
+		uniqueVolHandle, err := c.generateUniqueCSIVolumeHandle(pv.Spec.CSI)
+		if err != nil {
+			return false, false, err
+		}
+		if inUse, err := c.askAPIServerForNode(uniqueVolHandle, pvc); err != nil {
+			return false, false, err
+		} else if inUse {
+			// If we reach here, this means we have not found any Pod , referencing this PVC,
+			// and the volume is still in use by a node. So we reque the PVC again to process
+			// it faster.
+			return true, true, nil
+		}
+	}
+
+	return false, false, nil
 }
 
-func (c *Controller) askInformer(pvc *v1.PersistentVolumeClaim) (bool, error) {
+func (c *Controller) askPodInformer(pvc *v1.PersistentVolumeClaim) (bool, error) {
 	klog.V(4).Infof("Looking for Pods using PVC %s/%s in the Informer's cache", pvc.Namespace, pvc.Name)
 
 	// The indexer is used to find pods which might use the PVC.
@@ -274,7 +374,7 @@ func (c *Controller) askInformer(pvc *v1.PersistentVolumeClaim) (bool, error) {
 	return false, nil
 }
 
-func (c *Controller) askAPIServer(pvc *v1.PersistentVolumeClaim) (bool, error) {
+func (c *Controller) askAPIServerForPod(pvc *v1.PersistentVolumeClaim) (bool, error) {
 	klog.V(4).Infof("Looking for Pods using PVC %s/%s with a live list", pvc.Namespace, pvc.Name)
 
 	podsList, err := c.client.CoreV1().Pods(pvc.Namespace).List(context.TODO(), metav1.ListOptions{})
@@ -417,4 +517,61 @@ func (c *Controller) enqueuePVCs(pod *v1.Pod, deleted bool) {
 			c.queue.Add(pod.Namespace + "/" + pod.Name + "-" + volume.Name)
 		}
 	}
+}
+
+func (c *Controller) getPV(pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
+	pv, err := c.pvLister.Get(pvc.Spec.VolumeName)
+	if err != nil {
+		klog.V(3).Infof("unexpected error getting persistent volume %q from cache for claim %s/%s: %v", pvc.Spec.VolumeName, pvc.Namespace, pvc.Name, err)
+		pv, err = c.client.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
+	}
+	return pv, err
+}
+
+func (c *Controller) askNodeInformer(volumeHandle string, pvc *v1.PersistentVolumeClaim) (bool, error) {
+	klog.V(3).Infof("For claim %s/%s checking for volume handle %s in node informer cache", pvc.Namespace, pvc.Name, volumeHandle)
+	if volumeHandle == "" {
+		return false, fmt.Errorf("Empty volume handle for claim %s/%s", pvc.Namespace, pvc.Name)
+	}
+
+	nodes, err := c.nodeLister.List(labels.Everything())
+	if err != nil {
+		return false, fmt.Errorf("unexpected error listing nodes from node informer: %v", err)
+	}
+	return c.isVolumeInUse(volumeHandle, nodes), nil
+}
+
+func (c *Controller) askAPIServerForNode(volumeHandle string, pvc *v1.PersistentVolumeClaim) (bool, error) {
+	klog.V(3).Infof("For claim %s/%s, volume %s, list nodes from API server", pvc.Namespace, pvc.Name, volumeHandle)
+	nodes, err := c.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("List of nodes from API server failed: %s", err.Error())
+	}
+	nodesPtr := []*v1.Node{}
+	for i := range nodes.Items {
+		nodesPtr = append(nodesPtr, &nodes.Items[i])
+	}
+
+	return c.isVolumeInUse(volumeHandle, nodesPtr), nil
+}
+
+// Helper function to determine if a given volume is present in the node's volumesInUse list.
+func (c *Controller) isVolumeInUse(volHandle string, nodes []*v1.Node) bool {
+	for _, node := range nodes {
+		for _, volInUse := range node.Status.VolumesInUse {
+			volInUseStr := strings.TrimPrefix(string(volInUse), volumeHandleCSIPrefix)
+			if volInUseStr == volHandle {
+				klog.Infof("Found volume %s in use at node %s", volInUseStr, node.Name)
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (c *Controller) generateUniqueCSIVolumeHandle(source *v1.CSIPersistentVolumeSource) (string, error) {
+	if source.Driver == "" || source.VolumeHandle == "" {
+		return "", fmt.Errorf("Failed to fetch CSI driver plugin or volume for CSI source %+v", source)
+	}
+	return fmt.Sprintf("%s%s%s", source.Driver, volumeHandleSep, source.VolumeHandle), nil
 }

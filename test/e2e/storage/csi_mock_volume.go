@@ -373,6 +373,11 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
 			framework.ExpectNoError(err, "Failed to start pod: %v", err)
 
+			// Delete the Pod, this should trigger NodeUnpublish and subsequently NodeUnstage call. Only after NodeUnstage success, the
+			// node.Status.VolumesInUse will no longer report the volume.
+			err = e2epod.DeletePodWithWait(m.cs, pod)
+			framework.ExpectNoError(err, "while deleting")
+
 			ginkgo.By(fmt.Sprintf("Wait for the volumeattachment to be deleted up to %v", csiVolumeAttachmentTimeout))
 			// This step can be slow because we have to wait either a NodeUpdate event happens or
 			// the detachment for this volume timeout so that we can do a force detach.
