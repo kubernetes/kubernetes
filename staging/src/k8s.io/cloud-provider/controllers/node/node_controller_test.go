@@ -162,7 +162,7 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 	}
 }
 
-func Test_AddCloudNode(t *testing.T) {
+func Test_syncNode(t *testing.T) {
 	tests := []struct {
 		name         string
 		fakeCloud    *fakecloud.Cloud
@@ -1290,14 +1290,19 @@ func Test_AddCloudNode(t *testing.T) {
 			cloudNodeController := &CloudNodeController{
 				kubeClient:                clientset,
 				nodeInformer:              factory.Core().V1().Nodes(),
+				nodesLister:               factory.Core().V1().Nodes().Lister(),
 				cloud:                     test.fakeCloud,
 				recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 				nodeStatusUpdateFrequency: 1 * time.Second,
 			}
+
+			factory.Start(nil)
+			factory.WaitForCacheSync(nil)
+
 			w := eventBroadcaster.StartLogging(klog.Infof)
 			defer w.Stop()
 
-			cloudNodeController.AddCloudNode(context.TODO(), test.existingNode)
+			cloudNodeController.syncNode(context.TODO(), test.existingNode.Name)
 
 			updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), test.existingNode.Name, metav1.GetOptions{})
 			if err != nil {
@@ -1311,7 +1316,7 @@ func Test_AddCloudNode(t *testing.T) {
 	}
 }
 
-// test AddCloudNode with instanceV2, same test case with TestGCECondition.
+// test syncNode with instanceV2, same test case with TestGCECondition.
 func TestGCEConditionV2(t *testing.T) {
 	existingNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1369,14 +1374,19 @@ func TestGCEConditionV2(t *testing.T) {
 	cloudNodeController := &CloudNodeController{
 		kubeClient:                clientset,
 		nodeInformer:              factory.Core().V1().Nodes(),
+		nodesLister:               factory.Core().V1().Nodes().Lister(),
 		cloud:                     fakeCloud,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
+
+	factory.Start(nil)
+	factory.WaitForCacheSync(nil)
+
 	w := eventBroadcaster.StartLogging(klog.Infof)
 	defer w.Stop()
 
-	cloudNodeController.AddCloudNode(context.TODO(), existingNode)
+	cloudNodeController.syncNode(context.TODO(), existingNode.Name)
 
 	updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), existingNode.Name, metav1.GetOptions{})
 	if err != nil {
@@ -1452,14 +1462,19 @@ func TestGCECondition(t *testing.T) {
 	cloudNodeController := &CloudNodeController{
 		kubeClient:                clientset,
 		nodeInformer:              factory.Core().V1().Nodes(),
+		nodesLister:               factory.Core().V1().Nodes().Lister(),
 		cloud:                     fakeCloud,
 		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
+
+	factory.Start(nil)
+	factory.WaitForCacheSync(nil)
+
 	w := eventBroadcaster.StartLogging(klog.Infof)
 	defer w.Stop()
 
-	cloudNodeController.AddCloudNode(context.TODO(), existingNode)
+	cloudNodeController.syncNode(context.TODO(), existingNode.Name)
 
 	updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), existingNode.Name, metav1.GetOptions{})
 	if err != nil {
