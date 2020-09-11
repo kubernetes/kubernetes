@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package prometheus_extension
+package prometheusextension
 
 import (
 	"testing"
@@ -27,7 +27,7 @@ import (
 
 func TestSamplingHistogram(t *testing.T) {
 	clk := testclock.NewFakeClock(time.Unix(time.Now().Unix(), 999999990))
-	sh := NewTestableSamplingHistogram(clk, SamplingHistogramOpts{
+	sh, err := NewTestableSamplingHistogram(clk, SamplingHistogramOpts{
 		HistogramOpts: prometheus.HistogramOpts{
 			Namespace:   "test",
 			Subsystem:   "func",
@@ -39,6 +39,9 @@ func TestSamplingHistogram(t *testing.T) {
 		InitialValue:   1,
 		SamplingPeriod: time.Second,
 	})
+	if sh == nil || err != nil {
+		t.Errorf("Creation failed; err=%s", err.Error())
+	}
 	expectHistogram(t, "After creation", sh, 0, 0, 0, 0)
 	sh.Set(2)
 	expectHistogram(t, "After initial Set", sh, 0, 0, 0, 0)

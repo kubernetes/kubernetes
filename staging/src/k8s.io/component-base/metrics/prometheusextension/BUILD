@@ -3,8 +3,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["sampling-histogram.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/metrics/prometheus_extension",
-    importpath = "k8s.io/component-base/metrics/prometheus_extension",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/metrics/prometheusextension",
+    importpath = "k8s.io/component-base/metrics/prometheusextension",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",

@@ -27,7 +27,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
-        "//staging/src/k8s.io/component-base/metrics/prometheus_extension:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/prometheusextension:go_default_library",
         "//staging/src/k8s.io/component-base/version:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
@@ -81,7 +81,7 @@ filegroup(
         "//staging/src/k8s.io/component-base/metrics/prometheus/restclient:all-srcs",
         "//staging/src/k8s.io/component-base/metrics/prometheus/version:all-srcs",
         "//staging/src/k8s.io/component-base/metrics/prometheus/workqueue:all-srcs",
-        "//staging/src/k8s.io/component-base/metrics/prometheus_extension:all-srcs",
+        "//staging/src/k8s.io/component-base/metrics/prometheusextension:all-srcs",
         "//staging/src/k8s.io/component-base/metrics/testutil:all-srcs",
     ],
     tags = ["automanaged"],

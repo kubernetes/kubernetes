@@ -19,7 +19,7 @@ package metrics
 import (
 	"github.com/blang/semver"
 
-	promext "k8s.io/component-base/metrics/prometheus_extension"
+	promext "k8s.io/component-base/metrics/prometheusextension"
 )
 
 // SamplingHistogram is our internal representation for our wrapping struct around prometheus

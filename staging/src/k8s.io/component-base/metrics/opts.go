@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	promext "k8s.io/component-base/metrics/prometheus_extension"
+	promext "k8s.io/component-base/metrics/prometheusextension"
 )
 
 // KubeOpts is superset struct for prometheus.Opts. The prometheus Opts structure

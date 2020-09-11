@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package prometheus_extension
+package prometheusextension
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -38,21 +39,27 @@ type SamplingHistogram interface {
 	Add(float64)
 }
 
+// SamplingHistogramOpts bundles the options for creating a
+// SamplingHistogram metric.  This builds on the options for creating
+// a Histogram metric.
 type SamplingHistogramOpts struct {
 	prometheus.HistogramOpts
 
-	// The initial value of the variable
+	// The initial value of the variable.
 	InitialValue float64
 
-	// The variable is sampled once every this often
+	// The variable is sampled once every this often.
+	// Must be set to a positive value.
 	SamplingPeriod time.Duration
 }
 
-func NewSamplingHistogram(opts SamplingHistogramOpts) SamplingHistogram {
+// NewSamplingHistogram creates a new SamplingHistogram
+func NewSamplingHistogram(opts SamplingHistogramOpts) (SamplingHistogram, error) {
 	return NewTestableSamplingHistogram(clock.RealClock{}, opts)
 }
 
-func NewTestableSamplingHistogram(clock clock.Clock, opts SamplingHistogramOpts) SamplingHistogram {
+// NewTestableSamplingHistogram creates a SamplingHistogram that uses a mockable clock
+func NewTestableSamplingHistogram(clock clock.Clock, opts SamplingHistogramOpts) (SamplingHistogram, error) {
 	desc := prometheus.NewDesc(
 		prometheus.BuildFQName(opts.Namespace, opts.Subsystem, opts.Name),
 		opts.Help,
@@ -62,14 +69,17 @@ func NewTestableSamplingHistogram(clock clock.Clock, opts SamplingHistogramOpts)
 	return newSamplingHistogram(clock, desc, opts)
 }
 
-func newSamplingHistogram(clock clock.Clock, desc *prometheus.Desc, opts SamplingHistogramOpts, labelValues ...string) SamplingHistogram {
+func newSamplingHistogram(clock clock.Clock, desc *prometheus.Desc, opts SamplingHistogramOpts, labelValues ...string) (SamplingHistogram, error) {
+	if opts.SamplingPeriod <= 0 {
+		return nil, fmt.Errorf("the given sampling period was %v but must be positive", opts.SamplingPeriod)
+	}
 	return &samplingHistogram{
 		samplingPeriod:  opts.SamplingPeriod,
 		histogram:       prometheus.NewHistogram(opts.HistogramOpts),
 		clock:           clock,
 		lastSampleIndex: clock.Now().UnixNano() / int64(opts.SamplingPeriod),
 		value:           opts.InitialValue,
-	}
+	}, nil
 }
 
 type samplingHistogram struct {
