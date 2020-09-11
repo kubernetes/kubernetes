@@ -32,6 +32,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/prometheus/common/expfmt"
@@ -80,6 +81,8 @@ const (
 
 	acceptEncodingHeader = "Accept-Encoding"
 	acceptHeader         = "Accept"
+
+	maxWritePbTimes = 5
 )
 
 // Handler returns the HTTP handler for the global Prometheus registry. It is
@@ -389,6 +392,24 @@ func (r *registry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Write(buf.Bytes())
 }
 
+func RunWithTimeout(handler func(collector Collector, wg sync.WaitGroup, metricChan chan Metric), collector Collector, wg sync.WaitGroup, metricChan chan Metric, timeout time.Duration) error {
+	done := make(chan bool, 1)
+	go func(collector Collector, wg sync.WaitGroup, metricChan chan Metric) {
+		handler(collector, wg, metricChan)
+		done <- true
+		close(done)
+	}(collector, wg, metricChan)
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return errors.New("timeout")
+	case <-done:
+		return nil
+	}
+}
+
 func (r *registry) writePB(encoder expfmt.Encoder) error {
 	var metricHashes map[uint64]struct{}
 	if r.collectChecksEnabled {
@@ -407,11 +428,22 @@ func (r *registry) writePB(encoder expfmt.Encoder) error {
 		wg.Wait()
 		close(metricChan)
 	}()
+
+	f := func(collector Collector, wg sync.WaitGroup, metricChan chan Metric) {
+		defer wg.Done()
+		collector.Collect(metricChan)
+	}
+
+	errTimes := 0
 	for _, collector := range r.collectorsByID {
-		go func(collector Collector) {
-			defer wg.Done()
-			collector.Collect(metricChan)
-		}(collector)
+		err := RunWithTimeout(f, collector, wg, metricChan, 3*time.Second)
+		if err != nil {
+			errTimes++
+			if errTimes > maxWritePbTimes {
+				return fmt.Errorf("error collecting metric , %v", collector)
+				break
+			}
+		}
 	}
 	r.mtx.RUnlock()
 
