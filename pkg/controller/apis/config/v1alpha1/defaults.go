@@ -130,7 +130,10 @@ func RecommendedDefaultGenericControllerManagerConfiguration(obj *kubectrlmgrcon
 	}
 
 	if len(obj.LeaderElection.ResourceLock) == 0 {
-		obj.LeaderElection.ResourceLock = "endpointsleases"
+		// Use lease-based leader election to reduce cost.
+		// We migrated for EndpointsLease lock in 1.17 and starting in 1.20 we
+		// migrated to Lease lock.
+		obj.LeaderElection.ResourceLock = "leases"
 	}
 
 	// Use the default ClientConnectionConfiguration and LeaderElectionConfiguration options

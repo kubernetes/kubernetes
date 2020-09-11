@@ -49,7 +49,7 @@ func TestDefaultFlags(t *testing.T) {
 				},
 				ControllerStartInterval: metav1.Duration{Duration: 0},
 				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					ResourceLock:      "endpointsleases",
+					ResourceLock:      "leases",
 					LeaderElect:       true,
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
