@@ -485,6 +485,8 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 		},
 		Spec: *pod.Spec.DeepCopy(),
 	}
+	// set EphemeralContainers to nil so that the copy of pod can be created
+	copied.Spec.EphemeralContainers = nil
 	// change ShareProcessNamespace configuration only when commanded explicitly
 	if o.shareProcessedChanged {
 		copied.Spec.ShareProcessNamespace = pointer.BoolPtr(o.ShareProcesses)
@@ -544,11 +546,11 @@ func containerNameToRef(pod *corev1.Pod) map[string]*corev1.Container {
 		names[ref.Name] = ref
 	}
 	for i := range pod.Spec.InitContainers {
-		ref := &pod.Spec.Containers[i]
+		ref := &pod.Spec.InitContainers[i]
 		names[ref.Name] = ref
 	}
 	for i := range pod.Spec.EphemeralContainers {
-		ref := &pod.Spec.Containers[i]
+		ref := (*corev1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon)
 		names[ref.Name] = ref
 	}
 	return names
