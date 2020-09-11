@@ -215,17 +215,23 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 	if failSwapOn {
 		// Check whether swap is enabled. The Kubelet does not support running with swap enabled.
-		swapData, err := ioutil.ReadFile("/proc/swaps")
+		swapFile := "/proc/swaps"
+		swapData, err := ioutil.ReadFile(swapFile)
 		if err != nil {
-			return nil, err
-		}
-		swapData = bytes.TrimSpace(swapData) // extra trailing \n
-		swapLines := strings.Split(string(swapData), "\n")
+			if os.IsNotExist(err) {
+				klog.Warningf("file %v does not exist, assuming that swap is disabled", swapFile)
+			} else {
+				return nil, err
+			}
+		} else {
+			swapData = bytes.TrimSpace(swapData) // extra trailing \n
+			swapLines := strings.Split(string(swapData), "\n")
 
-		// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should
-		// error out unless --fail-swap-on is set to false.
-		if len(swapLines) > 1 {
-			return nil, fmt.Errorf("running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
+			// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should
+			// error out unless --fail-swap-on is set to false.
+			if len(swapLines) > 1 {
+				return nil, fmt.Errorf("running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
+			}
 		}
 	}
 
