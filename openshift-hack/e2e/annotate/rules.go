@@ -89,8 +89,6 @@ var (
 
 			// A fix is in progress: https://github.com/openshift/origin/pull/24709
 			`Multi-AZ Clusters should spread the pods of a replication controller across zones`,
-
-			`should check if kubectl diff finds a difference for Deployments`, // https://bugzilla.redhat.com/show_bug.cgi?id=1875194
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {

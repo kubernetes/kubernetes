@@ -833,7 +833,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-cli] Kubectl client Kubectl describe should check if kubectl describe prints relevant information for rc and pods  [Conformance]": "should check if kubectl describe prints relevant information for rc and pods  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-cli] Kubectl client Kubectl diff should check if kubectl diff finds a difference for Deployments [Conformance]": "should check if kubectl diff finds a difference for Deployments [Conformance] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-cli] Kubectl client Kubectl diff should check if kubectl diff finds a difference for Deployments [Conformance]": "should check if kubectl diff finds a difference for Deployments [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-cli] Kubectl client Kubectl expose should create services for rc  [Conformance]": "should create services for rc  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
