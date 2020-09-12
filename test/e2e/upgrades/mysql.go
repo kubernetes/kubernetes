@@ -66,7 +66,7 @@ func mysqlKubectlCreate(ns, file string) {
 		framework.Fail(err.Error())
 	}
 	input := string(data)
-	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
+	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-")
 }
 
 func (t *MySQLUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {

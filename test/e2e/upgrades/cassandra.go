@@ -65,7 +65,7 @@ func cassandraKubectlCreate(ns, file string) {
 		framework.Fail(err.Error())
 	}
 	input := string(data)
-	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
+	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-")
 }
 
 // Setup creates a Cassandra StatefulSet and a PDB. It also brings up a tester
