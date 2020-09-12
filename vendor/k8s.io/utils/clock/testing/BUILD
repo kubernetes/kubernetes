@@ -2,10 +2,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["clock.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/utils/clock",
-    importpath = "k8s.io/utils/clock",
+    srcs = ["fake_clock.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/utils/clock/testing",
+    importpath = "k8s.io/utils/clock/testing",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/k8s.io/utils/clock:go_default_library"],
 )
 
 filegroup(
@@ -17,10 +18,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//vendor/k8s.io/utils/clock/testing:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
