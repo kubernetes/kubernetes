@@ -58,3 +58,6 @@ patch:
         patched: '2020-09-12T12:41:28.874Z'
     - gitbook-cli > npmi > npm > request > tunnel-agent:
         patched: '2020-09-12T12:41:28.874Z'
+  'npm:tough-cookie:20160722':
+    - gitbook-plugin-mermaid > phantomjs > request > tough-cookie:
+        patched: '2020-09-12T12:42:46.019Z'
