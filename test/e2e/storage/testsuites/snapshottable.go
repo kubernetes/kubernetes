@@ -330,7 +330,7 @@ func DeleteAndWaitSnapshot(dc dynamic.Interface, ns string, snapshotName string,
 	var err error
 	ginkgo.By("deleting the snapshot")
 	err = dc.Resource(SnapshotGVR).Namespace(ns).Delete(context.TODO(), snapshotName, metav1.DeleteOptions{})
-	if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
@@ -441,12 +441,18 @@ func (sr *SnapshotResource) CleanupResource() error {
 					framework.ExpectNoError(err)
 				}
 				err = dc.Resource(SnapshotGVR).Namespace(sr.Vs.GetNamespace()).Delete(context.TODO(), sr.Vs.GetName(), metav1.DeleteOptions{})
+				if apierrors.IsNotFound(err) {
+					err = nil
+				}
 				framework.ExpectNoError(err)
 				err = utils.WaitForGVRDeletion(dc, SnapshotContentGVR, boundVsContent.GetName(), framework.Poll, framework.SnapshotDeleteTimeout)
 				framework.ExpectNoError(err)
 			case apierrors.IsNotFound(err):
 				// the volume snapshot is not bound to snapshot content yet
 				err = dc.Resource(SnapshotGVR).Namespace(sr.Vs.GetNamespace()).Delete(context.TODO(), sr.Vs.GetName(), metav1.DeleteOptions{})
+				if apierrors.IsNotFound(err) {
+					err = nil
+				}
 				framework.ExpectNoError(err)
 				err = utils.WaitForGVRDeletion(dc, SnapshotGVR, sr.Vs.GetName(), framework.Poll, framework.SnapshotDeleteTimeout)
 				framework.ExpectNoError(err)
@@ -474,6 +480,9 @@ func (sr *SnapshotResource) CleanupResource() error {
 				framework.ExpectNoError(err)
 			}
 			err = dc.Resource(SnapshotContentGVR).Namespace(sr.Vscontent.GetNamespace()).Delete(context.TODO(), sr.Vscontent.GetName(), metav1.DeleteOptions{})
+			if apierrors.IsNotFound(err) {
+				err = nil
+			}
 			framework.ExpectNoError(err)
 
 			err = utils.WaitForGVRDeletion(dc, SnapshotContentGVR, sr.Vscontent.GetName(), framework.Poll, framework.SnapshotDeleteTimeout)
