@@ -43,6 +43,7 @@ const (
 	flagAPIServer        = "server"
 	flagTLSServerName    = "tls-server-name"
 	flagInsecure         = "insecure-skip-tls-verify"
+	flagLocal            = "local"
 	flagCertFile         = "client-certificate"
 	flagKeyFile          = "client-key"
 	flagCAFile           = "certificate-authority"
@@ -89,6 +90,7 @@ type ConfigFlags struct {
 	APIServer        *string
 	TLSServerName    *string
 	Insecure         *bool
+	Local            *bool
 	CertFile         *string
 	KeyFile          *string
 	CAFile           *string
@@ -215,9 +217,15 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 
 	// we only have an interactive prompt when a password is allowed
 	if f.Password == nil {
-		return &clientConfig{clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)}
+		return &clientConfig{
+			defaultClientConfig: clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides),
+			local:               boolVal(f.Local),
+		}
 	}
-	return &clientConfig{clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)}
+	return &clientConfig{
+		local:               boolVal(f.Local),
+		defaultClientConfig: clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin),
+	}
 }
 
 // toRawKubePersistentConfigLoader binds config flag values to config overrides
@@ -367,6 +375,9 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.Insecure != nil {
 		flags.BoolVar(f.Insecure, flagInsecure, *f.Insecure, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure")
 	}
+	if f.Local != nil {
+		flags.BoolVar(f.Local, flagLocal, *f.Local, "If true, will not contact api-server but run locally.")
+	}
 	if f.CAFile != nil {
 		flags.StringVar(f.CAFile, flagCAFile, *f.CAFile, "Path to a cert file for the certificate authority")
 	}
@@ -391,10 +402,10 @@ func (f *ConfigFlags) WithDiscoveryBurst(discoveryBurst int) *ConfigFlags {
 // NewConfigFlags returns ConfigFlags with default values set
 func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 	impersonateGroup := []string{}
-	insecure := false
 
 	return &ConfigFlags{
-		Insecure:   &insecure,
+		Insecure:   boolPtr(false),
+		Local:      boolPtr(false),
 		Timeout:    stringptr("0"),
 		KubeConfig: stringptr(""),
 
@@ -422,6 +433,13 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 
 func stringptr(val string) *string {
 	return &val
+}
+
+func boolVal(p *bool) bool {
+	if p == nil {
+		return false
+	}
+	return *p
 }
 
 // overlyCautiousIllegalFileCharacters matches characters that *might* not be supported.  Windows is really restrictive, so this is really restrictive
