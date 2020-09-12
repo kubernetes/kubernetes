@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -28,13 +29,13 @@ import (
 	cadvisorfs "github.com/google/cadvisor/fs"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
-	assertModule "github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	critest "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -458,8 +459,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(c1.Logs)
 	assert.Nil(c1.Accelerators)
 	assert.Nil(c1.UserDefinedMetrics)
-	assert.True(assertModule.ObjectsAreEqual(p0.CPU.Time, metav1.NewTime(time.Unix(0, containerStats1.Cpu.Timestamp))) || assertModule.ObjectsAreEqual(p0.CPU.Time, metav1.NewTime(time.Unix(0, containerStats0.Cpu.Timestamp))))
-	assert.True(assertModule.ObjectsAreEqual(p0.Memory.Time, metav1.NewTime(time.Unix(0, containerStats1.Memory.Timestamp))) || assertModule.ObjectsAreEqual(p0.Memory.Time, metav1.NewTime(time.Unix(0, containerStats0.Memory.Timestamp))))
+	klog.Info(fmt.Sprintf("Pod Cpu Timestamp: %d, container 0 cpu timestamp: %d,container1 cpu timestamp: %d", p0.CPU.Time.UnixNano(), containerStats0.Cpu.Timestamp, containerStats1.Cpu.Timestamp))
 
 	p1 := podStatsMap[statsapi.PodReference{Name: "sandbox1-name", UID: "sandbox1-uid", Namespace: "sandbox1-ns"}]
 	assert.Equal(sandbox1.CreatedAt, p1.StartTime.UnixNano())
