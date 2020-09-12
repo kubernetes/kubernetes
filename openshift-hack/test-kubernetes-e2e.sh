@@ -11,11 +11,36 @@ set -o pipefail
 
 # Identify the platform under test to allow skipping tests that are
 # not compatible.
-PLATFORM="${PLATFORM:-gce}"
+CLUSTER_TYPE="${CLUSTER_TYPE:-gcp}"
+case "${CLUSTER_TYPE}" in
+  gcp)
+    # gce is used as a platform label instead of gcp
+    PLATFORM=gce
+    ;;
+  *)
+    PLATFORM="${CLUSTER_TYPE}"
+    ;;
+esac
 
-# As a starting point, only support a parallel suite of tests that are
-# not disabled or skipped.
-DEFAULT_TEST_ARGS="-skip=\[Slow\]|\[Serial\]|\[Disruptive\]|\[Flaky\]|\[Disabled:.+\]|\[Skipped:${PLATFORM}\]"
+# Support serial and parallel test suites
+TEST_SUITE="${TEST_SUITE:-parallel}"
+COMMON_SKIPS="\[Slow\]|\[Disruptive\]|\[Flaky\]|\[Disabled:.+\]|\[Skipped:${PLATFORM}\]"
+case "${TEST_SUITE}" in
+serial)
+  DEFAULT_TEST_ARGS="-focus=\[Serial\] -skip=${COMMON_SKIPS}"
+  NODES=1
+  ;;
+parallel)
+  DEFAULT_TEST_ARGS="-skip=\[Serial\]|${COMMON_SKIPS}"
+  # Use the same number of nodes - 30 - as specified for the parallel
+  # suite defined in origin.
+  NODES=30
+  ;;
+*)
+  echo >&2 "Unsupported test suite '${TEST_SUITE}'"
+  exit 1
+  ;;
+esac
 
 # Set KUBE_E2E_TEST_ARGS to configure test arguments like
 # -skip and -focus.
@@ -47,11 +72,9 @@ mkdir -p "${test_report_dir}"
 SERVER=
 SERVER="$( kubectl config view | grep server | head -n 1 | awk '{print $2}' )"
 
-# Use the same number of nodes - 30 - as specified for the parallel
-# suite defined in origin.
 # shellcheck disable=SC2086
 ginkgo \
-  -nodes 30 -noColor ${KUBE_E2E_TEST_ARGS} \
+  -nodes "${NODES}" -noColor ${KUBE_E2E_TEST_ARGS} \
   "$( which k8s-e2e.test )" -- \
   -report-dir "${test_report_dir}" \
   -host "${SERVER}" \
