@@ -47,7 +47,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -378,32 +378,13 @@ func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, Poll, 
 			Logf("PersistentVolume %s found and phase=%s (%v)", pvName, pv.Status.Phase, time.Since(start))
 			continue
 		}
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			Logf("PersistentVolume %s was removed", pvName)
 			return nil
 		}
 		Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, Poll, err)
 	}
 	return fmt.Errorf("PersistentVolume %s still exists within %v", pvName, timeout)
-}
-
-// findAvailableNamespaceName random namespace name starting with baseName.
-func findAvailableNamespaceName(baseName string, c clientset.Interface) (string, error) {
-	var name string
-	err := wait.PollImmediate(Poll, 30*time.Second, func() (bool, error) {
-		name = fmt.Sprintf("%v-%v", baseName, RandomSuffix())
-		_, err := c.CoreV1().Namespaces().Get(name, metav1.GetOptions{})
-		if err == nil {
-			// Already taken
-			return false, nil
-		}
-		if apierrs.IsNotFound(err) {
-			return true, nil
-		}
-		Logf("Unexpected error while getting namespace: %v", err)
-		return false, nil
-	})
-	return name, err
 }
 
 // CreateTestingNS should be used by every test, note that we append a common prefix to the provided test name.
@@ -417,10 +398,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 	// We don't use ObjectMeta.GenerateName feature, as in case of API call
 	// failure we don't know whether the namespace was created and what is its
 	// name.
-	name, err := findAvailableNamespaceName(baseName, c)
-	if err != nil {
-		return nil, err
-	}
+	name := fmt.Sprintf("%v-%v", baseName, RandomSuffix())
 
 	namespaceObj := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -436,7 +414,13 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 		var err error
 		got, err = c.CoreV1().Namespaces().Create(namespaceObj)
 		if err != nil {
-			Logf("Unexpected error while creating namespace: %v", err)
+			if apierrors.IsAlreadyExists(err) {
+				// regenerate on conflict
+				Logf("Namespace name %q was already taken, generate a new name and retry", namespaceObj.Name)
+				namespaceObj.Name = fmt.Sprintf("%v-%v", baseName, RandomSuffix())
+			} else {
+				Logf("Unexpected error while creating namespace: %v", err)
+			}
 			return false, nil
 		}
 		return true, nil
@@ -502,7 +486,7 @@ func WaitForService(c clientset.Interface, namespace, name string, exist bool, i
 		case err == nil:
 			Logf("Service %s in namespace %s found.", name, namespace)
 			return exist, nil
-		case apierrs.IsNotFound(err):
+		case apierrors.IsNotFound(err):
 			Logf("Service %s in namespace %s disappeared.", name, namespace)
 			return !exist, nil
 		case !testutils.IsRetryableAPIError(err):
@@ -1255,7 +1239,7 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 
 	rtObject, err := e2eresource.GetRuntimeObjectForKind(c, kind, ns, name)
 	if err != nil {
-		if apierrs.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			Logf("%v %s not found: %v", kind, name, err)
 			return nil
 		}
