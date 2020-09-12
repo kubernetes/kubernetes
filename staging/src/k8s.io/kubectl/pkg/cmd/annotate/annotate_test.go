@@ -642,7 +642,7 @@ func TestAnnotateLocal(t *testing.T) {
 	iostreams, _, _, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	options := NewAnnotateOptions(iostreams)
-	options.local = true
+	options.Co.Local = true
 	options.Filenames = []string{"../../../testdata/controller.yaml"}
 	args := []string{"a=b"}
 	if err := options.Complete(tf, cmd, args); err != nil {

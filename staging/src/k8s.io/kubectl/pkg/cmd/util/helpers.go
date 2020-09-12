@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -54,6 +55,25 @@ const (
 
 type debugError interface {
 	DebugError() (msg string, args []interface{})
+}
+
+type CommonOptions struct {
+	PrintFlags  *genericclioptions.PrintFlags
+	PrintObj    printers.ResourcePrinterFunc
+	RecordFlags *genericclioptions.RecordFlags
+
+	// Common user flags
+	Local                        bool
+	DryRunStrategy               DryRunStrategy
+	DryRunVerifier               *resource.DryRunVerifier
+	OutputFormat                 string
+	Builder                      *resource.Builder
+	UnstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+
+	// results of arg parsing
+	Recorder         genericclioptions.Recorder
+	Namespace        string
+	EnforceNamespace bool
 }
 
 // AddSourceToErr adds handleResourcePrefix and source string to error message.
@@ -188,6 +208,59 @@ func checkErr(err error, handleErr func(string, int)) {
 			handleErr(msg, DefaultErrorExitCode)
 		}
 	}
+}
+
+// CompleteUtil will populate the common options across the sub-commands
+func (co *CommonOptions) CompleteUtil(f Factory, cmd *cobra.Command, extraOpts map[string]bool) error {
+	var err error
+
+	if reqd, ok := extraOpts["RecordFlagsReqd"]; ok && reqd {
+		co.RecordFlags.Complete(cmd)
+		co.Recorder, err = co.RecordFlags.ToRecorder()
+		if err != nil {
+			return err
+		}
+	}
+
+	co.OutputFormat = GetFlagString(cmd, "output")
+	co.DryRunStrategy, err = GetDryRunStrategy(cmd)
+	if err != nil {
+		return err
+	}
+
+	if reqd, ok := extraOpts["localReqd"]; ok && reqd && !co.Local {
+		dynamicClient, err := f.DynamicClient()
+		if err != nil {
+			return err
+		}
+		discoveryClient, err := f.ToDiscoveryClient()
+		if err != nil {
+			return err
+		}
+		co.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+		co.Namespace, co.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+		if err != nil {
+			return err
+		}
+	}
+
+	PrintFlagsWithDryRunStrategy(co.PrintFlags, co.DryRunStrategy)
+	printer, err := co.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	co.PrintObj = func(obj runtime.Object, out io.Writer) error {
+		return printer.PrintObj(obj, out)
+	}
+
+	if reqd, ok := extraOpts["builderReqd"]; ok && reqd {
+		co.Builder = f.NewBuilder()
+	}
+	if reqd, ok := extraOpts["unstructuredClientForMappingReqd"]; ok && reqd {
+		co.UnstructuredClientForMapping = f.UnstructuredClientForMapping
+	}
+
+	return nil
 }
 
 func statusCausesToAggrError(scs []metav1.StatusCause) utilerrors.Aggregate {
