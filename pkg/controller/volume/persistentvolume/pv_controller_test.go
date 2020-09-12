@@ -322,13 +322,12 @@ func TestControllerSync(t *testing.T) {
 		// Start the controller
 		stopCh := make(chan struct{})
 		informers.Start(stopCh)
+		informers.WaitForCacheSync(stopCh)
 		go ctrl.Run(stopCh)
 
 		// Wait for the controller to pass initial sync and fill its caches.
 		err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-			return ctrl.volumeListerSynced() &&
-				ctrl.claimListerSynced() &&
-				len(ctrl.claims.ListKeys()) >= len(test.initialClaims) &&
+			return len(ctrl.claims.ListKeys()) >= len(test.initialClaims) &&
 				len(ctrl.volumes.store.ListKeys()) >= len(test.initialVolumes), nil
 		})
 		if err != nil {

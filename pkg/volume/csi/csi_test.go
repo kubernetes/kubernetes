@@ -255,6 +255,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				csiDriverInformer.Informer().GetStore().Add(driverInfo)
 			}
 			factory.Start(wait.NeverStop)
+			factory.WaitForCacheSync(wait.NeverStop)
 
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
 				tmpDir,
