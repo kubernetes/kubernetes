@@ -17,7 +17,6 @@ limitations under the License.
 package stats
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -35,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	critest "k8s.io/cri-api/pkg/apis/testing"
-	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -459,7 +457,8 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(c1.Logs)
 	assert.Nil(c1.Accelerators)
 	assert.Nil(c1.UserDefinedMetrics)
-	klog.Info(fmt.Sprintf("Pod Cpu Timestamp: %d, container 0 cpu timestamp: %d,container1 cpu timestamp: %d", p0.CPU.Time.UnixNano(), containerStats0.Cpu.Timestamp, containerStats1.Cpu.Timestamp))
+	assert.Equal(p0.CPU.Time.UnixNano(), containerStats1.Cpu.Timestamp)
+	assert.Equal(p0.CPU.Time.UnixNano(), containerStats0.Cpu.Timestamp)
 
 	p1 := podStatsMap[statsapi.PodReference{Name: "sandbox1-name", UID: "sandbox1-uid", Namespace: "sandbox1-ns"}]
 	assert.Equal(sandbox1.CreatedAt, p1.StartTime.UnixNano())
