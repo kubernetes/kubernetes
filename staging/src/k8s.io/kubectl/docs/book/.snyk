@@ -1,0 +1,60 @@
+# Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.
+version: v1.19.0
+ignore: {}
+# patches apply the minimum changes required to fix a vulnerability
+patch:
+  'npm:hoek:20180212':
+    - gitbook-cli > npm > request > hawk > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-plugin-mermaid > phantomjs > request > hawk > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-cli > npm > request > hawk > boom > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-plugin-mermaid > phantomjs > request > hawk > boom > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-cli > npm > request > hawk > sntp > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-plugin-mermaid > phantomjs > request > hawk > sntp > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-cli > npm > node-gyp > request > hawk > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-cli > npmi > npm > request > hawk > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-cli > npm > request > hawk > cryptiles > boom > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-plugin-mermaid > phantomjs > request > hawk > cryptiles > boom > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-cli > npm > node-gyp > request > hawk > boom > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-cli > npmi > npm > request > hawk > boom > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-cli > npm > node-gyp > request > hawk > sntp > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-cli > npmi > npm > request > hawk > sntp > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-cli > npmi > npm > node-gyp > request > hawk > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-cli > npm > node-gyp > request > hawk > cryptiles > boom > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-cli > npmi > npm > request > hawk > cryptiles > boom > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-cli > npmi > npm > node-gyp > request > hawk > boom > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-cli > npmi > npm > node-gyp > request > hawk > sntp > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-cli > npmi > npm > node-gyp > request > hawk > cryptiles > boom > hoek:
+        patched: '2020-09-12T12:41:28.874Z'
+  SNYK-JS-LODASH-567746:
+    - gitbook-cli > lodash:
+        patched: '2020-09-12T12:41:28.874Z'
+  'npm:request:20160119':
+    - gitbook-plugin-mermaid > phantomjs > request:
+        patched: '2020-09-12T12:41:28.874Z'
+  'npm:tough-cookie:20170905':
+    - gitbook-plugin-mermaid > phantomjs > request > tough-cookie:
+        patched: '2020-09-12T12:41:28.874Z'
+  'npm:tunnel-agent:20170305':
+    - gitbook-plugin-mermaid > phantomjs > request > tunnel-agent:
+        patched: '2020-09-12T12:41:28.874Z'
+    - gitbook-cli > npmi > npm > request > tunnel-agent:
+        patched: '2020-09-12T12:41:28.874Z'
