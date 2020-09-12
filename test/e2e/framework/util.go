@@ -320,25 +320,6 @@ func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, Poll, 
 	return fmt.Errorf("PersistentVolume %s still exists within %v", pvName, timeout)
 }
 
-// findAvailableNamespaceName random namespace name starting with baseName.
-func findAvailableNamespaceName(baseName string, c clientset.Interface) (string, error) {
-	var name string
-	err := wait.PollImmediate(Poll, 30*time.Second, func() (bool, error) {
-		name = fmt.Sprintf("%v-%v", baseName, RandomSuffix())
-		_, err := c.CoreV1().Namespaces().Get(context.TODO(), name, metav1.GetOptions{})
-		if err == nil {
-			// Already taken
-			return false, nil
-		}
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		Logf("Unexpected error while getting namespace: %v", err)
-		return false, nil
-	})
-	return name, err
-}
-
 // CreateTestingNS should be used by every test, note that we append a common prefix to the provided test name.
 // Please see NewFramework instead of using this directly.
 func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error) {
@@ -350,10 +331,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 	// We don't use ObjectMeta.GenerateName feature, as in case of API call
 	// failure we don't know whether the namespace was created and what is its
 	// name.
-	name, err := findAvailableNamespaceName(baseName, c)
-	if err != nil {
-		return nil, err
-	}
+	name := fmt.Sprintf("%v-%v", baseName, RandomSuffix())
 
 	namespaceObj := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -369,7 +347,13 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 		var err error
 		got, err = c.CoreV1().Namespaces().Create(context.TODO(), namespaceObj, metav1.CreateOptions{})
 		if err != nil {
-			Logf("Unexpected error while creating namespace: %v", err)
+			if apierrors.IsAlreadyExists(err) {
+				// regenerate on conflict
+				Logf("Namespace name %q was already taken, generate a new name and retry", namespaceObj.Name)
+				namespaceObj.Name = fmt.Sprintf("%v-%v", baseName, RandomSuffix())
+			} else {
+				Logf("Unexpected error while creating namespace: %v", err)
+			}
 			return false, nil
 		}
 		return true, nil
