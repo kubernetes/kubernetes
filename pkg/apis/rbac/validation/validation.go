@@ -33,6 +33,7 @@ func ValidateRBACName(name string, prefix bool) []string {
 	return path.IsValidPathSegmentName(name)
 }
 
+// ValidateRole validates a Role object.
 func ValidateRole(role *rbac.Role) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validation.ValidateObjectMeta(&role.ObjectMeta, true, ValidateRBACName, field.NewPath("metadata"))...)
@@ -48,6 +49,7 @@ func ValidateRole(role *rbac.Role) field.ErrorList {
 	return nil
 }
 
+// ValidateRoleUpdate validates a Role object update.
 func ValidateRoleUpdate(role *rbac.Role, oldRole *rbac.Role) field.ErrorList {
 	allErrs := ValidateRole(role)
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&role.ObjectMeta, &oldRole.ObjectMeta, field.NewPath("metadata"))...)
@@ -55,6 +57,7 @@ func ValidateRoleUpdate(role *rbac.Role, oldRole *rbac.Role) field.ErrorList {
 	return allErrs
 }
 
+// ValidateClusterRole validates a new ClusterRole object.
 func ValidateClusterRole(role *rbac.ClusterRole) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validation.ValidateObjectMeta(&role.ObjectMeta, false, ValidateRBACName, field.NewPath("metadata"))...)
@@ -86,6 +89,7 @@ func ValidateClusterRole(role *rbac.ClusterRole) field.ErrorList {
 	return nil
 }
 
+// ValidateClusterRoleUpdate validates a ClusterRole object update.
 func ValidateClusterRoleUpdate(role *rbac.ClusterRole, oldRole *rbac.ClusterRole) field.ErrorList {
 	allErrs := ValidateClusterRole(role)
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&role.ObjectMeta, &oldRole.ObjectMeta, field.NewPath("metadata"))...)
@@ -119,6 +123,7 @@ func ValidatePolicyRule(rule rbac.PolicyRule, isNamespaced bool, fldPath *field.
 	return allErrs
 }
 
+// ValidateRoleBinding validates a new RoleBinding object.
 func ValidateRoleBinding(roleBinding *rbac.RoleBinding) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validation.ValidateObjectMeta(&roleBinding.ObjectMeta, true, ValidateRBACName, field.NewPath("metadata"))...)
@@ -152,6 +157,7 @@ func ValidateRoleBinding(roleBinding *rbac.RoleBinding) field.ErrorList {
 	return allErrs
 }
 
+// ValidateRoleBindingUpdate validates a RoleBinding object update.
 func ValidateRoleBindingUpdate(roleBinding *rbac.RoleBinding, oldRoleBinding *rbac.RoleBinding) field.ErrorList {
 	allErrs := ValidateRoleBinding(roleBinding)
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&roleBinding.ObjectMeta, &oldRoleBinding.ObjectMeta, field.NewPath("metadata"))...)
@@ -163,6 +169,7 @@ func ValidateRoleBindingUpdate(roleBinding *rbac.RoleBinding, oldRoleBinding *rb
 	return allErrs
 }
 
+// ValidateClusterRoleBinding validates a new ClusterRoleBinding object.
 func ValidateClusterRoleBinding(roleBinding *rbac.ClusterRoleBinding) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validation.ValidateObjectMeta(&roleBinding.ObjectMeta, false, ValidateRBACName, field.NewPath("metadata"))...)
@@ -196,6 +203,7 @@ func ValidateClusterRoleBinding(roleBinding *rbac.ClusterRoleBinding) field.Erro
 	return allErrs
 }
 
+// ValidateClusterRoleBindingUpdate validates a ClusterRoleBinding object update.
 func ValidateClusterRoleBindingUpdate(roleBinding *rbac.ClusterRoleBinding, oldRoleBinding *rbac.ClusterRoleBinding) field.ErrorList {
 	allErrs := ValidateClusterRoleBinding(roleBinding)
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&roleBinding.ObjectMeta, &oldRoleBinding.ObjectMeta, field.NewPath("metadata"))...)

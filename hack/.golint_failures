@@ -39,7 +39,6 @@ pkg/apis/policy/v1beta1
 pkg/apis/rbac/v1
 pkg/apis/rbac/v1alpha1
 pkg/apis/rbac/v1beta1
-pkg/apis/rbac/validation
 pkg/apis/scheduling/v1
 pkg/apis/scheduling/v1alpha1
 pkg/apis/scheduling/v1beta1
