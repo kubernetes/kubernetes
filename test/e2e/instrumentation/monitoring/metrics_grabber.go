@@ -18,7 +18,9 @@ package monitoring
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -40,8 +42,16 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 		c = f.ClientSet
 		ec = f.KubemarkExternalClusterClientSet
 		framework.ExpectNoError(err)
-		grabber, err = e2emetrics.NewMetricsGrabber(c, ec, true, true, true, true, true)
-		framework.ExpectNoError(err)
+		gomega.Eventually(func() error {
+			grabber, err = e2emetrics.NewMetricsGrabber(c, ec, true, true, true, true, true)
+			if err != nil {
+				return fmt.Errorf("failed to create metrics grabber: %v", err)
+			}
+			if !grabber.HasControlPlanePods() {
+				return fmt.Errorf("unable to get find control plane pods")
+			}
+			return nil
+		}, 5*time.Minute, 10*time.Second).Should(gomega.BeNil())
 	})
 
 	ginkgo.It("should grab all metrics from API server.", func() {
