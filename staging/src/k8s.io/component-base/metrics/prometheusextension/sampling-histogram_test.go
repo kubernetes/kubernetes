@@ -93,6 +93,7 @@ func expectHistogram(t *testing.T, when string, sh SamplingHistogram, buckets ..
 	}
 	if dtom.Histogram == nil {
 		t.Errorf("%s, Collect returned a Metric without a Histogram: %#+v", when, dtom)
+		return
 	}
 	mh := dtom.Histogram
 	if len(mh.Bucket) != len(buckets)-1 {
@@ -100,16 +101,17 @@ func expectHistogram(t *testing.T, when string, sh SamplingHistogram, buckets ..
 	}
 	if mh.SampleCount == nil {
 		t.Errorf("%s, got Histogram with nil SampleCount", when)
-	}
-	if *(mh.SampleCount) != buckets[len(mh.Bucket)] {
+	} else if *(mh.SampleCount) != buckets[len(mh.Bucket)] {
 		t.Errorf("%s, SampleCount=%d but expected %d", when, *(mh.SampleCount), buckets[len(mh.Bucket)])
 	}
 	for i, mhBucket := range mh.Bucket {
 		if mhBucket == nil {
 			t.Errorf("%s, bucket %d was nil", when, i)
+			continue
 		}
 		if mhBucket.UpperBound == nil || mhBucket.CumulativeCount == nil {
 			t.Errorf("%s, bucket %d had nil bound or count", when, i)
+			continue
 		}
 		ub := float64(i)
 		if ub != *(mhBucket.UpperBound) {
