@@ -375,7 +375,7 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 
 // TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
 func findRunningKubletServiceName() string {
-	stdout, err := exec.Command("sudo", "systemctl", "list-units", "kubelet*", "--state=running").CombinedOutput()
+	stdout, err := exec.Command("sudo", "systemctl", "list-units", "*kubelet*", "--state=running").CombinedOutput()
 	framework.ExpectNoError(err)
 	regex := regexp.MustCompile("(kubelet-\\w+)")
 	matches := regex.FindStringSubmatch(string(stdout))
