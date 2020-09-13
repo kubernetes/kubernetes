@@ -33,12 +33,12 @@ type objectWithMeta interface {
 // Since we match objects by namespace and Labels/Selector, so if two objects have the same namespace and labels,
 // they will have the same key.
 func keyFunc(obj objectWithMeta) uint64 {
-	hash := fnv.New32a()
+	hash := fnv.New64a()
 	hashutil.DeepHashObject(hash, &equivalenceLabelObj{
 		namespace: obj.GetNamespace(),
 		labels:    obj.GetLabels(),
 	})
-	return uint64(hash.Sum32())
+	return hash.Sum64()
 }
 
 type equivalenceLabelObj struct {
@@ -48,7 +48,7 @@ type equivalenceLabelObj struct {
 
 // MatchingCache save label and selector matching relationship
 type MatchingCache struct {
-	mutex sync.RWMutex
+	mutex sync.Mutex
 	cache *lru.Cache
 }
 
