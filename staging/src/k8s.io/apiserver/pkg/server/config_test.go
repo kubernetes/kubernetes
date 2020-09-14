@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/waitgroup"
@@ -265,6 +266,7 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		return &authenticator.Response{User: &user.DefaultInfo{}}, true, nil
 	})
 	backend := &testBackend{}
+
 	c := &Config{
 		Authentication:     AuthenticationInfo{Authenticator: authn},
 		AuditBackend:       backend,
