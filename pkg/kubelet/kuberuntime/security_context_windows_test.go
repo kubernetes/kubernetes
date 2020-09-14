@@ -1,5 +1,7 @@
+// +build windows
+
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,7 +37,7 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 			Containers: []v1.Container{
 				{
 					Name:            "foo",
-					Image:           "busybox",
+					Image:           "windows",
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Command:         []string{"testCommand"},
 					WorkingDir:      "testWorkingDir",
@@ -43,9 +45,8 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 			},
 		},
 	}
-
-	rootUser := int64(0)
-	anyUser := int64(1000)
+	rootUser := "ContainerAdministrator"
+	anyUser := "anyone"
 	runAsNonRootTrue := true
 	runAsNonRootFalse := false
 	for _, test := range []struct {
@@ -56,59 +57,55 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		fail     bool
 	}{
 		{
-			desc: "Pass if SecurityContext is not set",
-			sc:   nil,
-			uid:  &rootUser,
-			fail: false,
+			desc:     "Pass if SecurityContext is not set",
+			sc:       nil,
+			username: rootUser,
+			fail:     false,
 		},
 		{
 			desc: "Pass if RunAsNonRoot is not set",
 			sc: &v1.SecurityContext{
-				RunAsUser: &rootUser,
+				RunAsNonRoot: nil,
 			},
-			uid:  &rootUser,
-			fail: false,
+			username: rootUser,
+			fail:     false,
 		},
 		{
 			desc: "Pass if RunAsNonRoot is false (image user is root)",
 			sc: &v1.SecurityContext{
 				RunAsNonRoot: &runAsNonRootFalse,
 			},
-			uid:  &rootUser,
-			fail: false,
+			username: rootUser,
+			fail:     false,
 		},
 		{
-			desc: "Pass if RunAsNonRoot is false (RunAsUser is root)",
+			desc: "Pass if RunAsNonRoot is false (WindowsOptions RunAsUserName is root)",
 			sc: &v1.SecurityContext{
 				RunAsNonRoot: &runAsNonRootFalse,
-				RunAsUser:    &rootUser,
+				WindowsOptions: &v1.WindowsSecurityContextOptions{
+					RunAsUserName: &rootUser,
+				},
 			},
-			uid:  &rootUser,
-			fail: false,
+			username: rootUser,
+			fail:     false,
 		},
 		{
 			desc: "Fail if container's RunAsUser is root and RunAsNonRoot is true",
 			sc: &v1.SecurityContext{
 				RunAsNonRoot: &runAsNonRootTrue,
-				RunAsUser:    &rootUser,
+				WindowsOptions: &v1.WindowsSecurityContextOptions{
+					RunAsUserName: &rootUser,
+				},
 			},
-			uid:  &rootUser,
-			fail: true,
+			username: rootUser,
+			fail:     true,
 		},
 		{
 			desc: "Fail if image's user is root and RunAsNonRoot is true",
 			sc: &v1.SecurityContext{
 				RunAsNonRoot: &runAsNonRootTrue,
 			},
-			uid:  &rootUser,
-			fail: true,
-		},
-		{
-			desc: "Fail if image's username is set and RunAsNonRoot is true",
-			sc: &v1.SecurityContext{
-				RunAsNonRoot: &runAsNonRootTrue,
-			},
-			username: "test",
+			username: rootUser,
 			fail:     true,
 		},
 		{
@@ -116,8 +113,8 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 			sc: &v1.SecurityContext{
 				RunAsNonRoot: &runAsNonRootTrue,
 			},
-			uid:  &anyUser,
-			fail: false,
+			username: anyUser,
+			fail:     false,
 		},
 		{
 			desc: "Pass if container's user and image's user aren't set and RunAsNonRoot is true",

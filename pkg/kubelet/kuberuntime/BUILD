@@ -28,6 +28,8 @@ go_library(
         "labels.go",
         "legacy.go",
         "security_context.go",
+        "security_context_others.go",
+        "security_context_windows.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/kuberuntime",
     deps = [
@@ -106,7 +108,8 @@ go_test(
         "kuberuntime_sandbox_test.go",
         "labels_test.go",
         "legacy_test.go",
-        "security_context_test.go",
+        "security_context_others_test.go",
+        "security_context_windows_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
