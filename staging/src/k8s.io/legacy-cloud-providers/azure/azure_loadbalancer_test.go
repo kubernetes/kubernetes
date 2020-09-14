@@ -381,7 +381,7 @@ func TestEnsureLoadBalancerDeleted(t *testing.T) {
 		},
 		{
 			desc:              "annotated service with different resourceGroup shouldn't be created but should be deleted successfully",
-			service:           getResourceGroupTestService("service5", "random-rg", "", 80),
+			service:           getResourceGroupTestService("service5", "random-rg", "1.2.3.4", 80),
 			expectCreateError: true,
 			wrongRGAtDelete:   true,
 		},
