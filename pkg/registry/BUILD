@@ -88,8 +88,6 @@ filegroup(
         "//pkg/registry/registrytest:all-srcs",
         "//pkg/registry/scheduling/priorityclass:all-srcs",
         "//pkg/registry/scheduling/rest:all-srcs",
-        "//pkg/registry/settings/podpreset:all-srcs",
-        "//pkg/registry/settings/rest:all-srcs",
         "//pkg/registry/storage/csidriver:all-srcs",
         "//pkg/registry/storage/csinode:all-srcs",
         "//pkg/registry/storage/csistoragecapacity:all-srcs",

@@ -368,7 +368,6 @@ function create-master-audit-policy {
       - group: "networking.k8s.io"
       - group: "policy"
       - group: "rbac.authorization.k8s.io"
-      - group: "settings.k8s.io"
       - group: "storage.k8s.io"'
 
   cat <<EOF >"${path}"

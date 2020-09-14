@@ -165,7 +165,6 @@ pkg/registry/rbac/rolebinding/policybased
 pkg/registry/rbac/validation
 pkg/registry/registrytest
 pkg/registry/scheduling/rest
-pkg/registry/settings/rest
 pkg/registry/storage/rest
 pkg/registry/storage/storageclass
 pkg/scheduler/apis/config/v1
@@ -234,7 +233,6 @@ staging/src/k8s.io/api/rbac/v1alpha1
 staging/src/k8s.io/api/rbac/v1beta1
 staging/src/k8s.io/api/scheduling/v1alpha1
 staging/src/k8s.io/api/scheduling/v1beta1
-staging/src/k8s.io/api/settings/v1alpha1
 staging/src/k8s.io/api/storage/v1
 staging/src/k8s.io/api/storage/v1alpha1
 staging/src/k8s.io/api/storage/v1beta1

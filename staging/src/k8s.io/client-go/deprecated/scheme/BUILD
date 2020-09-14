@@ -45,7 +45,6 @@ go_library(
         "//staging/src/k8s.io/api/scheduling/v1:go_default_library",
         "//staging/src/k8s.io/api/scheduling/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/scheduling/v1beta1:go_default_library",
-        "//staging/src/k8s.io/api/settings/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1beta1:go_default_library",

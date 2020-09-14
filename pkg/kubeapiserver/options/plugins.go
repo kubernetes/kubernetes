@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/nodetaint"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
-	"k8s.io/kubernetes/plugin/pkg/admission/podpreset"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	podpriority "k8s.io/kubernetes/plugin/pkg/admission/priority"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
@@ -69,7 +68,6 @@ var AllOrderedPlugins = []string{
 	exists.PluginName,                       // NamespaceExists
 	scdeny.PluginName,                       // SecurityContextDeny
 	antiaffinity.PluginName,                 // LimitPodHardAntiAffinityTopology
-	podpreset.PluginName,                    // PodPreset
 	limitranger.PluginName,                  // LimitRanger
 	serviceaccount.PluginName,               // ServiceAccount
 	noderestriction.PluginName,              // NodeRestriction
@@ -126,7 +124,6 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	nodetaint.Register(plugins)
 	label.Register(plugins) // DEPRECATED, future PVs should not rely on labels for zone topology
 	podnodeselector.Register(plugins)
-	podpreset.Register(plugins)
 	podtolerationrestriction.Register(plugins)
 	runtimeclass.Register(plugins)
 	resourcequota.Register(plugins)

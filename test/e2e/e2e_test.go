@@ -53,7 +53,6 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/network"
 	_ "k8s.io/kubernetes/test/e2e/node"
 	_ "k8s.io/kubernetes/test/e2e/scheduling"
-	_ "k8s.io/kubernetes/test/e2e/servicecatalog"
 	_ "k8s.io/kubernetes/test/e2e/storage"
 	_ "k8s.io/kubernetes/test/e2e/storage/external"
 	_ "k8s.io/kubernetes/test/e2e/ui"

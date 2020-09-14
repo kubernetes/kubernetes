@@ -36,7 +36,6 @@ import (
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	schedulerapi "k8s.io/api/scheduling/v1"
-	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
@@ -167,7 +166,6 @@ func TestServerSidePrint(t *testing.T) {
 			discoveryv1alpha1.SchemeGroupVersion,
 			discoveryv1beta1.SchemeGroupVersion,
 			rbacv1alpha1.SchemeGroupVersion,
-			settingsv1alpha1.SchemeGroupVersion,
 			schedulerapi.SchemeGroupVersion,
 			storagev1alpha1.SchemeGroupVersion,
 			extensionsv1beta1.SchemeGroupVersion,

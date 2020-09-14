@@ -257,10 +257,6 @@ API rule violation: list_type_missing,k8s.io/api/rbac/v1beta1,PolicyRule,Resourc
 API rule violation: list_type_missing,k8s.io/api/rbac/v1beta1,PolicyRule,Verbs
 API rule violation: list_type_missing,k8s.io/api/rbac/v1beta1,Role,Rules
 API rule violation: list_type_missing,k8s.io/api/rbac/v1beta1,RoleBinding,Subjects
-API rule violation: list_type_missing,k8s.io/api/settings/v1alpha1,PodPresetSpec,Env
-API rule violation: list_type_missing,k8s.io/api/settings/v1alpha1,PodPresetSpec,EnvFrom
-API rule violation: list_type_missing,k8s.io/api/settings/v1alpha1,PodPresetSpec,VolumeMounts
-API rule violation: list_type_missing,k8s.io/api/settings/v1alpha1,PodPresetSpec,Volumes
 API rule violation: list_type_missing,k8s.io/api/storage/v1,CSINodeDriver,TopologyKeys
 API rule violation: list_type_missing,k8s.io/api/storage/v1,CSINodeSpec,Drivers
 API rule violation: list_type_missing,k8s.io/api/storage/v1,StorageClass,AllowedTopologies
