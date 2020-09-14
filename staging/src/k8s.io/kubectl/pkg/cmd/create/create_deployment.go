@@ -46,9 +46,6 @@ var (
 	# Create a deployment named my-dep that runs the busybox image.
 	kubectl create deployment my-dep --image=busybox
 
-	# Create a deployment with command
-	kubectl create deployment my-dep --image=busybox -- date
-
 	# Create a deployment named my-dep that runs the nginx image with 3 replicas.
 	kubectl create deployment my-dep --image=nginx --replicas=3
 
@@ -93,7 +90,7 @@ func NewCreateCreateDeploymentOptions(ioStreams genericclioptions.IOStreams) *Cr
 func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewCreateCreateDeploymentOptions(ioStreams)
 	cmd := &cobra.Command{
-		Use:                   "deployment NAME --image=image -- [COMMAND] [args...]",
+		Use:                   "deployment NAME --image=image",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"deploy"},
 		Short:                 deploymentLong,
