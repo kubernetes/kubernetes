@@ -420,7 +420,8 @@ function DownloadAndInstall-CSIProxyBinaries {
 function Start-CSIProxy {
   if (Test-IsTestCluster $kube_env) {
     Log-Output "Creating CSI Proxy Service"
-    & sc.exe create csiproxy binPath= "${env:NODE_DIR}\csi-proxy.exe --windows-service"
+    $flags = "-windows-service -log_file=${env:LOGS_DIR}\csi-proxy.log -logtostderr=false"
+    & sc.exe create csiproxy binPath= "${env:NODE_DIR}\csi-proxy.exe $flags"
     & sc.exe failure csiproxy reset= 0 actions= restart/10000
     Log-Output "Starting CSI Proxy Service"
     & sc.exe start csiproxy
@@ -930,17 +931,9 @@ function Configure-GcePdTools {
   }
 
   Add-Content $PsHome\profile.ps1 `
-'$modulePath = "K8S_DIR\GetGcePdName.dll"
-Unblock-File $modulePath
-Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
-  if (Test-IsTestCluster $kube_env) {
-    if (ShouldWrite-File ${env:K8S_DIR}\diskutil.exe) {
-      # The source code of this executable file is https://github.com/kubernetes-sigs/sig-windows-tools/blob/master/cmd/diskutil/diskutil.c
-      MustDownload-File -OutFile ${env:K8S_DIR}\diskutil.exe `
-        -URLs "https://ddebroywin1.s3-us-west-2.amazonaws.com/diskutil.exe"
-    }
-    Copy-Item ${env:K8S_DIR}\diskutil.exe -Destination "C:\Windows\system32"
-  }
+  '$modulePath = "K8S_DIR\GetGcePdName.dll"
+  Unblock-File $modulePath
+  Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
 }
 
 # Setup cni network. This function supports both Docker and containerd.
