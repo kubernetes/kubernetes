@@ -1,4 +1,6 @@
-# Copyright 2017 The Kubernetes Authors.
+#!/bin/sh
+
+# Copyright 2020 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG BASEIMAGE
-FROM $BASEIMAGE
+ARCH=$(uname -m)
 
-CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
+if [ "${ARCH}" = "s390x" ]; then
+    echo "http://dl-cdn.alpinelinux.org/alpine/v3.8/main" > /etc/apk/repositories
+    echo "http://dl-cdn.alpinelinux.org/alpine/v3.8/community" >> /etc/apk/repositories
+fi
 
-COPY install-deps.sh /
-RUN ["sh", "-c", "/install-deps.sh"]
-RUN mkdir -p /run/nginx
+apk add --no-cache openssl nginx-mod-http-lua nginx-mod-http-lua-upstream
 
-ADD nginx.conf /etc/nginx/nginx.conf
-ADD template.lua /usr/local/share/lua/5.1/
-ADD README.md README.md
-ADD run.sh /usr/local/bin/run.sh
-RUN chmod +x /usr/local/bin/run.sh
-ENTRYPOINT ["/usr/local/bin/run.sh"]
+exit 0
