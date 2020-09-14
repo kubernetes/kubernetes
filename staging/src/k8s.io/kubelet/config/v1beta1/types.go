@@ -482,7 +482,6 @@ type KubeletConfiguration struct {
 	// +optional
 	PodCIDR string `json:"podCIDR,omitempty"`
 	// PodPidsLimit is the maximum number of pids in any pod.
-	// Requires the SupportPodPidsLimit feature gate to be enabled.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// lowering it may prevent container processes from forking after the change.
 	// Default: -1
