@@ -144,8 +144,11 @@ var _ = SIGDescribe("EndpointSlice", func() {
 			framework.Failf("Endpoints resource not deleted after Service %s/%s was deleted: %s", svc.Namespace, svc.Name, err)
 		}
 
-		// Expect EndpointSlice resource to be deleted when Service is.
-		if err := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		// Expect EndpointSlice resource to be deleted when Service is. Wait for
+		// up to 90 seconds since garbage collector only polls every 30 seconds
+		// and may need to retry informer resync at some point during an e2e
+		// run.
+		if err := wait.PollImmediate(2*time.Second, 90*time.Second, func() (bool, error) {
 			endpointSliceList, err := cs.DiscoveryV1beta1().EndpointSlices(svc.Namespace).List(context.TODO(), metav1.ListOptions{
 				LabelSelector: "kubernetes.io/service-name=" + svc.Name,
 			})
