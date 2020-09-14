@@ -2,7 +2,16 @@ apiVersion: v1
 kind: Namespace
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
+    istio-injection: disabled
+    k8s-app: istio
+  name: istio-operator
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
     istio-injection: disabled
     k8s-app: istio
   name: istio-system
@@ -13,7 +22,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -45,7 +54,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -72,7 +81,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -146,7 +155,7 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-pilot
     heritage: Tiller
     istio: security
@@ -284,7 +293,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -311,7 +320,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -338,7 +347,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: certmanager
     chart: certmanager
     heritage: Tiller
@@ -387,7 +396,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: certmanager
     chart: certmanager
     heritage: Tiller
@@ -428,7 +437,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -455,7 +464,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -482,7 +491,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     istio: mixer-adapter
     k8s-app: istio
@@ -506,7 +515,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: certmanager
     chart: certmanager
     heritage: Tiller
@@ -530,7 +539,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-pilot
     heritage: Tiller
     istio: rbac
@@ -616,7 +625,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -643,7 +652,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-pilot
     chart: istio
     heritage: Tiller
@@ -1411,7 +1420,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     istio: mixer-adapter
     k8s-app: istio
@@ -1435,7 +1444,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -1462,7 +1471,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-pilot
     chart: istio
     heritage: Tiller
@@ -1757,7 +1766,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -1784,7 +1793,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-pilot
     chart: istio
     heritage: Tiller
@@ -1932,7 +1941,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -1964,7 +1973,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-mixer
     chart: istio
     heritage: Tiller
@@ -2057,7 +2066,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-mixer
     chart: istio
     heritage: Tiller
@@ -2268,7 +2277,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -2300,7 +2309,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: certmanager
     chart: certmanager
     heritage: Tiller
@@ -2321,10 +2330,56 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+    k8s-app: istio
+  name: istiooperators.install.istio.io
+spec:
+  group: install.istio.io
+  names:
+    kind: IstioOperator
+    plural: istiooperators
+    shortNames:
+    - iop
+    singular: istiooperator
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        spec:
+          description: 'Specification of the desired state of the istio control plane
+            resource. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
+          type: object
+        status:
+          description: 'Status describes each of istio control plane component status
+            at the current time. 0 means NONE, 1 means UPDATING, 2 means HEALTHY,
+            3 means ERROR, 4 means RECONCILING. More info: https://github.com/istio/api/blob/master/operator/v1alpha1/istio.operator.v1alpha1.pb.html
+            & https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
+          type: object
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -2351,7 +2406,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -2378,7 +2433,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -2405,7 +2460,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -2432,7 +2487,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -2480,7 +2535,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -2507,7 +2562,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-citadel
     chart: istio
     heritage: Tiller
@@ -3238,7 +3293,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -3265,7 +3320,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -3292,7 +3347,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -3319,7 +3374,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: certmanager
     chart: certmanager
     heritage: Tiller
@@ -3362,7 +3417,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-citadel
     chart: istio
     heritage: Tiller
@@ -4092,7 +4147,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -4119,7 +4174,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -4146,7 +4201,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-mixer
     chart: istio
     heritage: Tiller
@@ -4226,7 +4281,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-mixer
     chart: istio
     heritage: Tiller
@@ -4310,7 +4365,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -4398,7 +4453,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -4425,7 +4480,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -4449,7 +4504,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -4476,7 +4531,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -4631,7 +4686,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-pilot
     chart: istio
     heritage: Tiller
@@ -4775,7 +4830,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -4975,7 +5030,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5086,7 +5141,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-pilot
     chart: istio
     heritage: Tiller
@@ -5209,7 +5264,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5236,7 +5291,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5263,7 +5318,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5290,7 +5345,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5317,7 +5372,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5344,7 +5399,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5376,7 +5431,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5403,7 +5458,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-pilot
     chart: istio
     heritage: Tiller
@@ -6113,7 +6168,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     istio: mixer-adapter
     k8s-app: istio
@@ -6135,7 +6190,7 @@ apiVersion: admissionregistration.k8s.io/v1beta1
 kind: MutatingWebhookConfiguration
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: sidecarInjectorWebhook
     chart: sidecarInjectorWebhook
     heritage: Tiller
@@ -6169,6 +6224,15 @@ kind: ServiceAccount
 metadata:
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
+    k8s-app: istio
+  name: istio-operator
+  namespace: istio-operator
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: security
     chart: security
     heritage: Tiller
@@ -6181,7 +6245,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: galley
     chart: galley
     heritage: Tiller
@@ -6194,7 +6258,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-ingressgateway
     chart: gateways
     heritage: Tiller
@@ -6207,7 +6271,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: mixer
     heritage: Tiller
@@ -6220,7 +6284,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: istio-multi
   namespace: istio-system
@@ -6229,7 +6293,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: pilot
     chart: pilot
     heritage: Tiller
@@ -6242,7 +6306,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: security
     chart: security
     heritage: Tiller
@@ -6255,7 +6319,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: sidecarInjectorWebhook
     chart: sidecarInjectorWebhook
     heritage: Tiller
@@ -6269,7 +6333,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: promsd
   namespace: istio-system
@@ -6278,7 +6342,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: security
     chart: security
     heritage: Tiller
@@ -6326,7 +6390,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: galley
     chart: galley
     heritage: Tiller
@@ -6410,7 +6474,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: mixer
     heritage: Tiller
@@ -6463,8 +6527,122 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
+  creationTimestamp: null
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
+    k8s-app: istio
+  name: istio-operator
+rules:
+- apiGroups:
+  - authentication.istio.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - config.istio.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - install.istio.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - networking.istio.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - rbac.istio.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - security.istio.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
+  verbs:
+  - '*'
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions.apiextensions.k8s.io
+  - customresourcedefinitions
+  verbs:
+  - '*'
+- apiGroups:
+  - apps
+  - extensions
+  resources:
+  - daemonsets
+  - deployments
+  - deployments/finalizers
+  - ingresses
+  - replicasets
+  - statefulsets
+  verbs:
+  - '*'
+- apiGroups:
+  - autoscaling
+  resources:
+  - horizontalpodautoscalers
+  verbs:
+  - '*'
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - servicemonitors
+  verbs:
+  - get
+  - create
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - '*'
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterrolebindings
+  - clusterroles
+  - roles
+  - rolebindings
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - endpoints
+  - events
+  - namespaces
+  - pods
+  - persistentvolumeclaims
+  - secrets
+  - services
+  - serviceaccounts
+  verbs:
+  - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: pilot
     chart: pilot
     heritage: Tiller
@@ -6568,7 +6746,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: istio-reader
 rules:
@@ -6598,7 +6776,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: security
     chart: security
     heritage: Tiller
@@ -6639,7 +6817,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: sidecarInjectorWebhook
     chart: sidecarInjectorWebhook
     heritage: Tiller
@@ -6670,7 +6848,7 @@ apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: promsd-istio-system
 rules:
@@ -6701,7 +6879,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: security
     chart: security
     heritage: Tiller
@@ -6721,7 +6899,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: galley
     chart: galley
     heritage: Tiller
@@ -6741,7 +6919,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: mixer
     heritage: Tiller
@@ -6761,7 +6939,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     chart: istio-1.4.10
     k8s-app: istio
   name: istio-multi
@@ -6778,7 +6956,23 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
+    k8s-app: istio
+  name: istio-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: istio-operator
+subjects:
+- kind: ServiceAccount
+  name: istio-operator
+  namespace: istio-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: pilot
     chart: pilot
     heritage: Tiller
@@ -6798,7 +6992,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: security
     chart: security
     heritage: Tiller
@@ -6818,7 +7012,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: sidecarInjectorWebhook
     chart: sidecarInjectorWebhook
     heritage: Tiller
@@ -6839,7 +7033,7 @@ apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: promsd-istio-system
 roleRef:
@@ -6903,7 +7097,7 @@ data:
     # the specified period, defaulting to non mTLS plain TCP
     # traffic. Set this field to tweak the period that Envoy will wait
     # for the client to send the first bits of data. (MUST BE >=1ms)
-    protocolDetectionTimeout: 100ms
+    protocolDetectionTimeout: 5000ms
 
     # DNS refresh rate for Envoy clusters of type STRICT_DNS
     dnsRefreshRate: 300s
@@ -7728,7 +7922,7 @@ data:
       {{- end }}
          traffic.sidecar.istio.io/kubevirtInterfaces: "{{ index .ObjectMeta.Annotations `traffic.sidecar.istio.io/kubevirtInterfaces` }}"
     injectedAnnotations:
-  values: '{"certmanager":{"enabled":false},"galley":{"enableAnalysis":false,"enableServiceDiscovery":false,"enabled":true,"global":{"arch":{"amd64":2,"ppc64le":2,"s390x":2},"certificates":[],"configValidation":true,"controlPlaneSecurityEnabled":true,"defaultNodeSelector":{},"defaultPodDisruptionBudget":{"enabled":false},"defaultResources":{"requests":{"cpu":"10m"}},"defaultTolerations":[],"disablePolicyChecks":false,"enableHelmTest":false,"enableTracing":true,"hub":"gke.gcr.io/istio","imagePullPolicy":"IfNotPresent","imagePullSecrets":[],"k8sIngress":{"enableHttps":false,"enabled":false,"gatewayName":"ingressgateway"},"localityLbSetting":{"enabled":true},"logging":{"level":"default:info"},"meshExpansion":{"enabled":false,"useILB":false},"meshID":"","meshNetworks":{},"monitoringPort":15014,"mtls":{"auto":false,"enabled":true},"multiCluster":{"clusterName":"","enabled":false},"network":"","oneNamespace":false,"operatorManageWebhooks":false,"outboundTrafficPolicy":{"mode":"ALLOW_ANY"},"policyCheckFailOpen":false,"priorityClassName":"","proxy":{"accessLogEncoding":"TEXT","accessLogFile":"","accessLogFormat":"","autoInject":"enabled","clusterDomain":"cluster.local","componentLogLevel":"","concurrency":2,"dnsRefreshRate":"300s","enableCoreDump":false,"enableCoreDumpImage":"ubuntu:xenial","envoyAccessLogService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyMetricsService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyStatsd":{"enabled":false,"host":null,"port":null},"excludeIPRanges":"","excludeInboundPorts":"","excludeOutboundPorts":"","image":"proxyv2","includeIPRanges":"*","includeInboundPorts":"*","init":{"resources":{"limits":{"cpu":"100m","memory":"50Mi"},"requests":{"cpu":"10m","memory":"10Mi"}}},"kubevirtInterfaces":"","logLevel":"","privileged":false,"protocolDetectionTimeout":"100ms","readinessFailureThreshold":30,"readinessInitialDelaySeconds":1,"readinessPeriodSeconds":2,"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"statusPort":15020,"tracer":"zipkin"},"proxy_init":{"image":"proxyv2"},"sds":{"enabled":false,"token":{"aud":"istio-ca"},"udsPath":""},"tag":"1.4.10-gke.5","tracer":{"datadog":{"address":"$(HOST_IP):8126"},"lightstep":{"accessToken":"","address":"","cacertPath":"","secure":true},"stackdriver":{"debug":false,"maxNumberOfAnnotations":200,"maxNumberOfAttributes":200,"maxNumberOfMessageEvents":200},"zipkin":{"address":""}},"trustDomain":"","trustDomainAliases":[],"useMCP":true},"image":"galley","nodeSelector":{},"podAnnotations":{},"podAntiAffinityLabelSelector":[],"podAntiAffinityTermLabelSelector":[],"replicaCount":1,"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%","tolerations":[]},"gateways":{"enabled":true,"global":{"arch":{"amd64":2,"ppc64le":2,"s390x":2},"certificates":[],"configValidation":true,"controlPlaneSecurityEnabled":true,"defaultNodeSelector":{},"defaultPodDisruptionBudget":{"enabled":false},"defaultResources":{"requests":{"cpu":"10m"}},"defaultTolerations":[],"disablePolicyChecks":false,"enableHelmTest":false,"enableTracing":true,"hub":"gke.gcr.io/istio","imagePullPolicy":"IfNotPresent","imagePullSecrets":[],"k8sIngress":{"enableHttps":false,"enabled":false,"gatewayName":"ingressgateway"},"localityLbSetting":{"enabled":true},"logging":{"level":"default:info"},"meshExpansion":{"enabled":false,"useILB":false},"meshID":"","meshNetworks":{},"monitoringPort":15014,"mtls":{"auto":false,"enabled":true},"multiCluster":{"clusterName":"","enabled":false},"network":"","oneNamespace":false,"operatorManageWebhooks":false,"outboundTrafficPolicy":{"mode":"ALLOW_ANY"},"policyCheckFailOpen":false,"priorityClassName":"","proxy":{"accessLogEncoding":"TEXT","accessLogFile":"","accessLogFormat":"","autoInject":"enabled","clusterDomain":"cluster.local","componentLogLevel":"","concurrency":2,"dnsRefreshRate":"300s","enableCoreDump":false,"enableCoreDumpImage":"ubuntu:xenial","envoyAccessLogService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyMetricsService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyStatsd":{"enabled":false,"host":null,"port":null},"excludeIPRanges":"","excludeInboundPorts":"","excludeOutboundPorts":"","image":"proxyv2","includeIPRanges":"*","includeInboundPorts":"*","init":{"resources":{"limits":{"cpu":"100m","memory":"50Mi"},"requests":{"cpu":"10m","memory":"10Mi"}}},"kubevirtInterfaces":"","logLevel":"","privileged":false,"protocolDetectionTimeout":"100ms","readinessFailureThreshold":30,"readinessInitialDelaySeconds":1,"readinessPeriodSeconds":2,"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"statusPort":15020,"tracer":"zipkin"},"proxy_init":{"image":"proxyv2"},"sds":{"enabled":false,"token":{"aud":"istio-ca"},"udsPath":""},"tag":"1.4.10-gke.5","tracer":{"datadog":{"address":"$(HOST_IP):8126"},"lightstep":{"accessToken":"","address":"","cacertPath":"","secure":true},"stackdriver":{"debug":false,"maxNumberOfAnnotations":200,"maxNumberOfAttributes":200,"maxNumberOfMessageEvents":200},"zipkin":{"address":""}},"trustDomain":"","trustDomainAliases":[],"useMCP":true},"istio-egressgateway":{"autoscaleEnabled":true,"autoscaleMax":5,"autoscaleMin":1,"cpu":{"targetAverageUtilization":80},"enabled":false,"env":{"ISTIO_META_ROUTER_MODE":"sni-dnat"},"labels":{"app":"istio-egressgateway","istio":"egressgateway"},"nodeSelector":{},"podAnnotations":{},"podAntiAffinityLabelSelector":[],"podAntiAffinityTermLabelSelector":[],"ports":[{"name":"http2","port":80},{"name":"https","port":443},{"name":"tls","port":15443,"targetPort":15443}],"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%","secretVolumes":[{"mountPath":"/etc/istio/egressgateway-certs","name":"egressgateway-certs","secretName":"istio-egressgateway-certs"},{"mountPath":"/etc/istio/egressgateway-ca-certs","name":"egressgateway-ca-certs","secretName":"istio-egressgateway-ca-certs"}],"serviceAnnotations":{},"tolerations":[],"type":"ClusterIP"},"istio-ilbgateway":{"autoscaleEnabled":true,"autoscaleMax":5,"autoscaleMin":1,"cpu":{"targetAverageUtilization":80},"enabled":false,"labels":{"app":"istio-ilbgateway","istio":"ilbgateway"},"loadBalancerIP":"","nodeSelector":{},"podAnnotations":{},"ports":[{"name":"grpc-pilot-mtls","port":15011},{"name":"grpc-pilot","port":15010},{"name":"tcp-citadel-grpc-tls","port":8060,"targetPort":8060},{"name":"tcp-dns","port":5353}],"resources":{"requests":{"cpu":"800m","memory":"512Mi"}},"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%","secretVolumes":[{"mountPath":"/etc/istio/ilbgateway-certs","name":"ilbgateway-certs","secretName":"istio-ilbgateway-certs"},{"mountPath":"/etc/istio/ilbgateway-ca-certs","name":"ilbgateway-ca-certs","secretName":"istio-ilbgateway-ca-certs"}],"serviceAnnotations":{"cloud.google.com/load-balancer-type":"internal"},"tolerations":[],"type":"LoadBalancer"},"istio-ingressgateway":{"applicationPorts":"","autoscaleEnabled":true,"autoscaleMax":5,"autoscaleMin":1,"cpu":{"targetAverageUtilization":80},"enabled":true,"env":{"ISTIO_META_ROUTER_MODE":"sni-dnat"},"externalIPs":[],"labels":{"app":"istio-ingressgateway","istio":"ingressgateway"},"loadBalancerIP":"","loadBalancerSourceRanges":[],"meshExpansionPorts":[{"name":"tcp-pilot-grpc-tls","port":15011,"targetPort":15011},{"name":"tcp-mixer-grpc-tls","port":15004,"targetPort":15004},{"name":"tcp-citadel-grpc-tls","port":8060,"targetPort":8060},{"name":"tcp-dns-tls","port":853,"targetPort":853}],"nodeSelector":{},"podAnnotations":{},"podAntiAffinityLabelSelector":[],"podAntiAffinityTermLabelSelector":[],"ports":[{"name":"status-port","port":15020,"targetPort":15020},{"name":"http2","nodePort":31380,"port":80,"targetPort":80},{"name":"https","nodePort":31390,"port":443},{"name":"tcp","nodePort":31400,"port":31400},{"name":"https-kiali","port":15029,"targetPort":15029},{"name":"https-prometheus","port":15030,"targetPort":15030},{"name":"https-grafana","port":15031,"targetPort":15031},{"name":"https-tracing","port":15032,"targetPort":15032},{"name":"tls","port":15443,"targetPort":15443}],"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%","sds":{"enabled":false,"image":"node-agent-k8s","resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}},"secretVolumes":[{"mountPath":"/etc/istio/ingressgateway-certs","name":"ingressgateway-certs","secretName":"istio-ingressgateway-certs"},{"mountPath":"/etc/istio/ingressgateway-ca-certs","name":"ingressgateway-ca-certs","secretName":"istio-ingressgateway-ca-certs"}],"serviceAnnotations":{},"tolerations":[],"type":"LoadBalancer"}},"global":{"arch":{"amd64":2,"ppc64le":2,"s390x":2},"certificates":[],"configValidation":true,"controlPlaneSecurityEnabled":true,"defaultNodeSelector":{},"defaultPodDisruptionBudget":{"enabled":false},"defaultResources":{"requests":{"cpu":"10m"}},"defaultTolerations":[],"disablePolicyChecks":false,"enableHelmTest":false,"enableTracing":true,"hub":"gke.gcr.io/istio","imagePullPolicy":"IfNotPresent","imagePullSecrets":[],"k8sIngress":{"enableHttps":false,"enabled":false,"gatewayName":"ingressgateway"},"localityLbSetting":{"enabled":true},"logging":{"level":"default:info"},"meshExpansion":{"enabled":false,"useILB":false},"meshID":"","meshNetworks":{},"monitoringPort":15014,"mtls":{"auto":false,"enabled":true},"multiCluster":{"clusterName":"","enabled":false},"network":"","oneNamespace":false,"operatorManageWebhooks":false,"outboundTrafficPolicy":{"mode":"ALLOW_ANY"},"policyCheckFailOpen":false,"priorityClassName":"","proxy":{"accessLogEncoding":"TEXT","accessLogFile":"","accessLogFormat":"","autoInject":"enabled","clusterDomain":"cluster.local","componentLogLevel":"","concurrency":2,"dnsRefreshRate":"300s","enableCoreDump":false,"enableCoreDumpImage":"ubuntu:xenial","envoyAccessLogService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyMetricsService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyStatsd":{"enabled":false,"host":null,"port":null},"excludeIPRanges":"","excludeInboundPorts":"","excludeOutboundPorts":"","image":"proxyv2","includeIPRanges":"*","includeInboundPorts":"*","init":{"resources":{"limits":{"cpu":"100m","memory":"50Mi"},"requests":{"cpu":"10m","memory":"10Mi"}}},"kubevirtInterfaces":"","logLevel":"","privileged":false,"protocolDetectionTimeout":"100ms","readinessFailureThreshold":30,"readinessInitialDelaySeconds":1,"readinessPeriodSeconds":2,"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"statusPort":15020,"tracer":"zipkin"},"proxy_init":{"image":"proxyv2"},"sds":{"enabled":false,"token":{"aud":"istio-ca"},"udsPath":""},"tag":"1.4.10-gke.5","tracer":{"datadog":{"address":"$(HOST_IP):8126"},"lightstep":{"accessToken":"","address":"","cacertPath":"","secure":true},"stackdriver":{"debug":false,"maxNumberOfAnnotations":200,"maxNumberOfAttributes":200,"maxNumberOfMessageEvents":200},"zipkin":{"address":""}},"trustDomain":"","trustDomainAliases":[],"useMCP":true},"grafana":{"enabled":false},"istio_cni":{"enabled":false,"repair":{"enabled":true}},"istiocoredns":{"enabled":false},"kiali":{"enabled":false},"mixer":{"adapters":{"kubernetesenv":{"enabled":true},"prometheus":{"enabled":false,"metricsExpiryDuration":"10m"},"stdio":{"enabled":false,"outputAsJson":true},"useAdapterCRDs":true},"env":{"GOMAXPROCS":"6"},"global":{"arch":{"amd64":2,"ppc64le":2,"s390x":2},"certificates":[],"configValidation":true,"controlPlaneSecurityEnabled":true,"defaultNodeSelector":{},"defaultPodDisruptionBudget":{"enabled":false},"defaultResources":{"requests":{"cpu":"10m"}},"defaultTolerations":[],"disablePolicyChecks":false,"enableHelmTest":false,"enableTracing":true,"hub":"gke.gcr.io/istio","imagePullPolicy":"IfNotPresent","imagePullSecrets":[],"k8sIngress":{"enableHttps":false,"enabled":false,"gatewayName":"ingressgateway"},"localityLbSetting":{"enabled":true},"logging":{"level":"default:info"},"meshExpansion":{"enabled":false,"useILB":false},"meshID":"","meshNetworks":{},"monitoringPort":15014,"mtls":{"auto":false,"enabled":true},"multiCluster":{"clusterName":"","enabled":false},"network":"","oneNamespace":false,"operatorManageWebhooks":false,"outboundTrafficPolicy":{"mode":"ALLOW_ANY"},"policyCheckFailOpen":false,"priorityClassName":"","proxy":{"accessLogEncoding":"TEXT","accessLogFile":"","accessLogFormat":"","autoInject":"enabled","clusterDomain":"cluster.local","componentLogLevel":"","concurrency":2,"dnsRefreshRate":"300s","enableCoreDump":false,"enableCoreDumpImage":"ubuntu:xenial","envoyAccessLogService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyMetricsService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyStatsd":{"enabled":false,"host":null,"port":null},"excludeIPRanges":"","excludeInboundPorts":"","excludeOutboundPorts":"","image":"proxyv2","includeIPRanges":"*","includeInboundPorts":"*","init":{"resources":{"limits":{"cpu":"100m","memory":"50Mi"},"requests":{"cpu":"10m","memory":"10Mi"}}},"kubevirtInterfaces":"","logLevel":"","privileged":false,"protocolDetectionTimeout":"100ms","readinessFailureThreshold":30,"readinessInitialDelaySeconds":1,"readinessPeriodSeconds":2,"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"statusPort":15020,"tracer":"zipkin"},"proxy_init":{"image":"proxyv2"},"sds":{"enabled":false,"token":{"aud":"istio-ca"},"udsPath":""},"tag":"1.4.10-gke.5","tracer":{"datadog":{"address":"$(HOST_IP):8126"},"lightstep":{"accessToken":"","address":"","cacertPath":"","secure":true},"stackdriver":{"debug":false,"maxNumberOfAnnotations":200,"maxNumberOfAttributes":200,"maxNumberOfMessageEvents":200},"zipkin":{"address":""}},"trustDomain":"","trustDomainAliases":[],"useMCP":true},"image":"mixer","nodeSelector":{},"podAnnotations":{},"podAntiAffinityLabelSelector":[],"podAntiAffinityTermLabelSelector":[],"policy":{"autoscaleEnabled":true,"autoscaleMax":5,"autoscaleMin":1,"cpu":{"targetAverageUtilization":80},"enabled":true,"replicaCount":1,"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%"},"telemetry":{"autoscaleEnabled":true,"autoscaleMax":5,"autoscaleMin":1,"cpu":{"targetAverageUtilization":80},"enabled":true,"loadshedding":{"latencyThreshold":"5000ms","mode":"enforce"},"replicaCount":1,"reportBatchMaxEntries":100,"reportBatchMaxTime":"1s","resources":{"limits":{"cpu":"4800m","memory":"4G"},"requests":{"cpu":"1000m","memory":"1G"}},"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%","sessionAffinityEnabled":true},"templates":{"useTemplateCRDs":true},"tolerations":[]},"nodeagent":{"enabled":false},"pilot":{"autoscaleEnabled":true,"autoscaleMax":5,"autoscaleMin":1,"configSource":{"subscribedResources":null},"cpu":{"targetAverageUtilization":80},"enableProtocolSniffingForInbound":false,"enableProtocolSniffingForOutbound":true,"enabled":true,"env":{"PILOT_PUSH_THROTTLE":100},"global":{"arch":{"amd64":2,"ppc64le":2,"s390x":2},"certificates":[],"configValidation":true,"controlPlaneSecurityEnabled":true,"defaultNodeSelector":{},"defaultPodDisruptionBudget":{"enabled":false},"defaultResources":{"requests":{"cpu":"10m"}},"defaultTolerations":[],"disablePolicyChecks":false,"enableHelmTest":false,"enableTracing":true,"hub":"gke.gcr.io/istio","imagePullPolicy":"IfNotPresent","imagePullSecrets":[],"k8sIngress":{"enableHttps":false,"enabled":false,"gatewayName":"ingressgateway"},"localityLbSetting":{"enabled":true},"logging":{"level":"default:info"},"meshExpansion":{"enabled":false,"useILB":false},"meshID":"","meshNetworks":{},"monitoringPort":15014,"mtls":{"auto":false,"enabled":true},"multiCluster":{"clusterName":"","enabled":false},"network":"","oneNamespace":false,"operatorManageWebhooks":false,"outboundTrafficPolicy":{"mode":"ALLOW_ANY"},"policyCheckFailOpen":false,"priorityClassName":"","proxy":{"accessLogEncoding":"TEXT","accessLogFile":"","accessLogFormat":"","autoInject":"enabled","clusterDomain":"cluster.local","componentLogLevel":"","concurrency":2,"dnsRefreshRate":"300s","enableCoreDump":false,"enableCoreDumpImage":"ubuntu:xenial","envoyAccessLogService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyMetricsService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyStatsd":{"enabled":false,"host":null,"port":null},"excludeIPRanges":"","excludeInboundPorts":"","excludeOutboundPorts":"","image":"proxyv2","includeIPRanges":"*","includeInboundPorts":"*","init":{"resources":{"limits":{"cpu":"100m","memory":"50Mi"},"requests":{"cpu":"10m","memory":"10Mi"}}},"kubevirtInterfaces":"","logLevel":"","privileged":false,"protocolDetectionTimeout":"100ms","readinessFailureThreshold":30,"readinessInitialDelaySeconds":1,"readinessPeriodSeconds":2,"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"statusPort":15020,"tracer":"zipkin"},"proxy_init":{"image":"proxyv2"},"sds":{"enabled":false,"token":{"aud":"istio-ca"},"udsPath":""},"tag":"1.4.10-gke.5","tracer":{"datadog":{"address":"$(HOST_IP):8126"},"lightstep":{"accessToken":"","address":"","cacertPath":"","secure":true},"stackdriver":{"debug":false,"maxNumberOfAnnotations":200,"maxNumberOfAttributes":200,"maxNumberOfMessageEvents":200},"zipkin":{"address":""}},"trustDomain":"","trustDomainAliases":[],"useMCP":true},"image":"pilot","keepaliveMaxServerConnectionAge":"30m","nodeSelector":{},"podAnnotations":{},"podAntiAffinityLabelSelector":[],"podAntiAffinityTermLabelSelector":[],"resources":{"requests":{"cpu":"500m","memory":"2048Mi"}},"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%","sidecar":true,"tolerations":[],"traceSampling":1},"prometheus":{"enabled":false},"security":{"citadelHealthCheck":false,"createMeshPolicy":true,"enableNamespacesByDefault":true,"enabled":true,"env":{},"global":{"arch":{"amd64":2,"ppc64le":2,"s390x":2},"certificates":[],"configValidation":true,"controlPlaneSecurityEnabled":true,"defaultNodeSelector":{},"defaultPodDisruptionBudget":{"enabled":false},"defaultResources":{"requests":{"cpu":"10m"}},"defaultTolerations":[],"disablePolicyChecks":false,"enableHelmTest":false,"enableTracing":true,"hub":"gke.gcr.io/istio","imagePullPolicy":"IfNotPresent","imagePullSecrets":[],"k8sIngress":{"enableHttps":false,"enabled":false,"gatewayName":"ingressgateway"},"localityLbSetting":{"enabled":true},"logging":{"level":"default:info"},"meshExpansion":{"enabled":false,"useILB":false},"meshID":"","meshNetworks":{},"monitoringPort":15014,"mtls":{"auto":false,"enabled":true},"multiCluster":{"clusterName":"","enabled":false},"network":"","oneNamespace":false,"operatorManageWebhooks":false,"outboundTrafficPolicy":{"mode":"ALLOW_ANY"},"policyCheckFailOpen":false,"priorityClassName":"","proxy":{"accessLogEncoding":"TEXT","accessLogFile":"","accessLogFormat":"","autoInject":"enabled","clusterDomain":"cluster.local","componentLogLevel":"","concurrency":2,"dnsRefreshRate":"300s","enableCoreDump":false,"enableCoreDumpImage":"ubuntu:xenial","envoyAccessLogService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyMetricsService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyStatsd":{"enabled":false,"host":null,"port":null},"excludeIPRanges":"","excludeInboundPorts":"","excludeOutboundPorts":"","image":"proxyv2","includeIPRanges":"*","includeInboundPorts":"*","init":{"resources":{"limits":{"cpu":"100m","memory":"50Mi"},"requests":{"cpu":"10m","memory":"10Mi"}}},"kubevirtInterfaces":"","logLevel":"","privileged":false,"protocolDetectionTimeout":"100ms","readinessFailureThreshold":30,"readinessInitialDelaySeconds":1,"readinessPeriodSeconds":2,"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"statusPort":15020,"tracer":"zipkin"},"proxy_init":{"image":"proxyv2"},"sds":{"enabled":false,"token":{"aud":"istio-ca"},"udsPath":""},"tag":"1.4.10-gke.5","tracer":{"datadog":{"address":"$(HOST_IP):8126"},"lightstep":{"accessToken":"","address":"","cacertPath":"","secure":true},"stackdriver":{"debug":false,"maxNumberOfAnnotations":200,"maxNumberOfAttributes":200,"maxNumberOfMessageEvents":200},"zipkin":{"address":""}},"trustDomain":"","trustDomainAliases":[],"useMCP":true},"image":"citadel","nodeSelector":{},"podAnnotations":{},"podAntiAffinityLabelSelector":[],"podAntiAffinityTermLabelSelector":[],"replicaCount":1,"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%","selfSigned":true,"tolerations":[],"workloadCertTtl":"2160h"},"sidecarInjectorWebhook":{"alwaysInjectSelector":[],"enableNamespacesByDefault":false,"enabled":true,"global":{"arch":{"amd64":2,"ppc64le":2,"s390x":2},"certificates":[],"configValidation":true,"controlPlaneSecurityEnabled":true,"defaultNodeSelector":{},"defaultPodDisruptionBudget":{"enabled":false},"defaultResources":{"requests":{"cpu":"10m"}},"defaultTolerations":[],"disablePolicyChecks":false,"enableHelmTest":false,"enableTracing":true,"hub":"gke.gcr.io/istio","imagePullPolicy":"IfNotPresent","imagePullSecrets":[],"k8sIngress":{"enableHttps":false,"enabled":false,"gatewayName":"ingressgateway"},"localityLbSetting":{"enabled":true},"logging":{"level":"default:info"},"meshExpansion":{"enabled":false,"useILB":false},"meshID":"","meshNetworks":{},"monitoringPort":15014,"mtls":{"auto":false,"enabled":true},"multiCluster":{"clusterName":"","enabled":false},"network":"","oneNamespace":false,"operatorManageWebhooks":false,"outboundTrafficPolicy":{"mode":"ALLOW_ANY"},"policyCheckFailOpen":false,"priorityClassName":"","proxy":{"accessLogEncoding":"TEXT","accessLogFile":"","accessLogFormat":"","autoInject":"enabled","clusterDomain":"cluster.local","componentLogLevel":"","concurrency":2,"dnsRefreshRate":"300s","enableCoreDump":false,"enableCoreDumpImage":"ubuntu:xenial","envoyAccessLogService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyMetricsService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyStatsd":{"enabled":false,"host":null,"port":null},"excludeIPRanges":"","excludeInboundPorts":"","excludeOutboundPorts":"","image":"proxyv2","includeIPRanges":"*","includeInboundPorts":"*","init":{"resources":{"limits":{"cpu":"100m","memory":"50Mi"},"requests":{"cpu":"10m","memory":"10Mi"}}},"kubevirtInterfaces":"","logLevel":"","privileged":false,"protocolDetectionTimeout":"100ms","readinessFailureThreshold":30,"readinessInitialDelaySeconds":1,"readinessPeriodSeconds":2,"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"statusPort":15020,"tracer":"zipkin"},"proxy_init":{"image":"proxyv2"},"sds":{"enabled":false,"token":{"aud":"istio-ca"},"udsPath":""},"tag":"1.4.10-gke.5","tracer":{"datadog":{"address":"$(HOST_IP):8126"},"lightstep":{"accessToken":"","address":"","cacertPath":"","secure":true},"stackdriver":{"debug":false,"maxNumberOfAnnotations":200,"maxNumberOfAttributes":200,"maxNumberOfMessageEvents":200},"zipkin":{"address":""}},"trustDomain":"","trustDomainAliases":[],"useMCP":true},"image":"sidecar_injector","injectedAnnotations":{},"neverInjectSelector":[],"nodeSelector":{},"podAnnotations":{},"podAntiAffinityLabelSelector":[],"podAntiAffinityTermLabelSelector":[],"replicaCount":1,"rewriteAppHTTPProbe":false,"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%","tolerations":[]},"tracing":{"enabled":false}}'
+  values: '{"certmanager":{"enabled":false},"galley":{"enableAnalysis":false,"enableServiceDiscovery":false,"enabled":true,"global":{"arch":{"amd64":2,"ppc64le":2,"s390x":2},"certificates":[],"configValidation":true,"controlPlaneSecurityEnabled":true,"defaultNodeSelector":{},"defaultPodDisruptionBudget":{"enabled":false},"defaultResources":{"requests":{"cpu":"10m"}},"defaultTolerations":[],"disablePolicyChecks":false,"enableHelmTest":false,"enableTracing":true,"hub":"gke.gcr.io/istio","imagePullPolicy":"IfNotPresent","imagePullSecrets":[],"k8sIngress":{"enableHttps":false,"enabled":false,"gatewayName":"ingressgateway"},"localityLbSetting":{"enabled":true},"logging":{"level":"default:info"},"meshExpansion":{"enabled":false,"useILB":false},"meshID":"","meshNetworks":{},"monitoringPort":15014,"mtls":{"auto":false,"enabled":true},"multiCluster":{"clusterName":"","enabled":false},"network":"","oneNamespace":false,"operatorManageWebhooks":false,"outboundTrafficPolicy":{"mode":"ALLOW_ANY"},"policyCheckFailOpen":false,"priorityClassName":"","proxy":{"accessLogEncoding":"TEXT","accessLogFile":"","accessLogFormat":"","autoInject":"enabled","clusterDomain":"cluster.local","componentLogLevel":"","concurrency":2,"dnsRefreshRate":"300s","enableCoreDump":false,"enableCoreDumpImage":"ubuntu:xenial","envoyAccessLogService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyMetricsService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyStatsd":{"enabled":false,"host":null,"port":null},"excludeIPRanges":"","excludeInboundPorts":"","excludeOutboundPorts":"","image":"proxyv2","includeIPRanges":"*","includeInboundPorts":"*","init":{"resources":{"limits":{"cpu":"100m","memory":"50Mi"},"requests":{"cpu":"10m","memory":"10Mi"}}},"kubevirtInterfaces":"","logLevel":"","privileged":false,"protocolDetectionTimeout":"5000ms","readinessFailureThreshold":30,"readinessInitialDelaySeconds":1,"readinessPeriodSeconds":2,"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"statusPort":15020,"tracer":"zipkin"},"proxy_init":{"image":"proxyv2"},"sds":{"enabled":false,"token":{"aud":"istio-ca"},"udsPath":""},"tag":"1.4.10-gke.5","tracer":{"datadog":{"address":"$(HOST_IP):8126"},"lightstep":{"accessToken":"","address":"","cacertPath":"","secure":true},"stackdriver":{"debug":false,"maxNumberOfAnnotations":200,"maxNumberOfAttributes":200,"maxNumberOfMessageEvents":200},"zipkin":{"address":""}},"trustDomain":"","trustDomainAliases":[],"useMCP":true},"image":"galley","nodeSelector":{},"podAnnotations":{},"podAntiAffinityLabelSelector":[],"podAntiAffinityTermLabelSelector":[],"replicaCount":1,"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%","tolerations":[]},"gateways":{"enabled":true,"global":{"arch":{"amd64":2,"ppc64le":2,"s390x":2},"certificates":[],"configValidation":true,"controlPlaneSecurityEnabled":true,"defaultNodeSelector":{},"defaultPodDisruptionBudget":{"enabled":false},"defaultResources":{"requests":{"cpu":"10m"}},"defaultTolerations":[],"disablePolicyChecks":false,"enableHelmTest":false,"enableTracing":true,"hub":"gke.gcr.io/istio","imagePullPolicy":"IfNotPresent","imagePullSecrets":[],"k8sIngress":{"enableHttps":false,"enabled":false,"gatewayName":"ingressgateway"},"localityLbSetting":{"enabled":true},"logging":{"level":"default:info"},"meshExpansion":{"enabled":false,"useILB":false},"meshID":"","meshNetworks":{},"monitoringPort":15014,"mtls":{"auto":false,"enabled":true},"multiCluster":{"clusterName":"","enabled":false},"network":"","oneNamespace":false,"operatorManageWebhooks":false,"outboundTrafficPolicy":{"mode":"ALLOW_ANY"},"policyCheckFailOpen":false,"priorityClassName":"","proxy":{"accessLogEncoding":"TEXT","accessLogFile":"","accessLogFormat":"","autoInject":"enabled","clusterDomain":"cluster.local","componentLogLevel":"","concurrency":2,"dnsRefreshRate":"300s","enableCoreDump":false,"enableCoreDumpImage":"ubuntu:xenial","envoyAccessLogService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyMetricsService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyStatsd":{"enabled":false,"host":null,"port":null},"excludeIPRanges":"","excludeInboundPorts":"","excludeOutboundPorts":"","image":"proxyv2","includeIPRanges":"*","includeInboundPorts":"*","init":{"resources":{"limits":{"cpu":"100m","memory":"50Mi"},"requests":{"cpu":"10m","memory":"10Mi"}}},"kubevirtInterfaces":"","logLevel":"","privileged":false,"protocolDetectionTimeout":"5000ms","readinessFailureThreshold":30,"readinessInitialDelaySeconds":1,"readinessPeriodSeconds":2,"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"statusPort":15020,"tracer":"zipkin"},"proxy_init":{"image":"proxyv2"},"sds":{"enabled":false,"token":{"aud":"istio-ca"},"udsPath":""},"tag":"1.4.10-gke.5","tracer":{"datadog":{"address":"$(HOST_IP):8126"},"lightstep":{"accessToken":"","address":"","cacertPath":"","secure":true},"stackdriver":{"debug":false,"maxNumberOfAnnotations":200,"maxNumberOfAttributes":200,"maxNumberOfMessageEvents":200},"zipkin":{"address":""}},"trustDomain":"","trustDomainAliases":[],"useMCP":true},"istio-egressgateway":{"autoscaleEnabled":true,"autoscaleMax":5,"autoscaleMin":1,"cpu":{"targetAverageUtilization":80},"enabled":false,"env":{"ISTIO_META_ROUTER_MODE":"sni-dnat"},"labels":{"app":"istio-egressgateway","istio":"egressgateway"},"nodeSelector":{},"podAnnotations":{},"podAntiAffinityLabelSelector":[],"podAntiAffinityTermLabelSelector":[],"ports":[{"name":"http2","port":80},{"name":"https","port":443},{"name":"tls","port":15443,"targetPort":15443}],"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%","secretVolumes":[{"mountPath":"/etc/istio/egressgateway-certs","name":"egressgateway-certs","secretName":"istio-egressgateway-certs"},{"mountPath":"/etc/istio/egressgateway-ca-certs","name":"egressgateway-ca-certs","secretName":"istio-egressgateway-ca-certs"}],"serviceAnnotations":{},"tolerations":[],"type":"ClusterIP"},"istio-ilbgateway":{"autoscaleEnabled":true,"autoscaleMax":5,"autoscaleMin":1,"cpu":{"targetAverageUtilization":80},"enabled":false,"labels":{"app":"istio-ilbgateway","istio":"ilbgateway"},"loadBalancerIP":"","nodeSelector":{},"podAnnotations":{},"ports":[{"name":"grpc-pilot-mtls","port":15011},{"name":"grpc-pilot","port":15010},{"name":"tcp-citadel-grpc-tls","port":8060,"targetPort":8060},{"name":"tcp-dns","port":5353}],"resources":{"requests":{"cpu":"800m","memory":"512Mi"}},"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%","secretVolumes":[{"mountPath":"/etc/istio/ilbgateway-certs","name":"ilbgateway-certs","secretName":"istio-ilbgateway-certs"},{"mountPath":"/etc/istio/ilbgateway-ca-certs","name":"ilbgateway-ca-certs","secretName":"istio-ilbgateway-ca-certs"}],"serviceAnnotations":{"cloud.google.com/load-balancer-type":"internal"},"tolerations":[],"type":"LoadBalancer"},"istio-ingressgateway":{"applicationPorts":"","autoscaleEnabled":true,"autoscaleMax":5,"autoscaleMin":1,"cpu":{"targetAverageUtilization":80},"enabled":true,"env":{"ISTIO_META_ROUTER_MODE":"sni-dnat"},"externalIPs":[],"labels":{"app":"istio-ingressgateway","istio":"ingressgateway"},"loadBalancerIP":"","loadBalancerSourceRanges":[],"meshExpansionPorts":[{"name":"tcp-pilot-grpc-tls","port":15011,"targetPort":15011},{"name":"tcp-mixer-grpc-tls","port":15004,"targetPort":15004},{"name":"tcp-citadel-grpc-tls","port":8060,"targetPort":8060},{"name":"tcp-dns-tls","port":853,"targetPort":853}],"nodeSelector":{},"podAnnotations":{},"podAntiAffinityLabelSelector":[],"podAntiAffinityTermLabelSelector":[],"ports":[{"name":"status-port","port":15020,"targetPort":15020},{"name":"http2","nodePort":31380,"port":80,"targetPort":80},{"name":"https","nodePort":31390,"port":443},{"name":"tcp","nodePort":31400,"port":31400},{"name":"https-kiali","port":15029,"targetPort":15029},{"name":"https-prometheus","port":15030,"targetPort":15030},{"name":"https-grafana","port":15031,"targetPort":15031},{"name":"https-tracing","port":15032,"targetPort":15032},{"name":"tls","port":15443,"targetPort":15443}],"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%","sds":{"enabled":false,"image":"node-agent-k8s","resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}},"secretVolumes":[{"mountPath":"/etc/istio/ingressgateway-certs","name":"ingressgateway-certs","secretName":"istio-ingressgateway-certs"},{"mountPath":"/etc/istio/ingressgateway-ca-certs","name":"ingressgateway-ca-certs","secretName":"istio-ingressgateway-ca-certs"}],"serviceAnnotations":{},"tolerations":[],"type":"LoadBalancer"}},"global":{"arch":{"amd64":2,"ppc64le":2,"s390x":2},"certificates":[],"configValidation":true,"controlPlaneSecurityEnabled":true,"defaultNodeSelector":{},"defaultPodDisruptionBudget":{"enabled":false},"defaultResources":{"requests":{"cpu":"10m"}},"defaultTolerations":[],"disablePolicyChecks":false,"enableHelmTest":false,"enableTracing":true,"hub":"gke.gcr.io/istio","imagePullPolicy":"IfNotPresent","imagePullSecrets":[],"k8sIngress":{"enableHttps":false,"enabled":false,"gatewayName":"ingressgateway"},"localityLbSetting":{"enabled":true},"logging":{"level":"default:info"},"meshExpansion":{"enabled":false,"useILB":false},"meshID":"","meshNetworks":{},"monitoringPort":15014,"mtls":{"auto":false,"enabled":true},"multiCluster":{"clusterName":"","enabled":false},"network":"","oneNamespace":false,"operatorManageWebhooks":false,"outboundTrafficPolicy":{"mode":"ALLOW_ANY"},"policyCheckFailOpen":false,"priorityClassName":"","proxy":{"accessLogEncoding":"TEXT","accessLogFile":"","accessLogFormat":"","autoInject":"enabled","clusterDomain":"cluster.local","componentLogLevel":"","concurrency":2,"dnsRefreshRate":"300s","enableCoreDump":false,"enableCoreDumpImage":"ubuntu:xenial","envoyAccessLogService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyMetricsService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyStatsd":{"enabled":false,"host":null,"port":null},"excludeIPRanges":"","excludeInboundPorts":"","excludeOutboundPorts":"","image":"proxyv2","includeIPRanges":"*","includeInboundPorts":"*","init":{"resources":{"limits":{"cpu":"100m","memory":"50Mi"},"requests":{"cpu":"10m","memory":"10Mi"}}},"kubevirtInterfaces":"","logLevel":"","privileged":false,"protocolDetectionTimeout":"5000ms","readinessFailureThreshold":30,"readinessInitialDelaySeconds":1,"readinessPeriodSeconds":2,"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"statusPort":15020,"tracer":"zipkin"},"proxy_init":{"image":"proxyv2"},"sds":{"enabled":false,"token":{"aud":"istio-ca"},"udsPath":""},"tag":"1.4.10-gke.5","tracer":{"datadog":{"address":"$(HOST_IP):8126"},"lightstep":{"accessToken":"","address":"","cacertPath":"","secure":true},"stackdriver":{"debug":false,"maxNumberOfAnnotations":200,"maxNumberOfAttributes":200,"maxNumberOfMessageEvents":200},"zipkin":{"address":""}},"trustDomain":"","trustDomainAliases":[],"useMCP":true},"grafana":{"enabled":false},"istio_cni":{"enabled":false,"repair":{"enabled":true}},"istiocoredns":{"enabled":false},"kiali":{"enabled":false},"mixer":{"adapters":{"kubernetesenv":{"enabled":true},"prometheus":{"enabled":false,"metricsExpiryDuration":"10m"},"stdio":{"enabled":false,"outputAsJson":true},"useAdapterCRDs":true},"env":{"GOMAXPROCS":"6"},"global":{"arch":{"amd64":2,"ppc64le":2,"s390x":2},"certificates":[],"configValidation":true,"controlPlaneSecurityEnabled":true,"defaultNodeSelector":{},"defaultPodDisruptionBudget":{"enabled":false},"defaultResources":{"requests":{"cpu":"10m"}},"defaultTolerations":[],"disablePolicyChecks":false,"enableHelmTest":false,"enableTracing":true,"hub":"gke.gcr.io/istio","imagePullPolicy":"IfNotPresent","imagePullSecrets":[],"k8sIngress":{"enableHttps":false,"enabled":false,"gatewayName":"ingressgateway"},"localityLbSetting":{"enabled":true},"logging":{"level":"default:info"},"meshExpansion":{"enabled":false,"useILB":false},"meshID":"","meshNetworks":{},"monitoringPort":15014,"mtls":{"auto":false,"enabled":true},"multiCluster":{"clusterName":"","enabled":false},"network":"","oneNamespace":false,"operatorManageWebhooks":false,"outboundTrafficPolicy":{"mode":"ALLOW_ANY"},"policyCheckFailOpen":false,"priorityClassName":"","proxy":{"accessLogEncoding":"TEXT","accessLogFile":"","accessLogFormat":"","autoInject":"enabled","clusterDomain":"cluster.local","componentLogLevel":"","concurrency":2,"dnsRefreshRate":"300s","enableCoreDump":false,"enableCoreDumpImage":"ubuntu:xenial","envoyAccessLogService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyMetricsService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyStatsd":{"enabled":false,"host":null,"port":null},"excludeIPRanges":"","excludeInboundPorts":"","excludeOutboundPorts":"","image":"proxyv2","includeIPRanges":"*","includeInboundPorts":"*","init":{"resources":{"limits":{"cpu":"100m","memory":"50Mi"},"requests":{"cpu":"10m","memory":"10Mi"}}},"kubevirtInterfaces":"","logLevel":"","privileged":false,"protocolDetectionTimeout":"5000ms","readinessFailureThreshold":30,"readinessInitialDelaySeconds":1,"readinessPeriodSeconds":2,"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"statusPort":15020,"tracer":"zipkin"},"proxy_init":{"image":"proxyv2"},"sds":{"enabled":false,"token":{"aud":"istio-ca"},"udsPath":""},"tag":"1.4.10-gke.5","tracer":{"datadog":{"address":"$(HOST_IP):8126"},"lightstep":{"accessToken":"","address":"","cacertPath":"","secure":true},"stackdriver":{"debug":false,"maxNumberOfAnnotations":200,"maxNumberOfAttributes":200,"maxNumberOfMessageEvents":200},"zipkin":{"address":""}},"trustDomain":"","trustDomainAliases":[],"useMCP":true},"image":"mixer","nodeSelector":{},"podAnnotations":{},"podAntiAffinityLabelSelector":[],"podAntiAffinityTermLabelSelector":[],"policy":{"autoscaleEnabled":true,"autoscaleMax":5,"autoscaleMin":1,"cpu":{"targetAverageUtilization":80},"enabled":true,"replicaCount":1,"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%"},"telemetry":{"autoscaleEnabled":true,"autoscaleMax":5,"autoscaleMin":1,"cpu":{"targetAverageUtilization":80},"enabled":true,"loadshedding":{"latencyThreshold":"5000ms","mode":"enforce"},"replicaCount":1,"reportBatchMaxEntries":100,"reportBatchMaxTime":"1s","resources":{"limits":{"cpu":"4800m","memory":"4G"},"requests":{"cpu":"1000m","memory":"1G"}},"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%","sessionAffinityEnabled":true},"templates":{"useTemplateCRDs":true},"tolerations":[]},"nodeagent":{"enabled":false},"pilot":{"autoscaleEnabled":true,"autoscaleMax":5,"autoscaleMin":1,"configSource":{"subscribedResources":null},"cpu":{"targetAverageUtilization":80},"enableProtocolSniffingForInbound":false,"enableProtocolSniffingForOutbound":true,"enabled":true,"env":{"PILOT_PUSH_THROTTLE":100},"global":{"arch":{"amd64":2,"ppc64le":2,"s390x":2},"certificates":[],"configValidation":true,"controlPlaneSecurityEnabled":true,"defaultNodeSelector":{},"defaultPodDisruptionBudget":{"enabled":false},"defaultResources":{"requests":{"cpu":"10m"}},"defaultTolerations":[],"disablePolicyChecks":false,"enableHelmTest":false,"enableTracing":true,"hub":"gke.gcr.io/istio","imagePullPolicy":"IfNotPresent","imagePullSecrets":[],"k8sIngress":{"enableHttps":false,"enabled":false,"gatewayName":"ingressgateway"},"localityLbSetting":{"enabled":true},"logging":{"level":"default:info"},"meshExpansion":{"enabled":false,"useILB":false},"meshID":"","meshNetworks":{},"monitoringPort":15014,"mtls":{"auto":false,"enabled":true},"multiCluster":{"clusterName":"","enabled":false},"network":"","oneNamespace":false,"operatorManageWebhooks":false,"outboundTrafficPolicy":{"mode":"ALLOW_ANY"},"policyCheckFailOpen":false,"priorityClassName":"","proxy":{"accessLogEncoding":"TEXT","accessLogFile":"","accessLogFormat":"","autoInject":"enabled","clusterDomain":"cluster.local","componentLogLevel":"","concurrency":2,"dnsRefreshRate":"300s","enableCoreDump":false,"enableCoreDumpImage":"ubuntu:xenial","envoyAccessLogService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyMetricsService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyStatsd":{"enabled":false,"host":null,"port":null},"excludeIPRanges":"","excludeInboundPorts":"","excludeOutboundPorts":"","image":"proxyv2","includeIPRanges":"*","includeInboundPorts":"*","init":{"resources":{"limits":{"cpu":"100m","memory":"50Mi"},"requests":{"cpu":"10m","memory":"10Mi"}}},"kubevirtInterfaces":"","logLevel":"","privileged":false,"protocolDetectionTimeout":"5000ms","readinessFailureThreshold":30,"readinessInitialDelaySeconds":1,"readinessPeriodSeconds":2,"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"statusPort":15020,"tracer":"zipkin"},"proxy_init":{"image":"proxyv2"},"sds":{"enabled":false,"token":{"aud":"istio-ca"},"udsPath":""},"tag":"1.4.10-gke.5","tracer":{"datadog":{"address":"$(HOST_IP):8126"},"lightstep":{"accessToken":"","address":"","cacertPath":"","secure":true},"stackdriver":{"debug":false,"maxNumberOfAnnotations":200,"maxNumberOfAttributes":200,"maxNumberOfMessageEvents":200},"zipkin":{"address":""}},"trustDomain":"","trustDomainAliases":[],"useMCP":true},"image":"pilot","keepaliveMaxServerConnectionAge":"30m","nodeSelector":{},"podAnnotations":{},"podAntiAffinityLabelSelector":[],"podAntiAffinityTermLabelSelector":[],"resources":{"requests":{"cpu":"500m","memory":"2048Mi"}},"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%","sidecar":true,"tolerations":[],"traceSampling":1},"prometheus":{"enabled":false},"security":{"citadelHealthCheck":false,"createMeshPolicy":true,"enableNamespacesByDefault":true,"enabled":true,"env":{},"global":{"arch":{"amd64":2,"ppc64le":2,"s390x":2},"certificates":[],"configValidation":true,"controlPlaneSecurityEnabled":true,"defaultNodeSelector":{},"defaultPodDisruptionBudget":{"enabled":false},"defaultResources":{"requests":{"cpu":"10m"}},"defaultTolerations":[],"disablePolicyChecks":false,"enableHelmTest":false,"enableTracing":true,"hub":"gke.gcr.io/istio","imagePullPolicy":"IfNotPresent","imagePullSecrets":[],"k8sIngress":{"enableHttps":false,"enabled":false,"gatewayName":"ingressgateway"},"localityLbSetting":{"enabled":true},"logging":{"level":"default:info"},"meshExpansion":{"enabled":false,"useILB":false},"meshID":"","meshNetworks":{},"monitoringPort":15014,"mtls":{"auto":false,"enabled":true},"multiCluster":{"clusterName":"","enabled":false},"network":"","oneNamespace":false,"operatorManageWebhooks":false,"outboundTrafficPolicy":{"mode":"ALLOW_ANY"},"policyCheckFailOpen":false,"priorityClassName":"","proxy":{"accessLogEncoding":"TEXT","accessLogFile":"","accessLogFormat":"","autoInject":"enabled","clusterDomain":"cluster.local","componentLogLevel":"","concurrency":2,"dnsRefreshRate":"300s","enableCoreDump":false,"enableCoreDumpImage":"ubuntu:xenial","envoyAccessLogService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyMetricsService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyStatsd":{"enabled":false,"host":null,"port":null},"excludeIPRanges":"","excludeInboundPorts":"","excludeOutboundPorts":"","image":"proxyv2","includeIPRanges":"*","includeInboundPorts":"*","init":{"resources":{"limits":{"cpu":"100m","memory":"50Mi"},"requests":{"cpu":"10m","memory":"10Mi"}}},"kubevirtInterfaces":"","logLevel":"","privileged":false,"protocolDetectionTimeout":"5000ms","readinessFailureThreshold":30,"readinessInitialDelaySeconds":1,"readinessPeriodSeconds":2,"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"statusPort":15020,"tracer":"zipkin"},"proxy_init":{"image":"proxyv2"},"sds":{"enabled":false,"token":{"aud":"istio-ca"},"udsPath":""},"tag":"1.4.10-gke.5","tracer":{"datadog":{"address":"$(HOST_IP):8126"},"lightstep":{"accessToken":"","address":"","cacertPath":"","secure":true},"stackdriver":{"debug":false,"maxNumberOfAnnotations":200,"maxNumberOfAttributes":200,"maxNumberOfMessageEvents":200},"zipkin":{"address":""}},"trustDomain":"","trustDomainAliases":[],"useMCP":true},"image":"citadel","nodeSelector":{},"podAnnotations":{},"podAntiAffinityLabelSelector":[],"podAntiAffinityTermLabelSelector":[],"replicaCount":1,"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%","selfSigned":true,"tolerations":[],"workloadCertTtl":"2160h"},"sidecarInjectorWebhook":{"alwaysInjectSelector":[],"enableNamespacesByDefault":false,"enabled":true,"global":{"arch":{"amd64":2,"ppc64le":2,"s390x":2},"certificates":[],"configValidation":true,"controlPlaneSecurityEnabled":true,"defaultNodeSelector":{},"defaultPodDisruptionBudget":{"enabled":false},"defaultResources":{"requests":{"cpu":"10m"}},"defaultTolerations":[],"disablePolicyChecks":false,"enableHelmTest":false,"enableTracing":true,"hub":"gke.gcr.io/istio","imagePullPolicy":"IfNotPresent","imagePullSecrets":[],"k8sIngress":{"enableHttps":false,"enabled":false,"gatewayName":"ingressgateway"},"localityLbSetting":{"enabled":true},"logging":{"level":"default:info"},"meshExpansion":{"enabled":false,"useILB":false},"meshID":"","meshNetworks":{},"monitoringPort":15014,"mtls":{"auto":false,"enabled":true},"multiCluster":{"clusterName":"","enabled":false},"network":"","oneNamespace":false,"operatorManageWebhooks":false,"outboundTrafficPolicy":{"mode":"ALLOW_ANY"},"policyCheckFailOpen":false,"priorityClassName":"","proxy":{"accessLogEncoding":"TEXT","accessLogFile":"","accessLogFormat":"","autoInject":"enabled","clusterDomain":"cluster.local","componentLogLevel":"","concurrency":2,"dnsRefreshRate":"300s","enableCoreDump":false,"enableCoreDumpImage":"ubuntu:xenial","envoyAccessLogService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyMetricsService":{"enabled":false,"host":null,"port":null,"tcpKeepalive":{"interval":"10s","probes":3,"time":"10s"},"tlsSettings":{"caCertificates":null,"clientCertificate":null,"mode":"DISABLE","privateKey":null,"sni":null,"subjectAltNames":[]}},"envoyStatsd":{"enabled":false,"host":null,"port":null},"excludeIPRanges":"","excludeInboundPorts":"","excludeOutboundPorts":"","image":"proxyv2","includeIPRanges":"*","includeInboundPorts":"*","init":{"resources":{"limits":{"cpu":"100m","memory":"50Mi"},"requests":{"cpu":"10m","memory":"10Mi"}}},"kubevirtInterfaces":"","logLevel":"","privileged":false,"protocolDetectionTimeout":"5000ms","readinessFailureThreshold":30,"readinessInitialDelaySeconds":1,"readinessPeriodSeconds":2,"resources":{"limits":{"cpu":"2000m","memory":"1024Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"statusPort":15020,"tracer":"zipkin"},"proxy_init":{"image":"proxyv2"},"sds":{"enabled":false,"token":{"aud":"istio-ca"},"udsPath":""},"tag":"1.4.10-gke.5","tracer":{"datadog":{"address":"$(HOST_IP):8126"},"lightstep":{"accessToken":"","address":"","cacertPath":"","secure":true},"stackdriver":{"debug":false,"maxNumberOfAnnotations":200,"maxNumberOfAttributes":200,"maxNumberOfMessageEvents":200},"zipkin":{"address":""}},"trustDomain":"","trustDomainAliases":[],"useMCP":true},"image":"sidecar_injector","injectedAnnotations":{},"neverInjectSelector":[],"nodeSelector":{},"podAnnotations":{},"podAntiAffinityLabelSelector":[],"podAntiAffinityTermLabelSelector":[],"replicaCount":1,"rewriteAppHTTPProbe":false,"rollingMaxSurge":"100%","rollingMaxUnavailable":"25%","tolerations":[]},"tracing":{"enabled":false}}'
 kind: ConfigMap
 metadata:
   labels:
@@ -7965,6 +8159,23 @@ kind: Service
 metadata:
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
+    k8s-app: istio
+    name: istio-operator
+  name: istio-operator
+  namespace: istio-operator
+spec:
+  ports:
+  - name: http-metrics
+    port: 8383
+    targetPort: 8383
+  selector:
+    name: istio-operator
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
     app: security
     chart: security
     heritage: Tiller
@@ -8015,7 +8226,7 @@ kind: Service
 metadata:
   annotations: null
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-ingressgateway
     chart: gateways
     heritage: Tiller
@@ -8188,6 +8399,51 @@ spec:
     addonmanager.kubernetes.io/mode: Reconcile
     app: promsd
     k8s-app: istio
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+    k8s-app: istio
+  name: istio-operator
+  namespace: istio-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: istio-operator
+  template:
+    metadata:
+      labels:
+        name: istio-operator
+    spec:
+      containers:
+      - command:
+        - operator
+        - server
+        env:
+        - name: WATCH_NAMESPACE
+          value: istio-system
+        - name: LEADER_ELECTION_NAMESPACE
+          value: istio-operator
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: OPERATOR_NAME
+          value: istio-operator
+        image: gke.gcr.io/istio/operator:1.6.9-gke.0
+        imagePullPolicy: IfNotPresent
+        name: istio-operator
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+      serviceAccountName: istio-operator
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -8405,7 +8661,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-ingressgateway
     chart: gateways
     heritage: Tiller
@@ -9557,7 +9813,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: attributemanifest
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: mixer
     heritage: Tiller
@@ -9700,7 +9956,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: attributemanifest
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: mixer
     heritage: Tiller
@@ -9767,7 +10023,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: handler
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: mixer
     heritage: Tiller
@@ -9783,7 +10039,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: handler
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: stackdriver
   namespace: istio-system
@@ -9962,7 +10218,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: mixer
     heritage: Tiller
@@ -10004,7 +10260,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: client-received-bytes-count
   namespace: istio-system
@@ -10040,7 +10296,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: client-request-bytes
   namespace: istio-system
@@ -10081,7 +10337,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: client-request-count
   namespace: istio-system
@@ -10122,7 +10378,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: client-response-bytes
   namespace: istio-system
@@ -10163,7 +10419,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: client-roundtrip-latencies
   namespace: istio-system
@@ -10204,7 +10460,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: client-sent-bytes-count
   namespace: istio-system
@@ -10240,7 +10496,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: mixer-request-count
   namespace: istio-system
@@ -10268,7 +10524,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: mixer-request-latency
   namespace: istio-system
@@ -10296,7 +10552,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: server-accesslog-stackdriver
   namespace: istio-system
@@ -10363,7 +10619,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: server-received-bytes-count
   namespace: istio-system
@@ -10402,7 +10658,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: server-request-bytes
   namespace: istio-system
@@ -10446,7 +10702,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: server-request-count
   namespace: istio-system
@@ -10490,7 +10746,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: server-response-bytes
   namespace: istio-system
@@ -10534,7 +10790,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: server-response-latencies
   namespace: istio-system
@@ -10578,7 +10834,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: server-sent-bytes-count
   namespace: istio-system
@@ -10617,7 +10873,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: server-tcp-accesslog-stackdriver
   namespace: istio-system
@@ -10672,7 +10928,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: stackdriver-edge
   namespace: istio-system
@@ -10695,7 +10951,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: instance
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: stackdriver-span
   namespace: istio-system
@@ -10739,7 +10995,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: rule
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: mixer
     heritage: Tiller
@@ -10757,7 +11013,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: rule
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: stackdriver-client
   namespace: istio-system
@@ -10776,7 +11032,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: rule
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: stackdriver-edge
   namespace: istio-system
@@ -10823,7 +11079,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: rule
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: stackdriver-mixer
   namespace: istio-system
@@ -10840,7 +11096,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: rule
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: stackdriver-server
   namespace: istio-system
@@ -10859,7 +11115,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: rule
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: stackdriver-tcp-client
   namespace: istio-system
@@ -10875,7 +11131,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: rule
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
   name: stackdriver-tcp-server
   namespace: istio-system
@@ -10906,7 +11162,7 @@ apiVersion: config.istio.io/v1alpha2
 kind: rule
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: mixer
     heritage: Tiller
@@ -10921,11 +11177,46 @@ spec:
     - attributes
   match: context.protocol == "tcp"
 ---
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+    k8s-app: istio
+  name: istio-1-6-9-gke-0
+  namespace: istio-system
+spec:
+  components:
+    ingressGateways:
+    - enabled: false
+      name: istio-ingressgateway
+  revision: istio-169
+  values:
+    global:
+      defaultPodDisruptionBudget:
+        enabled: false
+      disablePolicyChecks: false
+    mixer:
+      adapters:
+        prometheus:
+          enabled: false
+        useAdapterCRDs: true
+    prometheus:
+      enabled: false
+    telemetry:
+      enabled: true
+      v1:
+        enabled: false
+      v2:
+        enabled: true
+        stackdriver:
+          enabled: true
+---
 apiVersion: networking.istio.io/v1alpha3
 kind: DestinationRule
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: mixer
     heritage: Tiller
@@ -10954,7 +11245,7 @@ apiVersion: networking.istio.io/v1alpha3
 kind: DestinationRule
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: mixer
     heritage: Tiller
