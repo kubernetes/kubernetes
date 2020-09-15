@@ -29,12 +29,8 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -119,7 +115,6 @@ type genericScheduler struct {
 	cache                    internalcache.Cache
 	extenders                []framework.Extender
 	nodeInfoSnapshot         *internalcache.Snapshot
-	pvcLister                corelisters.PersistentVolumeClaimLister
 	percentageOfNodesToScore int32
 	nextStartNodeIndex       int
 }
@@ -137,11 +132,6 @@ func (g *genericScheduler) snapshot() error {
 func (g *genericScheduler) Schedule(ctx context.Context, prof *profile.Profile, state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
-
-	if err := podPassesBasicChecks(pod, g.pvcLister); err != nil {
-		return result, err
-	}
-	trace.Step("Basic checks done")
 
 	if err := g.snapshot(); err != nil {
 		return result, err
@@ -273,7 +263,6 @@ func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, prof *profil
 			filteredNodesStatuses[n.Node().Name] = s
 		}
 		return nil, filteredNodesStatuses, nil
-
 	}
 
 	feasibleNodes, err := g.findNodesThatPassFilters(ctx, prof, state, pod, filteredNodesStatuses)
@@ -584,57 +573,16 @@ func (g *genericScheduler) prioritizeNodes(
 	return result, nil
 }
 
-// podPassesBasicChecks makes sanity checks on the pod if it can be scheduled.
-func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeClaimLister) error {
-	// Check PVCs used by the pod
-	namespace := pod.Namespace
-	manifest := &(pod.Spec)
-	for i := range manifest.Volumes {
-		volume := &manifest.Volumes[i]
-		var pvcName string
-		ephemeral := false
-		switch {
-		case volume.PersistentVolumeClaim != nil:
-			pvcName = volume.PersistentVolumeClaim.ClaimName
-		case volume.Ephemeral != nil &&
-			utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume):
-			pvcName = pod.Name + "-" + volume.Name
-			ephemeral = true
-		default:
-			// Volume is not using a PVC, ignore
-			continue
-		}
-		pvc, err := pvcLister.PersistentVolumeClaims(namespace).Get(pvcName)
-		if err != nil {
-			// The error has already enough context ("persistentvolumeclaim "myclaim" not found")
-			return err
-		}
-
-		if pvc.DeletionTimestamp != nil {
-			return fmt.Errorf("persistentvolumeclaim %q is being deleted", pvc.Name)
-		}
-
-		if ephemeral &&
-			!metav1.IsControlledBy(pvc, pod) {
-			return fmt.Errorf("persistentvolumeclaim %q was not created for the pod", pvc.Name)
-		}
-	}
-
-	return nil
-}
-
 // NewGenericScheduler creates a genericScheduler object.
 func NewGenericScheduler(
 	cache internalcache.Cache,
 	nodeInfoSnapshot *internalcache.Snapshot,
 	extenders []framework.Extender,
-	pvcLister corelisters.PersistentVolumeClaimLister,
 	percentageOfNodesToScore int32) ScheduleAlgorithm {
 	return &genericScheduler{
 		cache:                    cache,
 		extenders:                extenders,
 		nodeInfoSnapshot:         nodeInfoSnapshot,
-		pvcLister:                pvcLister,
 		percentageOfNodesToScore: percentageOfNodesToScore,
 	}
 }
