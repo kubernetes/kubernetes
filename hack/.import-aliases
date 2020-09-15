@@ -45,7 +45,7 @@
   "k8s.io/kubelet/pkg/apis/pluginregistration/v1": "kubeletpluginregistrationv1",
   "k8s.io/kubelet/pkg/apis/pluginregistration/v1alpha1": "kubeletpluginregistrationv1alpha1",
   "k8s.io/kubelet/pkg/apis/pluginregistration/v1beta1": "kubeletpluginregistrationv1beta1",
-  "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1": "kubeletpodresourcesv1alpha1",
+  "k8s.io/kubelet/pkg/apis/podresources/v1alpha1": "kubeletpodresourcesv1alpha1",
   "k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1": "kubeletresourcemetricsv1alpha1",
   "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1": "kubeletstatsv1alpha1",
   "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1": "proxyconfigv1alpha1",

@@ -2351,6 +2351,7 @@ k8s.io/kubectl/pkg/validation
 k8s.io/kubelet/config/v1beta1
 k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1
 k8s.io/kubelet/pkg/apis/pluginregistration/v1
+k8s.io/kubelet/pkg/apis/podresources/v1alpha1
 # k8s.io/legacy-cloud-providers v0.0.0 => ./staging/src/k8s.io/legacy-cloud-providers
 ## explicit
 # k8s.io/legacy-cloud-providers => ./staging/src/k8s.io/legacy-cloud-providers
