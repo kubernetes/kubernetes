@@ -94,14 +94,22 @@ var NetexecImageName = imageutils.GetE2EImage(imageutils.Agnhost)
 // NewNetworkingTestConfig creates and sets up a new test config helper.
 func NewNetworkingTestConfig(f *framework.Framework, hostNetwork, SCTPEnabled bool) *NetworkingTestConfig {
 	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork, SCTPEnabled: SCTPEnabled}
+	config.EndpointPodHTTPPort = EndpointHTTPPort
+	config.EndpointPodUDPPort = EndpointUDPPort
+	config.EndpointPodSCTPPort = EndpointSCTPPort
 	ginkgo.By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setup(getServiceSelector())
 	return config
 }
 
 // NewHostNetworkingTestConfig creates and sets up a new test config helper using backend pods using host network.
-func NewHostNetworkingTestConfig(f *framework.Framework, hostNetwork bool) *NetworkingTestConfig {
+// we need to set an offset because the tests are run in parallel and, since the pods are using the hostNetwork,
+// they can not expose the same port or they will have a conflict and will not be scheduled
+func NewHostNetworkingTestConfig(f *framework.Framework, hostNetwork bool, portOffset int32) *NetworkingTestConfig {
 	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork, NetProxyHostNetwork: true}
+	config.EndpointPodHTTPPort = EndpointHTTPPort + portOffset
+	config.EndpointPodUDPPort = EndpointUDPPort + portOffset
+	config.EndpointPodSCTPPort = EndpointSCTPPort + portOffset
 	ginkgo.By(fmt.Sprintf("Performing setup for host networking test in namespace %v", config.Namespace))
 	config.setup(getServiceSelector())
 	return config
@@ -110,6 +118,9 @@ func NewHostNetworkingTestConfig(f *framework.Framework, hostNetwork bool) *Netw
 // NewCoreNetworkingTestConfig creates and sets up a new test config helper for Node E2E.
 func NewCoreNetworkingTestConfig(f *framework.Framework, hostNetwork bool) *NetworkingTestConfig {
 	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork}
+	config.EndpointPodHTTPPort = EndpointHTTPPort
+	config.EndpointPodUDPPort = EndpointUDPPort
+	config.EndpointPodSCTPPort = EndpointSCTPPort
 	ginkgo.By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setupCore(getServiceSelector())
 	return config
@@ -143,8 +154,14 @@ type NetworkingTestConfig struct {
 	// test config. Each invocation of `setup` creates a service with
 	// 1 pod per node running the netexecImage.
 	EndpointPods []*v1.Pod
-	f            *framework.Framework
-	podClient    *framework.PodClient
+	// EndpointPodHTTPPort is the pod port used for testing.
+	EndpointPodHTTPPort int32
+	// EndpointPodUDPPort is an endpoint UDP port for testing.
+	EndpointPodUDPPort int32
+	// EndpointPodSCTPPort is an endpoint SCTP port for testing.
+	EndpointPodSCTPPort int32
+	f                   *framework.Framework
+	podClient           *framework.PodClient
 	// NodePortService is a Service with Type=NodePort spanning over all
 	// endpointPods.
 	NodePortService *v1.Service
@@ -505,7 +522,7 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 		Handler: v1.Handler{
 			HTTPGet: &v1.HTTPGetAction{
 				Path: "/healthz",
-				Port: intstr.IntOrString{IntVal: EndpointHTTPPort},
+				Port: intstr.IntOrString{IntVal: config.EndpointPodHTTPPort},
 			},
 		},
 	}
@@ -526,17 +543,17 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Args: []string{
 						"netexec",
-						fmt.Sprintf("--http-port=%d", EndpointHTTPPort),
-						fmt.Sprintf("--udp-port=%d", EndpointUDPPort),
+						fmt.Sprintf("--http-port=%d", config.EndpointPodHTTPPort),
+						fmt.Sprintf("--udp-port=%d", config.EndpointPodUDPPort),
 					},
 					Ports: []v1.ContainerPort{
 						{
 							Name:          "http",
-							ContainerPort: EndpointHTTPPort,
+							ContainerPort: config.EndpointPodHTTPPort,
 						},
 						{
 							Name:          "udp",
-							ContainerPort: EndpointUDPPort,
+							ContainerPort: config.EndpointPodUDPPort,
 							Protocol:      v1.ProtocolUDP,
 						},
 					},
@@ -551,10 +568,10 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname stri
 	}
 	// we want sctp to be optional as it will load the sctp kernel module
 	if config.SCTPEnabled {
-		pod.Spec.Containers[0].Args = append(pod.Spec.Containers[0].Args, fmt.Sprintf("--sctp-port=%d", EndpointSCTPPort))
+		pod.Spec.Containers[0].Args = append(pod.Spec.Containers[0].Args, fmt.Sprintf("--sctp-port=%d", config.EndpointPodSCTPPort))
 		pod.Spec.Containers[0].Ports = append(pod.Spec.Containers[0].Ports, v1.ContainerPort{
 			Name:          "sctp",
-			ContainerPort: EndpointSCTPPort,
+			ContainerPort: config.EndpointPodSCTPPort,
 			Protocol:      v1.ProtocolSCTP,
 		})
 	}
@@ -606,8 +623,8 @@ func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, se
 		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeNodePort,
 			Ports: []v1.ServicePort{
-				{Port: ClusterHTTPPort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(EndpointHTTPPort)},
-				{Port: ClusterUDPPort, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(EndpointUDPPort)},
+				{Port: ClusterHTTPPort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(int(config.EndpointPodHTTPPort))},
+				{Port: ClusterUDPPort, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(int(config.EndpointPodUDPPort))},
 			},
 			Selector:        selector,
 			SessionAffinity: sessionAffinity,
