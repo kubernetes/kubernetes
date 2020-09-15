@@ -53,8 +53,9 @@ const (
 	// EndpointUDPPort is an endpoint UDP port for testing.
 	EndpointUDPPort = 8081
 	// EndpointSCTPPort is an endpoint SCTP port for testing.
-	EndpointSCTPPort      = 8082
-	testContainerHTTPPort = 8080
+	EndpointSCTPPort = 8082
+	// testContainerHTTPPort is the test container http port.
+	testContainerHTTPPort = 9080
 	// ClusterHTTPPort is a cluster HTTP port for testing.
 	ClusterHTTPPort = 80
 	// ClusterUDPPort is a cluster UDP port for testing.
@@ -573,8 +574,7 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Args: []string{
 						"netexec",
-						fmt.Sprintf("--http-port=%d", EndpointHTTPPort),
-						fmt.Sprintf("--udp-port=%d", EndpointUDPPort),
+						fmt.Sprintf("--http-port=%d", testContainerHTTPPort),
 					},
 					Ports: []v1.ContainerPort{
 						{
@@ -585,10 +585,6 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 				},
 			},
 		},
-	}
-	// we want sctp to be optional as it will load the sctp kernel module
-	if config.SCTPEnabled {
-		pod.Spec.Containers[0].Args = append(pod.Spec.Containers[0].Args, fmt.Sprintf("--sctp-port=%d", EndpointSCTPPort))
 	}
 	return pod
 }
