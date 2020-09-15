@@ -27,6 +27,11 @@ var (
 	parallelism = 16
 )
 
+// GetParallelism returns the currently set parallelism.
+func GetParallelism() int {
+	return parallelism
+}
+
 // SetParallelism sets the parallelism for all scheduler algorithms.
 // TODO(#95952): Remove global setter in favor of a struct that holds the configuration.
 func SetParallelism(p int) {

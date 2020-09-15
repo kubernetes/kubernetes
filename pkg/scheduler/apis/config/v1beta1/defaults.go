@@ -163,6 +163,15 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 	}
 }
 
+func SetDefaults_DefaultPreemptionArgs(obj *v1beta1.DefaultPreemptionArgs) {
+	if obj.MinCandidateNodesPercentage == nil {
+		obj.MinCandidateNodesPercentage = pointer.Int32Ptr(10)
+	}
+	if obj.MinCandidateNodesAbsolute == nil {
+		obj.MinCandidateNodesAbsolute = pointer.Int32Ptr(100)
+	}
+}
+
 func SetDefaults_InterPodAffinityArgs(obj *v1beta1.InterPodAffinityArgs) {
 	// Note that an object is created manually in cmd/kube-scheduler/app/options/deprecated.go
 	// DeprecatedOptions#ApplyTo.

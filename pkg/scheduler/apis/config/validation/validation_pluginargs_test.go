@@ -24,6 +24,55 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
+func TestValidateDefaultPreemptionArgs(t *testing.T) {
+	cases := map[string]struct {
+		args    config.DefaultPreemptionArgs
+		wantErr string
+	}{
+		"valid args (default)": {
+			args: config.DefaultPreemptionArgs{
+				MinCandidateNodesPercentage: 10,
+				MinCandidateNodesAbsolute:   100,
+			},
+		},
+		"negative minCandidateNodesPercentage": {
+			args: config.DefaultPreemptionArgs{
+				MinCandidateNodesPercentage: -1,
+				MinCandidateNodesAbsolute:   100,
+			},
+			wantErr: "minCandidateNodesPercentage is not in the range [0, 100]",
+		},
+		"minCandidateNodesPercentage over 100": {
+			args: config.DefaultPreemptionArgs{
+				MinCandidateNodesPercentage: 900,
+				MinCandidateNodesAbsolute:   100,
+			},
+			wantErr: "minCandidateNodesPercentage is not in the range [0, 100]",
+		},
+		"negative minCandidateNodesAbsolute": {
+			args: config.DefaultPreemptionArgs{
+				MinCandidateNodesPercentage: 20,
+				MinCandidateNodesAbsolute:   -1,
+			},
+			wantErr: "minCandidateNodesAbsolute is not in the range [0, inf)",
+		},
+		"all zero": {
+			args: config.DefaultPreemptionArgs{
+				MinCandidateNodesPercentage: 0,
+				MinCandidateNodesAbsolute:   0,
+			},
+			wantErr: "both minCandidateNodesPercentage and minCandidateNodesAbsolute cannot be zero",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := ValidateDefaultPreemptionArgs(tc.args)
+			assertErr(t, tc.wantErr, err)
+		})
+	}
+}
+
 func TestValidateInterPodAffinityArgs(t *testing.T) {
 	cases := map[string]struct {
 		args    config.InterPodAffinityArgs
