@@ -21,12 +21,12 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	goatomic "sync/atomic"
 
 	"go.uber.org/atomic"
 
-	"k8s.io/klog/v2"
-
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 )
 
 // terminationLoggingListener wraps the given listener to mark late connections
@@ -41,10 +41,13 @@ type terminationLoggingListener struct {
 	lateStopCh <-chan struct{}
 }
 
+type eventfFunc func(eventType, reason, messageFmt string, args ...interface{})
+
 var (
 	lateConnectionRemoteAddrsLock sync.RWMutex
-	lateConnectionRemoteAddrs     map[string]bool = map[string]bool{}
-	lateConnectionEventf          func(eventType, reason, messageFmt string, args ...interface{})
+	lateConnectionRemoteAddrs     = map[string]bool{}
+
+	unexpectedRequestsEventf goatomic.Value
 )
 
 func (l *terminationLoggingListener) Accept() (net.Conn, error) {
@@ -74,24 +77,17 @@ func WithLateConnectionFilter(handler http.Handler) http.Handler {
 		lateConnectionRemoteAddrsLock.RUnlock()
 
 		if late {
-			// ignore connections to local IP. Those clients better know what they are doing.
-			local := false
-			host, _, err := net.SplitHostPort(r.RemoteAddr)
-			if err != nil {
-				// ignore error and keep going
-			} else if ip := net.ParseIP(host); ip != nil {
-				local = ip.IsLoopback()
-			}
-
-			if pth := "/" + strings.TrimLeft(r.URL.Path, "/"); pth != "/readyz" && pth != "/healthz" {
-				if local {
-					klog.V(4).Infof("Request from loopback client %s to %q (user agent %q) through connection created very late in the graceful termination process (more than 80%% has passed). This client probably does not watch /readyz and might get failures when termination is over.", r.RemoteAddr, r.URL.Path, r.UserAgent())
+			if pth := "/" + strings.TrimLeft(r.URL.Path, "/"); pth != "/readyz" && pth != "/healthz" && pth != "/livez" {
+				if isLocal(r) {
+					klog.V(4).Infof("Loopback request to %q (user agent %q) through connection created very late in the graceful termination process (more than 80%% has passed). This client probably does not watch /readyz and might get failures when termination is over.", r.URL.Path, r.UserAgent())
 				} else {
-					klog.Warningf("Request from %s to %q (user agent %q) through connection created very late in the graceful termination process (more than 80%% has passed), possibly a sign for a broken load balancer setup.", r.RemoteAddr, r.URL.Path, r.UserAgent())
+					klog.Warningf("Request to %q (source IP %s, user agent %q) through a connection created very late in the graceful termination process (more than 80%% has passed), possibly a sign for a broken load balancer setup.", r.URL.Path, r.RemoteAddr, r.UserAgent())
 
 					// create only one event to avoid event spam.
-					if swapped := lateRequestReceived.CAS(false, true); swapped && lateConnectionEventf != nil {
-						lateConnectionEventf(corev1.EventTypeWarning, "LateConnections", "The apiserver received connections (e.g. from %q, user agent %q) very late in the graceful termination process, possibly a sign for a broken load balancer setup.", r.RemoteAddr, r.UserAgent())
+					var eventf eventfFunc
+					eventf, _ = unexpectedRequestsEventf.Load().(eventfFunc)
+					if swapped := lateRequestReceived.CAS(false, true); swapped && eventf != nil {
+						eventf(corev1.EventTypeWarning, "LateConnections", "The apiserver received connections (e.g. from %q, user agent %q) very late in the graceful termination process, possibly a sign for a broken load balancer setup.", r.RemoteAddr, r.UserAgent())
 					}
 				}
 			}
@@ -99,4 +95,49 @@ func WithLateConnectionFilter(handler http.Handler) http.Handler {
 
 		handler.ServeHTTP(w, r)
 	})
+}
+
+// WithNonReadyRequestLogging rejects the request until the process has been ready once.
+func WithNonReadyRequestLogging(handler http.Handler, hasBeenReadyCh <-chan struct{}) http.Handler {
+	var nonReadyRequestReceived atomic.Bool
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if hasBeenReadyCh != nil {
+			select {
+			case <-hasBeenReadyCh:
+				handler.ServeHTTP(w, r)
+				return
+			default:
+			}
+		}
+
+		// ignore connections to local IP. Those clients better know what they are doing.
+		if pth := "/" + strings.TrimLeft(r.URL.Path, "/"); pth != "/readyz" && pth != "/healthz" && pth != "/livez" {
+			if isLocal(r) {
+				klog.V(2).Infof("Loopback request to %q (user agent %q) before server is ready. This client probably does not watch /readyz and might get inconsistent answers.", r.URL.Path, r.UserAgent())
+			} else {
+				klog.Warningf("Request to %q (source IP %s, user agent %q) before server is ready, possibly a sign for a broken load balancer setup.", r.URL.Path, r.RemoteAddr, r.UserAgent())
+
+				// create only one event to avoid event spam.
+				var eventf eventfFunc
+				eventf, _ = unexpectedRequestsEventf.Load().(eventfFunc)
+				if swapped := nonReadyRequestReceived.CAS(false, true); swapped && eventf != nil {
+					eventf(corev1.EventTypeWarning, "NonReadyRequests", "The kube-apiserver received requests (e.g. from %q, user agent %q, accessing %s) before it was ready, possibly a sign for a broken load balancer setup.", r.RemoteAddr, r.UserAgent(), r.URL.Path)
+				}
+			}
+		}
+
+		handler.ServeHTTP(w, r)
+	})
+}
+
+func isLocal(req *http.Request) bool {
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		// ignore error and keep going
+	} else if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback()
+	}
+
+	return false
 }
