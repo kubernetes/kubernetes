@@ -155,7 +155,7 @@ filegroup(
     srcs = select(for_platforms(
         for_server = [
             "//cmd/kubemark",
-            "//test/e2e_node:e2e_node.test_binary",
+            "//test/e2e_node:e2e_node.test",
         ],
         for_test = [
             "//cmd/gendocs",
@@ -164,7 +164,7 @@ filegroup(
             "//cmd/genswaggertypedocs",
             "//cmd/genyaml",
             "//cmd/linkcheck",
-            "//test/e2e:e2e.test_binary",
+            "//test/e2e:e2e.test",
             "//vendor/github.com/onsi/ginkgo/ginkgo",
             "//cluster/images/conformance/go-runner",
         ],

@@ -22,9 +22,13 @@ build --define gotags=selinux
 # This flag requires Bazel 0.5.0+
 build --sandbox_fake_username
 
+# Output go_build_mode metadata for binaries. This metadata is used for
+# executable selection e.g. in CI.
+build --aspects //build:go.bzl%go_build_mode_aspect
+
 # Enable go race detection.
-build:unit --features=race
-test:unit --features=race
+build:unit --@io_bazel_rules_go//go/config:race
+test:unit --@io_bazel_rules_go//go/config:race
 
 test:unit --build_tests_only
 test:unit --test_tag_filters=-e2e,-integration

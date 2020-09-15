@@ -45,11 +45,11 @@ genrule(
     srcs = [
         "//test/e2e:all-srcs",
         "//test/e2e_node:all-srcs",
-        "//test/e2e:e2e.test_binary",
+        "//test/e2e:e2e.test",
         "//vendor/github.com/onsi/ginkgo/ginkgo",
     ],
     outs = ["specsummaries.json"],
-    cmd = "$(location //vendor/github.com/onsi/ginkgo/ginkgo) --dryRun=true --focus=[Conformance] $(location //test/e2e:e2e.test_binary) -- --spec-dump $$(pwd)/$@ > /dev/null",
+    cmd = "$(location //vendor/github.com/onsi/ginkgo/ginkgo) --dryRun=true --focus=[Conformance] $(location //test/e2e:e2e.test) -- --spec-dump $$(pwd)/$@ > /dev/null",
     message = "Getting all conformance spec summaries.",
 )
 
