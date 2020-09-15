@@ -35,7 +35,10 @@ type Snapshot struct {
 	nodeInfoList []*schedulernodeinfo.NodeInfo
 	// havePodsWithAffinityNodeInfoList is the list of nodes with at least one pod declaring affinity terms.
 	havePodsWithAffinityNodeInfoList []*schedulernodeinfo.NodeInfo
-	generation                       int64
+	// havePodsWithRequiredAntiAffinityNodeInfoList is the list of nodes with at least one
+	// pod declaring required anti-affinity terms.
+	havePodsWithRequiredAntiAffinityNodeInfoList []*schedulernodeinfo.NodeInfo
+	generation                                   int64
 }
 
 var _ schedulerlisters.SharedLister = &Snapshot{}
@@ -52,10 +55,14 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	nodeInfoMap := createNodeInfoMap(pods, nodes)
 	nodeInfoList := make([]*schedulernodeinfo.NodeInfo, 0, len(nodeInfoMap))
 	havePodsWithAffinityNodeInfoList := make([]*schedulernodeinfo.NodeInfo, 0, len(nodeInfoMap))
+	havePodsWithRequiredAntiAffinityNodeInfoList := make([]*schedulernodeinfo.NodeInfo, 0, len(nodeInfoMap))
 	for _, v := range nodeInfoMap {
 		nodeInfoList = append(nodeInfoList, v)
 		if len(v.PodsWithAffinity()) > 0 {
 			havePodsWithAffinityNodeInfoList = append(havePodsWithAffinityNodeInfoList, v)
+		}
+		if len(v.PodsWithRequiredAntiAffinity()) > 0 {
+			havePodsWithRequiredAntiAffinityNodeInfoList = append(havePodsWithRequiredAntiAffinityNodeInfoList, v)
 		}
 	}
 
@@ -63,6 +70,7 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	s.nodeInfoMap = nodeInfoMap
 	s.nodeInfoList = nodeInfoList
 	s.havePodsWithAffinityNodeInfoList = havePodsWithAffinityNodeInfoList
+	s.havePodsWithRequiredAntiAffinityNodeInfoList = havePodsWithRequiredAntiAffinityNodeInfoList
 
 	return s
 }
@@ -175,6 +183,11 @@ func (s *Snapshot) List() ([]*schedulernodeinfo.NodeInfo, error) {
 // HavePodsWithAffinityList returns the list of nodes with at least one pods with inter-pod affinity
 func (s *Snapshot) HavePodsWithAffinityList() ([]*schedulernodeinfo.NodeInfo, error) {
 	return s.havePodsWithAffinityNodeInfoList, nil
+}
+
+// HavePodsWithRequiredAntiAffinityList returns the list of nodes with at least one pods with inter-pod affinity
+func (s *Snapshot) HavePodsWithRequiredAntiAffinityList() ([]*schedulernodeinfo.NodeInfo, error) {
+	return s.havePodsWithRequiredAntiAffinityNodeInfoList, nil
 }
 
 // Get returns the NodeInfo of the given node name.

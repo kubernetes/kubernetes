@@ -229,13 +229,13 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, allNodes []*nodeinfo.Node
 			klog.Error("node not found")
 			return
 		}
-		for _, existingPod := range nodeInfo.PodsWithAffinity() {
+		for _, existingPod := range nodeInfo.PodsWithRequiredAntiAffinity() {
 			existingPodTopologyMaps, err := getMatchingAntiAffinityTopologyPairsOfPod(pod, existingPod, node)
 			if err != nil {
 				errCh.SendErrorWithCancel(err, cancel)
 				return
 			}
-			if existingPodTopologyMaps != nil {
+			if len(existingPodTopologyMaps) != 0 {
 				appendResult(existingPodTopologyMaps)
 			}
 		}
@@ -334,7 +334,7 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework
 	if allNodes, err = pl.sharedLister.NodeInfos().List(); err != nil {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("failed to list NodeInfos: %v", err))
 	}
-	if havePodsWithAffinityNodes, err = pl.sharedLister.NodeInfos().HavePodsWithAffinityList(); err != nil {
+	if havePodsWithAffinityNodes, err = pl.sharedLister.NodeInfos().HavePodsWithRequiredAntiAffinityList(); err != nil {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("failed to list NodeInfos with pods with affinity: %v", err))
 	}
 
