@@ -221,9 +221,10 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 	if !bytes.Equal(caCurrent, caExpected) {
 		return errors.Errorf("a kubeconfig file %q exists already but has got the wrong CA cert", kubeConfigFilePath)
 	}
-	// If the current API Server location on disk doesn't match the expected API server, error out because we have a file, but it's stale
+	// If the current API Server location on disk doesn't match the expected API server, show a warning
 	if currentConfig.Clusters[currentCluster].Server != config.Clusters[expectedCluster].Server {
-		return errors.Errorf("a kubeconfig file %q exists already but has got the wrong API Server URL", kubeConfigFilePath)
+		klog.Warningf("a kubeconfig file %q exists already but has an unexpected API Server URL: expected: %s, got: %s",
+			kubeConfigFilePath, config.Clusters[expectedCluster].Server, currentConfig.Clusters[currentCluster].Server)
 	}
 
 	return nil
@@ -331,13 +332,6 @@ func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec, clustername st
 
 // ValidateKubeconfigsForExternalCA check if the kubeconfig file exist and has the expected CA and server URL using kubeadmapi.InitConfiguration.
 func ValidateKubeconfigsForExternalCA(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	kubeConfigFileNames := []string{
-		kubeadmconstants.AdminKubeConfigFileName,
-		kubeadmconstants.KubeletKubeConfigFileName,
-		kubeadmconstants.ControllerManagerKubeConfigFileName,
-		kubeadmconstants.SchedulerKubeConfigFileName,
-	}
-
 	// Creates a kubeconfig file with the target CA and server URL
 	// to be used as a input for validating user provided kubeconfig files
 	caCert, err := pkiutil.TryLoadCertFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
@@ -345,19 +339,42 @@ func ValidateKubeconfigsForExternalCA(outDir string, cfg *kubeadmapi.InitConfigu
 		return errors.Wrapf(err, "the CA file couldn't be loaded")
 	}
 
+	// validate user provided kubeconfig files for the scheduler and controller-manager
+	localAPIEndpoint, err := kubeadmutil.GetLocalAPIEndpoint(&cfg.LocalAPIEndpoint)
+	if err != nil {
+		return err
+	}
+
+	validationConfigLocal := kubeconfigutil.CreateBasic(localAPIEndpoint, "dummy", "dummy", pkiutil.EncodeCertPEM(caCert))
+	kubeConfigFileNamesLocal := []string{
+		kubeadmconstants.ControllerManagerKubeConfigFileName,
+		kubeadmconstants.SchedulerKubeConfigFileName,
+	}
+
+	for _, kubeConfigFileName := range kubeConfigFileNamesLocal {
+		if err = validateKubeConfig(outDir, kubeConfigFileName, validationConfigLocal); err != nil {
+			return errors.Wrapf(err, "the %s file does not exists or it is not valid", kubeConfigFileName)
+		}
+	}
+
+	// validate user provided kubeconfig files for the kubelet and admin
 	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
 	if err != nil {
 		return err
 	}
 
-	validationConfig := kubeconfigutil.CreateBasic(controlPlaneEndpoint, "dummy", "dummy", pkiutil.EncodeCertPEM(caCert))
+	validationConfigCPE := kubeconfigutil.CreateBasic(controlPlaneEndpoint, "dummy", "dummy", pkiutil.EncodeCertPEM(caCert))
+	kubeConfigFileNamesCPE := []string{
+		kubeadmconstants.AdminKubeConfigFileName,
+		kubeadmconstants.KubeletKubeConfigFileName,
+	}
 
-	// validate user provided kubeconfig files
-	for _, kubeConfigFileName := range kubeConfigFileNames {
-		if err = validateKubeConfig(outDir, kubeConfigFileName, validationConfig); err != nil {
+	for _, kubeConfigFileName := range kubeConfigFileNamesCPE {
+		if err = validateKubeConfig(outDir, kubeConfigFileName, validationConfigCPE); err != nil {
 			return errors.Wrapf(err, "the %s file does not exists or it is not valid", kubeConfigFileName)
 		}
 	}
+
 	return nil
 }
 
