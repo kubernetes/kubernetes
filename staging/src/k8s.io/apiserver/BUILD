@@ -37,6 +37,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/authorization/union:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/endpoints:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/features:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/quota/v1:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/registry:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/server:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/storage:all-srcs",

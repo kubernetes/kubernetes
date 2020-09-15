@@ -22,8 +22,6 @@ go_library(
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/apis/core/v1/helper/qos:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/quota/v1:go_default_library",
-        "//pkg/quota/v1/generic:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -32,6 +30,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/quota/v1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/quota/v1/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ],
 )
@@ -46,14 +46,14 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/quota/v1:go_default_library",
-        "//pkg/quota/v1/generic:go_default_library",
         "//pkg/util/node:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/quota/v1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/quota/v1/generic:go_default_library",
     ],
 )
 

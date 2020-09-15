@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	podpriority "k8s.io/kubernetes/plugin/pkg/admission/priority"
-	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
 	"k8s.io/kubernetes/plugin/pkg/admission/runtimeclass"
 	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
 	"k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
@@ -56,6 +55,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
+	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
 	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
 	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
 )
