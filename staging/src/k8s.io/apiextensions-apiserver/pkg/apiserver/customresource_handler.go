@@ -849,6 +849,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				reqScope.Kind,
 				reqScope.HubGroupVersion,
 				crd.Spec.PreserveUnknownFields,
+				false,
 			)
 			if err != nil {
 				return nil, err
@@ -876,6 +877,21 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		// override status subresource values
 		// shallow copy
 		statusScope := *requestScopes[v.Name]
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+			statusScope.FieldManager, err = fieldmanager.NewDefaultCRDFieldManager(
+				openAPIModels,
+				statusScope.Convertor,
+				statusScope.Defaulter,
+				statusScope.Creater,
+				statusScope.Kind,
+				statusScope.HubGroupVersion,
+				crd.Spec.PreserveUnknownFields,
+				true,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
 		statusScope.Subresource = "status"
 		statusScope.Namer = handlers.ContextBasedNaming{
 			SelfLinker:         meta.NewAccessor(),

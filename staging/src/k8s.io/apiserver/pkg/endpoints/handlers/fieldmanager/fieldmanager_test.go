@@ -86,10 +86,14 @@ type TestFieldManager struct {
 }
 
 func NewDefaultTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
-	return NewTestFieldManager(gvk, nil)
+	return NewTestFieldManager(gvk, false, nil)
 }
 
-func NewTestFieldManager(gvk schema.GroupVersionKind, chainFieldManager func(fieldmanager.Manager) fieldmanager.Manager) TestFieldManager {
+func NewSubresourceTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
+	return NewTestFieldManager(gvk, true, nil)
+}
+
+func NewTestFieldManager(gvk schema.GroupVersionKind, ignoreManagedFieldsFromRequestObject bool, chainFieldManager func(fieldmanager.Manager) fieldmanager.Manager) TestFieldManager {
 	m := NewFakeOpenAPIModels()
 	typeConverter := NewFakeTypeConverter(m)
 	converter := internal.NewVersionConverter(typeConverter, &fakeObjectConvertor{}, gvk.GroupVersion())
@@ -118,7 +122,7 @@ func NewTestFieldManager(gvk schema.GroupVersionKind, chainFieldManager func(fie
 		f = chainFieldManager(f)
 	}
 	return TestFieldManager{
-		fieldManager: fieldmanager.NewFieldManager(f),
+		fieldManager: fieldmanager.NewFieldManager(f, ignoreManagedFieldsFromRequestObject),
 		emptyObj:     live,
 		liveObj:      live.DeepCopyObject(),
 	}
@@ -1232,4 +1236,57 @@ func getLastApplied(obj runtime.Object) (string, error) {
 		return "", fmt.Errorf("expected last applied annotation, but got none for object: %v", obj)
 	}
 	return lastApplied, nil
+}
+
+func TestUpdateViaSubresources(t *testing.T) {
+	f := NewSubresourceTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
+
+	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal([]byte(`{
+		"apiVersion": "v1",
+		"kind": "Pod",
+		"metadata": {
+			"labels": {
+				"a":"b"
+			},
+		}
+	}`), &obj.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+	obj.SetManagedFields([]metav1.ManagedFieldsEntry{
+		{
+			Manager:    "test",
+			Operation:  metav1.ManagedFieldsOperationApply,
+			APIVersion: "apps/v1",
+			FieldsType: "FieldsV1",
+			FieldsV1: &metav1.FieldsV1{
+				[]byte(`{"f:metadata":{"f:labels":{"f:another_field":{}}}}`),
+			},
+		},
+	})
+
+	// Check that managed fields cannot be changed via subresources
+	expectedManager := "fieldmanager_test_subresource"
+	if err := f.Update(obj, expectedManager); err != nil {
+		t.Fatalf("failed to apply object: %v", err)
+	}
+
+	managedFields := f.ManagedFields()
+	if len(managedFields) != 1 {
+		t.Fatalf("Expected new managed fields to have one entry. Got:\n%#v", managedFields)
+	}
+	if managedFields[0].Manager != expectedManager {
+		t.Fatalf("Expected first item to have manager set to: %s. Got: %s", expectedManager, managedFields[0].Manager)
+	}
+
+	// Check that managed fields cannot be reset via subresources
+	newObj := obj.DeepCopy()
+	newObj.SetManagedFields([]metav1.ManagedFieldsEntry{})
+	if err := f.Update(newObj, expectedManager); err != nil {
+		t.Fatalf("failed to apply object: %v", err)
+	}
+	newManagedFields := f.ManagedFields()
+	if len(newManagedFields) != 1 {
+		t.Fatalf("Expected new managed fields to have one entry. Got:\n%#v", newManagedFields)
+	}
 }

@@ -1582,7 +1582,108 @@ func TestErrorsDontFailPatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to patch object with empty FieldsType: %v", err)
 	}
+}
 
+func TestApplyDoesNotChangeManagedFieldsViaSubresources(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	podBytes := []byte(`{
+		"apiVersion": "v1",
+		"kind": "Pod",
+		"metadata": {
+			"name": "just-a-pod"
+		},
+		"spec": {
+			"containers": [{
+				"name":  "test-container-a",
+				"image": "test-image-one"
+			}]
+		}
+	}`)
+
+	liveObj, err := client.CoreV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("pods").
+		Name("just-a-pod").
+		Body(podBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	updateBytes := []byte(`{
+		"metadata": {
+			"managedFields": [{
+				"manager":"testing",
+				"operation":"Update",
+				"apiVersion":"v1",
+				"fieldsType":"FieldsV1",
+				"fieldsV1":{
+					"f:spec":{
+						"f:containers":{
+							"k:{\"name\":\"testing\"}":{
+								".":{},
+								"f:image":{},
+								"f:name":{}
+							}
+						}
+					}
+				}
+			}]
+		},
+		"status": {
+			"conditions": [{"type": "MyStatus", "status":"true"}]
+		}
+	}`)
+
+	updateActor := "update_managedfields_test"
+	newObj, err := client.CoreV1().RESTClient().
+		Patch(types.MergePatchType).
+		Namespace("default").
+		Param("fieldManager", updateActor).
+		Name("just-a-pod").
+		Resource("pods").
+		SubResource("status").
+		Body(updateBytes).
+		Do(context.TODO()).
+		Get()
+
+	if err != nil {
+		t.Fatalf("Error updating subresource: %v ", err)
+	}
+
+	liveAccessor, err := meta.Accessor(liveObj)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor for live object: %v", err)
+	}
+	newAccessor, err := meta.Accessor(newObj)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor for new object: %v", err)
+	}
+
+	liveManagedFields := liveAccessor.GetManagedFields()
+	if len(liveManagedFields) != 1 {
+		t.Fatalf("Expected managedFields in the live object to have exactly one entry, got %d: %v", len(liveManagedFields), liveManagedFields)
+	}
+
+	newManagedFields := newAccessor.GetManagedFields()
+	if len(newManagedFields) != 2 {
+		t.Fatalf("Expected managedFields in the new object to have exactly two entries, got %d: %v", len(newManagedFields), newManagedFields)
+	}
+
+	if !reflect.DeepEqual(liveManagedFields[0], newManagedFields[0]) {
+		t.Fatalf("managedFields updated via subresource:\n\nlive managedFields: %v\nnew managedFields: %v\n\n", liveManagedFields, newManagedFields)
+	}
+
+	if newManagedFields[1].Manager != updateActor {
+		t.Fatalf(`Expected managerFields to have an entry with manager set to %q`, updateActor)
+	}
 }
 
 // TestClearManagedFieldsWithUpdateEmptyList verifies it's possible to clear the managedFields by sending an empty list.
