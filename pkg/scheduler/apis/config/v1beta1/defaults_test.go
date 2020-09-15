@@ -313,6 +313,24 @@ func TestPluginArgsDefaults(t *testing.T) {
 		want     runtime.Object
 	}{
 		{
+			name: "DefaultPreemptionArgs empty",
+			in:   &v1beta1.DefaultPreemptionArgs{},
+			want: &v1beta1.DefaultPreemptionArgs{
+				MinCandidateNodesPercentage: pointer.Int32Ptr(10),
+				MinCandidateNodesAbsolute:   pointer.Int32Ptr(100),
+			},
+		},
+		{
+			name: "DefaultPreemptionArgs with value",
+			in: &v1beta1.DefaultPreemptionArgs{
+				MinCandidateNodesPercentage: pointer.Int32Ptr(50),
+			},
+			want: &v1beta1.DefaultPreemptionArgs{
+				MinCandidateNodesPercentage: pointer.Int32Ptr(50),
+				MinCandidateNodesAbsolute:   pointer.Int32Ptr(100),
+			},
+		},
+		{
 			name: "InterPodAffinityArgs empty",
 			in:   &v1beta1.InterPodAffinityArgs{},
 			want: &v1beta1.InterPodAffinityArgs{

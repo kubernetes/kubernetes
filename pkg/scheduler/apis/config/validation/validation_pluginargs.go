@@ -26,6 +26,38 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
+// ValidateDefaultPreemptionArgs validates that DefaultPreemptionArgs are correct.
+func ValidateDefaultPreemptionArgs(args config.DefaultPreemptionArgs) error {
+	if err := validateMinCandidateNodesPercentage(args.MinCandidateNodesPercentage); err != nil {
+		return err
+	}
+	if err := validateMinCandidateNodesAbsolute(args.MinCandidateNodesAbsolute); err != nil {
+		return err
+	}
+	if args.MinCandidateNodesPercentage == 0 && args.MinCandidateNodesAbsolute == 0 {
+		return fmt.Errorf("both minCandidateNodesPercentage and minCandidateNodesAbsolute cannot be zero")
+	}
+	return nil
+}
+
+// validateMinCandidateNodesPercentage validates that
+// minCandidateNodesPercentage is within the allowed range.
+func validateMinCandidateNodesPercentage(minCandidateNodesPercentage int32) error {
+	if minCandidateNodesPercentage < 0 || minCandidateNodesPercentage > 100 {
+		return fmt.Errorf("minCandidateNodesPercentage is not in the range [0, 100]")
+	}
+	return nil
+}
+
+// validateMinCandidateNodesAbsolute validates that minCandidateNodesAbsolute
+// is within the allowed range.
+func validateMinCandidateNodesAbsolute(minCandidateNodesAbsolute int32) error {
+	if minCandidateNodesAbsolute < 0 {
+		return fmt.Errorf("minCandidateNodesAbsolute is not in the range [0, inf)")
+	}
+	return nil
+}
+
 // ValidateInterPodAffinityArgs validates that InterPodAffinityArgs are correct.
 func ValidateInterPodAffinityArgs(args config.InterPodAffinityArgs) error {
 	return ValidateHardPodAffinityWeight(field.NewPath("hardPodAffinityWeight"), args.HardPodAffinityWeight)

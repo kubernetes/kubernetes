@@ -10,6 +10,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/features:go_default_library",
+        "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/apis/config/validation:go_default_library",
         "//pkg/scheduler/core:go_default_library",
         "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/internal/parallelize:go_default_library",
@@ -51,6 +53,8 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/controller/volume/scheduling:go_default_library",
+        "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/apis/config/v1beta1:go_default_library",
         "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultbinder:go_default_library",
         "//pkg/scheduler/framework/plugins/interpodaffinity:go_default_library",
@@ -66,6 +70,7 @@ go_test(
         "//pkg/scheduler/framework/plugins/volumezone:go_default_library",
         "//pkg/scheduler/framework/runtime:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
+        "//pkg/scheduler/internal/parallelize:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
         "//pkg/scheduler/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -77,6 +82,7 @@ go_test(
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
         "//staging/src/k8s.io/client-go/tools/events:go_default_library",
+        "//staging/src/k8s.io/kube-scheduler/config/v1beta1:go_default_library",
         "//staging/src/k8s.io/kube-scheduler/extender/v1:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
     ],
