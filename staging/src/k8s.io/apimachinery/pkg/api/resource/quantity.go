@@ -394,7 +394,7 @@ func (_ Quantity) OpenAPISchemaType() []string { return []string{"string"} }
 
 // OpenAPISchemaFormat is used by the kube-openapi generator when constructing
 // the OpenAPI spec of this type.
-func (_ Quantity) OpenAPISchemaFormat() string { return "" }
+func (_ Quantity) OpenAPISchemaFormat() string { return "int-or-string" }
 
 // CanonicalizeBytes returns the canonical form of q and its suffix (see comment on Quantity).
 //
