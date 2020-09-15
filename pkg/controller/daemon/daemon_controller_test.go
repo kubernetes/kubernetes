@@ -521,15 +521,10 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	}
 
 	f.Start(stopCh)
-
-	cacheCtx, cancelCacheCtx := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancelCacheCtx()
-	ok := cache.WaitForNamedCacheSync(
-		"test dsc",
-		cacheCtx.Done(), f.Core().V1().Nodes().Informer().HasSynced,
-	)
-	if !ok {
-		t.Fatal("caches failed to sync")
+	for ty, ok := range f.WaitForCacheSync(stopCh) {
+		if !ok {
+			t.Fatalf("caches failed to sync: %v", ty)
+		}
 	}
 
 	expectStableQueueLength(0)
@@ -542,7 +537,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 
 	// create of DS adds to queue, processes
 	waitForQueueLength(1, "created DS")
-	ok = dsc.processNextWorkItem()
+	ok := dsc.processNextWorkItem()
 	if !ok {
 		t.Fatal("queue is shutting down")
 	}
