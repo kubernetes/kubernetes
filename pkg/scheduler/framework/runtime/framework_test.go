@@ -18,6 +18,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -1138,6 +1139,7 @@ func TestPostFilterPlugins(t *testing.T) {
 }
 
 func TestPreBindPlugins(t *testing.T) {
+	injectedStatusErr := errors.New("injected status")
 	tests := []struct {
 		name       string
 		plugins    []*TestPlugin
@@ -1166,7 +1168,7 @@ func TestPreBindPlugins(t *testing.T) {
 					inj:  injectedResult{PreBindStatus: int(v1alpha1.Unschedulable)},
 				},
 			},
-			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running "TestPlugin" prebind plugin for pod "": injected status`),
+			wantStatus: v1alpha1.AsStatus(fmt.Errorf(`error while running "TestPlugin" prebind plugin for pod "": %w`, injectedStatusErr)),
 		},
 		{
 			name: "ErrorPreBindPlugin",
@@ -1176,7 +1178,7 @@ func TestPreBindPlugins(t *testing.T) {
 					inj:  injectedResult{PreBindStatus: int(v1alpha1.Error)},
 				},
 			},
-			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running "TestPlugin" prebind plugin for pod "": injected status`),
+			wantStatus: v1alpha1.AsStatus(fmt.Errorf(`error while running "TestPlugin" prebind plugin for pod "": %w`, injectedStatusErr)),
 		},
 		{
 			name: "UnschedulablePreBindPlugin",
@@ -1186,7 +1188,7 @@ func TestPreBindPlugins(t *testing.T) {
 					inj:  injectedResult{PreBindStatus: int(v1alpha1.UnschedulableAndUnresolvable)},
 				},
 			},
-			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running "TestPlugin" prebind plugin for pod "": injected status`),
+			wantStatus: v1alpha1.AsStatus(fmt.Errorf(`error while running "TestPlugin" prebind plugin for pod "": %w`, injectedStatusErr)),
 		},
 		{
 			name: "SuccessErrorPreBindPlugins",
@@ -1200,7 +1202,7 @@ func TestPreBindPlugins(t *testing.T) {
 					inj:  injectedResult{PreBindStatus: int(v1alpha1.Error)},
 				},
 			},
-			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running "TestPlugin 1" prebind plugin for pod "": injected status`),
+			wantStatus: v1alpha1.AsStatus(fmt.Errorf(`error while running "TestPlugin 1" prebind plugin for pod "": %w`, injectedStatusErr)),
 		},
 		{
 			name: "ErrorSuccessPreBindPlugin",
@@ -1214,7 +1216,7 @@ func TestPreBindPlugins(t *testing.T) {
 					inj:  injectedResult{PreBindStatus: int(v1alpha1.Success)},
 				},
 			},
-			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running "TestPlugin" prebind plugin for pod "": injected status`),
+			wantStatus: v1alpha1.AsStatus(fmt.Errorf(`error while running "TestPlugin" prebind plugin for pod "": %w`, injectedStatusErr)),
 		},
 		{
 			name: "SuccessSuccessPreBindPlugin",
@@ -1242,7 +1244,7 @@ func TestPreBindPlugins(t *testing.T) {
 					inj:  injectedResult{PreBindStatus: int(v1alpha1.Error)},
 				},
 			},
-			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running "TestPlugin" prebind plugin for pod "": injected status`),
+			wantStatus: v1alpha1.AsStatus(fmt.Errorf(`error while running "TestPlugin" prebind plugin for pod "": %w`, injectedStatusErr)),
 		},
 		{
 			name: "UnschedulableAndSuccessPreBindPlugin",
@@ -1256,7 +1258,7 @@ func TestPreBindPlugins(t *testing.T) {
 					inj:  injectedResult{PreBindStatus: int(v1alpha1.Success)},
 				},
 			},
-			wantStatus: v1alpha1.NewStatus(v1alpha1.Error, `error while running "TestPlugin" prebind plugin for pod "": injected status`),
+			wantStatus: v1alpha1.AsStatus(fmt.Errorf(`error while running "TestPlugin" prebind plugin for pod "": %w`, injectedStatusErr)),
 		},
 	}
 

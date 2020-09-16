@@ -210,6 +210,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 	errS := errors.New("scheduler")
 	errB := errors.New("binder")
+	preBindErr := errors.New("on PreBind")
 
 	table := []struct {
 		name                string
@@ -255,12 +256,12 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			sendPod: podWithID("foo", ""),
 			algo:    mockScheduler{core.ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
 			registerPluginFuncs: []st.RegisterPluginFunc{
-				st.RegisterPreBindPlugin("FakePreBind", st.NewFakePreBindPlugin(framework.NewStatus(framework.Error, "prebind error"))),
+				st.RegisterPreBindPlugin("FakePreBind", st.NewFakePreBindPlugin(framework.AsStatus(preBindErr))),
 			},
 			expectErrorPod:   podWithID("foo", testNode.Name),
 			expectForgetPod:  podWithID("foo", testNode.Name),
 			expectAssumedPod: podWithID("foo", testNode.Name),
-			expectError:      errors.New(`error while running "FakePreBind" prebind plugin for pod "foo": prebind error`),
+			expectError:      fmt.Errorf(`error while running "FakePreBind" prebind plugin for pod "foo": %w`, preBindErr),
 			eventReason:      "FailedScheduling",
 		},
 		{

@@ -710,9 +710,9 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state *framework.
 	for _, pl := range f.preBindPlugins {
 		status = f.runPreBindPlugin(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
-			msg := fmt.Sprintf("error while running %q prebind plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
-			klog.Error(msg)
-			return framework.NewStatus(framework.Error, msg)
+			err := fmt.Errorf("error while running %q prebind plugin for pod %q: %w", pl.Name(), pod.Name, status.AsError())
+			klog.Error(err)
+			return framework.AsStatus(err)
 		}
 	}
 	return nil
@@ -743,9 +743,9 @@ func (f *frameworkImpl) RunBindPlugins(ctx context.Context, state *framework.Cyc
 			continue
 		}
 		if !status.IsSuccess() {
-			msg := fmt.Sprintf("plugin %q failed to bind pod \"%v/%v\": %v", bp.Name(), pod.Namespace, pod.Name, status.Message())
-			klog.Error(msg)
-			return framework.NewStatus(framework.Error, msg)
+			err := fmt.Errorf("plugin %q failed to bind pod \"%v/%v\": %w", bp.Name(), pod.Namespace, pod.Name, status.AsError())
+			klog.Error(err)
+			return framework.AsStatus(err)
 		}
 		return status
 	}

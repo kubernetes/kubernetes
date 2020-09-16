@@ -92,12 +92,14 @@ const (
 	MaxTotalScore int64 = math.MaxInt64
 )
 
-// Status indicates the result of running a plugin. It consists of a code and a
-// message. When the status code is not `Success`, the reasons should explain why.
+// Status indicates the result of running a plugin. It consists of a code, a
+// message and (optionally) an error. When the status code is not `Success`,
+// the reasons should explain why.
 // NOTE: A nil Status is also considered as Success.
 type Status struct {
 	code    Code
 	reasons []string
+	err     error
 }
 
 // Code returns code of the Status.
@@ -143,14 +145,30 @@ func (s *Status) AsError() error {
 	if s.IsSuccess() {
 		return nil
 	}
+	if s.err != nil {
+		return s.err
+	}
 	return errors.New(s.Message())
 }
 
 // NewStatus makes a Status out of the given arguments and returns its pointer.
 func NewStatus(code Code, reasons ...string) *Status {
-	return &Status{
+	s := &Status{
 		code:    code,
 		reasons: reasons,
+	}
+	if code == Error {
+		s.err = errors.New(s.Message())
+	}
+	return s
+}
+
+// AsStatus wraps an error in a Status.
+func AsStatus(err error) *Status {
+	return &Status{
+		code:    Error,
+		reasons: []string{err.Error()},
+		err:     err,
 	}
 }
 
@@ -166,10 +184,10 @@ func (p PluginToStatus) Merge() *Status {
 	}
 
 	finalStatus := NewStatus(Success)
-	var hasError, hasUnschedulableAndUnresolvable, hasUnschedulable bool
+	var hasUnschedulableAndUnresolvable, hasUnschedulable bool
 	for _, s := range p {
 		if s.Code() == Error {
-			hasError = true
+			finalStatus.err = s.AsError()
 		} else if s.Code() == UnschedulableAndUnresolvable {
 			hasUnschedulableAndUnresolvable = true
 		} else if s.Code() == Unschedulable {
@@ -181,7 +199,7 @@ func (p PluginToStatus) Merge() *Status {
 		}
 	}
 
-	if hasError {
+	if finalStatus.err != nil {
 		finalStatus.code = Error
 	} else if hasUnschedulableAndUnresolvable {
 		finalStatus.code = UnschedulableAndUnresolvable
