@@ -590,7 +590,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			gomega.Expect(runOutput).ToNot(gomega.ContainSubstring("stdin closed"))
 			g := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 			runTestPod, _, err := polymorphichelpers.GetFirstPod(f.ClientSet.CoreV1(), ns, "run=run-test-3", 1*time.Minute, g)
-			gomega.Expect(err).To(gomega.BeNil())
+			framework.ExpectNoError(err)
 			if !e2epod.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, time.Minute) {
 				framework.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test-3")
 			}
@@ -605,7 +605,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				gomega.Expect(logOutput).ToNot(gomega.ContainSubstring("stdin closed"))
 				return strings.Contains(logOutput, "abcd1234"), nil
 			})
-			gomega.Expect(err).To(gomega.BeNil())
+			framework.ExpectNoError(err)
 
 			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test-3", metav1.DeleteOptions{})).To(gomega.BeNil())
 		})

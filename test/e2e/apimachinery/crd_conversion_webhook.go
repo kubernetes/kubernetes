@@ -415,7 +415,7 @@ func testCustomResourceConversionWebhook(f *framework.Framework, crd *apiextensi
 		},
 	}
 	_, err := customResourceClients["v1"].Create(context.TODO(), crInstance, metav1.CreateOptions{})
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 	ginkgo.By("v2 custom resource should be converted")
 	v2crd, err := customResourceClients["v2"].Get(context.TODO(), name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Getting v2 of custom resource %s", name)
@@ -440,13 +440,13 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 		},
 	}
 	_, err := customResourceClients["v1"].Create(context.TODO(), crInstance, metav1.CreateOptions{})
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 
 	// Now cr-instance-1 is stored as v1. lets change storage version
 	crd, err = integration.UpdateV1CustomResourceDefinitionWithRetry(testCrd.APIExtensionClient, crd.Name, func(c *apiextensionsv1.CustomResourceDefinition) {
 		c.Spec.Versions = alternativeAPIVersions
 	})
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 	ginkgo.By("Create a v2 custom resource")
 	crInstance = &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -471,13 +471,13 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 			break
 		}
 	}
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 
 	// Now that we have a v1 and v2 object, both list operation in v1 and v2 should work as expected.
 
 	ginkgo.By("List CRs in v1")
 	list, err := customResourceClients["v1"].List(context.TODO(), metav1.ListOptions{})
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 	gomega.Expect(len(list.Items)).To(gomega.BeIdenticalTo(2))
 	framework.ExpectEqual((list.Items[0].GetName() == name1 && list.Items[1].GetName() == name2) ||
 		(list.Items[0].GetName() == name2 && list.Items[1].GetName() == name1), true)
@@ -486,7 +486,7 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 
 	ginkgo.By("List CRs in v2")
 	list, err = customResourceClients["v2"].List(context.TODO(), metav1.ListOptions{})
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 	gomega.Expect(len(list.Items)).To(gomega.BeIdenticalTo(2))
 	framework.ExpectEqual((list.Items[0].GetName() == name1 && list.Items[1].GetName() == name2) ||
 		(list.Items[0].GetName() == name2 && list.Items[1].GetName() == name1), true)

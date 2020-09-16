@@ -177,7 +177,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 			// running as cluster e2e test, because node e2e test does not create and
 			// run controller manager, i.e., no node lifecycle controller.
 			node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-			gomega.Expect(err).To(gomega.BeNil())
+			framework.ExpectNoError(err)
 			_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
 			framework.ExpectEqual(readyCondition.Status, v1.ConditionTrue)
 		})
@@ -186,7 +186,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 
 func getHeartbeatTimeAndStatus(clientSet clientset.Interface, nodeName string) (time.Time, v1.NodeStatus) {
 	node, err := clientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 	_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
 	framework.ExpectEqual(readyCondition.Status, v1.ConditionTrue)
 	heartbeatTime := readyCondition.LastHeartbeatTime.Time
