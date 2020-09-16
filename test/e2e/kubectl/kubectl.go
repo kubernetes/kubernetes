@@ -558,11 +558,24 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 
 		ginkgo.It("should support inline execution and attach", func() {
+			waitForStdinContent := func(pod, content string) string {
+				var logOutput string
+				err := wait.Poll(10*time.Second, 5*time.Minute, func() (bool, error) {
+					logOutput = framework.RunKubectlOrDie(ns, "logs", pod)
+					return strings.Contains(logOutput, content), nil
+				})
+
+				gomega.Expect(err).To(gomega.BeNil(), fmt.Sprintf("unexpected error waiting for '%v' output", content))
+				return logOutput
+			}
+
 			ginkgo.By("executing a command with run and attach with stdin")
 			// We wait for a non-empty line so we know kubectl has attached
-			runOutput := framework.NewKubectlCommand(ns, "run", "run-test", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--stdin", "--", "sh", "-c", "while [ -z \"$s\" ]; do read s; sleep 1; done; echo read:$s && cat && echo 'stdin closed'").
+			framework.NewKubectlCommand(ns, "run", "run-test", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--stdin", "--", "sh", "-c", "echo -n read: && cat && echo 'stdin closed'").
 				WithStdinData("value\nabcd1234").
 				ExecOrDie(ns)
+
+			runOutput := waitForStdinContent("run-test", "stdin closed")
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("read:value"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
@@ -575,37 +588,31 @@ var _ = SIGDescribe("Kubectl client", func() {
 			// "stdin closed", but hasn't exited yet.
 			// We wait 10 seconds before printing to give time to kubectl to attach
 			// to the container, this does not solve the race though.
-			runOutput = framework.NewKubectlCommand(ns, "run", "run-test-2", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "sleep 10; cat && echo 'stdin closed'").
+			framework.NewKubectlCommand(ns, "run", "run-test-2", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234").
 				ExecOrDie(ns)
+
+			runOutput = waitForStdinContent("run-test-2", "stdin closed")
 			gomega.Expect(runOutput).ToNot(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
 
 			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test-2", metav1.DeleteOptions{})).To(gomega.BeNil())
 
 			ginkgo.By("executing a command with run and attach with stdin with open stdin should remain running")
-			runOutput = framework.NewKubectlCommand(ns, "run", "run-test-3", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			framework.NewKubectlCommand(ns, "run", "run-test-3", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234\n").
 				ExecOrDie(ns)
+
+			runOutput = waitForStdinContent("run-test-3", "abcd1234")
+			gomega.Expect(runOutput).To(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).ToNot(gomega.ContainSubstring("stdin closed"))
+
 			g := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 			runTestPod, _, err := polymorphichelpers.GetFirstPod(f.ClientSet.CoreV1(), ns, "run=run-test-3", 1*time.Minute, g)
 			framework.ExpectNoError(err)
 			if !e2epod.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, time.Minute) {
 				framework.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test-3")
 			}
-
-			// NOTE: we cannot guarantee our output showed up in the container logs before stdin was closed, so we have
-			// to loop test.
-			err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-				if !e2epod.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, 1*time.Second) {
-					framework.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test-3")
-				}
-				logOutput := framework.RunKubectlOrDie(ns, "logs", runTestPod.Name)
-				gomega.Expect(logOutput).ToNot(gomega.ContainSubstring("stdin closed"))
-				return strings.Contains(logOutput, "abcd1234"), nil
-			})
-			framework.ExpectNoError(err)
 
 			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test-3", metav1.DeleteOptions{})).To(gomega.BeNil())
 		})
