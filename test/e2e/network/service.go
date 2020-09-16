@@ -4001,6 +4001,9 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 
 		ginkgo.By("dumping iptables rules on the node")
 		cmd = "sudo iptables-save"
+		if framework.TestContext.ClusterIsIPv6() {
+			cmd = "sudo ip6tables-save"
+		}
 		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
 		result, err := hostExec.IssueCommandWithResult(cmd, node)
 		if err != nil {
@@ -4061,6 +4064,9 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 		node, err := e2enode.GetRandomReadySchedulableNode(cs)
 		framework.ExpectNoError(err)
 		cmd := "sudo iptables-save"
+		if framework.TestContext.ClusterIsIPv6() {
+			cmd = "sudo ip6tables-save"
+		}
 		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
 		result, err := hostExec.IssueCommandWithResult(cmd, node)
 		if err != nil {
