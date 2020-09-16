@@ -1776,7 +1776,11 @@ func TestNodeAddressesNotUpdateV2(t *testing.T) {
 		cloud:        fakeCloud,
 	}
 
-	cloudNodeController.updateNodeAddress(context.TODO(), existingNode)
+	instanceMeta, err := cloudNodeController.getInstanceNodeAddresses(context.TODO(), existingNode)
+	if err != nil {
+		t.Errorf("get instance metadata with error %v", err)
+	}
+	cloudNodeController.updateNodeAddress(context.TODO(), existingNode, instanceMeta)
 
 	updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), existingNode.Name, metav1.GetOptions{})
 	if err != nil {
@@ -1848,7 +1852,11 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 		cloud:        fakeCloud,
 	}
 
-	cloudNodeController.updateNodeAddress(context.TODO(), existingNode)
+	instanceMeta, err := cloudNodeController.getInstanceNodeAddresses(context.TODO(), existingNode)
+	if err != nil {
+		t.Errorf("get instance metadata with error %v", err)
+	}
+	cloudNodeController.updateNodeAddress(context.TODO(), existingNode, instanceMeta)
 
 	updatedNode, err := clientset.CoreV1().Nodes().Get(context.TODO(), existingNode.Name, metav1.GetOptions{})
 	if err != nil {
