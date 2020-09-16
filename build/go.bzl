@@ -12,92 +12,100 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_context", "go_test")
+load("@io_bazel_rules_go//go/platform:list.bzl", "GOOS_GOARCH")
 
-# Defines several go_binary rules to work around a Bazel issue which makes
-# the pure attribute on go_binary not configurable.
-# The name provided will have cgo enabled if targeting Linux, and will
-# be a pure go binary otherwise. Additionally, if targeting Windows, the
-# output filename will have a .exe suffix.
-def go_binary_conditional_pure(name, tags = None, **kwargs):
-    tags = tags or []
-    tags.append("manual")
+# Defines a go_binary rule that enables cgo on platform builds targeting Linux,
+# and otherwise builds a pure go binary.
+def go_binary_conditional_pure(name, tags = [], **kwargs):
     go_binary(
-        name = "_%s-cgo" % name,
-        out = name,
-        pure = "off",
-        tags = tags,
-        **kwargs
-    )
-
-    # Define a rule for both Unix and Windows exe suffixes.
-    [go_binary(
-        name = "_%s-pure" % out,
-        out = out,
-        pure = "on",
-        tags = tags,
-        **kwargs
-    ) for out in [name, name + ".exe"]]
-
-    # The real magic, where we work around the pure attribute not being
-    # configurable: select the appropriate go_binary rule above based on the
-    # configured platform.
-    native.alias(
         name = name,
-        actual = select({
-            "@io_bazel_rules_go//go/platform:linux": ":_%s-cgo" % name,
-            "@io_bazel_rules_go//go/platform:windows": ":_%s.exe-pure" % name,
-            "//conditions:default": ":_%s-pure" % name,
+        pure = select({
+            "@io_bazel_rules_go//go/platform:linux": "off",
+            "//conditions:default": "on",
         }),
+        tags = ["manual"] + tags,
+        **kwargs
     )
 
-# Defines several go_test rules to work around a Bazel issue which makes
-# the pure attribute on go_test not configurable.
-# This also defines genrules to produce test binaries named ${out} and
-# ${out}.exe, and an alias named ${out}_binary which automatically selects
-# the correct filename suffix (i.e. with a .exe on Windows).
-def go_test_conditional_pure(name, out, tags = None, **kwargs):
-    tags = tags or []
+# Defines a go_test rule that enables cgo on platform builds targeting Linux,
+# and otherwise builds a pure go binary.
+def go_test_conditional_pure(name, out, tags = [], **kwargs):
     tags.append("manual")
 
     go_test(
-        name = "_%s-cgo" % name,
-        pure = "off",
-        testonly = False,
-        tags = tags,
-        **kwargs
-    )
-
-    go_test(
-        name = "_%s-pure" % name,
-        pure = "on",
+        name = out,
+        pure = select({
+            "@io_bazel_rules_go//go/platform:linux": "off",
+            "//conditions:default": "on",
+        }),
         testonly = False,
         tags = tags,
         **kwargs
     )
 
     native.alias(
-        name = name,
-        actual = select({
-            "@io_bazel_rules_go//go/platform:linux": ":_%s-cgo" % name,
-            "//conditions:default": ":_%s-pure" % name,
-        }),
+        name = "name",
+        actual = out,
     )
 
-    [native.genrule(
-        name = "gen_%s" % o,
-        srcs = [name],
-        outs = [o],
-        cmd = "cp $< $@;",
-        output_to_bindir = True,
-        executable = True,
-        tags = tags,
-    ) for o in [out, out + ".exe"]]
+_GO_BUILD_MODE_TMPL = "{goos}/{goarch}/pure={pure},static={static},msan={msan},race={race}\n"
 
-    native.alias(
-        name = "%s_binary" % out,
-        actual = select({
-            "@io_bazel_rules_go//go/platform:windows": ":gen_%s.exe" % out,
-            "//conditions:default": ":gen_%s" % out,
-        }),
+def _go_build_mode_aspect_impl(target, ctx):
+    if (not hasattr(ctx.rule.attr, "_is_executable") or
+        not ctx.rule.attr._is_executable or
+        ctx.rule.attr.testonly):
+        # We only care about exporting platform info for executable targets
+        # that aren't testonly (e.g. kubectl and e2e.test).
+        return []
+
+    mode = go_context(ctx).mode
+
+    out = ctx.actions.declare_file(
+        target.files_to_run.executable.basename + ".go_build_mode",
+        sibling = target.files_to_run.executable,
     )
+    ctx.actions.write(out, _GO_BUILD_MODE_TMPL.format(
+        goos = mode.goos,
+        goarch = mode.goarch,
+        pure = str(mode.pure).lower(),
+        static = str(mode.static).lower(),
+        msan = str(mode.msan).lower(),
+        race = str(mode.race).lower(),
+    ))
+
+    return [OutputGroupInfo(default = depset([out]))]
+
+# This aspect ouputs a *.go_build_mode metadata for go binaries. This metadata
+# is used for executable selection e.g. in CI.
+go_build_mode_aspect = aspect(
+    implementation = _go_build_mode_aspect_impl,
+    attrs = {
+        "goos": attr.string(
+            default = "auto",
+            values = ["auto"] + {goos: None for goos, _ in GOOS_GOARCH}.keys(),
+        ),
+        "goarch": attr.string(
+            default = "auto",
+            values = ["auto"] + {goarch: None for _, goarch in GOOS_GOARCH}.keys(),
+        ),
+        "pure": attr.string(
+            default = "auto",
+            values = ["auto", "on", "off"],
+        ),
+        "static": attr.string(
+            default = "auto",
+            values = ["auto", "on", "off"],
+        ),
+        "msan": attr.string(
+            default = "auto",
+            values = ["auto", "on", "off"],
+        ),
+        "race": attr.string(
+            default = "auto",
+            values = ["auto", "on", "off"],
+        ),
+        "_go_context_data": attr.label(default = "@io_bazel_rules_go//:go_context_data"),
+    },
+    toolchains = ["@io_bazel_rules_go//go:toolchain"],
+)

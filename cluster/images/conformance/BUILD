@@ -15,7 +15,7 @@ container_layer(
     files = [
         "//cluster/images/conformance/go-runner",
         "//cmd/kubectl",
-        "//test/e2e:e2e.test_binary",
+        "//test/e2e:e2e.test",
         "//vendor/github.com/onsi/ginkgo/ginkgo",
     ],
 )
