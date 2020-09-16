@@ -252,11 +252,11 @@ func prometheusExporterPodSpec(metricName string, metricValue int64, port int32)
 
 // CreateAdapter creates Custom Metrics - Stackdriver adapter
 // adapterDeploymentFile should be a filename for adapter deployment located in StagingDeploymentLocation
-func CreateAdapter(namespace, adapterDeploymentFile string) error {
+func CreateAdapter(adapterDeploymentFile string) error {
 	// A workaround to make the work on GKE. GKE doesn't normally allow to create cluster roles,
 	// which the adapter deployment does. The solution is to create cluster role binding for
 	// cluster-admin role and currently used service account.
-	err := createClusterAdminBinding(namespace)
+	err := createClusterAdminBinding()
 	if err != nil {
 		return err
 	}
@@ -265,12 +265,12 @@ func CreateAdapter(namespace, adapterDeploymentFile string) error {
 	if err != nil {
 		return err
 	}
-	stat, err := framework.RunKubectl(namespace, "create", "-f", adapterURL)
+	stat, err := framework.RunKubectl("create", "-f", adapterURL)
 	framework.Logf(stat)
 	return err
 }
 
-func createClusterAdminBinding(namespace string) error {
+func createClusterAdminBinding() error {
 	stdout, stderr, err := framework.RunCmd("gcloud", "config", "get-value", "core/account")
 	if err != nil {
 		framework.Logf(stderr)
@@ -278,7 +278,7 @@ func createClusterAdminBinding(namespace string) error {
 	}
 	serviceAccount := strings.TrimSpace(stdout)
 	framework.Logf("current service account: %q", serviceAccount)
-	stat, err := framework.RunKubectl(namespace, "create", "clusterrolebinding", ClusterAdminBinding, "--clusterrole=cluster-admin", "--user="+serviceAccount)
+	stat, err := framework.RunKubectl("create", "clusterrolebinding", ClusterAdminBinding, "--clusterrole=cluster-admin", "--user="+serviceAccount)
 	framework.Logf(stat)
 	return err
 }
