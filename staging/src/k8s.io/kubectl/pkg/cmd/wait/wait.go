@@ -165,6 +165,7 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 		ResourceFinder: builder,
 		DynamicClient:  dynamicClient,
 		Timeout:        effectiveTimeout,
+		ForCondition:   flags.ForCondition,
 
 		Printer:     printer,
 		ConditionFn: conditionFn,
@@ -215,6 +216,7 @@ type WaitOptions struct {
 	UIDMap        UIDMap
 	DynamicClient dynamic.Interface
 	Timeout       time.Duration
+	ForCondition  string
 
 	Printer     printers.ResourcePrinter
 	ConditionFn ConditionFunc
@@ -227,7 +229,7 @@ type ConditionFunc func(info *resource.Info, o *WaitOptions) (finalObject runtim
 // RunWait runs the waiting logic
 func (o *WaitOptions) RunWait() error {
 	visitCount := 0
-	err := o.ResourceFinder.Do().Visit(func(info *resource.Info, err error) error {
+	visitFunc := func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
@@ -242,7 +244,13 @@ func (o *WaitOptions) RunWait() error {
 			return fmt.Errorf("%v unsatisified for unknown reason", finalObject)
 		}
 		return err
-	})
+	}
+	visitor := o.ResourceFinder.Do()
+	if visitor, ok := visitor.(*resource.Result); ok && strings.ToLower(o.ForCondition) == "delete" {
+		visitor.IgnoreErrors(apierrors.IsNotFound)
+	}
+
+	err := visitor.Visit(visitFunc)
 	if err != nil {
 		return err
 	}
