@@ -266,7 +266,6 @@ var _ = SIGDescribe("Proxy", func() {
 		ginkgo.It("proxy connection returns a series of 301 redirections for a pod", func() {
 			ns := f.Namespace.Name
 			httpVerbs := []string{"DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"}
-			var statusCode int
 
 			ginkgo.By("Creating a Pod")
 			_, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), &v1.Pod{
@@ -302,19 +301,6 @@ var _ = SIGDescribe("Proxy", func() {
 
 			for _, httpVerb := range httpVerbs {
 
-				// Using RESTClient doesn't work due to auto follow on 301
-				framework.Logf("Using http verb: %v", httpVerb)
-				r := f.ClientSet.CoreV1().RESTClient().Verb(httpVerb).
-					Namespace(ns).
-					Resource("pods").
-					SubResource("proxy").
-					Name("proxy-pod-target")
-				framework.Logf("Request String: %v", r.URL().String())
-				// Request returns 500 status - Can this be diabled?
-				_, err := r.Do(context.Background()).StatusCode(&statusCode).Raw()
-				framework.Logf("RESTClient() StatusCode: %d", statusCode)
-				framework.Logf("Error: %#v", err)
-
 				// Using http.Client to verify 301 redirect from .../proxy to .../proxy/
 				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/pods/proxy-pod-target/proxy"
 				framework.Logf("Starting http.Client for %s", urlString)
@@ -330,7 +316,6 @@ var _ = SIGDescribe("Proxy", func() {
 				framework.ExpectNoError(err, "processing response")
 				defer resp.Body.Close()
 
-				framework.Logf("Processing %s request...", httpVerb)
 				framework.Logf("http.Client request:%s StatusCode:%d", httpVerb, resp.StatusCode)
 				framework.ExpectEqual(resp.StatusCode, 301, "The resp.StatusCode returned: %d", resp.StatusCode)
 			}
