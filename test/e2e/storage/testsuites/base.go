@@ -84,13 +84,14 @@ var BaseSuites = []func() TestSuite{
 	InitDisruptiveTestSuite,
 	InitVolumeLimitsTestSuite,
 	InitTopologyTestSuite,
-	InitStressTestSuite,
+	InitVolumeStressTestSuite,
 }
 
 // CSISuites is a list of storage test suites that work only for CSI drivers
 var CSISuites = append(BaseSuites,
 	InitEphemeralTestSuite,
 	InitSnapshottableTestSuite,
+	InitSnapshottableStressTestSuite,
 )
 
 // TestSuite represents an interface for a set of tests which works with TestDriver

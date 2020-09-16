@@ -189,7 +189,10 @@ type DriverInfo struct {
 	// Example: multi-zonal disk requires at least 2 allowed topologies.
 	NumAllowedTopologies int
 	// [Optional] Scale parameters for stress tests.
+	// TODO(#96241): Rename this field to reflect the tests that consume it.
 	StressTestOptions *StressTestOptions
+	// [Optional] Scale parameters for volume snapshot stress tests.
+	VolumeSnapshotStressTestOptions *VolumeSnapshotStressTestOptions
 }
 
 // StressTestOptions contains parameters used for stress tests.
@@ -199,6 +202,15 @@ type StressTestOptions struct {
 	NumPods int
 	// Number of times to restart each Pod.
 	NumRestarts int
+}
+
+// VolumeSnapshotStressTestOptions contains parameters used for volume snapshot stress tests.
+type VolumeSnapshotStressTestOptions struct {
+	// Number of pods to create in the test. This may also create
+	// up to 1 volume per pod.
+	NumPods int
+	// Number of snapshots to create for each volume.
+	NumSnapshots int
 }
 
 // PerTestConfig represents parameters that control test execution.

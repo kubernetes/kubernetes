@@ -90,6 +90,14 @@ func initHostPathCSIDriver(name string, capabilities map[testsuites.Capability]b
 				Min: "1Mi",
 			},
 			Capabilities: capabilities,
+			StressTestOptions: &testsuites.StressTestOptions{
+				NumPods:     10,
+				NumRestarts: 10,
+			},
+			VolumeSnapshotStressTestOptions: &testsuites.VolumeSnapshotStressTestOptions{
+				NumPods:      10,
+				NumSnapshots: 10,
+			},
 		},
 		manifests:        manifests,
 		volumeAttributes: volumeAttributes,
@@ -506,6 +514,14 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 			StressTestOptions: &testsuites.StressTestOptions{
 				NumPods:     10,
 				NumRestarts: 10,
+			},
+			VolumeSnapshotStressTestOptions: &testsuites.VolumeSnapshotStressTestOptions{
+				// GCE only allows for one snapshot per volume to be created at a time,
+				// which can cause test timeouts. We reduce the likelihood of test timeouts
+				// by increasing the number of pods (and volumes) and reducing the number
+				// of snapshots per volume.
+				NumPods:      20,
+				NumSnapshots: 2,
 			},
 		},
 	}
