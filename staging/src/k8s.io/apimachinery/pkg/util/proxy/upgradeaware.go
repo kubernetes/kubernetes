@@ -164,7 +164,10 @@ func NewUpgradeRequestRoundTripper(connection, request http.RoundTripper) Upgrad
 
 // normalizeLocation returns the result of parsing the full URL, with scheme set to http if missing
 func normalizeLocation(location *url.URL) *url.URL {
-	normalized, _ := url.Parse(location.String())
+	normalized, err := url.Parse(location.String())
+	if err != nil {
+		panic(fmt.Errorf("error parsing %s (from %#v): %v", location.String(), location, err))
+	}
 	if len(normalized.Scheme) == 0 {
 		normalized.Scheme = "http"
 	}

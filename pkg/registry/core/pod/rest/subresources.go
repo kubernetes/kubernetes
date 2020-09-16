@@ -71,7 +71,9 @@ func (r *ProxyREST) Connect(ctx context.Context, id string, opts runtime.Object,
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(74, location.String())
 	location.Path = net.JoinPreservingTrailingSlash(location.Path, proxyOpts.Path)
+	fmt.Println(76, location.String())
 	// Return a proxy handler that uses the desired transport, wrapped with additional proxy handling (to get URL rewriting, X-Forwarded-* headers, etc)
 	return newThrottledUpgradeAwareProxyHandler(location, transport, true, false, false, responder), nil
 }
