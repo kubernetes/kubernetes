@@ -568,6 +568,9 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		State:        toKubeContainerState(status.State),
 		CreatedAt:    time.Unix(0, status.CreatedAt),
 	}
+	if annotatedInfo.Image != "" {
+		cStatus.Image = annotatedInfo.Image
+	}
 
 	if status.State != runtimeapi.ContainerState_CONTAINER_CREATED {
 		// If container is not in the created state, we have tried and

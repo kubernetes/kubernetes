@@ -32,6 +32,7 @@ const (
 	podDeletionGracePeriodLabel    = "io.kubernetes.pod.deletionGracePeriod"
 	podTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 
+	containerImageLabel                    = "io.kubernetes.container.image"
 	containerHashLabel                     = "io.kubernetes.container.hash"
 	containerRestartCountLabel             = "io.kubernetes.container.restartCount"
 	containerTerminationMessagePathLabel   = "io.kubernetes.container.terminationMessagePath"
@@ -61,6 +62,7 @@ type labeledContainerInfo struct {
 }
 
 type annotatedContainerInfo struct {
+	Image                     string
 	Hash                      uint64
 	RestartCount              int
 	PodDeletionGracePeriod    *int64
@@ -112,6 +114,7 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 		annotations[a.Name] = a.Value
 	}
 
+	annotations[containerImageLabel] = container.Image
 	annotations[containerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	annotations[containerRestartCountLabel] = strconv.Itoa(restartCount)
 	annotations[containerTerminationMessagePathLabel] = container.TerminationMessagePath
@@ -186,6 +189,7 @@ func getContainerInfoFromLabels(labels map[string]string) *labeledContainerInfo 
 func getContainerInfoFromAnnotations(annotations map[string]string) *annotatedContainerInfo {
 	var err error
 	containerInfo := &annotatedContainerInfo{
+		Image:                    getStringValueFromLabel(annotations, containerImageLabel),
 		TerminationMessagePath:   getStringValueFromLabel(annotations, containerTerminationMessagePathLabel),
 		TerminationMessagePolicy: v1.TerminationMessagePolicy(getStringValueFromLabel(annotations, containerTerminationMessagePolicyLabel)),
 	}

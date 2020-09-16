@@ -224,6 +224,26 @@ func TestToKubeContainerStatus(t *testing.T) {
 				StartedAt: time.Unix(0, startedAt),
 			},
 		},
+		"right image from annotations": {
+			input: &runtimeapi.ContainerStatus{
+				Id:        cid.ID,
+				Metadata:  meta,
+				Image:     imageSpec,
+				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt: createdAt,
+				StartedAt: startedAt,
+				Annotations: map[string]string{
+					containerImageLabel: "fimage-alias",
+				},
+			},
+			expected: &kubecontainer.Status{
+				ID:        *cid,
+				Image:     "fimage-alias",
+				State:     kubecontainer.ContainerStateRunning,
+				CreatedAt: time.Unix(0, createdAt),
+				StartedAt: time.Unix(0, startedAt),
+			},
+		},
 	} {
 		actual := toKubeContainerStatus(test.input, cid.Type)
 		assert.Equal(t, test.expected, actual, desc)
