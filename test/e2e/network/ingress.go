@@ -89,7 +89,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 	// TODO: write similar tests for nginx, haproxy and AWS Ingress.
 	ginkgo.Describe("GCE [Slow] [Feature:Ingress]", func() {
 		var gceController *gce.IngressController
-
+		var ipAddress string
 		// Platform specific setup
 		ginkgo.BeforeEach(func() {
 			e2eskipper.SkipUnlessProviderIs("gce", "gke")
@@ -101,6 +101,8 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 			err := gceController.Init()
 			framework.ExpectNoError(err)
+			ipAddress = gceController.CreateStaticIP(ns)
+			ginkgo.By(fmt.Sprintf("allocated static ip: %v through the GCE cloud provider", ipAddress))
 		})
 
 		// Platform specific cleanup
