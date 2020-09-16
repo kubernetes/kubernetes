@@ -35,11 +35,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
-type stressTestSuite struct {
+type volumeStressTestSuite struct {
 	tsInfo TestSuiteInfo
 }
 
-type stressTest struct {
+type volumeStressTest struct {
 	config        *PerTestConfig
 	driverCleanup func()
 
@@ -55,13 +55,13 @@ type stressTest struct {
 	testOptions StressTestOptions
 }
 
-var _ TestSuite = &stressTestSuite{}
+var _ TestSuite = &volumeStressTestSuite{}
 
-// InitStressTestSuite returns stressTestSuite that implements TestSuite interface
-func InitStressTestSuite() TestSuite {
-	return &stressTestSuite{
+// InitVolumeStressTestSuite returns volumeStressTestSuite that implements TestSuite interface
+func InitVolumeStressTestSuite() TestSuite {
+	return &volumeStressTestSuite{
 		tsInfo: TestSuiteInfo{
-			Name: "stress",
+			Name: "volume-stress",
 			TestPatterns: []testpatterns.TestPattern{
 				testpatterns.DefaultFsDynamicPV,
 				testpatterns.BlockVolModeDynamicPV,
@@ -70,24 +70,30 @@ func InitStressTestSuite() TestSuite {
 	}
 }
 
-func (t *stressTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+func (t *volumeStressTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *stressTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeStressTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
-func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeStressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	var (
 		dInfo = driver.GetDriverInfo()
 		cs    clientset.Interface
-		l     *stressTest
+		l     *volumeStressTest
 	)
 
 	// Check preconditions before setting up namespace via framework below.
 	ginkgo.BeforeEach(func() {
 		if dInfo.StressTestOptions == nil {
 			e2eskipper.Skipf("Driver %s doesn't specify stress test options -- skipping", dInfo.Name)
+		}
+		if dInfo.StressTestOptions.NumPods <= 0 {
+			framework.Failf("NumPods in stress test options must be a positive integer, received: %d", dInfo.StressTestOptions.NumPods)
+		}
+		if dInfo.StressTestOptions.NumRestarts <= 0 {
+			framework.Failf("NumRestarts in stress test options must be a positive integer, received: %d", dInfo.StressTestOptions.NumRestarts)
 		}
 
 		if _, ok := driver.(DynamicPVTestDriver); !ok {
@@ -103,11 +109,11 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 	// registers its own BeforeEach which creates the namespace. Beware that it
 	// also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("stress")
+	f := framework.NewDefaultFramework("volume-stress")
 
 	init := func() {
 		cs = f.ClientSet
-		l = &stressTest{}
+		l = &volumeStressTest{}
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
@@ -162,6 +168,7 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 		createPodsAndVolumes()
 	})
 
+	// See #96177, this is necessary for cleaning up resources when tests are interrupted.
 	f.AddAfterEach("cleanup", func(f *framework.Framework, failed bool) {
 		cleanup()
 	})

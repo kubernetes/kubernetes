@@ -21,7 +21,7 @@ spec:
       serviceAccountName: csi-gce-pd-controller-sa
       containers:
         - name: csi-snapshotter
-          image: gcr.io/gke-release/csi-snapshotter:v2.1.1-gke.0
+          image: k8s.gcr.io/sig-storage/csi-snapshotter:v3.0.2
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -55,7 +55,7 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: gce-pd-driver
-          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.7.0-gke.0
+          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v1.0.1-gke.0
           args:
             - "--v=5"
             - "--endpoint=unix:/csi/csi.sock"
