@@ -1105,7 +1105,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 				destChain := svcXlbChain
 				// We have to SNAT packets to external IPs if externalTrafficPolicy is cluster.
-				if !(utilfeature.DefaultFeatureGate.Enabled(features.ExternalPolicyForExternalIP) && svcInfo.OnlyNodeLocalEndpoints()) {
+				if !svcInfo.OnlyNodeLocalEndpoints() {
 					destChain = svcChain
 					writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 				}
