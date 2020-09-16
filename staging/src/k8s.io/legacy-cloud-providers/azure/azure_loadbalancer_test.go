@@ -1669,7 +1669,7 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 		} else {
 			assert.Equal(t, test.expectedProbes, probe, "TestCase[%d]: %s", i, test.desc)
 			assert.Equal(t, test.expectedRules, lbrule, "TestCase[%d]: %s", i, test.desc)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 		}
 	}
 }

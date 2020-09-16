@@ -221,7 +221,7 @@ func TestCommonAttachDiskWithVMSS(t *testing.T) {
 				testCloud.DisableAvailabilitySetNodes = true
 			}
 			ss, err := newScaleSet(testCloud)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			testCloud.VMSet = ss
 		}
 

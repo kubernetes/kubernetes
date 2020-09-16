@@ -43,12 +43,12 @@ func TestIgnoreClusterName(t *testing.T) {
 		},
 	}
 	nsNew, err := client.CoreV1().Namespaces().Create(context.TODO(), &ns, metav1.CreateOptions{})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, ns.Name, nsNew.Name)
 	assert.Empty(t, nsNew.ClusterName)
 
 	nsNew, err = client.CoreV1().Namespaces().Update(context.TODO(), &ns, metav1.UpdateOptions{})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, ns.Name, nsNew.Name)
 	assert.Empty(t, nsNew.ClusterName)
 }

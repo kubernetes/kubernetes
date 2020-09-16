@@ -196,7 +196,7 @@ func TestGetVMSSPublicIPAddress(t *testing.T) {
 		},
 	}
 	pip, err := testPip.MarshalJSON()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	response := &http.Response{
 		StatusCode: http.StatusOK,
 		Body:       ioutil.NopCloser(bytes.NewReader(pip)),
@@ -329,7 +329,7 @@ func TestList(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	pipList := []network.PublicIPAddress{getTestPublicIPAddress("pip1"), getTestPublicIPAddress("pip2"), getTestPublicIPAddress("pip3")}
 	responseBody, err := json.Marshal(network.PublicIPAddressListResult{Value: &pipList})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusOK,
@@ -418,7 +418,7 @@ func TestListWithListResponderError(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	pipList := []network.PublicIPAddress{getTestPublicIPAddress("pip1"), getTestPublicIPAddress("pip2"), getTestPublicIPAddress("pip3")}
 	responseBody, err := json.Marshal(network.PublicIPAddressListResult{Value: &pipList})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusNotFound,
@@ -507,7 +507,7 @@ func TestListNextResultsMultiPages(t *testing.T) {
 		pipClient := getTestPublicIPAddressClient(armClient)
 		result, err := pipClient.listNextResults(context.TODO(), lastResult)
 		if test.prepareErr != nil || test.sendErr != nil {
-			assert.NotNil(t, err)
+			assert.Error(t, err)
 		} else {
 			assert.NoError(t, err)
 		}
@@ -556,7 +556,7 @@ func TestListNextResultsMultiPagesWithListResponderError(t *testing.T) {
 	expected.Response = autorest.Response{Response: response}
 	pipClient := getTestPublicIPAddressClient(armClient)
 	result, err := pipClient.listNextResults(context.TODO(), lastResult)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 	assert.Equal(t, expected, result)
 }
 

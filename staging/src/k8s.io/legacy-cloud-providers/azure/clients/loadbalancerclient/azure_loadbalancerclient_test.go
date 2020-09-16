@@ -136,7 +136,7 @@ func TestList(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	lbList := []network.LoadBalancer{getTestLoadBalancer("lb1"), getTestLoadBalancer("lb2"), getTestLoadBalancer("lb3")}
 	responseBody, err := json.Marshal(network.LoadBalancerListResult{Value: &lbList})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusOK,
@@ -206,7 +206,7 @@ func TestListNextResultsMultiPages(t *testing.T) {
 		lbClient := getTestLoadBalancerClient(armClient)
 		result, err := lbClient.listNextResults(context.TODO(), lastResult)
 		if test.prepareErr != nil || test.sendErr != nil {
-			assert.NotNil(t, err)
+			assert.Error(t, err)
 		} else {
 			assert.NoError(t, err)
 		}

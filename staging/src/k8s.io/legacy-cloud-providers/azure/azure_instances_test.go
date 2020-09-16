@@ -729,5 +729,5 @@ func TestCurrentNodeName(t *testing.T) {
 	hostname := "testvm"
 	nodeName, err := cloud.CurrentNodeName(context.Background(), hostname)
 	assert.Equal(t, types.NodeName(hostname), nodeName)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }

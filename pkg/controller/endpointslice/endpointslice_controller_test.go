@@ -98,7 +98,7 @@ func TestSyncServiceNoSelector(t *testing.T) {
 	})
 
 	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Len(t, client.Actions(), 0)
 }
 
@@ -117,7 +117,7 @@ func TestSyncServicePendingDeletion(t *testing.T) {
 	})
 
 	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Len(t, client.Actions(), 0)
 }
 
@@ -366,7 +366,7 @@ func TestSyncServiceFull(t *testing.T) {
 
 	// run through full sync service loop
 	err = esController.syncService(fmt.Sprintf("%s/%s", namespace, serviceName))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// last action should be to create endpoint slice
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")

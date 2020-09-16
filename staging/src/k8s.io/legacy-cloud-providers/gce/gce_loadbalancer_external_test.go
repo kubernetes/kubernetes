@@ -641,7 +641,7 @@ func TestTargetPoolNeedsRecreation(t *testing.T) {
 	exists, needsRecreation, err := gce.targetPoolNeedsRecreation(lbName, vals.Region, v1.ServiceAffinityNone)
 	assert.True(t, exists)
 	assert.False(t, needsRecreation)
-	require.NotNil(t, err)
+	require.Error(t, err)
 	assert.True(t, strings.HasPrefix(err.Error(), errPrefixGetTargetPool))
 	c.MockTargetPools.GetHook = nil
 
@@ -934,7 +934,7 @@ func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {
 		ipnet,
 		svc.Spec.Ports,
 		hosts)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	msg := fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
 	checkEvent(t, recorder, msg, true)
@@ -947,7 +947,7 @@ func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {
 		ipnet,
 		svc.Spec.Ports,
 		hosts)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	msg = fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
 	checkEvent(t, recorder, msg, true)

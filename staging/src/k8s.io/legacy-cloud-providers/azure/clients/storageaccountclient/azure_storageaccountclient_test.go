@@ -380,7 +380,7 @@ func TestListNextResultsMultiPages(t *testing.T) {
 		saClient := getTestStorageAccountClient(armClient)
 		result, err := saClient.listNextResults(context.TODO(), lastResult)
 		if test.prepareErr != nil || test.sendErr != nil {
-			assert.NotNil(t, err)
+			assert.Error(t, err)
 		} else {
 			assert.NoError(t, err)
 		}
@@ -428,7 +428,7 @@ func TestListNextResultsMultiPagesWithListResponderError(t *testing.T) {
 	}
 	expected := storage.AccountListResult{Response: autorest.Response{Response: response}}
 	result, err := saClient.listNextResults(context.TODO(), lastResult)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 	assert.Equal(t, expected, result)
 }
 
@@ -440,7 +440,7 @@ func TestListByResourceGroup(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	snList := []storage.Account{getTestStorageAccount("sn1"), getTestStorageAccount("pip2"), getTestStorageAccount("pip3")}
 	responseBody, err := json.Marshal(storage.AccountListResult{Value: &snList})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusOK,
@@ -462,7 +462,7 @@ func TestListByResourceGroupResponderError(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	snList := []storage.Account{getTestStorageAccount("sn1"), getTestStorageAccount("pip2"), getTestStorageAccount("pip3")}
 	responseBody, err := json.Marshal(storage.AccountListResult{Value: &snList})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusNotFound,

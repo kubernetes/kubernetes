@@ -82,7 +82,7 @@ func TestEnforcePolicy(t *testing.T) {
 				objectFuzzer.Fuzz(e)
 				ev, err := EnforcePolicy(e, tc.level, tc.omitStages)
 				if omitSet.Has(string(e.Stage)) {
-					require.Nil(t, err)
+					require.NoError(t, err)
 					require.Nil(t, ev)
 					return
 				}
@@ -136,10 +136,10 @@ func TestEnforcePolicy(t *testing.T) {
 					expected.Level = tc.level
 					require.Equal(t, expected, ev)
 				default:
-					require.NotNil(t, err)
+					require.Error(t, err)
 					return
 				}
-				require.Nil(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}

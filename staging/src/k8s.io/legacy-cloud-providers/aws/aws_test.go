@@ -1764,7 +1764,7 @@ func TestEnsureLoadBalancerHealthCheck(t *testing.T) {
 
 			err = c.ensureLoadBalancerHealthCheck(elbDesc, protocol, port, path, test.annotations)
 
-			require.Nil(t, err)
+			require.NoError(t, err)
 			awsServices.elb.(*MockedFakeELB).AssertExpectations(t)
 		})
 	}
@@ -1784,11 +1784,11 @@ func TestEnsureLoadBalancerHealthCheck(t *testing.T) {
 		// test default HC
 		elbDesc := &elb.LoadBalancerDescription{LoadBalancerName: &lbName, HealthCheck: defaultHC}
 		err = c.ensureLoadBalancerHealthCheck(elbDesc, protocol, port, path, map[string]string{})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		// test HC with override
 		elbDesc = &elb.LoadBalancerDescription{LoadBalancerName: &lbName, HealthCheck: &currentHC}
 		err = c.ensureLoadBalancerHealthCheck(elbDesc, protocol, port, path, annotations)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("validates resulting expected health check before making an API call", func(t *testing.T) {
