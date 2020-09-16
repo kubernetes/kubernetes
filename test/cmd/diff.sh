@@ -54,7 +54,7 @@ run_kubectl_diff_tests() {
     kube::test::if_has_string "${resourceVersion}" "${initialResourceVersion}"
 
     # Test found diff with server-side apply
-    output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml --server-side --force-conflicts || test $? -eq 1)
+    output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml --server-side || test $? -eq 1)
     kube::test::if_has_string "${output_message}" 'k8s.gcr.io/pause:3.0'
 
     # Ensure diff --server-side only dry-runs and doesn't persist change
