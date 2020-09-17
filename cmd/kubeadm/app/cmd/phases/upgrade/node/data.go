@@ -28,7 +28,6 @@ type Data interface {
 	EtcdUpgrade() bool
 	RenewCerts() bool
 	DryRun() bool
-	KubeletVersion() string
 	Cfg() *kubeadmapi.InitConfiguration
 	IsControlPlaneNode() bool
 	Client() clientset.Interface
