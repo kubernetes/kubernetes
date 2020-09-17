@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/util/dryrun"
@@ -73,6 +74,8 @@ type serviceStorage struct {
 	OldService         *api.Service
 	ServiceList        *api.ServiceList
 	Err                error
+
+	afterDelete genericregistry.ObjectFunc
 }
 
 func (s *serviceStorage) NamespaceScoped() bool {
@@ -148,12 +151,19 @@ func (s *serviceStorage) Update(ctx context.Context, name string, objInfo rest.U
 func (s *serviceStorage) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	if !dryrun.IsDryRun(options.DryRun) {
 		s.DeletedID = name
+		if s.afterDelete != nil {
+			s.afterDelete(s.Service)
+		}
 	}
 	return s.Service, s.DeletedImmediately, s.Err
 }
 
 func (s *serviceStorage) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
 	panic("not implemented")
+}
+
+func (s *serviceStorage) SetAfterDelete(f genericregistry.ObjectFunc) {
+	s.afterDelete = f
 }
 
 func (s *serviceStorage) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
@@ -251,7 +261,7 @@ func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.P
 		t.Fatalf("cannot create port allocator %v", err)
 	}
 
-	rest, _ := NewREST(serviceStorage, endpointStorage, podStorage.Pod, rPrimary, rSecondary, portAllocator, nil)
+	rest, _ := NewREST(serviceStorage, endpointStorage, podStorage.Pod, serviceStorage.SetAfterDelete, rPrimary, rSecondary, portAllocator, nil)
 
 	return rest, serviceStorage, server
 }
@@ -1428,16 +1438,28 @@ func TestServiceRegistryDelete(t *testing.T) {
 			Selector:        map[string]string{"bar": "baz"},
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
+			ClusterIP:       "1.2.3.4",
 			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
 			}},
 		},
 	}
-	registry.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+	if _, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create service: %v", err)
+	}
+	if !storage.serviceIPs.Has(net.ParseIP("1.2.3.4")) {
+		t.Errorf("Service's ClusterIP is not allocated!")
+	}
+	if _, _, err := storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{}); err != nil {
+		t.Fatalf("Failed to delete service: %v", err)
+	}
 	if e, a := "foo", registry.DeletedID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
+	}
+	if storage.serviceIPs.Has(net.ParseIP("1.2.3.4")) {
+		t.Errorf("Service's ClusterIP is not released!")
 	}
 }
 
@@ -1464,6 +1486,9 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 	_, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
+	}
+	if !storage.serviceIPs.Has(net.ParseIP("1.2.3.4")) {
+		t.Errorf("Service's ClusterIP is not allocated!")
 	}
 	_, _, err = storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {

@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/klog/v2"
@@ -97,6 +98,7 @@ func NewREST(
 	services ServiceStorage,
 	endpoints EndpointsStorage,
 	pods rest.Getter,
+	setAfterDelete setAfterDeleteFunc,
 	serviceIPs ipallocator.Interface,
 	secondaryServiceIPs ipallocator.Interface,
 	serviceNodePorts portallocator.Interface,
@@ -115,7 +117,8 @@ func NewREST(
 		proxyTransport:      proxyTransport,
 		pods:                pods,
 	}
-
+	// Set the AfterDelete step to perform necessary cleanup upon service deletion.
+	setAfterDelete(rest.getAfterDeleteFunc())
 	return rest, &registry.ProxyREST{Redirector: rest, ProxyTransport: proxyTransport}
 }
 
@@ -233,6 +236,10 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation
 	return out, err
 }
 
+// Delete implements the logic to handle the deletion of a service object. Note that it doesn't
+// perform any resource de-allocation (e.g. releasing of clusterIP and nodePort), which will
+// take place during the AfterDelete step instead. This is to ensure the de-allocation logic
+// continue to work with service that has finalizers attached.
 func (rs *REST) Delete(ctx context.Context, id string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	// TODO: handle graceful
 	obj, _, err := rs.services.Delete(ctx, id, deleteValidation, options)
@@ -241,18 +248,6 @@ func (rs *REST) Delete(ctx context.Context, id string, deleteValidation rest.Val
 	}
 
 	svc := obj.(*api.Service)
-
-	// Only perform the cleanup if this is a non-dryrun deletion
-	if !dryrun.IsDryRun(options.DryRun) {
-		// TODO: can leave dangling endpoints, and potentially return incorrect
-		// endpoints if a new service is created with the same name
-		_, _, err = rs.endpoints.Delete(ctx, id, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
-		if err != nil && !errors.IsNotFound(err) {
-			return nil, false, err
-		}
-
-		rs.releaseAllocatedResources(svc)
-	}
 
 	// TODO: this is duplicated from the generic storage, when this wrapper is fully removed we can drop this
 	details := &metav1.StatusDetails{
@@ -265,6 +260,26 @@ func (rs *REST) Delete(ctx context.Context, id string, deleteValidation rest.Val
 	}
 	status := &metav1.Status{Status: metav1.StatusSuccess, Details: details}
 	return status, true, nil
+}
+
+func (rs *REST) getAfterDeleteFunc() genericregistry.ObjectFunc {
+	return func(obj runtime.Object) error {
+		svc, ok := obj.(*api.Service)
+		if !ok {
+			return fmt.Errorf("unexpected type of deleted object, want service")
+		}
+		// Releasing clusterIP, nodePort and healthCheckNodePort.
+		rs.releaseAllocatedResources(svc)
+		// Deleting the corresponding enpoint object upon service deletion.
+		// TODO: can leave dangling endpoints, and potentially return incorrect
+		// endpoints if a new service is created with the same name
+		ctx := genericapirequest.WithNamespace(context.Background(), svc.Namespace)
+		_, _, err := rs.endpoints.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+		return nil
+	}
 }
 
 func (rs *REST) releaseAllocatedResources(svc *api.Service) {
