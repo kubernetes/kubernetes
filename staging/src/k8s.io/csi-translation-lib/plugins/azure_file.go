@@ -116,7 +116,13 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 		klog.Warningf("getStorageAccountName(%s) returned with error: %v", azureSource.SecretName, err)
 		accountName = azureSource.SecretName
 	}
-	volumeID := fmt.Sprintf(volumeIDTemplate, "", accountName, azureSource.ShareName, "")
+	resourceGroup := ""
+	if pv.ObjectMeta.Annotations != nil {
+		if v, ok := pv.ObjectMeta.Annotations[resourceGroupAnnotation]; ok {
+			resourceGroup = v
+		}
+	}
+	volumeID := fmt.Sprintf(volumeIDTemplate, resourceGroup, accountName, azureSource.ShareName, "")
 
 	var (
 		// refer to https://github.com/kubernetes-sigs/azurefile-csi-driver/blob/master/docs/driver-parameters.md
@@ -174,6 +180,12 @@ func (t *azureFileCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume)
 
 	pv.Spec.CSI = nil
 	pv.Spec.AzureFile = azureSource
+	if resourceGroup != "" {
+		if pv.ObjectMeta.Annotations == nil {
+			pv.ObjectMeta.Annotations = map[string]string{}
+		}
+		pv.ObjectMeta.Annotations[resourceGroupAnnotation] = resourceGroup
+	}
 
 	return pv, nil
 }
