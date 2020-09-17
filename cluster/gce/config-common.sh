@@ -162,4 +162,4 @@ export WINDOWS_INFRA_CONTAINER="gcr.io/gke-release/pause-win:1.2.1"
 # Storage Path for csi-proxy. csi-proxy only needs to be installed for Windows.
 export CSI_PROXY_STORAGE_PATH="https://storage.googleapis.com/gke-release/csi-proxy"
 # Version for csi-proxy
-export CSI_PROXY_VERSION="v0.2.0-gke.0"
+export CSI_PROXY_VERSION="v0.2.1-gke.0"
