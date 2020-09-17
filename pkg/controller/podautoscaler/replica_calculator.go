@@ -387,7 +387,7 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 		// Unready pods are ignored.
 		if resource == v1.ResourceCPU {
 			var ignorePod bool
-			_, condition := podutil.GetPodCondition(&pod.Status, v1.PodReady)
+			condition := podutil.GetPodReadyCondition(pod.Status)
 			if condition == nil || pod.Status.StartTime == nil {
 				ignorePod = true
 			} else {
