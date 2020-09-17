@@ -118,30 +118,30 @@ dependencies:
 
   # Base images
   - name: "k8s.gcr.io/debian-base: dependents"
-    version: 2.1.3
+    version: buster-v1.2.0
     refPaths:
     - path: build/workspace.bzl
       match: tag =
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-arm:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-arm:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-arm64:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-arm64:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-ppc64le:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-ppc64le:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-s390x:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-s390x:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   - name: "k8s.gcr.io/debian-iptables: dependents"
-    version: 12.1.2
+    version: buster-v1.3.0
     refPaths:
     - path: build/common.sh
       match: debian_iptables_version=
     - path: build/workspace.bzl
       match: tag =
     - path: test/utils/image/manifest.go
-      match: configs\[DebianIptables\] = Config{buildImageRegistry, "debian-iptables", "v\d+\.\d+.\d+"}
+      match: configs\[DebianIptables\] = Config{buildImageRegistry, "debian-iptables", "[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"}
 
   - name: "k8s.gcr.io/go-runner: dependents"
     version: buster-v2.0.1
