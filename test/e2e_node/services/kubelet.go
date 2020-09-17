@@ -27,12 +27,12 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"k8s.io/klog/v2"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
+
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -356,13 +356,15 @@ func createPodDirectory() (string, error) {
 
 // createKubeconfig creates a kubeconfig file at the fully qualified `path`. The parent dirs must exist.
 func createKubeconfig(path string) error {
-	kubeconfig := []byte(`apiVersion: v1
+	kubeconfig := []byte(fmt.Sprintf(`apiVersion: v1
 kind: Config
 users:
 - name: kubelet
+  user:
+    token: %s
 clusters:
 - cluster:
-    server: ` + getAPIServerClientURL() + `
+    server: %s
     insecure-skip-tls-verify: true
   name: local
 contexts:
@@ -370,7 +372,7 @@ contexts:
     cluster: local
     user: kubelet
   name: local-context
-current-context: local-context`)
+current-context: local-context`, framework.TestContext.BearerToken, getAPIServerClientURL()))
 
 	if err := ioutil.WriteFile(path, kubeconfig, 0666); err != nil {
 		return err

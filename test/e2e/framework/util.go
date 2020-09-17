@@ -467,7 +467,13 @@ func LoadConfig() (config *restclient.Config, err error) {
 
 	if TestContext.NodeE2E {
 		// This is a node e2e test, apply the node e2e configuration
-		return &restclient.Config{Host: TestContext.Host}, nil
+		return &restclient.Config{
+			Host:        TestContext.Host,
+			BearerToken: TestContext.BearerToken,
+			TLSClientConfig: restclient.TLSClientConfig{
+				Insecure: true,
+			},
+		}, nil
 	}
 	c, err := restclientConfig(TestContext.KubeContext)
 	if err != nil {
