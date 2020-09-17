@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -317,7 +317,13 @@ func ResourceLocation(ctx context.Context, getter ResourceGetter, rt http.RoundT
 		Scheme: scheme,
 	}
 	if port == "" {
-		loc.Host = podIP
+		// when using an ipv6 IP as a hostname in a URL, it must be wrapped in [...]
+		// net.JoinHostPort does this for you.
+		if strings.Contains(podIP, ":") {
+			loc.Host = "[" + podIP + "]"
+		} else {
+			loc.Host = podIP
+		}
 	} else {
 		loc.Host = net.JoinHostPort(podIP, port)
 	}
