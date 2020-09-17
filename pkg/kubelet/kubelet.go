@@ -789,7 +789,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewNoNewPrivsAdmitHandler(klet.containerRuntime))
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewProcMountAdmitHandler(klet.containerRuntime))
 
-	klet.nodeLeaseController = nodelease.NewController(klet.clock, klet.heartbeatClient, string(klet.nodeName), kubeCfg.NodeLeaseDurationSeconds, klet.onRepeatedHeartbeatFailure)
+	leaseClient := klet.heartbeatClient.CoordinationV1().Leases(v1.NamespaceNodeLease)
+	nodeClient := klet.heartbeatClient.CoreV1().Nodes()
+	klet.nodeLeaseController = nodelease.NewController(klet.clock, nodeClient, leaseClient, string(klet.nodeName), kubeCfg.NodeLeaseDurationSeconds, klet.onRepeatedHeartbeatFailure)
 
 	// Finally, put the most recent version of the config on the Kubelet, so
 	// people can see how it was configured.

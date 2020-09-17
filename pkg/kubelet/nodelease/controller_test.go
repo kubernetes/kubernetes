@@ -37,6 +37,33 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+func newTestControllerWithoutNode(fakeClock clock.Clock, node *corev1.Node) *controller {
+	return newTestController(fakeClock, node, false)
+}
+
+func newTestControllerWithNode(fakeClock clock.Clock, node *corev1.Node) *controller {
+	return newTestController(fakeClock, node, true)
+}
+
+// newTestController returns a fake client set and controller initialized with it, and optionall
+// adds the node added to the fake clientset.
+func newTestController(fakeClock clock.Clock, node *corev1.Node, addNodeToFakeClient bool) *controller {
+	var clientset *fake.Clientset
+	if addNodeToFakeClient {
+		clientset = fake.NewSimpleClientset(node)
+	} else {
+		clientset = fake.NewSimpleClientset()
+	}
+
+	return &controller{
+		nodeClient:           clientset.CoreV1().Nodes(),
+		leaseClient:          clientset.CoordinationV1().Leases(corev1.NamespaceNodeLease),
+		holderIdentity:       node.Name,
+		leaseDurationSeconds: 10,
+		clock:                fakeClock,
+	}
+}
+
 func TestNewLease(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
 	node := &corev1.Node{
@@ -52,14 +79,9 @@ func TestNewLease(t *testing.T) {
 		expect     *coordinationv1.Lease
 	}{
 		{
-			desc: "nil base without node",
-			controller: &controller{
-				client:               fake.NewSimpleClientset(),
-				holderIdentity:       node.Name,
-				leaseDurationSeconds: 10,
-				clock:                fakeClock,
-			},
-			base: nil,
+			desc:       "nil base without node",
+			controller: newTestControllerWithoutNode(fakeClock, node),
+			base:       nil,
 			expect: &coordinationv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      node.Name,
@@ -73,14 +95,9 @@ func TestNewLease(t *testing.T) {
 			},
 		},
 		{
-			desc: "nil base with node",
-			controller: &controller{
-				client:               fake.NewSimpleClientset(node),
-				holderIdentity:       node.Name,
-				leaseDurationSeconds: 10,
-				clock:                fakeClock,
-			},
-			base: nil,
+			desc:       "nil base with node",
+			controller: newTestControllerWithNode(fakeClock, node),
+			base:       nil,
 			expect: &coordinationv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      node.Name,
@@ -102,13 +119,8 @@ func TestNewLease(t *testing.T) {
 			},
 		},
 		{
-			desc: "non-nil base without owner ref, renew time is updated",
-			controller: &controller{
-				client:               fake.NewSimpleClientset(node),
-				holderIdentity:       node.Name,
-				leaseDurationSeconds: 10,
-				clock:                fakeClock,
-			},
+			desc:       "non-nil base without owner ref, renew time is updated",
+			controller: newTestControllerWithNode(fakeClock, node),
 			base: &coordinationv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      node.Name,
@@ -141,13 +153,8 @@ func TestNewLease(t *testing.T) {
 			},
 		},
 		{
-			desc: "non-nil base with owner ref, renew time is updated",
-			controller: &controller{
-				client:               fake.NewSimpleClientset(node),
-				holderIdentity:       node.Name,
-				leaseDurationSeconds: 10,
-				clock:                fakeClock,
-			},
+			desc:       "non-nil base with owner ref, renew time is updated",
+			controller: newTestControllerWithNode(fakeClock, node),
 			base: &coordinationv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      node.Name,
@@ -271,7 +278,7 @@ func TestRetryUpdateLease(t *testing.T) {
 			}
 			c := &controller{
 				clock:                      clock.NewFakeClock(time.Now()),
-				client:                     cl,
+				nodeClient:                 cl.CoreV1().Nodes(),
 				leaseClient:                cl.CoordinationV1().Leases(corev1.NamespaceNodeLease),
 				holderIdentity:             node.Name,
 				leaseDurationSeconds:       10,
@@ -407,7 +414,7 @@ func TestUpdateUsingLatestLease(t *testing.T) {
 			}
 			c := &controller{
 				clock:                clock.NewFakeClock(time.Now()),
-				client:               cl,
+				nodeClient:           cl.CoreV1().Nodes(),
 				leaseClient:          cl.CoordinationV1().Leases(corev1.NamespaceNodeLease),
 				holderIdentity:       node.Name,
 				leaseDurationSeconds: 10,

@@ -27,8 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
 	coordclientset "k8s.io/client-go/kubernetes/typed/coordination/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/utils/pointer"
 
 	"k8s.io/klog/v2"
@@ -51,7 +51,7 @@ type Controller interface {
 }
 
 type controller struct {
-	client                     clientset.Interface
+	nodeClient                 corev1client.NodeInterface
 	leaseClient                coordclientset.LeaseInterface
 	holderIdentity             string
 	leaseDurationSeconds       int32
@@ -64,14 +64,10 @@ type controller struct {
 }
 
 // NewController constructs and returns a controller
-func NewController(clock clock.Clock, client clientset.Interface, holderIdentity string, leaseDurationSeconds int32, onRepeatedHeartbeatFailure func()) Controller {
-	var leaseClient coordclientset.LeaseInterface
-	if client != nil {
-		leaseClient = client.CoordinationV1().Leases(corev1.NamespaceNodeLease)
-	}
+func NewController(clock clock.Clock, nodeClient corev1client.NodeInterface, leaseClient coordclientset.LeaseInterface, holderIdentity string, leaseDurationSeconds int32, onRepeatedHeartbeatFailure func()) Controller {
 	leaseDuration := time.Duration(leaseDurationSeconds) * time.Second
 	return &controller{
-		client:                     client,
+		nodeClient:                 nodeClient,
 		leaseClient:                leaseClient,
 		holderIdentity:             holderIdentity,
 		leaseDurationSeconds:       leaseDurationSeconds,
@@ -215,7 +211,7 @@ func (c *controller) newLease(base *coordinationv1.Lease) *coordinationv1.Lease 
 	// the connection between master and node is not ready yet. So try to set
 	// owner reference every time when renewing the lease, until successful.
 	if len(lease.OwnerReferences) == 0 {
-		if node, err := c.client.CoreV1().Nodes().Get(context.TODO(), c.holderIdentity, metav1.GetOptions{}); err == nil {
+		if node, err := c.nodeClient.Get(context.TODO(), c.holderIdentity, metav1.GetOptions{}); err == nil {
 			lease.OwnerReferences = []metav1.OwnerReference{
 				{
 					APIVersion: corev1.SchemeGroupVersion.WithKind("Node").Version,
