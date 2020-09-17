@@ -119,8 +119,10 @@ var (
 )
 
 const (
+	// None is to be used for unset/default images
+	None = iota
 	// Agnhost image
-	Agnhost = iota
+	Agnhost
 	// AgnhostPrivate image
 	AgnhostPrivate
 	// APIServer image
