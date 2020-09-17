@@ -24,9 +24,9 @@ import (
 	"path"
 	"testing"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -65,14 +65,16 @@ func NewE2EServices(monitorParent bool) *E2EServices {
 func (e *E2EServices) Start() error {
 	var err error
 	if !framework.TestContext.NodeConformance {
+		if e.services, err = e.startInternalServices(); err != nil {
+			return fmt.Errorf("failed to start internal services: %v", err)
+		}
 		// Start kubelet
 		e.kubelet, err = e.startKubelet()
 		if err != nil {
 			return fmt.Errorf("failed to start kubelet: %v", err)
 		}
 	}
-	e.services, err = e.startInternalServices()
-	return err
+	return nil
 }
 
 // Stop stops the e2e services.
@@ -129,7 +131,11 @@ func (e *E2EServices) startInternalServices() (*server, error) {
 		return nil, fmt.Errorf("can't get current binary: %v", err)
 	}
 	// Pass all flags into the child process, so that it will see the same flag set.
-	startCmd := exec.Command(testBin, append([]string{"--run-services-mode"}, os.Args[1:]...)...)
+	startCmd := exec.Command(testBin,
+		append(
+			[]string{"--run-services-mode", fmt.Sprintf("--bearer-token=%s", framework.TestContext.BearerToken)},
+			os.Args[1:]...,
+		)...)
 	server := newServer("services", startCmd, nil, nil, getServicesHealthCheckURLs(), servicesLogFile, e.monitorParent, false)
 	return server, server.start()
 }
