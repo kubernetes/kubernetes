@@ -241,13 +241,13 @@ func TestKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Fra
 	seed := time.Now().UTC().UnixNano()
 
 	ginkgo.By("Writing to the volume.")
-	CheckWriteToPath(f, clientPod, v1.PersistentVolumeFilesystem, path, byteLen, seed)
+	CheckWriteToPath(f, clientPod, v1.PersistentVolumeFilesystem, false, path, byteLen, seed)
 
 	ginkgo.By("Restarting kubelet")
 	KubeletCommand(KRestart, c, clientPod)
 
 	ginkgo.By("Testing that written file is accessible.")
-	CheckReadFromPath(f, clientPod, v1.PersistentVolumeFilesystem, path, byteLen, seed)
+	CheckReadFromPath(f, clientPod, v1.PersistentVolumeFilesystem, false, path, byteLen, seed)
 
 	framework.Logf("Volume mount detected on pod %s and written file %s is readable post-restart.", clientPod.Name, path)
 }
@@ -259,13 +259,13 @@ func TestKubeletRestartsAndRestoresMap(c clientset.Interface, f *framework.Frame
 	seed := time.Now().UTC().UnixNano()
 
 	ginkgo.By("Writing to the volume.")
-	CheckWriteToPath(f, clientPod, v1.PersistentVolumeBlock, path, byteLen, seed)
+	CheckWriteToPath(f, clientPod, v1.PersistentVolumeBlock, false, path, byteLen, seed)
 
 	ginkgo.By("Restarting kubelet")
 	KubeletCommand(KRestart, c, clientPod)
 
 	ginkgo.By("Testing that written pv is accessible.")
-	CheckReadFromPath(f, clientPod, v1.PersistentVolumeBlock, path, byteLen, seed)
+	CheckReadFromPath(f, clientPod, v1.PersistentVolumeBlock, false, path, byteLen, seed)
 
 	framework.Logf("Volume map detected on pod %s and written data %s is readable post-restart.", clientPod.Name, path)
 }
@@ -656,33 +656,54 @@ func genBinDataFromSeed(len int, seed int64) []byte {
 }
 
 // CheckReadFromPath validate that file can be properly read.
-func CheckReadFromPath(f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, path string, len int, seed int64) {
+//
+// Note: directIO does not work with (default) BusyBox Pods. A requirement for
+// directIO to function correctly, is to read whole sector(s) for Block-mode
+// PVCs (normally a sector is 512 bytes), or memory pages for files (commonly
+// 4096 bytes).
+func CheckReadFromPath(f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, directIO bool, path string, len int, seed int64) {
 	var pathForVolMode string
+	var iflag string
+
 	if volMode == v1.PersistentVolumeBlock {
 		pathForVolMode = path
 	} else {
 		pathForVolMode = filepath.Join(path, "file1.txt")
 	}
 
+	if directIO {
+		iflag = "iflag=direct"
+	}
+
 	sum := sha256.Sum256(genBinDataFromSeed(len, seed))
 
-	VerifyExecInPodSucceed(f, pod, fmt.Sprintf("dd if=%s bs=%d count=1 | sha256sum", pathForVolMode, len))
-	VerifyExecInPodSucceed(f, pod, fmt.Sprintf("dd if=%s bs=%d count=1 | sha256sum | grep -Fq %x", pathForVolMode, len, sum))
+	VerifyExecInPodSucceed(f, pod, fmt.Sprintf("dd if=%s %s bs=%d count=1 | sha256sum", pathForVolMode, iflag, len))
+	VerifyExecInPodSucceed(f, pod, fmt.Sprintf("dd if=%s %s bs=%d count=1 | sha256sum | grep -Fq %x", pathForVolMode, iflag, len, sum))
 }
 
 // CheckWriteToPath that file can be properly written.
-func CheckWriteToPath(f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, path string, len int, seed int64) {
+//
+// Note: nocache does not work with (default) BusyBox Pods. To read without
+// caching, enable directIO with CheckReadFromPath and check the hints about
+// the len requirements.
+func CheckWriteToPath(f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, nocache bool, path string, len int, seed int64) {
 	var pathForVolMode string
+	var oflag string
+
 	if volMode == v1.PersistentVolumeBlock {
 		pathForVolMode = path
 	} else {
 		pathForVolMode = filepath.Join(path, "file1.txt")
+	}
+
+	if nocache {
+		oflag = "oflag=nocache"
 	}
 
 	encoded := base64.StdEncoding.EncodeToString(genBinDataFromSeed(len, seed))
 
 	VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo %s | base64 -d | sha256sum", encoded))
-	VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo %s | base64 -d | dd of=%s bs=%d count=1", encoded, pathForVolMode, len))
+	VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo %s | base64 -d | dd of=%s %s bs=%d count=1", encoded, pathForVolMode, oflag, len))
 }
 
 // findMountPoints returns all mount points on given node under specified directory.
