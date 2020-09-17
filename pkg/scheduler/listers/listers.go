@@ -41,6 +41,8 @@ type NodeInfoLister interface {
 	List() ([]*schedulernodeinfo.NodeInfo, error)
 	// Returns the list of NodeInfos of nodes with pods with affinity terms.
 	HavePodsWithAffinityList() ([]*schedulernodeinfo.NodeInfo, error)
+	// Returns the list of NodeInfos of nodes with pods with required anti-affinity terms.
+	HavePodsWithRequiredAntiAffinityList() ([]*schedulernodeinfo.NodeInfo, error)
 	// Returns the NodeInfo of the given node name.
 	Get(nodeName string) (*schedulernodeinfo.NodeInfo, error)
 }
