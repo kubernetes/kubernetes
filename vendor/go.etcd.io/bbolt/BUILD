@@ -13,6 +13,7 @@ go_library(
         "bolt_openbsd.go",
         "bolt_ppc64.go",
         "bolt_ppc64le.go",
+        "bolt_riscv64.go",
         "bolt_s390x.go",
         "bolt_unix.go",
         "bolt_unix_aix.go",

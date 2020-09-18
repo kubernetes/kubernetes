@@ -29,6 +29,9 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
             "//pkg/volume/util/fsquota:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",

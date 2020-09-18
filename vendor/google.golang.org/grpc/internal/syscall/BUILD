@@ -26,6 +26,9 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/google.golang.org/grpc/grpclog:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//vendor/google.golang.org/grpc/grpclog:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
             "//vendor/google.golang.org/grpc/grpclog:go_default_library",
         ],

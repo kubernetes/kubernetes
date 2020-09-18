@@ -44,6 +44,10 @@ go_library(
             "//vendor/github.com/coreos/go-systemd/journal:go_default_library",
             "//vendor/go.etcd.io/etcd/pkg/systemd:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//vendor/github.com/coreos/go-systemd/journal:go_default_library",
+            "//vendor/go.etcd.io/etcd/pkg/systemd:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
             "//vendor/github.com/coreos/go-systemd/journal:go_default_library",
             "//vendor/go.etcd.io/etcd/pkg/systemd:go_default_library",

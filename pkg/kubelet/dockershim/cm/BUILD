@@ -37,6 +37,9 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//pkg/kubelet/dockershim/libdocker:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//pkg/kubelet/dockershim/libdocker:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
             "//pkg/kubelet/dockershim/libdocker:go_default_library",
         ],

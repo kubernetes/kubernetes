@@ -39,6 +39,9 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
         ],

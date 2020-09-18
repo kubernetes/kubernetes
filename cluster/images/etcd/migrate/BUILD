@@ -40,6 +40,9 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/github.com/mrunalp/fileutils:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//vendor/github.com/mrunalp/fileutils:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
             "//vendor/github.com/mrunalp/fileutils:go_default_library",
         ],

@@ -77,6 +77,10 @@ go_library(
             "//vendor/golang.org/x/net/ipv6:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//vendor/golang.org/x/net/ipv4:go_default_library",
+            "//vendor/golang.org/x/net/ipv6:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
             "//vendor/golang.org/x/net/ipv4:go_default_library",
             "//vendor/golang.org/x/net/ipv6:go_default_library",
