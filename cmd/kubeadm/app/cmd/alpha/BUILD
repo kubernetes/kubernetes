@@ -67,10 +67,12 @@ go_test(
         "//cmd/kubeadm/test:go_default_library",
         "//cmd/kubeadm/test/cmd:go_default_library",
         "//cmd/kubeadm/test/kubeconfig:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
