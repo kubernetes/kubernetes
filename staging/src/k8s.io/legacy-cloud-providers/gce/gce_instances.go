@@ -210,6 +210,11 @@ func (g *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID str
 	return false, cloudprovider.NotImplemented
 }
 
+// InstanceShutdown returns true if the instance is in safe state to detach volumes
+func (g *Cloud) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, error) {
+	return false, cloudprovider.NotImplemented
+}
+
 func nodeAddressesFromInstance(instance *compute.Instance) ([]v1.NodeAddress, error) {
 	if len(instance.NetworkInterfaces) < 1 {
 		return nil, fmt.Errorf("could not find network interfaces for instanceID %q", instance.Id)
@@ -251,6 +256,61 @@ func (g *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID strin
 	}
 
 	return true, nil
+}
+
+// InstanceExists returns true if the instance with the given provider id still exists and is running.
+// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+func (g *Cloud) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {
+	providerID := node.Spec.ProviderID
+	if providerID == "" {
+		var err error
+		if providerID, err = g.InstanceID(ctx, types.NodeName(node.Name)); err != nil {
+			return false, err
+		}
+	}
+	return g.InstanceExistsByProviderID(ctx, providerID)
+}
+
+// InstanceMetadata returns metadata of the specified instance.
+func (g *Cloud) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Hour)
+	defer cancel()
+
+	providerID := node.Spec.ProviderID
+	if providerID == "" {
+		var err error
+		if providerID, err = g.InstanceID(ctx, types.NodeName(node.Name)); err != nil {
+			return nil, err
+		}
+	}
+
+	_, zone, name, err := splitProviderID(providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	region, err := GetGCERegion(zone)
+	if err != nil {
+		return nil, err
+	}
+
+	instance, err := g.c.Instances().Get(timeoutCtx, meta.ZonalKey(canonicalizeInstanceName(name), zone))
+	if err != nil {
+		return nil, fmt.Errorf("error while querying for providerID %q: %v", providerID, err)
+	}
+
+	addresses, err := nodeAddressesFromInstance(instance)
+	if err != nil {
+		return nil, err
+	}
+
+	return &cloudprovider.InstanceMetadata{
+		ProviderID:    providerID,
+		InstanceType:  lastComponent(instance.MachineType),
+		NodeAddresses: addresses,
+		Zone:          zone,
+		Region:        region,
+	}, nil
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
