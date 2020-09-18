@@ -17,7 +17,6 @@ limitations under the License.
 package plugins
 
 import (
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/debugger"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
@@ -74,6 +73,5 @@ func NewInTreeRegistry() runtime.Registry {
 		queuesort.Name:                             queuesort.New,
 		defaultbinder.Name:                         defaultbinder.New,
 		defaultpreemption.Name:                     defaultpreemption.New,
-		debugger.Name:                              debugger.New,
 	}
 }

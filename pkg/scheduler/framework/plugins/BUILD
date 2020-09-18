@@ -10,7 +10,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/scheduler/apis/config:go_default_library",
-        "//pkg/scheduler/framework/plugins/debugger:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultbinder:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultpreemption:go_default_library",
         "//pkg/scheduler/framework/plugins/imagelocality:go_default_library",
@@ -48,7 +47,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/scheduler/framework/plugins/debugger:all-srcs",
         "//pkg/scheduler/framework/plugins/defaultbinder:all-srcs",
         "//pkg/scheduler/framework/plugins/defaultpreemption:all-srcs",
         "//pkg/scheduler/framework/plugins/examples:all-srcs",

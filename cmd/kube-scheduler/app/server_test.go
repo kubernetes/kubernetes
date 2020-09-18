@@ -160,7 +160,6 @@ profiles:
 			{Name: "PodTopologySpread"},
 			{Name: "InterPodAffinity"},
 			{Name: "VolumeBinding"},
-			{Name: "Debugger"},
 		},
 		"FilterPlugin": {
 			{Name: "NodeUnschedulable"},
@@ -291,7 +290,6 @@ profiles:
 						{Name: "PodTopologySpread"},
 						{Name: "InterPodAffinity"},
 						{Name: "VolumeBinding"},
-						{Name: "Debugger"},
 					},
 					"FilterPlugin": {
 						{Name: "NodeUnschedulable"},
