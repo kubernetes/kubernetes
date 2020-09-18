@@ -115,6 +115,7 @@ func registerAPIMetrics(attributes ...string) *apiCallMetrics {
 				Namespace:      azureMetricsNamespace,
 				Name:           "api_request_duration_seconds",
 				Help:           "Latency of an Azure API call",
+				Buckets:        []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50, 120, 300, 600, 1200},
 				StabilityLevel: metrics.ALPHA,
 			},
 			attributes,
