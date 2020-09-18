@@ -87,7 +87,6 @@ filegroup(
         "//cmd/kubeadm/app/util/image:all-srcs",
         "//cmd/kubeadm/app/util/initsystem:all-srcs",
         "//cmd/kubeadm/app/util/kubeconfig:all-srcs",
-        "//cmd/kubeadm/app/util/kustomize:all-srcs",
         "//cmd/kubeadm/app/util/output:all-srcs",
         "//cmd/kubeadm/app/util/patches:all-srcs",
         "//cmd/kubeadm/app/util/pkiutil:all-srcs",

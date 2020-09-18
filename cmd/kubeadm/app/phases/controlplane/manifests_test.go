@@ -125,7 +125,7 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 
 			// Execute createStaticPodFunction
 			manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-			err := CreateStaticPodFiles(manifestPath, "", "", cfg, &kubeadmapi.APIEndpoint{}, test.components...)
+			err := CreateStaticPodFiles(manifestPath, "", cfg, &kubeadmapi.APIEndpoint{}, test.components...)
 			if err != nil {
 				t.Errorf("Error executing createStaticPodFunction: %v", err)
 				return
@@ -138,56 +138,6 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 				testutil.AssertFileExists(t, manifestPath, fileName+".yaml")
 			}
 		})
-	}
-}
-
-func TestCreateStaticPodFilesKustomize(t *testing.T) {
-	// Create temp folder for the test case
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
-
-	// Creates a Cluster Configuration
-	cfg := &kubeadmapi.ClusterConfiguration{
-		KubernetesVersion: "v1.9.0",
-	}
-
-	kustomizePath := filepath.Join(tmpdir, "kustomize")
-	err := os.MkdirAll(kustomizePath, 0777)
-	if err != nil {
-		t.Fatalf("Couldn't create %s", kustomizePath)
-	}
-
-	patchString := dedent.Dedent(`
-    apiVersion: v1
-    kind: Pod
-    metadata:
-        name: kube-apiserver
-        namespace: kube-system
-        annotations:
-            kustomize: patch for kube-apiserver
-    `)
-
-	err = ioutil.WriteFile(filepath.Join(kustomizePath, "patch.yaml"), []byte(patchString), 0644)
-	if err != nil {
-		t.Fatalf("WriteFile returned unexpected error: %v", err)
-	}
-
-	// Execute createStaticPodFunction with kustomizations
-	manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-	err = CreateStaticPodFiles(manifestPath, kustomizePath, "", cfg, &kubeadmapi.APIEndpoint{}, kubeadmconstants.KubeAPIServer)
-	if err != nil {
-		t.Errorf("Error executing createStaticPodFunction: %v", err)
-		return
-	}
-
-	pod, err := staticpodutil.ReadStaticPodFromDisk(filepath.Join(manifestPath, fmt.Sprintf("%s.yaml", kubeadmconstants.KubeAPIServer)))
-	if err != nil {
-		t.Errorf("Error executing ReadStaticPodFromDisk: %v", err)
-		return
-	}
-
-	if _, ok := pod.ObjectMeta.Annotations["kustomize"]; !ok {
-		t.Error("Kustomize did not apply patches corresponding to the resource")
 	}
 }
 
@@ -220,7 +170,7 @@ func TestCreateStaticPodFilesWithPatches(t *testing.T) {
 
 	// Execute createStaticPodFunction with patches
 	manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-	err = CreateStaticPodFiles(manifestPath, "", patchesPath, cfg, &kubeadmapi.APIEndpoint{}, kubeadmconstants.KubeAPIServer)
+	err = CreateStaticPodFiles(manifestPath, patchesPath, cfg, &kubeadmapi.APIEndpoint{}, kubeadmconstants.KubeAPIServer)
 	if err != nil {
 		t.Errorf("Error executing createStaticPodFunction: %v", err)
 		return

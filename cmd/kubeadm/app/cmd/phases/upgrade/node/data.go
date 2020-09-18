@@ -33,6 +33,5 @@ type Data interface {
 	IsControlPlaneNode() bool
 	Client() clientset.Interface
 	IgnorePreflightErrors() sets.String
-	KustomizeDir() string
 	PatchesDir() string
 }

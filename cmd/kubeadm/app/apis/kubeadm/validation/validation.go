@@ -462,7 +462,6 @@ func isAllowedFlag(flagName string) bool {
 		kubeadmcmdoptions.NodeCRISocket,
 		kubeadmcmdoptions.KubeconfigDir,
 		kubeadmcmdoptions.UploadCerts,
-		kubeadmcmdoptions.Kustomize,
 		kubeadmcmdoptions.Patches,
 		"print-join-command", "rootfs", "v")
 	if knownFlags.Has(flagName) {
