@@ -1,7 +1,7 @@
 // Package query provides serialization of AWS query requests, and responses.
 package query
 
-//go:generate go run -tags codegen ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/input/query.json build_test.go
+//go:generate go run -tags codegen ../../../private/model/cli/gen-protocol-tests ../../../models/protocol_tests/input/query.json build_test.go
 
 import (
 	"net/url"

@@ -1788,7 +1788,7 @@ type AssumeRoleWithSAMLInput struct {
 	// in the IAM User Guide.
 	//
 	// SAMLAssertion is a required field
-	SAMLAssertion *string `min:"4" type:"string" required:"true"`
+	SAMLAssertion *string `min:"4" type:"string" required:"true" sensitive:"true"`
 }
 
 // String returns the string representation
@@ -2100,7 +2100,7 @@ type AssumeRoleWithWebIdentityInput struct {
 	// the application makes an AssumeRoleWithWebIdentity call.
 	//
 	// WebIdentityToken is a required field
-	WebIdentityToken *string `min:"4" type:"string" required:"true"`
+	WebIdentityToken *string `min:"4" type:"string" required:"true" sensitive:"true"`
 }
 
 // String returns the string representation

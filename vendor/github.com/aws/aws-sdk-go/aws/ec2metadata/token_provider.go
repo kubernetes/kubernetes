@@ -46,7 +46,7 @@ func (t *tokenProvider) fetchTokenHandler(r *request.Request) {
 		return
 	}
 
-	output, err := t.client.getToken(t.configuredTTL)
+	output, err := t.client.getToken(r.Context(), t.configuredTTL)
 
 	if err != nil {
 
