@@ -18,6 +18,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/volume",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/proxy/util:go_default_library",
         "//pkg/volume/util/fs:go_default_library",
         "//pkg/volume/util/hostutil:go_default_library",
         "//pkg/volume/util/recyclerclient:go_default_library",

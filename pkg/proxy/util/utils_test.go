@@ -163,6 +163,39 @@ func TestIsProxyableHostname(t *testing.T) {
 	}
 }
 
+func TestIsAllowedHost(t *testing.T) {
+	testCases := []struct {
+		ip     string
+		denied []string
+		want   error
+	}{
+		{"8.8.8.8", []string{}, nil},
+		{"169.254.169.254", []string{"169.0.0.0/8"}, ErrAddressNotAllowed},
+		{"169.254.169.254", []string{"fce8::/15", "169.254.169.0/24"}, ErrAddressNotAllowed},
+		{"fce9:beef::", []string{"fce8::/15", "169.254.169.0/24"}, ErrAddressNotAllowed},
+		{"127.0.0.1", []string{"127.0.0.1/32"}, ErrAddressNotAllowed},
+		{"34.107.204.206", []string{"fce8::/15"}, nil},
+		{"fce9:beef::", []string{"127.0.0.1/32"}, nil},
+		{"34.107.204.206", []string{"127.0.0.1/32"}, nil},
+		{"127.0.0.1", []string{}, nil},
+	}
+
+	for i := range testCases {
+		var denyList []*net.IPNet
+		for _, cidrStr := range testCases[i].denied {
+			_, ipNet, err := net.ParseCIDR(cidrStr)
+			if err != nil {
+				t.Fatalf("bad IP for test case: %v: %v", cidrStr, err)
+			}
+			denyList = append(denyList, ipNet)
+		}
+		got := IsAllowedHost(net.ParseIP(testCases[i].ip), denyList)
+		if testCases[i].want != got {
+			t.Errorf("case %d: expected %v, got %v", i, testCases[i].want, got)
+		}
+	}
+}
+
 func TestShouldSkipService(t *testing.T) {
 	testCases := []struct {
 		service    *v1.Service

@@ -1010,10 +1010,10 @@ github.com/spf13/pflag
 ## explicit
 github.com/spf13/viper
 # github.com/spf13/viper => github.com/spf13/viper v1.4.0
-# github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc => github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
+# github.com/storageos/go-api v2.2.0+incompatible => github.com/storageos/go-api v2.2.0+incompatible
 ## explicit
 github.com/storageos/go-api
-# github.com/storageos/go-api => github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
+# github.com/storageos/go-api => github.com/storageos/go-api v2.2.0+incompatible
 github.com/storageos/go-api/netutil
 github.com/storageos/go-api/serror
 github.com/storageos/go-api/types
