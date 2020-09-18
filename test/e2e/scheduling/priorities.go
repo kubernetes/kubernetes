@@ -250,7 +250,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		defer func() {
 			// Resize the replication controller to zero to get rid of pods.
 			if err := e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rc.Name); err != nil {
-				framework.Logf("Failed to cleanup replication controller %v: %v.", rc.Name, err)
+				framework.Failf("Failed to cleanup replication controller %v: %v.", rc.Name, err)
 			}
 		}()
 
