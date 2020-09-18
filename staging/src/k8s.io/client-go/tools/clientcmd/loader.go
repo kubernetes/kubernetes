@@ -244,6 +244,9 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	mergo.MergeWithOverwrite(config, mapConfig)
 	mergo.MergeWithOverwrite(config, nonMapConfig)
 
+	if (len(config.Contexts) > 1 && config.CurrentContext == "") {
+		errlist = append(errlist, ErrNoContextSet)
+	}
 	if rules.ResolvePaths() {
 		if err := ResolveLocalPaths(config); err != nil {
 			errlist = append(errlist, err)
