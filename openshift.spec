@@ -6,7 +6,7 @@
 %global gopath      %{_datadir}/gocode
 %global import_path k8s.io/kubernetes
 
-%global golang_version 1.14
+%global golang_version 1.15
 
 %{!?commit:
 # DO NOT MODIFY: the value on the line below is sed-like replaced by openshift/doozer

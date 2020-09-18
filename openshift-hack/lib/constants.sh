@@ -4,7 +4,7 @@
 
 readonly OS_GO_PACKAGE=github.com/openshift/origin
 
-readonly OS_BUILD_ENV_GOLANG="${OS_BUILD_ENV_GOLANG:-1.14}"
+readonly OS_BUILD_ENV_GOLANG="${OS_BUILD_ENV_GOLANG:-1.15}"
 readonly OS_BUILD_ENV_IMAGE="${OS_BUILD_ENV_IMAGE:-openshift/origin-release:golang-${OS_BUILD_ENV_GOLANG}}"
 readonly OS_REQUIRED_GO_VERSION="go${OS_BUILD_ENV_GOLANG}"
 readonly OS_GLIDE_MINOR_VERSION="13"
