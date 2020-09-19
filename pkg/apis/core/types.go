@@ -4568,10 +4568,10 @@ const (
 // TODO: Decide whether to store these separately or with the object they apply to.
 type Event struct {
 	metav1.TypeMeta
-	// +optional
+
 	metav1.ObjectMeta
 
-	// Required. The object that this event is about. Mapped to events.Event.regarding
+	// The object that this event is about. Mapped to events.Event.regarding
 	// +optional
 	InvolvedObject ObjectReference
 
