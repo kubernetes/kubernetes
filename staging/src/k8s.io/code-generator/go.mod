@@ -23,7 +23,4 @@ require (
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
-replace (
-	github.com/stretchr/testify => github.com/stretchr/testify v1.4.0
-	k8s.io/code-generator => ../code-generator
-)
+replace k8s.io/code-generator => ../code-generator

@@ -19,7 +19,4 @@ require (
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 )
 
-replace (
-	github.com/stretchr/testify => github.com/stretchr/testify v1.4.0
-	k8s.io/cri-api => ../cri-api
-)
+replace k8s.io/cri-api => ../cri-api

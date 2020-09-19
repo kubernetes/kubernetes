@@ -13,7 +13,4 @@ require (
 	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
 )
 
-replace (
-	github.com/stretchr/testify => github.com/stretchr/testify v1.4.0
-	k8s.io/mount-utils => ../mount-utils
-)
+replace k8s.io/mount-utils => ../mount-utils
