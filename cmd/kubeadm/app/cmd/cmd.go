@@ -90,8 +90,11 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(NewCmdToken(out, err))
 	cmds.AddCommand(upgrade.NewCmdUpgrade(out))
 	cmds.AddCommand(alpha.NewCmdAlpha(in, out))
-
 	options.AddKubeadmOtherFlags(cmds.PersistentFlags(), &rootfsPath)
+
+	// TODO: remove "certs" from "alpha"
+	// https://github.com/kubernetes/kubeadm/issues/2291
+	cmds.AddCommand(alpha.NewCmdCertsUtility(out))
 
 	return cmds
 }
