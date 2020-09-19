@@ -23,7 +23,9 @@ import (
 	"strings"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -43,9 +45,10 @@ const (
 	ClusterAddonLabelKey   = "k8s-app"
 	DNSLabelName           = "kube-dns"
 	DNSAutoscalerLabelName = "kube-dns-autoscaler"
+	LastPollLivenessProbe  = "/last-poll"
 )
 
-var _ = SIGDescribe("DNS horizontal autoscaling", func() {
+var _ = SIGDescribe("[ProportionalScaling] DNS horizontal autoscaling", func() {
 	f := framework.NewDefaultFramework("dns-autoscaling")
 	var c clientset.Interface
 	var previousParams map[string]string
@@ -55,7 +58,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 	var DNSParams3 DNSParamsLinear
 
 	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce", "gke", "azure")
 		c = f.ClientSet
 
 		nodes, err := e2enode.GetReadySchedulableNodes(c)
@@ -102,7 +105,8 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 
 	// This test is separated because it is slow and need to run serially.
 	// Will take around 5 minutes to run on a 4 nodes cluster.
-	ginkgo.It("[Serial] [Slow] kube-dns-autoscaler should scale kube-dns pods when cluster size changed", func() {
+	ginkgo.It("[ProportionalScaling] [Serial] [Slow] kube-dns-autoscaler should scale kube-dns pods when cluster size changed", func() {
+		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		numNodes, err := e2enode.TotalRegistered(c)
 		framework.ExpectNoError(err)
 
@@ -167,8 +171,8 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 	})
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #55779 is fixed.
-	ginkgo.It("[DisabledForLargeClusters] kube-dns-autoscaler should scale kube-dns pods in both nonfaulty and faulty scenarios", func() {
-
+	ginkgo.It("[ProportionalScaling] [DisabledForLargeClusters] kube-dns-autoscaler should scale kube-dns pods in both nonfaulty and faulty scenarios", func() {
+		e2eskipper.SkipUnlessProviderIs("gce", "gke", "azure")
 		ginkgo.By("Replace the dns autoscaling parameters with testing parameters")
 		err := updateDNSScalingConfigMap(c, packDNSScalingConfigMap(packLinearParams(&DNSParams1)))
 		framework.ExpectNoError(err)
@@ -220,6 +224,53 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 		getExpectReplicasLinear = getExpectReplicasFuncLinear(c, &DNSParams1)
 		err = waitForDNSReplicasSatisfied(c, getExpectReplicasLinear, DNSdefaultTimeout)
 		framework.ExpectNoError(err)
+	})
+
+	ginkgo.It("[ProportionalScaling] [Liveness] kube-dns-autoscaler should restart at last-poll liveness fail", func() {
+		e2eskipper.SkipUnlessProviderIs("azure")
+
+		livenessOn, err := isScalerLivenessProbeEnabled(c)
+		framework.ExpectNoError(err)
+		if !livenessOn {
+			e2eskipper.Skipf("Skipping - liveness http probe not enabled")
+		}
+
+		ginkgo.By("Replace the dns autoscaling parameters with testing parameters")
+		err = updateDNSScalingConfigMap(c, packDNSScalingConfigMap(packLinearParams(&DNSParams1)))
+		framework.ExpectNoError(err)
+		defer func() {
+			ginkgo.By("Restoring initial dns autoscaling parameters")
+			err = updateDNSScalingConfigMap(c, packDNSScalingConfigMap(previousParams))
+			framework.ExpectNoError(err)
+		}()
+		ginkgo.By("Wait for kube-dns scaled to expected number")
+		getExpectReplicasLinear := getExpectReplicasFuncLinear(c, &DNSParams1)
+		err = waitForDNSReplicasSatisfied(c, getExpectReplicasLinear, DNSdefaultTimeout)
+		framework.ExpectNoError(err)
+
+		// pollute the cpa's configMap with bad parameters
+		badScalingParams := make(map[string]string)
+		badScalingParams["NeitherLinearNorLadder"] = fmt.Sprintf("{\"nodesPerReplica\": %v,\"coresPerReplica\": %v,\"min\": %v,\"max\": %v}",
+			1, 1, 1, 1)
+
+		ginkgo.By("Replace the dns autoscaling parameters with erroneous parameters")
+		err = updateDNSScalingConfigMap(c, packDNSScalingConfigMap(badScalingParams))
+		framework.ExpectNoError(err)
+
+		ginkgo.By("--- Scenario: Scaler pod should start failing liveness probe and should restart ---")
+		// checking for one restart is okay to avoid going into crashloopbackoff
+		err = waitForScalerPodToRestart(c, DNSdefaultTimeout, 1)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Replace the dns autoscaling parameters with legitimate testing parameters")
+		err = updateDNSScalingConfigMap(c, packDNSScalingConfigMap(packLinearParams(&DNSParams1)))
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Wait for kube-dns scaled to expected number")
+		getExpectReplicasLinear = getExpectReplicasFuncLinear(c, &DNSParams1)
+		err = waitForDNSReplicasSatisfied(c, getExpectReplicasLinear, DNSdefaultTimeout)
+		framework.ExpectNoError(err)
+
 	})
 })
 
@@ -380,4 +431,53 @@ func waitForDNSConfigMapCreated(c clientset.Interface, timeout time.Duration) (c
 		return nil, fmt.Errorf("err waiting for DNS autoscaling ConfigMap got re-created: %v", err)
 	}
 	return configMap, nil
+}
+
+func waitForScalerPodToRestart(c clientset.Interface, timeout time.Duration, restartTarget int32) error {
+	framework.Logf("Waiting for scaler pod to go into restart")
+	label := labels.SelectorFromSet(labels.Set(map[string]string{ClusterAddonLabelKey: DNSAutoscalerLabelName}))
+	listOpts := metav1.ListOptions{LabelSelector: label.String()}
+	pods, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), listOpts)
+	if err != nil {
+		return err
+	}
+	scalerPodName := pods.Items[0].Name
+
+	condition := func() (bool, error) {
+		pod, err := c.CoreV1().Pods(metav1.NamespaceSystem).Get(context.TODO(), scalerPodName, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}
+		restartCount := pod.Status.ContainerStatuses[0].RestartCount
+		framework.Logf("Pod restart count is: %d, want: %d", restartCount, restartTarget)
+		return restartCount >= restartTarget, nil
+	}
+
+	if err := wait.Poll(10*time.Second, timeout, condition); err != nil {
+		return fmt.Errorf("err waiting for DNS autoscaler pod to restart: %v", err)
+	}
+	return nil
+}
+
+func isScalerLivenessProbeEnabled(c clientset.Interface) (bool, error) {
+	scalerDeployment, err := getScalerDeployment(c)
+	framework.ExpectNoError(err)
+	livenessProbe := scalerDeployment.Spec.Template.Spec.Containers[0].LivenessProbe
+	if livenessProbe == nil || livenessProbe.HTTPGet == nil {
+		return false, nil
+	}
+	return livenessProbe.HTTPGet.Path == LastPollLivenessProbe, nil
+}
+
+func getScalerDeployment(c clientset.Interface) (*appsv1.Deployment, error) {
+	label := labels.SelectorFromSet(labels.Set(map[string]string{ClusterAddonLabelKey: DNSAutoscalerLabelName}))
+	listOpts := metav1.ListOptions{LabelSelector: label.String()}
+	deployments, err := c.AppsV1().Deployments(metav1.NamespaceSystem).List(context.TODO(), listOpts)
+	if err != nil {
+		return nil, err
+	}
+	return &deployments.Items[0], nil
 }
