@@ -801,14 +801,31 @@ func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (in
 	return 0, nil
 }
 
-// CleanupAndExit remove iptables rules and exit if success return nil
+// CleanupAndExit remove iptables rules and ipset/ipvs rules in ipvs proxy mode
+// and exit if success return nil
 func (s *ProxyServer) CleanupAndExit() error {
-	encounteredError := userspace.CleanupLeftovers(s.IptInterface)
-	encounteredError = iptables.CleanupLeftovers(s.IptInterface) || encounteredError
-	encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, s.IptInterface, s.IpsetInterface, s.CleanupIPVS) || encounteredError
+	// cleanup IPv6 and IPv4 iptables rules
+	var ipts []utiliptables.Interface
+	for _, proto := range []utiliptables.Protocol{utiliptables.ProtocolIPv4, utiliptables.ProtocolIPv6} {
+		ipt, err := utiliptables.New(s.execer, proto)
+		if err != nil {
+			klog.Warningf("Unable to clean up iptables rules for %s: %v", proto, err)
+			continue
+		}
+		ipts = append(ipts, ipt)
+	}
+
+	// If one iptables binary is missing, then the warning above is fine. If both are missing, it's an error.
+	encounteredError := len(ipts) == 0
+
+	for _, ipt := range ipts {
+		encounteredError = userspace.CleanupLeftovers(ipt) || encounteredError
+		encounteredError = iptables.CleanupLeftovers(ipt) || encounteredError
+		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, ipt, s.IpsetInterface, s.CleanupIPVS) || encounteredError
+	}
+
 	if encounteredError {
 		return errors.New("encountered an error while tearing down rules")
 	}
-
 	return nil
 }

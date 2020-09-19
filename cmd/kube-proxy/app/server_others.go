@@ -91,26 +91,6 @@ func newProxyServer(
 		return nil, fmt.Errorf("unable to register configz: %s", err)
 	}
 
-	hostname, err := utilnode.GetHostname(config.HostnameOverride)
-	if err != nil {
-		return nil, err
-	}
-
-	client, eventClient, err := createClients(config.ClientConnection, master)
-	if err != nil {
-		return nil, err
-	}
-
-	nodeIP := detectNodeIP(client, hostname, config.BindAddress)
-
-	protocol := utiliptables.ProtocolIPv4
-	if utilsnet.IsIPv6(nodeIP) {
-		klog.V(0).Infof("kube-proxy node IP is an IPv6 address (%s), assume IPv6 operation", nodeIP.String())
-		protocol = utiliptables.ProtocolIPv6
-	} else {
-		klog.V(0).Infof("kube-proxy node IP is an IPv4 address (%s), assume IPv4 operation", nodeIP.String())
-	}
-
 	var iptInterface utiliptables.Interface
 	var ipvsInterface utilipvs.Interface
 	var kernelHandler ipvs.KernelHandler
@@ -119,10 +99,6 @@ func newProxyServer(
 	// Create a iptables utils.
 	execer := exec.New()
 
-	iptInterface, err = utiliptables.New(execer, protocol)
-	if err != nil {
-		klog.Fatalf("Cannot initialize iptables support for %s: %v", protocol, err)
-	}
 	kernelHandler = ipvs.NewLinuxKernelHandler()
 	ipsetInterface = utilipset.New(execer)
 	canUseIPVS, err := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface)
@@ -138,7 +114,6 @@ func newProxyServer(
 	if cleanupAndExit {
 		return &ProxyServer{
 			execer:         execer,
-			IptInterface:   iptInterface,
 			IpvsInterface:  ipvsInterface,
 			IpsetInterface: ipsetInterface,
 		}, nil
@@ -146,6 +121,30 @@ func newProxyServer(
 
 	if len(config.ShowHiddenMetricsForVersion) > 0 {
 		metrics.SetShowHidden()
+	}
+
+	hostname, err := utilnode.GetHostname(config.HostnameOverride)
+	if err != nil {
+		return nil, err
+	}
+
+	client, eventClient, err := createClients(config.ClientConnection, master)
+	if err != nil {
+		return nil, err
+	}
+
+	nodeIP := detectNodeIP(client, hostname, config.BindAddress)
+	protocol := utiliptables.ProtocolIPv4
+	if utilsnet.IsIPv6(nodeIP) {
+		klog.V(0).Infof("kube-proxy node IP is an IPv6 address (%s), assume IPv6 operation", nodeIP.String())
+		protocol = utiliptables.ProtocolIPv6
+	} else {
+		klog.V(0).Infof("kube-proxy node IP is an IPv4 address (%s), assume IPv4 operation", nodeIP.String())
+	}
+
+	iptInterface, err = utiliptables.New(execer, protocol)
+	if err != nil {
+		klog.Fatalf("Cannot initialize iptables support for %s: %v", protocol, err)
 	}
 
 	// Create event recorder
