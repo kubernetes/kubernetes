@@ -30,6 +30,7 @@ import (
 	discovery "k8s.io/api/discovery/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -595,6 +596,73 @@ func TestReconcileEndpointSlicesReplaceDeprecated(t *testing.T) {
 	cmc.Check(t)
 }
 
+// In this test, we want to verify that a Service recreation will result in new
+// EndpointSlices being created.
+func TestReconcileEndpointSlicesRecreation(t *testing.T) {
+	testCases := []struct {
+		name           string
+		ownedByService bool
+		expectChanges  bool
+	}{
+		{
+			name:           "slice owned by Service",
+			ownedByService: true,
+			expectChanges:  false,
+		}, {
+			name:           "slice owned by other Service UID",
+			ownedByService: false,
+			expectChanges:  true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			client := newClientset()
+			setupMetrics()
+			namespace := "test"
+
+			svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
+			slice := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
+
+			pod := newPod(1, namespace, true, 1)
+			slice.Endpoints = append(slice.Endpoints, podToEndpoint(pod, &corev1.Node{}, &corev1.Service{Spec: corev1.ServiceSpec{}}))
+
+			if !tc.ownedByService {
+				slice.OwnerReferences[0].UID = "different"
+			}
+			existingSlices := []*discovery.EndpointSlice{slice}
+			createEndpointSlices(t, client, namespace, existingSlices)
+
+			cmc := newCacheMutationCheck(existingSlices)
+
+			numActionsBefore := len(client.Actions())
+			r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+			reconcileHelper(t, r, &svc, []*corev1.Pod{pod}, existingSlices, time.Now())
+
+			if tc.expectChanges {
+				if len(client.Actions()) != numActionsBefore+2 {
+					t.Fatalf("Expected 2 additional actions, got %d", len(client.Actions())-numActionsBefore)
+				}
+
+				expectAction(t, client.Actions(), numActionsBefore, "create", "endpointslices")
+				expectAction(t, client.Actions(), numActionsBefore+1, "delete", "endpointslices")
+
+				fetchedSlices := fetchEndpointSlices(t, client, namespace)
+
+				if len(fetchedSlices) != 1 {
+					t.Fatalf("Expected 1 EndpointSlice to exist, got %d", len(fetchedSlices))
+				}
+			} else {
+				if len(client.Actions()) != numActionsBefore {
+					t.Errorf("Expected no additional actions, got %d", len(client.Actions())-numActionsBefore)
+				}
+			}
+			// ensure cache mutation has not occurred
+			cmc.Check(t)
+		})
+	}
+}
+
 // Named ports can map to different port numbers on different pods.
 // This test ensures that EndpointSlices are grouped correctly in that case.
 func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
@@ -818,15 +886,24 @@ func TestReconcilerFinalizeSvcDeletionTimestamp(t *testing.T) {
 			namespace := "test"
 			svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 			svc.DeletionTimestamp = tc.deletionTimestamp
+			gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
+			ownerRef := metav1.NewControllerRef(&svc, gvk)
+
 			esToCreate := &discovery.EndpointSlice{
-				ObjectMeta:  metav1.ObjectMeta{Name: "to-create"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "to-create",
+					OwnerReferences: []metav1.OwnerReference{*ownerRef},
+				},
 				AddressType: endpointMeta.AddressType,
 				Ports:       endpointMeta.Ports,
 			}
 
 			// Add EndpointSlice that can be updated.
 			esToUpdate, err := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(context.TODO(), &discovery.EndpointSlice{
-				ObjectMeta:  metav1.ObjectMeta{Name: "to-update"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "to-update",
+					OwnerReferences: []metav1.OwnerReference{*ownerRef},
+				},
 				AddressType: endpointMeta.AddressType,
 				Ports:       endpointMeta.Ports,
 			}, metav1.CreateOptions{})
@@ -839,7 +916,10 @@ func TestReconcilerFinalizeSvcDeletionTimestamp(t *testing.T) {
 
 			// Add EndpointSlice that can be deleted.
 			esToDelete, err := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(context.TODO(), &discovery.EndpointSlice{
-				ObjectMeta:  metav1.ObjectMeta{Name: "to-delete"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "to-delete",
+					OwnerReferences: []metav1.OwnerReference{*ownerRef},
+				},
 				AddressType: endpointMeta.AddressType,
 				Ports:       endpointMeta.Ports,
 			}, metav1.CreateOptions{})
