@@ -18,10 +18,12 @@ package phases
 
 import (
 	"github.com/pkg/errors"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
+	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 )
 
 var (
@@ -61,5 +63,11 @@ func runMarkControlPlane(c workflow.RunData) error {
 	}
 
 	nodeRegistration := data.Cfg().NodeRegistration
+
+	klog.V(1).Infoln("[mark-control-plane] Preserving the CRISocket information for the control-plane node")
+	if err := patchnodephase.AnnotateCRISocket(client, nodeRegistration.Name, nodeRegistration.CRISocket); err != nil {
+		return errors.Wrap(err, "Error writing Crisocket information for the control-plane node")
+	}
+
 	return markcontrolplanephase.MarkControlPlane(client, nodeRegistration.Name, nodeRegistration.Taints)
 }
