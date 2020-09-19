@@ -21,7 +21,7 @@ require (
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
 	github.com/satori/go.uuid v1.2.0 // indirect
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.5.1
 	github.com/vmware/govmomi v0.20.3
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
@@ -41,7 +41,7 @@ require (
 )
 
 replace (
-	github.com/jmespath/go-jmespath => github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
+	github.com/stretchr/testify => github.com/stretchr/testify v1.4.0
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver
