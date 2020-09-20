@@ -187,10 +187,11 @@ var _ = SIGDescribe("PreStop", func() {
 		err = podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(gracefulTerminationPeriodSeconds))
 		framework.ExpectNoError(err, "failed to delete pod")
 
-		//wait up to graceful termination period seconds
-		time.Sleep(30 * time.Second)
+		// wait for less than the gracePeriod termination ensuring the
+		// preStop hook is still executing.
+		time.Sleep(15 * time.Second)
 
-		ginkgo.By("verifying the pod running state after graceful termination")
+		ginkgo.By("verifying the pod is running while in the graceful period termination")
 		result := &v1.PodList{}
 		err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
 			client, err := e2ekubelet.ProxyRequest(f.ClientSet, pod.Spec.NodeName, "pods", ports.KubeletPort)
