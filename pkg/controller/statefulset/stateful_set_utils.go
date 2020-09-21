@@ -224,6 +224,11 @@ func isHealthy(pod *v1.Pod) bool {
 	return isRunningAndReady(pod) && !isTerminating(pod)
 }
 
+// isPending returns true if pod has a Phase of PodPending
+func isPending(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodPending
+}
+
 // allowsBurst is true if the alpha burst annotation is set.
 func allowsBurst(set *apps.StatefulSet) bool {
 	return set.Spec.PodManagementPolicy == apps.ParallelPodManagement
