@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/net"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/transport"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
@@ -52,6 +53,8 @@ const (
 
 	// We have seen one of these calls take just over 15 seconds, so putting this at 30.
 	proxyHTTPCallTimeout = 30 * time.Second
+	podRetryPeriod       = 1 * time.Second
+	podRetryTimeout      = 1 * time.Minute
 )
 
 var _ = SIGDescribe("Proxy", func() {
@@ -256,6 +259,44 @@ var _ = SIGDescribe("Proxy", func() {
 				}
 
 				framework.Failf(strings.Join(errs, "\n"))
+			}
+		})
+
+		ginkgo.It("proxy connection returns a series of 301 redirections for a node", func() {
+			httpVerbs := []string{"DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"}
+
+			nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			framework.ExpectNoError(err, "Error fetching the list of nodes")
+
+			firstNodeName := nodeList.Items[0].GetName()
+			framework.Logf("Name of first Node: %s", firstNodeName)
+
+			transportCfg, err := f.ClientConfig().TransportConfig()
+			framework.ExpectNoError(err, "Error creating transportCfg")
+			restTransport, err := transport.New(transportCfg)
+			framework.ExpectNoError(err, "Error creating restTransport")
+			// Disable 301 automatic follow
+			client := &http.Client{
+				CheckRedirect: func(req *http.Request, via []*http.Request) error {
+					return http.ErrUseLastResponse
+				},
+				Transport: restTransport,
+			}
+
+			for _, httpVerb := range httpVerbs {
+				// Using http.Client to verify 301 redirect from .../proxy to .../proxy/
+				urlString := f.ClientConfig().Host + "/api/v1/nodes/" + firstNodeName + "/proxy"
+				framework.Logf("Starting http.Client for %s", urlString)
+
+				request, err := http.NewRequest(httpVerb, urlString, nil)
+				framework.ExpectNoError(err, "processing request")
+
+				resp, err := client.Do(request)
+				framework.ExpectNoError(err, "processing response")
+				defer resp.Body.Close()
+
+				framework.Logf("http.Client request:%s StatusCode:%d", httpVerb, resp.StatusCode)
+				framework.ExpectEqual(resp.StatusCode, 301, "The resp.StatusCode returned: %d", resp.StatusCode)
 			}
 		})
 	})
