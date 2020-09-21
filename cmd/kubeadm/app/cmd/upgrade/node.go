@@ -39,7 +39,6 @@ import (
 // supported by this api will be exposed as a flag.
 type nodeOptions struct {
 	kubeConfigPath        string
-	kubeletVersion        string
 	etcdUpgrade           bool
 	renewCerts            bool
 	dryRun                bool
@@ -57,7 +56,6 @@ type nodeData struct {
 	etcdUpgrade           bool
 	renewCerts            bool
 	dryRun                bool
-	kubeletVersion        string
 	cfg                   *kubeadmapi.InitConfiguration
 	isControlPlaneNode    bool
 	client                clientset.Interface
@@ -117,8 +115,6 @@ func newNodeOptions() *nodeOptions {
 func addUpgradeNodeFlags(flagSet *flag.FlagSet, nodeOptions *nodeOptions) {
 	options.AddKubeConfigFlag(flagSet, &nodeOptions.kubeConfigPath)
 	flagSet.BoolVar(&nodeOptions.dryRun, options.DryRun, nodeOptions.dryRun, "Do not change any state, just output the actions that would be performed.")
-	flagSet.StringVar(&nodeOptions.kubeletVersion, options.KubeletVersion, nodeOptions.kubeletVersion, "The *desired* version for the kubelet config after the upgrade. If not specified, the KubernetesVersion from the kubeadm-config ConfigMap will be used")
-	flagSet.MarkDeprecated(options.KubeletVersion, "This flag is deprecated and will be removed in a future version.")
 	flagSet.BoolVar(&nodeOptions.renewCerts, options.CertificateRenewal, nodeOptions.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
 	flagSet.BoolVar(&nodeOptions.etcdUpgrade, options.EtcdUpgrade, nodeOptions.etcdUpgrade, "Perform the upgrade of etcd.")
 	flagSet.StringSliceVar(&nodeOptions.ignorePreflightErrors, options.IgnorePreflightErrors, nodeOptions.ignorePreflightErrors, "A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.")
@@ -160,7 +156,6 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions) (*node
 		etcdUpgrade:           options.etcdUpgrade,
 		renewCerts:            options.renewCerts,
 		dryRun:                options.dryRun,
-		kubeletVersion:        options.kubeletVersion,
 		cfg:                   cfg,
 		client:                client,
 		isControlPlaneNode:    isControlPlaneNode,
@@ -183,11 +178,6 @@ func (d *nodeData) EtcdUpgrade() bool {
 // RenewCerts returns the renewCerts flag.
 func (d *nodeData) RenewCerts() bool {
 	return d.renewCerts
-}
-
-// KubeletVersion returns the kubeletVersion flag.
-func (d *nodeData) KubeletVersion() string {
-	return d.kubeletVersion
 }
 
 // Cfg returns initConfiguration.
