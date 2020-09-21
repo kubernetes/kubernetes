@@ -32,15 +32,24 @@ type klogWrapper struct{}
 const klogWrapperDepth = 4
 
 func (klogWrapper) Info(args ...interface{}) {
-	klog.InfoDepth(klogWrapperDepth, args...)
+	//Discard all Info logging, if verbose level is less than 6
+	if klog.V(6).Enabled() {
+		klog.InfoDepth(klogWrapperDepth, args...)
+	}
 }
 
 func (klogWrapper) Infoln(args ...interface{}) {
-	klog.InfoDepth(klogWrapperDepth, fmt.Sprintln(args...))
+	//Discard all Info logging, if verbose level is less than 6
+	if klog.V(6).Enabled() {
+		klog.InfoDepth(klogWrapperDepth, fmt.Sprintln(args...))
+	}
 }
 
 func (klogWrapper) Infof(format string, args ...interface{}) {
-	klog.InfoDepth(klogWrapperDepth, fmt.Sprintf(format, args...))
+	//Discard all Info logging, if verbose level is less than 6
+	if klog.V(6).Enabled() {
+		klog.InfoDepth(klogWrapperDepth, fmt.Sprintf(format, args...))
+	}
 }
 
 func (klogWrapper) Warning(args ...interface{}) {
