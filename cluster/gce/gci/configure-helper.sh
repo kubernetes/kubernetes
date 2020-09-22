@@ -385,6 +385,10 @@ function mount-ext(){
 # Local ssds, if present, are mounted or symlinked to their appropriate
 # locations
 function ensure-local-ssds() {
+  if [ "${NODE_LOCAL_SSDS_EPHEMERAL:-false}" == "true" ]; then
+    ensure-local-ssds-ephemeral-storage
+    return
+  fi
   get-local-disk-num "scsi" "block"
   local scsiblocknum="${localdisknum}"
   local i=0
@@ -434,6 +438,62 @@ function ensure-local-ssds() {
       echo "No local NVMe SSD disks found."
     fi
   done
+}
+
+# Local SSDs, if present, are used in a single RAID 0 array and directories that
+# back ephemeral storage are mounted on them (kubelet root, container runtime
+# root and pod logs).
+function ensure-local-ssds-ephemeral-storage() {
+  local devices=()
+  # Get nvme devices
+  for ssd in /dev/nvme*n*; do
+    if [ -e "${ssd}" ]; then
+      # This workaround to find if the NVMe device is a local SSD is required
+      # because the existing Google images does not them in /dev/disk/by-id
+      if [[ "$(lsblk -o MODEL -dn "${ssd}")" == "nvme_card" ]]; then
+        devices+=("${ssd}")
+      fi
+    fi
+  done
+  if [ "${#devices[@]}" -eq 0 ]; then
+    echo "No local NVMe SSD disks found."
+    return
+  fi
+
+  local device="${devices[0]}"
+  if [ "${#devices[@]}" -ne 1 ]; then
+    seen_arrays=(/dev/md/*)
+    device=${seen_arrays[0]}
+    echo "Setting RAID array with local SSDs on device ${device}"
+    if [ ! -e "$device" ]; then
+      device="/dev/md/0"
+      echo "y" | mdadm --create "${device}" --level=0 --raid-devices=${#devices[@]} "${devices[@]}"
+    fi
+  fi
+
+  local ephemeral_mountpoint="/mnt/stateful_partition/kube-ephemeral-ssd"
+  safe-format-and-mount "${device}" "${ephemeral_mountpoint}"
+
+  # mount container runtime root dir on SSD
+  local container_runtime="${CONTAINER_RUNTIME:-docker}"
+  systemctl stop "$container_runtime"
+  # Some images remount the container runtime root dir.
+  umount "/var/lib/${container_runtime}" || true
+  # Move the container runtime's directory to the new location to preserve
+  # preloaded images.
+  if [ ! -d "${ephemeral_mountpoint}/${container_runtime}" ]; then
+    mv "/var/lib/${container_runtime}" "${ephemeral_mountpoint}/${container_runtime}"
+  fi
+  safe-bind-mount "${ephemeral_mountpoint}/${container_runtime}" "/var/lib/${container_runtime}"
+  systemctl start "$container_runtime"
+
+  # mount kubelet root dir on SSD
+  mkdir -p "${ephemeral_mountpoint}/kubelet"
+  safe-bind-mount "${ephemeral_mountpoint}/kubelet" "/var/lib/kubelet"
+
+  # mount pod logs root dir on SSD
+  mkdir -p "${ephemeral_mountpoint}/log_pods"
+  safe-bind-mount "${ephemeral_mountpoint}/log_pods" "/var/log/pods"
 }
 
 # Installs logrotate configuration files
@@ -2950,8 +3010,8 @@ function main() {
   setup-os-params
   config-ip-firewall
   create-dirs
-  setup-kubelet-dir
   ensure-local-ssds
+  setup-kubelet-dir
   setup-logrotate
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     mount-master-pd
