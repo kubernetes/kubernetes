@@ -456,7 +456,7 @@ func (rc *reconciler) cleanupMounts(volume podVolume) {
 	// to unmount both volume and device in the same routine.
 	err := rc.operationExecutor.UnmountVolume(mountedVolume, rc.actualStateOfWorld, rc.kubeletPodsDir)
 	if err != nil {
-		klog.Errorf(mountedVolume.GenerateErrorDetailed(fmt.Sprintf("volumeHandler.UnmountVolumeHandler for UnmountVolume failed"), err).Error())
+		klog.Errorf(mountedVolume.GenerateErrorDetailed("volumeHandler.UnmountVolumeHandler for UnmountVolume failed", err).Error())
 		return
 	}
 }
