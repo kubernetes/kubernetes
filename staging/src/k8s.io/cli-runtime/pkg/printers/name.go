@@ -38,6 +38,9 @@ type NamePrinter struct {
 	// took place on an object, to be included in the
 	// finalized "successful" message.
 	Operation string
+	// WithNamespace indicates whether a namespace should be
+	// printed along side the "resource/name" pair for an object.
+	WithNamespace bool
 }
 
 // PrintObj is an implementation of ResourcePrinter.PrintObj which decodes the object
@@ -80,13 +83,21 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	}
 
 	name := "<unknown>"
+	namespace := ""
 	if acc, err := meta.Accessor(obj); err == nil {
 		if n := acc.GetName(); len(n) > 0 {
 			name = n
 		}
+		if p.WithNamespace {
+			if ns := acc.GetNamespace(); len(ns) > 0 {
+				namespace = ns
+			} else {
+				namespace = "<unknown>"
+			}
+		}
 	}
 
-	return printObj(w, name, p.Operation, p.ShortOutput, GetObjectGroupKind(obj))
+	return printObj(w, name, namespace, p.Operation, p.ShortOutput, GetObjectGroupKind(obj))
 }
 
 func GetObjectGroupKind(obj runtime.Object) schema.GroupKind {
@@ -107,7 +118,7 @@ func GetObjectGroupKind(obj runtime.Object) schema.GroupKind {
 	return schema.GroupKind{Kind: "<unknown>"}
 }
 
-func printObj(w io.Writer, name string, operation string, shortOutput bool, groupKind schema.GroupKind) error {
+func printObj(w io.Writer, name, namespace, operation string, shortOutput bool, groupKind schema.GroupKind) error {
 	if len(groupKind.Kind) == 0 {
 		return fmt.Errorf("missing kind for resource with name %v", name)
 	}
@@ -120,11 +131,18 @@ func printObj(w io.Writer, name string, operation string, shortOutput bool, grou
 		operation = ""
 	}
 
+	message := fmt.Sprintf("%s%s", name, operation)
+
 	if len(groupKind.Group) == 0 {
-		fmt.Fprintf(w, "%s/%s%s\n", strings.ToLower(groupKind.Kind), name, operation)
-		return nil
+		message = fmt.Sprintf("%s/%s", strings.ToLower(groupKind.Kind), message)
+	} else {
+		message = fmt.Sprintf("%s.%s/%s", strings.ToLower(groupKind.Kind), groupKind.Group, message)
 	}
 
-	fmt.Fprintf(w, "%s.%s/%s%s\n", strings.ToLower(groupKind.Kind), groupKind.Group, name, operation)
+	if len(namespace) > 0 {
+		message = fmt.Sprintf("%s/%s", namespace, message)
+	}
+
+	fmt.Fprintf(w, "%s\n", message)
 	return nil
 }
