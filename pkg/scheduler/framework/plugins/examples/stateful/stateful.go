@@ -24,7 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // MultipointExample is an example plugin that is executed at multiple extension points.

@@ -19,6 +19,7 @@ package util
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -87,6 +88,14 @@ func MoreImportantPod(pod1, pod2 *v1.Pod) bool {
 		return p1 > p2
 	}
 	return GetPodStartTime(pod1).Before(GetPodStartTime(pod2))
+}
+
+func GetPodKey(pod *v1.Pod) (string, error) {
+	uid := string(pod.UID)
+	if len(uid) == 0 {
+		return "", errors.New("Cannot get cache key for pod with empty UID")
+	}
+	return uid, nil
 }
 
 // GetPodAffinityTerms gets pod affinity terms by a pod affinity object.

@@ -17,11 +17,10 @@ limitations under the License.
 package queuesort
 
 import (
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"testing"
 	"time"
-
-	v1 "k8s.io/api/core/v1"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 func TestLess(t *testing.T) {

@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -76,7 +75,7 @@ type PodInfo struct {
 	ParseError                 error
 }
 
-// AffinityTerm is a processed version of v1.PodAffinityTerm.
+// AffinityTerm is a processed version of v1.PodAffinityTerm.pkg/scheduler/internal/cache/cache_test.go
 type AffinityTerm struct {
 	Namespaces  sets.String
 	Selector    labels.Selector
@@ -518,7 +517,7 @@ func podWithRequiredAntiAffinity(p *v1.Pod) bool {
 
 func removeFromSlice(s []*PodInfo, k string) []*PodInfo {
 	for i := range s {
-		k2, err := GetPodKey(s[i].Pod)
+		k2, err := schedutil.GetPodKey(s[i].Pod)
 		if err != nil {
 			klog.Errorf("Cannot get pod key, err: %v", err)
 			continue
@@ -535,7 +534,7 @@ func removeFromSlice(s []*PodInfo, k string) []*PodInfo {
 
 // RemovePod subtracts pod information from this NodeInfo.
 func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
-	k, err := GetPodKey(pod)
+	k, err := schedutil.GetPodKey(pod)
 	if err != nil {
 		return err
 	}
@@ -547,7 +546,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 	}
 
 	for i := range n.Pods {
-		k2, err := GetPodKey(n.Pods[i].Pod)
+		k2, err := schedutil.GetPodKey(n.Pods[i].Pod)
 		if err != nil {
 			klog.Errorf("Cannot get pod key, err: %v", err)
 			continue
@@ -682,12 +681,12 @@ func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
 			continue
 		}
 		// If pod is on the given node, add it to 'filtered' only if it is present in nodeInfo.
-		podKey, err := GetPodKey(p)
+		podKey, err := schedutil.GetPodKey(p)
 		if err != nil {
 			continue
 		}
 		for _, np := range n.Pods {
-			npodkey, _ := GetPodKey(np.Pod)
+			npodkey, _ := schedutil.GetPodKey(np.Pod)
 			if npodkey == podKey {
 				filtered = append(filtered, p)
 				break
@@ -695,15 +694,6 @@ func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
 		}
 	}
 	return filtered
-}
-
-// GetPodKey returns the string key of a pod.
-func GetPodKey(pod *v1.Pod) (string, error) {
-	uid := string(pod.UID)
-	if len(uid) == 0 {
-		return "", errors.New("Cannot get cache key for pod with empty UID")
-	}
-	return uid, nil
 }
 
 // DefaultBindAllHostIP defines the default ip address used to bind to all host.

@@ -23,7 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // Name of the plugin used in the plugin registry and configurations.

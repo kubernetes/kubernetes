@@ -9,7 +9,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/internal/queue",
     visibility = ["//pkg/scheduler:__subpackages__"],
     deps = [
-        "//pkg/scheduler/framework/v1alpha1:go_default_library",
+        "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/internal/heap:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
         "//pkg/scheduler/util:go_default_library",
@@ -28,8 +28,8 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/framework/plugins/queuesort:go_default_library",
-        "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
         "//pkg/scheduler/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

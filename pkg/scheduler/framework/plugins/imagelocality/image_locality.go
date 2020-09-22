@@ -23,7 +23,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+
+	framework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // The two thresholds are used as bounds for the image score range. They correspond to a reasonable size range for

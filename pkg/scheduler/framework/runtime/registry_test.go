@@ -21,7 +21,8 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 func TestDecodeInto(t *testing.T) {
@@ -103,7 +104,7 @@ func (p *mockNoopPlugin) Name() string {
 }
 
 func NewMockNoopPluginFactory() PluginFactory {
-	return func(_ runtime.Object, _ v1alpha1.FrameworkHandle) (v1alpha1.Plugin, error) {
+	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
 		return &mockNoopPlugin{}, nil
 	}
 }

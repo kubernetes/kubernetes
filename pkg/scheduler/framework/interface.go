@@ -16,7 +16,7 @@ limitations under the License.
 
 // This file defines the scheduling framework plugin interfaces.
 
-package v1alpha1
+package framework
 
 import (
 	"context"
@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/events"
+
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -277,7 +278,7 @@ type PreFilterPlugin interface {
 // running the pod.
 type FilterPlugin interface {
 	Plugin
-	// Filter is called by the scheduling framework.
+	// Filter is called by the scheduling
 	// All FilterPlugins should return "Success" to declare that
 	// the given node fits the pod. If Filter doesn't return "Success",
 	// it will return "Unschedulable", "UnschedulableAndUnresolvable" or "Error".
@@ -295,7 +296,7 @@ type FilterPlugin interface {
 // after a pod cannot be scheduled.
 type PostFilterPlugin interface {
 	Plugin
-	// PostFilter is called by the scheduling framework.
+	// PostFilter is called by the scheduling
 	// A PostFilter plugin should return one of the following statuses:
 	// - Unschedulable: the plugin gets executed successfully but the pod cannot be made schedulable.
 	// - Success: the plugin gets executed successfully and the pod can be made schedulable.
@@ -407,7 +408,7 @@ type BindPlugin interface {
 	Bind(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) *Status
 }
 
-// Framework manages the set of plugins in use by the scheduling framework.
+// Framework manages the set of plugins in use by the scheduling
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
 	FrameworkHandle

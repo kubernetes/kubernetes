@@ -12,7 +12,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger",
     visibility = ["//pkg/scheduler:__subpackages__"],
     deps = [
-        "//pkg/scheduler/framework/v1alpha1:go_default_library",
+        "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -27,7 +27,7 @@ go_test(
     srcs = ["comparer_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/scheduler/framework/v1alpha1:go_default_library",
+        "//pkg/scheduler/framework:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
     ],

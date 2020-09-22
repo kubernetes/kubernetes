@@ -27,8 +27,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 var (
@@ -350,7 +351,7 @@ func (cache *schedulerCache) PodCount() (int, error) {
 }
 
 func (cache *schedulerCache) AssumePod(pod *v1.Pod) error {
-	key, err := framework.GetPodKey(pod)
+	key, err := util.GetPodKey(pod)
 	if err != nil {
 		return err
 	}
@@ -376,7 +377,7 @@ func (cache *schedulerCache) FinishBinding(pod *v1.Pod) error {
 
 // finishBinding exists to make tests determinitistic by injecting now as an argument
 func (cache *schedulerCache) finishBinding(pod *v1.Pod, now time.Time) error {
-	key, err := framework.GetPodKey(pod)
+	key, err := util.GetPodKey(pod)
 	if err != nil {
 		return err
 	}
@@ -395,7 +396,7 @@ func (cache *schedulerCache) finishBinding(pod *v1.Pod, now time.Time) error {
 }
 
 func (cache *schedulerCache) ForgetPod(pod *v1.Pod) error {
-	key, err := framework.GetPodKey(pod)
+	key, err := util.GetPodKey(pod)
 	if err != nil {
 		return err
 	}
@@ -465,7 +466,7 @@ func (cache *schedulerCache) removePod(pod *v1.Pod) error {
 }
 
 func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
-	key, err := framework.GetPodKey(pod)
+	key, err := util.GetPodKey(pod)
 	if err != nil {
 		return err
 	}
@@ -502,7 +503,7 @@ func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
 }
 
 func (cache *schedulerCache) UpdatePod(oldPod, newPod *v1.Pod) error {
-	key, err := framework.GetPodKey(oldPod)
+	key, err := util.GetPodKey(oldPod)
 	if err != nil {
 		return err
 	}
@@ -530,7 +531,7 @@ func (cache *schedulerCache) UpdatePod(oldPod, newPod *v1.Pod) error {
 }
 
 func (cache *schedulerCache) RemovePod(pod *v1.Pod) error {
-	key, err := framework.GetPodKey(pod)
+	key, err := util.GetPodKey(pod)
 	if err != nil {
 		return err
 	}
@@ -559,7 +560,7 @@ func (cache *schedulerCache) RemovePod(pod *v1.Pod) error {
 }
 
 func (cache *schedulerCache) IsAssumedPod(pod *v1.Pod) (bool, error) {
-	key, err := framework.GetPodKey(pod)
+	key, err := util.GetPodKey(pod)
 	if err != nil {
 		return false, err
 	}
@@ -577,7 +578,7 @@ func (cache *schedulerCache) IsAssumedPod(pod *v1.Pod) (bool, error) {
 // GetPod might return a pod for which its node has already been deleted from
 // the main cache. This is useful to properly process pod update events.
 func (cache *schedulerCache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
-	key, err := framework.GetPodKey(pod)
+	key, err := util.GetPodKey(pod)
 	if err != nil {
 		return nil, err
 	}
