@@ -335,7 +335,7 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 
 		var name string = p.Name
 		if name == "" {
-			name = fmt.Sprintf("%s-%s:%d", family, p.Protocol, p.ContainerPort)
+			name = fmt.Sprintf("%s-%s-%s:%d:%d", family, p.Protocol, p.HostIP, p.ContainerPort, p.HostPort)
 		}
 
 		// Protect against a port name being used more than once in a container.
