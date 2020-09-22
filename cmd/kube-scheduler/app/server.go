@@ -198,6 +198,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 				klog.Fatalf("leaderelection lost")
 			},
 		}
+		cc.LeaderElection.ReleaseOnCancel = true
 		leaderElector, err := leaderelection.NewLeaderElector(*cc.LeaderElection)
 		if err != nil {
 			return fmt.Errorf("couldn't create leader elector: %v", err)
