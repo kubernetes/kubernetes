@@ -167,17 +167,17 @@ type NetexecDialResponse struct {
 }
 
 // DialFromEndpointContainer executes a curl via kubectl exec in an endpoint container.
-func (config *NetworkingTestConfig) DialFromEndpointContainer(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) error {
-	return config.DialFromContainer(protocol, echoHostname, config.EndpointPods[0].Status.PodIP, targetIP, EndpointHTTPPort, targetPort, maxTries, minTries, expectedEps)
+func (config *NetworkingTestConfig) DialFromEndpointContainer(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) {
+	config.DialFromContainer(protocol, echoHostname, config.EndpointPods[0].Status.PodIP, targetIP, EndpointHTTPPort, targetPort, maxTries, minTries, expectedEps)
 }
 
 // DialFromTestContainer executes a curl via kubectl exec in a test container.
-func (config *NetworkingTestConfig) DialFromTestContainer(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) error {
-	return config.DialFromContainer(protocol, echoHostname, config.TestContainerPod.Status.PodIP, targetIP, testContainerHTTPPort, targetPort, maxTries, minTries, expectedEps)
+func (config *NetworkingTestConfig) DialFromTestContainer(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) {
+	config.DialFromContainer(protocol, echoHostname, config.TestContainerPod.Status.PodIP, targetIP, testContainerHTTPPort, targetPort, maxTries, minTries, expectedEps)
 }
 
 // DialEchoFromTestContainer executes a curl via kubectl exec in a test container. The response is expected to match the echoMessage.
-func (config *NetworkingTestConfig) DialEchoFromTestContainer(protocol, targetIP string, targetPort, maxTries, minTries int, echoMessage string) error {
+func (config *NetworkingTestConfig) DialEchoFromTestContainer(protocol, targetIP string, targetPort, maxTries, minTries int, echoMessage string) {
 	expectedResponse := sets.NewString()
 	expectedResponse.Insert(echoMessage)
 	var dialCommand string
@@ -191,7 +191,7 @@ func (config *NetworkingTestConfig) DialEchoFromTestContainer(protocol, targetIP
 	} else {
 		dialCommand = fmt.Sprintf("echo%%20%s", echoMessage)
 	}
-	return config.DialFromContainer(protocol, dialCommand, config.TestContainerPod.Status.PodIP, targetIP, testContainerHTTPPort, targetPort, maxTries, minTries, expectedResponse)
+	config.DialFromContainer(protocol, dialCommand, config.TestContainerPod.Status.PodIP, targetIP, testContainerHTTPPort, targetPort, maxTries, minTries, expectedResponse)
 }
 
 // diagnoseMissingEndpoints prints debug information about the endpoints that
@@ -248,8 +248,7 @@ func makeCURLDialCommand(ipPort, dialCmd, protocol, targetIP string, targetPort 
 // maxTries == minTries will confirm that we see the expected endpoints and no
 // more for maxTries. Use this if you want to eg: fail a readiness check on a
 // pod and confirm it doesn't show up as an endpoint.
-// Returns nil if no error, or error message if failed after trying maxTries.
-func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, containerIP, targetIP string, containerHTTPPort, targetPort, maxTries, minTries int, expectedResponses sets.String) error {
+func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, containerIP, targetIP string, containerHTTPPort, targetPort, maxTries, minTries int, expectedResponses sets.String) {
 	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHTTPPort))
 	cmd := makeCURLDialCommand(ipPort, dialCommand, protocol, targetIP, targetPort)
 
@@ -274,19 +273,16 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, dialCommand, con
 
 		// Check against i+1 so we exit if minTries == maxTries.
 		if (responses.Equal(expectedResponses) || responses.Len() == 0 && expectedResponses.Len() == 0) && i+1 >= minTries {
-			framework.Logf("reached %v after %v/%v tries", targetIP, i, maxTries)
-			return nil
+			return
 		}
 		// TODO: get rid of this delay #36281
 		time.Sleep(hitEndpointRetryDelay)
 	}
+
 	if dialCommand == echoHostname {
 		config.diagnoseMissingEndpoints(responses)
 	}
-	returnMsg := fmt.Errorf("did not find expected responses... \nTries %d\nCommand %v\nretrieved %v\nexpected %v", maxTries, cmd, responses, expectedResponses)
-	framework.Logf("encountered error during dial (%v)", returnMsg)
-	return returnMsg
-
+	framework.Failf("Failed to find expected responses:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", maxTries, cmd, responses, expectedResponses)
 }
 
 // GetEndpointsFromTestContainer executes a curl via kubectl exec in a test container.
@@ -681,7 +677,6 @@ func (config *NetworkingTestConfig) setupCore(selector map[string]string) {
 
 	epCount := len(config.EndpointPods)
 	config.MaxTries = epCount*epCount + testTries
-	framework.Logf("Setting MaxTries for pod polling to %v for networking test based on endpoint count %v", config.MaxTries, epCount)
 }
 
 // setup includes setupCore and also sets up services
