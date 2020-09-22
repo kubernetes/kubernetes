@@ -135,6 +135,7 @@ require (
 	k8s.io/kubelet v0.0.0
 	k8s.io/legacy-cloud-providers v0.0.0
 	k8s.io/metrics v0.0.0
+	k8s.io/mount-utils v0.0.0
 	k8s.io/sample-apiserver v0.0.0
 	k8s.io/system-validators v1.1.2
 	k8s.io/utils v0.0.0-20200729134348-d5654de09c73

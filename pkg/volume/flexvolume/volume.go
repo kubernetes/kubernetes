@@ -17,7 +17,7 @@ limitations under the License.
 package flexvolume
 
 import (
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"
 
 	"k8s.io/apimachinery/pkg/types"

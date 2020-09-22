@@ -27,9 +27,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
 	testingexec "k8s.io/utils/exec/testing"
-	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 
 	authenticationv1 "k8s.io/api/authentication/v1"

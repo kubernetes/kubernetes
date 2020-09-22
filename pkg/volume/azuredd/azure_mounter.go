@@ -24,7 +24,7 @@ import (
 	"runtime"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"

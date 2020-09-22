@@ -34,9 +34,9 @@ import (
 	"k8s.io/client-go/informers"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/integer"
-	"k8s.io/utils/mount"
 	utilnet "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"

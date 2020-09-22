@@ -30,7 +30,7 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 const (

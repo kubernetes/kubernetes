@@ -26,7 +26,7 @@ import (
 	"sync"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -111,7 +111,7 @@ func clearBackingDev(path string) {
 // Breaking this up helps with testing
 func detectMountpointInternal(m mount.Interface, path string) (string, error) {
 	for path != "" && path != "/" {
-		// per k8s.io/utils/mount/mount_linux this detects all but
+		// per k8s.io/mount-utils/mount_linux this detects all but
 		// a bind mount from one part of a mount to another.
 		// For our purposes that's fine; we simply want the "true"
 		// mount point

@@ -23,7 +23,7 @@ import (
 
 	flockerapi "github.com/clusterhq/flocker-go"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
