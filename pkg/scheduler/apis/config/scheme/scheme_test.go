@@ -24,7 +24,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-scheduler/config/v1beta1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
@@ -34,6 +38,7 @@ func TestCodecsDecodePluginConfig(t *testing.T) {
 	testCases := []struct {
 		name         string
 		data         []byte
+		feature      featuregate.Feature
 		wantErr      string
 		wantProfiles []config.KubeSchedulerProfile
 	}{
@@ -257,6 +262,7 @@ profiles:
     args:
   - name: VolumeBinding
     args:
+  - name: PodTopologySpread
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
@@ -291,6 +297,73 @@ profiles:
 								BindTimeoutSeconds: 600,
 							},
 						},
+						{
+							Name: "PodTopologySpread",
+							Args: &config.PodTopologySpreadArgs{},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "empty PodTopologySpread, feature DefaultPodTopologySpread enabled",
+			data: []byte(`
+apiVersion: kubescheduler.config.k8s.io/v1beta1
+kind: KubeSchedulerConfiguration
+profiles:
+- pluginConfig:
+  - name: PodTopologySpread
+    args:
+      defaultConstraints:
+`),
+			feature: features.DefaultPodTopologySpread,
+			wantProfiles: []config.KubeSchedulerProfile{
+				{
+					SchedulerName: "default-scheduler",
+					PluginConfig: []config.PluginConfig{
+						{
+							Name: "PodTopologySpread",
+							Args: &config.PodTopologySpreadArgs{
+								DefaultConstraints: []corev1.TopologySpreadConstraint{
+									{
+										MaxSkew:           3,
+										TopologyKey:       corev1.LabelHostname,
+										WhenUnsatisfiable: corev1.ScheduleAnyway,
+									},
+									{
+										MaxSkew:           5,
+										TopologyKey:       corev1.LabelZoneFailureDomainStable,
+										WhenUnsatisfiable: corev1.ScheduleAnyway,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "empty array PodTopologySpread, feature DefaultPodTopologySpread enabled",
+			data: []byte(`
+apiVersion: kubescheduler.config.k8s.io/v1beta1
+kind: KubeSchedulerConfiguration
+profiles:
+- pluginConfig:
+  - name: PodTopologySpread
+    args:
+      defaultConstraints: []
+`),
+			feature: features.DefaultPodTopologySpread,
+			wantProfiles: []config.KubeSchedulerProfile{
+				{
+					SchedulerName: "default-scheduler",
+					PluginConfig: []config.PluginConfig{
+						{
+							Name: "PodTopologySpread",
+							Args: &config.PodTopologySpreadArgs{
+								DefaultConstraints: []corev1.TopologySpreadConstraint{},
+							},
+						},
 					},
 				},
 			},
@@ -299,6 +372,9 @@ profiles:
 	decoder := Codecs.UniversalDecoder()
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.feature != "" {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, tt.feature, true)()
+			}
 			obj, gvk, err := decoder.Decode(tt.data, nil, nil)
 			if err != nil {
 				if tt.wantErr != err.Error() {
@@ -374,6 +450,14 @@ func TestCodecsEncodePluginConfig(t *testing.T) {
 								},
 							},
 							{
+								Name: "PodTopologySpread",
+								Args: runtime.RawExtension{
+									Object: &v1beta1.PodTopologySpreadArgs{
+										DefaultConstraints: []corev1.TopologySpreadConstraint{},
+									},
+								},
+							},
+							{
 								Name: "OutOfTreePlugin",
 								Args: runtime.RawExtension{
 									Raw: []byte(`{"foo":"bar"}`),
@@ -429,6 +513,11 @@ profiles:
         weight: 2
     name: NodeResourcesLeastAllocated
   - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta1
+      defaultConstraints: []
+      kind: PodTopologySpreadArgs
+    name: PodTopologySpread
+  - args:
       foo: bar
     name: OutOfTreePlugin
 `,
@@ -457,6 +546,10 @@ profiles:
 								Args: &config.VolumeBindingArgs{
 									BindTimeoutSeconds: 300,
 								},
+							},
+							{
+								Name: "PodTopologySpread",
+								Args: &config.PodTopologySpreadArgs{},
 							},
 							{
 								Name: "OutOfTreePlugin",
@@ -510,6 +603,11 @@ profiles:
       bindTimeoutSeconds: 300
       kind: VolumeBindingArgs
     name: VolumeBinding
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta1
+      defaultConstraints: null
+      kind: PodTopologySpreadArgs
+    name: PodTopologySpread
   - args:
       foo: bar
     name: OutOfTreePlugin
