@@ -89,11 +89,7 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 			name = n
 		}
 		if p.WithNamespace {
-			if ns := acc.GetNamespace(); len(ns) > 0 {
-				namespace = ns
-			} else {
-				namespace = "<unknown>"
-			}
+			namespace = acc.GetNamespace()
 		}
 	}
 
