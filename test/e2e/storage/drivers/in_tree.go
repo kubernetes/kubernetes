@@ -1209,6 +1209,13 @@ func (v *cinderVolume) DeleteVolume() {
 		}
 		framework.Logf("Failed to delete volume %s / %s: %v\n%s", id, name, err, string(output))
 	}
+	// Timed out, try to get "cinder show <volume>" output for easier debugging
+	showOutput, showErr := exec.Command("cinder", "show", id).CombinedOutput()
+	if showErr != nil {
+		framework.Logf("Failed to show volume %s / %s: %v\n%s", id, name, showErr, string(showOutput))
+	} else {
+		framework.Logf("Volume %s / %s:\n%s", id, name, string(showOutput))
+	}
 	framework.Logf("Giving up deleting volume %s / %s: %v\n%s", id, name, err, string(output[:]))
 }
 
