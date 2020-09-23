@@ -408,7 +408,6 @@ github.com/go-bindata/go-bindata/go-bindata
 github.com/go-logr/logr
 # github.com/go-logr/logr => github.com/go-logr/logr v0.2.0
 # github.com/go-openapi/analysis v0.19.5 => github.com/go-openapi/analysis v0.19.5
-## explicit
 github.com/go-openapi/analysis
 # github.com/go-openapi/analysis => github.com/go-openapi/analysis v0.19.5
 github.com/go-openapi/analysis/internal
