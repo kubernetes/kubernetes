@@ -60,7 +60,7 @@ func TestNamePrinter_PrintObj(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "print object with operation",
+			name: "print object with operation option",
 			fields: fields{
 				Operation: "created",
 			},
@@ -79,7 +79,27 @@ func TestNamePrinter_PrintObj(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "print object with namespace",
+			name: "print object with operation and short-output options",
+			fields: fields{
+				Operation:   "created",
+				ShortOutput: true,
+			},
+			args: args{
+				obj: &corev1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "Pod",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod",
+						Namespace: "test-namespace",
+					},
+				},
+			},
+			wantW:   "pod/test-pod\n",
+			wantErr: false,
+		},
+		{
+			name: "print object with namespace option",
 			fields: fields{
 				WithNamespace: true,
 			},
@@ -95,6 +115,44 @@ func TestNamePrinter_PrintObj(t *testing.T) {
 				},
 			},
 			wantW:   "test-namespace/pod/test-pod\n",
+			wantErr: false,
+		},
+		{
+			name: "print cluster-scoped object with namespace option",
+			fields: fields{
+				WithNamespace: true,
+			},
+			args: args{
+				obj: &corev1.PersistentVolume{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "PersistentVolume",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-pv",
+					},
+				},
+			},
+			wantW:   "persistentvolume/test-pv\n",
+			wantErr: false,
+		},
+		{
+			name: "print object with operation and namespace options",
+			fields: fields{
+				Operation:     "created",
+				WithNamespace: true,
+			},
+			args: args{
+				obj: &corev1.Pod{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "Pod",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod",
+						Namespace: "test-namespace",
+					},
+				},
+			},
+			wantW:   "test-namespace/pod/test-pod created\n",
 			wantErr: false,
 		},
 	}
