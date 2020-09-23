@@ -557,11 +557,11 @@ func doSafeOpen(pathname string, base string) (int, error) {
 		var deviceStat unix.Stat_t
 		err := unix.Fstat(childFD, &deviceStat)
 		if err != nil {
-			return -1, fmt.Errorf("Error running fstat on %s with %v", currentPath, err)
+			return -1, fmt.Errorf("error running fstat on %s with %v", currentPath, err)
 		}
 		fileFmt := deviceStat.Mode & syscall.S_IFMT
 		if fileFmt == syscall.S_IFLNK {
-			return -1, fmt.Errorf("Unexpected symlink found %s", currentPath)
+			return -1, fmt.Errorf("unexpected symlink found %s", currentPath)
 		}
 
 		// Close parentFD
