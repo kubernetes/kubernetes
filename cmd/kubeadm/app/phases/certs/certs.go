@@ -286,6 +286,7 @@ type certKeyLocation struct {
 
 // SharedCertificateExists verifies if the shared certificates - the certificates that must be
 // equal across control-plane nodes: ca.key, ca.crt, sa.key, sa.pub + etcd/ca.key, etcd/ca.crt if local/stacked etcd
+// Missing keys are non-fatal and produce warnings.
 func SharedCertificateExists(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
 
 	if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
@@ -373,7 +374,7 @@ func validateCACert(l certKeyLocation) error {
 }
 
 // validateCACertAndKey tries to load a x509 certificate and private key from pkiDir,
-// and validates that the cert is a CA
+// and validates that the cert is a CA. Failure to load the key produces a warning.
 func validateCACertAndKey(l certKeyLocation) error {
 	if err := validateCACert(l); err != nil {
 		return err
@@ -381,7 +382,7 @@ func validateCACertAndKey(l certKeyLocation) error {
 
 	_, err := pkiutil.TryLoadKeyFromDisk(l.pkiDir, l.caBaseName)
 	if err != nil {
-		return errors.Wrapf(err, "failure loading key for %s", l.uxName)
+		klog.Warningf("assuming external key for %s: %v", l.uxName, err)
 	}
 	return nil
 }
