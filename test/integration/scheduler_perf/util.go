@@ -238,12 +238,13 @@ func (tc *throughputCollector) run(ctx context.Context) {
 		klog.Fatalf("%v", err)
 	}
 	lastScheduledCount := len(podsScheduled)
+	ticker := time.NewTicker(throughputSampleFrequency)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		// TODO(#94665): use time.Ticker instead
-		case <-time.After(throughputSampleFrequency):
+		case <-ticker.C:
 			podsScheduled, err := getScheduledPods(tc.podInformer, tc.namespaces...)
 			if err != nil {
 				klog.Fatalf("%v", err)
