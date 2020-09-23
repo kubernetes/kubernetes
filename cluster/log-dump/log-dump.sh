@@ -503,6 +503,9 @@ function dump_nodes_with_logexporter() {
   local -r cloud_provider="${KUBERNETES_PROVIDER}"
   local -r enable_hollow_node_logs="${ENABLE_HOLLOW_NODE_LOGS:-false}"
   local -r logexport_sleep_seconds="$(( 90 + NUM_NODES / 3 ))"
+  if [[ -z "${ZONE_NODE_SELECTOR_DISABLED:-}" ]]; then
+    local -r node_selector="${ZONE_NODE_SELECTOR_LABEL:-topology.kubernetes.io/zone}: ${ZONE}"
+  fi
 
   # Fill in the parameters in the logexporter daemonset template.
   local -r tmp="${KUBE_TEMP}/logexporter"
@@ -510,6 +513,7 @@ function dump_nodes_with_logexporter() {
   mkdir -p "${tmp}"
   cp "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml" "${manifest_yaml}"
 
+  sed -i'' -e "s@{{.NodeSelector}}@${node_selector:-}@g" "${manifest_yaml}"
   sed -i'' -e "s@{{.LogexporterNamespace}}@${logexporter_namespace}@g" "${manifest_yaml}"
   sed -i'' -e "s@{{.ServiceAccountCredentials}}@${service_account_credentials}@g" "${manifest_yaml}"
   sed -i'' -e "s@{{.CloudProvider}}@${cloud_provider}@g" "${manifest_yaml}"
