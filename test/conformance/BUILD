@@ -33,7 +33,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//test/conformance/behaviors:all-srcs",
-        "//test/conformance/kubeconform:all-srcs",
         "//test/conformance/testdata:all-srcs",
     ],
     tags = ["automanaged"],
