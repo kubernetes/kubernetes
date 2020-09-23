@@ -166,17 +166,17 @@ type NetexecDialResponse struct {
 	Errors    []string `json:"errors"`
 }
 
-// DialFromEndpointContainer executes a curl via kubectl exec in an endpoint container.
+// DialFromEndpointContainer executes a curl via kubectl exec in an endpoint container.   Returns an error to be handled by the caller.
 func (config *NetworkingTestConfig) DialFromEndpointContainer(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) error {
 	return config.DialFromContainer(protocol, echoHostname, config.EndpointPods[0].Status.PodIP, targetIP, EndpointHTTPPort, targetPort, maxTries, minTries, expectedEps)
 }
 
-// DialFromTestContainer executes a curl via kubectl exec in a test container.
+// DialFromTestContainer executes a curl via kubectl exec in a test container. Returns an error to be handled by the caller.
 func (config *NetworkingTestConfig) DialFromTestContainer(protocol, targetIP string, targetPort, maxTries, minTries int, expectedEps sets.String) error {
 	return config.DialFromContainer(protocol, echoHostname, config.TestContainerPod.Status.PodIP, targetIP, testContainerHTTPPort, targetPort, maxTries, minTries, expectedEps)
 }
 
-// DialEchoFromTestContainer executes a curl via kubectl exec in a test container. The response is expected to match the echoMessage.
+// DialEchoFromTestContainer executes a curl via kubectl exec in a test container. The response is expected to match the echoMessage,  Returns an error to be handled by the caller.
 func (config *NetworkingTestConfig) DialEchoFromTestContainer(protocol, targetIP string, targetPort, maxTries, minTries int, echoMessage string) error {
 	expectedResponse := sets.NewString()
 	expectedResponse.Insert(echoMessage)
