@@ -521,7 +521,11 @@ func hasMatchingEndpointSlices(cs clientset.Interface, ns, svcName string, numEn
 	for _, endpointSlice := range esList.Items {
 		actualNumEndpoints += len(endpointSlice.Endpoints)
 	}
-	if actualNumEndpoints != numEndpoints {
+	// In some cases the EndpointSlice controller will create more
+	// EndpointSlices than necessary resulting in some duplication. This is
+	// valid and tests should only fail here if less EndpointSlices than
+	// expected are added.
+	if actualNumEndpoints < numEndpoints {
 		framework.Logf("EndpointSlices for %s/%s Service have %d/%d endpoints", ns, svcName, actualNumEndpoints, numEndpoints)
 		return esList.Items, false
 	}
