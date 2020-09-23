@@ -67,15 +67,31 @@ type kubeConfigSpec struct {
 // CreateJoinControlPlaneKubeConfigFiles will create and write to disk the kubeconfig files required by kubeadm
 // join --control-plane workflow, plus the admin kubeconfig file used by the administrator and kubeadm itself; the
 // kubelet.conf file must not be created because it will be created and signed by the kubelet TLS bootstrap process.
-// If any kubeconfig files already exists, it used only if evaluated equal; otherwise an error is returned.
+// When not using external CA mode, if a kubeconfig file already exists it is used only if evaluated equal,
+// otherwise an error is returned. For external CA mode, the creation of kubeconfig files is skipped.
 func CreateJoinControlPlaneKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration) error {
-	return createKubeConfigFiles(
-		outDir,
-		cfg,
+	var externaCA bool
+	caKeyPath := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)
+	if _, err := os.Stat(caKeyPath); os.IsNotExist(err) {
+		externaCA = true
+	}
+
+	files := []string{
 		kubeadmconstants.AdminKubeConfigFileName,
 		kubeadmconstants.ControllerManagerKubeConfigFileName,
 		kubeadmconstants.SchedulerKubeConfigFileName,
-	)
+	}
+
+	for _, file := range files {
+		if externaCA {
+			fmt.Printf("[kubeconfig] External CA mode: Using user provided %s\n", file)
+			continue
+		}
+		if err := createKubeConfigFiles(outDir, cfg, file); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // CreateKubeConfigFile creates a kubeconfig file.
