@@ -9,6 +9,9 @@ labels: kind/bug
 
 If the matter is security related, please disclose it privately via https://kubernetes.io/security/
 -->
+<!-- Please review the
+[FAQ](https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/kubectl/docs/maintainers/faq.md)
+before submitting -->
 
 **What happened**:
 
