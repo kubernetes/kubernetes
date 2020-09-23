@@ -1216,7 +1216,7 @@ func (v *cinderVolume) DeleteVolume() {
 	} else {
 		framework.Logf("Volume %s / %s:\n%s", id, name, string(showOutput))
 	}
-	framework.Logf("Giving up deleting volume %s / %s: %v\n%s", id, name, err, string(output[:]))
+	framework.Failf("Failed to delete pre-provisioned volume %s / %s: %v\n%s", id, name, err, string(output[:]))
 }
 
 // GCE
