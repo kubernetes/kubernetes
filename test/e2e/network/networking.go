@@ -398,7 +398,7 @@ var _ = SIGDescribe("Networking", func() {
 		}
 
 		ginkgo.By("verifying that kube-proxy rules are eventually recreated")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(f.ClientSet, ns, host, podNames, svcIP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(f.ClientSet, ns, podNames, svcIP, servicePort))
 
 		ginkgo.By("verifying that kubelet rules are eventually recreated")
 		err = utilwait.PollImmediate(framework.Poll, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
