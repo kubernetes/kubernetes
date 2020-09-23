@@ -9,7 +9,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/conformance",
     visibility = ["//visibility:private"],
     deps = [
-        "//test/conformance/behaviors:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
@@ -79,7 +78,6 @@ go_test(
     srcs = ["walk_test.go"],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
-    deps = ["//test/conformance/behaviors:go_default_library"],
 )
 
 genrule(
