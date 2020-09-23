@@ -783,6 +783,33 @@ func visitContainers(podSpec *v1.PodSpec, mask ContainerType, visitor ContainerV
 	return true
 }
 
+// WaitForPodSuccessInNamespaceWithOS uses different timeout based on Node OS.
+// It returns nil if the pod reached state success, or an error if it reached failure or ran too long.
+func WaitForPodSuccessInNamespaceWithOS(c clientset.Interface, podName, namespace string) error {
+	if NodeOSDistroIs("windows") {
+		return e2epod.WaitForPodSuccessInNamespaceSlow(c, podName, namespace)
+	}
+	return e2epod.WaitForPodSuccessInNamespace(c, podName, namespace)
+}
+
+// WaitForPodRunningInNamespaceWithOS uses different timeout based on Node OS.
+// It waits for the specified pod to become running.
+// Returns an error if timeout occurs first, or pod goes in to failed state.
+func WaitForPodRunningInNamespaceWithOS(c clientset.Interface, pod *v1.Pod) error {
+	if NodeOSDistroIs("windows") {
+		return e2epod.WaitForPodRunningInNamespaceSlow(c, pod.Name, pod.Namespace)
+	}
+	return e2epod.WaitForPodRunningInNamespace(c, pod)
+}
+
+// CreatePodWithOS with given claims based on node selector
+func CreatePodWithOS(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
+	if NodeOSDistroIs("winidows") {
+		return e2epod.CreatePodSlow(client, namespace, nodeSelector, pvclaims, isPrivileged, command)
+	}
+	return e2epod.CreatePod(client, namespace, nodeSelector, pvclaims, isPrivileged, command)
+}
+
 // MatchContainerOutput creates a pod and waits for all it's containers to exit with success.
 // It then tests that the matcher with each expectedOutput matches the output of the specified container.
 func (f *Framework) MatchContainerOutput(
@@ -803,7 +830,7 @@ func (f *Framework) MatchContainerOutput(
 	}()
 
 	// Wait for client pod to complete.
-	podErr := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, createdPod.Name, ns)
+	podErr := WaitForPodSuccessInNamespaceWithOS(f.ClientSet, createdPod.Name, ns)
 
 	// Grab its logs.  Get host first.
 	podStatus, err := podClient.Get(context.TODO(), createdPod.Name, metav1.GetOptions{})

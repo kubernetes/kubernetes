@@ -455,7 +455,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		}()
 
 		// Wait for pod to be running
-		err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, l.pod)
+		err = framework.WaitForPodRunningInNamespaceWithOS(f.ClientSet, l.pod)
 		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		// Exec into container that mounted the volume, delete subpath directory
@@ -852,7 +852,7 @@ func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks
 	defer func() {
 		e2epod.DeletePodWithWait(f.ClientSet, pod)
 	}()
-	err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
+	err = framework.WaitForPodRunningInNamespaceWithOS(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while waiting for pod to be running")
 
 	ginkgo.By("Failing liveness probe")
@@ -1026,7 +1026,7 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating pod")
 
-	err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
+	err = framework.WaitForPodRunningInNamespaceWithOS(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while waiting for pod to be running")
 
 	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
@@ -1057,7 +1057,7 @@ func formatVolume(f *framework.Framework, pod *v1.Pod) {
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating volume init pod")
 
-	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+	err = framework.WaitForPodSuccessInNamespaceWithOS(f.ClientSet, pod.Name, pod.Namespace)
 	framework.ExpectNoError(err, "while waiting for volume init pod to succeed")
 
 	err = e2epod.DeletePodWithWait(f.ClientSet, pod)

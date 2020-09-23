@@ -77,13 +77,27 @@ func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeC
 
 // CreatePod with given claims based on node selector
 func CreatePod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
+	return CreatePodWithTimeout(client, namespace, nodeSelector, pvclaims, isPrivileged, command, false)
+}
+
+// CreatePodSlow with given claims based on node selector and slow timeout
+func CreatePodSlow(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string) (*v1.Pod, error) {
+	return CreatePodWithTimeout(client, namespace, nodeSelector, pvclaims, isPrivileged, command, true)
+}
+
+// CreatePodWithTimeout with given claims based on node selector and timeouot selection (isSlow)
+func CreatePodWithTimeout(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, isSlow bool) (*v1.Pod, error) {
 	pod := MakePod(namespace, nodeSelector, pvclaims, isPrivileged, command)
 	pod, err := client.CoreV1().Pods(namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)
 	}
 	// Waiting for pod to be running
-	err = WaitForPodNameRunningInNamespace(client, pod.Name, namespace)
+	if isSlow {
+		err = WaitForPodRunningInNamespaceSlow(client, pod.Name, namespace)
+	} else {
+		err = WaitForPodNameRunningInNamespace(client, pod.Name, namespace)
+	}
 	if err != nil {
 		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
 	}

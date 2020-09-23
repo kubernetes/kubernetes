@@ -359,7 +359,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 		if *defaultSC.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
 			ginkgo.By("creating a pod referring to the claim")
 			var pod *v1.Pod
-			pod, err := e2epod.CreatePod(t.Client, claim.Namespace, nil /* nodeSelector */, []*v1.PersistentVolumeClaim{claim}, true /* isPrivileged */, "" /* command */)
+			pod, err := framework.CreatePodWithOS(t.Client, claim.Namespace, nil /* nodeSelector */, []*v1.PersistentVolumeClaim{claim}, true /* isPrivileged */, "" /* command */)
 			// Delete pod now, otherwise PV can't be deleted below
 			framework.ExpectNoError(err)
 			e2epod.DeletePodOrFail(t.Client, pod.Namespace, pod.Name)
@@ -605,7 +605,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	if expectUnschedulable {
 		pod, err = e2epod.CreateUnschedulablePod(t.Client, namespace, nodeSelector, createdClaims, true /* isPrivileged */, "" /* command */)
 	} else {
-		pod, err = e2epod.CreatePod(t.Client, namespace, nil /* nodeSelector */, createdClaims, true /* isPrivileged */, "" /* command */)
+		pod, err = framework.CreatePodWithOS(t.Client, namespace, nil /* nodeSelector */, createdClaims, true /* isPrivileged */, "" /* command */)
 	}
 	framework.ExpectNoError(err)
 	defer func() {

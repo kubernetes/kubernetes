@@ -332,7 +332,7 @@ func startVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 		}
 	}
 	if config.WaitForCompletion {
-		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(client, serverPod.Name, serverPod.Namespace))
+		framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceWithOS(client, serverPod.Name, serverPod.Namespace))
 		framework.ExpectNoError(podClient.Delete(context.TODO(), serverPod.Name, metav1.DeleteOptions{}))
 	} else {
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, serverPod))
@@ -441,7 +441,7 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 	if slow {
 		err = e2epod.WaitForPodRunningInNamespaceSlow(client, clientPod.Name, clientPod.Namespace)
 	} else {
-		err = e2epod.WaitForPodRunningInNamespace(client, clientPod)
+		err = framework.WaitForPodRunningInNamespaceWithOS(client, clientPod)
 	}
 	if err != nil {
 		e2epod.DeletePodOrFail(client, clientPod.Namespace, clientPod.Name)
