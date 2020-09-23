@@ -19,7 +19,7 @@ package collectors
 import (
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
 var (
