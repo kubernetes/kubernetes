@@ -107,7 +107,7 @@ func (o createContextOptions) run() (string, bool, error) {
 	context := o.modifyContext(*startingStanza)
 	config.Contexts[name] = &context
 
-	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
+	if err := clientcmd.ModifyConfig(o.configAccess, *config, true, false); err != nil {
 		return name, exists, err
 	}
 

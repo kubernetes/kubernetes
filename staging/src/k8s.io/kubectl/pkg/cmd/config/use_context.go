@@ -64,7 +64,7 @@ func NewCmdConfigUseContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 
 func (o useContextOptions) run() error {
 	config, err := o.configAccess.GetStartingConfig()
-	if err != nil {
+	if err != nil && !errors.Is(err, clientcmd.ErrNoContextSet){
 		return err
 	}
 
@@ -75,7 +75,7 @@ func (o useContextOptions) run() error {
 
 	config.CurrentContext = o.contextName
 
-	return clientcmd.ModifyConfig(o.configAccess, *config, true)
+	return clientcmd.ModifyConfig(o.configAccess, *config, true, true)
 }
 
 func (o *useContextOptions) complete(cmd *cobra.Command) error {

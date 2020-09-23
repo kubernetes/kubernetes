@@ -101,6 +101,9 @@ func (o *PathOptions) GetStartingConfig() (*clientcmdapi.Config, error) {
 		return clientcmdapi.NewConfig(), nil
 	}
 	if err != nil {
+		if errors.Is(err, ErrNoContextSet) {
+			return &rawConfig, err
+		}
 		return nil, err
 	}
 
@@ -164,7 +167,7 @@ func NewDefaultPathOptions() *PathOptions {
 // (no nil strings), we're forced have separate handling for them.  In the kubeconfig cases, newConfig should have at most one difference,
 // that means that this code will only write into a single file.  If you want to relativizePaths, you must provide a fully qualified path in any
 // modified element.
-func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, relativizePaths bool) error {
+func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, relativizePaths bool, isSetContext bool) error {
 	if UseModifyConfigLock {
 		possibleSources := configAccess.GetLoadingPrecedence()
 		// sort the possible kubeconfig files so we always "lock" in the same order
@@ -179,8 +182,13 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 	}
 
 	startingConfig, err := configAccess.GetStartingConfig()
+
 	if err != nil {
-		return err
+		if isSetContext && errors.Is(err, ErrNoContextSet) {
+
+		} else {
+			return err
+		}
 	}
 
 	// We need to find all differences, locate their original files, read a partial config to modify only that stanza and write out the file.
@@ -191,8 +199,14 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 	}
 
 	if startingConfig.CurrentContext != newConfig.CurrentContext {
-		if err := writeCurrentContext(configAccess, newConfig.CurrentContext); err != nil {
-			return err
+		if err := writeCurrentContext(configAccess, newConfig.CurrentContext, isSetContext);
+
+		err != nil {
+			if isSetContext && errors.Is(err, ErrNoContextSet) {
+
+			} else {
+				return err
+			}
 		}
 	}
 
@@ -371,7 +385,7 @@ func (p *persister) Persist(config map[string]string) error {
 	authInfo, ok := newConfig.AuthInfos[p.user]
 	if ok && authInfo.AuthProvider != nil {
 		authInfo.AuthProvider.Config = config
-		ModifyConfig(p.configAccess, *newConfig, false)
+		ModifyConfig(p.configAccess, *newConfig, false, false)
 	}
 	return nil
 }
@@ -380,9 +394,12 @@ func (p *persister) Persist(config map[string]string) error {
 // If newCurrentContext is the same as the startingConfig's current context, then we exit.
 // If newCurrentContext has a value, then that value is written into the default destination file.
 // If newCurrentContext is empty, then we find the config file that is setting the CurrentContext and clear the value from that file
-func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) error {
-	if startingConfig, err := configAccess.GetStartingConfig(); err != nil {
-		return err
+func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string, isSetContext bool) error {
+	startingConfig, err := configAccess.GetStartingConfig()
+	if err != nil {
+		if !(isSetContext == true && errors.Is(err, ErrNoContextSet)){
+			return err
+		}
 	} else if startingConfig.CurrentContext == newCurrentContext {
 		return nil
 	}

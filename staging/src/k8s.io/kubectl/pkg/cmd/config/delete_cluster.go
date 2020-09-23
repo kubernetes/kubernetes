@@ -74,7 +74,7 @@ func runDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAccess, cmd *c
 
 	delete(config.Clusters, name)
 
-	if err := clientcmd.ModifyConfig(configAccess, *config, true); err != nil {
+	if err := clientcmd.ModifyConfig(configAccess, *config, true, false); err != nil {
 		return err
 	}
 

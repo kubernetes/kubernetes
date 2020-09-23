@@ -200,7 +200,7 @@ func (o createAuthInfoOptions) run() error {
 	authInfo := o.modifyAuthInfo(*startingStanza)
 	config.AuthInfos[o.name] = &authInfo
 
-	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
+	if err := clientcmd.ModifyConfig(o.configAccess, *config, true, false); err != nil {
 		return err
 	}
 

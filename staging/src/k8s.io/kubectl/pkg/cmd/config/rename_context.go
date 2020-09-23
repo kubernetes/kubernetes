@@ -123,7 +123,7 @@ func (o RenameContextOptions) RunRenameContext(out io.Writer) error {
 		config.CurrentContext = o.newName
 	}
 
-	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
+	if err := clientcmd.ModifyConfig(o.configAccess, *config, true, false); err != nil {
 		return err
 	}
 

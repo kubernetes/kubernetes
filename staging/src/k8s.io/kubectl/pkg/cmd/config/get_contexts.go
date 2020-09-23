@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -111,7 +112,7 @@ func (o *GetContextsOptions) Complete(cmd *cobra.Command, args []string) error {
 // RunGetContexts implements all the necessary functionality for context retrieval.
 func (o GetContextsOptions) RunGetContexts() error {
 	config, err := o.configAccess.GetStartingConfig()
-	if err != nil {
+	if err != nil && !errors.Is(err, clientcmd.ErrNoContextSet){
 		return err
 	}
 

@@ -17,6 +17,7 @@ limitations under the License.
 package clientcmd
 
 import (
+	"errors"
 	"io"
 	"sync"
 
@@ -67,7 +68,7 @@ func (config *DeferredLoadingClientConfig) createClientConfig() (ClientConfig, e
 		return config.clientConfig, nil
 	}
 	mergedConfig, err := config.loader.Load()
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrNoContextSet){
 		return nil, err
 	}
 
@@ -80,15 +81,23 @@ func (config *DeferredLoadingClientConfig) createClientConfig() (ClientConfig, e
 	} else {
 		config.clientConfig = NewNonInteractiveClientConfig(*mergedConfig, currentContext, config.overrides, config.loader)
 	}
-	return config.clientConfig, nil
+	if err != nil {
+		return config.clientConfig, err
+	} else {
+		return config.clientConfig, nil
+	}
 }
 
 func (config *DeferredLoadingClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	mergedConfig, err := config.createClientConfig()
 	if err != nil {
-		return clientcmdapi.Config{}, err
+		if errors.Is(err, ErrNoContextSet) {
+			config, _ := mergedConfig.RawConfig()
+			return config, err
+		} else {
+			return clientcmdapi.Config{}, err
+		}
 	}
-
 	return mergedConfig.RawConfig()
 }
 

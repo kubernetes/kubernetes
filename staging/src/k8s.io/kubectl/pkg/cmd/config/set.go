@@ -111,7 +111,7 @@ func (o setOptions) run() error {
 		return err
 	}
 
-	if err := clientcmd.ModifyConfig(o.configAccess, *config, false); err != nil {
+	if err := clientcmd.ModifyConfig(o.configAccess, *config, false, false); err != nil {
 		return err
 	}
 
