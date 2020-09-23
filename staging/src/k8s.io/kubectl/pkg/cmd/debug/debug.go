@@ -135,7 +135,7 @@ func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	o := NewDebugOptions(streams)
 
 	cmd := &cobra.Command{
-		Use:                   "debug NAME --image=image [ -- COMMAND [args...] ]",
+		Use:                   "debug (POD | TYPE[[.VERSION].GROUP]/NAME) --image=image [ -- COMMAND [args...] ]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Attach a debug container to a running pod"),
 		Long:                  debugLong,
