@@ -90,8 +90,8 @@ var (
 `)
 )
 
-// newCmdCertsUtility returns main command for certs phase
-func newCmdCertsUtility(out io.Writer) *cobra.Command {
+// NewCmdCertsUtility returns main command for certs phase
+func NewCmdCertsUtility(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "certs",
 		Aliases: []string{"certificates"},
