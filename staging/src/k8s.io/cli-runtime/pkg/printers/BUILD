@@ -39,6 +39,7 @@ go_test(
     srcs = [
         "json_test.go",
         "jsonpath_test.go",
+        "name_test.go",
         "sourcechecker_test.go",
         "tableprinter_test.go",
         "template_test.go",
