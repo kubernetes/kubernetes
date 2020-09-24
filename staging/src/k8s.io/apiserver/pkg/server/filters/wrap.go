@@ -17,22 +17,37 @@ limitations under the License.
 package filters
 
 import (
+	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/klog/v2"
 	"net/http"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server/httplog"
 )
 
 // WithPanicRecovery wraps an http Handler to recover and log panics (except in the special case of http.ErrAbortHandler panics, which suppress logging).
-func WithPanicRecovery(handler http.Handler, isTerminating func() bool) http.Handler {
+func WithPanicRecovery(handler http.Handler, isTerminating func() bool, resolver request.RequestInfoResolver) http.Handler {
 	return withPanicRecovery(handler, func(w http.ResponseWriter, req *http.Request, err interface{}) {
 		if err == http.ErrAbortHandler {
-			// honor the http.ErrAbortHandler sentinel panic value:
-			//   ErrAbortHandler is a sentinel panic value to abort a handler.
-			//   While any panic from ServeHTTP aborts the response to the client,
-			//   panicking with ErrAbortHandler also suppresses logging of a stack trace to the server's error log.
+			// Honor the http.ErrAbortHandler sentinel panic value
+			//
+			// If ServeHTTP panics, the server (the caller of ServeHTTP) assumes
+			// that the effect of the panic was isolated to the active request.
+			// It recovers the panic, logs a stack trace to the server error log,
+			// and either closes the network connection or sends an HTTP/2
+			// RST_STREAM, depending on the HTTP protocol. To abort a handler so
+			// the client sees an interrupted response but the server doesn't log
+			// an error, panic with the value ErrAbortHandler.
+			//
+			// Note that the ReallyCrash variable controls the behaviour of the HandleCrash function
+			// So it might actually crash, after calling the handlers
+			info, err := resolver.NewRequestInfo(req)
+			if err != nil {
+				metrics.RecordRequestAbort(req, nil)
+				return
+			}
+			metrics.RecordRequestAbort(req, info)
 			return
 		}
 		http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)

@@ -26,6 +26,7 @@ import (
 
 // BuildInsecureHandlerChain sets up the server to listen to http. Should be removed.
 func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.Handler {
+	requestInfoResolver := server.NewRequestInfoResolver(c)
 	handler := apiHandler
 	// Temporarily disable APIPriorityAndFairness during development
 	// so that /debug/pprof works even while this feature is totally
@@ -40,10 +41,10 @@ func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.H
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc, c.RequestTimeout)
 	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)
-	handler = genericapifilters.WithRequestInfo(handler, server.NewRequestInfoResolver(c))
+	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericapifilters.WithWarningRecorder(handler)
 	handler = genericapifilters.WithCacheControl(handler)
-	handler = genericfilters.WithPanicRecovery(handler, nil)
+	handler = genericfilters.WithPanicRecovery(handler, nil, requestInfoResolver)
 
 	return handler
 }
