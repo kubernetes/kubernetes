@@ -2,6 +2,7 @@
 
 users:
 - name: etcd
+  uid: 2030
   homedir: /var/etcd
   lock_passwd: true
   ssh_redirect_user: true

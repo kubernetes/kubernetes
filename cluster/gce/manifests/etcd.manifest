@@ -17,6 +17,16 @@
 "containers":[
     {
     "name": "etcd-container",
+    "securityContext": {
+      "runAsUser": {{runAsUser}},
+      "runAsGroup": {{runAsGroup}},
+      "allowPrivilegeEscalation": false,
+      "capabilities": {
+        "drop": [
+	  "all"
+	]
+      }
+    },
     "image": "{{ pillar.get('etcd_docker_repository', 'k8s.gcr.io/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.4.13-0') }}",
     "resources": {
       "requests": {

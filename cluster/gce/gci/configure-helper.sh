@@ -1769,6 +1769,8 @@ function prepare-etcd-manifest {
   fi
   # Replace the volume host path.
   sed -i -e "s@/mnt/master-pd/var/etcd@/mnt/disks/master-pd/var/etcd@g" "${temp_file}"
+  sed -i -e "s@{{runAsUser}}@${ETCD_RUNASUSER:-2030}@g" "${temp_file}"
+  sed -i -e "s@{{runAsGroup}}@${ETCD_RUNASGROUP:-2030}@g" "${temp_file}"
   mv "${temp_file}" /etc/kubernetes/manifests
 }
 
@@ -1789,10 +1791,10 @@ function start-etcd-servers {
   if [[ -e /etc/init.d/etcd ]]; then
     rm -f /etc/init.d/etcd
   fi
-  prepare-log-file /var/log/etcd.log
+  prepare-log-file /var/log/etcd.log "${ETCD_RUNASUSER:-2030}" "${ETCD_RUNASGROUP:-2030}"
   prepare-etcd-manifest "" "2379" "2380" "200m" "etcd.manifest"
 
-  prepare-log-file /var/log/etcd-events.log
+  prepare-log-file /var/log/etcd-events.log "${ETCD_RUNASUSER:-2030}" "${ETCD_RUNASGROUP:-2030}"
   prepare-etcd-manifest "-events" "4002" "2381" "100m" "etcd-events.manifest"
 }
 
