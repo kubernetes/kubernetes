@@ -79,7 +79,7 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.Cy
 	preemptionStartTime := time.Now()
 	defer func() {
 		metrics.PreemptionAttempts.Inc()
-		metrics.SchedulingAlgorithmPreemptionEvaluationDuration.Observe(metrics.SinceInSeconds(preemptionStartTime))
+		metrics.DeprecatedSchedulingAlgorithmPreemptionEvaluationDuration.Observe(metrics.SinceInSeconds(preemptionStartTime))
 	}()
 
 	nnn, err := pl.preempt(ctx, state, pod, m)

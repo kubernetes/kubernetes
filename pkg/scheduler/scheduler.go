@@ -412,7 +412,7 @@ func (sched *Scheduler) finishBinding(prof *profile.Profile, assumed *v1.Pod, ta
 		return
 	}
 
-	metrics.BindingLatency.Observe(metrics.SinceInSeconds(start))
+	metrics.DeprecatedBindingLatency.Observe(metrics.SinceInSeconds(start))
 	prof.Recorder.Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
 }
 

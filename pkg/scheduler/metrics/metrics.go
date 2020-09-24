@@ -67,22 +67,24 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	SchedulingAlgorithmPreemptionEvaluationDuration = metrics.NewHistogram(
+	DeprecatedSchedulingAlgorithmPreemptionEvaluationDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "scheduling_algorithm_preemption_evaluation_seconds",
-			Help:           "Scheduling algorithm preemption evaluation duration in seconds",
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         SchedulerSubsystem,
+			Name:              "scheduling_algorithm_preemption_evaluation_seconds",
+			Help:              "Scheduling algorithm preemption evaluation duration in seconds",
+			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.20.0",
 		},
 	)
-	BindingLatency = metrics.NewHistogram(
+	DeprecatedBindingLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "binding_duration_seconds",
-			Help:           "Binding latency in seconds",
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         SchedulerSubsystem,
+			Name:              "binding_duration_seconds",
+			Help:              "Binding latency in seconds",
+			Buckets:           metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.20.0",
 		},
 	)
 	PreemptionVictims = metrics.NewHistogram(
@@ -189,8 +191,8 @@ var (
 		scheduleAttempts,
 		e2eSchedulingLatency,
 		SchedulingAlgorithmLatency,
-		BindingLatency,
-		SchedulingAlgorithmPreemptionEvaluationDuration,
+		DeprecatedBindingLatency,
+		DeprecatedSchedulingAlgorithmPreemptionEvaluationDuration,
 		PreemptionVictims,
 		PreemptionAttempts,
 		pendingPods,
