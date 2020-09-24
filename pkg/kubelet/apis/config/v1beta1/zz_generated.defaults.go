@@ -29,10 +29,10 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1beta1.KubeletConfiguration{}, func(obj interface{}) { SetObjectDefaultsKubeletConfiguration(obj.(*v1beta1.KubeletConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.KubeletConfiguration{}, func(obj interface{}) { SetObjectDefaults_KubeletConfiguration(obj.(*v1beta1.KubeletConfiguration)) })
 	return nil
 }
 
-func SetObjectDefaultsKubeletConfiguration(in *v1beta1.KubeletConfiguration) {
-	SetDefaultsKubeletConfiguration(in)
+func SetObjectDefaults_KubeletConfiguration(in *v1beta1.KubeletConfiguration) {
+	SetDefaults_KubeletConfiguration(in)
 }
