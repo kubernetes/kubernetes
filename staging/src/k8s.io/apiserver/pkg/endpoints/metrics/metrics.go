@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -185,6 +186,16 @@ var (
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "code"},
 	)
+
+	apiSelfRequestCounter = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_selfrequest_total",
+			Help:           "Counter of apiserver self-requests broken out for each verb, API resource and subresource.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"verb", "resource", "subresource"},
+	)
+
 	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 
 	metrics = []resettableCollector{
@@ -201,6 +212,7 @@ var (
 		currentInflightRequests,
 		currentInqueueRequests,
 		requestTerminationsTotal,
+		apiSelfRequestCounter,
 	}
 
 	// these are the known (e.g. whitelisted/known) content types which we will report for
@@ -351,6 +363,11 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	elapsedSeconds := elapsed.Seconds()
 	cleanContentType := cleanContentType(contentType)
 	requestCounter.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, cleanContentType, codeToString(httpCode)).Inc()
+	// MonitorRequest happens after authentication, so we can trust the username given by the request
+	info, ok := request.UserFrom(req.Context())
+	if ok && info.GetName() == user.APIServerUser {
+		apiSelfRequestCounter.WithLabelValues(reportedVerb, resource, subresource).Inc()
+	}
 	if deprecated {
 		deprecatedRequestGauge.WithLabelValues(group, version, resource, subresource, removedRelease).Set(1)
 		audit.AddAuditAnnotation(req.Context(), deprecatedAnnotationKey, "true")
