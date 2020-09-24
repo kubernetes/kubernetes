@@ -734,7 +734,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithWarningRecorder(handler)
 	handler = genericapifilters.WithCacheControl(handler)
 	handler = genericapifilters.WithRequestReceivedTimestamp(handler)
-	handler = genericfilters.WithPanicRecovery(handler)
+	handler = genericfilters.WithPanicRecovery(handler, c.RequestInfoResolver)
 	return handler
 }
 
