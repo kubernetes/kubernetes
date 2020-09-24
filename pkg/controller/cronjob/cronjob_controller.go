@@ -119,20 +119,18 @@ func (jm *Controller) syncAll() {
 		js = append(js, *jobTmp)
 		return nil
 	})
-
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Failed to extract job list: %v", err))
 		return
 	}
-
 	klog.V(4).Infof("Found %d jobs", len(js))
-	cronJobListFunc := func(opts metav1.ListOptions) (runtime.Object, error) {
-		return jm.kubeClient.BatchV1beta1().CronJobs(metav1.NamespaceAll).List(context.TODO(), opts)
-	}
 
 	jobsByCj := groupJobsByParent(js)
 	klog.V(4).Infof("Found %d groups", len(jobsByCj))
-	err = pager.New(pager.SimplePageFunc(cronJobListFunc)).EachListItem(context.Background(), metav1.ListOptions{}, func(object runtime.Object) error {
+
+	err = pager.New(func(ctx context.Context, opts metav1.ListOptions) (runtime.Object, error) {
+		return jm.kubeClient.BatchV1beta1().CronJobs(metav1.NamespaceAll).List(ctx, opts)
+	}).EachListItem(context.Background(), metav1.ListOptions{}, func(object runtime.Object) error {
 		cj, ok := object.(*batchv1beta1.CronJob)
 		if !ok {
 			return fmt.Errorf("expected type *batchv1beta1.CronJob, got type %T", cj)
