@@ -76,7 +76,7 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 	}
 
 	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme)
-	// This configures the testing master the same way the real master is
+	// This configures the testing apiserver the same way the real apiserver is
 	// configured. The storage versions of these resources are different
 	// from the storage versions of other resources in their group.
 	resourceEncodingOverrides := []schema.GroupVersionResource{
@@ -141,20 +141,20 @@ func (fakeLocalhost443Listener) Addr() net.Addr {
 // their various strategies properly wired up. This surfaced as a bug where strategies defined Export functions, but
 // they were never used outside of unit tests because the export strategies were not assigned inside the Store.
 func TestLegacyRestStorageStrategies(t *testing.T) {
-	_, etcdserver, masterCfg, _ := newMaster(t)
+	_, etcdserver, apiserverCfg, _ := newInstance(t)
 	defer etcdserver.Terminate(t)
 
 	storageProvider := corerest.LegacyRESTStorageProvider{
-		StorageFactory:       masterCfg.ExtraConfig.StorageFactory,
-		ProxyTransport:       masterCfg.ExtraConfig.ProxyTransport,
-		KubeletClientConfig:  masterCfg.ExtraConfig.KubeletClientConfig,
-		EventTTL:             masterCfg.ExtraConfig.EventTTL,
-		ServiceIPRange:       masterCfg.ExtraConfig.ServiceIPRange,
-		ServiceNodePortRange: masterCfg.ExtraConfig.ServiceNodePortRange,
-		LoopbackClientConfig: masterCfg.GenericConfig.LoopbackClientConfig,
+		StorageFactory:       apiserverCfg.ExtraConfig.StorageFactory,
+		ProxyTransport:       apiserverCfg.ExtraConfig.ProxyTransport,
+		KubeletClientConfig:  apiserverCfg.ExtraConfig.KubeletClientConfig,
+		EventTTL:             apiserverCfg.ExtraConfig.EventTTL,
+		ServiceIPRange:       apiserverCfg.ExtraConfig.ServiceIPRange,
+		ServiceNodePortRange: apiserverCfg.ExtraConfig.ServiceNodePortRange,
+		LoopbackClientConfig: apiserverCfg.GenericConfig.LoopbackClientConfig,
 	}
 
-	_, apiGroupInfo, err := storageProvider.NewLegacyRESTStorage(masterCfg.GenericConfig.RESTOptionsGetter)
+	_, apiGroupInfo, err := storageProvider.NewLegacyRESTStorage(apiserverCfg.GenericConfig.RESTOptionsGetter)
 	if err != nil {
 		t.Errorf("failed to create legacy REST storage: %v", err)
 	}
@@ -177,11 +177,11 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 }
 
 func TestCertificatesRestStorageStrategies(t *testing.T) {
-	_, etcdserver, masterCfg, _ := newMaster(t)
+	_, etcdserver, apiserverCfg, _ := newInstance(t)
 	defer etcdserver.Terminate(t)
 
 	certStorageProvider := certificatesrest.RESTStorageProvider{}
-	apiGroupInfo, _, err := certStorageProvider.NewRESTStorage(masterCfg.ExtraConfig.APIResourceConfigSource, masterCfg.GenericConfig.RESTOptionsGetter)
+	apiGroupInfo, _, err := certStorageProvider.NewRESTStorage(apiserverCfg.ExtraConfig.APIResourceConfigSource, apiserverCfg.GenericConfig.RESTOptionsGetter)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -199,20 +199,20 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 	}
 }
 
-func newMaster(t *testing.T) (*Master, *etcd3testing.EtcdTestServer, Config, *assert.Assertions) {
+func newInstance(t *testing.T) (*Instance, *etcd3testing.EtcdTestServer, Config, *assert.Assertions) {
 	etcdserver, config, assert := setUp(t)
 
-	master, err := config.Complete().New(genericapiserver.NewEmptyDelegate())
+	apiserver, err := config.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		t.Fatalf("Error in bringing up the master: %v", err)
 	}
 
-	return master, etcdserver, config, assert
+	return apiserver, etcdserver, config, assert
 }
 
 // TestVersion tests /version
 func TestVersion(t *testing.T) {
-	s, etcdserver, _, _ := newMaster(t)
+	s, etcdserver, _, _ := newInstance(t)
 	defer etcdserver.Terminate(t)
 
 	req, _ := http.NewRequest("GET", "/version", nil)
@@ -301,10 +301,10 @@ func decodeResponse(resp *http.Response, obj interface{}) error {
 // Because we need to be backwards compatible with release 1.1, at endpoints
 // that exist in release 1.1, the responses should have empty APIVersion.
 func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
-	master, etcdserver, _, assert := newMaster(t)
+	apiserver, etcdserver, _, assert := newInstance(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
+	server := httptest.NewServer(apiserver.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
 
 	// /api exists in release-1.1
 	resp, err := http.Get(server.URL + "/api")
@@ -376,10 +376,10 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 
 // This test doesn't cover the apiregistration and apiextensions group, as they are installed by other apiservers.
 func TestStorageVersionHashes(t *testing.T) {
-	master, etcdserver, _, _ := newMaster(t)
+	apiserver, etcdserver, _, _ := newInstance(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
+	server := httptest.NewServer(apiserver.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
 
 	c := &restclient.Config{
 		Host:          server.URL,
@@ -420,10 +420,10 @@ func TestStorageVersionHashes(t *testing.T) {
 }
 
 func TestStorageVersionHashEqualities(t *testing.T) {
-	master, etcdserver, _, assert := newMaster(t)
+	apiserver, etcdserver, _, assert := newInstance(t)
 	defer etcdserver.Terminate(t)
 
-	server := httptest.NewServer(master.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
+	server := httptest.NewServer(apiserver.GenericAPIServer.Handler.GoRestfulContainer.ServeMux)
 
 	// Test 1: extensions/v1beta1/ingresses and apps/v1/ingresses have
 	// the same storage version hash.

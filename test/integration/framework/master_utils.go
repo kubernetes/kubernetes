@@ -89,17 +89,17 @@ func alwaysEmpty(req *http.Request) (*authauthenticator.Response, bool, error) {
 
 // MasterReceiver can be used to provide the master to a custom incoming server function
 type MasterReceiver interface {
-	SetMaster(m *controlplane.Master)
+	SetMaster(m *controlplane.Instance)
 }
 
 // MasterHolder implements
 type MasterHolder struct {
 	Initialized chan struct{}
-	M           *controlplane.Master
+	M           *controlplane.Instance
 }
 
 // SetMaster assigns the current master.
-func (h *MasterHolder) SetMaster(m *controlplane.Master) {
+func (h *MasterHolder) SetMaster(m *controlplane.Instance) {
 	h.M = m
 	close(h.Initialized)
 }
@@ -124,8 +124,8 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 }
 
 // startMasterOrDie starts a kubernetes master and an httpserver to handle api requests
-func startMasterOrDie(masterConfig *controlplane.Config, incomingServer *httptest.Server, masterReceiver MasterReceiver) (*controlplane.Master, *httptest.Server, CloseFunc) {
-	var m *controlplane.Master
+func startMasterOrDie(masterConfig *controlplane.Config, incomingServer *httptest.Server, masterReceiver MasterReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
+	var m *controlplane.Instance
 	var s *httptest.Server
 
 	// Ensure we log at least level 4
@@ -333,7 +333,7 @@ func NewMasterConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config 
 type CloseFunc func()
 
 // RunAMaster starts a master with the provided config.
-func RunAMaster(masterConfig *controlplane.Config) (*controlplane.Master, *httptest.Server, CloseFunc) {
+func RunAMaster(masterConfig *controlplane.Config) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	if masterConfig == nil {
 		masterConfig = NewMasterConfig()
 		masterConfig.GenericConfig.EnableProfiling = true
@@ -342,7 +342,7 @@ func RunAMaster(masterConfig *controlplane.Config) (*controlplane.Master, *httpt
 }
 
 // RunAMasterUsingServer starts up a master using the provided config on the specified server.
-func RunAMasterUsingServer(masterConfig *controlplane.Config, s *httptest.Server, masterReceiver MasterReceiver) (*controlplane.Master, *httptest.Server, CloseFunc) {
+func RunAMasterUsingServer(masterConfig *controlplane.Config, s *httptest.Server, masterReceiver MasterReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	return startMasterOrDie(masterConfig, s, masterReceiver)
 }
 

@@ -223,8 +223,8 @@ type EndpointReconcilerConfig struct {
 	Interval   time.Duration
 }
 
-// Master contains state for a Kubernetes cluster master/api server.
-type Master struct {
+// Instance contains state for a Kubernetes cluster api server instance.
+type Instance struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
 
 	ClusterAuthenticationInfo clusterauthenticationtrust.ClusterAuthenticationInfo
@@ -334,7 +334,7 @@ func (c *Config) Complete() CompletedConfig {
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
 //   KubeletClientConfig
-func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*Master, error) {
+func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*Instance, error) {
 	if reflect.DeepEqual(c.ExtraConfig.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
 		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
@@ -381,7 +381,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		}
 	}
 
-	m := &Master{
+	m := &Instance{
 		GenericAPIServer:          s,
 		ClusterAuthenticationInfo: c.ExtraConfig.ClusterAuthenticationInfo,
 	}
@@ -486,7 +486,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 }
 
 // InstallLegacyAPI will install the legacy APIs for the restStorageProviders if they are enabled.
-func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) error {
+func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) error {
 	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
 	if err != nil {
 		return fmt.Errorf("error building core storage: %v", err)
@@ -504,7 +504,7 @@ func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.
 	return nil
 }
 
-func (m *Master) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient corev1client.NodeInterface) {
+func (m *Instance) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient corev1client.NodeInterface) {
 	nodeTunneler.Run(nodeAddressProvider{nodeClient}.externalAddresses)
 	err := m.GenericAPIServer.AddHealthChecks(healthz.NamedCheck("SSH Tunnel Check", tunneler.TunnelSyncHealthChecker(nodeTunneler)))
 	if err != nil {
@@ -519,7 +519,7 @@ type RESTStorageProvider interface {
 }
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
-func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) error {
+func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) error {
 	apiGroupsInfo := []*genericapiserver.APIGroupInfo{}
 
 	for _, restStorageBuilder := range restStorageProviders {
