@@ -525,6 +525,13 @@ ENABLE_PROMETHEUS_TO_SD=${ENABLE_PROMETHEUS_TO_SD:-true}
 # Optional: [Experiment Only] Run kube-proxy as a DaemonSet if set to true, run as static pods otherwise.
 KUBE_PROXY_DAEMONSET=${KUBE_PROXY_DAEMONSET:-false} # true, false
 
+# Control whether the startup scripts manage the lifecycle of kube-proxy
+# When true, the startup scripts do not enable kube-proxy either as a daemonset addon or as a static pod
+# regardless of the value of KUBE_PROXY_DAEMONSET.
+# When false, the value of KUBE_PROXY_DAEMONSET controls whether kube-proxy comes up as a static pod or
+# as an addon daemonset.
+KUBE_PROXY_DISABLE="${KUBE_PROXY_DISABLE:-false}" # true, false
+
 # Optional: Change the kube-proxy implementation. Choices are [iptables, ipvs].
 KUBE_PROXY_MODE=${KUBE_PROXY_MODE:-iptables}
 
