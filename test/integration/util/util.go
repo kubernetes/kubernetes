@@ -355,7 +355,7 @@ func InitTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 // WaitForSchedulerCacheCleanup waits for cleanup of scheduler's cache to complete
 func WaitForSchedulerCacheCleanup(sched *scheduler.Scheduler, t *testing.T) {
 	schedulerCacheIsEmpty := func() (bool, error) {
-		dump := sched.Cache().Dump()
+		dump := sched.SchedulerCache.Dump()
 
 		return len(dump.Nodes) == 0 && len(dump.AssumedPods) == 0, nil
 	}
