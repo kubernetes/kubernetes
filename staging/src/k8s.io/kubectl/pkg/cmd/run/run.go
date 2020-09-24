@@ -246,7 +246,11 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return printer.PrintObj(obj, o.Out)
 	}
 
-	deleteOpts := o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
+	deleteOpts, err := o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
+	if err != nil {
+		return err
+	}
+
 	deleteOpts.IgnoreNotFound = true
 	deleteOpts.WaitForDeletion = false
 	deleteOpts.GracePeriod = -1

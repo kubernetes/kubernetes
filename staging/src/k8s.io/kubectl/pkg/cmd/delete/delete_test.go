@@ -112,8 +112,8 @@ func hasExpectedPropagationPolicy(body io.ReadCloser, policy *metav1.DeletionPro
 	return *policy == *parsedBody.PropagationPolicy
 }
 
-// Tests that DeleteOptions.OrphanDependents is appropriately set while deleting objects.
-func TestOrphanDependentsInDeleteObject(t *testing.T) {
+// TestCascadingStrategy tests that DeleteOptions.DeletionPropagation is appropriately set while deleting objects.
+func TestCascadingStrategy(t *testing.T) {
 	cmdtesting.InitTestErrorHandler(t)
 	_, _, rc := cmdtesting.TestData()
 
@@ -137,7 +137,7 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 		}),
 	}
 
-	// DeleteOptions.PropagationPolicy should be Background, when cascade is true (default).
+	// DeleteOptions.PropagationPolicy should be Background, when cascading strategy is empty (default).
 	backgroundPolicy := metav1.DeletePropagationBackground
 	policy = &backgroundPolicy
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -149,13 +149,26 @@ func TestOrphanDependentsInDeleteObject(t *testing.T) {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 
-	// Test that delete options should be set to orphan when cascade is false.
+	// DeleteOptions.PropagationPolicy should be Foreground, when cascading strategy is foreground.
+	foregroundPolicy := metav1.DeletePropagationForeground
+	policy = &foregroundPolicy
+	streams, _, buf, _ = genericclioptions.NewTestIOStreams()
+	cmd = NewCmdDelete(tf, streams)
+	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("cascade", "foreground")
+	cmd.Flags().Set("output", "name")
+	cmd.Run(cmd, []string{"secrets/mysecret"})
+	if buf.String() != "secret/mysecret\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+
+	// Test that delete options should be set to orphan when cascading strategy is orphan.
 	orphanPolicy := metav1.DeletePropagationOrphan
 	policy = &orphanPolicy
 	streams, _, buf, _ = genericclioptions.NewTestIOStreams()
 	cmd = NewCmdDelete(tf, streams)
 	cmd.Flags().Set("namespace", "test")
-	cmd.Flags().Set("cascade", "false")
+	cmd.Flags().Set("cascade", "orphan")
 	cmd.Flags().Set("output", "name")
 	cmd.Run(cmd, []string{"secrets/mysecret"})
 	if buf.String() != "secret/mysecret\n" {
@@ -427,10 +440,10 @@ func TestDeleteObjectNotFound(t *testing.T) {
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../testdata/redis-master-controller.yaml"},
 		},
-		GracePeriod: -1,
-		Cascade:     false,
-		Output:      "name",
-		IOStreams:   genericclioptions.NewTestIOStreamsDiscard(),
+		GracePeriod:       -1,
+		CascadingStrategy: metav1.DeletePropagationOrphan,
+		Output:            "name",
+		IOStreams:         genericclioptions.NewTestIOStreamsDiscard(),
 	}
 	err := options.Complete(tf, []string{}, fakecmd())
 	if err != nil {
@@ -504,13 +517,13 @@ func TestDeleteAllNotFound(t *testing.T) {
 
 	// Make sure we can explicitly choose to fail on NotFound errors, even with --all
 	options := &DeleteOptions{
-		FilenameOptions: resource.FilenameOptions{},
-		GracePeriod:     -1,
-		Cascade:         false,
-		DeleteAll:       true,
-		IgnoreNotFound:  false,
-		Output:          "name",
-		IOStreams:       genericclioptions.NewTestIOStreamsDiscard(),
+		FilenameOptions:   resource.FilenameOptions{},
+		GracePeriod:       -1,
+		CascadingStrategy: metav1.DeletePropagationOrphan,
+		DeleteAll:         true,
+		IgnoreNotFound:    false,
+		Output:            "name",
+		IOStreams:         genericclioptions.NewTestIOStreamsDiscard(),
 	}
 	err := options.Complete(tf, []string{"services"}, fakecmd())
 	if err != nil {
@@ -630,10 +643,10 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../testdata/redis-master-controller.yaml", "../../../testdata/frontend-service.yaml"},
 		},
-		GracePeriod: -1,
-		Cascade:     false,
-		Output:      "name",
-		IOStreams:   streams,
+		GracePeriod:       -1,
+		CascadingStrategy: metav1.DeletePropagationOrphan,
+		Output:            "name",
+		IOStreams:         streams,
 	}
 	err := options.Complete(tf, []string{}, fakecmd())
 	if err != nil {
@@ -801,11 +814,11 @@ func TestResourceErrors(t *testing.T) {
 
 			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 			options := &DeleteOptions{
-				FilenameOptions: resource.FilenameOptions{},
-				GracePeriod:     -1,
-				Cascade:         false,
-				Output:          "name",
-				IOStreams:       streams,
+				FilenameOptions:   resource.FilenameOptions{},
+				GracePeriod:       -1,
+				CascadingStrategy: metav1.DeletePropagationOrphan,
+				Output:            "name",
+				IOStreams:         streams,
 			}
 			err := options.Complete(tf, testCase.args, fakecmd())
 			if !testCase.errFn(err) {
