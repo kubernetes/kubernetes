@@ -38,9 +38,9 @@ import (
 )
 
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
-func CreateInitStaticPodManifestFiles(manifestDir, kustomizeDir, patchesDir string, cfg *kubeadmapi.InitConfiguration) error {
+func CreateInitStaticPodManifestFiles(manifestDir, patchesDir string, cfg *kubeadmapi.InitConfiguration) error {
 	klog.V(1).Infoln("[control-plane] creating static Pod files")
-	return CreateStaticPodFiles(manifestDir, kustomizeDir, patchesDir, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
+	return CreateStaticPodFiles(manifestDir, patchesDir, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
 }
 
 // GetStaticPodSpecs returns all staticPodSpecs actualized to the context of the current configuration
@@ -91,7 +91,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 }
 
 // CreateStaticPodFiles creates all the requested static pod files.
-func CreateStaticPodFiles(manifestDir, kustomizeDir, patchesDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, componentNames ...string) error {
+func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, componentNames ...string) error {
 	// gets the StaticPodSpecs, actualized for the current ClusterConfiguration
 	klog.V(1).Infoln("[control-plane] getting StaticPodSpecs")
 	specs := GetStaticPodSpecs(cfg, endpoint)
@@ -107,15 +107,6 @@ func CreateStaticPodFiles(manifestDir, kustomizeDir, patchesDir string, cfg *kub
 		// print all volumes that are mounted
 		for _, v := range spec.Spec.Volumes {
 			klog.V(2).Infof("[control-plane] adding volume %q for component %q", v.Name, componentName)
-		}
-
-		// if kustomizeDir is defined, customize the static pod manifest
-		if kustomizeDir != "" {
-			kustomizedSpec, err := staticpodutil.KustomizeStaticPod(&spec, kustomizeDir)
-			if err != nil {
-				return errors.Wrapf(err, "failed to kustomize static pod manifest file for %q", componentName)
-			}
-			spec = *kustomizedSpec
 		}
 
 		// if patchesDir is defined, patch the static Pod manifest

@@ -42,7 +42,6 @@ type nodeOptions struct {
 	etcdUpgrade           bool
 	renewCerts            bool
 	dryRun                bool
-	kustomizeDir          string
 	patchesDir            string
 	ignorePreflightErrors []string
 }
@@ -59,7 +58,6 @@ type nodeData struct {
 	cfg                   *kubeadmapi.InitConfiguration
 	isControlPlaneNode    bool
 	client                clientset.Interface
-	kustomizeDir          string
 	patchesDir            string
 	ignorePreflightErrors sets.String
 }
@@ -81,7 +79,6 @@ func NewCmdNode() *cobra.Command {
 	// adds flags to the node command
 	// flags could be eventually inherited by the sub-commands automatically generated for phases
 	addUpgradeNodeFlags(cmd.Flags(), nodeOptions)
-	options.AddKustomizePodsFlag(cmd.Flags(), &nodeOptions.kustomizeDir)
 	options.AddPatchesFlag(cmd.Flags(), &nodeOptions.patchesDir)
 
 	// initialize the workflow runner with the list of phases
@@ -159,7 +156,6 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions) (*node
 		cfg:                   cfg,
 		client:                client,
 		isControlPlaneNode:    isControlPlaneNode,
-		kustomizeDir:          options.kustomizeDir,
 		patchesDir:            options.patchesDir,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 	}, nil
@@ -193,11 +189,6 @@ func (d *nodeData) IsControlPlaneNode() bool {
 // Client returns a Kubernetes client to be used by kubeadm.
 func (d *nodeData) Client() clientset.Interface {
 	return d.client
-}
-
-// KustomizeDir returns the folder where kustomize patches for static pod manifest are stored
-func (d *nodeData) KustomizeDir() string {
-	return d.kustomizeDir
 }
 
 // PatchesDir returns the folder where patches for components are stored
