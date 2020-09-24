@@ -40,7 +40,7 @@ type NamePrinter struct {
 	Operation string
 	// WithNamespace indicates whether a namespace should be
 	// printed along side the "resource/name" pair for an object.
-	// This flag effective useful when operations across all
+	// This flag is effective when operations across all
 	// namespace are done.
 	WithNamespace bool
 }
