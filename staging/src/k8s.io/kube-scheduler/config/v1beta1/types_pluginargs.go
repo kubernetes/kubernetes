@@ -70,6 +70,17 @@ type NodeResourcesFitArgs struct {
 	IgnoredResourceGroups []string `json:"ignoredResourceGroups,omitempty"`
 }
 
+// PodTopologySpreadConstraintsDefaulting defines how to set default constraints
+// for the PodTopologySpread plugin.
+type PodTopologySpreadConstraintsDefaulting string
+
+const (
+	// SystemDefaulting instructs to use the kubernetes defined default.
+	SystemDefaulting PodTopologySpreadConstraintsDefaulting = "System"
+	// ListDefaulting instructs to use the config provided default.
+	ListDefaulting PodTopologySpreadConstraintsDefaulting = "List"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodTopologySpreadArgs holds arguments used to configure the PodTopologySpread plugin.
@@ -77,14 +88,26 @@ type PodTopologySpreadArgs struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// DefaultConstraints defines topology spread constraints to be applied to
-	// pods that don't define any in `pod.spec.topologySpreadConstraints`.
-	// `topologySpreadConstraint.labelSelectors` must be empty, as they are
-	// deduced the pods' membership to Services, Replication Controllers, Replica
-	// Sets or Stateful Sets.
-	// Empty by default.
+	// Pods that don't define any in `pod.spec.topologySpreadConstraints`.
+	// `.defaultConstraints[*].labelSelectors` must be empty, as they are
+	// deduced from the Pod's membership to Services, ReplicationControllers,
+	// ReplicaSets or StatefulSets.
+	// When not empty, .defaultingType must be "List".
 	// +optional
 	// +listType=atomic
-	DefaultConstraints []corev1.TopologySpreadConstraint `json:"defaultConstraints"`
+	DefaultConstraints []corev1.TopologySpreadConstraint `json:"defaultConstraints,omitempty"`
+
+	// DefaultingType determines how .defaultConstraints are deduced. Can be one
+	// of "System" or "List".
+	//
+	// - "System": Use kubernetes defined constraints that spread Pods among
+	//   Nodes and Zones.
+	// - "List": Use constraints defined in .defaultConstraints.
+	//
+	// Defaults to "List" if feature gate DefaultPodTopologySpread is disabled
+	// and to "System" if enabled.
+	// +optional
+	DefaultingType PodTopologySpreadConstraintsDefaulting `json:"defaultingType,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

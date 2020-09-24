@@ -38,11 +38,11 @@ type topologySpreadConstraint struct {
 	Selector    labels.Selector
 }
 
-// defaultConstraints builds the constraints for a pod using
+// buildDefaultConstraints builds the constraints for a pod using
 // .DefaultConstraints and the selectors from the services, replication
 // controllers, replica sets and stateful sets that match the pod.
-func (pl *PodTopologySpread) defaultConstraints(p *v1.Pod, action v1.UnsatisfiableConstraintAction) ([]topologySpreadConstraint, error) {
-	constraints, err := filterTopologySpreadConstraints(pl.args.DefaultConstraints, action)
+func (pl *PodTopologySpread) buildDefaultConstraints(p *v1.Pod, action v1.UnsatisfiableConstraintAction) ([]topologySpreadConstraint, error) {
+	constraints, err := filterTopologySpreadConstraints(pl.defaultConstraints, action)
 	if err != nil || len(constraints) == 0 {
 		return nil, err
 	}
