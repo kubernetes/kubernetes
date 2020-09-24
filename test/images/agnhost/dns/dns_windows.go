@@ -80,8 +80,8 @@ func getRegistryValue(reg, key string) string {
 	return regValue
 }
 
-// getDNSSuffixList reads DNS config file and returns the list of configured DNS suffixes
-func getDNSSuffixList() []string {
+// GetDNSSuffixList reads DNS config file and returns the list of configured DNS suffixes
+func GetDNSSuffixList() []string {
 	// We start with the general suffix list that apply to all network connections.
 	allSuffixes := []string{}
 	suffixes := getRegistryValue(netRegistry, "SearchList")
