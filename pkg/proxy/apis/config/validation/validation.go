@@ -276,8 +276,7 @@ func validateKubeProxyNodePortAddress(nodePortAddresses []string, fldPath *field
 
 	for i := range nodePortAddresses {
 		if _, _, err := net.ParseCIDR(nodePortAddresses[i]); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath, nodePortAddresses, "must be a valid IP block"))
-			break
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), nodePortAddresses[i], "must be a valid CIDR"))
 		}
 	}
 
@@ -307,7 +306,7 @@ func validateIPVSExcludeCIDRs(excludeCIDRs []string, fldPath *field.Path) field.
 
 	for i := range excludeCIDRs {
 		if _, _, err := net.ParseCIDR(excludeCIDRs[i]); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath, excludeCIDRs, "must be a valid IP block"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), excludeCIDRs[i], "must be a valid CIDR"))
 		}
 	}
 	return allErrs
