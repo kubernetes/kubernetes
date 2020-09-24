@@ -1395,10 +1395,8 @@ google.golang.org/api/googleapi/transport
 google.golang.org/api/internal
 google.golang.org/api/internal/gensupport
 google.golang.org/api/internal/third_party/uritemplates
-google.golang.org/api/logging/v2beta1
 google.golang.org/api/monitoring/v3
 google.golang.org/api/option
-google.golang.org/api/pubsub/v1
 google.golang.org/api/tpu/v1
 google.golang.org/api/transport/http
 google.golang.org/api/transport/http/internal/propagation
