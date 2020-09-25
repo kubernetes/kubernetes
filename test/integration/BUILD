@@ -50,6 +50,7 @@ filegroup(
         "//test/integration/deployment:all-srcs",
         "//test/integration/disruption:all-srcs",
         "//test/integration/dryrun:all-srcs",
+        "//test/integration/dualstack:all-srcs",
         "//test/integration/endpoints:all-srcs",
         "//test/integration/endpointslice:all-srcs",
         "//test/integration/etcd:all-srcs",
