@@ -313,7 +313,7 @@ function do-single-node-upgrade() {
   # Drain node
   echo "== Draining ${instance}. == " >&2
   local drain_rc
-  "${KUBE_ROOT}/cluster/kubectl.sh" drain --delete-local-data --force --ignore-daemonsets "${instance}" \
+  "${KUBE_ROOT}/cluster/kubectl.sh" drain --delete-emptydir-data --force --ignore-daemonsets "${instance}" \
     && drain_rc=$? || drain_rc=$?
   if [[ "${drain_rc}" != 0 ]]; then
     echo "== FAILED to drain ${instance} =="
