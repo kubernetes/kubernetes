@@ -59,18 +59,6 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 )
 
-// Config is a struct of configuration directives for NewControlPlaneComponents.
-type Config struct {
-	// If nil, a default is used, partially filled configs will not get populated.
-	ControlPlaneConfig      *controlplane.Config
-	StartReplicationManager bool
-	// Client throttling qps
-	QPS float32
-	// Client burst qps, also burst replicas allowed in rc manager
-	Burst int
-	// TODO: Add configs for endpoints controller, scheduler etc
-}
-
 // alwaysAllow always allows an action
 type alwaysAllow struct{}
 
