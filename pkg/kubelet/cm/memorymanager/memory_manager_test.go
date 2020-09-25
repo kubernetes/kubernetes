@@ -11,6 +11,10 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
 
 const (
@@ -20,7 +24,67 @@ const (
 
 type nodeResources map[v1.ResourceName]resource.Quantity
 
-// validateReservedMemory
+type mockPolicy struct {
+	err error
+}
+
+func (p *mockPolicy) Name() string {
+	return string(policyTypeMock)
+}
+
+func (p *mockPolicy) Start(s state.State) error {
+	return p.err
+}
+
+func (p *mockPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
+	return p.err
+}
+
+func (p *mockPolicy) RemoveContainer(s state.State, podUID string, containerName string) error {
+	return p.err
+}
+
+func (p *mockPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+	return nil
+}
+
+func (p *mockPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	return nil
+}
+
+type mockRuntimeService struct {
+	err error
+}
+
+func (rt mockRuntimeService) UpdateContainerResources(id string, resources *runtimeapi.LinuxContainerResources) error {
+	return rt.err
+}
+
+type mockPodStatusProvider struct {
+	podStatus v1.PodStatus
+	found     bool
+}
+
+func (psp mockPodStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
+	return psp.podStatus, psp.found
+}
+
+func getPod(podUID string, containerName string, requirements *v1.ResourceRequirements) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: types.UID(podUID),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:      containerName,
+					Resources: *requirements,
+				},
+			},
+		},
+	}
+}
+
 func TestValidatePreReservedMemory(t *testing.T) {
 	const msgNotEqual = "the total amount of memory of type \"%s\" is not equal to the value determined by Node Allocatable feature"
 	testCases := []struct {
@@ -106,6 +170,7 @@ func TestValidatePreReservedMemory(t *testing.T) {
 	}
 }
 
+// validateReservedMemory
 func TestConvertPreReserved(t *testing.T) {
 	machineInfo := info.MachineInfo{
 		Topology: []info.Node{

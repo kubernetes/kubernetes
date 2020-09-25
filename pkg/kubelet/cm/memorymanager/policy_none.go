@@ -59,3 +59,10 @@ func (p *none) RemoveContainer(s state.State, podUID string, containerName strin
 func (p *none) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	return nil
 }
+
+// GetPodTopologyHints implements the topologymanager.HintProvider Interface
+// and is consulted to achieve NUMA aware resource alignment among this
+// and other resource controllers.
+func (p *none) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	return nil
+}
