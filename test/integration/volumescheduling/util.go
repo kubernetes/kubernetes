@@ -68,7 +68,7 @@ func initTestControlPlane(t *testing.T, nsPrefix string, admission admission.Int
 	h := &framework.ControlPlaneHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
-		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
+		h.Instance.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()

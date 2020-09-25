@@ -77,18 +77,18 @@ func alwaysEmpty(req *http.Request) (*authauthenticator.Response, bool, error) {
 
 // ControlPlaneReceiver can be used to provide the control plane to a custom incoming server function
 type ControlPlaneReceiver interface {
-	SetInstance(m *controlplane.Instance)
+	SetInstance(i *controlplane.Instance)
 }
 
-// ControlPlaneHolder implements
+// ControlPlaneHolder implements ControlPlaneReceiver
 type ControlPlaneHolder struct {
 	Initialized chan struct{}
-	M           *controlplane.Instance
+	Instance    *controlplane.Instance
 }
 
 // SetInstance assigns the current control plane.
-func (h *ControlPlaneHolder) SetInstance(m *controlplane.Instance) {
-	h.M = m
+func (h *ControlPlaneHolder) SetInstance(i *controlplane.Instance) {
+	h.Instance = i
 	close(h.Initialized)
 }
 
@@ -113,7 +113,7 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 
 // startControlPlaneOrDie starts a kubernetes control plane and an httpserver to handle api requests
 func startControlPlaneOrDie(controlPlaneConfig *controlplane.Config, incomingServer *httptest.Server, controlPlaneReceiver ControlPlaneReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
-	var m *controlplane.Instance
+	var instance *controlplane.Instance
 	var s *httptest.Server
 
 	// Ensure we log at least level 4
@@ -127,14 +127,14 @@ func startControlPlaneOrDie(controlPlaneConfig *controlplane.Config, incomingSer
 		s = incomingServer
 	} else {
 		s = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			m.GenericAPIServer.Handler.ServeHTTP(w, req)
+			instance.GenericAPIServer.Handler.ServeHTTP(w, req)
 		}))
 	}
 
 	stopCh := make(chan struct{})
 	closeFn := func() {
-		if m != nil {
-			m.GenericAPIServer.RunPreShutdownHooks()
+		if instance != nil {
+			instance.GenericAPIServer.RunPreShutdownHooks()
 		}
 		close(stopCh)
 		s.Close()
@@ -192,7 +192,7 @@ func startControlPlaneOrDie(controlPlaneConfig *controlplane.Config, incomingSer
 		)
 	}
 
-	m, err = controlPlaneConfig.Complete().New(genericapiserver.NewEmptyDelegate())
+	instance, err = controlPlaneConfig.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		// We log the error first so that even if closeFn crashes, the error is shown
 		klog.Errorf("error in bringing up the control plane: %v", err)
@@ -200,14 +200,14 @@ func startControlPlaneOrDie(controlPlaneConfig *controlplane.Config, incomingSer
 		klog.Fatalf("error in bringing up the control plane: %v", err)
 	}
 	if controlPlaneReceiver != nil {
-		controlPlaneReceiver.SetInstance(m)
+		controlPlaneReceiver.SetInstance(instance)
 	}
 
 	// TODO have this start method actually use the normal start sequence for the API server
 	// this method never actually calls the `Run` method for the API server
 	// fire the post hooks ourselves
-	m.GenericAPIServer.PrepareRun()
-	m.GenericAPIServer.RunPostStartHooks(stopCh)
+	instance.GenericAPIServer.PrepareRun()
+	instance.GenericAPIServer.RunPostStartHooks(stopCh)
 
 	cfg := *controlPlaneConfig.GenericConfig.LoopbackClientConfig
 	cfg.ContentConfig.GroupVersion = &schema.GroupVersion{}
@@ -233,7 +233,7 @@ func startControlPlaneOrDie(controlPlaneConfig *controlplane.Config, incomingSer
 		klog.Fatal(err)
 	}
 
-	return m, s, closeFn
+	return instance, s, closeFn
 }
 
 // NewIntegrationTestControlPlaneConfig returns the control plane config appropriate for most integration tests.

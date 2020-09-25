@@ -58,7 +58,7 @@ func TestQuota(t *testing.T) {
 	h := &framework.ControlPlaneHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
-		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
+		h.Instance.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
 	admissionCh := make(chan struct{})
@@ -249,7 +249,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	h := &framework.ControlPlaneHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
-		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
+		h.Instance.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
 	admissionCh := make(chan struct{})
