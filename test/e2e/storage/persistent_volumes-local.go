@@ -791,7 +791,7 @@ func twoPodsReadWriteSerialTest(f *framework.Framework, config *localTestConfig,
 func createPodWithFsGroupTest(config *localTestConfig, testVol *localTestVolume, fsGroup int64, expectedFsGroup int64) *v1.Pod {
 	pod, err := createLocalPod(config, testVol, &fsGroup)
 	framework.ExpectNoError(err)
-	_, err = framework.LookForStringInPodExec(config.ns, pod.Name, []string{"stat", "-c", "%g", volumeDir}, strconv.FormatInt(expectedFsGroup, 10), time.Second*3)
+	_, err = framework.LookForStringInPodExec(config.ns, pod.Name, "", []string{"stat", "-c", "%g", volumeDir}, strconv.FormatInt(expectedFsGroup, 10), time.Second*3)
 	framework.ExpectNoError(err, "failed to get expected fsGroup %d on directory %s in pod %s", fsGroup, volumeDir, pod.Name)
 	return pod
 }
