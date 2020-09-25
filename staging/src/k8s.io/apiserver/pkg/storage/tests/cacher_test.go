@@ -99,9 +99,12 @@ func AddObjectMetaFieldsSet(source fields.Set, objectMeta *metav1.ObjectMeta, ha
 	return source
 }
 
+func newPod() runtime.Object     { return &example.Pod{} }
+func newPodList() runtime.Object { return &example.PodList{} }
+
 func newEtcdTestStorage(t *testing.T, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
-	storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), prefix, value.IdentityTransformer, true)
+	storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), newPod, prefix, value.IdentityTransformer, true)
 	return server, storage
 }
 
@@ -118,8 +121,8 @@ func newTestCacherWithClock(s storage.Interface, clock clock.Clock) (*cacherstor
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
 		GetAttrsFunc:   GetAttrs,
-		NewFunc:        func() runtime.Object { return &example.Pod{} },
-		NewListFunc:    func() runtime.Object { return &example.PodList{} },
+		NewFunc:        newPod,
+		NewListFunc:    newPodList,
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 		Clock:          clock,
 	}

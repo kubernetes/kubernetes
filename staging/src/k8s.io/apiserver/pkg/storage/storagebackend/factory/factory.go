@@ -19,6 +19,7 @@ package factory
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
@@ -27,12 +28,12 @@ import (
 type DestroyFunc func()
 
 // Create creates a storage backend based on given config.
-func Create(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
+func Create(c storagebackend.Config, newFunc func() runtime.Object) (storage.Interface, DestroyFunc, error) {
 	switch c.Type {
 	case "etcd2":
 		return nil, nil, fmt.Errorf("%v is no longer a supported storage backend", c.Type)
 	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD3:
-		return newETCD3Storage(c)
+		return newETCD3Storage(c, newFunc)
 	default:
 		return nil, nil, fmt.Errorf("unknown storage type: %s", c.Type)
 	}

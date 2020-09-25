@@ -101,6 +101,15 @@ type Reflector struct {
 	watchErrorHandler WatchErrorHandler
 }
 
+// ResourceVersionUpdater is an interface that allows store implementation to
+// track the current resource version of the reflector. This is especially
+// important if storage bookmarks are enabled.
+type ResourceVersionUpdater interface {
+	// UpdateResourceVersion is called each time current resource version of the reflector
+	// is updated.
+	UpdateResourceVersion(resourceVersion string)
+}
+
 // The WatchErrorHandler is called whenever ListAndWatch drops the
 // connection with an error. After calling this handler, the informer
 // will backoff and retry.
@@ -507,6 +516,9 @@ loop:
 			}
 			*resourceVersion = newResourceVersion
 			r.setLastSyncResourceVersion(newResourceVersion)
+			if rvu, ok := r.store.(ResourceVersionUpdater); ok {
+				rvu.UpdateResourceVersion(newResourceVersion)
+			}
 			eventCount++
 		}
 	}
