@@ -52,7 +52,7 @@ type Helper struct {
 	GracePeriodSeconds  int
 	IgnoreAllDaemonSets bool
 	Timeout             time.Duration
-	DeleteLocalData     bool
+	DeleteEmptyDirData  bool
 	Selector            string
 	PodSelector         string
 
