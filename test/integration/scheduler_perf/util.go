@@ -52,7 +52,7 @@ const (
 var dataItemsDir = flag.String("data-items-dir", "", "destination directory for storing generated data items for perf dashboard")
 
 // mustSetupScheduler starts the following components:
-// - k8s api server (a.k.a. master)
+// - k8s api server (a.k.a. control plane)
 // - scheduler
 // It returns clientset and destroyFunc which should be used to
 // remove resources after finished.

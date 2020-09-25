@@ -122,10 +122,10 @@ func TestBootstrapTokenAuth(t *testing.T) {
 	for _, test := range tests {
 
 		authenticator := bearertoken.New(bootstrap.NewTokenAuthenticator(bootstrapSecrets{test.secret}))
-		// Set up a master
-		masterConfig := framework.NewIntegrationTestMasterConfig()
-		masterConfig.GenericConfig.Authentication.Authenticator = authenticator
-		_, s, closeFn := framework.RunAMaster(masterConfig)
+		// Set up a control plane
+		controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+		controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator
+		_, s, closeFn := framework.RunAControlPlane(controlPlaneConfig)
 		defer closeFn()
 
 		ns := framework.CreateTestingNamespace("auth-bootstrap-token", s, t)

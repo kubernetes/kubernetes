@@ -280,7 +280,7 @@ func machine3Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*extenderv1.HostPrior
 }
 
 func TestSchedulerExtender(t *testing.T) {
-	testCtx := testutils.InitTestMaster(t, "scheduler-extender", nil)
+	testCtx := testutils.InitTestControlPlane(t, "scheduler-extender", nil)
 	clientSet := testCtx.ClientSet
 
 	extender1 := &Extender{

@@ -9,8 +9,8 @@ load("//build:platforms.bzl", "go_platform_constraint")
 go_library(
     name = "go_default_library",
     srcs = [
+        "controlplane_utils.go",
         "etcd.go",
-        "master_utils.go",
         "perf_utils.go",
         "serializer.go",
         "test_server.go",

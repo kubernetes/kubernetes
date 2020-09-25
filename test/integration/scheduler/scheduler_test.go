@@ -55,7 +55,7 @@ type nodeStateManager struct {
 // from configurations provided by a ConfigMap object and then verifies that the
 // configuration is applied correctly.
 func TestSchedulerCreationFromConfigMap(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAControlPlane(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("configmap", s, t)
@@ -310,7 +310,7 @@ priorities: []
 // TestSchedulerCreationFromNonExistentConfigMap ensures that creation of the
 // scheduler from a non-existent ConfigMap fails.
 func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAControlPlane(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("configmap", s, t)

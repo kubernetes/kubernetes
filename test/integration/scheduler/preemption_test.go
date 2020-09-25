@@ -148,7 +148,7 @@ func TestPreemption(t *testing.T) {
 		},
 	}
 	testCtx := testutils.InitTestSchedulerWithOptions(t,
-		testutils.InitTestMaster(t, "preemption", nil),
+		testutils.InitTestControlPlane(t, "preemption", nil),
 		nil, time.Second,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
@@ -596,7 +596,7 @@ func TestDisablePreemption(t *testing.T) {
 // This test verifies that system critical priorities are created automatically and resolved properly.
 func TestPodPriorityResolution(t *testing.T) {
 	admission := priority.NewPlugin()
-	testCtx := testutils.InitTestScheduler(t, testutils.InitTestMaster(t, "preemption", admission), nil)
+	testCtx := testutils.InitTestScheduler(t, testutils.InitTestControlPlane(t, "preemption", admission), nil)
 	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 

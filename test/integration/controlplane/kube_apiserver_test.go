@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package master
+package controlplane
 
 import (
 	"bytes"
@@ -412,9 +412,9 @@ func verifyEndpointsWithIPs(servers []*kubeapiservertesting.TestServer, ips []st
 	return reflect.DeepEqual(listenAddresses, ips)
 }
 
-func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
+func testReconcilersControlPlaneLease(t *testing.T, leaseCount int, controlPlaneCount int) {
 	var leaseServers = make([]*kubeapiservertesting.TestServer, leaseCount)
-	var masterCountServers = make([]*kubeapiservertesting.TestServer, masterCount)
+	var controlPlaneCountServers = make([]*kubeapiservertesting.TestServer, controlPlaneCount)
 	etcd := framework.SharedEtcd()
 
 	instanceOptions := &kubeapiservertesting.TestServerInstanceOptions{
@@ -425,25 +425,25 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 	defer registry.CleanupStorage()
 
 	wg := sync.WaitGroup{}
-	// 1. start masterCount api servers
-	for i := 0; i < masterCount; i++ {
-		// start master count api server
+	// 1. start controlPlaneCount api servers
+	for i := 0; i < controlPlaneCount; i++ {
+		// start controlPlaneCount api server
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
 			server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
 				"--endpoint-reconciler-type", "master-count",
 				"--advertise-address", fmt.Sprintf("10.0.1.%v", i+1),
-				"--apiserver-count", fmt.Sprintf("%v", masterCount),
+				"--apiserver-count", fmt.Sprintf("%v", controlPlaneCount),
 			}, etcd)
-			masterCountServers[i] = server
+			controlPlaneCountServers[i] = server
 		}(i)
 	}
 	wg.Wait()
 
-	// 2. verify master count servers have registered
+	// 2. verify controlPlaneCount servers have registered
 	if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
-		client, err := kubernetes.NewForConfig(masterCountServers[0].ClientConfig)
+		client, err := kubernetes.NewForConfig(controlPlaneCountServers[0].ClientConfig)
 		if err != nil {
 			t.Logf("error creating client: %v", err)
 			return false, nil
@@ -453,9 +453,9 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 			t.Logf("error fetching endpoints: %v", err)
 			return false, nil
 		}
-		return verifyEndpointsWithIPs(masterCountServers, getEndpointIPs(endpoints)), nil
+		return verifyEndpointsWithIPs(controlPlaneCountServers, getEndpointIPs(endpoints)), nil
 	}); err != nil {
-		t.Fatalf("master count endpoints failed to register: %v", err)
+		t.Fatalf("controlPlaneCount endpoints failed to register: %v", err)
 	}
 
 	// 3. start lease api servers
@@ -480,8 +480,8 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 
 	time.Sleep(3 * time.Second)
 
-	// 4. Shutdown the masterCount server
-	for _, server := range masterCountServers {
+	// 4. Shutdown the controlPlaneCount server
+	for _, server := range controlPlaneCountServers {
 		server.TearDownFn()
 	}
 
@@ -503,19 +503,19 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 	}
 }
 
-func TestReconcilerMasterLeaseCombined(t *testing.T) {
-	testReconcilersMasterLease(t, 1, 2)
+func TestReconcilerControlPlaneLeaseCombined(t *testing.T) {
+	testReconcilersControlPlaneLease(t, 1, 2)
 }
 
-func TestReconcilerMasterLeaseMultiMoreMasters(t *testing.T) {
-	testReconcilersMasterLease(t, 2, 1)
+func TestReconcilerControlPlaneLeaseMultiMoreControlPlanes(t *testing.T) {
+	testReconcilersControlPlaneLease(t, 2, 1)
 }
 
-func TestReconcilerMasterLeaseMultiCombined(t *testing.T) {
-	testReconcilersMasterLease(t, 2, 2)
+func TestReconcilerControlPlaneLeaseMultiCombined(t *testing.T) {
+	testReconcilersControlPlaneLease(t, 2, 2)
 }
 
-func TestMultiMasterNodePortAllocation(t *testing.T) {
+func TestMultiControlPlaneNodePortAllocation(t *testing.T) {
 	var kubeAPIServers []*kubeapiservertesting.TestServer
 	var clientAPIServers []*kubernetes.Clientset
 	etcd := framework.SharedEtcd()
@@ -529,7 +529,7 @@ func TestMultiMasterNodePortAllocation(t *testing.T) {
 
 	// create 2 api servers and 2 clients
 	for i := 0; i < 2; i++ {
-		// start master count api server
+		// start controlPlaneCount api server
 		t.Logf("starting api server: %d", i)
 		server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
 			"--advertise-address", fmt.Sprintf("10.0.1.%v", i+1),

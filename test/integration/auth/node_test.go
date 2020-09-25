@@ -46,10 +46,10 @@ func TestNodeAuthorizer(t *testing.T) {
 	const (
 		// Define credentials
 		// Fake values for testing.
-		tokenMaster      = "master-token"
-		tokenNodeUnknown = "unknown-token"
-		tokenNode1       = "node1-token"
-		tokenNode2       = "node2-token"
+		tokenControlPlane = "controlplane-token"
+		tokenNodeUnknown  = "unknown-token"
+		tokenNode1        = "node1-token"
+		tokenNode2        = "node2-token"
 	)
 
 	// Enable DynamicKubeletConfig feature so that Node.Spec.ConfigSource can be set
@@ -63,7 +63,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		t.Fatal(err)
 	}
 	tokenFile.WriteString(strings.Join([]string{
-		fmt.Sprintf(`%s,admin,uid1,"system:masters"`, tokenMaster),
+		fmt.Sprintf(`%s,admin,uid1,"system:masters"`, tokenControlPlane),
 		fmt.Sprintf(`%s,unknown,uid2,"system:nodes"`, tokenNodeUnknown),
 		fmt.Sprintf(`%s,system:node:node1,uid3,"system:nodes"`, tokenNode1),
 		fmt.Sprintf(`%s,system:node:node2,uid4,"system:nodes"`, tokenNode2),
@@ -82,7 +82,7 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	// Build client config and superuser clientset
 	clientConfig := server.ClientConfig
-	superuserClient, superuserClientExternal := clientsetForToken(tokenMaster, clientConfig)
+	superuserClient, superuserClientExternal := clientsetForToken(tokenControlPlane, clientConfig)
 
 	// Wait for a healthy server
 	for {

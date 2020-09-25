@@ -50,21 +50,21 @@ const (
 )
 
 func setup(t testing.TB) (*httptest.Server, *rest.Config, framework.CloseFunc) {
-	opts := framework.MasterConfigOptions{EtcdOptions: framework.DefaultEtcdOptions()}
+	opts := framework.ControlPlaneConfigOptions{EtcdOptions: framework.DefaultEtcdOptions()}
 	opts.EtcdOptions.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
-	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(&opts)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&opts)
 	resourceConfig := controlplane.DefaultAPIResourceConfigSource()
 	resourceConfig.EnableVersions(schema.GroupVersion{
 		Group:   "flowcontrol.apiserver.k8s.io",
 		Version: "v1alpha1",
 	})
-	masterConfig.GenericConfig.MaxRequestsInFlight = 1
-	masterConfig.GenericConfig.MaxMutatingRequestsInFlight = 1
-	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	controlPlaneConfig.GenericConfig.MaxRequestsInFlight = 1
+	controlPlaneConfig.GenericConfig.MaxMutatingRequestsInFlight = 1
+	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+	controlPlaneConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
+	_, s, closeFn := framework.RunAControlPlane(controlPlaneConfig)
 
-	return s, masterConfig.GenericConfig.LoopbackClientConfig, closeFn
+	return s, controlPlaneConfig.GenericConfig.LoopbackClientConfig, closeFn
 }
 
 func TestPriorityLevelIsolation(t *testing.T) {

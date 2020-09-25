@@ -514,8 +514,8 @@ func TestPreFilterPlugin(t *testing.T) {
 		},
 	}
 
-	// Create the master and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "prefilter-plugin", nil), 2,
+	// Create the control plane and the scheduler with the test plugin set.
+	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestControlPlane(t, "prefilter-plugin", nil), 2,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)
@@ -642,10 +642,10 @@ func TestPostFilterPlugin(t *testing.T) {
 				},
 			}
 
-			// Create the master and the scheduler with the test plugin set.
+			// Create the control plane and the scheduler with the test plugin set.
 			testCtx := initTestSchedulerForFrameworkTest(
 				t,
-				testutils.InitTestMaster(t, fmt.Sprintf("postfilter%v-", i), nil),
+				testutils.InitTestControlPlane(t, fmt.Sprintf("postfilter%v-", i), nil),
 				numNodes,
 				scheduler.WithProfiles(prof),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
@@ -702,7 +702,7 @@ func TestScorePlugin(t *testing.T) {
 		},
 	}
 
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "score-plugin", nil), 10,
+	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestControlPlane(t, "score-plugin", nil), 10,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)
@@ -777,7 +777,7 @@ func TestNormalizeScorePlugin(t *testing.T) {
 			},
 		},
 	}
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "score-plugin", nil), 10,
+	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestControlPlane(t, "score-plugin", nil), 10,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 
@@ -824,8 +824,8 @@ func TestReservePluginReserve(t *testing.T) {
 		},
 	}
 
-	// Create the master and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "reserve-plugin-reserve", nil), 2,
+	// Create the control plane and the scheduler with the test plugin set.
+	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestControlPlane(t, "reserve-plugin-reserve", nil), 2,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)
@@ -895,8 +895,8 @@ func TestPrebindPlugin(t *testing.T) {
 		},
 	}
 
-	// Create the master and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "prebind-plugin", nil), 2,
+	// Create the control plane and the scheduler with the test plugin set.
+	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestControlPlane(t, "prebind-plugin", nil), 2,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)
@@ -1029,8 +1029,8 @@ func TestReservePluginUnreserve(t *testing.T) {
 				})
 			}
 
-			// Create the master and the scheduler with the test plugin set.
-			testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "reserve-plugin-unreserve", nil), 2,
+			// Create the control plane and the scheduler with the test plugin set.
+			testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestControlPlane(t, "reserve-plugin-unreserve", nil), 2,
 				scheduler.WithProfiles(prof),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry))
 			defer testutils.CleanupTest(t, testCtx)
@@ -1083,7 +1083,7 @@ type pluginInvokeEvent struct {
 
 // TestBindPlugin tests invocation of bind plugins.
 func TestBindPlugin(t *testing.T) {
-	testContext := testutils.InitTestMaster(t, "bind-plugin", nil)
+	testContext := testutils.InitTestControlPlane(t, "bind-plugin", nil)
 	bindPlugin1 := &BindPlugin{PluginName: "bind-plugin-1", client: testContext.ClientSet}
 	bindPlugin2 := &BindPlugin{PluginName: "bind-plugin-2", client: testContext.ClientSet}
 	reservePlugin := &ReservePlugin{name: "mock-reserve-plugin"}
@@ -1312,8 +1312,8 @@ func TestPostBindPlugin(t *testing.T) {
 				},
 			}
 
-			// Create the master and the scheduler with the test plugin set.
-			testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "postbind-plugin", nil), 2,
+			// Create the control plane and the scheduler with the test plugin set.
+			testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestControlPlane(t, "postbind-plugin", nil), 2,
 				scheduler.WithProfiles(prof),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry))
 			defer testutils.CleanupTest(t, testCtx)
@@ -1357,8 +1357,8 @@ func TestPermitPlugin(t *testing.T) {
 	perPlugin := &PermitPlugin{name: permitPluginName}
 	registry, prof := initRegistryAndConfig(perPlugin)
 
-	// Create the master and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "permit-plugin", nil), 2,
+	// Create the control plane and the scheduler with the test plugin set.
+	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestControlPlane(t, "permit-plugin", nil), 2,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)
@@ -1454,8 +1454,8 @@ func TestMultiplePermitPlugins(t *testing.T) {
 	perPlugin2 := &PermitPlugin{name: "permit-plugin-2"}
 	registry, prof := initRegistryAndConfig(perPlugin1, perPlugin2)
 
-	// Create the master and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "multi-permit-plugin", nil), 2,
+	// Create the control plane and the scheduler with the test plugin set.
+	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestControlPlane(t, "multi-permit-plugin", nil), 2,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)
@@ -1509,8 +1509,8 @@ func TestPermitPluginsCancelled(t *testing.T) {
 	perPlugin2 := &PermitPlugin{name: "permit-plugin-2"}
 	registry, prof := initRegistryAndConfig(perPlugin1, perPlugin2)
 
-	// Create the master and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "permit-plugins", nil), 2,
+	// Create the control plane and the scheduler with the test plugin set.
+	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestControlPlane(t, "permit-plugins", nil), 2,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)
@@ -1550,9 +1550,9 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 	permitPlugin := &PermitPlugin{name: permitPluginName}
 	registry, prof := initRegistryAndConfig(permitPlugin)
 
-	// Create the master and the scheduler with the test plugin set.
+	// Create the control plane and the scheduler with the test plugin set.
 	// TODO Make the subtests not share scheduler instances.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "permit-plugin", nil), 2,
+	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestControlPlane(t, "permit-plugin", nil), 2,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)
@@ -1651,8 +1651,8 @@ func TestFilterPlugin(t *testing.T) {
 		},
 	}
 
-	// Create the master and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "filter-plugin", nil), 1,
+	// Create the control plane and the scheduler with the test plugin set.
+	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestControlPlane(t, "filter-plugin", nil), 1,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)
@@ -1723,8 +1723,8 @@ func TestPreScorePlugin(t *testing.T) {
 		},
 	}
 
-	// Create the master and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "pre-score-plugin", nil), 2,
+	// Create the control plane and the scheduler with the test plugin set.
+	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestControlPlane(t, "pre-score-plugin", nil), 2,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)
@@ -1779,8 +1779,8 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	permitPlugin := &PermitPlugin{}
 	registry, prof := initRegistryAndConfig(permitPlugin)
 
-	// Create the master and the scheduler with the test plugin set.
-	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestMaster(t, "preempt-with-permit-plugin", nil), 0,
+	// Create the control plane and the scheduler with the test plugin set.
+	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestControlPlane(t, "preempt-with-permit-plugin", nil), 0,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	defer testutils.CleanupTest(t, testCtx)

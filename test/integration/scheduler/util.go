@@ -77,16 +77,16 @@ func initDisruptionController(t *testing.T, testCtx *testutils.TestContext) *dis
 	return dc
 }
 
-// initTest initializes a test environment and creates master and scheduler with default
+// initTest initializes a test environment and creates control plane and scheduler with default
 // configuration.
 func initTest(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testutils.TestContext {
-	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestMaster(t, nsPrefix, nil), nil, time.Second, opts...)
+	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestControlPlane(t, nsPrefix, nil), nil, time.Second, opts...)
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx
 }
 
-// initTestDisablePreemption initializes a test environment and creates master and scheduler with default
+// initTestDisablePreemption initializes a test environment and creates control plane and scheduler with default
 // configuration but with pod preemption disabled.
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *testutils.TestContext {
 	prof := schedulerconfig.KubeSchedulerProfile{
@@ -100,7 +100,7 @@ func initTestDisablePreemption(t *testing.T, nsPrefix string) *testutils.TestCon
 		},
 	}
 	testCtx := testutils.InitTestSchedulerWithOptions(
-		t, testutils.InitTestMaster(t, nsPrefix, nil), nil,
+		t, testutils.InitTestControlPlane(t, nsPrefix, nil), nil,
 		time.Second, scheduler.WithProfiles(prof))
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)

@@ -114,8 +114,8 @@ func TestPerformance(t *testing.T) {
 		t.Skip("Skipping because we want to run short tests")
 	}
 
-	apiURL, masterShutdown := util.StartApiserver()
-	defer masterShutdown()
+	apiURL, controlPlaneShutdown := util.StartApiserver()
+	defer controlPlaneShutdown()
 
 	_, clusterCIDR, _ := net.ParseCIDR("10.96.0.0/11") // allows up to 8K nodes
 	_, serviceCIDR, _ := net.ParseCIDR("10.94.0.0/24") // does not matter for test - pick upto  250 services

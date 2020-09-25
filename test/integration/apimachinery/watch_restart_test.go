@@ -66,11 +66,11 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 	// Has to be longer than 5 seconds
 	timeout := 30 * time.Second
 
-	// Set up a master
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	// Set up a control plane
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	// Timeout is set random between MinRequestTimeout and 2x
-	masterConfig.GenericConfig.MinRequestTimeout = int(timeout.Seconds()) / 4
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	controlPlaneConfig.GenericConfig.MinRequestTimeout = int(timeout.Seconds()) / 4
+	_, s, closeFn := framework.RunAControlPlane(controlPlaneConfig)
 	defer closeFn()
 
 	config := &restclient.Config{

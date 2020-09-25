@@ -36,8 +36,8 @@ import (
 )
 
 func TestEndpointSliceMirroring(t *testing.T) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, server, closeFn := framework.RunAMaster(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, server, closeFn := framework.RunAControlPlane(controlPlaneConfig)
 	defer closeFn()
 
 	config := restclient.Config{Host: server.URL}

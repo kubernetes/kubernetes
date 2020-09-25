@@ -16,7 +16,7 @@ limitations under the License.
 
 package serviceaccount
 
-// This file tests authentication and (soon) authorization of HTTP requests to a master object.
+// This file tests authentication and (soon) authorization of HTTP requests to a control plane object.
 // It does not use the client in pkg/client/... because authentication and authorization needs
 // to work for any client of the HTTP interface.
 
@@ -363,7 +363,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 // It is the responsibility of the caller to ensure the returned stopFunc is called
 func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclient.Config, func(), error) {
 	// Listener
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	h := &framework.ControlPlaneHolder{Initialized: make(chan struct{})}
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
@@ -441,12 +441,12 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	serviceAccountAdmission.SetExternalKubeClientSet(externalRootClientset)
 	serviceAccountAdmission.SetExternalKubeInformerFactory(externalInformers)
 
-	masterConfig := framework.NewMasterConfig()
-	masterConfig.GenericConfig.EnableIndex = true
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator
-	masterConfig.GenericConfig.Authorization.Authorizer = authorizer
-	masterConfig.GenericConfig.AdmissionControl = serviceAccountAdmission
-	_, _, kubeAPIServerCloseFn := framework.RunAMasterUsingServer(masterConfig, apiServer, h)
+	controlPlaneConfig := framework.NewControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.EnableIndex = true
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator
+	controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizer
+	controlPlaneConfig.GenericConfig.AdmissionControl = serviceAccountAdmission
+	_, _, kubeAPIServerCloseFn := framework.RunAControlPlaneUsingServer(controlPlaneConfig, apiServer, h)
 
 	// Start the service account and service account token controllers
 	stopCh := make(chan struct{})

@@ -37,7 +37,7 @@ import (
 )
 
 func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAControlPlane(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("pod-activedeadline-update", s, t)
@@ -154,7 +154,7 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 }
 
 func TestPodReadOnlyFilesystem(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAControlPlane(nil)
 	defer closeFn()
 
 	isReadOnly := true
@@ -190,7 +190,7 @@ func TestPodReadOnlyFilesystem(t *testing.T) {
 func TestPodCreateEphemeralContainers(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAControlPlane(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("pod-create-ephemeral-containers", s, t)
@@ -264,7 +264,7 @@ func setUpEphemeralContainers(podsClient typedv1.PodInterface, pod *v1.Pod, cont
 func TestPodPatchEphemeralContainers(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAControlPlane(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("pod-patch-ephemeral-containers", s, t)
@@ -470,7 +470,7 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 func TestPodUpdateEphemeralContainers(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAControlPlane(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("pod-update-ephemeral-containers", s, t)

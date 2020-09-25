@@ -144,7 +144,7 @@ var defaultTimerConfig = attachdetach.TimerConfig{
 // event is somehow missed by AttachDetach controller - it still
 // gets cleaned up by Desired State of World populator.
 func TestPodDeletionWithDswp(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	_, server, closeFn := framework.RunAControlPlane(framework.NewIntegrationTestControlPlaneConfig())
 	defer closeFn()
 	namespaceName := "test-pod-deletion"
 	node := &v1.Node{
@@ -219,7 +219,7 @@ func initCSIObjects(stopCh chan struct{}, informers clientgoinformers.SharedInfo
 }
 
 func TestPodUpdateWithWithADC(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	_, server, closeFn := framework.RunAControlPlane(framework.NewIntegrationTestControlPlaneConfig())
 	defer closeFn()
 	namespaceName := "test-pod-update"
 
@@ -288,7 +288,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 }
 
 func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	_, server, closeFn := framework.RunAControlPlane(framework.NewIntegrationTestControlPlaneConfig())
 	defer closeFn()
 	namespaceName := "test-pod-update"
 
@@ -472,7 +472,7 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 // event is somehow missed by AttachDetach controller - it still
 // gets added by Desired State of World populator.
 func TestPodAddedByDswp(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	_, server, closeFn := framework.RunAControlPlane(framework.NewIntegrationTestControlPlaneConfig())
 	defer closeFn()
 	namespaceName := "test-pod-deletion"
 
@@ -547,7 +547,7 @@ func TestPodAddedByDswp(t *testing.T) {
 }
 
 func TestPVCBoundWithADC(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	_, server, closeFn := framework.RunAControlPlane(framework.NewIntegrationTestControlPlaneConfig())
 	defer closeFn()
 	namespaceName := "test-pod-deletion"
 

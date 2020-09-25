@@ -55,13 +55,13 @@ type ShutdownFunc func()
 
 // StartApiserver starts a local API server for testing and returns the handle to the URL and the shutdown function to stop it.
 func StartApiserver() (string, ShutdownFunc) {
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	h := &framework.ControlPlaneHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
-	_, _, closeFn := framework.RunAMasterUsingServer(framework.NewIntegrationTestMasterConfig(), s, h)
+	_, _, closeFn := framework.RunAControlPlaneUsingServer(framework.NewIntegrationTestControlPlaneConfig(), s, h)
 
 	shutdownFunc := func() {
 		klog.Infof("destroying API server")
@@ -310,29 +310,29 @@ func UpdateNodeStatus(cs clientset.Interface, node *v1.Node) error {
 	return err
 }
 
-// InitTestMaster initializes a test environment and creates a master with default
+// InitTestControlPlane initializes a test environment and creates a control plane with default
 // configuration.
-func InitTestMaster(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
+func InitTestControlPlane(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	testCtx := TestContext{
 		Ctx:      ctx,
 		CancelFn: cancelFunc,
 	}
 
-	// 1. Create master
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	// 1. Create control plane
+	h := &framework.ControlPlaneHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 
 	if admission != nil {
-		masterConfig.GenericConfig.AdmissionControl = admission
+		controlPlaneConfig.GenericConfig.AdmissionControl = admission
 	}
 
-	_, testCtx.HTTPServer, testCtx.CloseFn = framework.RunAMasterUsingServer(masterConfig, s, h)
+	_, testCtx.HTTPServer, testCtx.CloseFn = framework.RunAControlPlaneUsingServer(controlPlaneConfig, s, h)
 
 	if nsPrefix != "default" {
 		testCtx.NS = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), s, t)

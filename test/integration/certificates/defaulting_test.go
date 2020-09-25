@@ -59,7 +59,7 @@ func TestCSRSignerNameDefaulting(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, s, closeFn := framework.RunAMaster(nil)
+			_, s, closeFn := framework.RunAControlPlane(nil)
 			defer closeFn()
 			client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			csrClient := client.CertificatesV1beta1().CertificateSigningRequests()

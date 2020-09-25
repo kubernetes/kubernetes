@@ -41,11 +41,11 @@ func scrapeMetrics(s *httptest.Server) (testutil.Metrics, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to contact metrics endpoint of master: %v", err)
+		return nil, fmt.Errorf("Unable to contact metrics endpoint of control plane: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Non-200 response trying to scrape metrics from master: %v", resp)
+		return nil, fmt.Errorf("Non-200 response trying to scrape metrics from control plane: %v", resp)
 	}
 	metrics := testutil.NewMetrics()
 	data, err := ioutil.ReadAll(resp.Body)
@@ -59,17 +59,17 @@ func scrapeMetrics(s *httptest.Server) (testutil.Metrics, error) {
 func checkForExpectedMetrics(t *testing.T, metrics testutil.Metrics, expectedMetrics []string) {
 	for _, expected := range expectedMetrics {
 		if _, found := metrics[expected]; !found {
-			t.Errorf("Master metrics did not include expected metric %q", expected)
+			t.Errorf("Control plane metrics did not include expected metric %q", expected)
 		}
 	}
 }
 
-func TestMasterProcessMetrics(t *testing.T) {
+func TestControlPlaneProcessMetrics(t *testing.T) {
 	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
 		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
 	}
 
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAControlPlane(nil)
 	defer closeFn()
 
 	metrics, err := scrapeMetrics(s)
@@ -85,7 +85,7 @@ func TestMasterProcessMetrics(t *testing.T) {
 }
 
 func TestApiserverMetrics(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAControlPlane(nil)
 	defer closeFn()
 
 	// Make a request to the apiserver to ensure there's at least one data point

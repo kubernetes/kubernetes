@@ -53,8 +53,8 @@ import (
 	_ "k8s.io/kubernetes/pkg/controlplane"
 )
 
-// StartRealMasterOrDie starts an API master that is appropriate for use in tests that require one of every resource
-func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOptions)) *Master {
+// StartRealControlPlaneOrDie starts a control plane that is appropriate for use in tests that require one of every resource
+func StartRealControlPlaneOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOptions)) *ControlPlane {
 	certDir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -101,7 +101,7 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 	}
 
 	// then build and use an etcd lock
-	// this prevents more than one of these masters from running at the same time
+	// this prevents more than one of these control planes from running at the same time
 	lock := concurrency.NewLocker(session, "kube_integration_etcd_raw")
 	lock.Lock()
 
@@ -129,7 +129,7 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 		// Catch panics that occur in this go routine so we get a comprehensible failure
 		defer func() {
 			if err := recover(); err != nil {
-				t.Errorf("Unexpected panic trying to start API master: %#v", err)
+				t.Errorf("Unexpected panic trying to start control plane: %#v", err)
 			}
 		}()
 
@@ -190,7 +190,7 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 		}
 	}
 
-	return &Master{
+	return &ControlPlane{
 		Client:    kubeClient,
 		Dynamic:   dynamic.NewForConfigOrDie(kubeClientConfig),
 		Config:    kubeClientConfig,
@@ -201,9 +201,9 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 	}
 }
 
-// Master represents a running API server that is ready for use
+// ControlPlane represents a running API server that is ready for use
 // The Cleanup func must be deferred to prevent resource leaks
-type Master struct {
+type ControlPlane struct {
 	Client    clientset.Interface
 	Dynamic   dynamic.Interface
 	Config    *restclient.Config

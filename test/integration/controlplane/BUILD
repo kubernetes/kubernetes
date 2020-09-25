@@ -17,7 +17,7 @@ go_test(
         "kube_apiserver_test.go",
         "main_test.go",
         "secrets_transformation_test.go",
-        "synthetic_master_test.go",
+        "synthetic_controlplane_test.go",
     ],
     embed = [":go_default_library"],
     rundir = ".",
@@ -143,7 +143,7 @@ filegroup(
 go_library(
     name = "go_default_library",
     srcs = ["transformation_testcase.go"],
-    importpath = "k8s.io/kubernetes/test/integration/master",
+    importpath = "k8s.io/kubernetes/test/integration/controlplane",
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
