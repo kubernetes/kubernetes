@@ -497,6 +497,8 @@ ExecStartPre=/bin/mkdir -p ${gcfsd_mnt_dir}
 ExecStart=${KUBE_HOME}/bin/gcfsd --mount_point=${gcfsd_mnt_dir}
 ExecStop=/bin/umount ${gcfsd_mnt_dir}
 RuntimeDirectory=gcfsd
+Restart=always
+RestartSec=10
 [Install]
 WantedBy=multi-user.target
 EOF
