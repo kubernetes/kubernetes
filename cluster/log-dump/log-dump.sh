@@ -55,7 +55,7 @@ readonly extra_log_files="${LOG_DUMP_EXTRA_FILES:-}"
 readonly extra_systemd_services="${LOG_DUMP_SAVE_SERVICES:-}"
 readonly dump_systemd_journal="${LOG_DUMP_SYSTEMD_JOURNAL:-false}"
 # Log files found in WINDOWS_LOGS_DIR on Windows nodes:
-readonly windows_node_logfiles="kubelet.log kube-proxy.log docker.log docker_images.log"
+readonly windows_node_logfiles="kubelet.log kube-proxy.log docker.log docker_images.log csi-proxy.log"
 # Log files found in other directories on Windows nodes:
 readonly windows_node_otherfiles="C:\\Windows\\MEMORY.dmp"
 
