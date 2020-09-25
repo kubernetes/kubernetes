@@ -67,6 +67,8 @@ spec:
           requests:
             cpu: 10m
             memory: 10Mi
+      nodeSelector:
+        {{.NodeSelector}}
       volumes:
       - name: service
         secret:
