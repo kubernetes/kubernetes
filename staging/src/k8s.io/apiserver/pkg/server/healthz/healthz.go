@@ -262,6 +262,12 @@ func handleRootHealth(name string, firstTimeHealthy func(), checks ...HealthChec
 
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
+
+		// signal first time this is healthy
+		if firstTimeHealthy != nil {
+			notifyOnce.Do(firstTimeHealthy)
+		}
+
 		if _, found := r.URL.Query()["verbose"]; !found {
 			fmt.Fprint(w, "ok")
 			return
@@ -269,13 +275,6 @@ func handleRootHealth(name string, firstTimeHealthy func(), checks ...HealthChec
 
 		individualCheckOutput.WriteTo(w)
 		fmt.Fprintf(w, "%s check passed\n", name)
-
-		// signal first time this is healthy
-		if firstTimeHealthy != nil {
-			notifyOnce.Do(func() {
-				firstTimeHealthy()
-			})
-		}
 	}
 }
 
