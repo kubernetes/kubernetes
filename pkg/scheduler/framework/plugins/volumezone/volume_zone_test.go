@@ -18,6 +18,7 @@ package volumezone
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -413,21 +414,21 @@ func TestWithBinding(t *testing.T) {
 			name: "unbound volume empty storage class",
 			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_EmptySC"),
 			Node: testNode,
-			wantStatus: framework.NewStatus(framework.Error,
-				"PersistentVolumeClaim had no pv name and storageClass name"),
+			wantStatus: framework.AsStatus(fmt.Errorf(
+				"PersistentVolumeClaim had no pv name and storageClass name")),
 		},
 		{
 			name: "unbound volume no storage class",
 			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_NoSC"),
 			Node: testNode,
-			wantStatus: framework.NewStatus(framework.Error,
-				"StorageClass \"Class_0\" claimed by PersistentVolumeClaim \"PVC_NoSC\" not found"),
+			wantStatus: framework.AsStatus(fmt.Errorf(
+				"StorageClass \"Class_0\" claimed by PersistentVolumeClaim \"PVC_NoSC\" not found")),
 		},
 		{
 			name:       "unbound volume immediate binding mode",
 			Pod:        createPodWithVolume("pod_1", "vol_1", "PVC_ImmediateSC"),
 			Node:       testNode,
-			wantStatus: framework.NewStatus(framework.Error, "VolumeBindingMode not set for StorageClass \"Class_Immediate\""),
+			wantStatus: framework.AsStatus(fmt.Errorf("VolumeBindingMode not set for StorageClass \"Class_Immediate\"")),
 		},
 		{
 			name: "unbound volume wait binding mode",
