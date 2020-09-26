@@ -77,7 +77,6 @@ filegroup(
         "//pkg/ssh:all-srcs",
         "//pkg/util:all-srcs",
         "//pkg/volume:all-srcs",
-        "//pkg/watch/json:all-srcs",
         "//pkg/windows/service:all-srcs",
     ],
     tags = ["automanaged"],
