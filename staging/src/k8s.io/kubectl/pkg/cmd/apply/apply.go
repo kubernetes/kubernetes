@@ -180,7 +180,6 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	}
 
 	// bind flag structs
-	o.DeleteFlags.AddFlags(cmd)
 	o.RecordFlags.AddFlags(cmd)
 	o.PrintFlags.AddFlags(cmd)
 
