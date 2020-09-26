@@ -90,6 +90,11 @@ function setup() {
 }
 
 function log-dump-ssh() {
+  if [[ "${KUBERNETES_CONFORMANCE_PROVIDER:-}" == 'gke' ]]; then
+    ssh-to-gke-node "$@"
+    return
+  fi
+
   if [[ "${gcloud_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
     ssh-to-node "$@"
     return
@@ -336,6 +341,9 @@ function dump_masters() {
     return
   elif [[ -n "${KUBEMARK_MASTER_NAME:-}" ]]; then
     master_names=( "${KUBEMARK_MASTER_NAME}" )
+  elif [[ "${KUBERNETES_CONFORMANCE_PROVIDER:-}" == 'gke' ]]; then
+    echo "Skip collection of master logs for 'gke' cluster deployment"
+    return
   else
     if ! (detect-master); then
       echo "Master not detected. Is the cluster up?"
@@ -386,6 +394,12 @@ function dump_nodes() {
   elif [[ ! "${node_ssh_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
     echo "Node SSH not supported for ${KUBERNETES_PROVIDER}"
     return
+  elif [[ "${KUBERNETES_CONFORMANCE_PROVIDER:-}" == 'gke' ]] && [[ -n "${NODE_INSTANCE_GROUP[@]:-}" ]]; then
+    for group in "${NODE_INSTANCE_GROUP[@]}"; do
+      node_names+=($(gcloud compute instance-groups managed list-instances \
+        "${group}" --zone "${ZONE}" --project "${PROJECT}" \
+       --format='value(instance)'))
+    done
   else
     echo "Detecting nodes in the cluster"
     detect-node-names &> /dev/null
@@ -612,6 +626,8 @@ function detect_node_failures() {
   detect-node-names
   if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
     local all_instance_groups=(${INSTANCE_GROUPS[@]} ${WINDOWS_INSTANCE_GROUPS[@]})
+  elif [[ "${KUBERNETES_CONFORMANCE_PROVIDER:-}" == 'gke' ]]; then
+    local all_instance_groups=(${NODE_INSTANCE_GROUP[@]})
   else
     local all_instance_groups=(${INSTANCE_GROUPS[@]})
   fi
@@ -635,6 +651,23 @@ function detect_node_failures() {
            jsonPayload.resource.name:\"${group}\"
            timestamp >= \"${creation_timestamp}\""
   done
+}
+
+# SSH to a node by name ($1) and run a command ($2).
+# If/When KUBERNETES_PROVIDER=gke is enabled, this
+# function needs to be moved to cluster/gke/util.sh
+function ssh-to-gke-node() {
+  local node="$1"
+  local cmd="$2"
+  # Loop until we can successfully ssh into the box
+  for try in {1..5}; do
+    if gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --ssh-flag="-o ConnectTimeout=30" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "echo test > /dev/null"; then
+      break
+    fi
+    sleep 5
+  done
+  # Then actually try the command.
+  gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --ssh-flag="-o ConnectTimeout=30" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "${cmd}"
 }
 
 function main() {
