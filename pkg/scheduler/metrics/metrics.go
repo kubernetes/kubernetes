@@ -187,6 +187,15 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"type"})
 
+	PodPriority = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "pod_priority",
+			Help:           "Pod priority number",
+			Buckets:        metrics.ExponentialBuckets(1, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		})
+
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
 		e2eSchedulingLatency,
@@ -204,6 +213,7 @@ var (
 		SchedulerGoroutines,
 		PermitWaitDuration,
 		CacheSize,
+		PodPriority,
 	}
 )
 
