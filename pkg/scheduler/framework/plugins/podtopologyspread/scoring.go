@@ -113,7 +113,7 @@ func (pl *PodTopologySpread) PreScore(
 ) *framework.Status {
 	allNodes, err := pl.sharedLister.NodeInfos().List()
 	if err != nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("error when getting all nodes: %v", err))
+		return framework.AsStatus(fmt.Errorf("getting all nodes: %w", err))
 	}
 
 	if len(filteredNodes) == 0 || len(allNodes) == 0 {
@@ -127,7 +127,7 @@ func (pl *PodTopologySpread) PreScore(
 	}
 	err = pl.initPreScoreState(state, pod, filteredNodes)
 	if err != nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("error when calculating preScoreState: %v", err))
+		return framework.AsStatus(fmt.Errorf("calculating preScoreState: %w", err))
 	}
 
 	// return if incoming pod doesn't have soft topology spread Constraints.
@@ -173,14 +173,14 @@ func (pl *PodTopologySpread) PreScore(
 // it is normalized later.
 func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, err := pl.sharedLister.NodeInfos().Get(nodeName)
-	if err != nil || nodeInfo.Node() == nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v, node is nil: %v", nodeName, err, nodeInfo.Node() == nil))
+	if err != nil {
+		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
 	node := nodeInfo.Node()
 	s, err := getPreScoreState(cycleState)
 	if err != nil {
-		return 0, framework.NewStatus(framework.Error, err.Error())
+		return 0, framework.AsStatus(err)
 	}
 
 	// Return if the node is not qualified.
@@ -210,7 +210,7 @@ func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.Cy
 func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
 	s, err := getPreScoreState(cycleState)
 	if err != nil {
-		return framework.NewStatus(framework.Error, err.Error())
+		return framework.AsStatus(err)
 	}
 	if s == nil {
 		return nil
@@ -235,7 +235,7 @@ func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState *fra
 	for i := range scores {
 		nodeInfo, err := pl.sharedLister.NodeInfos().Get(scores[i].Name)
 		if err != nil {
-			return framework.NewStatus(framework.Error, err.Error())
+			return framework.AsStatus(err)
 		}
 		node := nodeInfo.Node()
 
