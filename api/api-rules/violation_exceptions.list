@@ -139,6 +139,7 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,PodSecurityContext,Supp
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSecurityContext,Sysctls
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,Containers
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,EphemeralContainers
+API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,ExposedNodeLabelsSelectors
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,HostAliases
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,ImagePullSecrets
 API rule violation: list_type_missing,k8s.io/api/core/v1,PodSpec,InitContainers
@@ -407,6 +408,7 @@ API rule violation: names_match,k8s.io/api/core/v1,NodeSpec,DoNotUseExternalID
 API rule violation: names_match,k8s.io/api/core/v1,PersistentVolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,PersistentVolumeSource,StorageOS
 API rule violation: names_match,k8s.io/api/core/v1,PodSpec,DeprecatedServiceAccount
+API rule violation: names_match,k8s.io/api/core/v1,PodSpec,ExposedNodeLabelsSelectors
 API rule violation: names_match,k8s.io/api/core/v1,RBDPersistentVolumeSource,CephMonitors
 API rule violation: names_match,k8s.io/api/core/v1,RBDPersistentVolumeSource,RBDImage
 API rule violation: names_match,k8s.io/api/core/v1,RBDPersistentVolumeSource,RBDPool
