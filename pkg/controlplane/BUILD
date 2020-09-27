@@ -38,6 +38,7 @@ go_library(
         "//pkg/apis/storage/install:go_default_library",
         "//pkg/controlplane/controller/clusterauthenticationtrust:go_default_library",
         "//pkg/controlplane/reconcilers:go_default_library",
+        "//pkg/controlplane/routes:go_default_library",
         "//pkg/controlplane/tunneler:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",

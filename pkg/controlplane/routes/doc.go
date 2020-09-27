@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package routes holds a collection of optional master http handlers.
+// Package routes holds a collection of optional controlplane http handlers.
 package routes
