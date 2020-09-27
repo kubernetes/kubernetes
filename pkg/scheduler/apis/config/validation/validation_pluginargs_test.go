@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"errors"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -24,10 +25,18 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
+type ValidateError struct {
+	errMsg string
+}
+
+func (e ValidateError) Error() string {
+	return e.errMsg
+}
+
 func TestValidateInterPodAffinityArgs(t *testing.T) {
 	cases := map[string]struct {
 		args    config.InterPodAffinityArgs
-		wantErr string
+		wantErr ValidateError
 	}{
 		"valid args": {
 			args: config.InterPodAffinityArgs{
@@ -38,13 +47,13 @@ func TestValidateInterPodAffinityArgs(t *testing.T) {
 			args: config.InterPodAffinityArgs{
 				HardPodAffinityWeight: -1,
 			},
-			wantErr: `hardPodAffinityWeight: Invalid value: -1: not in valid range [0-100]`,
+			wantErr: ValidateError{errMsg: `hardPodAffinityWeight: Invalid value: -1: not in valid range [0-100]`},
 		},
 		"hardPodAffinityWeight more than max": {
 			args: config.InterPodAffinityArgs{
 				HardPodAffinityWeight: 101,
 			},
-			wantErr: `hardPodAffinityWeight: Invalid value: 101: not in valid range [0-100]`,
+			wantErr: ValidateError{errMsg: `hardPodAffinityWeight: Invalid value: 101: not in valid range [0-100]`},
 		},
 	}
 
@@ -59,7 +68,7 @@ func TestValidateInterPodAffinityArgs(t *testing.T) {
 func TestValidateNodeLabelArgs(t *testing.T) {
 	cases := map[string]struct {
 		args    config.NodeLabelArgs
-		wantErr string
+		wantErr ValidateError
 	}{
 		"valid config": {
 			args: config.NodeLabelArgs{
@@ -74,14 +83,14 @@ func TestValidateNodeLabelArgs(t *testing.T) {
 				PresentLabels: []string{"label"},
 				AbsentLabels:  []string{"label"},
 			},
-			wantErr: `detecting at least one label (e.g., "label") that exist in both the present([label]) and absent([label]) label list`,
+			wantErr: ValidateError{errMsg: `detecting at least one label (e.g., "label") that exist in both the present([label]) and absent([label]) label list`},
 		},
 		"labels preference conflict": {
 			args: config.NodeLabelArgs{
 				PresentLabelsPreference: []string{"label"},
 				AbsentLabelsPreference:  []string{"label"},
 			},
-			wantErr: `detecting at least one label (e.g., "label") that exist in both the present([label]) and absent([label]) label list`,
+			wantErr: ValidateError{errMsg: `detecting at least one label (e.g., "label") that exist in both the present([label]) and absent([label]) label list`},
 		},
 	}
 
@@ -96,7 +105,7 @@ func TestValidateNodeLabelArgs(t *testing.T) {
 func TestValidatePodTopologySpreadArgs(t *testing.T) {
 	cases := map[string]struct {
 		args    *config.PodTopologySpreadArgs
-		wantErr string
+		wantErr ValidateError
 	}{
 		"valid config": {
 			args: &config.PodTopologySpreadArgs{
@@ -124,7 +133,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `defaultConstraints[0].maxSkew: Invalid value: -1: must be greater than zero`,
+			wantErr: ValidateError{errMsg: `defaultConstraints[0].maxSkew: Invalid value: -1: must be greater than zero`},
 		},
 		"empty topology key": {
 			args: &config.PodTopologySpreadArgs{
@@ -136,7 +145,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `defaultConstraints[0].topologyKey: Required value: can not be empty`,
+			wantErr: ValidateError{errMsg: `defaultConstraints[0].topologyKey: Required value: can not be empty`},
 		},
 		"whenUnsatisfiable is empty": {
 			args: &config.PodTopologySpreadArgs{
@@ -148,7 +157,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `defaultConstraints[0].whenUnsatisfiable: Required value: can not be empty`,
+			wantErr: ValidateError{errMsg: `defaultConstraints[0].whenUnsatisfiable: Required value: can not be empty`},
 		},
 		"whenUnsatisfiable contains unsupported action": {
 			args: &config.PodTopologySpreadArgs{
@@ -160,7 +169,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `defaultConstraints[0].whenUnsatisfiable: Unsupported value: "unknown action": supported values: "DoNotSchedule", "ScheduleAnyway"`,
+			wantErr: ValidateError{errMsg: `defaultConstraints[0].whenUnsatisfiable: Unsupported value: "unknown action": supported values: "DoNotSchedule", "ScheduleAnyway"`},
 		},
 		"duplicated constraints": {
 			args: &config.PodTopologySpreadArgs{
@@ -177,7 +186,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `defaultConstraints[1]: Duplicate value: "{node, DoNotSchedule}"`,
+			wantErr: ValidateError{errMsg: `defaultConstraints[1]: Duplicate value: "{node, DoNotSchedule}"`},
 		},
 		"label selector present": {
 			args: &config.PodTopologySpreadArgs{
@@ -194,7 +203,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `defaultConstraints[0].labelSelector: Forbidden: constraint must not define a selector, as they deduced for each pod`,
+			wantErr: ValidateError{errMsg: `defaultConstraints[0].labelSelector: Forbidden: constraint must not define a selector, as they deduced for each pod`},
 		},
 	}
 
@@ -209,7 +218,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 	cases := map[string]struct {
 		args    config.RequestedToCapacityRatioArgs
-		wantErr string
+		wantErr ValidateError
 	}{
 		"valid config": {
 			args: config.RequestedToCapacityRatioArgs{
@@ -245,7 +254,7 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `at least one point must be specified`,
+			wantErr: ValidateError{errMsg: `at least one point must be specified`},
 		},
 		"utilization less than min": {
 			args: config.RequestedToCapacityRatioArgs{
@@ -260,7 +269,7 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `utilization values must not be less than 0. Utilization[0]==-10`,
+			wantErr: ValidateError{errMsg: `utilization values must not be less than 0. Utilization[0]==-10`},
 		},
 		"utilization greater than max": {
 			args: config.RequestedToCapacityRatioArgs{
@@ -275,7 +284,7 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `utilization values must not be greater than 100. Utilization[1]==110`,
+			wantErr: ValidateError{errMsg: `utilization values must not be greater than 100. Utilization[1]==110`},
 		},
 		"Utilization values in non-increasing order": {
 			args: config.RequestedToCapacityRatioArgs{
@@ -294,7 +303,7 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `utilization values must be sorted. Utilization[0]==30 >= Utilization[1]==20`,
+			wantErr: ValidateError{errMsg: `utilization values must be sorted. Utilization[0]==30 >= Utilization[1]==20`},
 		},
 		"duplicated utilization values": {
 			args: config.RequestedToCapacityRatioArgs{
@@ -313,7 +322,7 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `utilization values must be sorted. Utilization[1]==20 >= Utilization[2]==20`,
+			wantErr: ValidateError{errMsg: `utilization values must be sorted. Utilization[1]==20 >= Utilization[2]==20`},
 		},
 		"score less than min": {
 			args: config.RequestedToCapacityRatioArgs{
@@ -328,7 +337,7 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `score values must not be less than 0. Score[0]==-1`,
+			wantErr: ValidateError{errMsg: `score values must not be less than 0. Score[0]==-1`},
 		},
 		"score greater than max": {
 			args: config.RequestedToCapacityRatioArgs{
@@ -343,7 +352,7 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `score values must not be greater than 10. Score[1]==11`,
+			wantErr: ValidateError{errMsg: `score values must not be greater than 10. Score[1]==11`},
 		},
 		"resources weight less than 1": {
 			args: config.RequestedToCapacityRatioArgs{
@@ -360,7 +369,7 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `resource custom weight 0 must not be less than 1`,
+			wantErr: ValidateError{errMsg: `resource custom weight 0 must not be less than 1`},
 		},
 	}
 
@@ -375,7 +384,7 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 func TestValidateNodeResourcesLeastAllocatedArgs(t *testing.T) {
 	cases := map[string]struct {
 		args    *config.NodeResourcesLeastAllocatedArgs
-		wantErr string
+		wantErr ValidateError
 	}{
 		"valid config": {
 			args: &config.NodeResourcesLeastAllocatedArgs{
@@ -400,7 +409,7 @@ func TestValidateNodeResourcesLeastAllocatedArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `resource Weight of cpu should be a positive value, got 0`,
+			wantErr: ValidateError{errMsg: `resource Weight of cpu should be a positive value, got 0`},
 		},
 		"weight more than max": {
 			args: &config.NodeResourcesLeastAllocatedArgs{
@@ -411,7 +420,7 @@ func TestValidateNodeResourcesLeastAllocatedArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `resource Weight of memory should be less than 100, got 101`,
+			wantErr: ValidateError{errMsg: `resource Weight of memory should be less than 100, got 101`},
 		},
 	}
 
@@ -426,7 +435,7 @@ func TestValidateNodeResourcesLeastAllocatedArgs(t *testing.T) {
 func TestValidateNodeResourcesMostAllocatedArgs(t *testing.T) {
 	cases := map[string]struct {
 		args    *config.NodeResourcesMostAllocatedArgs
-		wantErr string
+		wantErr ValidateError
 	}{
 		"valid config": {
 			args: &config.NodeResourcesMostAllocatedArgs{
@@ -451,7 +460,7 @@ func TestValidateNodeResourcesMostAllocatedArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `resource Weight of cpu should be a positive value, got -1`,
+			wantErr: ValidateError{errMsg: `resource Weight of cpu should be a positive value, got -1`},
 		},
 		"weight more than max": {
 			args: &config.NodeResourcesMostAllocatedArgs{
@@ -462,28 +471,32 @@ func TestValidateNodeResourcesMostAllocatedArgs(t *testing.T) {
 					},
 				},
 			},
-			wantErr: `resource Weight of memory should be less than 100, got 110`,
+			wantErr: ValidateError{errMsg: `resource Weight of memory should be less than 100, got 110`},
 		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			err := ValidateNodeResourcesMostAllocatedArgs(tc.args)
-			assertErr(t, tc.wantErr, err)
+			if err != nil {
+				assertErr(t, tc.wantErr, ValidateError{errMsg: err.Error()})
+			}else{
+				assertErr(t, tc.wantErr, ValidateError{errMsg: ""})
+			}
 		})
 	}
 }
 
-func assertErr(t *testing.T, wantErr string, gotErr error) {
-	if wantErr == "" {
-		if gotErr != nil {
+func assertErr(t *testing.T, wantErr ValidateError, gotErr ValidateError) {
+	if wantErr.errMsg == "" {
+		if gotErr.errMsg != "" {
 			t.Fatalf("\nwant err to be:\n\tnil\ngot:\n\t%s", gotErr.Error())
 		}
 	} else {
-		if gotErr == nil {
+		if gotErr.errMsg == "" {
 			t.Fatalf("\nwant err to be:\n\t%s\ngot:\n\tnil", wantErr)
 		}
-		if gotErr.Error() != wantErr {
+		if errors.Is(gotErr, wantErr) {
 			t.Errorf("\nwant err to be:\n\t%s\ngot:\n\t%s", wantErr, gotErr.Error())
 		}
 	}
