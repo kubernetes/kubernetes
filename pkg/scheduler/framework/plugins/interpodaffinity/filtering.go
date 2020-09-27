@@ -244,10 +244,10 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework
 	var nodesWithRequiredAntiAffinityPods []*framework.NodeInfo
 	var err error
 	if allNodes, err = pl.sharedLister.NodeInfos().List(); err != nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("failed to list NodeInfos: %v", err))
+		return framework.AsStatus(fmt.Errorf("failed to list NodeInfos: %w", err))
 	}
 	if nodesWithRequiredAntiAffinityPods, err = pl.sharedLister.NodeInfos().HavePodsWithRequiredAntiAffinityList(); err != nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("failed to list NodeInfos with pods with affinity: %v", err))
+		return framework.AsStatus(fmt.Errorf("failed to list NodeInfos with pods with affinity: %w", err))
 	}
 
 	podInfo := framework.NewPodInfo(pod)
@@ -282,7 +282,7 @@ func (pl *InterPodAffinity) PreFilterExtensions() framework.PreFilterExtensions 
 func (pl *InterPodAffinity) AddPod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.NewStatus(framework.Error, err.Error())
+		return framework.AsStatus(err)
 	}
 	state.updateWithPod(podToAdd, nodeInfo.Node(), 1)
 	return nil
@@ -292,7 +292,7 @@ func (pl *InterPodAffinity) AddPod(ctx context.Context, cycleState *framework.Cy
 func (pl *InterPodAffinity) RemovePod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.NewStatus(framework.Error, err.Error())
+		return framework.AsStatus(err)
 	}
 	state.updateWithPod(podToRemove, nodeInfo.Node(), -1)
 	return nil
@@ -377,12 +377,12 @@ func satisfyPodAffinity(state *preFilterState, nodeInfo *framework.NodeInfo) boo
 // It checks if a pod can be scheduled on the specified node with pod affinity/anti-affinity configuration.
 func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	if nodeInfo.Node() == nil {
-		return framework.NewStatus(framework.Error, "node not found")
+		return framework.AsStatus(fmt.Errorf("node not found"))
 	}
 
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.NewStatus(framework.Error, err.Error())
+		return framework.AsStatus(err)
 	}
 
 	if !satisfyPodAffinity(state, nodeInfo) {

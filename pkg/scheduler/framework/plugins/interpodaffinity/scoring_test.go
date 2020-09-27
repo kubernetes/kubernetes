@@ -18,6 +18,7 @@ package interpodaffinity
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -561,7 +562,7 @@ func TestPreferredAffinity(t *testing.T) {
 		{
 			name:       "invalid Affinity fails PreScore",
 			pod:        &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: invalidAffinityLabels}},
-			wantStatus: framework.NewStatus(framework.Error, "invalid label value"),
+			wantStatus: framework.AsStatus(fmt.Errorf("invalid label value")),
 			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
@@ -570,7 +571,7 @@ func TestPreferredAffinity(t *testing.T) {
 		{
 			name:       "invalid AntiAffinity fails PreScore",
 			pod:        &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: invalidAntiAffinityLabels}},
-			wantStatus: framework.NewStatus(framework.Error, "invalid label value"),
+			wantStatus: framework.AsStatus(fmt.Errorf("invalid label value")),
 			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
