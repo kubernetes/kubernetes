@@ -18,7 +18,6 @@ package validation
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -349,7 +348,7 @@ func TestValidatePolicy(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual := ValidatePolicy(test.policy)
-			if fmt.Sprint(test.expected) != fmt.Sprint(actual) {
+			if !errors.Is(actual, test.expected) {
 				t.Errorf("expected: %s, actual: %s", test.expected, actual)
 			}
 		})
