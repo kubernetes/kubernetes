@@ -136,6 +136,7 @@ func setPodsStatuses(podIndexer cache.Indexer, job *batch.Job, pendingPods, acti
 func TestControllerSyncJob(t *testing.T) {
 	jobConditionComplete := batch.JobComplete
 	jobConditionFailed := batch.JobFailed
+	jobConditionPodFailure := batch.JobPodFailure
 
 	testCases := map[string]struct {
 		// job setup
@@ -266,6 +267,16 @@ func TestControllerSyncJob(t *testing.T) {
 			2, 5, 0, true, 0,
 			nil, true, 0, 0, 0, 1,
 			0, 0, 0, 0, 1, &jobConditionFailed, "BackoffLimitExceeded",
+		},
+		"pod create failure": {
+			2, 5, 0, false, 0,
+			fmt.Errorf("fake error"), true, 0, 1, 0, 0,
+			1, 0, 1, 0, 0, &jobConditionPodFailure, "FailedCreate",
+		},
+		"pod delete failure": {
+			2, 5, 0, false, 0,
+			fmt.Errorf("fake error"), true, 0, 3, 0, 0,
+			0, 1, 3, 0, 0, &jobConditionPodFailure, "FailedDelete",
 		},
 	}
 

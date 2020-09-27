@@ -539,6 +539,15 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 	} else {
 		if jobNeedsSync && job.DeletionTimestamp == nil {
 			active, manageJobErr = jm.manageJob(activePods, succeeded, &job)
+			if manageJobErr != nil {
+				parallelism := *job.Spec.Parallelism
+				if diff := int32(len(activePods)) - parallelism; diff > 0 {
+					failureReason = "FailedDelete"
+				} else if diff < 0 {
+					failureReason = "FailedCreate"
+				}
+				job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobPodFailure, failureReason, manageJobErr.Error()))
+			}
 		}
 		completions := succeeded
 		complete := false
