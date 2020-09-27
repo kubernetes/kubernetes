@@ -436,7 +436,9 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		testPodFailSubpath(f, l.pod, true)
 	})
 
-	ginkgo.It("should be able to unmount after the subpath directory is deleted", func() {
+	// Set this test linux-only because the test will fail in Windows when
+	// deleting a dir from one container while another container still use it.
+	ginkgo.It("should be able to unmount after the subpath directory is deleted [LinuxOnly]", func() {
 		init()
 		defer cleanup()
 
