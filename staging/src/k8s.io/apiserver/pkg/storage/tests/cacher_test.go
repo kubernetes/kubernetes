@@ -22,6 +22,7 @@ import (
 	"reflect"
 	goruntime "runtime"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -941,8 +942,12 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 	defer watcher.Stop()
 
 	done := make(chan struct{})
-	defer close(done)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	defer wg.Wait()   // We must wait for the waitgroup to exit before we terminate the cache or the server in prior defers
+	defer close(done) // call close first, so the goroutine knows to exit
 	go func() {
+		defer wg.Done()
 		for i := 0; i < 100; i++ {
 			select {
 			case <-done:
