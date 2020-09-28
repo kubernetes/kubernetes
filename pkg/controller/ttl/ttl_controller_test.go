@@ -75,7 +75,7 @@ func TestPatchNode(t *testing.T) {
 
 	for i, testCase := range testCases {
 		fakeClient := &fake.Clientset{}
-		ttlController := &TTLController{
+		ttlController := &Controller{
 			kubeClient: fakeClient,
 		}
 		err := ttlController.patchNodeWithAnnotation(testCase.node, v1.ObjectTTLAnnotationKey, testCase.ttlSeconds)
@@ -132,7 +132,7 @@ func TestUpdateNodeIfNeeded(t *testing.T) {
 		fakeClient := &fake.Clientset{}
 		nodeStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 		nodeStore.Add(testCase.node)
-		ttlController := &TTLController{
+		ttlController := &Controller{
 			kubeClient:        fakeClient,
 			nodeStore:         listers.NewNodeLister(nodeStore),
 			desiredTTLSeconds: testCase.desiredTTL,
@@ -213,7 +213,7 @@ func TestDesiredTTL(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		ttlController := &TTLController{
+		ttlController := &Controller{
 			queue:             workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 			nodeCount:         testCase.nodeCount,
 			desiredTTLSeconds: testCase.desiredTTL,
