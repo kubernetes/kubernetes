@@ -35,7 +35,9 @@ import (
 
 func NewSimpleDynamicClient(scheme *runtime.Scheme, objects ...runtime.Object) *FakeDynamicClient {
 	// In order to use List with this client, you have to have the v1.List registered in your scheme. Neat thing though
-	// it does NOT have to be the *same* list
+	// it does NOT have to be the *same* list. UnstructuredList returned from this fake client will NOT have apiVersion and kind set,
+	// but each Unstructured object in Items will preserve their respective apiVersion and kind. As a result, schema conversion for
+	// *List kinds will not work and conversion of each Unstructured object in Items will be required instead.
 	scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: "fake-dynamic-client-group", Version: "v1", Kind: "List"}, &unstructured.UnstructuredList{})
 
 	codecs := serializer.NewCodecFactory(scheme)
