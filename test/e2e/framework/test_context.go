@@ -114,7 +114,7 @@ type TestContextType struct {
 	// DumpSystemdJournal controls whether to dump the full systemd journal.
 	DumpSystemdJournal       bool
 	ImageServiceEndpoint     string
-	MasterOSDistro           string
+	ControlPlaneOSDistro     string
 	NodeOSDistro             string
 	NodeOSArch               string
 	VerifyServiceAccount     bool
@@ -227,9 +227,9 @@ type CloudConfig struct {
 	Zone              string // for multizone tests, arbitrarily chosen zone
 	Region            string
 	MultiZone         bool
-	MultiMaster       bool
+	MultiControlPlane bool
 	Cluster           string
-	MasterName        string
+	ControlPlaneName  string
 	NodeInstanceGroup string // comma-delimited list of groups' names
 	NumNodes          int
 	ClusterIPRange    string
@@ -237,7 +237,7 @@ type CloudConfig struct {
 	Network           string
 	ConfigFile        string // for azure and openstack
 	NodeTag           string
-	MasterTag         string
+	ControlPlaneTag   string
 
 	Provider ProviderInterface
 }
@@ -323,27 +323,27 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.Tooling, "tooling", "", "The tooling in use (kops, gke, etc.)")
 	flags.StringVar(&TestContext.OutputDir, "e2e-output-dir", "/tmp", "Output directory for interesting/useful test data, like performance data, benchmarks, and other metrics.")
 	flags.StringVar(&TestContext.Prefix, "prefix", "e2e", "A prefix to be added to cloud resources created during testing.")
-	flags.StringVar(&TestContext.MasterOSDistro, "master-os-distro", "debian", "The OS distribution of cluster master (debian, ubuntu, gci, coreos, or custom).")
+	flags.StringVar(&TestContext.ControlPlaneOSDistro, "master-os-distro", "debian", "The OS distribution of cluster master (debian, ubuntu, gci, coreos, or custom).")
 	flags.StringVar(&TestContext.NodeOSDistro, "node-os-distro", "debian", "The OS distribution of cluster VM instances (debian, ubuntu, gci, coreos, or custom).")
 	flags.StringVar(&TestContext.NodeOSArch, "node-os-arch", "amd64", "The OS architecture of cluster VM instances (amd64, arm64, or custom).")
 	flags.StringVar(&TestContext.ClusterDNSDomain, "dns-domain", "cluster.local", "The DNS Domain of the cluster.")
 
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
 	cloudConfig := &TestContext.CloudConfig
-	flags.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
+	flags.StringVar(&cloudConfig.ControlPlaneName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
 	flags.StringVar(&cloudConfig.APIEndpoint, "gce-api-endpoint", "", "The GCE APIEndpoint being used, if applicable")
 	flags.StringVar(&cloudConfig.ProjectID, "gce-project", "", "The GCE project being used, if applicable")
 	flags.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
 	flags.StringVar(&cloudConfig.Region, "gce-region", "", "GCE region being used, if applicable")
 	flags.BoolVar(&cloudConfig.MultiZone, "gce-multizone", false, "If true, start GCE cloud provider with multizone support.")
-	flags.BoolVar(&cloudConfig.MultiMaster, "gce-multimaster", false, "If true, the underlying GCE/GKE cluster is assumed to be multi-master.")
+	flags.BoolVar(&cloudConfig.MultiControlPlane, "gce-multimaster", false, "If true, the underlying GCE/GKE cluster is assumed to be multi-master.")
 	flags.StringVar(&cloudConfig.Cluster, "gke-cluster", "", "GKE name of cluster being used, if applicable")
 	flags.StringVar(&cloudConfig.NodeInstanceGroup, "node-instance-group", "", "Name of the managed instance group for nodes. Valid only for gce, gke or aws. If there is more than one group: comma separated list of groups.")
 	flags.StringVar(&cloudConfig.Network, "network", "e2e", "The cloud provider network for this e2e cluster.")
 	flags.IntVar(&cloudConfig.NumNodes, "num-nodes", DefaultNumNodes, fmt.Sprintf("Number of nodes in the cluster. If the default value of '%q' is used the number of schedulable nodes is auto-detected.", DefaultNumNodes))
 	flags.StringVar(&cloudConfig.ClusterIPRange, "cluster-ip-range", "10.64.0.0/14", "A CIDR notation IP range from which to assign IPs in the cluster.")
 	flags.StringVar(&cloudConfig.NodeTag, "node-tag", "", "Network tags used on node instances. Valid only for gce, gke")
-	flags.StringVar(&cloudConfig.MasterTag, "master-tag", "", "Network tags used on master instances. Valid only for gce, gke")
+	flags.StringVar(&cloudConfig.ControlPlaneTag, "master-tag", "", "Network tags used on master instances. Valid only for gce, gke")
 
 	flags.StringVar(&cloudConfig.ClusterTag, "cluster-tag", "", "Tag used to identify resources.  Only required if provider is aws.")
 	flags.StringVar(&cloudConfig.ConfigFile, "cloud-config-file", "", "Cloud config file.  Only required if provider is azure or vsphere.")

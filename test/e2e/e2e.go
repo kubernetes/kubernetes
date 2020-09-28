@@ -340,7 +340,7 @@ func lookupClusterImageSources() (string, string, error) {
 		args := []string{"compute"}
 		args = append(args, argv...)
 		args = append(args, "--project", framework.TestContext.CloudConfig.ProjectID)
-		if framework.TestContext.CloudConfig.MultiMaster {
+		if framework.TestContext.CloudConfig.MultiControlPlane {
 			args = append(args, "--region", framework.TestContext.CloudConfig.Region)
 		} else {
 			args = append(args, "--zone", framework.TestContext.CloudConfig.Zone)
@@ -398,9 +398,9 @@ func lookupClusterImageSources() (string, string, error) {
 	frags := strings.Split(nodeImg, "/")
 	nodeImg = frags[len(frags)-1]
 
-	// For GKE clusters, MasterName will not be defined; we just leave masterImg blank.
+	// For GKE clusters, ControlPlaneName will not be defined; we just leave masterImg blank.
 	masterImg := ""
-	if masterName := framework.TestContext.CloudConfig.MasterName; masterName != "" {
+	if masterName := framework.TestContext.CloudConfig.ControlPlaneName; masterName != "" {
 		img, err := host2image(masterName)
 		if err != nil {
 			return "", "", err

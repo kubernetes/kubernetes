@@ -171,7 +171,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		e2eskipper.SkipUnlessProviderIs("gce")
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		framework.ExpectNoError(waitForMasters(framework.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
+		framework.ExpectNoError(waitForMasters(framework.TestContext.CloudConfig.ControlPlaneName, c, 1, 10*time.Minute))
 		additionalReplicaZones = make([]string, 0)
 		existingRCs = make([]string, 0)
 	})
@@ -187,7 +187,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 		for _, zone := range additionalReplicaZones {
 			removeMasterReplica(zone)
 		}
-		framework.ExpectNoError(waitForMasters(framework.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
+		framework.ExpectNoError(waitForMasters(framework.TestContext.CloudConfig.ControlPlaneName, c, 1, 10*time.Minute))
 	})
 
 	type Action int
@@ -215,7 +215,7 @@ var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 			framework.ExpectNoError(removeWorkerNodes(zone))
 			additionalNodesZones = removeZoneFromZones(additionalNodesZones, zone)
 		}
-		framework.ExpectNoError(waitForMasters(framework.TestContext.CloudConfig.MasterName, c, len(additionalReplicaZones)+1, 10*time.Minute))
+		framework.ExpectNoError(waitForMasters(framework.TestContext.CloudConfig.ControlPlaneName, c, len(additionalReplicaZones)+1, 10*time.Minute))
 		framework.ExpectNoError(framework.AllNodesReady(c, 5*time.Minute))
 
 		// Verify that API server works correctly with HA master.

@@ -95,7 +95,7 @@ func masterUpgrade(f *framework.Framework, v string) error {
 	case "gce":
 		return masterUpgradeGCE(v, false)
 	case "gke":
-		return framework.MasterUpgradeGKE(f.Namespace.Name, v)
+		return framework.ControlPlaneUpgradeGKE(f.Namespace.Name, v)
 	default:
 		return fmt.Errorf("masterUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
 	}
@@ -138,7 +138,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
 			framework.ExpectNoError(err)
 
-			testSuite := &junit.TestSuite{Name: "Master upgrade"}
+			testSuite := &junit.TestSuite{Name: "ControlPlane upgrade"}
 			masterUpgradeTest := &junit.TestCase{
 				Name:      "[sig-cloud-provider-gcp] master-upgrade",
 				Classname: "upgrade_tests",
@@ -585,7 +585,7 @@ func traceRouteToMaster() {
 		framework.Logf("Could not find traceroute program")
 		return
 	}
-	cmd := exec.Command(traceroute, "-I", framework.GetMasterHost())
+	cmd := exec.Command(traceroute, "-I", framework.GetControlPlaneHost())
 	out, err := cmd.Output()
 	if len(out) != 0 {
 		framework.Logf(string(out))
@@ -618,7 +618,7 @@ func checkMasterVersion(c clientset.Interface, want string) error {
 	if !strings.HasPrefix(got, want) {
 		return fmt.Errorf("master had kube-apiserver version %s which does not start with %s", got, want)
 	}
-	framework.Logf("Master is at version %s", want)
+	framework.Logf("ControlPlane is at version %s", want)
 	return nil
 }
 

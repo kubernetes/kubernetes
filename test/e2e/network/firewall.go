@@ -167,7 +167,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		}
 
 		// Send requests from outside of the cluster because internal traffic is whitelisted
-		ginkgo.By("Accessing the external service ip from outside, all non-master nodes should be reached")
+		ginkgo.By("Accessing the external service ip from outside, all non-control plane nodes should be reached")
 		err = testHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.GetServiceLoadBalancerPropagationTimeout(cs), nodesSet)
 		framework.ExpectNoError(err)
 
@@ -203,23 +203,23 @@ var _ = SIGDescribe("Firewall rule", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Checking if e2e firewall rules are correct")
-		for _, expFw := range gce.GetE2eFirewalls(cloudConfig.MasterName, cloudConfig.MasterTag, cloudConfig.NodeTag, cloudConfig.Network, cloudConfig.ClusterIPRange) {
+		for _, expFw := range gce.GetE2eFirewalls(cloudConfig.ControlPlaneName, cloudConfig.ControlPlaneTag, cloudConfig.NodeTag, cloudConfig.Network, cloudConfig.ClusterIPRange) {
 			fw, err := gceCloud.GetFirewall(expFw.Name)
 			framework.ExpectNoError(err)
 			err = gce.VerifyFirewallRule(fw, expFw, cloudConfig.Network, false)
 			framework.ExpectNoError(err)
 		}
 
-		ginkgo.By("Checking well known ports on master and nodes are not exposed externally")
+		ginkgo.By("Checking well known ports on control plane and nodes are not exposed externally")
 		nodeAddr := e2enode.FirstAddress(nodes, v1.NodeExternalIP)
 		if nodeAddr == "" {
 			framework.Failf("did not find any node addresses")
 		}
 
-		masterAddresses := framework.GetAllMasterAddresses(cs)
-		for _, masterAddress := range masterAddresses {
-			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureKubeControllerManagerPort, firewallTestTCPTimeout)
-			assertNotReachableHTTPTimeout(masterAddress, kubeschedulerconfig.DefaultInsecureSchedulerPort, firewallTestTCPTimeout)
+		controlPlaneAddresses := framework.GetAllControlPlaneAddresses(cs)
+		for _, controlPlaneAddress := range controlPlaneAddresses {
+			assertNotReachableHTTPTimeout(controlPlaneAddress, ports.InsecureKubeControllerManagerPort, firewallTestTCPTimeout)
+			assertNotReachableHTTPTimeout(controlPlaneAddress, kubeschedulerconfig.DefaultInsecureSchedulerPort, firewallTestTCPTimeout)
 		}
 		assertNotReachableHTTPTimeout(nodeAddr, ports.KubeletPort, firewallTestTCPTimeout)
 		assertNotReachableHTTPTimeout(nodeAddr, ports.KubeletReadOnlyPort, firewallTestTCPTimeout)

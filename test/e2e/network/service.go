@@ -3755,7 +3755,7 @@ func restartApiserver(namespace string, cs clientset.Interface) error {
 	if err != nil {
 		return err
 	}
-	return framework.MasterUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
+	return framework.ControlPlaneUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
 }
 
 func sshRestartMaster() error {
@@ -3769,7 +3769,7 @@ func sshRestartMaster() error {
 		command = "sudo /etc/init.d/kube-apiserver restart"
 	}
 	framework.Logf("Restarting master via ssh, running: %v", command)
-	result, err := e2essh.SSH(command, net.JoinHostPort(framework.GetMasterHost(), e2essh.SSHPort), framework.TestContext.Provider)
+	result, err := e2essh.SSH(command, net.JoinHostPort(framework.GetControlPlaneHost(), e2essh.SSHPort), framework.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
 		return fmt.Errorf("couldn't restart apiserver: %v", err)

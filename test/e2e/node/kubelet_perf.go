@@ -109,13 +109,13 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	// TODO(random-liu): Remove the original log when we migrate to new perfdash
 	framework.Logf("%s", rm.FormatResourceUsage(usageSummary))
 	// Log perf result
-	printPerfData(e2eperf.ResourceUsageToPerfData(rm.GetMasterNodeLatest(usageSummary)))
+	printPerfData(e2eperf.ResourceUsageToPerfData(rm.GetControlPlaneNodeLatest(usageSummary)))
 	verifyMemoryLimits(f.ClientSet, expectedMemory, usageSummary)
 
 	cpuSummary := rm.GetCPUSummary()
 	framework.Logf("%s", rm.FormatCPUSummary(cpuSummary))
 	// Log perf result
-	printPerfData(e2eperf.CPUUsageToPerfData(rm.GetMasterNodeCPUSummary(cpuSummary)))
+	printPerfData(e2eperf.CPUUsageToPerfData(rm.GetControlPlaneNodeCPUSummary(cpuSummary)))
 	verifyCPULimits(expectedCPU, cpuSummary)
 
 	ginkgo.By("Deleting the RC")

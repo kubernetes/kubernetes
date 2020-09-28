@@ -207,7 +207,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				ginkgo.By(fmt.Sprintf("Block traffic from node %s to the master", node.Name))
 				host, err := e2enode.GetExternalIP(&node)
 				framework.ExpectNoError(err)
-				masterAddresses := framework.GetAllMasterAddresses(c)
+				masterAddresses := framework.GetAllControlPlaneAddresses(c)
 				defer func() {
 					ginkgo.By(fmt.Sprintf("Unblock traffic from node %s to the master", node.Name))
 					for _, masterAddress := range masterAddresses {
@@ -595,7 +595,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				ginkgo.By(fmt.Sprintf("Block traffic from node %s to the master", node.Name))
 				host, err := e2enode.GetExternalIP(&node)
 				framework.ExpectNoError(err)
-				masterAddresses := framework.GetAllMasterAddresses(c)
+				masterAddresses := framework.GetAllControlPlaneAddresses(c)
 				defer func() {
 					ginkgo.By(fmt.Sprintf("Unblock traffic from node %s to the master", node.Name))
 					for _, masterAddress := range masterAddresses {

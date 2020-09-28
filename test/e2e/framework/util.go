@@ -141,7 +141,7 @@ const (
 	largeClusterThreshold = 100
 
 	// TODO(justinsb): Avoid hardcoding this.
-	awsMasterIP = "172.20.0.9"
+	awsControlPlaneIP = "172.20.0.9"
 
 	// AllContainers specifies that all containers be visited
 	// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
@@ -166,11 +166,11 @@ var RunID = uuid.NewUUID()
 // CreateTestingNSFn is a func that is responsible for creating namespace used for executing e2e tests.
 type CreateTestingNSFn func(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error)
 
-// GetMasterHost returns a hostname of a master.
-func GetMasterHost() string {
-	masterURL, err := url.Parse(TestContext.Host)
+// GetControlPlaneHost returns a hostname of a control plane.
+func GetControlPlaneHost() string {
+	controlPlaneURL, err := url.Parse(TestContext.Host)
 	ExpectNoError(err)
-	return masterURL.Hostname()
+	return controlPlaneURL.Hostname()
 }
 
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.
@@ -183,10 +183,10 @@ func ProviderIs(providers ...string) bool {
 	return false
 }
 
-// MasterOSDistroIs returns true if the master OS distro is included in the supportedMasterOsDistros. Otherwise false.
-func MasterOSDistroIs(supportedMasterOsDistros ...string) bool {
-	for _, distro := range supportedMasterOsDistros {
-		if strings.EqualFold(distro, TestContext.MasterOSDistro) {
+// ControlPlaneOSDistroIs returns true if the control plane OS distro is included in the supportedControlPlaneOsDistros. Otherwise false.
+func ControlPlaneOSDistroIs(supportedControlPlaneOsDistros ...string) bool {
+	for _, distro := range supportedControlPlaneOsDistros {
+		if strings.EqualFold(distro, TestContext.ControlPlaneOSDistro) {
 			return true
 		}
 	}
@@ -1158,7 +1158,7 @@ func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
 	return TestContext.CloudConfig.Provider.EnsureLoadBalancerResourcesDeleted(ip, portRange)
 }
 
-// CoreDump SSHs to the master and all nodes and dumps their logs into dir.
+// CoreDump SSHs to the control plane and all nodes and dumps their logs into dir.
 // It shells out to cluster/log-dump/log-dump.sh to accomplish this.
 func CoreDump(dir string) {
 	if TestContext.DisableLogDump {
@@ -1218,9 +1218,9 @@ func RunCmdEnv(env []string, command string, args ...string) (string, string, er
 	return stdout, stderr, nil
 }
 
-// getMasterAddresses returns the externalIP, internalIP and hostname fields of the master.
+// getControlPlaneAddresses returns the externalIP, internalIP and hostname fields of the control plane.
 // If any of these is unavailable, it is set to "".
-func getMasterAddresses(c clientset.Interface) (string, string, string) {
+func getControlPlaneAddresses(c clientset.Interface) (string, string, string) {
 	var externalIP, internalIP, hostname string
 
 	// Populate the internal IP.
@@ -1247,12 +1247,12 @@ func getMasterAddresses(c clientset.Interface) (string, string, string) {
 	return externalIP, internalIP, hostname
 }
 
-// GetAllMasterAddresses returns all IP addresses on which the kubelet can reach the master.
+// GetAllControlPlaneAddresses returns all IP addresses on which the kubelet can reach the control plane.
 // It may return internal and external IPs, even if we expect for
 // e.g. internal IPs to be used (issue #56787), so that we can be
-// sure to block the master fully during tests.
-func GetAllMasterAddresses(c clientset.Interface) []string {
-	externalIP, internalIP, _ := getMasterAddresses(c)
+// sure to block the control plane fully during tests.
+func GetAllControlPlaneAddresses(c clientset.Interface) []string {
+	externalIP, internalIP, _ := getControlPlaneAddresses(c)
 
 	ips := sets.NewString()
 	switch TestContext.Provider {
@@ -1264,7 +1264,7 @@ func GetAllMasterAddresses(c clientset.Interface) []string {
 			ips.Insert(internalIP)
 		}
 	case "aws":
-		ips.Insert(awsMasterIP)
+		ips.Insert(awsControlPlaneIP)
 	default:
 		Failf("This test is not supported for provider %s and should be disabled", TestContext.Provider)
 	}

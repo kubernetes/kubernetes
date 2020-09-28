@@ -168,7 +168,7 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 		}
 
 		ginkgo.By("Restarting kubelet on master node")
-		masterAddress := framework.GetMasterHost() + ":22"
+		masterAddress := framework.GetControlPlaneHost() + ":22"
 		err := restartKubelet(masterAddress)
 		framework.ExpectNoError(err, "Unable to restart kubelet on master node")
 
