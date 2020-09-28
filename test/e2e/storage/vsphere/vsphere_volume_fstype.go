@@ -107,7 +107,7 @@ func invokeTestForFstype(f *framework.Framework, client clientset.Interface, nam
 
 	// Create Pod and verify the persistent volume is accessible
 	pod := createPodAndVerifyVolumeAccessible(client, namespace, pvclaim, persistentvolumes)
-	_, err := framework.LookForStringInPodExec(namespace, pod.Name, "", []string{"/bin/cat", "/mnt/volume1/fstype"}, expectedContent, time.Minute)
+	_, err := framework.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/cat", "/mnt/volume1/fstype"}, expectedContent, time.Minute)
 	framework.ExpectNoError(err)
 
 	// Detach and delete volume

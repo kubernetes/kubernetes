@@ -503,9 +503,15 @@ func RandomSuffix() string {
 }
 
 // LookForStringInPodExec looks for the given string in the output of a command
-// executed in specified pod container, or the first container if not specified.
+// executed in the first container of specified pod.
 // TODO(alejandrox1): move to pod/ subpkg once kubectl methods are refactored.
-func LookForStringInPodExec(ns, podName, containerName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
+func LookForStringInPodExec(ns, podName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
+	return LookForStringInPodExecToContainer(ns, podName, "", command, expectedString, timeout)
+}
+
+// LookForStringInPodExecToContainer looks for the given string in the output of a
+// command executed in specified pod container, or first container if not specified.
+func LookForStringInPodExecToContainer(ns, podName, containerName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
 	return lookForString(expectedString, timeout, func() string {
 		args := []string{"exec", podName, fmt.Sprintf("--namespace=%v", ns)}
 		if len(containerName) > 0 {

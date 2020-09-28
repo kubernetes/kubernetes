@@ -140,7 +140,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		podName := pods.Items[0].Name
 
 		queryDNS := fmt.Sprintf(queryDNSPythonTemplate, backendSvcName+"."+namespaces[0].Name)
-		_, err = framework.LookForStringInPodExec(namespaces[0].Name, podName, "", []string{"python", "-c", queryDNS}, "ok", dnsReadyTimeout)
+		_, err = framework.LookForStringInPodExec(namespaces[0].Name, podName, []string{"python", "-c", queryDNS}, "ok", dnsReadyTimeout)
 		framework.ExpectNoError(err, "waiting for output from pod exec")
 
 		updatedPodYaml := prepareResourceWithReplacedString(frontendPodYaml, fmt.Sprintf("dns-backend.development.svc.%s", framework.TestContext.ClusterDNSDomain), fmt.Sprintf("dns-backend.%s.svc.%s", namespaces[0].Name, framework.TestContext.ClusterDNSDomain))
