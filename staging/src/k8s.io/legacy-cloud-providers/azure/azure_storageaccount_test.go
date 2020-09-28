@@ -84,3 +84,219 @@ func TestGetStorageAccessKeys(t *testing.T) {
 		}
 	}
 }
+
+func TestGetStorageAccount(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	cloud := &Cloud{}
+
+	name := "testAccount"
+	location := "testLocation"
+	networkID := "networkID"
+	accountProperties := storage.AccountProperties{
+		NetworkRuleSet: &storage.NetworkRuleSet{
+			VirtualNetworkRules: &[]storage.VirtualNetworkRule{
+				{
+					VirtualNetworkResourceID: &networkID,
+					Action:                   storage.Allow,
+					State:                    "state",
+				},
+			},
+		}}
+
+	account := storage.Account{
+		Sku: &storage.Sku{
+			Name: "testSku",
+			Tier: "testSkuTier",
+		},
+		Kind:              "testKind",
+		Location:          &location,
+		Name:              &name,
+		AccountProperties: &accountProperties,
+	}
+
+	testResourceGroups := []storage.Account{account}
+
+	accountOptions := &AccountOptions{
+		ResourceGroup:             "rg",
+		VirtualNetworkResourceIDs: []string{networkID},
+	}
+
+	mockStorageAccountsClient := mockstorageaccountclient.NewMockInterface(ctrl)
+	cloud.StorageAccountClient = mockStorageAccountsClient
+
+	mockStorageAccountsClient.EXPECT().ListByResourceGroup(gomock.Any(), "rg").Return(testResourceGroups, nil).Times(1)
+
+	accountsWithLocations, err := cloud.getStorageAccounts(accountOptions)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if accountsWithLocations == nil {
+		t.Error("unexpected error as returned accounts are nil")
+	}
+
+	if len(accountsWithLocations) == 0 {
+		t.Error("unexpected error as returned accounts slice is empty")
+	}
+
+	expectedAccountWithLocation := accountWithLocation{
+		Name:        "testAccount",
+		StorageType: "testSku",
+		Location:    "testLocation",
+	}
+
+	accountWithLocation := accountsWithLocations[0]
+	if accountWithLocation.Name != expectedAccountWithLocation.Name {
+		t.Errorf("expected %s, but was %s", accountWithLocation.Name, expectedAccountWithLocation.Name)
+	}
+
+	if accountWithLocation.StorageType != expectedAccountWithLocation.StorageType {
+		t.Errorf("expected %s, but was %s", accountWithLocation.StorageType, expectedAccountWithLocation.StorageType)
+	}
+
+	if accountWithLocation.Location != expectedAccountWithLocation.Location {
+		t.Errorf("expected %s, but was %s", accountWithLocation.Location, expectedAccountWithLocation.Location)
+	}
+}
+
+func TestGetStorageAccountEdgeCases(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	cloud := &Cloud{}
+
+	// default account with name, location, sku, kind
+	name := "testAccount"
+	location := "testLocation"
+	sku := &storage.Sku{
+		Name: "testSku",
+		Tier: "testSkuTier",
+	}
+	account := storage.Account{
+		Sku:      sku,
+		Kind:     "testKind",
+		Location: &location,
+		Name:     &name,
+	}
+
+	accountPropertiesWithoutNetworkRuleSet := storage.AccountProperties{NetworkRuleSet: nil}
+	accountPropertiesWithoutVirtualNetworkRules := storage.AccountProperties{
+		NetworkRuleSet: &storage.NetworkRuleSet{
+			VirtualNetworkRules: nil,
+		}}
+
+	tests := []struct {
+		testCase           string
+		testAccountOptions *AccountOptions
+		testResourceGroups []storage.Account
+		expectedResult     []accountWithLocation
+		expectedError      error
+	}{
+		{
+			testCase: "account name is nil",
+			testAccountOptions: &AccountOptions{
+				ResourceGroup: "rg",
+			},
+			testResourceGroups: []storage.Account{},
+			expectedResult:     []accountWithLocation{},
+			expectedError:      nil,
+		},
+		{
+			testCase: "account location is nil",
+			testAccountOptions: &AccountOptions{
+				ResourceGroup: "rg",
+			},
+			testResourceGroups: []storage.Account{{Name: &name}},
+			expectedResult:     []accountWithLocation{},
+			expectedError:      nil,
+		},
+		{
+			testCase: "account sku is nil",
+			testAccountOptions: &AccountOptions{
+				ResourceGroup: "rg",
+			},
+			testResourceGroups: []storage.Account{{Name: &name, Location: &location}},
+			expectedResult:     []accountWithLocation{},
+			expectedError:      nil,
+		},
+		{
+			testCase: "account options type is not empty and not equal account storage type",
+			testAccountOptions: &AccountOptions{
+				ResourceGroup: "rg",
+				Type:          "testAccountOptionsType",
+			},
+			testResourceGroups: []storage.Account{account},
+			expectedResult:     []accountWithLocation{},
+			expectedError:      nil,
+		},
+		{
+			testCase: "account options kind is not empty and not equal account type",
+			testAccountOptions: &AccountOptions{
+				ResourceGroup: "rg",
+				Kind:          "testAccountOptionsKind",
+			},
+			testResourceGroups: []storage.Account{account},
+			expectedResult:     []accountWithLocation{},
+			expectedError:      nil,
+		},
+		{
+			testCase: "account options location is not empty and not equal account location",
+			testAccountOptions: &AccountOptions{
+				ResourceGroup: "rg",
+				Location:      "testAccountOptionsLocation",
+			},
+			testResourceGroups: []storage.Account{account},
+			expectedResult:     []accountWithLocation{},
+			expectedError:      nil,
+		},
+		{
+			testCase: "account options account properties are nil",
+			testAccountOptions: &AccountOptions{
+				ResourceGroup:             "rg",
+				VirtualNetworkResourceIDs: []string{"id"},
+			},
+			testResourceGroups: []storage.Account{},
+			expectedResult:     []accountWithLocation{},
+			expectedError:      nil,
+		},
+		{
+			testCase: "account options account properties network rule set is nil",
+			testAccountOptions: &AccountOptions{
+				ResourceGroup:             "rg",
+				VirtualNetworkResourceIDs: []string{"id"},
+			},
+			testResourceGroups: []storage.Account{{Name: &name, Kind: "kind", Location: &location, Sku: sku, AccountProperties: &accountPropertiesWithoutNetworkRuleSet}},
+			expectedResult:     []accountWithLocation{},
+			expectedError:      nil,
+		},
+		{
+			testCase: "account options account properties virtual network rule is nil",
+			testAccountOptions: &AccountOptions{
+				ResourceGroup:             "rg",
+				VirtualNetworkResourceIDs: []string{"id"},
+			},
+			testResourceGroups: []storage.Account{{Name: &name, Kind: "kind", Location: &location, Sku: sku, AccountProperties: &accountPropertiesWithoutVirtualNetworkRules}},
+			expectedResult:     []accountWithLocation{},
+			expectedError:      nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Logf("running test case: %s", test.testCase)
+		mockStorageAccountsClient := mockstorageaccountclient.NewMockInterface(ctrl)
+		cloud.StorageAccountClient = mockStorageAccountsClient
+
+		mockStorageAccountsClient.EXPECT().ListByResourceGroup(gomock.Any(), "rg").Return(test.testResourceGroups, nil).AnyTimes()
+
+		accountsWithLocations, err := cloud.getStorageAccounts(test.testAccountOptions)
+		if err != test.expectedError {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		if len(accountsWithLocations) != len(test.expectedResult) {
+			t.Error("unexpected error as returned accounts slice is not empty")
+		}
+	}
+}
