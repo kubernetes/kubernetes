@@ -377,7 +377,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 	}
 }
 
-func TestSnapshot(t *testing.T) {
+func TestDump(t *testing.T) {
 	nodeName := "node"
 	now := time.Now()
 	ttl := 10 * time.Second
