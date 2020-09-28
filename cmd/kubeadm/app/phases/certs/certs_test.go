@@ -400,6 +400,19 @@ func TestSharedCertificateExists(t *testing.T) {
 			expectedError: true,
 		},
 		{
+			name: "missing ca.key",
+			files: certstestutil.PKIFiles{
+				"ca.crt":             caCert,
+				"front-proxy-ca.crt": caCert,
+				"front-proxy-ca.key": caKey,
+				"sa.pub":             publicKey,
+				"sa.key":             key,
+				"etcd/ca.crt":        caCert,
+				"etcd/ca.key":        caKey,
+			},
+			expectedError: false,
+		},
+		{
 			name: "missing sa.key",
 			files: certstestutil.PKIFiles{
 				"ca.crt":             caCert,
@@ -640,7 +653,7 @@ func TestValidateMethods(t *testing.T) {
 			name:            "validateCACertAndKey (key missing)",
 			validateFunc:    validateCACertAndKey,
 			loc:             certKeyLocation{caBaseName: "ca", baseName: "", uxName: "CA"},
-			expectedSuccess: false,
+			expectedSuccess: true,
 		},
 		{
 			name: "validateSignedCert",
@@ -663,6 +676,15 @@ func TestValidateMethods(t *testing.T) {
 			validateFunc:    validatePrivatePublicKey,
 			loc:             certKeyLocation{baseName: "sa", uxName: "service account"},
 			expectedSuccess: true,
+		},
+		{
+			name: "validatePrivatePublicKey (missing key)",
+			files: certstestutil.PKIFiles{
+				"sa.pub": key.Public(),
+			},
+			validateFunc:    validatePrivatePublicKey,
+			loc:             certKeyLocation{baseName: "sa", uxName: "service account"},
+			expectedSuccess: false,
 		},
 	}
 
