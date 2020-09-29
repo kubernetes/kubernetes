@@ -116,7 +116,9 @@ func WithNonReadyRequestLogging(handler http.Handler, hasBeenReadyCh <-chan stru
 		// ignore connections to local IP. Those clients better know what they are doing.
 		if pth := "/" + strings.TrimLeft(r.URL.Path, "/"); pth != "/readyz" && pth != "/healthz" && pth != "/livez" {
 			if isLocal(r) {
-				klog.V(2).Infof("Loopback request to %q (user agent %q) before server is ready. This client probably does not watch /readyz and might get inconsistent answers.", r.URL.Path, r.UserAgent())
+				if !isKubeApiserverLoopBack(r) {
+					klog.V(2).Infof("Loopback request to %q (user agent %q) before server is ready. This client probably does not watch /readyz and might get inconsistent answers.", r.URL.Path, r.UserAgent())
+				}
 			} else {
 				klog.Warningf("Request to %q (source IP %s, user agent %q) before server is ready, possibly a sign for a broken load balancer setup.", r.URL.Path, r.RemoteAddr, r.UserAgent())
 
@@ -142,4 +144,8 @@ func isLocal(req *http.Request) bool {
 	}
 
 	return false
+}
+
+func isKubeApiserverLoopBack(req *http.Request) bool {
+	return strings.HasPrefix(req.UserAgent(), "kube-apiserver/")
 }
