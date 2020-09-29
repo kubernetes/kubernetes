@@ -875,21 +875,6 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		// override status subresource values
 		// shallow copy
 		statusScope := *requestScopes[v.Name]
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-			statusScope.FieldManager, err = fieldmanager.NewDefaultCRDFieldManager(
-				openAPIModels,
-				statusScope.Convertor,
-				statusScope.Defaulter,
-				statusScope.Creater,
-				statusScope.Kind,
-				statusScope.HubGroupVersion,
-				crd.Spec.PreserveUnknownFields,
-				true,
-			)
-			if err != nil {
-				return nil, err
-			}
-		}
 		statusScope.Subresource = "status"
 		statusScope.Namer = handlers.ContextBasedNaming{
 			SelfLinker:         meta.NewAccessor(),
@@ -904,6 +889,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				statusScope,
 				storages[v.Name].Status,
 				crd.Spec.PreserveUnknownFields,
+				true,
 			)
 			if err != nil {
 				return nil, err
@@ -947,7 +933,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	return ret, nil
 }
 
-func scopeWithFieldManager(openAPIModels proto.Models, reqScope handlers.RequestScope, storage rest.ResetFieldsStrategy, preserveUnknownFields bool) (handlers.RequestScope, error) {
+func scopeWithFieldManager(openAPIModels proto.Models, reqScope handlers.RequestScope, storage rest.ResetFieldsStrategy, preserveUnknownFields, ignoreManagedFieldsFromRequestObject bool) (handlers.RequestScope, error) {
 	resetFields := storage.GetResetFields()
 
 	fieldManager, err := fieldmanager.NewDefaultCRDFieldManager(
@@ -959,6 +945,7 @@ func scopeWithFieldManager(openAPIModels proto.Models, reqScope handlers.Request
 		reqScope.HubGroupVersion,
 		resetFields,
 		preserveUnknownFields,
+		ignoreManagedFieldsFromRequestObject,
 	)
 	if err != nil {
 		return handlers.RequestScope{}, err
