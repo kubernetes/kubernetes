@@ -327,10 +327,10 @@ type KubeletConfiguration struct {
 	// status to master if node status does not change. Kubelet will ignore this
 	// frequency and post node status immediately if any change is detected. It is
 	// only used when node lease feature is enabled. nodeStatusReportFrequency's
-	// default value is 1m. But if nodeStatusUpdateFrequency is set explicitly,
+	// default value is 5m. But if nodeStatusUpdateFrequency is set explicitly,
 	// nodeStatusReportFrequency's default value will be set to
 	// nodeStatusUpdateFrequency for backward compatibility.
-	// Default: "1m"
+	// Default: "5m"
 	// +optional
 	NodeStatusReportFrequency metav1.Duration `json:"nodeStatusReportFrequency,omitempty"`
 	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease,
