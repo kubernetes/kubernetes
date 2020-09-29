@@ -86,17 +86,17 @@ func (pl *SelectorSpread) Score(ctx context.Context, state *framework.CycleState
 
 	c, err := state.Read(preScoreStateKey)
 	if err != nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("Error reading %q from cycleState: %v", preScoreStateKey, err))
+		return 0, framework.AsStatus(fmt.Errorf("reading %q from cycleState: %w", preScoreStateKey, err))
 	}
 
 	s, ok := c.(*preScoreState)
 	if !ok {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("%+v convert to tainttoleration.preScoreState error", c))
+		return 0, framework.AsStatus(fmt.Errorf("cannot convert saved state to tainttoleration.preScoreState"))
 	}
 
 	nodeInfo, err := pl.sharedLister.NodeInfos().Get(nodeName)
 	if err != nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
+		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
 	count := countMatchingPods(pod.Namespace, s.selector, nodeInfo)
