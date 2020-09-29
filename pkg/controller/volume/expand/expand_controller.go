@@ -61,8 +61,8 @@ const (
 	defaultWorkerCount = 10
 )
 
-// ExpandController expands the pvs
-type ExpandController interface {
+// Controller expands the pvs
+type Controller interface {
 	Run(stopCh <-chan struct{})
 }
 
@@ -119,7 +119,7 @@ func NewExpandController(
 	plugins []volume.VolumePlugin,
 	translator CSINameTranslator,
 	csiMigratedPluginManager csimigration.PluginManager,
-	filteredDialOptions *proxyutil.FilteredDialOptions) (ExpandController, error) {
+	filteredDialOptions *proxyutil.FilteredDialOptions) (Controller, error) {
 
 	expc := &expandController{
 		kubeClient:               kubeClient,
