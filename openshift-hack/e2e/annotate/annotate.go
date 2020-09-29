@@ -228,9 +228,6 @@ func (r *ginkgoTestRenamer) generateRename(name, parentName string, node types.T
 			name += " [Suite:openshift/conformance/parallel]"
 		}
 	}
-	if isGoModulePath(node.CodeLocation().FileName, "github.com/openshift/origin", "test") && !strings.Contains(name, "[Suite:openshift") {
-		name += " [Suite:openshift]"
-	}
 	if isGoModulePath(node.CodeLocation().FileName, "k8s.io/kubernetes", "test/e2e") {
 		name += " [Suite:k8s]"
 	}
