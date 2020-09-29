@@ -320,8 +320,9 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	}
 
 	// Avoid calling event handler under lock.
-	// This is safe as long as there is at most one call to processEvent in flight
-	// at any point in time.
+	// This is safe as long as there is at most one call to Add/Update/Delete and
+	// UpdateResourceVersion in flight at any point in time, which is true now,
+	// because reflector calls them synchronously from its main thread.
 	if w.eventHandler != nil {
 		w.eventHandler(wcEvent)
 	}
@@ -388,20 +389,23 @@ func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 		return
 	}
 
-	w.Lock()
-	defer w.Unlock()
-	w.resourceVersion = rv
+	func() {
+		w.Lock()
+		defer w.Unlock()
+		w.resourceVersion = rv
+	}()
 
-	// Don't dispatch bookmarks coming from the storage layer.
-	// They can be very frequent (even to the level of subseconds)
-	// to allow efficient watch resumption on kube-apiserver restarts,
-	// and propagating them down may overload the whole system.
-	//
-	// TODO: If at some point we decide the performance and scalability
-	// footprint is acceptable, this is the place to hook them in.
-	// However, we then need to check if this was called as a result
-	// of a bookmark event or regular Add/Update/Delete operation by
-	// checking if resourceVersion here has changed.
+	// Avoid calling event handler under lock.
+	// This is safe as long as there is at most one call to Add/Update/Delete and
+	// UpdateResourceVersion in flight at any point in time, which is true now,
+	// because reflector calls them synchronously from its main thread.
+	if w.eventHandler != nil {
+		wcEvent := &watchCacheEvent{
+			Type:            watch.Bookmark,
+			ResourceVersion: rv,
+		}
+		w.eventHandler(wcEvent)
+	}
 }
 
 // List returns list of pointers to <storeElement> objects.
