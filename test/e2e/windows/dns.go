@@ -67,7 +67,7 @@ var _ = SIGDescribe("DNS", func() {
 			Command:       cmd,
 			Namespace:     f.Namespace.Name,
 			PodName:       testUtilsPod.Name,
-			ContainerName: "util",
+			ContainerName: "agnhost-container",
 			CaptureStdout: true,
 			CaptureStderr: true,
 		})
