@@ -3933,24 +3933,28 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 			err := cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", podName, f.Namespace.Name)
 		}()
-
-		ginkgo.By("dumping iptables rules on the node")
+		// wait until host port manager syncs rules
 		cmd = "sudo iptables-save"
-		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
-		result, err := hostExec.IssueCommandWithResult(cmd, node)
-		if err != nil {
-			framework.Failf("Interrogation of iptables rules failed on node %v", node.Name)
+		if framework.TestContext.ClusterIsIPv6() {
+			cmd = "sudo ip6tables-save"
 		}
-
-		ginkgo.By("checking that iptables contains the necessary iptables rules")
-		found := false
-		for _, line := range strings.Split(result, "\n") {
-			if strings.Contains(line, "-p sctp") && strings.Contains(line, "--dport 5060") {
-				found = true
-				break
+		err = wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
+			framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
+			result, err := hostExec.IssueCommandWithResult(cmd, node)
+			if err != nil {
+				framework.Logf("Interrogation of iptables rules failed on node %v", node.Name)
+				return false, nil
 			}
-		}
-		if !found {
+
+			for _, line := range strings.Split(result, "\n") {
+				if strings.Contains(line, "-p sctp") && strings.Contains(line, "--dport 5060") {
+					return true, nil
+				}
+			}
+			framework.Logf("retrying ... not hostport sctp iptables rules found on node %v", node.Name)
+			return false, nil
+		})
+		if err != nil {
 			framework.Failf("iptables rules are not set for a pod with sctp hostport")
 		}
 		ginkgo.By("validating sctp module is still not loaded")
@@ -3989,28 +3993,31 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 
 		err = e2enetwork.WaitForService(f.ClientSet, ns, serviceName, true, 5*time.Second, e2eservice.TestTimeout)
 		framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceName, err))
-
-		ginkgo.By("dumping iptables rules on a node")
 		hostExec := utils.NewHostExec(f)
 		defer hostExec.Cleanup()
 		node, err := e2enode.GetRandomReadySchedulableNode(cs)
 		framework.ExpectNoError(err)
 		cmd := "sudo iptables-save"
-		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
-		result, err := hostExec.IssueCommandWithResult(cmd, node)
-		if err != nil {
-			framework.Failf("Interrogation of iptables rules failed on node %v", node.Name)
+		if framework.TestContext.ClusterIsIPv6() {
+			cmd = "sudo ip6tables-save"
 		}
-
-		ginkgo.By("checking that iptables contains the necessary iptables rules")
-		kubeService := false
-		for _, line := range strings.Split(result, "\n") {
-			if strings.Contains(line, "-A KUBE-SERVICES") && strings.Contains(line, "-p sctp") {
-				kubeService = true
-				break
+		err = wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
+			framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
+			result, err := hostExec.IssueCommandWithResult(cmd, node)
+			if err != nil {
+				framework.Logf("Interrogation of iptables rules failed on node %v", node.Name)
+				return false, nil
 			}
-		}
-		if !kubeService {
+
+			for _, line := range strings.Split(result, "\n") {
+				if strings.Contains(line, "-A KUBE-SERVICES") && strings.Contains(line, "-p sctp") {
+					return true, nil
+				}
+			}
+			framework.Logf("retrying ... no iptables rules found for service with sctp ports on node %v", node.Name)
+			return false, nil
+		})
+		if err != nil {
 			framework.Failf("iptables rules are not set for a clusterip service with sctp ports")
 		}
 		ginkgo.By("validating sctp module is still not loaded")
