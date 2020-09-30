@@ -122,13 +122,16 @@ func (s *Updater) update(oldObject, newObject *typed.TypedValue, version fieldpa
 // this is a CREATE call).
 func (s *Updater) Update(liveObject, newObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string) (*typed.TypedValue, fieldpath.ManagedFields, error) {
 	var err error
+	managers, err = s.reconcileManagedFieldsWithSchemaChanges(liveObject, managers)
+	if err != nil {
+		return nil, fieldpath.ManagedFields{}, err
+	}
 	if s.enableUnions {
 		newObject, err = liveObject.NormalizeUnions(newObject)
 		if err != nil {
 			return nil, fieldpath.ManagedFields{}, err
 		}
 	}
-	managers = shallowCopyManagers(managers)
 	managers, compare, err := s.update(liveObject, newObject, version, managers, manager, true)
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, err
@@ -157,8 +160,11 @@ func (s *Updater) Update(liveObject, newObject *typed.TypedValue, version fieldp
 // and return it. If the object hasn't changed, nil is returned (the
 // managers can still have changed though).
 func (s *Updater) Apply(liveObject, configObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string, force bool) (*typed.TypedValue, fieldpath.ManagedFields, error) {
-	managers = shallowCopyManagers(managers)
 	var err error
+	managers, err = s.reconcileManagedFieldsWithSchemaChanges(liveObject, managers)
+	if err != nil {
+		return nil, fieldpath.ManagedFields{}, err
+	}
 	if s.enableUnions {
 		configObject, err = configObject.NormalizeUnionsApply(configObject)
 		if err != nil {
@@ -202,14 +208,6 @@ func (s *Updater) Apply(liveObject, configObject *typed.TypedValue, version fiel
 		newObject = nil
 	}
 	return newObject, managers, nil
-}
-
-func shallowCopyManagers(managers fieldpath.ManagedFields) fieldpath.ManagedFields {
-	newManagers := fieldpath.ManagedFields{}
-	for manager, set := range managers {
-		newManagers[manager] = set
-	}
-	return newManagers
 }
 
 // prune will remove a field, list or map item, iff:
@@ -299,4 +297,33 @@ func (s *Updater) addBackDanglingItems(merged, pruned *typed.TypedValue, lastSet
 		return nil, fmt.Errorf("failed to create field set from merged object in last applied version: %v", err)
 	}
 	return merged.RemoveItems(mergedSet.Difference(prunedSet).Intersection(lastSet.Set())), nil
+}
+
+// reconcileManagedFieldsWithSchemaChanges reconciles the managed fields with any changes to the
+// object's schema since the managed fields were written.
+//
+// Supports:
+// - changing types from atomic to granular
+// - changing types from granular to atomic
+func (s *Updater) reconcileManagedFieldsWithSchemaChanges(liveObject *typed.TypedValue, managers fieldpath.ManagedFields) (fieldpath.ManagedFields, error) {
+	result := fieldpath.ManagedFields{}
+	for manager, versionedSet := range managers {
+		tv, err := s.Converter.Convert(liveObject, versionedSet.APIVersion())
+		if s.Converter.IsMissingVersionError(err) { // okay to skip, obsolete versions will be deleted automatically anyway
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		reconciled, err := typed.ReconcileFieldSetWithSchema(versionedSet.Set(), tv)
+		if err != nil {
+			return nil, err
+		}
+		if reconciled != nil {
+			result[manager] = fieldpath.NewVersionedSet(reconciled, versionedSet.APIVersion(), versionedSet.Applied())
+		} else {
+			result[manager] = versionedSet
+		}
+	}
+	return result, nil
 }

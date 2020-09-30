@@ -71,6 +71,11 @@ func (tv TypedValue) AsValue() value.Value {
 	return tv.value
 }
 
+// Schema gets the schema from the TypedValue.
+func (tv TypedValue) Schema() *schema.Schema {
+	return tv.schema
+}
+
 // Validate returns an error with a list of every spec violation.
 func (tv TypedValue) Validate() error {
 	w := tv.walker()
