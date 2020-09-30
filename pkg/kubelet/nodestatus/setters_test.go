@@ -416,7 +416,7 @@ func TestNodeAddress(t *testing.T) {
 			}
 
 			// construct setter
-			setter := NodeAddress(nodeIP,
+			setter := NodeAddress([]net.IP{nodeIP},
 				nodeIPValidator,
 				hostname,
 				testCase.hostnameOverride,
@@ -431,6 +431,70 @@ func TestNodeAddress(t *testing.T) {
 			} else if err != nil && testCase.shouldError {
 				// expected an error, and got one, so just return early here
 				return
+			}
+
+			assert.True(t, apiequality.Semantic.DeepEqual(testCase.expectedAddresses, existingNode.Status.Addresses),
+				"Diff: %s", diff.ObjectDiff(testCase.expectedAddresses, existingNode.Status.Addresses))
+		})
+	}
+}
+
+// We can't test failure or autodetection cases here because the relevant code isn't mockable
+func TestNodeAddress_NoCloudProvider(t *testing.T) {
+	cases := []struct {
+		name              string
+		nodeIPs           []net.IP
+		expectedAddresses []v1.NodeAddress
+	}{
+		{
+			name:    "Single --node-ip",
+			nodeIPs: []net.IP{net.ParseIP("10.1.1.1")},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+		{
+			name:    "Dual --node-ips",
+			nodeIPs: []net.IP{net.ParseIP("10.1.1.1"), net.ParseIP("fd01::1234")},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+		},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			// testCase setup
+			existingNode := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
+				Spec:       v1.NodeSpec{},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{},
+				},
+			}
+
+			nodeIPValidator := func(nodeIP net.IP) error {
+				return nil
+			}
+			nodeAddressesFunc := func() ([]v1.NodeAddress, error) {
+				return nil, fmt.Errorf("not reached")
+			}
+
+			// construct setter
+			setter := NodeAddress(testCase.nodeIPs,
+				nodeIPValidator,
+				testKubeletHostname,
+				false, // hostnameOverridden
+				false, // externalCloudProvider
+				nil,   // cloud
+				nodeAddressesFunc)
+
+			// call setter on existing node
+			err := setter(existingNode)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
 
 			assert.True(t, apiequality.Semantic.DeepEqual(testCase.expectedAddresses, existingNode.Status.Addresses),
