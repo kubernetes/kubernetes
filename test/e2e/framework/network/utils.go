@@ -97,6 +97,14 @@ func NewNetworkingTestConfig(f *framework.Framework, hostNetwork, SCTPEnabled bo
 	return config
 }
 
+// NewDualNetworkingTestConfig creates and sets up a new test config helper.
+func NewDualNetworkingTestConfig(f *framework.Framework, hostNetwork, SCTPEnabled bool) *NetworkingTestConfig {
+	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork, SCTPEnabled: SCTPEnabled, DualStackEnabled: true}
+	ginkgo.By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
+	config.setup(getServiceSelector())
+	return config
+}
+
 // NewCoreNetworkingTestConfig creates and sets up a new test config helper for Node E2E.
 func NewCoreNetworkingTestConfig(f *framework.Framework, hostNetwork bool) *NetworkingTestConfig {
 	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork}
@@ -127,6 +135,8 @@ type NetworkingTestConfig struct {
 	// if the test pods are listening on sctp port. We need this as sctp tests
 	// are marked as disruptive as they may load the sctp module.
 	SCTPEnabled bool
+	// DualStackEnabled enables dual stack on services
+	DualStackEnabled bool
 	// EndpointPods are the pods belonging to the Service created by this
 	// test config. Each invocation of `setup` creates a service with
 	// 1 pod per node running the netexecImage.
@@ -146,10 +156,14 @@ type NetworkingTestConfig struct {
 	// MaxTries is the number of retries tolerated for tests run against
 	// endpoints and services created by this config.
 	MaxTries int
-	// The ClusterIP of the Service reated by this test config.
+	// The ClusterIP of the Service related by this test config.
 	ClusterIP string
+	// The SecondaryClusterIP of the Service related by this test config.
+	SecondaryClusterIP string
 	// External ip of first node for use in nodePort testing.
 	NodeIP string
+	// External ip of other IP family of first node for use in nodePort testing.
+	SecondaryNodeIP string
 	// The http/udp/sctp nodePorts of the Service.
 	NodeHTTPPort int
 	NodeUDPPort  int
@@ -616,6 +630,10 @@ func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, se
 	if config.SCTPEnabled {
 		res.Spec.Ports = append(res.Spec.Ports, v1.ServicePort{Port: ClusterSCTPPort, Name: "sctp", Protocol: v1.ProtocolSCTP, TargetPort: intstr.FromInt(EndpointSCTPPort)})
 	}
+	if config.DualStackEnabled {
+		requireDual := v1.IPFamilyPolicyRequireDualStack
+		res.Spec.IPFamilyPolicy = &requireDual
+	}
 	return res
 }
 
@@ -722,6 +740,11 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 		}
 	}
 	config.ClusterIP = config.NodePortService.Spec.ClusterIP
+	if config.DualStackEnabled {
+		config.SecondaryClusterIP = config.NodePortService.Spec.ClusterIPs[1]
+	}
+	// TODO: add SecondaryNodeIP configuration once it is implemented
+	// xref: https://github.com/kubernetes/enhancements/pull/1665
 	if config.ExternalAddr != "" {
 		config.NodeIP = config.ExternalAddr
 	} else {
