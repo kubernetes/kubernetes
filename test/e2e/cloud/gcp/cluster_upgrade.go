@@ -585,7 +585,7 @@ func traceRouteToMaster() {
 		framework.Logf("Could not find traceroute program")
 		return
 	}
-	cmd := exec.Command(traceroute, "-I", framework.GetMasterHost())
+	cmd := exec.Command(traceroute, "-I", framework.APIAddress())
 	out, err := cmd.Output()
 	if len(out) != 0 {
 		framework.Logf(string(out))
