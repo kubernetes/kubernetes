@@ -60,63 +60,10 @@ func (t *dnsFederationsConfigMapTest) run() {
 	defer t.c.CoreV1().ConfigMaps(t.ns).Delete(context.TODO(), t.name, metav1.DeleteOptions{})
 	t.createUtilPodLabel("e2e-dns-configmap")
 	defer t.deleteUtilPod()
-	originalConfigMapData := t.fetchDNSConfigMapData()
-	defer t.restoreDNSConfigMap(originalConfigMapData)
 
 	t.validate(framework.TestContext.ClusterDNSDomain)
 
-	if t.name == "coredns" {
-		t.labels = []string{"abc", "ghi"}
-		valid1 := map[string]string{
-			"Corefile": fmt.Sprintf(`.:53 {
-        health
-        ready
-        kubernetes %v in-addr.arpa ip6.arpa {
-            pods insecure
-            fallthrough in-addr.arpa ip6.arpa
-            ttl 30
-        }
-        federation %v {
-           abc def.com
-        }
-        forward . /etc/resolv.conf
-    }`, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterDNSDomain)}
-		valid1m := map[string]string{t.labels[0]: "def.com"}
-
-		valid2 := map[string]string{
-			"Corefile": fmt.Sprintf(`:53 {
-        health
-        ready
-        kubernetes %v in-addr.arpa ip6.arpa {
-            pods insecure
-            fallthrough in-addr.arpa ip6.arpa
-            ttl 30
-        }
-        federation %v {
-           ghi xyz.com
-        }
-        forward . /etc/resolv.conf
-    }`, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterDNSDomain)}
-		valid2m := map[string]string{t.labels[1]: "xyz.com"}
-
-		ginkgo.By("default -> valid1")
-		t.setConfigMap(&v1.ConfigMap{Data: valid1}, valid1m, true)
-		t.deleteCoreDNSPods()
-		t.validate(framework.TestContext.ClusterDNSDomain)
-
-		ginkgo.By("valid1 -> valid2")
-		t.setConfigMap(&v1.ConfigMap{Data: valid2}, valid2m, true)
-		t.deleteCoreDNSPods()
-		t.validate(framework.TestContext.ClusterDNSDomain)
-
-		ginkgo.By("valid2 -> default")
-		t.setConfigMap(&v1.ConfigMap{Data: originalConfigMapData}, nil, false)
-		t.deleteCoreDNSPods()
-		t.validate(framework.TestContext.ClusterDNSDomain)
-
-		t.restoreDNSConfigMap(originalConfigMapData)
-
-	} else {
+	if t.name != "coredns" {
 		t.labels = []string{"abc", "ghi"}
 		valid1 := map[string]string{"federations": t.labels[0] + "=def"}
 		valid1m := map[string]string{t.labels[0]: "def"}
