@@ -17,7 +17,6 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/helper/qos:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/client:go_default_library",
@@ -62,6 +61,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
 )

@@ -29,6 +29,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -40,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -1433,6 +1433,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
                 "dnsPolicy": "ClusterFirst",
                 "enableServiceLinks": true,
                 "restartPolicy": "Always",
+                "schedulerName": "",
                 "securityContext": {},
                 "terminationGracePeriodSeconds": 30
             },
@@ -1452,6 +1453,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
                 "dnsPolicy": "ClusterFirst",
                 "enableServiceLinks": true,
                 "restartPolicy": "Always",
+                "schedulerName": "",
                 "securityContext": {},
                 "terminationGracePeriodSeconds": 30
             },
@@ -1482,8 +1484,8 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
     }
 }
 `
-	if e, a := expected, buf.String(); e != a {
-		t.Errorf("did not match: %v", diff.StringDiff(e, a))
+	if diff := cmp.Diff(expected, buf.String()); diff != "" {
+		t.Errorf("did not match (-want,+got):\n%s", diff)
 	}
 }
 
@@ -2339,10 +2341,10 @@ DELETED    test        pod/foo   0/0              0          <unknown>   <none> 
 		},
 		{
 			format: "json",
-			expected: `{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"bar","namespace":"test","resourceVersion":"9"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
-{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"10"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
-{"type":"MODIFIED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"11"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
-{"type":"DELETED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"12"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+			expected: `{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"bar","namespace":"test","resourceVersion":"9"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","schedulerName":"","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"10"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","schedulerName":"","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+{"type":"MODIFIED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"11"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","schedulerName":"","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+{"type":"DELETED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"12"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","schedulerName":"","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
 `,
 		},
 		{
@@ -2360,6 +2362,7 @@ DELETED    test        pod/foo   0/0              0          <unknown>   <none> 
     dnsPolicy: ClusterFirst
     enableServiceLinks: true
     restartPolicy: Always
+    schedulerName: ""
     securityContext: {}
     terminationGracePeriodSeconds: 30
   status: {}
@@ -2378,6 +2381,7 @@ object:
     dnsPolicy: ClusterFirst
     enableServiceLinks: true
     restartPolicy: Always
+    schedulerName: ""
     securityContext: {}
     terminationGracePeriodSeconds: 30
   status: {}
@@ -2396,6 +2400,7 @@ object:
     dnsPolicy: ClusterFirst
     enableServiceLinks: true
     restartPolicy: Always
+    schedulerName: ""
     securityContext: {}
     terminationGracePeriodSeconds: 30
   status: {}
@@ -2414,6 +2419,7 @@ object:
     dnsPolicy: ClusterFirst
     enableServiceLinks: true
     restartPolicy: Always
+    schedulerName: ""
     securityContext: {}
     terminationGracePeriodSeconds: 30
   status: {}
@@ -2508,8 +2514,8 @@ pod/foo
 			}
 
 			cmd.Run(cmd, []string{"pods"})
-			if e, a := tc.expected, buf.String(); e != a {
-				t.Errorf("expected\n%v\ngot\n%v", e, a)
+			if diff := cmp.Diff(tc.expected, buf.String()); diff != "" {
+				t.Errorf("did not match (-want,+got):\n%s", diff)
 			}
 		})
 	}

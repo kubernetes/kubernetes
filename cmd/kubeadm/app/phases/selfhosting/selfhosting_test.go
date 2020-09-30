@@ -181,6 +181,7 @@ spec:
       nodeSelector:
         node-role.kubernetes.io/master: ""
       priorityClassName: system-cluster-critical
+      schedulerName: ""
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
@@ -333,6 +334,7 @@ spec:
       nodeSelector:
         node-role.kubernetes.io/master: ""
       priorityClassName: system-cluster-critical
+      schedulerName: ""
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
@@ -448,6 +450,7 @@ spec:
       nodeSelector:
         node-role.kubernetes.io/master: ""
       priorityClassName: system-cluster-critical
+      schedulerName: ""
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master

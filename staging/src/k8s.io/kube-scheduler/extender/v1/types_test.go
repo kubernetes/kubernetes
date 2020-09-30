@@ -53,7 +53,7 @@ func TestCompatibility(t *testing.T) {
 				NodeNameToVictims:     map[string]*Victims{"foo": {Pods: []*v1.Pod{&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "podname"}}}, NumPDBViolations: 1}},
 				NodeNameToMetaVictims: map[string]*MetaVictims{"foo": {Pods: []*MetaPod{{UID: "myuid"}}, NumPDBViolations: 1}},
 			},
-			expectJSON: `{"Pod":{"metadata":{"name":"podname","creationTimestamp":null},"spec":{"containers":null},"status":{}},"NodeNameToVictims":{"foo":{"Pods":[{"metadata":{"name":"podname","creationTimestamp":null},"spec":{"containers":null},"status":{}}],"NumPDBViolations":1}},"NodeNameToMetaVictims":{"foo":{"Pods":[{"UID":"myuid"}],"NumPDBViolations":1}}}`,
+			expectJSON: `{"Pod":{"metadata":{"name":"podname","creationTimestamp":null},"spec":{"containers":null,"schedulerName":""},"status":{}},"NodeNameToVictims":{"foo":{"Pods":[{"metadata":{"name":"podname","creationTimestamp":null},"spec":{"containers":null,"schedulerName":""},"status":{}}],"NumPDBViolations":1}},"NodeNameToMetaVictims":{"foo":{"Pods":[{"UID":"myuid"}],"NumPDBViolations":1}}}`,
 		},
 		{
 			emptyObj: &ExtenderArgs{},
@@ -62,7 +62,7 @@ func TestCompatibility(t *testing.T) {
 				Nodes:     &corev1.NodeList{Items: []corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "nodename"}}}},
 				NodeNames: &[]string{"node1"},
 			},
-			expectJSON: `{"Pod":{"metadata":{"name":"podname","creationTimestamp":null},"spec":{"containers":null},"status":{}},"Nodes":{"metadata":{},"items":[{"metadata":{"name":"nodename","creationTimestamp":null},"spec":{},"status":{"daemonEndpoints":{"kubeletEndpoint":{"Port":0}},"nodeInfo":{"machineID":"","systemUUID":"","bootID":"","kernelVersion":"","osImage":"","containerRuntimeVersion":"","kubeletVersion":"","kubeProxyVersion":"","operatingSystem":"","architecture":""}}}]},"NodeNames":["node1"]}`,
+			expectJSON: `{"Pod":{"metadata":{"name":"podname","creationTimestamp":null},"spec":{"containers":null,"schedulerName":""},"status":{}},"Nodes":{"metadata":{},"items":[{"metadata":{"name":"nodename","creationTimestamp":null},"spec":{},"status":{"daemonEndpoints":{"kubeletEndpoint":{"Port":0}},"nodeInfo":{"machineID":"","systemUUID":"","bootID":"","kernelVersion":"","osImage":"","containerRuntimeVersion":"","kubeletVersion":"","kubeProxyVersion":"","operatingSystem":"","architecture":""}}}]},"NodeNames":["node1"]}`,
 		},
 		{
 			emptyObj: &ExtenderFilterResult{},

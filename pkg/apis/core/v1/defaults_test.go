@@ -131,7 +131,6 @@ func TestWorkloadDefaults(t *testing.T) {
 		".Spec.InitContainers[0].TerminationMessagePath":                                              `"/dev/termination-log"`,
 		".Spec.InitContainers[0].TerminationMessagePolicy":                                            `"File"`,
 		".Spec.RestartPolicy":                                                                         `"Always"`,
-		".Spec.SchedulerName":                                                                         `"default-scheduler"`,
 		".Spec.SecurityContext":                                                                       `{}`,
 		".Spec.TerminationGracePeriodSeconds":                                                         `30`,
 		".Spec.Volumes[0].VolumeSource.AzureDisk.CachingMode":                                         `"ReadWrite"`,
@@ -255,7 +254,6 @@ func TestPodDefaults(t *testing.T) {
 		".Spec.InitContainers[0].StartupProbe.SuccessThreshold":                                       "1",
 		".Spec.InitContainers[0].StartupProbe.TimeoutSeconds":                                         "1",
 		".Spec.RestartPolicy":                                                                         `"Always"`,
-		".Spec.SchedulerName":                                                                         `"default-scheduler"`,
 		".Spec.SecurityContext":                                                                       `{}`,
 		".Spec.TerminationGracePeriodSeconds":                                                         `30`,
 		".Spec.Volumes[0].VolumeSource.AzureDisk.CachingMode":                                         `"ReadWrite"`,
@@ -1891,12 +1889,12 @@ func TestSetDefaultProbe(t *testing.T) {
 	}
 }
 
-func TestSetDefaultSchedulerName(t *testing.T) {
+func TestSetDefaultSchedulerNameEmpty(t *testing.T) {
 	pod := &v1.Pod{}
 
 	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
-	if output.Spec.SchedulerName != v1.DefaultSchedulerName {
-		t.Errorf("Expected scheduler name: %+v\ngot: %+v\n", v1.DefaultSchedulerName, output.Spec.SchedulerName)
+	if output.Spec.SchedulerName != "" {
+		t.Errorf("Expected empty scheduler name, got: %+v\n", output.Spec.SchedulerName)
 	}
 }
 

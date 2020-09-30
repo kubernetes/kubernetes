@@ -44,7 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -66,25 +65,21 @@ func (podStrategy) NamespaceScoped() bool {
 	return true
 }
 
-// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
+// PrepareForCreate sets the default values and clears fields that are not
+// allowed to be set by end users on creation.
 func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pod := obj.(*api.Pod)
-	pod.Status = api.PodStatus{
-		Phase:    api.PodPending,
-		QOSClass: qos.GetPodQOS(pod),
-	}
-
+	podutil.SetDefaultPodValues(pod, nil)
 	podutil.DropDisabledPodFields(pod, nil)
-
 	applySeccompVersionSkew(pod)
 }
 
-// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+// PrepareForUpdate sets the default values and clears fields that are not
+// allowed to be set by end users on update.
 func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
-	newPod.Status = oldPod.Status
-
+	podutil.SetDefaultPodValues(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
 }
 

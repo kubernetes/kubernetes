@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -301,6 +302,26 @@ func DropDisabledTemplateFields(podTemplate, oldPodTemplate *api.PodTemplateSpec
 		oldPodAnnotations = oldPodTemplate.Annotations
 	}
 	dropDisabledFields(podSpec, podAnnotations, oldPodSpec, oldPodAnnotations)
+}
+
+// SetDefaultPodValues sets the default values for pod metadata and spec.
+// This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a Pod.
+func SetDefaultPodValues(pod, oldPod *api.Pod) {
+	if pod == nil {
+		return
+	}
+	if oldPod != nil {
+		pod.Spec.SchedulerName = oldPod.Spec.SchedulerName
+		pod.Status = oldPod.Status
+		return
+	}
+	if pod.Spec.SchedulerName == "" {
+		pod.Spec.SchedulerName = api.DefaultSchedulerName
+	}
+	pod.Status = api.PodStatus{
+		Phase:    api.PodPending,
+		QOSClass: qos.GetPodQOS(pod),
+	}
 }
 
 // DropDisabledPodFields removes disabled fields from the pod metadata and spec.

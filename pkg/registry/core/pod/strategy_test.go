@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -259,6 +260,71 @@ func TestGetPodQOS(t *testing.T) {
 		if actual != testCase.expected {
 			t.Errorf("[%d]: invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
 		}
+	}
+}
+
+func TestSchedulerNameCreate(t *testing.T) {
+	testCases := []struct {
+		pod  *api.Pod
+		want string
+	}{
+		{
+			pod:  &api.Pod{},
+			want: api.DefaultSchedulerName,
+		},
+		{
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					SchedulerName: "foo-scheduler",
+				},
+			},
+			want: "foo-scheduler",
+		},
+	}
+	for id, tc := range testCases {
+		t.Run(fmt.Sprintf("%d", id), func(t *testing.T) {
+			Strategy.PrepareForCreate(genericapirequest.NewContext(), tc.pod)
+			got := tc.pod.Spec.SchedulerName
+			if got != tc.want {
+				t.Errorf("got .spec.schedulerName %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPrepareForUpdate(t *testing.T) {
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			SchedulerName: "foo-scheduler",
+			Hostname:      "foo-host",
+		},
+		Status: api.PodStatus{
+			Phase:    api.PodRunning,
+			QOSClass: api.PodQOSBurstable,
+		},
+	}
+	oldPod := &api.Pod{
+		Spec: api.PodSpec{
+			SchedulerName: "bar-scheduler",
+		},
+		Status: api.PodStatus{
+			Phase:    api.PodPending,
+			QOSClass: api.PodQOSBestEffort,
+		},
+	}
+	wantPod := &api.Pod{
+		Spec: api.PodSpec{
+			SchedulerName: "bar-scheduler",
+			Hostname:      "foo-host",
+		},
+		Status: api.PodStatus{
+			Phase:    api.PodPending,
+			QOSClass: api.PodQOSBestEffort,
+		},
+	}
+	Strategy.PrepareForUpdate(genericapirequest.NewContext(), pod, oldPod)
+	if diff := cmp.Diff(wantPod, pod); diff != "" {
+		t.Errorf("unexpected Pod (-want,+got):\n%s", diff)
 	}
 }
 

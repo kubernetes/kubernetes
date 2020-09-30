@@ -44,7 +44,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/install:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",
         "//pkg/apis/networking:go_default_library",
