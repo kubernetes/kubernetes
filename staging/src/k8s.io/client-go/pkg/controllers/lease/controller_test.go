@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package nodelease
+package lease
 
 import (
 	"errors"
@@ -191,7 +191,9 @@ func TestNewLease(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			newLease := tc.controller.newLease(tc.base)
+			tc.controller.newLeasePostProcessFunc = SetNodeOwnerFunc(tc.controller.client, node.Name)
+			tc.controller.leaseNamespace = corev1.NamespaceNodeLease
+			newLease, _, _ := tc.controller.newLease(tc.base)
 			if newLease == tc.base {
 				t.Fatalf("the new lease must be newly allocated, but got same address as base")
 			}
@@ -274,8 +276,10 @@ func TestRetryUpdateLease(t *testing.T) {
 				client:                     cl,
 				leaseClient:                cl.CoordinationV1().Leases(corev1.NamespaceNodeLease),
 				holderIdentity:             node.Name,
+				leaseNamespace:             corev1.NamespaceNodeLease,
 				leaseDurationSeconds:       10,
 				onRepeatedHeartbeatFailure: tc.onRepeatedHeartbeatFailure,
+				newLeasePostProcessFunc:    SetNodeOwnerFunc(cl, node.Name),
 			}
 			if err := c.retryUpdateLease(nil); tc.expectErr != (err != nil) {
 				t.Fatalf("got %v, expected %v", err != nil, tc.expectErr)
@@ -406,12 +410,14 @@ func TestUpdateUsingLatestLease(t *testing.T) {
 				cl.PrependReactor("create", "leases", tc.createReactor)
 			}
 			c := &controller{
-				clock:                clock.NewFakeClock(time.Now()),
-				client:               cl,
-				leaseClient:          cl.CoordinationV1().Leases(corev1.NamespaceNodeLease),
-				holderIdentity:       node.Name,
-				leaseDurationSeconds: 10,
-				latestLease:          tc.latestLease,
+				clock:                   clock.NewFakeClock(time.Now()),
+				client:                  cl,
+				leaseClient:             cl.CoordinationV1().Leases(corev1.NamespaceNodeLease),
+				holderIdentity:          node.Name,
+				leaseNamespace:          corev1.NamespaceNodeLease,
+				leaseDurationSeconds:    10,
+				latestLease:             tc.latestLease,
+				newLeasePostProcessFunc: SetNodeOwnerFunc(cl, node.Name),
 			}
 
 			c.sync()
