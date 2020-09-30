@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE=staging-k8s.gcr.io/kube-addon-manager
+IMAGE=gcr.io/k8s-staging-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
 VERSION=v9.1.2
