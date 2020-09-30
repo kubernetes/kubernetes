@@ -1556,13 +1556,16 @@ func parseMetadataLocalHostname(metadata string) (string, []string) {
 
 // extractNodeAddresses maps the instance information from EC2 to an array of NodeAddresses
 func extractNodeAddresses(instance *ec2.Instance) ([]v1.NodeAddress, error) {
-	// Not clear if the order matters here, but we might as well indicate a sensible preference order
+	// We want the IPs to end up in order by interface (in particular, we want eth0's
+	// IPs first)
 
 	if instance == nil {
 		return nil, fmt.Errorf("nil instance passed to extractNodeAddresses")
 	}
 
 	addresses := []v1.NodeAddress{}
+
+	interfaceIPs := make(map[int][]string)
 
 	// handle internal network interfaces
 	for _, networkInterface := range instance.NetworkInterfaces {
@@ -1571,14 +1574,25 @@ func extractNodeAddresses(instance *ec2.Instance) ([]v1.NodeAddress, error) {
 			continue
 		}
 
+		ips := []string{}
+
 		for _, internalIP := range networkInterface.PrivateIpAddresses {
 			if ipAddress := aws.StringValue(internalIP.PrivateIpAddress); ipAddress != "" {
 				ip := net.ParseIP(ipAddress)
 				if ip == nil {
 					return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%q)", aws.StringValue(instance.InstanceId), ipAddress)
 				}
-				addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ip.String()})
+				ips = append(ips, ip.String())
 			}
+		}
+
+		interfaceIPs[int(*networkInterface.Attachment.DeviceIndex)] = ip
+	}
+
+	for i := 0; i < len(interfaceIPs); i++ {
+		internalIPs := interfaceIPs[i]
+		for _, internalIP := range internalIPs {
+			addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: internalIP})
 		}
 	}
 
