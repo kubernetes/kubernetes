@@ -46,11 +46,10 @@ import (
 var newLineRegexp = regexp.MustCompile("\r?\n")
 
 type dnsTestCommon struct {
-	f      *framework.Framework
-	c      clientset.Interface
-	ns     string
-	name   string
-	labels []string
+	f    *framework.Framework
+	c    clientset.Interface
+	ns   string
+	name string
 
 	dnsPod       *v1.Pod
 	utilPod      *v1.Pod
@@ -187,13 +186,6 @@ func (t *dnsTestCommon) restoreDNSConfigMap(configMapData map[string]string) {
 	} else {
 		t.c.CoreV1().ConfigMaps(t.ns).Delete(context.TODO(), t.name, metav1.DeleteOptions{})
 	}
-}
-
-func (t *dnsTestCommon) deleteConfigMap() {
-	ginkgo.By(fmt.Sprintf("Deleting the ConfigMap (%s:%s)", t.ns, t.name))
-	t.cm = nil
-	err := t.c.CoreV1().ConfigMaps(t.ns).Delete(context.TODO(), t.name, metav1.DeleteOptions{})
-	framework.ExpectNoError(err, "failed to delete config map: %s", t.name)
 }
 
 func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
