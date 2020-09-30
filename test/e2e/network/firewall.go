@@ -216,10 +216,10 @@ var _ = SIGDescribe("Firewall rule", func() {
 			framework.Failf("did not find any node addresses")
 		}
 
-		masterAddresses := framework.GetAllMasterAddresses(cs)
-		for _, masterAddress := range masterAddresses {
-			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureKubeControllerManagerPort, firewallTestTCPTimeout)
-			assertNotReachableHTTPTimeout(masterAddress, kubeschedulerconfig.DefaultInsecureSchedulerPort, firewallTestTCPTimeout)
+		controlPlaneAddresses := framework.GetControlPlaneAddresses(cs)
+		for _, instanceAddress := range controlPlaneAddresses {
+			assertNotReachableHTTPTimeout(instanceAddress, ports.InsecureKubeControllerManagerPort, firewallTestTCPTimeout)
+			assertNotReachableHTTPTimeout(instanceAddress, kubeschedulerconfig.DefaultInsecureSchedulerPort, firewallTestTCPTimeout)
 		}
 		assertNotReachableHTTPTimeout(nodeAddr, ports.KubeletPort, firewallTestTCPTimeout)
 		assertNotReachableHTTPTimeout(nodeAddr, ports.KubeletReadOnlyPort, firewallTestTCPTimeout)

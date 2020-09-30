@@ -1247,11 +1247,11 @@ func getMasterAddresses(c clientset.Interface) (string, string, string) {
 	return externalIP, internalIP, hostname
 }
 
-// GetAllMasterAddresses returns all IP addresses on which the kubelet can reach the master.
+// GetControlPlaneAddresses returns all IP addresses on which the kubelet can reach the control plane.
 // It may return internal and external IPs, even if we expect for
 // e.g. internal IPs to be used (issue #56787), so that we can be
-// sure to block the master fully during tests.
-func GetAllMasterAddresses(c clientset.Interface) []string {
+// sure to block the control plane fully during tests.
+func GetControlPlaneAddresses(c clientset.Interface) []string {
 	externalIP, internalIP, _ := getMasterAddresses(c)
 
 	ips := sets.NewString()
