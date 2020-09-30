@@ -1518,12 +1518,22 @@ func (proxier *Proxier) syncProxyRules() {
 	// Drop the packets in INVALID state, which would potentially cause
 	// unexpected connection reset.
 	// https://github.com/kubernetes/kubernetes/issues/74839
-	writeLine(proxier.filterRules,
-		"-A", string(kubeForwardChain),
-		"-m", "conntrack",
-		"--ctstate", "INVALID",
-		"-j", "DROP",
-	)
+	if proxier.localDetector.IsImplemented() {
+		args = append(args[:0],
+			"-A", string(kubeForwardChain),
+			"-m", "conntrack",
+		)
+		writeLine(proxier.filterRules,
+			proxier.localDetector.DropLocalInvalidConnTrack(args)...,
+		)
+	} else {
+		writeLine(proxier.filterRules,
+			"-A", string(kubeForwardChain),
+			"-m", "conntrack",
+			"--ctstate", "INVALID",
+			"-j", "DROP",
+		)
+	}
 
 	// If the masqueradeMark has been added then we want to forward that same
 	// traffic, this allows NodePort traffic to be forwarded even if the default

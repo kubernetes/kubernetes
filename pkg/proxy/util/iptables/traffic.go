@@ -38,6 +38,10 @@ type LocalTrafficDetector interface {
 	// JumpINotfLocal appends conditions to jump to a target chain if traffic detected not to be
 	// of local origin
 	JumpIfNotLocal(args []string, toChain string) []string
+
+	// DropLocalInvalidConnTrack appends conditions to drop packets with an invalid conntrack state
+	// of local origin
+	DropLocalInvalidConnTrack(args []string) []string
 }
 
 type noOpLocalDetector struct{}
@@ -56,6 +60,10 @@ func (n *noOpLocalDetector) JumpIfLocal(args []string, toChain string) []string 
 }
 
 func (n *noOpLocalDetector) JumpIfNotLocal(args []string, toChain string) []string {
+	return args // no-op
+}
+
+func (n *noOpLocalDetector) DropLocalInvalidConnTrack(args []string) []string {
 	return args // no-op
 }
 
@@ -89,5 +97,11 @@ func (d *detectLocalByCIDR) JumpIfLocal(args []string, toChain string) []string 
 func (d *detectLocalByCIDR) JumpIfNotLocal(args []string, toChain string) []string {
 	line := append(args, "!", "-s", d.cidr, "-j", toChain)
 	klog.V(4).Info("[DetectLocalByCIDR (", d.cidr, ")]", " Jump Not Local: ", line)
+	return line
+}
+
+func (d *detectLocalByCIDR) DropLocalInvalidConnTrack(args []string) []string {
+	line := append(args, "-s", d.cidr, "-m", "conntrack", "--ctstate", "INVALID", "-j", "DROP")
+	klog.V(4).Info("[DropLocalInvalidConnTrack (", d.cidr, ")]", " Drop Local Invalid ConnTrack: ", line)
 	return line
 }

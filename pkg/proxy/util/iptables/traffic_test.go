@@ -30,12 +30,14 @@ func TestNoOpLocalDetector(t *testing.T) {
 		args                    []string
 		expectedJumpIfOutput    []string
 		expectedJumpIfNotOutput []string
+		expectedDropLocalOutput []string
 	}{
 		{
 			chain:                   "TEST",
 			args:                    []string{"arg1", "arg2"},
 			expectedJumpIfOutput:    []string{"arg1", "arg2"},
 			expectedJumpIfNotOutput: []string{"arg1", "arg2"},
+			expectedDropLocalOutput: []string{"arg1"},
 		},
 	}
 	for _, c := range cases {
@@ -46,6 +48,7 @@ func TestNoOpLocalDetector(t *testing.T) {
 
 		jumpIf := localDetector.JumpIfLocal(c.args, c.chain)
 		jumpIfNot := localDetector.JumpIfNotLocal(c.args, c.chain)
+		dropLocal := localDetector.DropLocalInvalidConnTrack(c.args)
 
 		if !reflect.DeepEqual(jumpIf, c.expectedJumpIfOutput) {
 			t.Errorf("JumpIf, expected: '%v', but got: '%v'", c.expectedJumpIfOutput, jumpIf)
@@ -53,6 +56,10 @@ func TestNoOpLocalDetector(t *testing.T) {
 
 		if !reflect.DeepEqual(jumpIfNot, c.expectedJumpIfNotOutput) {
 			t.Errorf("JumpIfNot, expected: '%v', but got: '%v'", c.expectedJumpIfNotOutput, jumpIfNot)
+		}
+
+		if !reflect.DeepEqual(dropLocal, c.expectedDropLocalOutput) {
+			t.Errorf("DropLocal, expected: '%v', but got: '%v'", c.expectedDropLocalOutput, dropLocal)
 		}
 	}
 }
@@ -126,6 +133,7 @@ func TestDetectLocalByCIDR(t *testing.T) {
 		args                    []string
 		expectedJumpIfOutput    []string
 		expectedJumpIfNotOutput []string
+		expectedDropLocalOutput []string
 	}{
 		{
 			cidr:                    "10.0.0.0/14",
@@ -134,6 +142,7 @@ func TestDetectLocalByCIDR(t *testing.T) {
 			args:                    []string{"arg1", "arg2"},
 			expectedJumpIfOutput:    []string{"arg1", "arg2", "-s", "10.0.0.0/14", "-j", "TEST"},
 			expectedJumpIfNotOutput: []string{"arg1", "arg2", "!", "-s", "10.0.0.0/14", "-j", "TEST"},
+			expectedDropLocalOutput: []string{"arg1", "-s", "10.0.0.0/14", "-m", "conntrack", "--ctstate", "INVALID", "-j", "DROP"},
 		},
 		{
 			cidr:                    "2002::1234:abcd:ffff:c0a8:101/64",
@@ -142,6 +151,7 @@ func TestDetectLocalByCIDR(t *testing.T) {
 			args:                    []string{"arg1", "arg2"},
 			expectedJumpIfOutput:    []string{"arg1", "arg2", "-s", "2002::1234:abcd:ffff:c0a8:101/64", "-j", "TEST"},
 			expectedJumpIfNotOutput: []string{"arg1", "arg2", "!", "-s", "2002::1234:abcd:ffff:c0a8:101/64", "-j", "TEST"},
+			expectedDropLocalOutput: []string{"arg1", "-s", "2002::1234:abcd:ffff:c0a8:101/64", "-m", "conntrack", "--ctstate", "INVALID", "-j", "DROP"},
 		},
 	}
 	for _, c := range cases {
@@ -156,6 +166,7 @@ func TestDetectLocalByCIDR(t *testing.T) {
 
 		jumpIf := localDetector.JumpIfLocal(c.args, c.chain)
 		jumpIfNot := localDetector.JumpIfNotLocal(c.args, c.chain)
+		dropLocal := localDetector.DropLocalInvalidConnTrack(c.args)
 
 		if !reflect.DeepEqual(jumpIf, c.expectedJumpIfOutput) {
 			t.Errorf("JumpIf, expected: '%v', but got: '%v'", c.expectedJumpIfOutput, jumpIf)
@@ -163,6 +174,10 @@ func TestDetectLocalByCIDR(t *testing.T) {
 
 		if !reflect.DeepEqual(jumpIfNot, c.expectedJumpIfNotOutput) {
 			t.Errorf("JumpIfNot, expected: '%v', but got: '%v'", c.expectedJumpIfNotOutput, jumpIfNot)
+		}
+
+		if !reflect.DeepEqual(dropLocal, c.expectedDropLocalOutput) {
+			t.Errorf("DropLocal, expected: '%v', but got: '%v'", c.expectedDropLocalOutput, dropLocal)
 		}
 	}
 }
