@@ -576,3 +576,6 @@ export ENABLE_CSI_PROXY="${ENABLE_CSI_PROXY:-true}"
 # in addition to listening to 127.0.0.1, and whether kube-apiserver should connect to etcd servers
 # through host IP.
 export ETCD_LISTEN_ON_HOST_IP="${ETCD_LISTEN_ON_HOST_IP:-false}"
+
+# Use host IP instead of localhost in control plane kubeconfig files.
+export KUBECONFIG_USE_HOST_IP="${KUBECONFIG_USE_HOST_IP:-false}"
