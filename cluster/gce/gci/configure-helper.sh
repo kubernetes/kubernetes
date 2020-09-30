@@ -1265,11 +1265,18 @@ EOF
   fi
 }
 
+# Create kubeconfig files for control plane components.
 function create-kubeconfig {
   local component=$1
   local token=$2
   echo "Creating kubeconfig file for component ${component}"
   mkdir -p "/etc/srv/kubernetes/${component}"
+
+  local kube_apiserver="localhost"
+  if [[ ${KUBECONFIG_USE_HOST_IP:-} == "true" ]] ; then
+    kube_apiserver=$(hostname -i)
+  fi
+  
   cat <<EOF >"/etc/srv/kubernetes/${component}/kubeconfig"
 apiVersion: v1
 kind: Config
@@ -1281,7 +1288,7 @@ clusters:
 - name: local
   cluster:
     insecure-skip-tls-verify: true
-    server: https://localhost:443
+    server: https://${kube_apiserver}:443
 contexts:
 - context:
     cluster: local
