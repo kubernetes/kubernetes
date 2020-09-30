@@ -603,9 +603,11 @@ func makeInstance(num int, privateIP, publicIP, privateDNSName, publicDNSName st
 		},
 	}
 	if setNetInterface == true {
+		deviceIndex := int64(0)
 		instance.NetworkInterfaces = []*ec2.InstanceNetworkInterface{
 			{
-				Status: aws.String(ec2.NetworkInterfaceStatusInUse),
+				Status:     aws.String(ec2.NetworkInterfaceStatusInUse),
+				Attachment: &ec2.InstanceNetworkInterfaceAttachment{DeviceIndex: &deviceIndex},
 				PrivateIpAddresses: []*ec2.InstancePrivateIpAddress{
 					{
 						PrivateIpAddress: aws.String(privateIP),
