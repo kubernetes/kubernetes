@@ -128,7 +128,7 @@ func TestGCTerminated(t *testing.T) {
 			gcc, podInformer, _ := NewFromClient(client, test.threshold)
 			deletedPodNames := make([]string, 0)
 			var lock sync.Mutex
-			gcc.deletePod = func(_, name string) error {
+			gcc.deletePod = func(_, name string, _ int64) error {
 				lock.Lock()
 				defer lock.Unlock()
 				deletedPodNames = append(deletedPodNames, name)
@@ -328,7 +328,7 @@ func TestGCOrphaned(t *testing.T) {
 
 			deletedPodNames := make([]string, 0)
 			var lock sync.Mutex
-			gcc.deletePod = func(_, name string) error {
+			gcc.deletePod = func(_, name string, _ int64) error {
 				lock.Lock()
 				defer lock.Unlock()
 				deletedPodNames = append(deletedPodNames, name)
@@ -416,7 +416,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 			gcc, podInformer, _ := NewFromClient(client, -1)
 			deletedPodNames := make([]string, 0)
 			var lock sync.Mutex
-			gcc.deletePod = func(_, name string) error {
+			gcc.deletePod = func(_, name string, _ int64) error {
 				lock.Lock()
 				defer lock.Unlock()
 				deletedPodNames = append(deletedPodNames, name)

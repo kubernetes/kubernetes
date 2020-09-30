@@ -57,7 +57,7 @@ type PodGCController struct {
 
 	nodeQueue workqueue.DelayingInterface
 
-	deletePod              func(namespace, name string) error
+	deletePod              func(namespace, name string, grace int64) error
 	terminatedPodThreshold int
 }
 
@@ -74,9 +74,9 @@ func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInfor
 		nodeLister:             nodeInformer.Lister(),
 		nodeListerSynced:       nodeInformer.Informer().HasSynced,
 		nodeQueue:              workqueue.NewNamedDelayingQueue("orphaned_pods_nodes"),
-		deletePod: func(namespace, name string) error {
-			klog.Infof("PodGC is force deleting Pod: %v/%v", namespace, name)
-			return kubeClient.CoreV1().Pods(namespace).Delete(context.TODO(), name, *metav1.NewDeleteOptions(0))
+		deletePod: func(namespace, name string, grace int64) error {
+			klog.Infof("PodGC is deleting Pod: %v/%v with grace period seconds: %d", namespace, name, grace)
+			return kubeClient.CoreV1().Pods(namespace).Delete(context.TODO(), name, *metav1.NewDeleteOptions(grace))
 		},
 	}
 
@@ -147,7 +147,7 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 		wait.Add(1)
 		go func(namespace string, name string) {
 			defer wait.Done()
-			if err := gcc.deletePod(namespace, name); err != nil {
+			if err := gcc.deletePod(namespace, name, 0); err != nil {
 				// ignore not founds
 				defer utilruntime.HandleError(err)
 			}
@@ -179,11 +179,25 @@ func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod, nodes []*v1.Node) {
 		if !deletedNodesNames.Has(pod.Spec.NodeName) {
 			continue
 		}
-		klog.V(2).Infof("Found orphaned Pod %v/%v assigned to the Node %v. Deleting.", pod.Namespace, pod.Name, pod.Spec.NodeName)
-		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
-			utilruntime.HandleError(err)
+
+		if pod.DeletionTimestamp == nil {
+			var grace int64 = 0
+			if pod.Spec.TerminationGracePeriodSeconds != nil {
+				grace = *pod.Spec.TerminationGracePeriodSeconds
+			}
+			klog.V(2).Infof("Found orphaned Pod %v/%v assigned to the Node %v. Try to gracefully delete.", pod.Namespace, pod.Name, pod.Spec.NodeName)
+			if err := gcc.deletePod(pod.Namespace, pod.Name, grace); err != nil {
+				utilruntime.HandleError(err)
+			}
 		} else {
-			klog.V(0).Infof("Forced deletion of orphaned Pod %v/%v succeeded", pod.Namespace, pod.Name)
+			if pod.DeletionGracePeriodSeconds != nil && time.Now().After(pod.DeletionTimestamp.Add(time.Duration(*pod.DeletionGracePeriodSeconds)*time.Second)) {
+				klog.V(2).Infof("Found orphaned Pod %v/%v assigned to the Node %v. Force deleting after graceful period seconds.", pod.Namespace, pod.Name, pod.Spec.NodeName)
+				if err := gcc.deletePod(pod.Namespace, pod.Name, 0); err != nil {
+					utilruntime.HandleError(err)
+				} else {
+					klog.V(0).Infof("Forced deletion of orphaned Pod %v/%v succeeded", pod.Namespace, pod.Name)
+				}
+			}
 		}
 	}
 }
@@ -229,7 +243,7 @@ func (gcc *PodGCController) gcUnscheduledTerminating(pods []*v1.Pod) {
 		}
 
 		klog.V(2).Infof("Found unscheduled terminating Pod %v/%v not assigned to any Node. Deleting.", pod.Namespace, pod.Name)
-		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
+		if err := gcc.deletePod(pod.Namespace, pod.Name, 0); err != nil {
 			utilruntime.HandleError(err)
 		} else {
 			klog.V(0).Infof("Forced deletion of unscheduled terminating Pod %v/%v succeeded", pod.Namespace, pod.Name)
