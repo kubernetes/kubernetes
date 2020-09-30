@@ -19,9 +19,10 @@ limitations under the License.
 package fs
 
 import (
-	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"golang.org/x/sys/unix"
@@ -95,23 +96,35 @@ func Find(path string) (int64, error) {
 	} else if err != nil {
 		return 0, fmt.Errorf("unable to retrieve inode consumption via quota for %s: %v", path, err)
 	}
-	var counter byteCounter
-	var stderr bytes.Buffer
-	findCmd := exec.Command("find", path, "-xdev", "-printf", ".")
-	findCmd.Stdout, findCmd.Stderr = &counter, &stderr
-	if err := findCmd.Start(); err != nil {
-		return 0, fmt.Errorf("failed to exec cmd %v - %v; stderr: %v", findCmd.Args, err, stderr.String())
-	}
-	if err := findCmd.Wait(); err != nil {
-		return 0, fmt.Errorf("cmd %v failed. stderr: %s; err: %v", findCmd.Args, stderr.String(), err)
-	}
-	return counter.bytesWritten, nil
-}
 
-// Simple io.Writer implementation that counts how many bytes were written.
-type byteCounter struct{ bytesWritten int64 }
+	topLevelStat := &unix.Stat_t{}
+	err = unix.Stat(path, topLevelStat)
+	if err != nil {
+		return 0, err
+	}
 
-func (b *byteCounter) Write(p []byte) (int, error) {
-	b.bytesWritten += int64(len(p))
-	return len(p), nil
+	var count int64 = 0
+	err = filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			// ignore files that have been deleted after directory was read
+			if os.IsNotExist(err) {
+				return nil
+			}
+			count = 0
+			return err
+		}
+		count++
+		if info.IsDir() {
+			stat := &unix.Stat_t{}
+			err = unix.Stat(path, stat)
+			if err != nil {
+				return nil
+			}
+			if stat.Dev != topLevelStat.Dev {
+				return filepath.SkipDir
+			}
+		}
+		return nil
+	})
+	return count, err
 }
