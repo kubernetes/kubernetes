@@ -74,7 +74,9 @@ func createNodes(t *testing.T, client *clientset.Clientset, startIndex, endIndex
 	}()
 
 	for err := range errs {
-		t.Fatalf("Failed to create node: %v", err)
+		if err != nil {
+			t.Fatalf("Failed to create node: %v", err)
+		}
 	}
 }
 
