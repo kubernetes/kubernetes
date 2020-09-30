@@ -32,6 +32,7 @@ func run() int {
 	terminationLog := flag.String("termination-log-file", "", "Write logs after SIGTERM to this file (in addition to stderr)")
 	terminationLock := flag.String("termination-touch-file", "", "Touch this file on SIGTERM and delete on termination")
 	kubeconfigPath := flag.String("kubeconfig", "", "Optional kubeconfig used to create events")
+	gracefulTerminatioPeriod := flag.Duration("graceful-termination-duration", 105*time.Second, "The duration of the graceful termination period, e.g. 105s")
 
 	klog.InitFlags(nil)
 	flag.Set("v", "9")
@@ -126,12 +127,32 @@ func run() int {
 			// keep going
 		}
 
-		defer func() {
+		var deleteLockOnce sync.Once
+
+		if *gracefulTerminatioPeriod > 2*time.Second {
+			go func() {
+				<-termCh
+				<-time.After(*gracefulTerminatioPeriod - 2*time.Second)
+
+				deleteLockOnce.Do(func() {
+					klog.Infof("Graceful termination time nearly passed and kube-apiserver has still not terminated. Deleting termination lock file %q to avoid a false positive.", *terminationLock)
+					if err := os.Remove(*terminationLock); err != nil {
+						klog.Errorf("Termination lock file deletion failed: %v", err)
+					}
+
+					if err := eventf(client.CoreV1().Events(ref.Namespace), *ref, corev1.EventTypeWarning, "GracefulTerminationTimeout", "kube-apiserver did not terminate within %s", *gracefulTerminatioPeriod); err != nil {
+						klog.Error(err)
+					}
+				})
+			}()
+		}
+
+		defer deleteLockOnce.Do(func() {
 			klog.Infof("Deleting termination lock file %q", *terminationLock)
 			if err := os.Remove(*terminationLock); err != nil {
 				klog.Errorf("Termination lock file deletion failed: %v", err)
 			}
-		}()
+		})
 	}
 
 	cmd := exec.Command(args[0], args[1:]...)
