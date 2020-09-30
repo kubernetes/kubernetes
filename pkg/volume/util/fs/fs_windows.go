@@ -25,8 +25,6 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
-
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var (
@@ -34,7 +32,12 @@ var (
 	procGetDiskFreeSpaceEx = modkernel32.NewProc("GetDiskFreeSpaceExW")
 )
 
-// FSInfo returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
+type UsageInfo struct {
+	Bytes  int64
+	Inodes int64
+}
+
+// FsInfoInfo returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
 // for the filesystem that path resides upon.
 func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	var freeBytesAvailable, totalNumberOfBytes, totalNumberOfFreeBytes int64
@@ -58,28 +61,14 @@ func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 }
 
 // DiskUsage gets disk usage of specified path.
-func DiskUsage(path string) (*resource.Quantity, error) {
+func DiskUsage(path string) (UsageInfo, error) {
+	var usage UsageInfo
 	info, err := os.Lstat(path)
 	if err != nil {
-		return nil, err
+		return usage, err
 	}
-
-	usage, err := diskUsage(path, info)
-	if err != nil {
-		return nil, err
-	}
-
-	used, err := resource.ParseQuantity(fmt.Sprintf("%d", usage))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse fs usage %d due to %v", usage, err)
-	}
-	used.Format = resource.BinarySI
-	return &used, nil
-}
-
-// Always return zero since inodes is not supported on Windows.
-func Find(path string) (int64, error) {
-	return 0, nil
+	usage.Bytes, err = diskUsage(path, info)
+	return usage, err
 }
 
 func diskUsage(currPath string, info os.FileInfo) (int64, error) {
