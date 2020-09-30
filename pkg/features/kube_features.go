@@ -637,6 +637,12 @@ const (
 	//
 	// Disables Accelerator Metrics Collected by Kubelet
 	DisableAcceleratorUsageMetrics featuregate.Feature = "DisableAcceleratorUsageMetrics"
+
+	// owner: @roycaihw
+	// alpha: v1.20
+	//
+	// Assigns each kube-apiserver an ID in a cluster.
+	APIServerIdentity featuregate.Feature = "APIServerIdentity"
 )
 
 func init() {
@@ -734,6 +740,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WinOverlay:                                     {Default: true, PreRelease: featuregate.Beta},
 	WinDSR:                                         {Default: false, PreRelease: featuregate.Alpha},
 	DisableAcceleratorUsageMetrics:                 {Default: false, PreRelease: featuregate.Alpha},
+	APIServerIdentity:                              {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
