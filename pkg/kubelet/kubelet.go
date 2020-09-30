@@ -334,7 +334,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	hostname string,
 	hostnameOverridden bool,
 	nodeName types.NodeName,
-	nodeIP string,
+	nodeIPs []net.IP,
 	providerID string,
 	cloudProvider string,
 	certDirectory string,
@@ -462,7 +462,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 	}
 	httpClient := &http.Client{}
-	parsedNodeIP := net.ParseIP(nodeIP)
 
 	klet := &Kubelet{
 		hostname:                                hostname,
@@ -477,7 +476,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		registerNode:                            registerNode,
 		registerWithTaints:                      registerWithTaints,
 		registerSchedulable:                     registerSchedulable,
-		dnsConfigurer:                           dns.NewConfigurer(kubeDeps.Recorder, nodeRef, parsedNodeIP, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
+		dnsConfigurer:                           dns.NewConfigurer(kubeDeps.Recorder, nodeRef, nodeIPs, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
 		serviceLister:                           serviceLister,
 		serviceHasSynced:                        serviceHasSynced,
 		nodeLister:                              nodeLister,
@@ -506,7 +505,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		containerManager:                        kubeDeps.ContainerManager,
 		containerRuntimeName:                    containerRuntime,
 		redirectContainerStreaming:              crOptions.RedirectContainerStreaming,
-		nodeIP:                                  parsedNodeIP,
+		nodeIPs:                                 nodeIPs,
 		nodeIPValidator:                         validateNodeIP,
 		clock:                                   clock.RealClock{},
 		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
@@ -1041,8 +1040,8 @@ type Kubelet struct {
 	// oneTimeInitializer is used to initialize modules that are dependent on the runtime to be up.
 	oneTimeInitializer sync.Once
 
-	// If non-nil, use this IP address for the node
-	nodeIP net.IP
+	// If set, use this IP address or addresses for the node
+	nodeIPs []net.IP
 
 	// use this function to validate the kubelet nodeIP
 	nodeIPValidator func(net.IP) error

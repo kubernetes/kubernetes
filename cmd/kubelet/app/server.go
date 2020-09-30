@@ -102,6 +102,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/utils/exec"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -1082,6 +1083,27 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	// Setup event recorder if required.
 	makeEventRecorder(kubeDeps, nodeName)
 
+	var nodeIPs []net.IP
+	if kubeServer.NodeIP != "" {
+		for _, ip := range strings.Split(kubeServer.NodeIP, ",") {
+			parsedNodeIP := net.ParseIP(strings.TrimSpace(ip))
+			if parsedNodeIP == nil {
+				klog.Warningf("Could not parse --node-ip value %q; ignoring", ip)
+			} else {
+				nodeIPs = append(nodeIPs, parsedNodeIP)
+			}
+		}
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && len(nodeIPs) > 1 {
+		return fmt.Errorf("dual-stack --node-ip %q not supported in a single-stack cluster", kubeServer.NodeIP)
+	} else if len(nodeIPs) > 2 || (len(nodeIPs) == 2 && utilnet.IsIPv6(nodeIPs[0]) == utilnet.IsIPv6(nodeIPs[1])) {
+		return fmt.Errorf("bad --node-ip %q; must contain either a single IP or a dual-stack pair of IPs", kubeServer.NodeIP)
+	} else if len(nodeIPs) == 2 && kubeServer.CloudProvider != "" {
+		return fmt.Errorf("dual-stack --node-ip %q not supported when using a cloud provider", kubeServer.NodeIP)
+	} else if len(nodeIPs) == 2 && (nodeIPs[0].IsUnspecified() || nodeIPs[1].IsUnspecified()) {
+		return fmt.Errorf("dual-stack --node-ip %q cannot include '0.0.0.0' or '::'", kubeServer.NodeIP)
+	}
+
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
@@ -1100,7 +1122,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		hostname,
 		hostnameOverridden,
 		nodeName,
-		kubeServer.NodeIP,
+		nodeIPs,
 		kubeServer.ProviderID,
 		kubeServer.CloudProvider,
 		kubeServer.CertDirectory,
@@ -1174,7 +1196,7 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	hostname string,
 	hostnameOverridden bool,
 	nodeName types.NodeName,
-	nodeIP string,
+	nodeIPs []net.IP,
 	providerID string,
 	cloudProvider string,
 	certDirectory string,
@@ -1205,7 +1227,7 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		hostname,
 		hostnameOverridden,
 		nodeName,
-		nodeIP,
+		nodeIPs,
 		providerID,
 		cloudProvider,
 		certDirectory,
