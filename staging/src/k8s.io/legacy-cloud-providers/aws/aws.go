@@ -1586,7 +1586,7 @@ func extractNodeAddresses(instance *ec2.Instance) ([]v1.NodeAddress, error) {
 			}
 		}
 
-		interfaceIPs[int(*networkInterface.Attachment.DeviceIndex)] = ip
+		interfaceIPs[int(*networkInterface.Attachment.DeviceIndex)] = ips
 	}
 
 	for i := 0; i < len(interfaceIPs); i++ {
