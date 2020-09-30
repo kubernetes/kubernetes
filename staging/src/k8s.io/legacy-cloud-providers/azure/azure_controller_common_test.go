@@ -543,3 +543,32 @@ func TestFilterNonExistingDisks(t *testing.T) {
 	filteredDisks = filterDetachingDisks(disks)
 	assert.Equal(t, 0, len(filteredDisks))
 }
+
+func TestIsInstanceNotFoundError(t *testing.T) {
+	testCases := []struct {
+		errMsg         string
+		expectedResult bool
+	}{
+		{
+			errMsg:         "",
+			expectedResult: false,
+		},
+		{
+			errMsg:         "other error",
+			expectedResult: false,
+		},
+		{
+			errMsg:         "not an active Virtual Machine scale set vm",
+			expectedResult: false,
+		},
+		{
+			errMsg:         `compute.VirtualMachineScaleSetVMsClient#Update: Failure sending request: StatusCode=400 -- Original Error: Code="InvalidParameter" Message="The provided instanceId 1181 is not an active Virtual Machine Scale Set VM instanceId." Target="instanceIds"`,
+			expectedResult: true,
+		},
+	}
+
+	for i, test := range testCases {
+		result := isInstanceNotFoundError(fmt.Errorf(test.errMsg))
+		assert.Equal(t, test.expectedResult, result, "TestCase[%d]", i, result)
+	}
+}
