@@ -1774,6 +1774,20 @@ $FLUENTD_CONFIG = @'
 </source>
 
 # Example:
+# I0928 03:15:50.440223    4880 main.go:51] Starting CSI-Proxy Server ...
+<source>
+  @type tail
+  format multiline
+  multiline_flush_interval 5s
+  format_firstline /^\w\d{4}/
+  format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+  time_format %m%d %H:%M:%S.%N
+  path /etc/kubernetes/logs/csi-proxy.log
+  pos_file /etc/kubernetes/logs/gcp-csi-proxy.log.pos
+  tag csi-proxy
+</source>
+
+# Example:
 # time="2019-12-10T21:27:59.836946700Z" level=info msg="loading plugin \"io.containerd.grpc.v1.cri\"..." type=io.containerd.grpc.v1
 <source>
   @type tail
