@@ -66,10 +66,15 @@ func TestDiskUsage(t *testing.T) {
 	}
 	total := dirInfo1.Size() + dirInfo2.Size() + fileInfo1.Size() + fileInfo2.Size()
 
-	size, err := DiskUsage(dir_1)
+	usage, err := DiskUsage(dir_1)
 	if err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
 	}
+	size, err := resource.ParseQuantity(fmt.Sprintf("%d", usage.Bytes))
+	if err != nil {
+		t.Fatalf("TestDiskUsage failed: %s", err.Error())
+	}
+
 	used, err := resource.ParseQuantity(fmt.Sprintf("%d", total))
 	if err != nil {
 		t.Fatalf("TestDiskUsage failed: %s", err.Error())
