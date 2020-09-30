@@ -30,6 +30,8 @@ const (
 	NamespaceAll string = ""
 	// NamespaceNodeLease is the namespace where we place node lease objects (used for node heartbeats)
 	NamespaceNodeLease string = "kube-node-lease"
+	// NamespaceAPIServerLease is the namespace where we place kube-apiserver lease objects (used for apiserver identity)
+	NamespaceAPIServerLease string = "kube-apiserver-lease"
 	// TopologyKeyAny is the service topology key that matches any node
 	TopologyKeyAny string = "*"
 )

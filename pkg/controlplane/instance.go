@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"reflect"
 	"strconv"
 	"time"
@@ -44,6 +45,7 @@ import (
 	coordinationapiv1 "k8s.io/api/coordination/v1"
 	coordinationapiv1beta1 "k8s.io/api/coordination/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	eventsv1 "k8s.io/api/events/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
@@ -64,8 +66,12 @@ import (
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/clock"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -78,6 +84,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
+	"k8s.io/client-go/pkg/controllers/lease"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -481,6 +488,31 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		go controller.Run(1, hookContext.StopCh)
 		return nil
 	})
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+			kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
+			if err != nil {
+				return err
+			}
+			hostname, err := os.Hostname()
+			if err != nil {
+				return err
+			}
+			pid := strconv.Itoa(os.Getpid())
+			// ID (lease name) must be a valid lowercase RFC 1123 subdomain
+			uuidLength := 6
+			hostnameMaxLength := validation.DNS1123SubdomainMaxLength - len(pid) - uuidLength
+			if len(hostname) > hostnameMaxLength {
+				hostname = hostname[:hostnameMaxLength]
+			}
+			id := hostname + "-" + strconv.Itoa(os.Getpid()) + "-" + string(uuid.NewUUID())[:uuidLength]
+			// TODO(roycaihw): make leaseDurationSeconds and renewInterval flags
+			controller := lease.NewController(clock.RealClock{}, kubeClient, id, 3600, nil, 10*time.Second, v1.NamespaceAPIServerLease, nil)
+			go controller.Run(wait.NeverStop)
+			return nil
+		})
+	}
 
 	return m, nil
 }

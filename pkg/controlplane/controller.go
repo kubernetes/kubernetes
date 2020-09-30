@@ -31,10 +31,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	servicecontroller "k8s.io/kubernetes/pkg/registry/core/service/ipallocator/controller"
@@ -92,6 +94,9 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 	}
 
 	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic, corev1.NamespaceNodeLease}
+	if utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		systemNamespaces = append(systemNamespaces, corev1.NamespaceAPIServerLease)
+	}
 
 	return &Controller{
 		ServiceClient:   serviceClient,
