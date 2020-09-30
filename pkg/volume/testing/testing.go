@@ -1427,15 +1427,14 @@ func FindEmptyDirectoryUsageOnTmpfs() (*resource.Quantity, error) {
 		return nil, err
 	}
 	defer os.RemoveAll(tmpDir)
-	out, err := exec.New().Command("nice", "-n", "19", "du", "-x", "-s", "-B", "1", tmpDir).CombinedOutput()
+	out, err := exec.New().Command("nice", "-n", "19", "du", "-x", "-s", "-k", tmpDir).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed command 'du' on %s with error %v", tmpDir, err)
 	}
-	used, err := resource.ParseQuantity(strings.Fields(string(out))[0])
+	used, err := resource.ParseQuantity(strings.Fields(string(out))[0] + "Ki")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse 'du' output %s due to error %v", out, err)
 	}
-	used.Format = resource.BinarySI
 	return &used, nil
 }
 

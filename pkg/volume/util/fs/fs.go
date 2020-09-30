@@ -67,16 +67,14 @@ func DiskUsage(path string) (*resource.Quantity, error) {
 		return nil, fmt.Errorf("unable to retrieve disk consumption via quota for %s: %v", path, err)
 	}
 	// Uses the same niceness level as cadvisor.fs does when running du
-	// Uses -B 1 to always scale to a blocksize of 1 byte
-	out, err := exec.Command("nice", "-n", "19", "du", "-x", "-s", "-B", "1", path).CombinedOutput()
+	out, err := exec.Command("nice", "-n", "19", "du", "-x", "-s", "-k", path).CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("failed command 'du' ($ nice -n 19 du -x -s -B 1) on path %s with error %v", path, err)
+		return nil, fmt.Errorf("failed command 'du' ($ nice -n 19 du -x -s -k) on path %s with error %v", path, err)
 	}
-	used, err := resource.ParseQuantity(strings.Fields(string(out))[0])
+	used, err := resource.ParseQuantity(strings.Fields(string(out))[0] + "Ki")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse 'du' output %s due to error %v", out, err)
 	}
-	used.Format = resource.BinarySI
 	return &used, nil
 }
 
