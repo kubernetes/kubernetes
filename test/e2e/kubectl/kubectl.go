@@ -1069,13 +1069,13 @@ metadata:
 		/*
 			Release: v1.9
 			Testname: Kubectl, cluster info
-			Description: Call kubectl to get cluster-info, output MUST contain cluster-info returned and Kubernetes Master SHOULD be running.
+			Description: Call kubectl to get cluster-info, output MUST contain cluster-info returned and Kubernetes control plane SHOULD be running.
 		*/
-		framework.ConformanceIt("should check if Kubernetes master services is included in cluster-info ", func() {
+		framework.ConformanceIt("should check if Kubernetes control plane services is included in cluster-info ", func() {
 			ginkgo.By("validating cluster-info")
 			output := framework.RunKubectlOrDie(ns, "cluster-info")
 			// Can't check exact strings due to terminal control commands (colors)
-			requiredItems := []string{"Kubernetes master", "is running at"}
+			requiredItems := []string{"Kubernetes control plane", "is running at"}
 			for _, item := range requiredItems {
 				if !strings.Contains(output, item) {
 					framework.Failf("Missing %s in kubectl cluster-info", item)

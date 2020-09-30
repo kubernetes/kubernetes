@@ -38,11 +38,11 @@ import (
 
 var (
 	longDescr = templates.LongDesc(i18n.T(`
-  Display addresses of the master and services with label kubernetes.io/cluster-service=true
+  Display addresses of the control plane and services with label kubernetes.io/cluster-service=true
   To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.`))
 
 	clusterinfoExample = templates.Examples(i18n.T(`
-		# Print the address of the master and cluster services
+		# Print the address of the control plane and cluster services
 		kubectl cluster-info`))
 )
 
@@ -103,7 +103,7 @@ func (o *ClusterInfoOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		printService(o.Out, "Kubernetes master", o.Client.Host)
+		printService(o.Out, "Kubernetes control plane", o.Client.Host)
 
 		services := r.Object.(*corev1.ServiceList).Items
 		for _, service := range services {
