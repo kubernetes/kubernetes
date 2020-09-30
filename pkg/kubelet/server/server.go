@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/utils/clock"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -357,6 +357,7 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 		cadvisormetrics.NetworkUsageMetrics: struct{}{},
 		cadvisormetrics.AppMetrics:          struct{}{},
 		cadvisormetrics.ProcessMetrics:      struct{}{},
+		cadvisormetrics.CPUTopologyMetrics:  struct{}{},
 	}
 
 	// Only add the Accelerator metrics if the feature is inactive
@@ -371,6 +372,7 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 		Recursive: true,
 	}
 	r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
+	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
 	s.restfulCont.Handle(cadvisorMetricsPath,
 		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
