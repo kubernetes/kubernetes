@@ -679,12 +679,11 @@ func getNodeCIDRMaskSizes(clusterCIDRs []*net.IPNet, maskSizeIPv4, maskSizeIPv6 
 }
 
 func startLeaseGarbageCollector(ctx ControllerContext) (http.Handler, bool, error) {
-	// TODO(roycaihw): make leaseDuration and resync period flags
 	go leasegarbagecollector.NewController(
 		ctx.ClientBuilder.ClientOrDie("lease-garbage-collector"),
 		ctx.InformerFactory.Coordination().V1().Leases(),
 		clock.RealClock{},
-		time.Hour,
+		ctx.ComponentConfig.LeaseGarbageCollectorController.LeaseResyncPeriod.Duration,
 	).Run(ctx.Stop)
 	return nil, true, nil
 }

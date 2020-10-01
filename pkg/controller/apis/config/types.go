@@ -27,6 +27,7 @@ import (
 	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
+	leasegarbagecollectorconfig "k8s.io/kubernetes/pkg/controller/leasegarbagecollector/config"
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
 	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
 	nodelifecycleconfig "k8s.io/kubernetes/pkg/controller/nodelifecycle/config"
@@ -121,6 +122,9 @@ type KubeControllerManagerConfiguration struct {
 	// TTLAfterFinishedControllerConfiguration holds configuration for
 	// TTLAfterFinishedController related features.
 	TTLAfterFinishedController ttlafterfinishedconfig.TTLAfterFinishedControllerConfiguration
+	// LeaseGarbageCollectorControllerConfiguration holds configuration for
+	// LeaseGarbageCollectorController related features.
+	LeaseGarbageCollectorController leasegarbagecollectorconfig.LeaseGarbageCollectorControllerConfiguration
 }
 
 // GenericControllerManagerConfiguration holds configuration for a generic controller-manager

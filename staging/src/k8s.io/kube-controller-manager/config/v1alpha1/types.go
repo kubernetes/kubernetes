@@ -156,6 +156,9 @@ type KubeControllerManagerConfiguration struct {
 	// TTLAfterFinishedControllerConfiguration holds configuration for
 	// TTLAfterFinishedController related features.
 	TTLAfterFinishedController TTLAfterFinishedControllerConfiguration
+	// LeaseGarbageCollectorControllerConfiguration holds configuration for
+	// LeaseGarbageCollectorController related features.
+	LeaseGarbageCollectorController LeaseGarbageCollectorControllerConfiguration
 }
 
 // GenericControllerManagerConfiguration holds configuration for a generic controller-manager.
@@ -540,4 +543,9 @@ type TTLAfterFinishedControllerConfiguration struct {
 	// concurrentTTLSyncs is the number of TTL-after-finished collector workers that are
 	// allowed to sync concurrently.
 	ConcurrentTTLSyncs int32
+}
+
+// LeaseGarbageCollectorControllerConfiguration contains elements describing LeaseGarbageCollectorController.
+type LeaseGarbageCollectorControllerConfiguration struct {
+	LeaseResyncPeriod metav1.Duration
 }

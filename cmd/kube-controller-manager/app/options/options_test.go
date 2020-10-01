@@ -42,6 +42,7 @@ import (
 	endpointslicemirroringconfig "k8s.io/kubernetes/pkg/controller/endpointslicemirroring/config"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
+	leasegarbagecollectorconfig "k8s.io/kubernetes/pkg/controller/leasegarbagecollector/config"
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
 	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
 	nodelifecycleconfig "k8s.io/kubernetes/pkg/controller/nodelifecycle/config"
@@ -422,6 +423,11 @@ func TestAddFlags(t *testing.T) {
 		Master:     "192.168.4.20",
 		Metrics:    &metrics.Options{},
 		Logs:       logs.NewOptions(),
+		LeaseGarbageCollectorController: &LeaseGarbageCollectorControllerOptions{
+			&leasegarbagecollectorconfig.LeaseGarbageCollectorControllerConfiguration{
+				LeaseResyncPeriod: metav1.Duration{Duration: 1 * time.Hour},
+			},
+		},
 	}
 
 	// Sort GCIgnoredResources because it's built from a map, which means the
@@ -615,6 +621,9 @@ func TestApplyTo(t *testing.T) {
 			},
 			TTLAfterFinishedController: ttlafterfinishedconfig.TTLAfterFinishedControllerConfiguration{
 				ConcurrentTTLSyncs: 8,
+			},
+			LeaseGarbageCollectorController: leasegarbagecollectorconfig.LeaseGarbageCollectorControllerConfiguration{
+				LeaseResyncPeriod: metav1.Duration{Duration: 1 * time.Hour},
 			},
 		},
 	}

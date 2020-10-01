@@ -81,6 +81,7 @@ type KubeControllerManagerOptions struct {
 	ResourceQuotaController          *ResourceQuotaControllerOptions
 	SAController                     *SAControllerOptions
 	TTLAfterFinishedController       *TTLAfterFinishedControllerOptions
+	LeaseGarbageCollectorController  *LeaseGarbageCollectorControllerOptions
 
 	SecureServing *apiserveroptions.SecureServingOptionsWithLoopback
 	// TODO: remove insecure serving mode
@@ -174,6 +175,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		TTLAfterFinishedController: &TTLAfterFinishedControllerOptions{
 			&componentConfig.TTLAfterFinishedController,
 		},
+		LeaseGarbageCollectorController: &LeaseGarbageCollectorControllerOptions{
+			&componentConfig.LeaseGarbageCollectorController,
+		},
 		SecureServing: apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP(componentConfig.Generic.Address),
@@ -254,6 +258,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.ResourceQuotaController.AddFlags(fss.FlagSet("resourcequota controller"))
 	s.SAController.AddFlags(fss.FlagSet("serviceaccount controller"))
 	s.TTLAfterFinishedController.AddFlags(fss.FlagSet("ttl-after-finished controller"))
+	s.LeaseGarbageCollectorController.AddFlags(fss.FlagSet("leasegarbagecollector controller"))
 	s.Metrics.AddFlags(fss.FlagSet("metrics"))
 	s.Logs.AddFlags(fss.FlagSet("logs"))
 
@@ -340,6 +345,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 		return err
 	}
 	if err := s.TTLAfterFinishedController.ApplyTo(&c.ComponentConfig.TTLAfterFinishedController); err != nil {
+		return err
+	}
+	if err := s.LeaseGarbageCollectorController.ApplyTo(&c.ComponentConfig.LeaseGarbageCollectorController); err != nil {
 		return err
 	}
 	if err := s.InsecureServing.ApplyTo(&c.InsecureServing, &c.LoopbackClientConfig); err != nil {
