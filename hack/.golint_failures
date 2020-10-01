@@ -57,10 +57,9 @@ pkg/controller/daemon/config/v1alpha1
 pkg/controller/deployment
 pkg/controller/deployment/config/v1alpha1
 pkg/controller/disruption
-pkg/controller/endpoint
-pkg/controller/endpoint/config/v1alpha1
-pkg/controller/endpointslice/config/v1alpha1
-pkg/controller/endpointslicemirroring/config/v1alpha1
+pkg/controller/endpoint/config/v1alpha1 # only 'don't use underscores in Go names' due to auto generated functions
+pkg/controller/endpointslice/config/v1alpha1 # only 'don't use underscores in Go names' due to auto generated functions
+pkg/controller/endpointslicemirroring/config/v1alpha1 # only 'don't use underscores in Go names' due to auto generated functions
 pkg/controller/garbagecollector
 pkg/controller/garbagecollector/config/v1alpha1
 pkg/controller/job/config/v1alpha1
