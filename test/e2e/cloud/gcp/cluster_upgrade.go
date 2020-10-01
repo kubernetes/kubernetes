@@ -101,9 +101,9 @@ func masterUpgrade(f *framework.Framework, v string) error {
 	}
 }
 
-// masterUpgradeGCEWithKubeProxyDaemonSet upgrades master node on GCE with enabling/disabling the daemon set of kube-proxy.
+// instanceUpgradeGCEWithKubeProxyDaemonSet upgrades instance node on GCE with enabling/disabling the daemon set of kube-proxy.
 // TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
-func masterUpgradeGCEWithKubeProxyDaemonSet(v string, enableKubeProxyDaemonSet bool) error {
+func instanceUpgradeGCEWithKubeProxyDaemonSet(v string, enableKubeProxyDaemonSet bool) error {
 	return masterUpgradeGCE(v, enableKubeProxyDaemonSet)
 }
 
@@ -150,7 +150,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				defer finalizeUpgradeTest(start, masterUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(masterUpgrade(f, target))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(checkInstanceVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
@@ -172,7 +172,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				defer finalizeUpgradeTest(start, nodeUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(checkInstanceVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.NodeUpgrade, upgradeFunc)
 		})
@@ -191,7 +191,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				defer finalizeUpgradeTest(start, clusterUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(masterUpgrade(f, target))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(checkInstanceVersion(f.ClientSet, target))
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
@@ -224,7 +224,7 @@ var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(masterUpgrade(f, target))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(checkInstanceVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
@@ -272,7 +272,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				defer finalizeUpgradeTest(start, gpuUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(masterUpgrade(f, target))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(checkInstanceVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
@@ -290,7 +290,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				defer finalizeUpgradeTest(start, gpuUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(masterUpgrade(f, target))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(checkInstanceVersion(f.ClientSet, target))
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
@@ -312,7 +312,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 				framework.ExpectNoError(masterUpgrade(f, target))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(checkInstanceVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
@@ -338,7 +338,7 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 				defer finalizeUpgradeTest(start, statefulUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(masterUpgrade(f, target))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(checkInstanceVersion(f.ClientSet, target))
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
@@ -372,8 +372,8 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				start := time.Now()
 				defer finalizeUpgradeTest(start, kubeProxyUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(masterUpgradeGCEWithKubeProxyDaemonSet(target, true))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(instanceUpgradeGCEWithKubeProxyDaemonSet(target, true))
+				framework.ExpectNoError(checkInstanceVersion(f.ClientSet, target))
 				framework.ExpectNoError(nodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, true))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
 			}
@@ -402,8 +402,8 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(nodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, false))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-				framework.ExpectNoError(masterUpgradeGCEWithKubeProxyDaemonSet(target, false))
-				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
+				framework.ExpectNoError(instanceUpgradeGCEWithKubeProxyDaemonSet(target, false))
+				framework.ExpectNoError(checkInstanceVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, kubeProxyDowngradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
@@ -595,9 +595,9 @@ func traceRouteToMaster() {
 	}
 }
 
-// checkMasterVersion validates the master version
-func checkMasterVersion(c clientset.Interface, want string) error {
-	framework.Logf("Checking master version")
+// checkInstanceVersion validates the instance version
+func checkInstanceVersion(c clientset.Interface, want string) error {
+	framework.Logf("Checking instance version")
 	var err error
 	var v *version.Info
 	waitErr := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
@@ -609,16 +609,16 @@ func checkMasterVersion(c clientset.Interface, want string) error {
 		return true, nil
 	})
 	if waitErr != nil {
-		return fmt.Errorf("CheckMasterVersion() couldn't get the master version: %v", err)
+		return fmt.Errorf("checkInstanceVersion() couldn't get the instance version: %v", err)
 	}
 	// We do prefix trimming and then matching because:
 	// want looks like:  0.19.3-815-g50e67d4
 	// got  looks like: v0.19.3-815-g50e67d4034e858-dirty
 	got := strings.TrimPrefix(v.GitVersion, "v")
 	if !strings.HasPrefix(got, want) {
-		return fmt.Errorf("master had kube-apiserver version %s which does not start with %s", got, want)
+		return fmt.Errorf("instance had kube-apiserver version %s which does not start with %s", got, want)
 	}
-	framework.Logf("Master is at version %s", want)
+	framework.Logf("Instance is at version %s", want)
 	return nil
 }
 
