@@ -307,7 +307,7 @@ const (
 	KubernetesAPIApprovalPolicyConformant CustomResourceDefinitionConditionType = "KubernetesAPIApprovalPolicyConformant"
 )
 
-// CustomResourceDefinitionCondition contains details for the current condition of this pod.
+// CustomResourceDefinitionCondition contains details for the current condition of this CRD.
 type CustomResourceDefinitionCondition struct {
 	// type is the type of the condition. Types include Established, NamesAccepted and Terminating.
 	Type CustomResourceDefinitionConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=CustomResourceDefinitionConditionType"`

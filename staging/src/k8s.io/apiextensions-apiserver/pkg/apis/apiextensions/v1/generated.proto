@@ -130,7 +130,7 @@ message CustomResourceDefinition {
   optional CustomResourceDefinitionStatus status = 3;
 }
 
-// CustomResourceDefinitionCondition contains details for the current condition of this pod.
+// CustomResourceDefinitionCondition contains details for the current condition of this CRD.
 message CustomResourceDefinitionCondition {
   // type is the type of the condition. Types include Established, NamesAccepted and Terminating.
   optional string type = 1;
