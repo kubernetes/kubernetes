@@ -26,15 +26,7 @@ var (
 			`Ubernetes`,                   // Can't set zone labels today
 			`kube-ui`,                     // Not installed by default
 			`Kubernetes Dashboard`,        // Not installed by default (also probably slow image pull)
-
-			`NetworkPolicy.*egress`,     // not supported
-			`NetworkPolicy.*named port`, // not yet implemented
-			`enforce egress policy`,     // not support
-			`should proxy to cadvisor`,  // we don't expose cAdvisor port directly for security reasons
-
-			`NetworkPolicy.*IPBlock`,          // not supported
-			`NetworkPolicy.*Egress`,           // not supported
-			`NetworkPolicy.*default-deny-all`, // not supported
+			`should proxy to cadvisor`,    // we don't expose cAdvisor port directly for security reasons
 		},
 		// tests that rely on special configuration that we do not yet support
 		"[Disabled:SpecialConfig]": {
@@ -68,7 +60,6 @@ var (
 			`should check kube-proxy urls`,                              // previously this test was skipped b/c we reported -1 as the number of nodes, now we report proper number and test fails
 			`SSH`,                                                       // TRIAGE
 			`should implement service.kubernetes.io/service-proxy-name`, // this is an optional test that requires SSH. sig-network
-			`should allow ingress access on one named port`,             // https://bugzilla.redhat.com/show_bug.cgi?id=1711602
 			`recreate nodes and ensure they function upon restart`,      // https://bugzilla.redhat.com/show_bug.cgi?id=1756428
 			`\[Driver: iscsi\]`,                                         // https://bugzilla.redhat.com/show_bug.cgi?id=1711627
 
@@ -187,6 +178,16 @@ var (
 			// not run, assigned to arch as catch-all
 			`\[Feature:GKELocalSSD\]`,
 			`\[Feature:GKENodePool\]`,
+		},
+		// Tests that don't pass under openshift-sdn.
+		// These are skipped explicitly by openshift-hack/test-kubernetes-e2e.sh,
+		// but will also be skipped by openshift-tests in jobs that use openshift-sdn.
+		"[Skipped:Network/OpenShiftSDN]": {
+			`NetworkPolicy.*IPBlock`,    // feature is not supported by openshift-sdn
+			`NetworkPolicy.*[Ee]gress`,  // feature is not supported by openshift-sdn
+			`NetworkPolicy.*named port`, // feature is not supported by openshift-sdn
+
+			`NetworkPolicy between server and client should support a 'default-deny-all' policy`, // uses egress feature
 		},
 	}
 
