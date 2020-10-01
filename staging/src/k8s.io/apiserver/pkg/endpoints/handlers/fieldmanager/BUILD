@@ -50,6 +50,7 @@ go_test(
     srcs = [
         "capmanagers_test.go",
         "fieldmanager_test.go",
+        "managedfieldsupdater_test.go",
         "skipnonapplied_test.go",
     ],
     data = [
