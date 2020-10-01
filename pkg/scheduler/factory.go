@@ -272,11 +272,12 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 
 	// "PrioritySort" and "DefaultBinder" were neither predicates nor priorities
 	// before. We add them by default.
+
 	plugins := schedulerapi.Plugins{
-		QueueSort: &schedulerapi.PluginSet{
+		QueueSort: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{{Name: queuesort.Name}},
 		},
-		Bind: &schedulerapi.PluginSet{
+		Bind: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}},
 		},
 	}

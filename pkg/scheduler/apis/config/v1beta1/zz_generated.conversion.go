@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1alpha1 "k8s.io/component-base/config/v1alpha1"
 	v1 "k8s.io/kube-scheduler/config/v1"
 	v1beta1 "k8s.io/kube-scheduler/config/v1beta1"
 	config "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -290,10 +289,12 @@ func Convert_config_InterPodAffinityArgs_To_v1beta1_InterPodAffinityArgs(in *con
 }
 
 func autoConvert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in *v1beta1.KubeSchedulerConfiguration, out *config.KubeSchedulerConfiguration, s conversion.Scope) error {
-	if err := v1alpha1.Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.LeaderElection, &out.LeaderElection, 0); err != nil {
 		return err
 	}
-	if err := v1alpha1.Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ClientConnection, &out.ClientConnection, 0); err != nil {
 		return err
 	}
 	if err := metav1.Convert_Pointer_string_To_string(&in.HealthzBindAddress, &out.HealthzBindAddress, s); err != nil {
@@ -302,7 +303,8 @@ func autoConvert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfi
 	if err := metav1.Convert_Pointer_string_To_string(&in.MetricsBindAddress, &out.MetricsBindAddress, s); err != nil {
 		return err
 	}
-	if err := v1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.DebuggingConfiguration, &out.DebuggingConfiguration, 0); err != nil {
 		return err
 	}
 	if err := metav1.Convert_Pointer_int32_To_int32(&in.PercentageOfNodesToScore, &out.PercentageOfNodesToScore, s); err != nil {
@@ -331,10 +333,12 @@ func autoConvert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfi
 
 func autoConvert_config_KubeSchedulerConfiguration_To_v1beta1_KubeSchedulerConfiguration(in *config.KubeSchedulerConfiguration, out *v1beta1.KubeSchedulerConfiguration, s conversion.Scope) error {
 	// WARNING: in.AlgorithmSource requires manual conversion: does not exist in peer-type
-	if err := v1alpha1.Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.LeaderElection, &out.LeaderElection, 0); err != nil {
 		return err
 	}
-	if err := v1alpha1.Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ClientConnection, &out.ClientConnection, 0); err != nil {
 		return err
 	}
 	if err := metav1.Convert_string_To_Pointer_string(&in.HealthzBindAddress, &out.HealthzBindAddress, s); err != nil {
@@ -343,7 +347,8 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1beta1_KubeSchedulerConfi
 	if err := metav1.Convert_string_To_Pointer_string(&in.MetricsBindAddress, &out.MetricsBindAddress, s); err != nil {
 		return err
 	}
-	if err := v1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.DebuggingConfiguration, &out.DebuggingConfiguration, 0); err != nil {
 		return err
 	}
 	if err := metav1.Convert_int32_To_Pointer_int32(&in.PercentageOfNodesToScore, &out.PercentageOfNodesToScore, s); err != nil {
@@ -637,104 +642,38 @@ func Convert_config_PluginSet_To_v1beta1_PluginSet(in *config.PluginSet, out *v1
 }
 
 func autoConvert_v1beta1_Plugins_To_config_Plugins(in *v1beta1.Plugins, out *config.Plugins, s conversion.Scope) error {
-	if in.QueueSort != nil {
-		in, out := &in.QueueSort, &out.QueueSort
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.QueueSort = nil
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(&in.QueueSort, &out.QueueSort, s); err != nil {
+		return err
 	}
-	if in.PreFilter != nil {
-		in, out := &in.PreFilter, &out.PreFilter
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PreFilter = nil
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(&in.PreFilter, &out.PreFilter, s); err != nil {
+		return err
 	}
-	if in.Filter != nil {
-		in, out := &in.Filter, &out.Filter
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Filter = nil
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(&in.Filter, &out.Filter, s); err != nil {
+		return err
 	}
-	if in.PostFilter != nil {
-		in, out := &in.PostFilter, &out.PostFilter
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PostFilter = nil
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(&in.PostFilter, &out.PostFilter, s); err != nil {
+		return err
 	}
-	if in.PreScore != nil {
-		in, out := &in.PreScore, &out.PreScore
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PreScore = nil
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(&in.PreScore, &out.PreScore, s); err != nil {
+		return err
 	}
-	if in.Score != nil {
-		in, out := &in.Score, &out.Score
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Score = nil
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(&in.Score, &out.Score, s); err != nil {
+		return err
 	}
-	if in.Reserve != nil {
-		in, out := &in.Reserve, &out.Reserve
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Reserve = nil
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(&in.Reserve, &out.Reserve, s); err != nil {
+		return err
 	}
-	if in.Permit != nil {
-		in, out := &in.Permit, &out.Permit
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Permit = nil
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(&in.Permit, &out.Permit, s); err != nil {
+		return err
 	}
-	if in.PreBind != nil {
-		in, out := &in.PreBind, &out.PreBind
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PreBind = nil
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(&in.PreBind, &out.PreBind, s); err != nil {
+		return err
 	}
-	if in.Bind != nil {
-		in, out := &in.Bind, &out.Bind
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Bind = nil
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(&in.Bind, &out.Bind, s); err != nil {
+		return err
 	}
-	if in.PostBind != nil {
-		in, out := &in.PostBind, &out.PostBind
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PostBind = nil
+	if err := Convert_v1beta1_PluginSet_To_config_PluginSet(&in.PostBind, &out.PostBind, s); err != nil {
+		return err
 	}
 	return nil
 }
@@ -745,104 +684,38 @@ func Convert_v1beta1_Plugins_To_config_Plugins(in *v1beta1.Plugins, out *config.
 }
 
 func autoConvert_config_Plugins_To_v1beta1_Plugins(in *config.Plugins, out *v1beta1.Plugins, s conversion.Scope) error {
-	if in.QueueSort != nil {
-		in, out := &in.QueueSort, &out.QueueSort
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.QueueSort = nil
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.QueueSort, &out.QueueSort, s); err != nil {
+		return err
 	}
-	if in.PreFilter != nil {
-		in, out := &in.PreFilter, &out.PreFilter
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PreFilter = nil
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.PreFilter, &out.PreFilter, s); err != nil {
+		return err
 	}
-	if in.Filter != nil {
-		in, out := &in.Filter, &out.Filter
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Filter = nil
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.Filter, &out.Filter, s); err != nil {
+		return err
 	}
-	if in.PostFilter != nil {
-		in, out := &in.PostFilter, &out.PostFilter
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PostFilter = nil
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.PostFilter, &out.PostFilter, s); err != nil {
+		return err
 	}
-	if in.PreScore != nil {
-		in, out := &in.PreScore, &out.PreScore
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PreScore = nil
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.PreScore, &out.PreScore, s); err != nil {
+		return err
 	}
-	if in.Score != nil {
-		in, out := &in.Score, &out.Score
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Score = nil
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.Score, &out.Score, s); err != nil {
+		return err
 	}
-	if in.Reserve != nil {
-		in, out := &in.Reserve, &out.Reserve
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Reserve = nil
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.Reserve, &out.Reserve, s); err != nil {
+		return err
 	}
-	if in.Permit != nil {
-		in, out := &in.Permit, &out.Permit
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Permit = nil
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.Permit, &out.Permit, s); err != nil {
+		return err
 	}
-	if in.PreBind != nil {
-		in, out := &in.PreBind, &out.PreBind
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PreBind = nil
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.PreBind, &out.PreBind, s); err != nil {
+		return err
 	}
-	if in.Bind != nil {
-		in, out := &in.Bind, &out.Bind
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Bind = nil
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.Bind, &out.Bind, s); err != nil {
+		return err
 	}
-	if in.PostBind != nil {
-		in, out := &in.PostBind, &out.PostBind
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PostBind = nil
+	if err := Convert_config_PluginSet_To_v1beta1_PluginSet(&in.PostBind, &out.PostBind, s); err != nil {
+		return err
 	}
 	return nil
 }

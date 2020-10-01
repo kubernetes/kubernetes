@@ -106,17 +106,17 @@ type extensionPoint struct {
 
 func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionPoint {
 	return []extensionPoint{
-		{plugins.PreFilter, &f.preFilterPlugins},
-		{plugins.Filter, &f.filterPlugins},
-		{plugins.PostFilter, &f.postFilterPlugins},
-		{plugins.Reserve, &f.reservePlugins},
-		{plugins.PreScore, &f.preScorePlugins},
-		{plugins.Score, &f.scorePlugins},
-		{plugins.PreBind, &f.preBindPlugins},
-		{plugins.Bind, &f.bindPlugins},
-		{plugins.PostBind, &f.postBindPlugins},
-		{plugins.Permit, &f.permitPlugins},
-		{plugins.QueueSort, &f.queueSortPlugins},
+		{&plugins.PreFilter, &f.preFilterPlugins},
+		{&plugins.Filter, &f.filterPlugins},
+		{&plugins.PostFilter, &f.postFilterPlugins},
+		{&plugins.Reserve, &f.reservePlugins},
+		{&plugins.PreScore, &f.preScorePlugins},
+		{&plugins.Score, &f.scorePlugins},
+		{&plugins.PreBind, &f.preBindPlugins},
+		{&plugins.Bind, &f.bindPlugins},
+		{&plugins.PostBind, &f.postBindPlugins},
+		{&plugins.Permit, &f.permitPlugins},
+		{&plugins.QueueSort, &f.queueSortPlugins},
 	}
 }
 

@@ -462,7 +462,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 		WithProfiles(
 			schedulerapi.KubeSchedulerProfile{SchedulerName: "match-machine2",
 				Plugins: &schedulerapi.Plugins{
-					Filter: &schedulerapi.PluginSet{
+					Filter: schedulerapi.PluginSet{
 						Enabled:  []schedulerapi.Plugin{{Name: "FakeNodeSelector"}},
 						Disabled: []schedulerapi.Plugin{{Name: "*"}},
 					}},
@@ -475,7 +475,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 			schedulerapi.KubeSchedulerProfile{
 				SchedulerName: "match-machine3",
 				Plugins: &schedulerapi.Plugins{
-					Filter: &schedulerapi.PluginSet{
+					Filter: schedulerapi.PluginSet{
 						Enabled:  []schedulerapi.Plugin{{Name: "FakeNodeSelector"}},
 						Disabled: []schedulerapi.Plugin{{Name: "*"}},
 					}},

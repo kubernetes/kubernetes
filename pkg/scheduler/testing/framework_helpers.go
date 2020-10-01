@@ -107,33 +107,26 @@ func RegisterPluginAsExtensionsWithWeight(pluginName string, weight int32, plugi
 func getPluginSetByExtension(plugins *schedulerapi.Plugins, extension string) *schedulerapi.PluginSet {
 	switch extension {
 	case "QueueSort":
-		return initializeIfNeeded(&plugins.QueueSort)
+		return &plugins.QueueSort
 	case "Filter":
-		return initializeIfNeeded(&plugins.Filter)
+		return &plugins.Filter
 	case "PreFilter":
-		return initializeIfNeeded(&plugins.PreFilter)
+		return &plugins.PreFilter
 	case "PreScore":
-		return initializeIfNeeded(&plugins.PreScore)
+		return &plugins.PreScore
 	case "Score":
-		return initializeIfNeeded(&plugins.Score)
+		return &plugins.Score
 	case "Bind":
-		return initializeIfNeeded(&plugins.Bind)
+		return &plugins.Bind
 	case "Reserve":
-		return initializeIfNeeded(&plugins.Reserve)
+		return &plugins.Reserve
 	case "Permit":
-		return initializeIfNeeded(&plugins.Permit)
+		return &plugins.Permit
 	case "PreBind":
-		return initializeIfNeeded(&plugins.PreBind)
+		return &plugins.PreBind
 	case "PostBind":
-		return initializeIfNeeded(&plugins.PostBind)
+		return &plugins.PostBind
 	default:
 		return nil
 	}
-}
-
-func initializeIfNeeded(s **schedulerapi.PluginSet) *schedulerapi.PluginSet {
-	if *s == nil {
-		*s = &schedulerapi.PluginSet{}
-	}
-	return *s
 }
