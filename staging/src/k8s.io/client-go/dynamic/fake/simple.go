@@ -96,7 +96,8 @@ func (c *dynamicResourceClient) Create(ctx context.Context, obj *unstructured.Un
 			Invokes(testing.NewRootCreateAction(c.resource, obj), obj)
 
 	case len(c.namespace) == 0 && len(subresources) > 0:
-		accessor, err := meta.Accessor(obj)
+		var accessor metav1.Object // avoid shadowing err
+		accessor, err = meta.Accessor(obj)
 		if err != nil {
 			return nil, err
 		}
@@ -109,7 +110,8 @@ func (c *dynamicResourceClient) Create(ctx context.Context, obj *unstructured.Un
 			Invokes(testing.NewCreateAction(c.resource, c.namespace, obj), obj)
 
 	case len(c.namespace) > 0 && len(subresources) > 0:
-		accessor, err := meta.Accessor(obj)
+		var accessor metav1.Object // avoid shadowing err
+		accessor, err = meta.Accessor(obj)
 		if err != nil {
 			return nil, err
 		}
