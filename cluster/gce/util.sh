@@ -1612,24 +1612,24 @@ function create-certs {
 
   # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
   # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
-  CA_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/ca.key" | base64 | tr -d '\r\n')
-  CA_CERT_BASE64=$(cat "${CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
-  MASTER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" | base64 | tr -d '\r\n')
-  MASTER_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/${MASTER_NAME}.key" | base64 | tr -d '\r\n')
-  KUBELET_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubelet.crt" | base64 | tr -d '\r\n')
-  KUBELET_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubelet.key" | base64 | tr -d '\r\n')
-  KUBECFG_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubecfg.crt" | base64 | tr -d '\r\n')
-  KUBECFG_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubecfg.key" | base64 | tr -d '\r\n')
-  KUBEAPISERVER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kube-apiserver.crt" | base64 | tr -d '\r\n')
-  KUBEAPISERVER_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kube-apiserver.key" | base64 | tr -d '\r\n')
+  CA_KEY_BASE64=$(base64 "${CERT_DIR}/pki/private/ca.key" | tr -d '\r\n')
+  CA_CERT_BASE64=$(base64 "${CERT_DIR}/pki/ca.crt" | tr -d '\r\n')
+  MASTER_CERT_BASE64=$(base64 "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" | tr -d '\r\n')
+  MASTER_KEY_BASE64=$(base64 "${CERT_DIR}/pki/private/${MASTER_NAME}.key" | tr -d '\r\n')
+  KUBELET_CERT_BASE64=$(base64 "${CERT_DIR}/pki/issued/kubelet.crt" | tr -d '\r\n')
+  KUBELET_KEY_BASE64=$(base64 "${CERT_DIR}/pki/private/kubelet.key" | tr -d '\r\n')
+  KUBECFG_CERT_BASE64=$(base64 "${CERT_DIR}/pki/issued/kubecfg.crt" | tr -d '\r\n')
+  KUBECFG_KEY_BASE64=$(base64 "${CERT_DIR}/pki/private/kubecfg.key" | tr -d '\r\n')
+  KUBEAPISERVER_CERT_BASE64=$(base64 "${CERT_DIR}/pki/issued/kube-apiserver.crt" | tr -d '\r\n')
+  KUBEAPISERVER_KEY_BASE64=$(base64 "${CERT_DIR}/pki/private/kube-apiserver.key" | tr -d '\r\n')
 
   # Setting up an addition directory (beyond pki) as it is the simplest way to
   # ensure we get a different CA pair to sign the proxy-client certs and which
   # we can send CA public key to the user-apiserver to validate communication.
-  AGGREGATOR_CA_KEY_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/private/ca.key" | base64 | tr -d '\r\n')
-  REQUESTHEADER_CA_CERT_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
-  PROXY_CLIENT_CERT_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/issued/proxy-client.crt" | base64 | tr -d '\r\n')
-  PROXY_CLIENT_KEY_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/private/proxy-client.key" | base64 | tr -d '\r\n')
+  AGGREGATOR_CA_KEY_BASE64=$(base64 "${AGGREGATOR_CERT_DIR}/pki/private/ca.key" | tr -d '\r\n')
+  REQUESTHEADER_CA_CERT_BASE64=$(base64 "${AGGREGATOR_CERT_DIR}/pki/ca.crt" | tr -d '\r\n')
+  PROXY_CLIENT_CERT_BASE64=$(base64 "${AGGREGATOR_CERT_DIR}/pki/issued/proxy-client.crt" | tr -d '\r\n')
+  PROXY_CLIENT_KEY_BASE64=$(base64 "${AGGREGATOR_CERT_DIR}/pki/private/proxy-client.key" | tr -d '\r\n')
 }
 
 # Set up easy-rsa directory structure.
@@ -2512,10 +2512,10 @@ function create-etcd-certs {
     generate-etcd-cert "${KUBE_TEMP}/cfssl" "${host}" "peer" "peer"
 
   pushd "${KUBE_TEMP}/cfssl"
-  ETCD_CA_KEY_BASE64=$(cat "ca-key.pem" | base64 | tr -d '\r\n')
-  ETCD_CA_CERT_BASE64=$(cat "ca.pem" | gzip | base64 | tr -d '\r\n')
-  ETCD_PEER_KEY_BASE64=$(cat "peer-key.pem" | base64 | tr -d '\r\n')
-  ETCD_PEER_CERT_BASE64=$(cat "peer.pem" | gzip | base64 | tr -d '\r\n')
+  ETCD_CA_KEY_BASE64=$(base64 "ca-key.pem" | tr -d '\r\n')
+  ETCD_CA_CERT_BASE64=$(gzip -c "ca.pem" | base64 | tr -d '\r\n')
+  ETCD_PEER_KEY_BASE64=$(base64 "peer-key.pem" | tr -d '\r\n')
+  ETCD_PEER_CERT_BASE64=$(gzip -c "peer.pem" | base64 | tr -d '\r\n')
   popd
 }
 
@@ -2551,12 +2551,12 @@ function create-etcd-apiserver-certs {
     generate-etcd-cert "${KUBE_TEMP}/cfssl" "${hostClient}" "client" "etcd-apiserver-client"
 
   pushd "${KUBE_TEMP}/cfssl"
-  ETCD_APISERVER_CA_KEY_BASE64=$(cat "ca-key.pem" | base64 | tr -d '\r\n')
-  ETCD_APISERVER_CA_CERT_BASE64=$(cat "ca.pem" | gzip | base64 | tr -d '\r\n')
-  ETCD_APISERVER_SERVER_KEY_BASE64=$(cat "etcd-apiserver-server-key.pem" | base64 | tr -d '\r\n')
-  ETCD_APISERVER_SERVER_CERT_BASE64=$(cat "etcd-apiserver-server.pem" | gzip | base64 | tr -d '\r\n')
-  ETCD_APISERVER_CLIENT_KEY_BASE64=$(cat "etcd-apiserver-client-key.pem" | base64 | tr -d '\r\n')
-  ETCD_APISERVER_CLIENT_CERT_BASE64=$(cat "etcd-apiserver-client.pem" | gzip | base64 | tr -d '\r\n')
+  ETCD_APISERVER_CA_KEY_BASE64=$(base64 "ca-key.pem" | tr -d '\r\n')
+  ETCD_APISERVER_CA_CERT_BASE64=$(gzip -c "ca.pem" | base64 | tr -d '\r\n')
+  ETCD_APISERVER_SERVER_KEY_BASE64=$(base64 "etcd-apiserver-server-key.pem" | tr -d '\r\n')
+  ETCD_APISERVER_SERVER_CERT_BASE64=$(gzip -c "etcd-apiserver-server.pem" | base64 | tr -d '\r\n')
+  ETCD_APISERVER_CLIENT_KEY_BASE64=$(base64 "etcd-apiserver-client-key.pem" | tr -d '\r\n')
+  ETCD_APISERVER_CLIENT_CERT_BASE64=$(gzip -c "etcd-apiserver-client.pem" | base64 | tr -d '\r\n')
   popd
 }
 
