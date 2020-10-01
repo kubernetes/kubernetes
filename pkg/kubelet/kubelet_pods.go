@@ -813,11 +813,11 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *v1.ObjectFieldSelector, pod 
 	case "spec.serviceAccountName":
 		return pod.Spec.ServiceAccountName, nil
 	case "status.hostIP":
-		hostIP, err := kl.getHostIPAnyWay()
+		hostIPs, err := kl.getHostIPsAnyWay()
 		if err != nil {
 			return "", err
 		}
-		return hostIP.String(), nil
+		return hostIPs[0].String(), nil
 	case "status.podIP":
 		return podIP, nil
 	case "status.podIPs":
@@ -1523,14 +1523,17 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	})
 
 	if kl.kubeClient != nil {
-		hostIP, err := kl.getHostIPAnyWay()
+		hostIPs, err := kl.getHostIPsAnyWay()
 		if err != nil {
-			klog.V(4).Infof("Cannot get host IP: %v", err)
+			klog.V(4).Infof("Cannot get host IPs: %v", err)
 		} else {
-			s.HostIP = hostIP.String()
+			s.HostIP = hostIPs[0].String()
 			if kubecontainer.IsHostNetworkPod(pod) && s.PodIP == "" {
-				s.PodIP = hostIP.String()
+				s.PodIP = hostIPs[0].String()
 				s.PodIPs = []v1.PodIP{{IP: s.PodIP}}
+				if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && len(hostIPs) == 2 {
+					s.PodIPs = append(s.PodIPs, v1.PodIP{IP: hostIPs[1].String()})
+				}
 			}
 		}
 	}
