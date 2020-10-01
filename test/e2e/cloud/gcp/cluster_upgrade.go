@@ -89,26 +89,26 @@ var kubeProxyDowngradeTests = []upgrades.Test{
 	&upgrades.ServiceUpgradeTest{},
 }
 
-// masterUpgrade upgrades master node on GCE/GKE.
-func masterUpgrade(f *framework.Framework, v string) error {
+// instanceUpgrade upgrades instance node on GCE/GKE.
+func instanceUpgrade(f *framework.Framework, v string) error {
 	switch framework.TestContext.Provider {
 	case "gce":
-		return masterUpgradeGCE(v, false)
+		return instanceUpgradeGCE(v, false)
 	case "gke":
 		return framework.MasterUpgradeGKE(f.Namespace.Name, v)
 	default:
-		return fmt.Errorf("masterUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
+		return fmt.Errorf("instanceUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
 	}
 }
 
 // masterUpgradeGCEWithKubeProxyDaemonSet upgrades master node on GCE with enabling/disabling the daemon set of kube-proxy.
 // TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
 func masterUpgradeGCEWithKubeProxyDaemonSet(v string, enableKubeProxyDaemonSet bool) error {
-	return masterUpgradeGCE(v, enableKubeProxyDaemonSet)
+	return instanceUpgradeGCE(v, enableKubeProxyDaemonSet)
 }
 
 // TODO(mrhohn): Remove 'enableKubeProxyDaemonSet' when kube-proxy is run as a DaemonSet by default.
-func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
+func instanceUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 	env := append(os.Environ(), fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet))
 	// TODO: Remove these variables when they're no longer needed for downgrades.
 	if framework.TestContext.EtcdUpgradeVersion != "" && framework.TestContext.EtcdUpgradeStorage != "" {
@@ -149,7 +149,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, masterUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(masterUpgrade(f, target))
+				framework.ExpectNoError(instanceUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
@@ -190,7 +190,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, clusterUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(masterUpgrade(f, target))
+				framework.ExpectNoError(instanceUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
@@ -223,7 +223,7 @@ var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-				framework.ExpectNoError(masterUpgrade(f, target))
+				framework.ExpectNoError(instanceUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -271,7 +271,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, gpuUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(masterUpgrade(f, target))
+				framework.ExpectNoError(instanceUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
@@ -289,7 +289,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, gpuUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(masterUpgrade(f, target))
+				framework.ExpectNoError(instanceUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
@@ -311,7 +311,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-				framework.ExpectNoError(masterUpgrade(f, target))
+				framework.ExpectNoError(instanceUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -337,7 +337,7 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 				start := time.Now()
 				defer finalizeUpgradeTest(start, statefulUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(masterUpgrade(f, target))
+				framework.ExpectNoError(instanceUpgrade(f, target))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
