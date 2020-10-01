@@ -19,6 +19,8 @@ package network
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net"
 
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -31,8 +33,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	"fmt"
+	utilnet "k8s.io/utils/net"
 
 	"github.com/onsi/ginkgo"
 )
@@ -1373,8 +1374,11 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			if err != nil {
 				framework.ExpectNoError(err, "Error occurred while getting pod status.")
 			}
-
-			podServerCIDR := fmt.Sprintf("%s/32", podServerStatus.Status.PodIP)
+			hostMask := 32
+			if utilnet.IsIPv6String(podServerStatus.Status.PodIP) {
+				hostMask = 128
+			}
+			podServerCIDR := fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, hostMask)
 
 			// Creating pod-b and service-b
 			podServerB, serviceB = createServerPodAndService(f, f.Namespace, "pod-b", []int{80})
@@ -1450,9 +1454,18 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 				framework.ExpectNoError(err, "Error occurred while getting pod status.")
 			}
 
-			podServerAllowCIDR := fmt.Sprintf("%s/24", podServerStatus.Status.PodIP)
+			allowMask := 24
+			hostMask := 32
+			if utilnet.IsIPv6String(podServerStatus.Status.PodIP) {
+				allowMask = 64
+				hostMask = 128
+			}
+			_, podServerAllowSubnet, err := net.ParseCIDR(fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, allowMask))
+			framework.ExpectNoError(err, "could not parse allow subnet")
+			podServerAllowCIDR := podServerAllowSubnet.String()
+
 			// Exclude podServer's IP with an Except clause
-			podServerExceptList := []string{fmt.Sprintf("%s/32", podServerStatus.Status.PodIP)}
+			podServerExceptList := []string{fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, hostMask)}
 
 			// client-a can connect to server prior to applying the NetworkPolicy
 			ginkgo.By("Creating client-a which should be able to contact the server.", func() {
@@ -1515,10 +1528,19 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 				framework.ExpectNoError(err, "Error occurred while getting pod status.")
 			}
 
-			podServerAllowCIDR := fmt.Sprintf("%s/24", podServerStatus.Status.PodIP)
-			podServerIP := fmt.Sprintf("%s/32", podServerStatus.Status.PodIP)
+			allowMask := 24
+			hostMask := 32
+			if utilnet.IsIPv6String(podServerStatus.Status.PodIP) {
+				allowMask = 64
+				hostMask = 128
+			}
+			_, podServerAllowSubnet, err := net.ParseCIDR(fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, allowMask))
+			framework.ExpectNoError(err, "could not parse allow subnet")
+			podServerAllowCIDR := podServerAllowSubnet.String()
+
 			// Exclude podServer's IP with an Except clause
-			podServerExceptList := []string{podServerIP}
+			podServerCIDR := fmt.Sprintf("%s/%d", podServerStatus.Status.PodIP, hostMask)
+			podServerExceptList := []string{podServerCIDR}
 
 			// Create NetworkPolicy which blocks access to podServer with except clause.
 			policyAllowCIDRWithExceptServerPod := &networkingv1.NetworkPolicy{
@@ -1595,7 +1617,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 							To: []networkingv1.NetworkPolicyPeer{
 								{
 									IPBlock: &networkingv1.IPBlock{
-										CIDR: podServerIP,
+										CIDR: podServerCIDR,
 									},
 								},
 							},
