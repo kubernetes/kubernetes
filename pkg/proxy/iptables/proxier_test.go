@@ -943,6 +943,55 @@ func TestNodePortReject(t *testing.T) {
 	}
 }
 
+func TestLoadBalancerReject(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt, false)
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcNodePort := 3001
+	svcLBIP := "1.2.3.4"
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+	svcSessionAffinityTimeout := int32(10800)
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "LoadBalancer"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(svcNodePort),
+			}}
+			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+				IP: svcLBIP,
+			}}
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
+			svc.Spec.SessionAffinityConfig = &v1.SessionAffinityConfig{
+				ClientIP: &v1.ClientIPConfig{TimeoutSeconds: &svcSessionAffinityTimeout},
+			}
+		}),
+	)
+	makeEndpointsMap(fp)
+
+	fp.syncProxyRules()
+
+	kubeSvcExtRules := ipt.GetRules(string(kubeExternalServicesChain))
+	if !hasJump(kubeSvcExtRules, iptablestest.Reject, svcLBIP, svcPort) {
+		errorf(fmt.Sprintf("Failed to find a %v rule for LoadBalancer %v with no endpoints", iptablestest.Reject, svcPortName), kubeSvcExtRules, t)
+	}
+
+	kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+	if hasJump(kubeSvcRules, iptablestest.Reject, svcLBIP, svcPort) {
+		errorf(fmt.Sprintf("Found a %v rule for LoadBalancer %v with no endpoints in kubeServicesChain", iptablestest.Reject, svcPortName), kubeSvcRules, t)
+	}
+
+}
+
 func TestOnlyLocalLoadBalancing(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt, false)
