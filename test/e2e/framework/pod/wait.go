@@ -67,8 +67,11 @@ const (
 type podCondition func(pod *v1.Pod) (bool, error)
 
 // errorBadPodsStates create error message of basic info of bad pods for debugging.
-func errorBadPodsStates(badPods []v1.Pod, desiredPods int, ns, desiredState string, timeout time.Duration) string {
+func errorBadPodsStates(badPods []v1.Pod, desiredPods int, ns, desiredState string, timeout time.Duration, err error) string {
 	errStr := fmt.Sprintf("%d / %d pods in namespace %q are NOT in %s state in %v\n", len(badPods), desiredPods, ns, desiredState, timeout)
+	if err != nil {
+		errStr += fmt.Sprintf("Last error: %s\n", err)
+	}
 	// Print bad pods info only if there are fewer than 10 bad pods
 	if len(badPods) > 10 {
 		return errStr + "There are too many bad pods. Please check log for details."
@@ -110,6 +113,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 	badPods := []v1.Pod{}
 	desiredPods := 0
 	notReady := int32(0)
+	var lastAPIError error
 
 	if wait.PollImmediate(poll, timeout, func() (bool, error) {
 		// We get the new list of pods, replication controllers, and
@@ -117,10 +121,13 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 		// online during startup and we want to ensure they are also
 		// checked.
 		replicas, replicaOk := int32(0), int32(0)
+		// Clear API error from the last attempt in case the following calls succeed.
+		lastAPIError = nil
 
 		rcList, err := c.CoreV1().ReplicationControllers(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			e2elog.Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
+			lastAPIError = err
 			if testutils.IsRetryableAPIError(err) {
 				return false, nil
 			}
@@ -133,6 +140,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 
 		rsList, err := c.AppsV1().ReplicaSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
+			lastAPIError = err
 			e2elog.Logf("Error getting replication sets in namespace %q: %v", ns, err)
 			if testutils.IsRetryableAPIError(err) {
 				return false, nil
@@ -146,6 +154,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 
 		podList, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
+			lastAPIError = err
 			e2elog.Logf("Error getting pods in namespace '%s': %v", ns, err)
 			if testutils.IsRetryableAPIError(err) {
 				return false, nil
@@ -193,7 +202,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 		return false, nil
 	}) != nil {
 		if !ignoreNotReady {
-			return errors.New(errorBadPodsStates(badPods, desiredPods, ns, "RUNNING and READY", timeout))
+			return errors.New(errorBadPodsStates(badPods, desiredPods, ns, "RUNNING and READY", timeout, lastAPIError))
 		}
 		e2elog.Logf("Number of not-ready pods (%d) is below the allowed threshold (%d).", notReady, allowedNotReadyPods)
 	}
