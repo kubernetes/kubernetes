@@ -83,28 +83,28 @@ func etcdFailTest(f *framework.Framework, failCommand, fixCommand string) {
 	apps.TestReplicationControllerServeImageOrFail(f, "basic", framework.ServeHostnameImage)
 }
 
-// For this duration, etcd will be failed by executing a failCommand on the master.
+// For this duration, etcd will be failed by executing a failCommand on the instance.
 // If repeat is true, the failCommand will be called at a rate of once per second for
 // the failure duration. If repeat is false, failCommand will only be called once at the
 // beginning of the failure duration. After this duration, we execute a fixCommand on the
-// master and go on to assert that etcd and kubernetes components recover.
+// instance and go on to assert that etcd and kubernetes components recover.
 const etcdFailureDuration = 20 * time.Second
 
 func doEtcdFailure(failCommand, fixCommand string) {
 	ginkgo.By("failing etcd")
 
-	masterExec(failCommand)
+	instanceExec(failCommand)
 	time.Sleep(etcdFailureDuration)
-	masterExec(fixCommand)
+	instanceExec(fixCommand)
 }
 
-func masterExec(cmd string) {
+func instanceExec(cmd string) {
 	host := framework.GetMasterHost() + ":22"
 	result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
 	framework.ExpectNoError(err, "failed to SSH to host %s on provider %s and run command: %q", host, framework.TestContext.Provider, cmd)
 	if result.Code != 0 {
 		e2essh.LogResult(result)
-		framework.Failf("master exec command returned non-zero")
+		framework.Failf("instance exec command returned non-zero")
 	}
 }
 

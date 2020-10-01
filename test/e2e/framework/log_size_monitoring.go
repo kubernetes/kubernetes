@@ -131,9 +131,9 @@ type WorkItem struct {
 	backoffMultiplier int
 }
 
-func prepareData(masterAddress string, nodeAddresses []string) *LogsSizeData {
+func prepareData(instanceAddress string, nodeAddresses []string) *LogsSizeData {
 	data := make(LogSizeDataTimeseries)
-	ips := append(nodeAddresses, masterAddress)
+	ips := append(nodeAddresses, instanceAddress)
 	for _, ip := range ips {
 		data[ip] = make(map[string][]TimestampedSize)
 	}
