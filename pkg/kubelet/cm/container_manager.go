@@ -133,6 +133,7 @@ type NodeConfig struct {
 	NodeAllocatableConfig
 	QOSReserved                           map[v1.ResourceName]int64
 	ExperimentalCPUManagerPolicy          string
+	ExperimentalTopologyManagerScope      string
 	ExperimentalCPUManagerReconcilePeriod time.Duration
 	ExperimentalPodPidsLimit              int64
 	EnforceCPULimits                      bool
