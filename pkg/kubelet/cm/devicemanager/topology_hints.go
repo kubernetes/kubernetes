@@ -23,6 +23,7 @@ import (
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 // GetTopologyHints implements the TopologyManager HintProvider Interface which
@@ -53,11 +54,11 @@ func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 			allocated := m.podDevices.containerDevices(string(pod.UID), container.Name, resource)
 			if allocated.Len() > 0 {
 				if allocated.Len() != requested {
-					klog.Errorf("[devicemanager] Resource '%v' already allocated to (pod %v, container %v) with different number than request: requested: %d, allocated: %d", resource, string(pod.UID), container.Name, requested, allocated.Len())
+					klog.Errorf("[devicemanager] Resource '%v' already allocated to (pod %v, container %v) with different number than request: requested: %d, allocated: %d", resource, format.Pod(pod), container.Name, requested, allocated.Len())
 					deviceHints[resource] = []topologymanager.TopologyHint{}
 					continue
 				}
-				klog.Infof("[devicemanager] Regenerating TopologyHints for resource '%v' already allocated to (pod %v, container %v)", resource, string(pod.UID), container.Name)
+				klog.Infof("[devicemanager] Regenerating TopologyHints for resource '%v' already allocated to (pod %v, container %v)", resource, format.Pod(pod), container.Name)
 				deviceHints[resource] = m.generateDeviceTopologyHints(resource, allocated, sets.String{}, requested)
 				continue
 			}
