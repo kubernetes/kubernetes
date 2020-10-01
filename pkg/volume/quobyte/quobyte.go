@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -65,6 +66,9 @@ const (
 )
 
 func (plugin *quobytePlugin) Init(host volume.VolumeHost) error {
+	if host == nil {
+		return errors.New("host must not be nil")
+	}
 	plugin.host = host
 	return nil
 }
@@ -304,7 +308,8 @@ func (unmounter *quobyteUnmounter) TearDownAt(dir string) error {
 
 type quobyteVolumeDeleter struct {
 	*quobyteMounter
-	pv *v1.PersistentVolume
+	pv          *v1.PersistentVolume
+	dialOptions *proxyutil.FilteredDialOptions
 }
 
 func (plugin *quobytePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
@@ -320,6 +325,9 @@ func (plugin *quobytePlugin) newDeleterInternal(spec *volume.Spec) (volume.Delet
 	if err != nil {
 		return nil, err
 	}
+	if plugin.host == nil {
+		return nil, errors.New("host must not be nil")
+	}
 
 	return &quobyteVolumeDeleter{
 		quobyteMounter: &quobyteMounter{
@@ -334,7 +342,8 @@ func (plugin *quobytePlugin) newDeleterInternal(spec *volume.Spec) (volume.Delet
 			registry: source.Registry,
 			readOnly: readOnly,
 		},
-		pv: spec.PersistentVolume,
+		pv:          spec.PersistentVolume,
+		dialOptions: plugin.host.GetFilteredDialOptions(),
 	}, nil
 }
 
@@ -343,19 +352,24 @@ func (plugin *quobytePlugin) NewProvisioner(options volume.VolumeOptions) (volum
 }
 
 func (plugin *quobytePlugin) newProvisionerInternal(options volume.VolumeOptions) (volume.Provisioner, error) {
+	if plugin.host == nil {
+		return nil, errors.New("host must not be nil")
+	}
 	return &quobyteVolumeProvisioner{
 		quobyteMounter: &quobyteMounter{
 			quobyte: &quobyte{
 				plugin: plugin,
 			},
 		},
-		options: options,
+		options:     options,
+		dialOptions: plugin.host.GetFilteredDialOptions(),
 	}, nil
 }
 
 type quobyteVolumeProvisioner struct {
 	*quobyteMounter
-	options volume.VolumeOptions
+	options     volume.VolumeOptions
+	dialOptions *proxyutil.FilteredDialOptions
 }
 
 func (provisioner *quobyteVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
@@ -409,7 +423,8 @@ func (provisioner *quobyteVolumeProvisioner) Provision(selectedNode *v1.Node, al
 	provisioner.volume = fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.New().String())
 
 	manager := &quobyteVolumeManager{
-		config: cfg,
+		config:      cfg,
+		dialOptions: provisioner.dialOptions,
 	}
 
 	vol, sizeGB, err := manager.createVolume(provisioner, createQuota)
@@ -449,7 +464,8 @@ func (deleter *quobyteVolumeDeleter) Delete() error {
 		return err
 	}
 	manager := &quobyteVolumeManager{
-		config: cfg,
+		config:      cfg,
+		dialOptions: deleter.dialOptions,
 	}
 	err = manager.deleteVolume(deleter)
 	if err != nil {
