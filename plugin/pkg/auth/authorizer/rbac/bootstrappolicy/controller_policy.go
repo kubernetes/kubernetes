@@ -411,6 +411,14 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			},
 		})
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "lease-garbage-collector"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get", "delete", "list", "watch").Groups(coordinationGroup).Resources("leases").RuleOrDie(),
+			},
+		})
+	}
 
 	return controllerRoles, controllerRoleBindings
 }

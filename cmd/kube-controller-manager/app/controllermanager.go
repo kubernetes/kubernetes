@@ -425,6 +425,9 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	controllers["ttl-after-finished"] = startTTLAfterFinishedController
 	controllers["root-ca-cert-publisher"] = startRootCACertPublisher
 	controllers["ephemeral-volume"] = startEphemeralVolumeController
+	if utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		controllers["lease-garbage-collector"] = startLeaseGarbageCollector
+	}
 
 	return controllers
 }

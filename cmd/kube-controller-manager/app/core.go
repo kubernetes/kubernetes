@@ -32,6 +32,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	storagev1informer "k8s.io/client-go/informers/storage/v1"
@@ -47,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
+	"k8s.io/kubernetes/pkg/controller/leasegarbagecollector"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 	nodeipamcontroller "k8s.io/kubernetes/pkg/controller/nodeipam"
 	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
@@ -674,4 +676,15 @@ func getNodeCIDRMaskSizes(clusterCIDRs []*net.IPNet, maskSizeIPv4, maskSizeIPv6 
 		}
 	}
 	return nodeMaskCIDRs
+}
+
+func startLeaseGarbageCollector(ctx ControllerContext) (http.Handler, bool, error) {
+	// TODO(roycaihw): make leaseDuration and resync period flags
+	go leasegarbagecollector.NewController(
+		ctx.ClientBuilder.ClientOrDie("lease-garbage-collector"),
+		ctx.InformerFactory.Coordination().V1().Leases(),
+		clock.RealClock{},
+		time.Hour,
+	).Run(ctx.Stop)
+	return nil, true, nil
 }
