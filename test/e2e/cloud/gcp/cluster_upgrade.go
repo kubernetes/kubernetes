@@ -95,7 +95,7 @@ func masterUpgrade(f *framework.Framework, v string) error {
 	case "gce":
 		return masterUpgradeGCE(v, false)
 	case "gke":
-		return framework.MasterUpgradeGKE(f.Namespace.Name, v)
+		return framework.ControlPlaneUpgradeGKE(f.Namespace.Name, v)
 	default:
 		return fmt.Errorf("masterUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
 	}
@@ -585,7 +585,7 @@ func traceRouteToMaster() {
 		framework.Logf("Could not find traceroute program")
 		return
 	}
-	cmd := exec.Command(traceroute, "-I", framework.GetMasterHost())
+	cmd := exec.Command(traceroute, "-I", framework.GetControlPlaneHost())
 	out, err := cmd.Output()
 	if len(out) != 0 {
 		framework.Logf(string(out))
@@ -654,7 +654,7 @@ func nodeUpgrade(f *framework.Framework, v string, img string) error {
 	case "gce":
 		err = nodeUpgradeGCE(v, img, false)
 	case "gke":
-		err = nodeUpgradeGKE(f.Namespace.Name, v, img)
+		err = nodeControlPlaneUpgradeGKE(f.Namespace.Name, v, img)
 	default:
 		err = fmt.Errorf("nodeUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
 	}
@@ -687,7 +687,7 @@ func nodeUpgradeGCE(rawV, img string, enableKubeProxyDaemonSet bool) error {
 	return err
 }
 
-func nodeUpgradeGKE(namespace string, v string, img string) error {
+func nodeControlPlaneUpgradeGKE(namespace string, v string, img string) error {
 	framework.Logf("Upgrading nodes to version %q and image %q", v, img)
 	nps, err := nodePoolsGKE()
 	if err != nil {

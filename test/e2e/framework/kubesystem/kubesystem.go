@@ -32,12 +32,12 @@ func RestartControllerManager() error {
 	if !framework.ProviderIs("gce", "aws") {
 		return fmt.Errorf("unsupported provider for RestartControllerManager: %s", framework.TestContext.Provider)
 	}
-	if framework.ProviderIs("gce") && !framework.MasterOSDistroIs("gci") {
+	if framework.ProviderIs("gce") && !framework.ControlPlaneOSDistroIs("gci") {
 		return fmt.Errorf("unsupported master OS distro: %s", framework.TestContext.MasterOSDistro)
 	}
 	cmd := "pidof kube-controller-manager | xargs sudo kill"
 	framework.Logf("Restarting controller-manager via ssh, running: %v", cmd)
-	result, err := e2essh.SSH(cmd, net.JoinHostPort(framework.GetMasterHost(), e2essh.SSHPort), framework.TestContext.Provider)
+	result, err := e2essh.SSH(cmd, net.JoinHostPort(framework.GetControlPlaneHost(), e2essh.SSHPort), framework.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
 		return fmt.Errorf("couldn't restart controller-manager: %v", err)
@@ -49,7 +49,7 @@ func RestartControllerManager() error {
 func WaitForControllerManagerUp() error {
 	cmd := "curl http://localhost:" + strconv.Itoa(framework.InsecureKubeControllerManagerPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, net.JoinHostPort(framework.GetMasterHost(), e2essh.SSHPort), framework.TestContext.Provider)
+		result, err := e2essh.SSH(cmd, net.JoinHostPort(framework.GetControlPlaneHost(), e2essh.SSHPort), framework.TestContext.Provider)
 		if err != nil || result.Code != 0 {
 			e2essh.LogResult(result)
 		}

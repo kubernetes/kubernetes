@@ -70,12 +70,12 @@ type LogsSizeVerifier struct {
 	client      clientset.Interface
 	stopChannel chan bool
 	// data stores LogSizeData groupped per IP and log_path
-	data          *LogsSizeData
-	masterAddress string
-	nodeAddresses []string
-	wg            sync.WaitGroup
-	workChannel   chan WorkItem
-	workers       []*LogSizeGatherer
+	data                *LogsSizeData
+	controlPlaneAddress string
+	nodeAddresses       []string
+	wg                  sync.WaitGroup
+	workChannel         chan WorkItem
+	workers             []*LogSizeGatherer
 }
 
 // SingleLogSummary is a structure for handling average generation rate and number of probes.
@@ -131,9 +131,9 @@ type WorkItem struct {
 	backoffMultiplier int
 }
 
-func prepareData(masterAddress string, nodeAddresses []string) *LogsSizeData {
+func prepareData(controlPlaneAddress string, nodeAddresses []string) *LogsSizeData {
 	data := make(LogSizeDataTimeseries)
-	ips := append(nodeAddresses, masterAddress)
+	ips := append(nodeAddresses, controlPlaneAddress)
 	for _, ip := range ips {
 		data[ip] = make(map[string][]TimestampedSize)
 	}
@@ -159,20 +159,20 @@ func (d *LogsSizeData) addNewData(ip, path string, timestamp time.Time, size int
 func NewLogsVerifier(c clientset.Interface, stopChannel chan bool) *LogsSizeVerifier {
 	nodeAddresses, err := e2essh.NodeSSHHosts(c)
 	ExpectNoError(err)
-	masterAddress := GetMasterHost() + ":22"
+	controlPlaneAddress := GetControlPlaneHost() + ":22"
 
 	workChannel := make(chan WorkItem, len(nodeAddresses)+1)
 	workers := make([]*LogSizeGatherer, workersNo)
 
 	verifier := &LogsSizeVerifier{
-		client:        c,
-		stopChannel:   stopChannel,
-		data:          prepareData(masterAddress, nodeAddresses),
-		masterAddress: masterAddress,
-		nodeAddresses: nodeAddresses,
-		wg:            sync.WaitGroup{},
-		workChannel:   workChannel,
-		workers:       workers,
+		client:              c,
+		stopChannel:         stopChannel,
+		data:                prepareData(controlPlaneAddress, nodeAddresses),
+		controlPlaneAddress: controlPlaneAddress,
+		nodeAddresses:       nodeAddresses,
+		wg:                  sync.WaitGroup{},
+		workChannel:         workChannel,
+		workers:             workers,
 	}
 	verifier.wg.Add(workersNo)
 	for i := 0; i < workersNo; i++ {
@@ -209,7 +209,7 @@ func (s *LogsSizeVerifier) GetSummary() *LogsSizeDataSummary {
 // Run starts log size gathering. It starts a gorouting for every worker and then blocks until stopChannel is closed
 func (s *LogsSizeVerifier) Run() {
 	s.workChannel <- WorkItem{
-		ip:                s.masterAddress,
+		ip:                s.controlPlaneAddress,
 		paths:             masterLogsToCheck,
 		backoffMultiplier: 1,
 	}

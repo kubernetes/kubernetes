@@ -166,8 +166,8 @@ var RunID = uuid.NewUUID()
 // CreateTestingNSFn is a func that is responsible for creating namespace used for executing e2e tests.
 type CreateTestingNSFn func(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error)
 
-// GetMasterHost returns a hostname of a master.
-func GetMasterHost() string {
+// GetControlPlaneHost returns a hostname of a master.
+func GetControlPlaneHost() string {
 	masterURL, err := url.Parse(TestContext.Host)
 	ExpectNoError(err)
 	return masterURL.Hostname()
@@ -183,8 +183,8 @@ func ProviderIs(providers ...string) bool {
 	return false
 }
 
-// MasterOSDistroIs returns true if the master OS distro is included in the supportedMasterOsDistros. Otherwise false.
-func MasterOSDistroIs(supportedMasterOsDistros ...string) bool {
+// ControlPlaneOSDistroIs returns true if the master OS distro is included in the supportedMasterOsDistros. Otherwise false.
+func ControlPlaneOSDistroIs(supportedMasterOsDistros ...string) bool {
 	for _, distro := range supportedMasterOsDistros {
 		if strings.EqualFold(distro, TestContext.MasterOSDistro) {
 			return true
@@ -1227,9 +1227,9 @@ func RunCmdEnv(env []string, command string, args ...string) (string, string, er
 	return stdout, stderr, nil
 }
 
-// getMasterAddresses returns the externalIP, internalIP and hostname fields of the master.
+// getcontrolPlaneAddresses returns the externalIP, internalIP and hostname fields of the master.
 // If any of these is unavailable, it is set to "".
-func getMasterAddresses(c clientset.Interface) (string, string, string) {
+func getcontrolPlaneAddresses(c clientset.Interface) (string, string, string) {
 	var externalIP, internalIP, hostname string
 
 	// Populate the internal IP.
@@ -1261,7 +1261,7 @@ func getMasterAddresses(c clientset.Interface) (string, string, string) {
 // e.g. internal IPs to be used (issue #56787), so that we can be
 // sure to block the control plane fully during tests.
 func GetControlPlaneAddresses(c clientset.Interface) []string {
-	externalIP, internalIP, _ := getMasterAddresses(c)
+	externalIP, internalIP, _ := getcontrolPlaneAddresses(c)
 
 	ips := sets.NewString()
 	switch TestContext.Provider {

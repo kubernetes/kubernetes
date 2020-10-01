@@ -81,7 +81,7 @@ func installFlex(c clientset.Interface, node *v1.Node, vendor, driver, filePath 
 			host, err = e2enode.GetInternalIP(node)
 		}
 	} else {
-		masterHostWithPort := framework.GetMasterHost()
+		masterHostWithPort := framework.GetControlPlaneHost()
 		hostName := getHostFromHostPort(masterHostWithPort)
 		host = net.JoinHostPort(hostName, e2essh.SSHPort)
 	}
@@ -113,7 +113,7 @@ func uninstallFlex(c clientset.Interface, node *v1.Node, vendor, driver string) 
 			host, err = e2enode.GetInternalIP(node)
 		}
 	} else {
-		masterHostWithPort := framework.GetMasterHost()
+		masterHostWithPort := framework.GetControlPlaneHost()
 		hostName := getHostFromHostPort(masterHostWithPort)
 		host = net.JoinHostPort(hostName, e2essh.SSHPort)
 	}
@@ -168,7 +168,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("gce", "local")
-		e2eskipper.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
+		e2eskipper.SkipUnlessControlPlaneOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci", "custom")
 		e2eskipper.SkipUnlessSSHKeyPresent()
 

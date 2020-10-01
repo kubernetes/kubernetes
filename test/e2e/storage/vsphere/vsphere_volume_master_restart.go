@@ -168,12 +168,12 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 		}
 
 		ginkgo.By("Restarting kubelet on master node")
-		masterAddress := framework.GetMasterHost() + ":22"
-		err := restartKubelet(masterAddress)
+		controlPlaneAddress := framework.GetControlPlaneHost() + ":22"
+		err := restartKubelet(controlPlaneAddress)
 		framework.ExpectNoError(err, "Unable to restart kubelet on master node")
 
 		ginkgo.By("Verifying the kubelet on master node is up")
-		err = waitForKubeletUp(masterAddress)
+		err = waitForKubeletUp(controlPlaneAddress)
 		framework.ExpectNoError(err)
 
 		for i, pod := range pods {

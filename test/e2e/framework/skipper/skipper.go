@@ -199,9 +199,9 @@ func SkipIfMultizone(c clientset.Interface) {
 	}
 }
 
-// SkipUnlessMasterOSDistroIs skips if the master OS distro is not included in the supportedMasterOsDistros.
-func SkipUnlessMasterOSDistroIs(supportedMasterOsDistros ...string) {
-	if !framework.MasterOSDistroIs(supportedMasterOsDistros...) {
+// SkipUnlessControlPlaneOSDistroIs skips if the master OS distro is not included in the supportedMasterOsDistros.
+func SkipUnlessControlPlaneOSDistroIs(supportedMasterOsDistros ...string) {
+	if !framework.ControlPlaneOSDistroIs(supportedMasterOsDistros...) {
 		skipInternalf(1, "Only supported for master OS distro %v (not %s)", supportedMasterOsDistros, framework.TestContext.MasterOSDistro)
 	}
 }

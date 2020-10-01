@@ -75,8 +75,8 @@ func AppendContainerCommandGroupIfNeeded(args []string) []string {
 	return args
 }
 
-// MasterUpgradeGKE upgrades master node to the specified version on GKE.
-func MasterUpgradeGKE(namespace string, v string) error {
+// ControlPlaneUpgradeGKE upgrades master node to the specified version on GKE.
+func ControlPlaneUpgradeGKE(namespace string, v string) error {
 	Logf("Upgrading master to %q", v)
 	args := []string{
 		"container",
