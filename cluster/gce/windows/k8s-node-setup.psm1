@@ -263,6 +263,7 @@ function Set-EnvironmentVars {
     "WINDOWS_CNI_VERSION" = ${kube_env}['WINDOWS_CNI_VERSION']
     "CSI_PROXY_STORAGE_PATH" = ${kube_env}['CSI_PROXY_STORAGE_PATH']
     "CSI_PROXY_VERSION" = ${kube_env}['CSI_PROXY_VERSION']
+    "ENABLE_CSI_PROXY" = ${kube_env}['ENABLE_CSI_PROXY']
     "PKI_DIR" = ${kube_env}['PKI_DIR']
     "CA_FILE_PATH" = ${kube_env}['CA_FILE_PATH']
     "KUBELET_CONFIG" = ${kube_env}['KUBELET_CONFIG_FILE']
@@ -403,26 +404,29 @@ function DownloadAndInstall-KubernetesBinaries {
 # Required ${kube_env} keys:
 #   CSI_PROXY_STORAGE_PATH and CSI_PROXY_VERSION
 function DownloadAndInstall-CSIProxyBinaries {
-  if (ShouldWrite-File ${env:NODE_DIR}\csi-proxy.exe) {
-    $tmp_dir = 'C:\k8s_tmp'
-    New-Item -Force -ItemType 'directory' $tmp_dir | Out-Null
-    $filename = 'csi-proxy.exe'
-    $urls = "${env:CSI_PROXY_STORAGE_PATH}/${env:CSI_PROXY_VERSION}/$filename"
-    MustDownload-File -OutFile $tmp_dir\$filename -URLs $urls
-    Move-Item -Force $tmp_dir\$filename ${env:NODE_DIR}\$filename
-    # Clean up the temporary directory
-    Remove-Item -Force -Recurse $tmp_dir
+  if ("${env:ENABLE_CSI_PROXY}" -eq "true") {
+    if (ShouldWrite-File ${env:NODE_DIR}\csi-proxy.exe) {
+      $tmp_dir = 'C:\k8s_tmp'
+      New-Item -Force -ItemType 'directory' $tmp_dir | Out-Null
+      $filename = 'csi-proxy.exe'
+      $urls = "${env:CSI_PROXY_STORAGE_PATH}/${env:CSI_PROXY_VERSION}/$filename"
+      MustDownload-File -OutFile $tmp_dir\$filename -URLs $urls
+      Move-Item -Force $tmp_dir\$filename ${env:NODE_DIR}\$filename
+      # Clean up the temporary directory
+      Remove-Item -Force -Recurse $tmp_dir
+    }
   }
 }
 
 function Start-CSIProxy {
-  Log-Output "Creating CSI Proxy Service"
-  $flags = "-windows-service -log_file=${env:LOGS_DIR}\csi-proxy.log -logtostderr=false"
-  & sc.exe create csiproxy binPath= "${env:NODE_DIR}\csi-proxy.exe $flags"
-  & sc.exe failure csiproxy reset= 0 actions= restart/10000
-  Log-Output "Starting CSI Proxy Service"
-  & sc.exe start csiproxy
-
+  if ("${env:ENABLE_CSI_PROXY}" -eq "true") {
+    Log-Output "Creating CSI Proxy Service"
+    $flags = "-windows-service -log_file=${env:LOGS_DIR}\csi-proxy.log -logtostderr=false"
+    & sc.exe create csiproxy binPath= "${env:NODE_DIR}\csi-proxy.exe $flags"
+    & sc.exe failure csiproxy reset= 0 actions= restart/10000
+    Log-Output "Starting CSI Proxy Service"
+    & sc.exe start csiproxy
+  }
 }
 
 # TODO(pjh): this is copied from
