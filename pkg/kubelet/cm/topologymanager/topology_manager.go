@@ -79,6 +79,9 @@ type HintProvider interface {
 	// a consensus "best" hint. The hint providers may subsequently query the
 	// topology manager to influence actual resource assignment.
 	GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint
+	// GetPodTopologyHints returns a map of resource names to a list of possible
+	// concrete resource allocations per Pod in terms of NUMA locality hints.
+	GetPodTopologyHints(pod *v1.Pod) map[string][]TopologyHint
 	// Allocate triggers resource allocation to occur on the HintProvider after
 	// all hints have been gathered and the aggregated Hint is available via a
 	// call to Store.GetAffinity().

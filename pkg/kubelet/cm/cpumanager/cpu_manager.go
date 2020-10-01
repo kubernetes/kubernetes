@@ -81,6 +81,11 @@ type Manager interface {
 	// GetCPUs implements the podresources.CPUsProvider interface to provide allocated
 	// cpus for the container
 	GetCPUs(podUID, containerName string) []int64
+
+	// GetPodTopologyHints implements the topologymanager.HintProvider Interface
+	// and is consulted to achieve NUMA aware resource alignment per Pod
+	// among this and other resource controllers.
+	GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint
 }
 
 type manager struct {
@@ -302,6 +307,13 @@ func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[str
 	m.removeStaleState()
 	// Delegate to active policy
 	return m.policy.GetTopologyHints(m.state, pod, container)
+}
+
+func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	// Garbage collect any stranded resources before providing TopologyHints
+	m.removeStaleState()
+	// Delegate to active policy
+	return m.policy.GetPodTopologyHints(m.state, pod)
 }
 
 type reconciledContainer struct {

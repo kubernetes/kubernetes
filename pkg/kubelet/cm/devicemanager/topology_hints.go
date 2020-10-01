@@ -80,6 +80,12 @@ func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 	return deviceHints
 }
 
+// GetPodTopologyHints implements the TopologyManager HintProvider Interface which
+// ensures the Device Manager is consulted when Topology Aware Hints for Pod are created.
+func (m *ManagerImpl) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	return nil
+}
+
 func (m *ManagerImpl) deviceHasTopologyAlignment(resource string) bool {
 	// If any device has Topology set, we assume they care about alignment.
 	for device := range m.allDevices[resource] {
