@@ -316,7 +316,7 @@ func TestServerRunWithSNI(t *testing.T) {
 			preparedServer := s.PrepareRun()
 			go func() {
 				if err := preparedServer.Run(stopCh); err != nil {
-					t.Fatal(err)
+					t.Error(err)
 				}
 			}()
 

@@ -956,7 +956,7 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 				pod := fmt.Sprintf("foo-%d", i)
 				err := createPod(etcdStorage, makeTestPod(pod))
 				if err != nil {
-					t.Fatalf("failed to create pod %v: %v", pod, err)
+					t.Errorf("failed to create pod %v: %v", pod, err)
 				}
 				time.Sleep(time.Second / 100)
 			}

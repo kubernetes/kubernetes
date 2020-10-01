@@ -82,7 +82,7 @@ func TestForbidden(t *testing.T) {
 		if result != test.expected {
 			t.Errorf("Forbidden response body(%#v...)\n expected: %v\ngot:       %v", test.attributes, test.expected, result)
 		}
-		resultType := observer.HeaderMap.Get("Content-Type")
+		resultType := observer.Header().Get("Content-Type")
 		if resultType != test.contentType {
 			t.Errorf("Forbidden content type(%#v...) != %#v, got %#v", test.attributes, test.expected, result)
 		}

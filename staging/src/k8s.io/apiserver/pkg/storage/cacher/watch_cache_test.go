@@ -404,7 +404,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	matchValues = []storage.MatchValue{
 		{IndexName: "l:not-exist-label", Value: "whatever"},
 	}
-	list, resourceVersion, err = store.WaitUntilFreshAndList(5, matchValues, nil)
+	list, resourceVersion, _ = store.WaitUntilFreshAndList(5, matchValues, nil)
 	if resourceVersion != 5 {
 		t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
 	}

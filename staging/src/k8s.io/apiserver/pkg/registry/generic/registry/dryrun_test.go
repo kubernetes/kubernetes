@@ -185,7 +185,7 @@ func TestDryRunUpdateDoesntUpdate(t *testing.T) {
 		t.Fatalf("Failed to dry-run update: %v", err)
 	}
 	out := UnstructuredOrDie(`{}`)
-	err = s.Get(context.Background(), "key", storage.GetOptions{}, out)
+	_ = s.Get(context.Background(), "key", storage.GetOptions{}, out)
 	if !reflect.DeepEqual(created, out) {
 		t.Fatalf("Returned object %q different from expected %q", created, out)
 	}

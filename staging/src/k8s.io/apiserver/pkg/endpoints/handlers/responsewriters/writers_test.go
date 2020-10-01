@@ -54,7 +54,6 @@ func TestSerializeObjectParallel(t *testing.T) {
 
 		wantCode    int
 		wantHeaders http.Header
-		wantBody    []byte
 	}
 	newTest := func() test {
 		return test{
