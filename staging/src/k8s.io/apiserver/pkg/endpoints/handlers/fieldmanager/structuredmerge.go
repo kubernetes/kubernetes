@@ -108,6 +108,7 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 
 	// TODO(apelisse) use the first return value when unions are implemented
 	self := "current-operation"
+	formerSet := managed.Fields()[manager]
 	_, managedFields, err := f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed.Fields(), self)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to update ManagedFields: %v", err)
@@ -119,11 +120,14 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 	if vs, ok := managed.Fields()[self]; ok {
 		delete(managed.Fields(), self)
 
-		managed.Times()[manager] = &metav1.Time{Time: time.Now().UTC()}
 		if previous, ok := managed.Fields()[manager]; ok {
 			managed.Fields()[manager] = fieldpath.NewVersionedSet(vs.Set().Union(previous.Set()), vs.APIVersion(), vs.Applied())
 		} else {
 			managed.Fields()[manager] = vs
+		}
+		// Update the time only if the manager's fieldSet has changed.
+		if formerSet == nil || !managed.Fields()[manager].Set().Equals(formerSet.Set()) {
+			managed.Times()[manager] = &metav1.Time{Time: time.Now().UTC()}
 		}
 	}
 

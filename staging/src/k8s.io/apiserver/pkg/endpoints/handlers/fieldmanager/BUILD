@@ -52,6 +52,7 @@ go_test(
         "capmanagers_test.go",
         "fieldmanager_test.go",
         "skipnonapplied_test.go",
+        "structuredmerge_test.go",
     ],
     data = [
         "endpoints.yaml",
