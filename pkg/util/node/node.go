@@ -108,9 +108,9 @@ func GetNodeHostIP(node *v1.Node) (net.IP, error) {
 	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
 }
 
-// GetNodeIP returns the ip of node with the provided hostname
-// If required, wait for the node to be defined.
-func GetNodeIP(client clientset.Interface, hostname string) net.IP {
+// GetNodeIP returns an IP (as with GetNodeHostIP) for the node with the provided name.
+// If required, it will wait for the node to be created.
+func GetNodeIP(client clientset.Interface, name string) net.IP {
 	var nodeIP net.IP
 	backoff := wait.Backoff{
 		Steps:    6,
@@ -120,7 +120,7 @@ func GetNodeIP(client clientset.Interface, hostname string) net.IP {
 	}
 
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		node, err := client.CoreV1().Nodes().Get(context.TODO(), hostname, metav1.GetOptions{})
+		node, err := client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			klog.Errorf("Failed to retrieve node info: %v", err)
 			return false, nil
