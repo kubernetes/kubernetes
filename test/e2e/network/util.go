@@ -100,6 +100,7 @@ func newAgnhostPod(name string, args ...string) *v1.Pod {
 					Args:  args,
 				},
 			},
+			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 }
