@@ -947,16 +947,16 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 	if err != nil {
 		framework.Failf("Error getting node external ip : %v", err)
 	}
-	masterAddresses := framework.GetAllMasterAddresses(c)
-	ginkgo.By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
+	controlPlaneAddresses := framework.GetControlPlaneAddresses(c)
+	ginkgo.By(fmt.Sprintf("block network traffic from node %s to the control plane", node.Name))
 	defer func() {
 		// This code will execute even if setting the iptables rule failed.
 		// It is on purpose because we may have an error even if the new rule
 		// had been inserted. (yes, we could look at the error code and ssh error
 		// separately, but I prefer to stay on the safe side).
-		ginkgo.By(fmt.Sprintf("Unblock network traffic from node %s to the master", node.Name))
-		for _, masterAddress := range masterAddresses {
-			UnblockNetwork(host, masterAddress)
+		ginkgo.By(fmt.Sprintf("Unblock network traffic from node %s to the control plane", node.Name))
+		for _, instanceAddress := range controlPlaneAddresses {
+			UnblockNetwork(host, instanceAddress)
 		}
 	}()
 
@@ -964,8 +964,8 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 	if !e2enode.WaitConditionToBe(c, node.Name, v1.NodeReady, true, resizeNodeReadyTimeout) {
 		framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 	}
-	for _, masterAddress := range masterAddresses {
-		BlockNetwork(host, masterAddress)
+	for _, instanceAddress := range controlPlaneAddresses {
+		BlockNetwork(host, instanceAddress)
 	}
 
 	framework.Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
