@@ -166,11 +166,11 @@ var RunID = uuid.NewUUID()
 // CreateTestingNSFn is a func that is responsible for creating namespace used for executing e2e tests.
 type CreateTestingNSFn func(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error)
 
-// GetMasterHost returns a hostname of a master.
-func GetMasterHost() string {
-	masterURL, err := url.Parse(TestContext.Host)
+// APIAddress returns a address of an instance.
+func APIAddress() string {
+	instanceURL, err := url.Parse(TestContext.Host)
 	ExpectNoError(err)
-	return masterURL.Hostname()
+	return instanceURL.Hostname()
 }
 
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.

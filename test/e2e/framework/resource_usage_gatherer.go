@@ -604,7 +604,7 @@ type kubemarkResourceUsage struct {
 }
 
 func getMasterUsageByPrefix(prefix string) (string, error) {
-	sshResult, err := e2essh.SSH(fmt.Sprintf("ps ax -o %%cpu,rss,command | tail -n +2 | grep %v | sed 's/\\s+/ /g'", prefix), GetMasterHost()+":22", TestContext.Provider)
+	sshResult, err := e2essh.SSH(fmt.Sprintf("ps ax -o %%cpu,rss,command | tail -n +2 | grep %v | sed 's/\\s+/ /g'", prefix), APIAddress()+":22", TestContext.Provider)
 	if err != nil {
 		return "", err
 	}
