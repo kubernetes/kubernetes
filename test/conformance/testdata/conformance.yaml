@@ -1391,9 +1391,9 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, cluster info
   codename: '[sig-cli] Kubectl client Kubectl cluster-info should check if Kubernetes
-    master services is included in cluster-info  [Conformance]'
+    control plane services is included in cluster-info  [Conformance]'
   description: Call kubectl to get cluster-info, output MUST contain cluster-info
-    returned and Kubernetes Master SHOULD be running.
+    returned and Kubernetes control plane SHOULD be running.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, describe pod or rc
