@@ -189,6 +189,9 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 				return nil, fmt.Errorf("error creating listener: %q", err)
 			}
 		}
+		if err := c.reconcileLBAttributes(aws.StringValue(loadBalancer.LoadBalancerArn), annotations); err != nil {
+			return nil, err
+		}
 	} else {
 		// TODO: Sync internal vs non-internal
 
