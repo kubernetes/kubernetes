@@ -1,7 +1,7 @@
 ---
 name: Support Request
 about: Support request or question relating to Kubernetes
-labels: triage/support
+labels: kind/support
 
 ---
 
