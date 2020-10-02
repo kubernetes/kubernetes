@@ -23,6 +23,7 @@ import (
 	"net/url"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -39,7 +40,15 @@ type ProxyREST struct {
 // Implement Connecter
 var _ = rest.Connecter(&ProxyREST{})
 
+// Implement GroupVersionKindProvider
+var _ = rest.GroupVersionKindProvider(&ProxyREST{})
+
 var proxyMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
+
+// GroupVersionKind tells the ApiServer to treat this REST sub resource as a Node in the API spec
+func (r *ProxyREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
+	return schema.GroupVersionKind{Version: "v1", Kind: "Service"}
+}
 
 // New returns an empty service resource
 func (r *ProxyREST) New() runtime.Object {

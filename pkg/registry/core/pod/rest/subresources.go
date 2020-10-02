@@ -23,6 +23,7 @@ import (
 	"net/url"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -44,7 +45,15 @@ type ProxyREST struct {
 // Implement Connecter
 var _ = rest.Connecter(&ProxyREST{})
 
+// Implement GroupVersionKindProvider
+var _ = rest.GroupVersionKindProvider(&ProxyREST{})
+
 var proxyMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
+
+// GroupVersionKind tells the ApiServer to treat this REST sub resource as a Node in the API spec
+func (r *ProxyREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
+	return schema.GroupVersionKind{Version: "v1", Kind: "Pod"}
+}
 
 // New returns an empty podProxyOptions object.
 func (r *ProxyREST) New() runtime.Object {
@@ -88,6 +97,14 @@ type AttachREST struct {
 // Implement Connecter
 var _ = rest.Connecter(&AttachREST{})
 
+// Implement GroupVersionKindProvider
+var _ = rest.GroupVersionKindProvider(&AttachREST{})
+
+// GroupVersionKind tells the ApiServer to treat this REST sub resource as a Node in the API spec
+func (r *AttachREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
+	return schema.GroupVersionKind{Version: "v1", Kind: "Pod"}
+}
+
 // New creates a new podAttachOptions object.
 func (r *AttachREST) New() runtime.Object {
 	return &api.PodAttachOptions{}
@@ -125,6 +142,14 @@ type ExecREST struct {
 // Implement Connecter
 var _ = rest.Connecter(&ExecREST{})
 
+// Implement GroupVersionKindProvider
+var _ = rest.GroupVersionKindProvider(&ExecREST{})
+
+// GroupVersionKind tells the ApiServer to treat this REST sub resource as a Node in the API spec
+func (r *ExecREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
+	return schema.GroupVersionKind{Version: "v1", Kind: "Pod"}
+}
+
 // New creates a new podExecOptions object.
 func (r *ExecREST) New() runtime.Object {
 	return &api.PodExecOptions{}
@@ -161,6 +186,14 @@ type PortForwardREST struct {
 
 // Implement Connecter
 var _ = rest.Connecter(&PortForwardREST{})
+
+// Implement GroupVersionKindProvider
+var _ = rest.GroupVersionKindProvider(&PortForwardREST{})
+
+// GroupVersionKind tells the ApiServer to treat this REST sub resource as a Node in the API spec
+func (r *PortForwardREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
+	return schema.GroupVersionKind{Version: "v1", Kind: "Pod"}
+}
 
 // New returns an empty podPortForwardOptions object
 func (r *PortForwardREST) New() runtime.Object {
