@@ -592,9 +592,9 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDPersistentVo
 	volSz := fmt.Sprintf("%d", sz)
 	mon := util.kernelRBDMonitorsOpt(p.Mon)
 	if p.rbdMounter.imageFormat == rbdImageFormat2 {
-		klog.V(4).Infof("rbd: create %s size %s format %s (features: %s) using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, p.rbdMounter.imageFeatures, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
+		klog.V(4).Infof("rbd: create %s size %s format %s (features: %s) using mon %s, pool %s id %s key <masked>", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, p.rbdMounter.imageFeatures, mon, p.rbdMounter.Pool, p.rbdMounter.adminId)
 	} else {
-		klog.V(4).Infof("rbd: create %s size %s format %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
+		klog.V(4).Infof("rbd: create %s size %s format %s using mon %s, pool %s id %s key <masked>", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, mon, p.rbdMounter.Pool, p.rbdMounter.adminId)
 	}
 	args := []string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key=" + p.rbdMounter.adminSecret, "--image-format", p.rbdMounter.imageFormat}
 	if p.rbdMounter.imageFormat == rbdImageFormat2 {
@@ -629,7 +629,7 @@ func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
 	}
 	// rbd rm.
 	mon := util.kernelRBDMonitorsOpt(p.rbdMounter.Mon)
-	klog.V(4).Infof("rbd: rm %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
+	klog.V(4).Infof("rbd: rm %s using mon %s, pool %s id %s key <masked>", p.rbdMounter.Image, mon, p.rbdMounter.Pool, p.rbdMounter.adminId)
 	output, err = p.exec.Command("rbd",
 		"rm", p.rbdMounter.Image, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key="+p.rbdMounter.adminSecret).CombinedOutput()
 	if err == nil {
@@ -661,7 +661,7 @@ func (util *RBDUtil) ExpandImage(rbdExpander *rbdVolumeExpander, oldSize resourc
 
 	// rbd resize.
 	mon := util.kernelRBDMonitorsOpt(rbdExpander.rbdMounter.Mon)
-	klog.V(4).Infof("rbd: resize %s using mon %s, pool %s id %s key %s", rbdExpander.rbdMounter.Image, mon, rbdExpander.rbdMounter.Pool, rbdExpander.rbdMounter.adminId, rbdExpander.rbdMounter.adminSecret)
+	klog.V(4).Infof("rbd: resize %s using mon %s, pool %s id %s key <masked>", rbdExpander.rbdMounter.Image, mon, rbdExpander.rbdMounter.Pool, rbdExpander.rbdMounter.adminId)
 	output, err = rbdExpander.exec.Command("rbd",
 		"resize", rbdExpander.rbdMounter.Image, "--size", newVolSz, "--pool", rbdExpander.rbdMounter.Pool, "--id", rbdExpander.rbdMounter.adminId, "-m", mon, "--key="+rbdExpander.rbdMounter.adminSecret).CombinedOutput()
 	if err == nil {
@@ -703,7 +703,7 @@ func (util *RBDUtil) rbdInfo(b *rbdMounter) (int, error) {
 	// # image does not exist (exit=2)
 	// rbd: error opening image 1234: (2) No such file or directory
 	//
-	klog.V(4).Infof("rbd: info %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, id, secret)
+	klog.V(4).Infof("rbd: info %s using mon %s, pool %s id %s key <masked>", b.Image, mon, b.Pool, id)
 	output, err = b.exec.Command("rbd",
 		"info", b.Image, "--pool", b.Pool, "-m", mon, "--id", id, "--key="+secret, "-k=/dev/null", "--format=json").CombinedOutput()
 
@@ -766,7 +766,7 @@ func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, string, error) {
 	// # image does not exist (exit=2)
 	// rbd: error opening image kubernetes-dynamic-pvc-<UUID>: (2) No such file or directory
 	//
-	klog.V(4).Infof("rbd: status %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, id, secret)
+	klog.V(4).Infof("rbd: status %s using mon %s, pool %s id %s key <masked>", b.Image, mon, b.Pool, id)
 	cmd, err = b.exec.Command("rbd",
 		"status", b.Image, "--pool", b.Pool, "-m", mon, "--id", id, "--key="+secret).CombinedOutput()
 	output = string(cmd)
