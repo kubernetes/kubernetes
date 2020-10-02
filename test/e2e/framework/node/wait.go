@@ -40,8 +40,7 @@ var requiredPerNodePods = []*regexp.Regexp{
 }
 
 // WaitForReadyNodes waits up to timeout for cluster to has desired size and
-// there is no not-ready nodes in it. By cluster size we mean number of Nodes
-// excluding Master Node.
+// there is no not-ready nodes in it. By cluster size we mean number of schedulable Nodes.
 func WaitForReadyNodes(c clientset.Interface, size int, timeout time.Duration) error {
 	_, err := CheckReady(c, size, timeout)
 	return err
@@ -149,8 +148,7 @@ func WaitForNodeToBeReady(c clientset.Interface, name string, timeout time.Durat
 }
 
 // CheckReady waits up to timeout for cluster to has desired size and
-// there is no not-ready nodes in it. By cluster size we mean number of Nodes
-// excluding Master Node.
+// there is no not-ready nodes in it. By cluster size we mean number of schedulable Nodes.
 func CheckReady(c clientset.Interface, size int, timeout time.Duration) ([]v1.Node, error) {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(sleepTime) {
 		nodes, err := waitListSchedulableNodes(c)
