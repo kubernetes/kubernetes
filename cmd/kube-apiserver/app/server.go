@@ -364,6 +364,9 @@ func CreateKubeAPIServerConfig(
 			ExtendExpiration:            s.Authentication.ServiceAccounts.ExtendExpiration,
 
 			VersionedInformers: versionedInformers,
+
+			LeaseDurationSeconds:      s.LeaseDurationSeconds,
+			LeaseRenewIntervalSeconds: s.LeaseRenewIntervalSeconds,
 		},
 	}
 

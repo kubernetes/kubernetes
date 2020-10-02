@@ -205,6 +205,9 @@ type ExtraConfig struct {
 	ServiceAccountPublicKeys []interface{}
 
 	VersionedInformers informers.SharedInformerFactory
+
+	LeaseDurationSeconds      int
+	LeaseRenewIntervalSeconds int
 }
 
 // Config defines configuration for the master
@@ -507,8 +510,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				hostname = hostname[:hostnameMaxLength]
 			}
 			id := hostname + "-" + strconv.Itoa(os.Getpid()) + "-" + string(uuid.NewUUID())[:uuidLength]
-			// TODO(roycaihw): make leaseDurationSeconds and renewInterval flags
-			controller := lease.NewController(clock.RealClock{}, kubeClient, id, 3600, nil, 10*time.Second, v1.NamespaceAPIServerLease, nil)
+			controller := lease.NewController(clock.RealClock{}, kubeClient, id, int32(c.ExtraConfig.LeaseDurationSeconds), nil, time.Duration(c.ExtraConfig.LeaseRenewIntervalSeconds)*time.Second, v1.NamespaceAPIServerLease, nil)
 			go controller.Run(wait.NeverStop)
 			return nil
 		})

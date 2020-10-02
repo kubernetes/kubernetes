@@ -175,6 +175,12 @@ func (s *ServerRunOptions) Validate() []error {
 	errs = append(errs, validateTokenRequest(s)...)
 	errs = append(errs, s.Metrics.Validate()...)
 	errs = append(errs, s.Logs.Validate()...)
+	if s.LeaseDurationSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("--lease-duration-seconds should be a positive number, but value '%d' provided", s.LeaseDurationSeconds))
+	}
+	if s.LeaseRenewIntervalSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("--lease-renew-interval-seconds should be a positive number, but value '%d' provided", s.LeaseRenewIntervalSeconds))
+	}
 
 	return errs
 }
