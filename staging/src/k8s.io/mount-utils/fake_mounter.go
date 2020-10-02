@@ -132,6 +132,10 @@ func (f *FakeMounter) MountSensitive(source string, target string, fstype string
 	return nil
 }
 
+func (f *FakeMounter) MountSensitiveWithoutSystemd(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
+	return f.MountSensitive(source, target, fstype, options, nil /* sensitiveOptions */)
+}
+
 // Unmount records the unmount event and updates the in-memory mount points for FakeMounter
 func (f *FakeMounter) Unmount(target string) error {
 	f.mutex.Lock()

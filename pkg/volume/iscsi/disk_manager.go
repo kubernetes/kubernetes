@@ -67,7 +67,7 @@ func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter 
 	}
 	globalPDPath := manager.MakeGlobalPDName(*b.iscsiDisk)
 	mountOptions := util.JoinMountOptions(b.mountOptions, options)
-	err = mounter.Mount(globalPDPath, volPath, "", mountOptions)
+	err = mounter.MountSensitiveWithoutSystemd(globalPDPath, volPath, "", mountOptions, nil)
 	if err != nil {
 		klog.Errorf("Failed to bind mount: source:%s, target:%s, err:%v", globalPDPath, volPath, err)
 		noMnt, mntErr := b.mounter.IsLikelyNotMountPoint(volPath)

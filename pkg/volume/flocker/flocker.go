@@ -332,7 +332,7 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 	globalFlockerPath := makeGlobalFlockerPath(datasetUUID)
 	klog.V(4).Infof("attempting to mount %s", dir)
 
-	err = b.mounter.Mount(globalFlockerPath, dir, "", options)
+	err = b.mounter.MountSensitiveWithoutSystemd(globalFlockerPath, dir, "", options, nil)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
