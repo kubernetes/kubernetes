@@ -62,6 +62,95 @@ func returnMachineInfo() cadvisorapi.MachineInfo {
 	}
 }
 
+func TestPodGuaranteedCPUs(t *testing.T) {
+	CPUs := [][]struct {
+		request string
+		limit   string
+	}{
+		{
+			{request: "0", limit: "0"},
+		},
+		{
+			{request: "2", limit: "2"},
+		},
+		{
+			{request: "5", limit: "5"},
+		},
+		{
+			{request: "2", limit: "2"},
+			{request: "4", limit: "4"},
+		},
+	}
+	// tc for not guaranteed Pod
+	testPod1 := makeMultiContainerPod(CPUs[0], CPUs[0])
+	testPod2 := makeMultiContainerPod(CPUs[0], CPUs[1])
+	testPod3 := makeMultiContainerPod(CPUs[1], CPUs[0])
+	// tc for guaranteed Pod
+	testPod4 := makeMultiContainerPod(CPUs[1], CPUs[1])
+	testPod5 := makeMultiContainerPod(CPUs[2], CPUs[2])
+	// tc for comparing init containers and user containers
+	testPod6 := makeMultiContainerPod(CPUs[1], CPUs[2])
+	testPod7 := makeMultiContainerPod(CPUs[2], CPUs[1])
+	// tc for multi containers
+	testPod8 := makeMultiContainerPod(CPUs[3], CPUs[3])
+
+	p := staticPolicy{}
+
+	tcases := []struct {
+		name        string
+		pod         *v1.Pod
+		expectedCPU int
+	}{
+		{
+			name:        "TestCase01: if requestedCPU == 0, Pod is not Guaranteed Qos",
+			pod:         testPod1,
+			expectedCPU: 0,
+		},
+		{
+			name:        "TestCase02: if requestedCPU == 0, Pod is not Guaranteed Qos",
+			pod:         testPod2,
+			expectedCPU: 0,
+		},
+		{
+			name:        "TestCase03: if requestedCPU == 0, Pod is not Guaranteed Qos",
+			pod:         testPod3,
+			expectedCPU: 0,
+		},
+		{
+			name:        "TestCase04: Guaranteed Pod requests 2 CPUs",
+			pod:         testPod4,
+			expectedCPU: 2,
+		},
+		{
+			name:        "TestCase05: Guaranteed Pod requests 5 CPUs",
+			pod:         testPod5,
+			expectedCPU: 5,
+		},
+		{
+			name:        "TestCase06: The number of CPUs requested By app is bigger than the number of CPUs requested by init",
+			pod:         testPod6,
+			expectedCPU: 5,
+		},
+		{
+			name:        "TestCase07: The number of CPUs requested By init is bigger than the number of CPUs requested by app",
+			pod:         testPod7,
+			expectedCPU: 5,
+		},
+		{
+			name:        "TestCase08: Sum of CPUs requested by multiple containers",
+			pod:         testPod8,
+			expectedCPU: 6,
+		},
+	}
+	for _, tc := range tcases {
+		requestedCPU := p.podGuaranteedCPUs(tc.pod)
+
+		if requestedCPU != tc.expectedCPU {
+			t.Errorf("Expected in result to be %v , got %v", tc.expectedCPU, requestedCPU)
+		}
+	}
+}
+
 func TestGetTopologyHints(t *testing.T) {
 	machineInfo := returnMachineInfo()
 	tcases := returnTestCases()
@@ -107,6 +196,54 @@ func TestGetTopologyHints(t *testing.T) {
 		})
 		if !reflect.DeepEqual(tc.expectedHints, hints) {
 			t.Errorf("Expected in result to be %v , got %v", tc.expectedHints, hints)
+		}
+	}
+}
+
+func TestGetPodTopologyHints(t *testing.T) {
+	machineInfo := returnMachineInfo()
+
+	for _, tc := range returnTestCases() {
+		topology, _ := topology.Discover(&machineInfo)
+
+		var activePods []*v1.Pod
+		for p := range tc.assignments {
+			pod := v1.Pod{}
+			pod.UID = types.UID(p)
+			for c := range tc.assignments[p] {
+				container := v1.Container{}
+				container.Name = c
+				pod.Spec.Containers = append(pod.Spec.Containers, container)
+			}
+			activePods = append(activePods, &pod)
+		}
+
+		m := manager{
+			policy: &staticPolicy{
+				topology: topology,
+			},
+			state: &mockState{
+				assignments:   tc.assignments,
+				defaultCPUSet: tc.defaultCPUSet,
+			},
+			topology:          topology,
+			activePods:        func() []*v1.Pod { return activePods },
+			podStatusProvider: mockPodStatusProvider{},
+			sourcesReady:      &sourcesReadyStub{},
+		}
+
+		podHints := m.GetPodTopologyHints(&tc.pod)[string(v1.ResourceCPU)]
+		if len(tc.expectedHints) == 0 && len(podHints) == 0 {
+			continue
+		}
+		sort.SliceStable(podHints, func(i, j int) bool {
+			return podHints[i].LessThan(podHints[j])
+		})
+		sort.SliceStable(tc.expectedHints, func(i, j int) bool {
+			return tc.expectedHints[i].LessThan(tc.expectedHints[j])
+		})
+		if !reflect.DeepEqual(tc.expectedHints, podHints) {
+			t.Errorf("Expected in result to be %v , got %v", tc.expectedHints, podHints)
 		}
 	}
 }
