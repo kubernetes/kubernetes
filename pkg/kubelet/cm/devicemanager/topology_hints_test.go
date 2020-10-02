@@ -655,6 +655,265 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 	}
 }
 
+func TestGetPodDeviceRequest(t *testing.T) {
+	tcases := []struct {
+		description       string
+		pod               *v1.Pod
+		registeredDevices []string
+		expected          map[string]int
+	}{
+		{
+			description:       "empty pod",
+			pod:               &v1.Pod{},
+			registeredDevices: []string{},
+			expected:          map[string]int{},
+		},
+		{
+			description: "Init container requests device plugin resource",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			registeredDevices: []string{"gpu"},
+			expected:          map[string]int{"gpu": 2},
+		},
+		{
+			description: "Init containers request device plugin resource",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("2"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("4"),
+								},
+							},
+						},
+					},
+				},
+			},
+			registeredDevices: []string{"gpu"},
+			expected:          map[string]int{"gpu": 4},
+		},
+		{
+			description: "User container requests device plugin resource",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			registeredDevices: []string{"gpu"},
+			expected:          map[string]int{"gpu": 2},
+		},
+		{
+			description: "Init containers and user containers request the same amount of device plugin resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("2"),
+									v1.ResourceName("nic"):             resource.MustParse("2"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("2"),
+									v1.ResourceName("nic"):             resource.MustParse("2"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("1"),
+									v1.ResourceName("nic"):             resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("1"),
+									v1.ResourceName("nic"):             resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
+			},
+			registeredDevices: []string{"gpu", "nic"},
+			expected:          map[string]int{"gpu": 2, "nic": 2},
+		},
+		{
+			description: "Init containers request more device plugin resources than user containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("2"),
+									v1.ResourceName("nic"):             resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("3"),
+									v1.ResourceName("nic"):             resource.MustParse("2"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("1"),
+									v1.ResourceName("nic"):             resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
+			},
+			registeredDevices: []string{"gpu", "nic"},
+			expected:          map[string]int{"gpu": 3, "nic": 2},
+		},
+		{
+			description: "User containers request more device plugin resources than init containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("2"),
+									v1.ResourceName("nic"):             resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("2"),
+									v1.ResourceName("nic"):             resource.MustParse("1"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("3"),
+									v1.ResourceName("nic"):             resource.MustParse("2"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("3"),
+									v1.ResourceName("nic"):             resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			registeredDevices: []string{"gpu", "nic"},
+			expected:          map[string]int{"gpu": 6, "nic": 4},
+		},
+	}
+
+	for _, tc := range tcases {
+		m := ManagerImpl{
+			healthyDevices: make(map[string]sets.String),
+		}
+
+		for _, res := range tc.registeredDevices {
+			m.healthyDevices[res] = sets.NewString()
+		}
+
+		accumulatedResourceRequests := m.getPodDeviceRequest(tc.pod)
+
+		if !reflect.DeepEqual(accumulatedResourceRequests, tc.expected) {
+			t.Errorf("%v. expected alignment: %v but got: %v", tc.description, tc.expected, accumulatedResourceRequests)
+		}
+	}
+}
+
 func TestGetPodTopologyHints(t *testing.T) {
 	tcases := getCommonTestCases()
 	tcases = append(tcases, getPodScopeTestCases()...)
