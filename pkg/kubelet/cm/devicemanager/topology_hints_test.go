@@ -24,7 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -55,22 +55,13 @@ func TestGetTopologyHints(t *testing.T) {
 	tcases := getCommonTestCases()
 
 	for _, tc := range tcases {
-		resourceList := v1.ResourceList{}
-		for r := range tc.request {
-			resourceList[v1.ResourceName(r)] = resource.MustParse(tc.request[r])
-		}
-
-		pod := makePod(resourceList)
-		pod.UID = types.UID(tc.podUID)
-		pod.Spec.Containers[0].Name = tc.containerName
-
 		m := ManagerImpl{
 			allDevices:       make(map[string]map[string]pluginapi.Device),
 			healthyDevices:   make(map[string]sets.String),
 			allocatedDevices: make(map[string]sets.String),
 			podDevices:       newPodDevices(),
 			sourcesReady:     &sourcesReadyStub{},
-			activePods:       func() []*v1.Pod { return []*v1.Pod{pod} },
+			activePods:       func() []*v1.Pod { return []*v1.Pod{tc.pod} },
 			numaNodes:        []int{0, 1},
 		}
 
@@ -97,7 +88,7 @@ func TestGetTopologyHints(t *testing.T) {
 			}
 		}
 
-		hints := m.GetTopologyHints(pod, &pod.Spec.Containers[0])
+		hints := m.GetTopologyHints(tc.pod, &tc.pod.Spec.Containers[0])
 
 		for r := range tc.expectedHints {
 			sort.SliceStable(hints[r], func(i, j int) bool {
@@ -666,9 +657,7 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 
 type topologyHintTestCase struct {
 	description      string
-	podUID           string
-	containerName    string
-	request          map[string]string
+	pod              *v1.Pod
 	devices          map[string][]pluginapi.Device
 	allocatedDevices map[string]map[string]map[string][]string
 	expectedHints    map[string][]topologymanager.TopologyHint
@@ -677,11 +666,23 @@ type topologyHintTestCase struct {
 func getCommonTestCases() []topologyHintTestCase {
 	return []topologyHintTestCase{
 		{
-			description:   "Single Request, no alignment",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "1",
+			description: "Single Request, no alignment",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
 			},
 			devices: map[string][]pluginapi.Device{
 				"testdevice": {
@@ -694,11 +695,23 @@ func getCommonTestCases() []topologyHintTestCase {
 			},
 		},
 		{
-			description:   "Single Request, only one with alignment",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "1",
+			description: "Single Request, only one with alignment",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
 			},
 			devices: map[string][]pluginapi.Device{
 				"testdevice": {
@@ -720,11 +733,23 @@ func getCommonTestCases() []topologyHintTestCase {
 			},
 		},
 		{
-			description:   "Single Request, one device per socket",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "1",
+			description: "Single Request, one device per socket",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
 			},
 			devices: map[string][]pluginapi.Device{
 				"testdevice": {
@@ -750,11 +775,23 @@ func getCommonTestCases() []topologyHintTestCase {
 			},
 		},
 		{
-			description:   "Request for 2, one device per socket",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "2",
+			description: "Request for 2, one device per socket",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
 			},
 			devices: map[string][]pluginapi.Device{
 				"testdevice": {
@@ -772,11 +809,23 @@ func getCommonTestCases() []topologyHintTestCase {
 			},
 		},
 		{
-			description:   "Request for 2, 2 devices per socket",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "2",
+			description: "Request for 2, 2 devices per socket",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
 			},
 			devices: map[string][]pluginapi.Device{
 				"testdevice": {
@@ -804,11 +853,23 @@ func getCommonTestCases() []topologyHintTestCase {
 			},
 		},
 		{
-			description:   "Request for 2, optimal on 1 NUMA node, forced cross-NUMA",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "2",
+			description: "Request for 2, optimal on 1 NUMA node, forced cross-NUMA",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
 			},
 			devices: map[string][]pluginapi.Device{
 				"testdevice": {
@@ -835,12 +896,24 @@ func getCommonTestCases() []topologyHintTestCase {
 			},
 		},
 		{
-			description:   "2 device types, mixed configuration",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice1": "2",
-				"testdevice2": "1",
+			description: "2 device types, mixed configuration",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice1"): resource.MustParse("2"),
+									v1.ResourceName("testdevice2"): resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
 			},
 			devices: map[string][]pluginapi.Device{
 				"testdevice1": {
@@ -881,11 +954,23 @@ func getCommonTestCases() []topologyHintTestCase {
 			},
 		},
 		{
-			description:   "Single device type, more requested than available",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "6",
+			description: "Single device type, more requested than available",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("6"),
+								},
+							},
+						},
+					},
+				},
 			},
 			devices: map[string][]pluginapi.Device{
 				"testdevice": {
@@ -900,11 +985,23 @@ func getCommonTestCases() []topologyHintTestCase {
 			},
 		},
 		{
-			description:   "Single device type, all already allocated to container",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "2",
+			description: "Single device type, all already allocated to container",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
 			},
 			devices: map[string][]pluginapi.Device{
 				"testdevice": {
@@ -933,11 +1030,23 @@ func getCommonTestCases() []topologyHintTestCase {
 			},
 		},
 		{
-			description:   "Single device type, less already allocated to container than requested",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "4",
+			description: "Single device type, less already allocated to container than requested",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("4"),
+								},
+							},
+						},
+					},
+				},
 			},
 			devices: map[string][]pluginapi.Device{
 				"testdevice": {
@@ -959,11 +1068,23 @@ func getCommonTestCases() []topologyHintTestCase {
 			},
 		},
 		{
-			description:   "Single device type, more already allocated to container than requested",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "2",
+			description: "Single device type, more already allocated to container than requested",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
 			},
 			devices: map[string][]pluginapi.Device{
 				"testdevice": {
