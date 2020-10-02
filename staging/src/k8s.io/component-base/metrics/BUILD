@@ -13,6 +13,7 @@ go_library(
         "metric.go",
         "options.go",
         "opts.go",
+        "process.go",
         "processstarttime.go",
         "registry.go",
         "summary.go",

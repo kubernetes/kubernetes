@@ -37,6 +37,7 @@ var processStartTime = NewGaugeVec(
 // RegisterProcessStartTime registers the process_start_time_seconds to
 // a prometheus registry. This metric needs to be included to ensure counter
 // data fidelity.
+// Use RegisterProcess in process.go instead if you want to include every process metric
 func RegisterProcessStartTime(registrationFunc func(Registerable) error) error {
 	start, err := getProcessStart()
 	if err != nil {
