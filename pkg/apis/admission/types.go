@@ -25,21 +25,21 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// AdmissionReview describes an admission review request/response.
-type AdmissionReview struct {
+// Review describes an admission review request/response.
+type Review struct {
 	metav1.TypeMeta
 
 	// Request describes the attributes for the admission request.
 	// +optional
-	Request *AdmissionRequest
+	Request *Request
 
 	// Response describes the attributes for the admission response.
 	// +optional
-	Response *AdmissionResponse
+	Response *Response
 }
 
-// AdmissionRequest describes the admission.Attributes for the admission request.
-type AdmissionRequest struct {
+// Request describes the admission.Attributes for the admission request.
+type Request struct {
 	// UID is an identifier for the individual request/response. It allows us to distinguish instances of requests which are
 	// otherwise identical (parallel requests, requests when earlier requests did not modify etc)
 	// The UID is meant to track the round trip (request/response) between the KAS and the WebHook, not the user request.
@@ -115,8 +115,8 @@ type AdmissionRequest struct {
 	Options runtime.Object
 }
 
-// AdmissionResponse describes an admission response.
-type AdmissionResponse struct {
+// Response describes an admission response.
+type Response struct {
 	// UID is an identifier for the individual request/response.
 	// This should be copied over from the corresponding AdmissionRequest.
 	UID types.UID
