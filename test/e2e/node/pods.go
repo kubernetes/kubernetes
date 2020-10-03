@@ -263,6 +263,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 						start := time.Now()
 						created := podClient.Create(pod)
 						ch := make(chan []watch.Event)
+						waitForWatch := make(chan struct{})
 						go func() {
 							defer ginkgo.GinkgoRecover()
 							defer close(ch)
@@ -275,6 +276,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 								return
 							}
 							defer w.Stop()
+							close(waitForWatch)
 							events := []watch.Event{
 								{Type: watch.Added, Object: created},
 							}
@@ -291,6 +293,10 @@ var _ = SIGDescribe("Pods Extended", func() {
 							ch <- events
 						}()
 
+						select {
+						case <-ch: // in case the goroutine above exits before establishing the watch
+						case <-waitForWatch: // when the watch is established
+						}
 						t := time.Duration(rand.Intn(delay)) * time.Millisecond
 						time.Sleep(t)
 						err := podClient.Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
