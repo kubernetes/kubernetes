@@ -248,9 +248,11 @@ func (r *reconciler) finalize(
 
 // reconcileByPortMapping compares the endpoints found in existing slices with
 // the list of desired endpoints and returns lists of slices to create, update,
-// and delete. The logic is split up into several main steps:
+// and delete. It also checks that the slices mirror the parent services labels.
+// The logic is split up into several main steps:
 // 1. Iterate through existing slices, delete endpoints that are no longer
-//    desired and update matching endpoints that have changed.
+//    desired and update matching endpoints that have changed. It also checks
+//    if the slices have the labels of the parent services, and updates them if not.
 // 2. Iterate through slices that have been modified in 1 and fill them up with
 //    any remaining desired endpoints.
 // 3. If there still desired endpoints left, try to fit them into a previously
@@ -289,6 +291,9 @@ func (r *reconciler) reconcileByPortMapping(
 			}
 		}
 
+		// generate the slice labels and check if parent labels have changed
+		labels, labelsChanged := setEndpointSliceLabels(existingSlice, service)
+
 		// If an endpoint was updated or removed, mark for update or delete
 		if endpointUpdated || len(existingSlice.Endpoints) != len(newEndpoints) {
 			if len(existingSlice.Endpoints) > len(newEndpoints) {
@@ -301,9 +306,16 @@ func (r *reconciler) reconcileByPortMapping(
 				// otherwise, copy and mark for update
 				epSlice := existingSlice.DeepCopy()
 				epSlice.Endpoints = newEndpoints
+				epSlice.Labels = labels
 				slicesByName[existingSlice.Name] = epSlice
 				sliceNamesToUpdate.Insert(epSlice.Name)
 			}
+		} else if labelsChanged {
+			// if labels have changed, copy and mark for update
+			epSlice := existingSlice.DeepCopy()
+			epSlice.Labels = labels
+			slicesByName[existingSlice.Name] = epSlice
+			sliceNamesToUpdate.Insert(epSlice.Name)
 		} else {
 			// slices with no changes will be useful if there are leftover endpoints
 			sliceNamesUnchanged.Insert(existingSlice.Name)

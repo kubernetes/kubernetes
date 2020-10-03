@@ -72,6 +72,13 @@ func TestReconcile1Pod(t *testing.T) {
 	namespace := "test"
 	ipv6Family := corev1.IPv6Protocol
 	svcv4, _ := newServiceAndEndpointMeta("foo", namespace)
+	svcv4ClusterIP, _ := newServiceAndEndpointMeta("foo", namespace)
+	svcv4ClusterIP.Spec.ClusterIP = "1.1.1.1"
+	svcv4Labels, _ := newServiceAndEndpointMeta("foo", namespace)
+	svcv4Labels.Labels = map[string]string{"foo": "bar"}
+	svcv4BadLabels, _ := newServiceAndEndpointMeta("foo", namespace)
+	svcv4BadLabels.Labels = map[string]string{discovery.LabelServiceName: "bad",
+		discovery.LabelManagedBy: "actor", corev1.IsHeadlessService: "invalid"}
 	svcv6, _ := newServiceAndEndpointMeta("foo", namespace)
 	svcv6.Spec.IPFamily = &ipv6Family
 	svcv6ClusterIP, _ := newServiceAndEndpointMeta("foo", namespace)
@@ -94,6 +101,7 @@ func TestReconcile1Pod(t *testing.T) {
 		service             corev1.Service
 		expectedAddressType discovery.AddressType
 		expectedEndpoint    discovery.Endpoint
+		expectedLabels      map[string]string
 	}{
 		"ipv4": {
 			service:             svcv4,
@@ -111,6 +119,80 @@ func TestReconcile1Pod(t *testing.T) {
 					Namespace: namespace,
 					Name:      "pod1",
 				},
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelServiceName: "foo",
+				corev1.IsHeadlessService:   "",
+			},
+		},
+		"ipv4-clusterip": {
+			service:             svcv4ClusterIP,
+			expectedAddressType: discovery.AddressTypeIPv4,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses:  []string{"1.2.3.4"},
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Topology: map[string]string{
+					"kubernetes.io/hostname":        "node-1",
+					"topology.kubernetes.io/zone":   "us-central1-a",
+					"topology.kubernetes.io/region": "us-central1",
+				},
+				TargetRef: &corev1.ObjectReference{
+					Kind:      "Pod",
+					Namespace: namespace,
+					Name:      "pod1",
+				},
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelServiceName: "foo",
+			},
+		},
+		"ipv4-labels": {
+			service:             svcv4Labels,
+			expectedAddressType: discovery.AddressTypeIPv4,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses:  []string{"1.2.3.4"},
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Topology: map[string]string{
+					"kubernetes.io/hostname":        "node-1",
+					"topology.kubernetes.io/zone":   "us-central1-a",
+					"topology.kubernetes.io/region": "us-central1",
+				},
+				TargetRef: &corev1.ObjectReference{
+					Kind:      "Pod",
+					Namespace: namespace,
+					Name:      "pod1",
+				},
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelServiceName: "foo",
+				"foo":                      "bar",
+				corev1.IsHeadlessService:   "",
+			},
+		},
+		"ipv4-bad-labels": {
+			service:             svcv4BadLabels,
+			expectedAddressType: discovery.AddressTypeIPv4,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses:  []string{"1.2.3.4"},
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Topology: map[string]string{
+					"kubernetes.io/hostname":        "node-1",
+					"topology.kubernetes.io/zone":   "us-central1-a",
+					"topology.kubernetes.io/region": "us-central1",
+				},
+				TargetRef: &corev1.ObjectReference{
+					Kind:      "Pod",
+					Namespace: namespace,
+					Name:      "pod1",
+				},
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelServiceName: "foo",
+				corev1.IsHeadlessService:   "",
 			},
 		},
 		"ipv6": {
@@ -130,6 +212,11 @@ func TestReconcile1Pod(t *testing.T) {
 					Name:      "pod1",
 				},
 			},
+			expectedLabels: map[string]string{
+				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelServiceName: "foo",
+				corev1.IsHeadlessService:   "",
+			},
 		},
 		"ipv6-clusterip": {
 			service:             svcv6ClusterIP,
@@ -147,6 +234,10 @@ func TestReconcile1Pod(t *testing.T) {
 					Namespace: namespace,
 					Name:      "pod1",
 				},
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelServiceName: "foo",
 			},
 		},
 	}
@@ -174,8 +265,8 @@ func TestReconcile1Pod(t *testing.T) {
 				t.Errorf("Expected EndpointSlice name to start with %s, got %s", testCase.service.Name, slice.Name)
 			}
 
-			if slice.Labels[discovery.LabelServiceName] != testCase.service.Name {
-				t.Errorf("Expected EndpointSlice to have label set with %s value, got %s", testCase.service.Name, slice.Labels[discovery.LabelServiceName])
+			if !reflect.DeepEqual(testCase.expectedLabels, slice.Labels) {
+				t.Errorf("Expected EndpointSlice to have labels: %v , got %v", testCase.expectedLabels, slice.Labels)
 			}
 
 			if slice.Annotations[corev1.EndpointsLastChangeTriggerTime] != triggerTime.Format(time.RFC3339Nano) {
@@ -429,6 +520,81 @@ func TestReconcileEndpointSlicesUpdating(t *testing.T) {
 	expectActions(t, client.Actions(), 3, "update", "endpointslices")
 
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{100, 100, 50})
+}
+
+// In some cases, such as service labels updates, all slices for that service will require a change
+// This test ensures that we are updating those slices and not calling create + delete for each
+func TestReconcileEndpointSlicesServicesLabelsUpdating(t *testing.T) {
+	client := newClientset()
+	namespace := "test"
+	svc, _ := newServiceAndEndpointMeta("foo", namespace)
+
+	// start with 250 pods
+	pods := []*corev1.Pod{}
+	for i := 0; i < 250; i++ {
+		ready := !(i%3 == 0)
+		pods = append(pods, newPod(i, namespace, ready, 1))
+	}
+
+	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
+	numActionsExpected := 3
+	assert.Len(t, client.Actions(), numActionsExpected, "Expected 3 additional clientset actions")
+
+	slices := fetchEndpointSlices(t, client, namespace)
+	numActionsExpected++
+	expectUnorderedSlicesWithLengths(t, slices, []int{100, 100, 50})
+
+	// update service with new labels
+	svc.Labels = map[string]string{"foo": "bar"}
+	reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{&slices[0], &slices[1], &slices[2]}, time.Now())
+
+	numActionsExpected += 3
+	assert.Len(t, client.Actions(), numActionsExpected, "Expected 3 additional clientset actions")
+	expectActions(t, client.Actions(), 3, "update", "endpointslices")
+
+	newSlices := fetchEndpointSlices(t, client, namespace)
+	expectUnorderedSlicesWithLengths(t, newSlices, []int{100, 100, 50})
+	// check that the labels were updated
+	for _, slice := range newSlices {
+		w, ok := slice.Labels["foo"]
+		if !ok {
+			t.Errorf("Expected label \"foo\" from parent service not found")
+		} else if "bar" != w {
+			t.Errorf("Expected EndpointSlice to have parent service labels: have %s value, expected bar", w)
+		}
+	}
+}
+
+// In some cases, such as service labels updates, all slices for that service will require a change
+// However, this should not happen for reserved labels
+func TestReconcileEndpointSlicesServicesReservedLabels(t *testing.T) {
+	client := newClientset()
+	namespace := "test"
+	svc, _ := newServiceAndEndpointMeta("foo", namespace)
+
+	// start with 250 pods
+	pods := []*corev1.Pod{}
+	for i := 0; i < 250; i++ {
+		ready := !(i%3 == 0)
+		pods = append(pods, newPod(i, namespace, ready, 1))
+	}
+
+	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
+	numActionsExpected := 3
+	assert.Len(t, client.Actions(), numActionsExpected, "Expected 3 additional clientset actions")
+	slices := fetchEndpointSlices(t, client, namespace)
+	numActionsExpected++
+	expectUnorderedSlicesWithLengths(t, slices, []int{100, 100, 50})
+
+	// update service with new labels
+	svc.Labels = map[string]string{discovery.LabelServiceName: "bad", discovery.LabelManagedBy: "actor", corev1.IsHeadlessService: "invalid"}
+	reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{&slices[0], &slices[1], &slices[2]}, time.Now())
+	assert.Len(t, client.Actions(), numActionsExpected, "Expected no additional clientset actions")
+
+	newSlices := fetchEndpointSlices(t, client, namespace)
+	expectUnorderedSlicesWithLengths(t, newSlices, []int{100, 100, 50})
 }
 
 // In this test, we start with 10 slices that only have 30 endpoints each

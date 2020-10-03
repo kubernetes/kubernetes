@@ -21,6 +21,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 	utilnet "k8s.io/utils/net"
@@ -152,12 +154,9 @@ func endpointsEqualBeyondHash(ep1, ep2 *discovery.Endpoint) bool {
 func newEndpointSlice(service *corev1.Service, endpointMeta *endpointMeta) *discovery.EndpointSlice {
 	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
 	ownerRef := metav1.NewControllerRef(service, gvk)
-	return &discovery.EndpointSlice{
+	epSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{
-				discovery.LabelServiceName: service.Name,
-				discovery.LabelManagedBy:   controllerName,
-			},
+			Labels:          map[string]string{},
 			GenerateName:    getEndpointSlicePrefix(service.Name),
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Namespace:       service.Namespace,
@@ -166,6 +165,10 @@ func newEndpointSlice(service *corev1.Service, endpointMeta *endpointMeta) *disc
 		AddressType: endpointMeta.AddressType,
 		Endpoints:   []discovery.Endpoint{},
 	}
+	// add parent service labels
+	epSlice.Labels, _ = setEndpointSliceLabels(epSlice, service)
+
+	return epSlice
 }
 
 // getEndpointSlicePrefix returns a suitable prefix for an EndpointSlice name.
@@ -276,6 +279,62 @@ func serviceControllerKey(endpointSlice *discovery.EndpointSlice) (string, error
 		return "", fmt.Errorf("EndpointSlice missing %s label", discovery.LabelServiceName)
 	}
 	return fmt.Sprintf("%s/%s", endpointSlice.Namespace, serviceName), nil
+}
+
+// setEndpointSliceLabels returns a map with the new endpoint slices labels and true if there was an update.
+// Slices labels must be equivalent to the Service labels except for the reserved IsHeadlessService, LabelServiceName and LabelManagedBy labels
+// Changes to IsHeadlessService, LabelServiceName and LabelManagedBy labels on the Service do not result in updates to EndpointSlice labels.
+func setEndpointSliceLabels(epSlice *discovery.EndpointSlice, service *corev1.Service) (map[string]string, bool) {
+	updated := false
+	epLabels := make(map[string]string)
+	svcLabels := make(map[string]string)
+
+	// check if the endpoint slice and the service have the same labels
+	// clone current slice labels except the reserved labels
+	for key, value := range epSlice.Labels {
+		if IsReservedLabelKey(key) {
+			continue
+		}
+		// copy endpoint slice labels
+		epLabels[key] = value
+	}
+
+	for key, value := range service.Labels {
+		if IsReservedLabelKey(key) {
+			klog.Warningf("Service %s/%s using reserved endpoint slices label, skipping label %s: %s", service.Namespace, service.Name, key, value)
+			continue
+		}
+		// copy service labels
+		svcLabels[key] = value
+	}
+
+	// if the labels are not identical update the slice with the corresponding service labels
+	if !apiequality.Semantic.DeepEqual(epLabels, svcLabels) {
+		updated = true
+	}
+
+	// add or remove headless label depending on the service Type
+	if !helper.IsServiceIPSet(service) {
+		svcLabels[v1.IsHeadlessService] = ""
+	} else {
+		delete(svcLabels, v1.IsHeadlessService)
+	}
+
+	// override endpoint slices reserved labels
+	svcLabels[discovery.LabelServiceName] = service.Name
+	svcLabels[discovery.LabelManagedBy] = controllerName
+
+	return svcLabels, updated
+}
+
+// IsReservedLabelKey return true if the label is one of the reserved label for slices
+func IsReservedLabelKey(label string) bool {
+	if label == discovery.LabelServiceName ||
+		label == discovery.LabelManagedBy ||
+		label == v1.IsHeadlessService {
+		return true
+	}
+	return false
 }
 
 // endpointSliceEndpointLen helps sort endpoint slices by the number of
