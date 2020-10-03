@@ -42,6 +42,8 @@ const (
 
 	// operationCanceledErrorMessage means the operation is canceled by another new operation.
 	operationCanceledErrorMessage = "canceledandsupersededduetoanotheroperation"
+
+	cannotDeletePublicIPErrorMessageCode = "PublicIPAddressCannotBeDeleted"
 )
 
 // RequestBackoff if backoff is disabled in cloud provider it
@@ -275,6 +277,11 @@ func (az *Cloud) DeletePublicIP(service *v1.Service, pipResourceGroup string, pi
 	if rerr != nil {
 		klog.Errorf("PublicIPAddressesClient.Delete(%s) failed: %s", pipName, rerr.Error().Error())
 		az.Event(service, v1.EventTypeWarning, "DeletePublicIPAddress", rerr.Error().Error())
+
+		if strings.Contains(rerr.Error().Error(), cannotDeletePublicIPErrorMessageCode) {
+			klog.Warningf("DeletePublicIP for public IP %s failed with error %v, this is because other resources are referencing the public IP. The deletion of the service will continue.", pipName, rerr.Error())
+			return nil
+		}
 		return rerr.Error()
 	}
 
