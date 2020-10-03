@@ -50,7 +50,7 @@ import (
 )
 
 const (
-	testKubeletHostname = "127.0.0.1"
+	testKubeletHostname = "hostname"
 )
 
 // TODO(mtaufen): below is ported from the old kubelet_node_status_test.go code, potentially add more test coverage for NodeAddress setter in future
@@ -86,8 +86,8 @@ func TestNodeAddress(t *testing.T) {
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
 			},
 			expectedAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
 				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
 			},
 			shouldError: false,
@@ -432,10 +432,6 @@ func TestNodeAddress(t *testing.T) {
 				// expected an error, and got one, so just return early here
 				return
 			}
-
-			// Sort both sets for consistent equality
-			sortNodeAddresses(testCase.expectedAddresses)
-			sortNodeAddresses(existingNode.Status.Addresses)
 
 			assert.True(t, apiequality.Semantic.DeepEqual(testCase.expectedAddresses, existingNode.Status.Addresses),
 				"Diff: %s", diff.ObjectDiff(testCase.expectedAddresses, existingNode.Status.Addresses))
@@ -1677,19 +1673,6 @@ func TestVolumeLimits(t *testing.T) {
 }
 
 // Test Helpers:
-
-// sortableNodeAddress is a type for sorting []v1.NodeAddress
-type sortableNodeAddress []v1.NodeAddress
-
-func (s sortableNodeAddress) Len() int { return len(s) }
-func (s sortableNodeAddress) Less(i, j int) bool {
-	return (string(s[i].Type) + s[i].Address) < (string(s[j].Type) + s[j].Address)
-}
-func (s sortableNodeAddress) Swap(i, j int) { s[j], s[i] = s[i], s[j] }
-
-func sortNodeAddresses(addrs sortableNodeAddress) {
-	sort.Sort(addrs)
-}
 
 // testEvent is used to record events for tests
 type testEvent struct {
