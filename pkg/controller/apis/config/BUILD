@@ -19,6 +19,7 @@ go_library(
         "//pkg/controller/endpointslicemirroring/config:go_default_library",
         "//pkg/controller/garbagecollector/config:go_default_library",
         "//pkg/controller/job/config:go_default_library",
+        "//pkg/controller/leasegarbagecollector/config:go_default_library",
         "//pkg/controller/namespace/config:go_default_library",
         "//pkg/controller/nodeipam/config:go_default_library",
         "//pkg/controller/nodelifecycle/config:go_default_library",

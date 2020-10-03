@@ -66,6 +66,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/listers/storage/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/metadata:all-srcs",
         "//staging/src/k8s.io/client-go/pkg/apis/clientauthentication:all-srcs",
+        "//staging/src/k8s.io/client-go/pkg/controllers/lease:all-srcs",
         "//staging/src/k8s.io/client-go/pkg/version:all-srcs",
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth:all-srcs",
         "//staging/src/k8s.io/client-go/rest:all-srcs",

@@ -2065,6 +2065,7 @@ k8s.io/client-go/metadata/metadatalister
 k8s.io/client-go/pkg/apis/clientauthentication
 k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1
 k8s.io/client-go/pkg/apis/clientauthentication/v1beta1
+k8s.io/client-go/pkg/controllers/lease
 k8s.io/client-go/pkg/version
 k8s.io/client-go/plugin/pkg/client/auth
 k8s.io/client-go/plugin/pkg/client/auth/azure
