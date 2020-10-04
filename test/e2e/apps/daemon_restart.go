@@ -329,7 +329,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		}
 	})
 
-	ginkgo.It("Kube-proxy should recover after being killed accidentally", func() {
+	ginkgo.It("kube-proxy should recover after being killed accidentally", func() {
 		nodeIPs, err := e2enode.GetPublicIps(f.ClientSet)
 		if err != nil {
 			framework.Logf("Unexpected error occurred: %v", err)

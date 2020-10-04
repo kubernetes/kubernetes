@@ -2716,7 +2716,7 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, host, svcHeadlessIP, servicePort))
 	})
 
-	ginkgo.It("should be rejected when no endpoints exist", func() {
+	ginkgo.It("should be rejected when no endpoints exist (kube-proxy)", func() {
 		namespace := f.Namespace.Name
 		serviceName := "no-pods"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
