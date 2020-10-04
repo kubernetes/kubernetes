@@ -696,6 +696,9 @@ func (ss *scaleSet) listScaleSetVMs(scaleSetName, resourceGroup string) ([]compu
 	allVMs, rerr := ss.VirtualMachineScaleSetVMsClient.List(ctx, resourceGroup, scaleSetName, string(compute.InstanceView))
 	if rerr != nil {
 		klog.Errorf("VirtualMachineScaleSetVMsClient.List failed: %v", rerr)
+		if rerr.IsNotFound() {
+			return nil, cloudprovider.InstanceNotFound
+		}
 		return nil, rerr.Error()
 	}
 
