@@ -87,10 +87,4 @@ are a starting point and should not be considered to be production ready.
 If you like to run these tools in a production environment you could use the
 [Helm](https://helm.sh) charts, provided by the Helm community, which are used
 by a lot of people and therefore are widely tested. You can find them all via the
-[Helm Hub](https://hub.helm.sh/).
-
-The source of the mentioned charts can be found here:
-
-* [Elasticsearch](https://github.com/helm/charts/tree/master/stable/elasticsearch)
-* [Fluentd-elasticsearch](https://github.com/kiwigrid/helm-charts/tree/master/charts/fluentd-elasticsearch)
-* [Kibana](https://github.com/helm/charts/tree/master/stable/kibana)
+[Helm Hub](https://hub.helm.sh/) or the [Artifact hub](https://artifacthub.io/).
