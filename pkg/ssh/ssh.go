@@ -112,7 +112,7 @@ func (s *sshTunnel) Open() error {
 
 func (s *sshTunnel) Dial(ctx context.Context, network, address string) (net.Conn, error) {
 	if s.client == nil {
-		return nil, errors.New("tunnel is not opened.")
+		return nil, errors.New("tunnel is not opened")
 	}
 	// This Dial method does not allow to pass a context unfortunately
 	return s.client.Dial(network, address)
@@ -120,7 +120,7 @@ func (s *sshTunnel) Dial(ctx context.Context, network, address string) (net.Conn
 
 func (s *sshTunnel) Close() error {
 	if s.client == nil {
-		return errors.New("Cannot close tunnel. Tunnel was not opened.")
+		return errors.New("cannot close tunnel: tunnel is not opened")
 	}
 	if err := s.client.Close(); err != nil {
 		return err
@@ -232,15 +232,20 @@ func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer, 
 	return bout.String(), berr.String(), code, err
 }
 
-func MakePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
+// MakePrivateKeySignerFromFile returns a Signer for the input key file.
+// If the key file cannot be read, an error will be returned.
+func MakePrivateKeySignerFromFile(keyFile string) (ssh.Signer, error) {
 	// Create an actual signer.
-	buffer, err := ioutil.ReadFile(key)
+	buffer, err := ioutil.ReadFile(keyFile)
 	if err != nil {
-		return nil, fmt.Errorf("error reading SSH key %s: '%v'", key, err)
+		return nil, fmt.Errorf("error reading SSH key %s: '%v'", keyFile, err)
 	}
 	return MakePrivateKeySignerFromBytes(buffer)
 }
 
+// MakePrivateKeySignerFromBytes returns a Signer from the PEM encoded
+// private key. If the private key cannot be read or is encrypted,
+// an error will be returned.
 func MakePrivateKeySignerFromBytes(buffer []byte) (ssh.Signer, error) {
 	signer, err := ssh.ParsePrivateKey(buffer)
 	if err != nil {
@@ -249,6 +254,9 @@ func MakePrivateKeySignerFromBytes(buffer []byte) (ssh.Signer, error) {
 	return signer, nil
 }
 
+// ParsePublicKeyFromFile reads the key file and returns the RSA public key.
+// If the SSH key cannot be read or parsed, or has an invalid PEM, an error
+// will be returned.
 func ParsePublicKeyFromFile(keyFile string) (*rsa.PublicKey, error) {
 	buffer, err := ioutil.ReadFile(keyFile)
 	if err != nil {
@@ -294,7 +302,8 @@ func (*realTunnelCreator) newSSHTunnel(user, keyFile, host string) (tunnel, erro
 	return makeSSHTunnel(user, signer, host)
 }
 
-type SSHTunnelList struct {
+// TunnelList represents a list of SSH tunnels and their required metadata.
+type TunnelList struct {
 	entries       []sshTunnelEntry
 	adding        map[string]bool
 	tunnelCreator sshTunnelCreator
@@ -305,8 +314,9 @@ type SSHTunnelList struct {
 	healthCheckURL *url.URL
 }
 
-func NewSSHTunnelList(user, keyfile string, healthCheckURL *url.URL, stopChan chan struct{}) *SSHTunnelList {
-	l := &SSHTunnelList{
+// NewTunnelList creates a new TunnelList.
+func NewTunnelList(user, keyfile string, healthCheckURL *url.URL, stopChan chan struct{}) *TunnelList {
+	l := &TunnelList{
 		adding:         make(map[string]bool),
 		tunnelCreator:  &realTunnelCreator{},
 		user:           user,
@@ -328,7 +338,7 @@ func NewSSHTunnelList(user, keyfile string, healthCheckURL *url.URL, stopChan ch
 	return l
 }
 
-func (l *SSHTunnelList) delayedHealthCheck(e sshTunnelEntry, delay time.Duration) {
+func (l *TunnelList) delayedHealthCheck(e sshTunnelEntry, delay time.Duration) {
 	go func() {
 		defer runtime.HandleCrash()
 		time.Sleep(delay)
@@ -340,7 +350,7 @@ func (l *SSHTunnelList) delayedHealthCheck(e sshTunnelEntry, delay time.Duration
 	}()
 }
 
-func (l *SSHTunnelList) healthCheck(e sshTunnelEntry) error {
+func (l *TunnelList) healthCheck(e sshTunnelEntry) error {
 	// GET the healthcheck path using the provided tunnel's dial function.
 	transport := utilnet.SetTransportDefaults(&http.Transport{
 		DialContext: e.Tunnel.Dial,
@@ -359,7 +369,7 @@ func (l *SSHTunnelList) healthCheck(e sshTunnelEntry) error {
 	return nil
 }
 
-func (l *SSHTunnelList) removeAndReAdd(e sshTunnelEntry) {
+func (l *TunnelList) removeAndReAdd(e sshTunnelEntry) {
 	// Find the entry to replace.
 	l.tunnelsLock.Lock()
 	for i, entry := range l.entries {
@@ -376,7 +386,10 @@ func (l *SSHTunnelList) removeAndReAdd(e sshTunnelEntry) {
 	go l.createAndAddTunnel(e.Address)
 }
 
-func (l *SSHTunnelList) Dial(ctx context.Context, net, addr string) (net.Conn, error) {
+// Dial returns a new Connection interface for the input tunnel, and
+// connects to the corresponding addr through a tunnel in the TunnelList.
+// If the tunnel is not open, an error is returned.
+func (l *TunnelList) Dial(ctx context.Context, net, addr string) (net.Conn, error) {
 	start := time.Now()
 	id := mathrand.Int63() // So you can match begins/ends in the log.
 	klog.Infof("[%x: %v] Dialing...", id, addr)
@@ -390,7 +403,7 @@ func (l *SSHTunnelList) Dial(ctx context.Context, net, addr string) (net.Conn, e
 	return tunnel.Dial(ctx, net, addr)
 }
 
-func (l *SSHTunnelList) pickTunnel(addr string) (tunnel, error) {
+func (l *TunnelList) pickTunnel(addr string) (tunnel, error) {
 	l.tunnelsLock.Lock()
 	defer l.tunnelsLock.Unlock()
 	if len(l.entries) == 0 {
@@ -411,7 +424,7 @@ func (l *SSHTunnelList) pickTunnel(addr string) (tunnel, error) {
 // tunnels that are not in addresses are removed from entries and closed in a
 // background goroutine. New tunnels specified in addresses are opened in a
 // background goroutine and then added to entries.
-func (l *SSHTunnelList) Update(addrs []string) {
+func (l *TunnelList) Update(addrs []string) {
 	haveAddrsMap := make(map[string]bool)
 	wantAddrsMap := make(map[string]bool)
 	func() {
@@ -458,7 +471,7 @@ func (l *SSHTunnelList) Update(addrs []string) {
 	}()
 }
 
-func (l *SSHTunnelList) createAndAddTunnel(addr string) {
+func (l *TunnelList) createAndAddTunnel(addr string) {
 	klog.Infof("Trying to add tunnel to %q", addr)
 	tunnel, err := l.tunnelCreator.newSSHTunnel(l.user, l.keyfile, addr)
 	if err != nil {
@@ -479,6 +492,7 @@ func (l *SSHTunnelList) createAndAddTunnel(addr string) {
 	klog.Infof("Successfully added tunnel for %q", addr)
 }
 
+// EncodePrivateKey returns the PEM encoding of the block.
 func EncodePrivateKey(private *rsa.PrivateKey) []byte {
 	return pem.EncodeToMemory(&pem.Block{
 		Bytes: x509.MarshalPKCS1PrivateKey(private),
@@ -486,6 +500,9 @@ func EncodePrivateKey(private *rsa.PrivateKey) []byte {
 	})
 }
 
+// EncodePublicKey returns the PEM encoding of the public key block.
+// If the block has invalid headers and cannot be encoded,
+// nil will be returned.
 func EncodePublicKey(public *rsa.PublicKey) ([]byte, error) {
 	publicBytes, err := x509.MarshalPKIXPublicKey(public)
 	if err != nil {
@@ -497,6 +514,8 @@ func EncodePublicKey(public *rsa.PublicKey) ([]byte, error) {
 	}), nil
 }
 
+// EncodeSSHKey creates a PublicKey instance, given the RSA public key,
+// and serializes it.
 func EncodeSSHKey(public *rsa.PublicKey) ([]byte, error) {
 	publicKey, err := ssh.NewPublicKey(public)
 	if err != nil {
@@ -505,6 +524,8 @@ func EncodeSSHKey(public *rsa.PublicKey) ([]byte, error) {
 	return ssh.MarshalAuthorizedKey(publicKey), nil
 }
 
+// GenerateKey returns an RSA private key and public key
+// of the input bit size using crypto/rand.Reader.
 func GenerateKey(bits int) (*rsa.PrivateKey, *rsa.PublicKey, error) {
 	private, err := rsa.GenerateKey(rand.Reader, bits)
 	if err != nil {
