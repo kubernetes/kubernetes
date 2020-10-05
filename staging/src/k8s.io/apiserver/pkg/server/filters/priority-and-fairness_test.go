@@ -153,6 +153,10 @@ func TestApfSkipLongRunningRequest(t *testing.T) {
 	server := newApfServerWithSingleRequest(decisionSkipFilter, t)
 	defer server.Close()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
+
 	// send a watch request to test skipping long running request
 	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces?watch=true", server.URL), http.StatusOK); err != nil {
 		// request should not be rejected
@@ -165,6 +169,10 @@ func TestApfRejectRequest(t *testing.T) {
 
 	server := newApfServerWithSingleRequest(decisionReject, t)
 	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
 	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusTooManyRequests); err != nil {
 		t.Error(err)
@@ -187,6 +195,10 @@ func TestApfExemptRequest(t *testing.T) {
 	server := newApfServerWithSingleRequest(decisionNoQueuingExecute, t)
 	defer server.Close()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
+
 	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusOK); err != nil {
 		t.Error(err)
 	}
@@ -208,6 +220,10 @@ func TestApfExecuteRequest(t *testing.T) {
 
 	server := newApfServerWithSingleRequest(decisionQueuingExecute, t)
 	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
 	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusOK); err != nil {
 		t.Error(err)
@@ -273,6 +289,10 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 
 	server := newApfServerWithHooks(decisionQueuingExecute, onExecuteFunc, postExecuteFunc, postEnqueueFunc, postDequeueFunc, t)
 	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
 	for i := 0; i < concurrentRequests; i++ {
 		var err error
