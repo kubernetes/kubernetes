@@ -148,7 +148,7 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 	if err != nil {
 		return err
 	}
-	if !labels.AreLabelsInWhiteList(pod.Spec.NodeSelector, whitelist) {
+	if !isSubset(pod.Spec.NodeSelector, whitelist) {
 		return errors.NewForbidden(resource, pod.Name, fmt.Errorf("pod node label selector labels conflict with its namespace whitelist"))
 	}
 
@@ -258,4 +258,21 @@ func (p *Plugin) getNodeSelectorMap(namespace *corev1.Namespace) (labels.Set, er
 		}
 	}
 	return selector, nil
+}
+
+func isSubset(subSet, superSet labels.Set) bool {
+	if len(superSet) == 0 {
+		return true
+	}
+
+	for k, v := range subSet {
+		value, ok := superSet[k]
+		if !ok {
+			return false
+		}
+		if value != v {
+			return false
+		}
+	}
+	return true
 }
