@@ -76,10 +76,6 @@ func WithPriorityAndFairness(
 		klog.Warningf("priority and fairness support not found, skipping")
 		return handler
 	}
-	startOnce.Do(func() {
-		startRecordingUsage(watermark)
-		startRecordingUsage(waitingMark)
-	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
@@ -149,4 +145,11 @@ func WithPriorityAndFairness(
 		}
 
 	})
+}
+
+// StartPriorityAndFairnessWatermarkMaintenance starts the goroutines to observe and maintain watermarks for
+// priority-and-fairness requests.
+func StartPriorityAndFairnessWatermarkMaintenance(stopCh <-chan struct{}) {
+	startWatermarkMaintenance(watermark, stopCh)
+	startWatermarkMaintenance(waitingMark, stopCh)
 }
