@@ -711,10 +711,11 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler 
 	}
 	mods = utilipvs.GetRequiredIPVSModules(kernelVersion)
 	wantModules := sets.NewString()
-	schedulerMod, modNotFound := utilipvs.GetRequiredSchedulerModules(scheduler)
-	if modNotFound != nil {
-		klog.Error(modNotFound)
+	// We check for the existence of the scheduler mod and will trigger a missingMods error if not found
+	if scheduler == "" {
+		scheduler = DefaultScheduler
 	}
+	schedulerMod := "ip_vs_" + scheduler
 	mods = append(mods, schedulerMod)
 	wantModules.Insert(mods...)
 

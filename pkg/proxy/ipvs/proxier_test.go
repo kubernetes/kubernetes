@@ -348,13 +348,13 @@ func TestCanUseIPVSProxier(t *testing.T) {
 			ipsetVersion:  MinIPSetCheckVersion,
 			ok:            true,
 		},
-		// case 10, non-existent scheduler, fallback to rr
+		// case 10, non-existent scheduler, error due to modules not existing
 		{
 			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "ip_vs_dh"},
 			scheduler:     "foobar",
 			kernelVersion: "4.19",
 			ipsetVersion:  MinIPSetCheckVersion,
-			ok:            true,
+			ok:            false,
 		},
 	}
 
