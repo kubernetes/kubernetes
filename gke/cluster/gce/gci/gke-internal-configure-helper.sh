@@ -576,3 +576,26 @@ EOF
   systemctl start gcfsd.service
   systemctl start gcfs-snapshotter.service
 }
+
+# Set up the inplace agent.
+function gke-setup-inplace {
+  cat <<EOF >/etc/systemd/system/inplace.service
+# Systemd configuration for inplace server
+[Unit]
+Description=GKE component inplace update agent
+[Service]
+Restart=always
+RestartSec=10
+RemainAfterExit=yes
+RemainAfterExit=yes
+ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/inplace
+Restart=always
+RestartSec=10
+ExecStart=${KUBE_HOME}/bin/inplace --home_path=${KUBE_HOME}/inplace --inplace_binary_path=${KUBE_HOME}/bin/inplace
+[Install]
+WantedBy=kubernetes.target
+EOF
+
+  systemctl daemon-reload
+  systemctl start inplace.service
+}

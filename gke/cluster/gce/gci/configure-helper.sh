@@ -3477,6 +3477,11 @@ function main() {
     log-wrap 'StartClusterAutoscaler' start-cluster-autoscaler
     log-wrap 'StartLBController' start-lb-controller
     log-wrap 'UpdateLegacyAddonNodeLabels' update-legacy-addon-node-labels &
+    if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+      if [[ -f "${KUBE_HOME}/bin/inplace" ]]; then
+        log-wrap 'GKESetupInplace' gke-setup-inplace
+      fi
+    fi
   else
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
       log-wrap 'StartKubeProxy' start-kube-proxy

@@ -481,14 +481,7 @@ function install-hurl {
   fi
 
   local -r hurl_gcs_att="instance/attributes/hurl-gcs-url"
-  local -r hurl_gcs_url=$(curl \
-    --retry 5 \
-    --retry-delay 3 \
-    ${CURL_RETRY_CONNREFUSED} \
-    --fail \
-    --silent \
-    -H 'Metadata-Flavor: Google' \
-    "http://metadata/computeMetadata/v1/${hurl_gcs_att}")
+  local -r hurl_gcs_url=$(get-metadata-value "${hurl_gcs_att}")
 
   if [[ -z "${hurl_gcs_url}" ]]; then
     # URL not present in GCE Instance Metadata
@@ -504,6 +497,36 @@ function install-hurl {
     chmod a+x ${KUBE_HOME}/${hurl_bin}
     mv "${KUBE_HOME}/${hurl_bin}" "${KUBE_BIN}/${hurl_bin}"
     echo "install-hurl: hurl installed to ${KUBE_BIN}/${hurl_bin}"
+    return
+  fi
+}
+
+# Installs inplace to ${KUBE_HOME}/bin/inplace if not already installed.
+function install-inplace {
+  cd "${KUBE_HOME}"
+  if [[ -f "${KUBE_HOME}/bin/inplace" ]]; then
+    echo "install-inplace: inplace already installed"
+    return
+  fi
+  local -r inplace_gcs_att="instance/attributes/inplace-gcs-url"
+  local -r inplace_gcs_url=$(get-metadata-value "${inplace_gcs_att}")
+  if [[ -z "${inplace_gcs_url}" ]]; then
+    # URL not present in GCE Instance Metadata
+    echo "install-inplace: Unable to find GCE metadata ${inplace_gcs_att}"
+    return
+  fi
+  echo "install-inplace: Installing inplace from ${inplace_gcs_url} ..."
+  download-or-bust "" "${inplace_gcs_url}"
+  local -r inplace_bin="inplace"
+  if [[ -f "${KUBE_HOME}/${inplace_bin}" ]]; then
+    mv "${KUBE_HOME}/${inplace_bin}" "${KUBE_BIN}/${inplace_bin}"
+    if [[ ! -d "${KUBE_HOME}/${inplace_bin}" ]]; then
+      mkdir -p "${KUBE_HOME}/${inplace_bin}"
+    fi
+    cat > "${KUBE_HOME}/${inplace_bin}/inplace.hash" <<EOF
+${inplace_gcs_url}
+EOF
+    echo "install-inplace: inplace installed to ${KUBE_BIN}/${inplace_bin}"
     return
   fi
 }
@@ -1007,6 +1030,7 @@ KUBE_BIN="${KUBE_HOME}/bin"
 
 if [[ "$(is-master)" == "true" ]]; then
   log-wrap 'InstallHurl' install-hurl
+  log-wrap 'InstallInplace' install-inplace
 fi
 
 # download and source kube-env
@@ -1026,5 +1050,5 @@ log-wrap 'EnsureContainerRuntime' ensure-container-runtime
 # binaries and kube-system manifests
 log-wrap 'InstallKubeBinaryConfig' install-kube-binary-config
 
-log-end 'ConfigureMain'
 echo "Done for installing kubernetes files"
+log-end 'ConfigureMain'
