@@ -79,6 +79,8 @@ func WithPriorityAndFairness(
 	startOnce.Do(func() {
 		startRecordingUsage(watermark)
 		startRecordingUsage(waitingMark)
+		maintainObservations(watermark)
+		maintainObservations(waitingMark)
 	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
