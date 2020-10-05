@@ -17,7 +17,6 @@ limitations under the License.
 package ipvs
 
 import (
-	"fmt"
 	"net"
 	"reflect"
 	"sort"
@@ -410,54 +409,6 @@ func TestGetRequiredIPVSModules(t *testing.T) {
 			sort.Strings(test.want)
 			if !reflect.DeepEqual(got, test.want) {
 				t.Errorf("GetRequiredIPVSMods() = %v for kenel version: %s, want %v", got, test.kernelVersion, test.want)
-			}
-		})
-	}
-}
-
-func TestGetRequiredSchedulerModules(t *testing.T) {
-	Tests := []struct {
-		name         string
-		scheduler    string
-		want         string
-		expectedErrs error
-	}{
-		{
-			name:         "scheduler explicitly set to  rr",
-			scheduler:    "rr",
-			want:         "ip_vs_rr",
-			expectedErrs: nil,
-		},
-		{
-			name:         "scheduler set to  nq",
-			scheduler:    "nq",
-			want:         "ip_vs_nq",
-			expectedErrs: nil,
-		},
-		{
-			name:         "unset scheduler",
-			scheduler:    "",
-			want:         "ip_vs_rr",
-			expectedErrs: nil,
-		},
-		{
-			name:         "invalid scheduler algorithm",
-			scheduler:    "foobar",
-			want:         "ip_vs_rr",
-			expectedErrs: fmt.Errorf("ip_vs_%s is not a supported IPVS scheduler algorithm, falling back to round-robin", "foobar"),
-		},
-	}
-
-	for _, test := range Tests {
-		t.Run(test.name, func(t *testing.T) {
-			got, err := GetRequiredSchedulerModules(test.scheduler)
-			if !reflect.DeepEqual(got, test.want) {
-				t.Fatalf("GetRequiredSchedulerModules() = testCase %v failed- expected: %s scheduler, but got: %s", test.name, test.want, got)
-			}
-			if err != nil {
-				if err.Error() != test.expectedErrs.Error() {
-					t.Fatalf("Expected error: %v, got: %v", test.expectedErrs, err.Error())
-				}
 			}
 		})
 	}

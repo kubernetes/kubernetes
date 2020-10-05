@@ -111,6 +111,7 @@ func Test_getProxyMode(t *testing.T) {
 			kernelVersion: "4.18",
 			ipsetVersion:  ipvs.MinIPSetCheckVersion,
 			expected:      proxyModeIPVS,
+			scheduler:     "rr",
 		},
 		{ // flag says ipvs, ipset version ok, kernel modules installed for linux kernel 4.19
 			flag:          "ipvs",
@@ -118,6 +119,7 @@ func Test_getProxyMode(t *testing.T) {
 			kernelVersion: "4.19",
 			ipsetVersion:  ipvs.MinIPSetCheckVersion,
 			expected:      proxyModeIPVS,
+			scheduler:     "rr",
 		},
 		{ // flag says ipvs, ipset version too low, fallback on iptables mode
 			flag:          "ipvs",
@@ -151,13 +153,14 @@ func Test_getProxyMode(t *testing.T) {
 			expected:      proxyModeIPVS,
 			scheduler:     "sed",
 		},
-		{ // flag says ipvs, ipset version ok, non-existent scheduler
+		{ // flag says ipvs, kernel modules not installed for sed scheduler, fallback to iptables
 			flag:          "ipvs",
-			kmods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "ip_vs_sed"},
+			kmods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack"},
 			kernelVersion: "4.19",
 			ipsetVersion:  ipvs.MinIPSetCheckVersion,
-			expected:      proxyModeIPVS,
-			scheduler:     "foobar",
+			expected:      proxyModeIPTables,
+			kernelCompat:  true,
+			scheduler:     "sed",
 		},
 	}
 	for i, c := range cases {
@@ -167,11 +170,7 @@ func Test_getProxyMode(t *testing.T) {
 			modules:       c.kmods,
 			kernelVersion: c.kernelVersion,
 		}
-		scheduler := cases[i].scheduler
-		if scheduler == "" {
-			scheduler = "rr"
-		}
-		canUseIPVS, _ := ipvs.CanUseIPVSProxier(khandler, ipsetver, scheduler)
+		canUseIPVS, _ := ipvs.CanUseIPVSProxier(khandler, ipsetver, cases[i].scheduler)
 		r := getProxyMode(c.flag, canUseIPVS, kcompater)
 		if r != c.expected {
 			t.Errorf("Case[%d] Expected %q, got %q", i, c.expected, r)
