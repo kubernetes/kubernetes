@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"sync"
 	"sync/atomic"
 
 	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
@@ -58,9 +57,6 @@ var waitingMark = &requestWatermark{
 	mutatingObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{epmetrics.MutatingKind}).RequestsWaiting,
 }
 
-// apfStartOnce is used to avoid sharing one-time mutex with maxinflight handler
-var apfStartOnce sync.Once
-
 var atomicMutatingExecuting, atomicReadOnlyExecuting int32
 var atomicMutatingWaiting, atomicReadOnlyWaiting int32
 
@@ -75,12 +71,6 @@ func WithPriorityAndFairness(
 		klog.Warningf("priority and fairness support not found, skipping")
 		return handler
 	}
-	startOnce.Do(func() {
-		startRecordingUsage(watermark)
-	})
-	apfStartOnce.Do(func() {
-		startRecordingUsage(waitingMark)
-	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
@@ -155,4 +145,11 @@ func WithPriorityAndFairness(
 		}
 
 	})
+}
+
+// StartPriorityAndFairnessWatermarkMaintenance starts the goroutines to observe and maintain watermarks for
+// priority-and-fairness requests.
+func StartPriorityAndFairnessWatermarkMaintenance(stopCh <-chan struct{}) {
+	startWatermarkMaintenance(watermark, stopCh)
+	startWatermarkMaintenance(waitingMark, stopCh)
 }
