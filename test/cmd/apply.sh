@@ -269,7 +269,7 @@ __EOF__
   kube::test::get_object_assert 'services a' "{{${id_field:?}}}" 'a'
   # change immutable field and apply service a
   output_message=$(! kubectl apply -f hack/testdata/service-revision2.yaml 2>&1 "${kube_flags[@]:?}")
-  kube::test::if_has_string "${output_message}" 'field is immutable'
+  kube::test::if_has_string "${output_message}" 'may not change once set'
   # apply --force to recreate resources for immutable fields
   kubectl apply -f hack/testdata/service-revision2.yaml --force "${kube_flags[@]:?}"
   # check immutable field exists
