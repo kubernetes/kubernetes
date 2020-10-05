@@ -13,6 +13,7 @@ go_library(
     deps = [
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/apis/config/scheme:go_default_library",
+        "//pkg/scheduler/apis/config/v1beta2:go_default_library",
         "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/internal/parallelize:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",

@@ -162,6 +162,7 @@ pkg/registry/storage/rest
 pkg/registry/storage/storageclass
 pkg/scheduler/apis/config/v1
 pkg/scheduler/apis/config/v1beta1
+pkg/scheduler/apis/config/v1beta2
 pkg/security/podsecuritypolicy
 pkg/security/podsecuritypolicy/group
 pkg/security/podsecuritypolicy/selinux

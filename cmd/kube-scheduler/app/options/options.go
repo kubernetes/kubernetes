@@ -43,7 +43,8 @@ import (
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
-	kubeschedulerconfigv1beta1 "k8s.io/kube-scheduler/config/v1beta1"
+	kubeschedulerconfigv1beta2 "k8s.io/kube-scheduler/config/v1beta2"
+
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -136,7 +137,7 @@ func splitHostIntPort(s string) (string, int, error) {
 }
 
 func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
-	versionedCfg := kubeschedulerconfigv1beta1.KubeSchedulerConfiguration{}
+	versionedCfg := kubeschedulerconfigv1beta2.KubeSchedulerConfiguration{}
 	versionedCfg.DebuggingConfiguration = *configv1alpha1.NewRecommendedDebuggingConfiguration()
 
 	kubeschedulerscheme.Scheme.Default(&versionedCfg)

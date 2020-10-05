@@ -2357,6 +2357,7 @@ k8s.io/kube-proxy/config/v1alpha1
 # k8s.io/kube-scheduler => ./staging/src/k8s.io/kube-scheduler
 k8s.io/kube-scheduler/config/v1
 k8s.io/kube-scheduler/config/v1beta1
+k8s.io/kube-scheduler/config/v1beta2
 k8s.io/kube-scheduler/extender/v1
 # k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl
 ## explicit

@@ -5,6 +5,7 @@ module k8s.io/kube-scheduler
 go 1.15
 
 require (
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
 	github.com/google/go-cmp v0.5.2
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
