@@ -219,7 +219,7 @@ function gke-configure-node-sysctls {
 
   # Generate the kernel parameter defaults and overrides configs in
   # /etc/sysctl.d/. They will be loaded by systemd-sysctl on reboot.
-  python "${dir}/generate-conf-files.py" \
+  ${PYTHON} "${dir}/generate-conf-files.py" \
     --sysctl-defaults="${sysctl_defaults}" \
     --sysctl-overrides="${sysctl_overrides}" \
     --output-defaults=${output_defaults} \
@@ -227,7 +227,7 @@ function gke-configure-node-sysctls {
 
   # Extract the namespaced kernel parameter defaults and overrides that should
   # be passed to kubelet and set inside pod namespaces.
-  POD_SYSCTLS=$(python "${dir}/extract-namespaced.py" \
+  POD_SYSCTLS=$(${PYTHON} "${dir}/extract-namespaced.py" \
     --sysctl-defaults="${sysctl_defaults}" \
     --sysctl-overrides="${sysctl_overrides}" \
     --namespaced-sysctl-names="${namespaced_sysctl_names}")

@@ -72,6 +72,7 @@ function setup-os-params {
   # GKE.
   if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
     if [[ "${KUBERNETES_MASTER:-false}" == "false" ]]; then
+      export PYTHON
       gke-configure-node-sysctls
     fi
   fi
@@ -2268,7 +2269,7 @@ function download-component-data {
   cat > $attribute_config <<EOF
 attributes:
 - attributePath: $(get-metadata-value "instance/attributes/google-container-manifest-path")
-  localPath: $(python -c "import sys, yaml; print(yaml.load(open(sys.argv[1]))['staticPodPath'])" "${KUBE_HOME}/kubelet-config.yaml")
+  localPath: $(${PYTHON} -c "import sys, yaml; print(yaml.load(open(sys.argv[1]))['staticPodPath'])" "${KUBE_HOME}/kubelet-config.yaml")
   processKind: split-pod-list
 - attributePath: $(get-metadata-value "instance/attributes/extra-addons-path")
   localPath: ${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/gce-extras/extras.json
