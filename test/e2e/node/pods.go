@@ -155,8 +155,6 @@ var _ = SIGDescribe("Pods Extended", func() {
 			Release: v1.9
 			Testname: Pods, QOS
 			Description:  Create a Pod with CPU and Memory request and limits. Pod status MUST have QOSClass set to PodQOSGuaranteed.
-			Behaviors:
-			- pod/spec/container/resources
 		*/
 		framework.ConformanceIt("should be set on Pods with matching resource requests and limits for memory and cpu", func() {
 			ginkgo.By("creating the pod")
