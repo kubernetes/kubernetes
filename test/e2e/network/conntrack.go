@@ -275,6 +275,159 @@ var _ = SIGDescribe("Conntrack", func() {
 			framework.Failf("Failed to connect to backend 2")
 		}
 	})
+
+	// Regression test for #74839, where:
+	// Packets considered INVALID by conntrack are now dropped. In particular, this fixes
+	// a problem where spurious retransmits in a long-running TCP connection to a service
+	// IP could result in the connection being closed with the error "Connection reset by
+	// peer"
+	// xref: https://kubernetes.io/blog/2019/03/29/kube-proxy-subtleties-debugging-an-intermittent-connection-reset/
+	ginkgo.It("should drop invalid conntrack packets", func() {
+
+		// Create a TCP service
+		tcpJig := e2eservice.NewTestJig(cs, ns, serviceName)
+		ginkgo.By("creating a TCP service " + serviceName + " with type=NodePort in " + ns)
+		tcpService, err := tcpJig.CreateTCPService(func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.Ports = []v1.ServicePort{
+				{Port: 80, Name: "tcp", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(80)},
+			}
+		})
+		framework.ExpectNoError(err)
+
+		// Store the script in a configmap so we can use it from the pods
+		script := `
+#!/usr/bin/python
+from scapy.all import *
+
+# Interacts with a client by going through the three-way handshake.
+# Shuts down the connection immediately after the connection has been established.
+# Akaljed Dec 2010, http://www.akaljed.wordpress.com
+
+# Wait for client to connect.
+a=sniff(count=1,filter="tcp and host 192.168.1.1 and port 80")
+
+# some variables for later use.
+ValueOfPort=a[0].sport
+SeqNr=a[0].seq
+AckNr=a[0].seq+1
+
+# Generating the IP layer:
+ip=IP(src="192.168.1.1", dst="192.168.1.2")
+# Generating TCP layer:
+TCP_SYNACK=TCP(sport=80, dport=ValueOfPort, flags="SA", seq=SeqNr, ack=AckNr, options=[('MSS', 1460)])
+
+#send SYNACK to remote host AND receive ACK.
+ANSWER=sr1(ip/TCP_SYNACK)
+
+# Capture next TCP packets with dport 80. (contains http GET request)
+GEThttp = sniff(filter="tcp and port 80",count=1,prn=lambda x:x.sprintf("{IP:%IP.src%: %TCP.dport%}"))
+AckNr=AckNr+len(GEThttp[0].load)
+SeqNr=a[0].seq+1
+
+# Print the GET request
+# (Sanity check: size of data should be greater than 1.)
+if len(GEThttp[0].load)>1: print GEThttp[0].load
+
+# Generate custom http file content.
+html1="HTTP/1.1 200 OK\x0d\x0aDate: Wed, 29 Sep 2010 20:19:05 GMT\x0d\x0aServer: Testserver\x0d\x0aConnection: Keep-Alive\x0d\x0aContent-Type: text/html; charset=UTF-8\x0d\x0aContent-Length: 291\x0d\x0a\x0d\x0a<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\"><html><head><title>Testserver</title></head><body bgcolor=\"black\" text=\"white\" link=\"blue\" vlink=\"purple\" alink=\"red\"><p><font face=\"Courier\" color=\"blue\">-Welcome to test server-------------------------------</font></p></body></html>"
+
+# Generate TCP data
+data1=TCP(sport=80, dport=ValueOfPort, flags="PA", seq=SeqNr, ack=AckNr, options=[('MSS', 1460)])
+
+# Construct whole network packet, send it and fetch the returning ack.
+ackdata1=sr1(ip/data1/html1)
+# Store new sequence number.
+SeqNr=ackdata1.ack
+
+# Generate RST-ACK packet
+Bye=TCP(sport=80, dport=ValueOfPort, flags="FA", seq=SeqNr, ack=AckNr, options=[('MSS', 1460)])
+
+send(ip/Bye)
+`
+
+		execPermissions := int32(0744)
+
+		cm := &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "scapy-script",
+				Namespace: ns,
+			},
+			Data: map[string]string{
+				script: script,
+			},
+		}
+		_, err = cs.CoreV1().ConfigMaps(ns).Create(context.TODO(), cm, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "Failed to create ConfigMap with the scapy script")
+
+		// mount the script on the pod
+		volumes := []v1.Volume{
+			v1.Volume{
+				Name: "script",
+				VolumeSource: v1.VolumeSource{
+					ConfigMap: &v1.ConfigMapVolumeSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "scapy-script",
+						},
+						DefaultMode: &execPermissions,
+					},
+				},
+			},
+		}
+		mounts := []v1.VolumeMount{
+			v1.VolumeMount{
+				Name:      "script",
+				ReadOnly:  true,
+				MountPath: "/scripts",
+			},
+		}
+
+		// Add a backend pod to the server
+		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
+		serverPod := newAgnhostPod(podBackend1, "")
+		serverPod.Labels = tcpJig.Labels
+		serverPod.Spec.NodeName = serverNodeInfo.name
+		serverPod.Spec.Volumes = volumes
+
+		cmd := "python /scripts/invalid_conntrack.py"
+		serverPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
+		serverPod.Spec.Containers[0].Name = podBackend1
+		serverPod.Spec.Containers[0].VolumeMounts = mounts
+		fr.PodClient().CreateSync(serverPod)
+
+		// Waiting for service to expose endpoint.
+		err = validateEndpointsPorts(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+
+		ginkgo.By("creating a client pod and open a TCP connection to the service " + serviceName)
+		clientPod := newAgnhostPod(podClient, "")
+		clientPod.Spec.NodeName = clientNodeInfo.name
+		cmd = fmt.Sprintf(`date; nc -v %s %d`, tcpService.Spec.ClusterIP, tcpService.Spec.Ports[0].Port)
+		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
+		clientPod.Spec.Containers[0].Name = podClient
+		fr.PodClient().CreateSync(clientPod)
+
+		// Note that the fact that Endpoints object already exists, does NOT mean
+		// that iptables (or whatever else is used) was already programmed.
+		// Based on the above check if the pod has the connection open.
+		ginkgo.By("checking client pod connected to the backend 1 on Node IP " + serverNodeInfo.nodeIP)
+		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn("succeeded")); err != nil {
+			logs, err := e2epod.GetPodLogs(cs, ns, podClient, podClient)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod client logs: %s", logs)
+			framework.Failf("Failed to connect to backend 1")
+		}
+
+		// Check the server pod status, if it did receive a RST it will exit
+		ginkgo.By("checking server pod did not drop the connection")
+		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn(podBackend2)); err != nil {
+			logs, err := e2epod.GetPodLogs(cs, ns, podClient, podClient)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod client logs: %s", logs)
+			framework.Failf("Failed to connect to backend 2")
+		}
+	})
+
 })
 
 func dumpConntrack(cs clientset.Interface) {
