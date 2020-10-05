@@ -1594,8 +1594,7 @@ function create-certs {
   local -r primary_cn="${1}"
 
   # Determine extra certificate names for master
-  local octets
-  kube::util::read-array octets < <(echo "${SERVICE_CLUSTER_IP_RANGE}" | sed -e 's|/.*||' -e 's/\./ /g')
+  local octets=($(echo "${SERVICE_CLUSTER_IP_RANGE}" | sed -e 's|/.*||' -e 's/\./ /g'))
   ((octets[3]+=1))
   local -r service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
   local sans=""
@@ -2063,7 +2062,7 @@ function create-node-template() {
 
   local local_ssds=()
   local_ssd_ext_count=0
-  if [[ -n ${NODE_LOCAL_SSDS_EXT:-} ]]; then
+  if [[ -n "${NODE_LOCAL_SSDS_EXT:-}" ]]; then
     IFS=";" read -r -a ssdgroups <<< "${NODE_LOCAL_SSDS_EXT:-}"
     for ssdgroup in "${ssdgroups[@]}"
     do
