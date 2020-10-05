@@ -133,6 +133,14 @@ func (kl *Kubelet) reconcileHugePageResource(initialNode, existingNode *v1.Node)
 		if !v1helper.IsHugePageResourceName(resourceName) {
 			continue
 		}
+
+		if existingNode.Status.Capacity == nil {
+			existingNode.Status.Capacity = v1.ResourceList{}
+		}
+		if existingNode.Status.Allocatable == nil {
+			existingNode.Status.Allocatable = v1.ResourceList{}
+		}
+
 		supportedHugePageResources.Insert(string(resourceName))
 
 		initialCapacity := initialNode.Status.Capacity[resourceName]

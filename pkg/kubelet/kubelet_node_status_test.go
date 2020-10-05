@@ -1881,6 +1881,39 @@ func TestReconcileHugePageResource(t *testing.T) {
 				},
 			},
 		}, {
+			name:        "update needed when huge page resource quantity empty",
+			testKubelet: testKubelet,
+			needsUpdate: true,
+			initialNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("4Gi"),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						hugePageResourceName1Gi:     resource.MustParse("4Gi"),
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				Status: v1.NodeStatus{},
+			},
+			expectedNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						hugePageResourceName1Gi: resource.MustParse("4Gi"),
+					},
+					Allocatable: v1.ResourceList{
+						hugePageResourceName1Gi: resource.MustParse("4Gi"),
+					},
+				},
+			},
+		}, {
 			name:        "update needed when a huge page resources is no longer supported",
 			testKubelet: testKubelet,
 			needsUpdate: true,
