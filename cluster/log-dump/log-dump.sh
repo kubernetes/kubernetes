@@ -17,7 +17,6 @@
 # Call this to dump all master and node logs into the folder specified in $1
 # (defaults to _artifacts). Only works if the provider supports SSH.
 
-# TODO(shyamjvs): This script should be moved to test/e2e which is where it ideally belongs.
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -54,6 +53,11 @@ readonly systemd_services="kubelet kubelet-monitor kube-container-runtime-monito
 readonly extra_log_files="${LOG_DUMP_EXTRA_FILES:-}"
 readonly extra_systemd_services="${LOG_DUMP_SAVE_SERVICES:-}"
 readonly dump_systemd_journal="${LOG_DUMP_SYSTEMD_JOURNAL:-false}"
+
+# Root directory for Kubernetes files on Windows nodes.
+WINDOWS_K8S_DIR="C:\\etc\\kubernetes"
+# Directory where Kubernetes log files will be stored on Windows nodes.
+export WINDOWS_LOGS_DIR="${WINDOWS_K8S_DIR}\\logs"
 # Log files found in WINDOWS_LOGS_DIR on Windows nodes:
 readonly windows_node_logfiles="kubelet.log kube-proxy.log docker.log docker_images.log csi-proxy.log"
 # Log files found in other directories on Windows nodes:
@@ -63,22 +67,177 @@ readonly windows_node_otherfiles="C:\\Windows\\MEMORY.dmp"
 # file descriptors for large clusters.
 readonly max_dump_processes=25
 
-# TODO: Get rid of all the sourcing of bash dependencies eventually.
+# Example:  kube::util::trap_add 'echo "in trap DEBUG"' DEBUG
+# See: http://stackoverflow.com/questions/3338030/multiple-bash-traps-for-the-same-signal
+kube::util::trap_add() {
+  local trap_add_cmd
+  trap_add_cmd=$1
+  shift
+
+  for trap_add_name in "$@"; do
+    local existing_cmd
+    local new_cmd
+
+    # Grab the currently defined trap commands for this trap
+    existing_cmd=$(trap -p "${trap_add_name}" |  awk -F"'" '{print $2}')
+
+    if [[ -z "${existing_cmd}" ]]; then
+      new_cmd="${trap_add_cmd}"
+    else
+      new_cmd="${trap_add_cmd};${existing_cmd}"
+    fi
+
+    # Assign the test. Disable the shellcheck warning telling that trap
+    # commands should be single quoted to avoid evaluating them at this
+    # point instead evaluating them at run time. The logic of adding new
+    # commands to a single trap requires them to be evaluated right away.
+    # shellcheck disable=SC2064
+    trap "${new_cmd}" "${trap_add_name}"
+  done
+}
+
+# Opposite of kube::util::ensure-temp-dir()
+kube::util::cleanup-temp-dir() {
+  rm -rf "${KUBE_TEMP}"
+}
+
+# Create a temp dir that'll be deleted at the end of this bash session.
+#
+# Vars set:
+#   KUBE_TEMP
+kube::util::ensure-temp-dir() {
+  if [[ -z ${KUBE_TEMP-} ]]; then
+    KUBE_TEMP=$(mktemp -d 2>/dev/null || mktemp -d -t kubernetes.XXXXXX)
+    kube::util::trap_add kube::util::cleanup-temp-dir EXIT
+  fi
+}
+
+# Use the gcloud defaults to find the project.  If it is already set in the
+# environment then go with that.
+#
+# Vars set:
+#   PROJECT
+#   NETWORK_PROJECT
+#   PROJECT_REPORTED
+function detect-project() {
+  if [[ -z "${PROJECT-}" ]]; then
+    PROJECT=$(gcloud config list project --format 'value(core.project)')
+  fi
+
+  NETWORK_PROJECT=${NETWORK_PROJECT:-${PROJECT}}
+
+  if [[ -z "${PROJECT-}" ]]; then
+    echo "Could not detect Google Cloud Platform project.  Set the default project using " >&2
+    echo "'gcloud config set project <PROJECT>'" >&2
+    exit 1
+  fi
+  if [[ -z "${PROJECT_REPORTED-}" ]]; then
+    echo "Project: ${PROJECT}" >&2
+    echo "Network Project: ${NETWORK_PROJECT}" >&2
+    echo "Zone: ${ZONE}" >&2
+    PROJECT_REPORTED=true
+  fi
+}
+
+# Detect Linux and Windows nodes created in the instance group.
+#
+# Vars set:
+#   NODE_NAMES
+#   INSTANCE_GROUPS
+#   WINDOWS_NODE_NAMES
+#   WINDOWS_INSTANCE_GROUPS
+function detect-node-names() {
+  # These prefixes must not be prefixes of each other, so that they can be used to
+  # detect mutually exclusive sets of nodes.
+  local -r NODE_INSTANCE_PREFIX=${NODE_INSTANCE_PREFIX:-"${INSTANCE_PREFIX}-minion"}
+  local -r WINDOWS_NODE_INSTANCE_PREFIX=${WINDOWS_NODE_INSTANCE_PREFIX:-"${INSTANCE_PREFIX}-windows-node"}
+  detect-project
+  INSTANCE_GROUPS=()
+  INSTANCE_GROUPS+=($(gcloud compute instance-groups managed list \
+    --project "${PROJECT}" \
+    --filter "name ~ '${NODE_INSTANCE_PREFIX}-.+' AND zone:(${ZONE})" \
+    --format='value(name)' || true))
+  WINDOWS_INSTANCE_GROUPS=()
+  WINDOWS_INSTANCE_GROUPS+=($(gcloud compute instance-groups managed list \
+    --project "${PROJECT}" \
+    --filter "name ~ '${WINDOWS_NODE_INSTANCE_PREFIX}-.+' AND zone:(${ZONE})" \
+    --format='value(name)' || true))
+
+  NODE_NAMES=()
+  if [[ -n "${INSTANCE_GROUPS[@]:-}" ]]; then
+    for group in "${INSTANCE_GROUPS[@]}"; do
+      NODE_NAMES+=($(gcloud compute instance-groups managed list-instances \
+        "${group}" --zone "${ZONE}" --project "${PROJECT}" \
+        --format='value(instance)'))
+    done
+  fi
+  # Add heapster node name to the list too (if it exists).
+  if [[ -n "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
+    NODE_NAMES+=("${NODE_INSTANCE_PREFIX}-heapster")
+  fi
+  WINDOWS_NODE_NAMES=()
+  if [[ -n "${WINDOWS_INSTANCE_GROUPS[@]:-}" ]]; then
+    for group in "${WINDOWS_INSTANCE_GROUPS[@]}"; do
+      WINDOWS_NODE_NAMES+=($(gcloud compute instance-groups managed \
+        list-instances "${group}" --zone "${ZONE}" --project "${PROJECT}" \
+        --format='value(instance)'))
+    done
+  fi
+
+  echo "INSTANCE_GROUPS=${INSTANCE_GROUPS[*]:-}" >&2
+  echo "NODE_NAMES=${NODE_NAMES[*]:-}" >&2
+}
+
+# Detect the IP for the master
+#
+# Assumed vars:
+#   MASTER_NAME
+#   ZONE
+#   REGION
+# Vars set:
+#   KUBE_MASTER
+#   KUBE_MASTER_IP
+function detect-master() {
+  detect-project
+  KUBE_MASTER=${MASTER_NAME}
+  echo "Trying to find master named '${MASTER_NAME}'" >&2
+  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
+    local master_address_name="${MASTER_NAME}-ip"
+    echo "Looking for address '${master_address_name}'" >&2
+    if ! KUBE_MASTER_IP=$(gcloud compute addresses describe "${master_address_name}" \
+      --project "${PROJECT}" --region "${REGION}" -q --format='value(address)') || \
+      [[ -z "${KUBE_MASTER_IP-}" ]]; then
+      echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
+      exit 1
+    fi
+  fi
+  if [[ -z "${KUBE_MASTER_INTERNAL_IP-}" ]] && [[ ${GCE_PRIVATE_CLUSTER:-} == "true" ]]; then
+      local master_address_name="${MASTER_NAME}-internal-ip"
+      echo "Looking for address '${master_address_name}'" >&2
+      if ! KUBE_MASTER_INTERNAL_IP=$(gcloud compute addresses describe "${master_address_name}" \
+        --project "${PROJECT}" --region "${REGION}" -q --format='value(address)') || \
+        [[ -z "${KUBE_MASTER_INTERNAL_IP-}" ]]; then
+        echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
+        exit 1
+      fi
+  fi
+  echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP; internal IP: ${KUBE_MASTER_INTERNAL_IP:-(not set)})" >&2
+}
+
+# SSH to a node by name ($1) and run a command ($2).
 function setup() {
-  KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
   if [[ -z "${use_custom_instance_list}" ]]; then
-    : "${KUBE_CONFIG_FILE:='config-test.sh'}"
-    echo 'Sourcing kube-util.sh'
-    source "${KUBE_ROOT}/cluster/kube-util.sh"
-    echo 'Detecting project'
+    echo "Using gce provider, skipping check for LOG_DUMP_SSH_KEY and LOG_DUMP_SSH_USER"
+    ZONE="${KUBE_GCE_ZONE:-us-central1-b}"
+    REGION="${ZONE%-*}"
+    INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-kubernetes}"
+    CLUSTER_NAME="${CLUSTER_NAME:-${INSTANCE_PREFIX}}"
+    MASTER_NAME="${INSTANCE_PREFIX}-master"
+    GCE_PRIVATE_CLUSTER="${KUBE_GCE_PRIVATE_CLUSTER:-false}"
     detect-project 2>&1
   elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+    NUM_NODES=${NUM_NODES:-3}
     echo "Using 'use_custom_instance_list' with gke, skipping check for LOG_DUMP_SSH_KEY and LOG_DUMP_SSH_USER"
-    # Source the below script for the ssh-to-node utility function.
-    # Hack to save and restore the value of the ZONE env as the script overwrites it.
-    local gke_zone="${ZONE:-}"
-    source "${KUBE_ROOT}/cluster/gce/util.sh"
-    ZONE="${gke_zone}"
   elif [[ -z "${LOG_DUMP_SSH_KEY:-}" ]]; then
     echo 'LOG_DUMP_SSH_KEY not set, but required when using log_dump_custom_get_instances'
     exit 1
@@ -86,17 +245,21 @@ function setup() {
     echo 'LOG_DUMP_SSH_USER not set, but required when using log_dump_custom_get_instances'
     exit 1
   fi
-  source "${KUBE_ROOT}/hack/lib/util.sh"
 }
 
 function log-dump-ssh() {
-  if [[ "${gcloud_supported_providers}" =~ ${KUBERNETES_PROVIDER} ]]; then
-    ssh-to-node "$@"
-    return
-  fi
-
   local host="$1"
   local cmd="$2"
+
+  if [[ "${gcloud_supported_providers}" =~ ${KUBERNETES_PROVIDER} ]]; then
+    for (( i=0; i<5; i++)); do
+      if gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --ssh-flag="-o ConnectTimeout=30" --project "${PROJECT}" --zone="${ZONE}" "${host}" --command "echo test > /dev/null"; then
+        break
+      fi
+      sleep 5
+    done
+    return
+  fi
 
   ssh -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${LOG_DUMP_SSH_KEY}" "${LOG_DUMP_SSH_USER}@${host}" "${cmd}"
 }
@@ -152,7 +315,7 @@ function save-logs() {
     files+=("${extra[@]}")
     if [[ -n "${use_custom_instance_list}" ]]; then
       if [[ -n "${LOG_DUMP_SAVE_LOGS:-}" ]]; then
-	local dump=()
+        local dump=()
         IFS=' ' read -r -a dump <<< "${LOG_DUMP_SAVE_LOGS:-}"
         files+=("${dump[@]}")
       fi
@@ -191,8 +354,8 @@ function save-logs() {
     else
         local tmpfiles=()
         for f in "${kern_logfile}" "${initd_logfiles}" "${supervisord_logfiles}"; do
-	    IFS=' ' read -r -a tmpfiles <<< "$f"
-	    files+=("${tmpfiles[@]}")
+            IFS=' ' read -r -a tmpfiles <<< "$f"
+            files+=("${tmpfiles[@]}")
         done
     fi
 
@@ -528,7 +691,8 @@ function dump_nodes_with_logexporter() {
   local -r tmp="${KUBE_TEMP}/logexporter"
   local -r manifest_yaml="${tmp}/logexporter-daemonset.yaml"
   mkdir -p "${tmp}"
-  cp "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml" "${manifest_yaml}"
+  local -r cwd=$(dirname "${BASH_SOURCE[0]}")
+  cp "${cwd}/logexporter-daemonset.yaml" "${manifest_yaml}"
 
   sed -i'' -e "s@{{.NodeSelector}}@${node_selector:-}@g" "${manifest_yaml}"
   sed -i'' -e "s@{{.LogexporterNamespace}}@${logexporter_namespace}@g" "${manifest_yaml}"
@@ -541,10 +705,9 @@ function dump_nodes_with_logexporter() {
   sed -i'' -e "s@{{.ExtraSystemdServices}}@${extra_systemd_services}@g" "${manifest_yaml}"
 
   # Create the logexporter namespace, service-account secret and the logexporter daemonset within that namespace.
-  KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
-  if ! "${KUBECTL}" create -f "${manifest_yaml}"; then
+  if ! kubectl create -f "${manifest_yaml}"; then
     echo 'Failed to create logexporter daemonset.. falling back to logdump through SSH'
-    "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
+    kubectl delete namespace "${logexporter_namespace}" || true
     dump_nodes "${NODE_NAMES[@]}"
     return
   fi
@@ -569,10 +732,10 @@ function dump_nodes_with_logexporter() {
   # Store logs from logexporter pods to allow debugging log exporting process
   # itself.
   proc=${max_dump_processes}
-  "${KUBECTL}" get pods -n "${logexporter_namespace}" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.nodeName}{"\n"}{end}' | (while read -r pod node; do
+  kubectl get pods -n "${logexporter_namespace}" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.nodeName}{"\n"}{end}' | (while read -r pod node; do
     echo "Fetching logs from ${pod} running on ${node}"
     mkdir -p "${report_dir}/${node}"
-    "${KUBECTL}" logs -n "${logexporter_namespace}" "${pod}" > "${report_dir}/${node}/${pod}.log" &
+    kubectl logs -n "${logexporter_namespace}" "${pod}" > "${report_dir}/${node}/${pod}.log" &
 
     # We don't want to run more than ${max_dump_processes} at a time, so
     # wait once we hit that many nodes. This isn't ideal, since one might
@@ -593,7 +756,7 @@ function dump_nodes_with_logexporter() {
       echo "Attempt ${retry} failed to list marker files for successful nodes"
       if [[ "${retry}" == 10 ]]; then
         echo 'Final attempt to list marker files failed.. falling back to logdump through SSH'
-        "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
+        kubectl delete namespace "${logexporter_namespace}" || true
         dump_nodes "${NODE_NAMES[@]}"
         return
       fi
@@ -612,8 +775,8 @@ function dump_nodes_with_logexporter() {
   fi
 
   # Delete the logexporter resources and dump logs for the failed nodes (if any) through SSH.
-  "${KUBECTL}" get pods --namespace "${logexporter_namespace}" || true
-  "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
+  kubectl get pods --namespace "${logexporter_namespace}" || true
+  kubectl delete namespace "${logexporter_namespace}" || true
   if [[ "${#failed_nodes[@]}" != 0 ]]; then
     echo -e "Dumping logs through SSH for the following nodes:\n${failed_nodes[*]}"
     dump_nodes "${failed_nodes[@]}"
