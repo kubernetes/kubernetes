@@ -754,9 +754,9 @@ function construct-common-kubelet-flags {
 # Sets KUBELET_ARGS with the kubelet flags for Linux nodes.
 # $1: if 'true', we're rendering flags for a master, else a node
 function construct-linux-kubelet-flags {
-  local node_type=$1
+  local node_type="$1"
   local flags
-  flags=$(construct-common-kubelet-flags)
+  flags="$(construct-common-kubelet-flags)"
   # Keep in sync with CONTAINERIZED_MOUNTER_HOME in configure-helper.sh
   flags+=" --experimental-mounter-path=/home/kubernetes/containerized_mounter/mounter"
   flags+=" --experimental-check-node-capabilities-before-mount=true"
@@ -816,7 +816,7 @@ function construct-linux-kubelet-flags {
   fi
   flags+=" --volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
   local node_labels
-  node_labels=$(build-linux-node-labels "${node_type}")
+  node_labels="$(build-linux-node-labels "${node_type}")"
   if [[ -n "${node_labels:-}" ]]; then
     flags+=" --node-labels=${node_labels}"
   fi
@@ -845,13 +845,13 @@ function construct-linux-kubelet-flags {
 # string delimiters.
 function construct-windows-kubelet-flags {
   local flags
-  flags=$(construct-common-kubelet-flags)
+  flags="$(construct-common-kubelet-flags)"
 
   # Note: NODE_KUBELET_TEST_ARGS is empty in typical kube-up runs.
   flags+=" ${NODE_KUBELET_TEST_ARGS:-}"
 
   local node_labels
-  node_labels=$(build-windows-node-labels)
+  node_labels="$(build-windows-node-labels)"
   if [[ -n "${node_labels:-}" ]]; then
     flags+=" --node-labels=${node_labels}"
   fi
@@ -1843,7 +1843,8 @@ function get-env-val() {
 # Load the master env by calling get-master-env, and extract important values
 function parse-master-env() {
   # Get required master env vars
-  local master_env=$(get-master-env)
+  local master_env
+  master_env=$(get-master-env)
   KUBE_PROXY_TOKEN=$(get-env-val "${master_env}" "KUBE_PROXY_TOKEN")
   NODE_PROBLEM_DETECTOR_TOKEN=$(get-env-val "${master_env}" "NODE_PROBLEM_DETECTOR_TOKEN")
   CA_CERT_BASE64=$(get-env-val "${master_env}" "CA_CERT")
@@ -2278,7 +2279,7 @@ function check-existing() {
 
 function check-network-mode() {
   local mode
-  mode=$(gcloud compute networks list --filter="name=('${NETWORK}')" --project "${NETWORK_PROJECT}" --format='value(x_gcloud_subnet_mode)' || true)
+  mode="$(gcloud compute networks list --filter="name=('${NETWORK}')" --project "${NETWORK_PROJECT}" --format='value(x_gcloud_subnet_mode)' || true)"
   # The deprecated field uses lower case. Convert to upper case for consistency.
   echo "$mode" | tr '[:lower:]' '[:upper:]'
 }
@@ -2370,8 +2371,9 @@ function create-subnetworks() {
 
   # Look for the alias subnet, it must exist and have a secondary
   # range configured.
-  local subnet
-  subnet=$(gcloud compute networks subnets describe \
+  # Deliberately declare and assign at the same time or the CI pipeline fails
+  # shellcheck disable=SC2155
+  local subnet=$(gcloud compute networks subnets describe \
     --project "${NETWORK_PROJECT}" \
     --region ${REGION} \
     ${IP_ALIAS_SUBNETWORK} 2>/dev/null)
@@ -2758,7 +2760,7 @@ function replicate-master() {
     --size "${MASTER_DISK_SIZE}"
 
   local existing_master_replicas
-  existing_master_replicas=$(get-all-replica-names)
+  existing_master_replicas="$(get-all-replica-names)"
   replicate-master-instance "${EXISTING_MASTER_ZONE}" "${EXISTING_MASTER_NAME}" "${existing_master_replicas}"
 
   # Add new replica to the load balancer.
@@ -2819,7 +2821,7 @@ function create-loadbalancer() {
 
   local EXISTING_MASTER_NAME
   local EXISTING_MASTER_ZONE
-  EXISTING_MASTER_NAME=$(get-all-replica-names)
+  EXISTING_MASTER_NAME="$(get-all-replica-names)"
   EXISTING_MASTER_ZONE=$(gcloud compute instances list "${EXISTING_MASTER_NAME}" \
     --project "${PROJECT}" --format='value(zone)')
 
@@ -2910,7 +2912,7 @@ function create-internal-loadbalancer() {
 
   local EXISTING_MASTER_NAME
   local EXISTING_MASTER_ZONE
-  EXISTING_MASTER_NAME=$(get-all-replica-names)
+  EXISTING_MASTER_NAME="$(get-all-replica-names)"
   EXISTING_MASTER_ZONE=$(gcloud compute instances list "${EXISTING_MASTER_NAME}" \
     --project "${PROJECT}" --format='value(zone)')
 
@@ -3190,7 +3192,8 @@ function create-windows-nodes() {
 function create-heapster-node() {
   local gcloud="gcloud"
 
-  local network=$(make-gcloud-network-argument \
+  local network
+  network=$(make-gcloud-network-argument \
       "${NETWORK_PROJECT}" \
       "${REGION}" \
       "${NETWORK}" \
@@ -3525,7 +3528,7 @@ function kube-down() {
     detect-master
     local REMAINING_REPLICA_NAME
     local REMAINING_REPLICA_ZONE
-    REMAINING_REPLICA_NAME=$(get-all-replica-names)
+    REMAINING_REPLICA_NAME="$(get-all-replica-names)"
     REMAINING_REPLICA_ZONE=$(gcloud compute instances list "${REMAINING_REPLICA_NAME}" \
       --project "${PROJECT}" --format='value(zone)')
     if gcloud compute forwarding-rules describe "${MASTER_NAME}" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
@@ -3915,7 +3918,7 @@ function test-teardown() {
     "${NODE_TAG}-nodeports"
   if [[ ${MULTIZONE:-} == "true" && -n ${E2E_ZONES:-} ]]; then
     local zones
-    while IFS= read -r line; do zones+=("$line"); done <<< "${E2E_ZONES}"
+    read -r -a zones <<< "${E2E_ZONES}"
     # tear them down in reverse order, finally tearing down the master too.
     for ((zone_num=${#zones[@]}-1; zone_num>0; zone_num--)); do
       KUBE_GCE_ZONE="${zones[zone_num]}" KUBE_USE_EXISTING_MASTER="true" "${KUBE_ROOT}/cluster/kube-down.sh"
