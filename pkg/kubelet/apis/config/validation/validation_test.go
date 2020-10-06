@@ -160,8 +160,8 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			"CustomCPUCFSQuotaPeriod": true,
 		},
 	}
-	const numErrsErrorCase2 = 1
-	if allErrors := ValidateKubeletConfiguration(errorCase2); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase2 {
+	const numErrsErrorCase2 = 0
+	if allErrors := ValidateKubeletConfiguration(errorCase2); allErrors != nil && len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase2 {
 		t.Errorf("expect %d errors, got %v", numErrsErrorCase2, len(allErrors.(utilerrors.Aggregate).Errors()))
 	}
 }

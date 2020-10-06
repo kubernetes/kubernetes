@@ -154,10 +154,6 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 			kc.HairpinMode, kubeletconfig.HairpinNone, kubeletconfig.HairpinVeth, kubeletconfig.PromiscuousBridge))
 	}
 	if kc.ReservedSystemCPUs != "" {
-		// --reserved-cpus does not support --system-reserved-cgroup or --kube-reserved-cgroup
-		if kc.SystemReservedCgroup != "" || kc.KubeReservedCgroup != "" {
-			allErrors = append(allErrors, fmt.Errorf("can't use --reserved-cpus with --system-reserved-cgroup or --kube-reserved-cgroup"))
-		}
 		if _, err := cpuset.Parse(kc.ReservedSystemCPUs); err != nil {
 			allErrors = append(allErrors, fmt.Errorf("unable to parse --reserved-cpus, error: %v", err))
 		}
