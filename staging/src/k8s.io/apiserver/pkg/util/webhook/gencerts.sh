@@ -35,6 +35,18 @@ extendedKeyUsage = clientAuth, serverAuth
 subjectAltName = @alt_names
 [alt_names]
 IP.1 = 127.0.0.1
+DNS.1 = localhost
+EOF
+
+cat > server_no_san.conf << EOF
+[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+[req_distinguished_name]
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth, serverAuth
 EOF
 
 cat > client.conf << EOF
@@ -63,6 +75,10 @@ openssl req -x509 -new -nodes -key badCAKey.pem -days 100000 -out badCACert.pem 
 openssl genrsa -out serverKey.pem 2048
 openssl req -new -key serverKey.pem -out server.csr -subj "/CN=${CN_BASE}_server" -config server.conf
 openssl x509 -req -in server.csr -CA caCert.pem -CAkey caKey.pem -CAcreateserial -out serverCert.pem -days 100000 -extensions v3_req -extfile server.conf
+
+# Create a server certiticate w/o SAN
+openssl req -new -key serverKey.pem -out serverNoSAN.csr -subj "/CN=localhost" -config server_no_san.conf
+openssl x509 -req -in serverNoSAN.csr -CA caCert.pem -CAkey caKey.pem -CAcreateserial -out serverCertNoSAN.pem -days 100000 -extensions v3_req -extfile server_no_san.conf
 
 # Create a client certiticate
 openssl genrsa -out clientKey.pem 2048
@@ -94,7 +110,7 @@ limitations under the License.
 package webhook
 EOF
 
-for file in caKey caCert badCAKey badCACert serverKey serverCert clientKey clientCert; do
+for file in caKey caCert badCAKey badCACert serverKey serverCert serverCertNoSAN clientKey clientCert; do
 	data=$(cat ${file}.pem)
 	echo "" >> $outfile
 	echo "var $file = []byte(\`$data\`)" >> $outfile

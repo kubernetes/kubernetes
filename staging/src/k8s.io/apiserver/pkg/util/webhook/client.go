@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/util/x509metrics"
 	"k8s.io/client-go/rest"
 )
 
@@ -148,6 +149,11 @@ func (cm *ClientManager) HookClient(cc ClientConfig) (*rest.RESTClient, error) {
 
 		cfg.ContentConfig.NegotiatedSerializer = cm.negotiatedSerializer
 		cfg.ContentConfig.ContentType = runtime.ContentTypeJSON
+
+		// Add a transport wrapper that allows detection of TLS connections to
+		// servers without SAN extension in their serving certificates
+		cfg.Wrap(x509metrics.NewMissingSANRoundTripperWrapperConstructor(x509MissingSANCounter))
+
 		client, err := rest.UnversionedRESTClientFor(cfg)
 		if err == nil {
 			cm.cache.Add(string(cacheKey), client)
