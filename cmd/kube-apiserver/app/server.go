@@ -831,7 +831,7 @@ type eventRegistrySink struct {
 var _ genericapiserver.EventSink = eventRegistrySink{}
 
 func (s eventRegistrySink) Create(v1event *corev1.Event) (*corev1.Event, error) {
-	ctx := request.WithNamespace(request.NewContext(), v1event.Namespace)
+	ctx := request.WithNamespace(request.WithRequestInfo(request.NewContext(), &request.RequestInfo{APIVersion: "v1"}), v1event.Namespace)
 
 	var event core.Event
 	if err := v1.Convert_v1_Event_To_core_Event(v1event, &event, nil); err != nil {
