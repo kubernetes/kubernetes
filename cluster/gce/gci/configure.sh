@@ -126,9 +126,10 @@ function validate-hash {
   local -r file="$1"
   local -r expected="$2"
 
-  actual=$(sha512sum ${file} | awk '{ print $1 }') || true
-  if [[ "${actual}" != "${expected}" ]]; then
-    echo "== ${file} corrupted, sha512 ${actual} doesn't match expected ${expected} =="
+  actual_sha1=$(sha1sum "${file}" | awk '{ print $1 }') || true
+  actual_sha512=$(sha512sum "${file}" | awk '{ print $1 }') || true
+  if [[ "${actual_sha1}" != "${expected}" ]] && [[ "${actual_sha512}" != "${expected}" ]]; then
+    echo "== ${file} corrupted, sha1 ${actual_sha1}/sha512 ${actual_sha512} doesn't match expected ${expected} =="
     return 1
   fi
 }
@@ -146,7 +147,7 @@ function valid-storage-scope {
 
 # Retry a download until we get it. Takes a hash and a set of URLs.
 #
-# $1 is the sha512 of the URL. Can be "" if the sha512 is unknown.
+# $1 is the sha512/sha1 hash of the URL. Can be "" if the sha512/sha1 hash is unknown.
 # $2+ are the URLs to download.
 function download-or-bust {
   local -r hash="$1"
@@ -168,7 +169,7 @@ function download-or-bust {
         echo "== Hash validation of ${url} failed. Retrying. =="
       else
         if [[ -n "${hash}" ]]; then
-          echo "== Downloaded ${url} (SHA512 = ${hash}) =="
+          echo "== Downloaded ${url} (HASH = ${hash}) =="
         else
           echo "== Downloaded ${url} =="
         fi
