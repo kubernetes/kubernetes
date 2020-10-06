@@ -90,6 +90,12 @@ func calculateCondition(in *apiextensionsv1.CustomResourceDefinition) *apiextens
 
 	allErrs := field.ErrorList{}
 
+	if in.Spec.PreserveUnknownFields {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "preserveUnknownFields"),
+			in.Spec.PreserveUnknownFields,
+			fmt.Sprint("must be false")))
+	}
+
 	for i, v := range in.Spec.Versions {
 		if v.Schema == nil || v.Schema.OpenAPIV3Schema == nil {
 			continue
