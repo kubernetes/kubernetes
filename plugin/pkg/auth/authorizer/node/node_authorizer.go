@@ -148,7 +148,7 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 // authorizeStatusUpdate authorizes get/update/patch requests to status subresources of the specified type if they are related to the specified node
 func (r *NodeAuthorizer) authorizeStatusUpdate(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	switch attrs.GetVerb() {
-	case "update", "patch":
+	case "get", "update", "patch":
 		// ok
 	default:
 		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
