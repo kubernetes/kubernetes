@@ -373,38 +373,6 @@ function DownloadAndInstall-KubernetesBinaries {
   Remove-Item -Force -Recurse $tmp_dir
 }
 
-<<<<<<< HEAD
-=======
-# Downloads the csi-proxy binaries from kube-env's CSI_PROXY_STORAGE_PATH and
-# CSI_PROXY_VERSION, and then puts them in a subdirectory of $env:NODE_DIR.
-# Note: for now the installation is skipped for non-test clusters. Will be
-# installed for all cluster after tests pass.
-# Required ${kube_env} keys:
-#   CSI_PROXY_STORAGE_PATH and CSI_PROXY_VERSION
-function DownloadAndInstall-CSIProxyBinaries {
-  if (ShouldWrite-File ${env:NODE_DIR}\csi-proxy.exe) {
-    $tmp_dir = 'C:\k8s_tmp'
-    New-Item -Force -ItemType 'directory' $tmp_dir | Out-Null
-    $filename = 'csi-proxy.exe'
-    $urls = "${env:CSI_PROXY_STORAGE_PATH}/${env:CSI_PROXY_VERSION}/$filename"
-    MustDownload-File -OutFile $tmp_dir\$filename -URLs $urls
-    Move-Item -Force $tmp_dir\$filename ${env:NODE_DIR}\$filename
-    # Clean up the temporary directory
-    Remove-Item -Force -Recurse $tmp_dir
-  }
-}
-
-function Start-CSIProxy {
-  Log-Output "Creating CSI Proxy Service"
-  $flags = "-windows-service -log_file=${env:LOGS_DIR}\csi-proxy.log -logtostderr=false"
-  & sc.exe create csiproxy binPath= "${env:NODE_DIR}\csi-proxy.exe $flags"
-  & sc.exe failure csiproxy reset= 0 actions= restart/10000
-  Log-Output "Starting CSI Proxy Service"
-  & sc.exe start csiproxy
-
-}
-
->>>>>>> replace sha1 with sha512
 # TODO(pjh): this is copied from
 # https://github.com/Microsoft/SDN/blob/master/Kubernetes/windows/start-kubelet.ps1#L98.
 # See if there's a way to fetch or construct the "management subnet" so that
@@ -1593,12 +1561,6 @@ function Install-LoggingAgent {
     Restart-LoggingAgent
     return
   }
-<<<<<<< HEAD
-=======
-
-  # After a crash, the StackdriverLogging service could be missing, but its files will still be present
-  Cleanup-LoggingAgent
->>>>>>> replace sha1 with sha512
 
   $url = ("https://storage.googleapis.com/gke-release/winnode/stackdriver/" +
           "StackdriverLogging-${STACKDRIVER_VERSION}.exe")
