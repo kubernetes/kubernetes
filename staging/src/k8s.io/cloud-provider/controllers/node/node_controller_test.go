@@ -764,6 +764,7 @@ func Test_AddCloudNode(t *testing.T) {
 							Effect: v1.TaintEffectNoSchedule,
 						},
 					},
+					ProviderID: "fake://12345",
 				},
 			},
 			updatedNode: &v1.Node{
@@ -924,9 +925,6 @@ func Test_AddCloudNode(t *testing.T) {
 						},
 					},
 				},
-				Spec: v1.NodeSpec{
-					ProviderID: "aws://12345",
-				},
 			},
 		},
 		{
@@ -973,6 +971,7 @@ func Test_AddCloudNode(t *testing.T) {
 							Effect: v1.TaintEffectNoSchedule,
 						},
 					},
+					ProviderID: "fake://12345",
 				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
