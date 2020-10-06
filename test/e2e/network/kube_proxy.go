@@ -42,14 +42,14 @@ import (
 
 var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
-var _ = SIGDescribe("Network", func() {
+var _ = SIGDescribe("KubeProxy", func() {
 	const (
 		testDaemonHTTPPort    = 11301
 		testDaemonTCPPort     = 11302
 		postFinTimeoutSeconds = 30
 	)
 
-	fr := framework.NewDefaultFramework("network")
+	fr := framework.NewDefaultFramework("kube-proxy")
 
 	ginkgo.It("should set TCP CLOSE_WAIT timeout [Privileged]", func() {
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(fr.ClientSet, 2)
