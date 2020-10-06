@@ -21,7 +21,9 @@ import (
 	"sort"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
@@ -327,9 +329,29 @@ func NewLegacyRegistry() *LegacyRegistry {
 
 	// Register Priorities.
 	registry.registerPriorityConfigProducer(SelectorSpreadPriority,
-		func(args ConfigProducerArgs, plugins *config.Plugins, _ *[]config.PluginConfig) {
-			plugins.Score = appendToPluginSet(plugins.Score, selectorspread.Name, &args.Weight)
-			plugins.PreScore = appendToPluginSet(plugins.PreScore, selectorspread.Name, nil)
+		func(args ConfigProducerArgs, plugins *config.Plugins, pluginConfig *[]config.PluginConfig) {
+			if !feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
+				plugins.Score = appendToPluginSet(plugins.Score, selectorspread.Name, &args.Weight)
+				plugins.PreScore = appendToPluginSet(plugins.PreScore, selectorspread.Name, nil)
+				return
+			}
+			plugins.Score = appendToPluginSet(plugins.Score, podtopologyspread.Name, &args.Weight)
+			plugins.PreScore = appendToPluginSet(plugins.PreScore, podtopologyspread.Name, nil)
+			plArgs := config.PodTopologySpreadArgs{
+				DefaultingType: config.SystemDefaulting,
+			}
+			// The order in which SelectorSpreadPriority or EvenPodsSpreadPriority producers
+			// are called is not guaranteed. Override or append configuration.
+			for i, e := range *pluginConfig {
+				if e.Name == podtopologyspread.Name {
+					(*pluginConfig)[i].Args = &plArgs
+					return
+				}
+			}
+			*pluginConfig = append(*pluginConfig, config.PluginConfig{
+				Name: podtopologyspread.Name,
+				Args: &plArgs,
+			})
 		})
 	registry.registerPriorityConfigProducer(TaintTolerationPriority,
 		func(args ConfigProducerArgs, plugins *config.Plugins, _ *[]config.PluginConfig) {
@@ -402,9 +424,25 @@ func NewLegacyRegistry() *LegacyRegistry {
 			}
 		})
 	registry.registerPriorityConfigProducer(EvenPodsSpreadPriority,
-		func(args ConfigProducerArgs, plugins *config.Plugins, _ *[]config.PluginConfig) {
+		func(args ConfigProducerArgs, plugins *config.Plugins, pluginConfig *[]config.PluginConfig) {
 			plugins.PreScore = appendToPluginSet(plugins.PreScore, podtopologyspread.Name, nil)
 			plugins.Score = appendToPluginSet(plugins.Score, podtopologyspread.Name, &args.Weight)
+			if feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
+				// The order in which SelectorSpreadPriority or EvenPodsSpreadPriority producers
+				// are called is not guaranteed. If plugin was not configured yet, append
+				// configuration where system default constraints are disabled.
+				for _, e := range *pluginConfig {
+					if e.Name == podtopologyspread.Name {
+						return
+					}
+				}
+				*pluginConfig = append(*pluginConfig, config.PluginConfig{
+					Name: podtopologyspread.Name,
+					Args: &config.PodTopologySpreadArgs{
+						DefaultingType: config.ListDefaulting,
+					},
+				})
+			}
 		})
 
 	return registry
@@ -488,6 +526,15 @@ func (lr *LegacyRegistry) registerPriorityConfigProducer(name string, producer c
 func appendToPluginSet(set *config.PluginSet, name string, weight *int32) *config.PluginSet {
 	if set == nil {
 		set = &config.PluginSet{}
+	}
+	for _, e := range set.Enabled {
+		if e.Name == name {
+			// Keep the max weight.
+			if weight != nil && *weight > e.Weight {
+				e.Weight = *weight
+			}
+			return set
+		}
 	}
 	cfg := config.Plugin{Name: name}
 	if weight != nil {
