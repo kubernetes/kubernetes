@@ -3934,9 +3934,9 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", podName, f.Namespace.Name)
 		}()
 		// wait until host port manager syncs rules
-		cmd = "sudo iptables-save"
+		cmd = "iptables-save"
 		if framework.TestContext.ClusterIsIPv6() {
-			cmd = "sudo ip6tables-save"
+			cmd = "ip6tables-save"
 		}
 		err = wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
 			framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
@@ -3997,9 +3997,9 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 		defer hostExec.Cleanup()
 		node, err := e2enode.GetRandomReadySchedulableNode(cs)
 		framework.ExpectNoError(err)
-		cmd := "sudo iptables-save"
+		cmd := "iptables-save"
 		if framework.TestContext.ClusterIsIPv6() {
-			cmd = "sudo ip6tables-save"
+			cmd = "ip6tables-save"
 		}
 		err = wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
 			framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
