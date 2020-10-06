@@ -17,7 +17,6 @@ limitations under the License.
 package network
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"net"
@@ -37,7 +36,6 @@ import (
 	netutils "k8s.io/utils/net"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Agnhost)
@@ -240,117 +238,4 @@ var _ = SIGDescribe("KubeProxy", func() {
 		}
 	})
 
-	// Regression test for #74839, where:
-	// Packets considered INVALID by conntrack are now dropped. In particular, this fixes
-	// a problem where spurious retransmits in a long-running TCP connection to a service
-	// IP could result in the connection being closed with the error "Connection reset by
-	// peer"
-	ginkgo.It("should resolve connection reset issue #74839 [Slow]", func() {
-		serverLabel := map[string]string{
-			"app": "boom-server",
-		}
-		clientLabel := map[string]string{
-			"app": "client",
-		}
-
-		serverPod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "boom-server",
-				Labels: serverLabel,
-			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Name:  "boom-server",
-						Image: imageutils.GetE2EImage(imageutils.RegressionIssue74839),
-						Ports: []v1.ContainerPort{
-							{
-								ContainerPort: 9000, // Default port exposed by boom-server
-							},
-						},
-					},
-				},
-				Affinity: &v1.Affinity{
-					PodAntiAffinity: &v1.PodAntiAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: clientLabel,
-								},
-								TopologyKey: "kubernetes.io/hostname",
-							},
-						},
-					},
-				},
-			},
-		}
-		_, err := fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Create(context.TODO(), serverPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-
-		err = e2epod.WaitForPodsRunningReady(fr.ClientSet, fr.Namespace.Name, 1, 0, framework.PodReadyBeforeTimeout, map[string]string{})
-		framework.ExpectNoError(err)
-
-		ginkgo.By("Server pod created")
-
-		svc := &v1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "boom-server",
-			},
-			Spec: v1.ServiceSpec{
-				Selector: serverLabel,
-				Ports: []v1.ServicePort{
-					{
-						Protocol: v1.ProtocolTCP,
-						Port:     9000,
-					},
-				},
-			},
-		}
-		_, err = fr.ClientSet.CoreV1().Services(fr.Namespace.Name).Create(context.TODO(), svc, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-
-		ginkgo.By("Server service created")
-
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "startup-script",
-				Labels: clientLabel,
-			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Name:  "startup-script",
-						Image: imageutils.GetE2EImage(imageutils.BusyBox),
-						Command: []string{
-							"sh", "-c", "while true; do sleep 2; nc boom-server 9000& done",
-						},
-					},
-				},
-				Affinity: &v1.Affinity{
-					PodAntiAffinity: &v1.PodAntiAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: serverLabel,
-								},
-								TopologyKey: "kubernetes.io/hostname",
-							},
-						},
-					},
-				},
-				RestartPolicy: v1.RestartPolicyNever,
-			},
-		}
-		_, err = fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-
-		ginkgo.By("Client pod created")
-
-		for i := 0; i < 20; i++ {
-			time.Sleep(3 * time.Second)
-			resultPod, err := fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Get(context.TODO(), serverPod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			gomega.Expect(resultPod.Status.ContainerStatuses[0].LastTerminationState.Terminated).Should(gomega.BeNil())
-		}
-	})
 })
