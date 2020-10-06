@@ -80,6 +80,9 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodeunschedulable:go_default_library",
+        "//pkg/scheduler/framework/plugins/tainttoleration:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
     ],
 )
