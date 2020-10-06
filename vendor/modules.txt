@@ -2176,7 +2176,11 @@ k8s.io/component-base/metrics/testutil
 k8s.io/component-base/term
 k8s.io/component-base/version
 k8s.io/component-base/version/verflag
+# k8s.io/controller-manager v0.0.0 => ./staging/src/k8s.io/controller-manager
+## explicit
 # k8s.io/controller-manager => ./staging/src/k8s.io/controller-manager
+k8s.io/controller-manager/pkg/features
+k8s.io/controller-manager/pkg/features/register
 # k8s.io/cri-api v0.0.0 => ./staging/src/k8s.io/cri-api
 ## explicit
 # k8s.io/cri-api => ./staging/src/k8s.io/cri-api
