@@ -277,7 +277,7 @@ func (plugin *vsphereVolumePlugin) NewDeviceUnmounter() (volume.DeviceUnmounter,
 func (detacher *vsphereVMDKDetacher) Detach(volumeName string, nodeName types.NodeName) error {
 
 	volPath := getVolPathfromVolumeName(volumeName)
-	attached, err := detacher.vsphereVolumes.DiskIsAttached(volPath, nodeName)
+	attached, newVolumePath, err := detacher.vsphereVolumes.DiskIsAttached(volPath, nodeName)
 	if err != nil {
 		// Log error and continue with detach
 		klog.Errorf(
@@ -293,7 +293,7 @@ func (detacher *vsphereVMDKDetacher) Detach(volumeName string, nodeName types.No
 
 	attachdetachMutex.LockKey(string(nodeName))
 	defer attachdetachMutex.UnlockKey(string(nodeName))
-	if err := detacher.vsphereVolumes.DetachDisk(volPath, nodeName); err != nil {
+	if err := detacher.vsphereVolumes.DetachDisk(newVolumePath, nodeName); err != nil {
 		klog.Errorf("Error detaching volume %q: %v", volPath, err)
 		return err
 	}
