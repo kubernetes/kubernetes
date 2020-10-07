@@ -26,6 +26,7 @@ go_library(
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/pluginmanager/cache:go_default_library",
+        "//pkg/kubelet/util/format:go_default_library",
         "//pkg/scheduler/framework:go_default_library",
         "//pkg/util/selinux:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
