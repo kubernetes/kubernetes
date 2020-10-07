@@ -25,7 +25,7 @@ import (
 const GroupName = "cloudcontrollermanager.config.k8s.io"
 
 var (
-	// GroupName is the group name use in this package
+	// SchemeGroupVersion include GroupName and GroupVersion.
 	SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
 	// SchemeBuilder is the scheme builder with scheme init functions to run for this API package
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
