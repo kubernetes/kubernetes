@@ -7,7 +7,6 @@ test/integration/examples
 test/integration/framework
 test/integration/garbagecollector
 test/integration/scheduler_perf
-test/integration/ttlcontroller
 vendor/k8s.io/apimachinery/pkg/api/apitesting/roundtrip
 vendor/k8s.io/apimachinery/pkg/api/meta
 vendor/k8s.io/apimachinery/pkg/apis/meta/v1/validation
