@@ -363,6 +363,16 @@ var _ = SIGDescribe("Networking", func() {
 			}
 		})
 
+		// quick validation of udp, next test confirms that this services update as well after endpoints are removed, but is slower.
+		ginkgo.It("should support basic nodePort: udp functionality", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, true, false)
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP) and getting ALL host endpoints", config.NodeIP, config.NodeIP, config.NodeUDPPort))
+			err := config.DialFromNode("udp", config.NodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+			if err != nil {
+				framework.Failf("Failure validating that nodePort service WAS forwarding properly: %v", err)
+			}
+		})
+
 		// Slow because we confirm that the nodePort doesn't serve traffic, which requires a period of polling.
 		ginkgo.It("should update nodePort: udp [Slow]", func() {
 			config := e2enetwork.NewNetworkingTestConfig(f, true, false)
