@@ -135,7 +135,7 @@ func (az *Cloud) getNetworkResourceSubscriptionID() string {
 func (az *Cloud) mapLoadBalancerNameToVMSet(lbName string, clusterName string) (vmSetName string) {
 	vmSetName = strings.TrimSuffix(lbName, InternalLoadBalancerNameSuffix)
 	if strings.EqualFold(clusterName, vmSetName) {
-		vmSetName = az.vmSet.GetPrimaryVMSetName()
+		vmSetName = az.VMSet.GetPrimaryVMSetName()
 	}
 
 	return vmSetName
@@ -150,7 +150,7 @@ func (az *Cloud) getAzureLoadBalancerName(clusterName string, vmSetName string, 
 		clusterName = az.LoadBalancerName
 	}
 	lbNamePrefix := vmSetName
-	if strings.EqualFold(vmSetName, az.vmSet.GetPrimaryVMSetName()) || az.useStandardLoadBalancer() {
+	if strings.EqualFold(vmSetName, az.VMSet.GetPrimaryVMSetName()) || az.useStandardLoadBalancer() {
 		lbNamePrefix = clusterName
 	}
 	if isInternal {
@@ -732,7 +732,7 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 			return "", "", "", nil, nil
 		}
 
-		klog.Errorf("error: az.EnsureHostInPool(%s), az.vmSet.GetPrimaryInterface.Get(%s, %s), err=%v", nodeName, vmName, vmSetName, err)
+		klog.Errorf("error: az.EnsureHostInPool(%s), az.VMSet.GetPrimaryInterface.Get(%s, %s), err=%v", nodeName, vmName, vmSetName, err)
 		return "", "", "", nil, err
 	}
 

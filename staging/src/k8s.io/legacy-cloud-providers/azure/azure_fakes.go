@@ -761,6 +761,14 @@ func (fDC *fakeDisksClient) Get(ctx context.Context, resourceGroupName string, d
 		errors.New("Not such Disk"))
 }
 
+func (fDC *fakeDisksClient) ListByResourceGroup(ctx context.Context, resourceGroupName string) ([]compute.Disk, *retry.Error) {
+	return []compute.Disk{}, nil
+}
+
+func (fDC *fakeDisksClient) Update(ctx context.Context, resourceGroupName string, diskName string, diskParameter compute.DiskUpdate) *retry.Error {
+	return nil
+}
+
 // GetTestCloud returns a fake azure cloud for unit tests in Azure related CSI drivers
 func GetTestCloud(ctrl *gomock.Controller) (az *Cloud) {
 	az = &Cloud{
@@ -800,7 +808,7 @@ func GetTestCloud(ctrl *gomock.Controller) (az *Cloud) {
 	az.VirtualMachineScaleSetsClient = newFakeVirtualMachineScaleSetsClient()
 	az.VirtualMachineScaleSetVMsClient = newFakeVirtualMachineScaleSetVMsClient()
 	az.VirtualMachinesClient = newFakeAzureVirtualMachinesClient()
-	az.vmSet = newAvailabilitySet(az)
+	az.VMSet = newAvailabilitySet(az)
 	az.vmCache, _ = az.newVMCache()
 	az.lbCache, _ = az.newLBCache()
 	az.nsgCache, _ = az.newNSGCache()
