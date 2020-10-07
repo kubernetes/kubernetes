@@ -222,7 +222,7 @@ func TestCommonAttachDiskWithVMSS(t *testing.T) {
 			}
 			ss, err := newScaleSet(testCloud)
 			assert.Nil(t, err)
-			testCloud.vmSet = ss
+			testCloud.VMSet = ss
 		}
 
 		common := &controllerCommon{

@@ -908,7 +908,7 @@ func TestGetStandardInstanceIDByNodeName(t *testing.T) {
 			ID:   to.StringPtr(invalidResouceID),
 		}, nil).AnyTimes()
 
-		instanceID, err := cloud.vmSet.GetInstanceIDByNodeName(test.nodeName)
+		instanceID, err := cloud.VMSet.GetInstanceIDByNodeName(test.nodeName)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
 		assert.Equal(t, test.expectedID, instanceID, test.name)
 	}
@@ -979,7 +979,7 @@ func TestGetStandardVMPowerStatusByNodeName(t *testing.T) {
 		mockVMClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
 		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, test.nodeName, gomock.Any()).Return(test.vm, test.getErr).AnyTimes()
 
-		powerState, err := cloud.vmSet.GetPowerStatusByNodeName(test.nodeName)
+		powerState, err := cloud.VMSet.GetPowerStatusByNodeName(test.nodeName)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
 		assert.Equal(t, test.expectedStatus, powerState, test.name)
 	}
@@ -1064,7 +1064,7 @@ func TestGetStandardVMZoneByNodeName(t *testing.T) {
 		mockVMClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
 		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, test.nodeName, gomock.Any()).Return(test.vm, test.getErr).AnyTimes()
 
-		zone, err := cloud.vmSet.GetZoneByNodeName(test.nodeName)
+		zone, err := cloud.VMSet.GetZoneByNodeName(test.nodeName)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
 		assert.Equal(t, test.expectedZone, zone, test.name)
 	}
@@ -1166,7 +1166,7 @@ func TestGetStandardVMSetNames(t *testing.T) {
 		mockVMClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
 		mockVMClient.EXPECT().List(gomock.Any(), cloud.ResourceGroup).Return(test.vm, nil).AnyTimes()
 
-		vmSetNames, err := cloud.vmSet.GetVMSetNames(test.service, test.nodes)
+		vmSetNames, err := cloud.VMSet.GetVMSetNames(test.service, test.nodes)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
 		assert.Equal(t, test.expectedVMSetNames, vmSetNames, test.name)
 	}
@@ -1339,7 +1339,7 @@ func TestStandardEnsureHostInPool(t *testing.T) {
 		mockInterfaceClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, test.nicName, gomock.Any()).Return(testNIC, nil).AnyTimes()
 		mockInterfaceClient.EXPECT().CreateOrUpdate(gomock.Any(), cloud.ResourceGroup, gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
-		_, _, _, vm, err := cloud.vmSet.EnsureHostInPool(test.service, test.nodeName, test.backendPoolID, test.vmSetName, false)
+		_, _, _, vm, err := cloud.VMSet.EnsureHostInPool(test.service, test.nodeName, test.backendPoolID, test.vmSetName, false)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
 		assert.Nil(t, vm, test.name)
 	}
@@ -1501,7 +1501,7 @@ func TestStandardEnsureHostsInPool(t *testing.T) {
 		mockInterfaceClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, test.nicName, gomock.Any()).Return(testNIC, nil).AnyTimes()
 		mockInterfaceClient.EXPECT().CreateOrUpdate(gomock.Any(), cloud.ResourceGroup, gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
-		err := cloud.vmSet.EnsureHostsInPool(test.service, test.nodes, test.backendPoolID, test.vmSetName, false)
+		err := cloud.VMSet.EnsureHostsInPool(test.service, test.nodes, test.backendPoolID, test.vmSetName, false)
 		if test.expectedErr {
 			assert.Equal(t, test.expectedErrMsg, err.Error(), test.name)
 		} else {
