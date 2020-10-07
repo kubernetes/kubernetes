@@ -477,10 +477,10 @@ var _ = SIGDescribe("Networking", func() {
 		// restart iptables"?). So instead we just manually delete all "KUBE-"
 		// chains.
 
-		ginkgo.By("dumping iptables rules on a node")
+		ginkgo.By("dumping iptables rules on node " + host)
 		result, err := e2essh.SSH("sudo iptables-save", host, framework.TestContext.Provider)
+		e2essh.LogResult(result)
 		if err != nil || result.Code != 0 {
-			e2essh.LogResult(result)
 			framework.Failf("couldn't dump iptable rules: %v", err)
 		}
 
@@ -532,6 +532,9 @@ var _ = SIGDescribe("Networking", func() {
 			}
 			return false, nil
 		})
+		if err != nil {
+			e2essh.LogResult(result)
+		}
 		framework.ExpectNoError(err, "kubelet did not recreate its iptables rules")
 	})
 })
