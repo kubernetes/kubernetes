@@ -103,7 +103,10 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 		framework.ConformanceIt("should function for node-pod communication: http [LinuxOnly] [NodeConformance]", func() {
 			config := e2enetwork.NewCoreNetworkingTestConfig(f, true)
 			for _, endpointPod := range config.EndpointPods {
-				config.DialFromNode("http", endpointPod.Status.PodIP, e2enetwork.EndpointHTTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				err := config.DialFromNode("http", endpointPod.Status.PodIP, e2enetwork.EndpointHTTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				if err != nil {
+					framework.Failf("Error dialing HTTP node to pod %v", err)
+				}
 			}
 		})
 
@@ -117,7 +120,10 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 		framework.ConformanceIt("should function for node-pod communication: udp [LinuxOnly] [NodeConformance]", func() {
 			config := e2enetwork.NewCoreNetworkingTestConfig(f, true)
 			for _, endpointPod := range config.EndpointPods {
-				config.DialFromNode("udp", endpointPod.Status.PodIP, e2enetwork.EndpointUDPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				err := config.DialFromNode("udp", endpointPod.Status.PodIP, e2enetwork.EndpointUDPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				if err != nil {
+					framework.Failf("Error dialing UDP from node to pod: %v", err)
+				}
 			}
 		})
 	})
