@@ -467,10 +467,6 @@ function install-hurl {
 # Installs inplace to ${KUBE_HOME}/bin/inplace if not already installed.
 function install-inplace {
   cd "${KUBE_HOME}"
-  local -r inplace_bin="inplace"
-  if [[ ! -d "${KUBE_HOME}/${inplace_bin}" ]]; then
-    mkdir -p "${KUBE_HOME}/${inplace_bin}"
-  fi
   if [[ -f "${KUBE_HOME}/bin/inplace" ]]; then
     echo "install-inplace: inplace already installed"
     return
@@ -483,9 +479,13 @@ function install-inplace {
     return
   fi
   echo "install-inplace: Installing inplace from ${inplace_gcs_url} ..."
-  download-or-burst "" "${inplace_gcs_url}"
+  download-or-bust "" "${inplace_gcs_url}"
+  local -r inplace_bin="inplace"
   if [[ -f "${KUBE_HOME}/${inplace_bin}" ]]; then
     mv "${KUBE_HOME}/${inplace_bin}" "${KUBE_BIN}/${inplace_bin}"
+    if [[ ! -d "${KUBE_HOME}/${inplace_bin}" ]]; then
+      mkdir -p "${KUBE_HOME}/${inplace_bin}"
+    fi
     cat > "${KUBE_HOME}/${inplace_bin}/inplace.hash" <<EOF
 ${inplace_gcs_url}
 EOF
