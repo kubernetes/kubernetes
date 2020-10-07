@@ -264,7 +264,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				},
 				{
 					description:      "should not generate events for too old log",
-					timestamp:        bootTime.Add(-1 * time.Minute),
+					timestamp:        bootTime.Add(-5 * time.Minute),
 					message:          tempMessage,
 					messageNum:       3,
 					conditionReason:  defaultReason,
@@ -273,7 +273,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				},
 				{
 					description:      "should not change node condition for too old log",
-					timestamp:        bootTime.Add(-1 * time.Minute),
+					timestamp:        bootTime.Add(-5 * time.Minute),
 					message:          permMessage1,
 					messageNum:       1,
 					conditionReason:  defaultReason,
