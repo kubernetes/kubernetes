@@ -11,7 +11,7 @@ apiVersion: v1
 kind: Namespace
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     istio-injection: disabled
     k8s-app: istio
   name: istio-system
@@ -22,7 +22,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -54,7 +54,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -81,7 +81,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -155,7 +155,7 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
     heritage: Tiller
     istio: security
@@ -293,7 +293,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -320,7 +320,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -347,7 +347,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: certmanager
     chart: certmanager
     heritage: Tiller
@@ -396,7 +396,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: certmanager
     chart: certmanager
     heritage: Tiller
@@ -437,7 +437,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -464,7 +464,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -491,7 +491,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     istio: mixer-adapter
     k8s-app: istio
@@ -515,7 +515,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: certmanager
     chart: certmanager
     heritage: Tiller
@@ -539,7 +539,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
     heritage: Tiller
     istio: rbac
@@ -625,7 +625,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -652,7 +652,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
     chart: istio
     heritage: Tiller
@@ -1420,7 +1420,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     istio: mixer-adapter
     k8s-app: istio
@@ -1444,7 +1444,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -1471,7 +1471,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
     chart: istio
     heritage: Tiller
@@ -1766,7 +1766,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -1793,7 +1793,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
     chart: istio
     heritage: Tiller
@@ -1941,7 +1941,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -1973,7 +1973,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: istio-mixer
     chart: istio
     heritage: Tiller
@@ -2066,7 +2066,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: istio-mixer
     chart: istio
     heritage: Tiller
@@ -2277,7 +2277,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -2309,7 +2309,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: certmanager
     chart: certmanager
     heritage: Tiller
@@ -2331,7 +2331,7 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     k8s-app: istio
   name: istiooperators.install.istio.io
 spec:
@@ -2379,7 +2379,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -2406,7 +2406,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -2433,7 +2433,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -2460,7 +2460,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -2487,7 +2487,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -2535,7 +2535,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -2562,7 +2562,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: istio-citadel
     chart: istio
     heritage: Tiller
@@ -3293,7 +3293,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -3320,7 +3320,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -3347,7 +3347,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -3374,7 +3374,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: certmanager
     chart: certmanager
     heritage: Tiller
@@ -3417,7 +3417,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: istio-citadel
     chart: istio
     heritage: Tiller
@@ -4147,7 +4147,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -4174,7 +4174,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -4201,7 +4201,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: istio-mixer
     chart: istio
     heritage: Tiller
@@ -4281,7 +4281,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: istio-mixer
     chart: istio
     heritage: Tiller
@@ -4365,7 +4365,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -4453,7 +4453,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -4480,7 +4480,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -4504,7 +4504,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -4531,7 +4531,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -4686,7 +4686,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
     chart: istio
     heritage: Tiller
@@ -4830,7 +4830,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5030,7 +5030,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5141,7 +5141,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
     chart: istio
     heritage: Tiller
@@ -5264,7 +5264,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5291,7 +5291,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5318,7 +5318,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5345,7 +5345,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5372,7 +5372,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5399,7 +5399,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5431,7 +5431,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     chart: istio
     heritage: Tiller
@@ -5458,7 +5458,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
     chart: istio
     heritage: Tiller
@@ -6168,7 +6168,7 @@ metadata:
   annotations:
     helm.sh/resource-policy: keep
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
     istio: mixer-adapter
     k8s-app: istio
@@ -8134,7 +8134,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: security
     chart: security
     heritage: Tiller
@@ -8159,7 +8159,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: galley
     chart: galley
     heritage: Tiller
@@ -8185,7 +8185,7 @@ kind: Service
 metadata:
   annotations: null
   labels:
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: istio-ingressgateway
     chart: gateways
     heritage: Tiller
@@ -8232,7 +8232,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: pilot
     chart: pilot
     heritage: Tiller
@@ -8261,7 +8261,7 @@ metadata:
   annotations:
     networking.istio.io/exportTo: '*'
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: mixer
     heritage: Tiller
@@ -8287,7 +8287,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: sidecarInjectorWebhook
     chart: sidecarInjectorWebhook
     heritage: Tiller
@@ -8312,7 +8312,7 @@ metadata:
   annotations:
     networking.istio.io/exportTo: '*'
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: mixer
     chart: mixer
     heritage: Tiller
@@ -8343,7 +8343,7 @@ metadata:
   annotations:
     prometheus.io/scrape: "true"
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     k8s-app: istio
     kubernetes.io/cluster-service: "true"
     name: promsd
@@ -8408,7 +8408,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: security
     chart: security
     heritage: Tiller
@@ -8491,7 +8491,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: galley
     chart: galley
     heritage: Tiller
@@ -8815,7 +8815,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: pilot
     chart: pilot
     heritage: Tiller
@@ -8985,7 +8985,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-mixer
     chart: mixer
     heritage: Tiller
@@ -9151,7 +9151,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: sidecarInjectorWebhook
     chart: sidecarInjectorWebhook
     heritage: Tiller
@@ -9275,7 +9275,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: istio-mixer
     chart: mixer
     heritage: Tiller
@@ -9444,7 +9444,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
     app: promsd
     chart: promsd-1.0.3
     heritage: Tiller
