@@ -201,6 +201,17 @@ func objectRefPtrChanged(ref1, ref2 *corev1.ObjectReference) bool {
 	return false
 }
 
+// ownedBy returns true if the provided EndpointSlice is owned by the provided
+// Service.
+func ownedBy(endpointSlice *discovery.EndpointSlice, svc *corev1.Service) bool {
+	for _, o := range endpointSlice.OwnerReferences {
+		if o.UID == svc.UID && o.Kind == "Service" && o.APIVersion == "v1" {
+			return true
+		}
+	}
+	return false
+}
+
 // getSliceToFill will return the EndpointSlice that will be closest to full
 // when numEndpoints are added. If no EndpointSlice can be found, a nil pointer
 // will be returned.
