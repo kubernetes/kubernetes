@@ -1500,7 +1500,7 @@ func (vs *VSphere) SecretAdded(obj interface{}) {
 		return
 	}
 
-	klog.V(4).Infof("secret added: %+v", obj)
+	klog.V(4).Infof("refreshing node cache for secret: %s/%s", secret.Namespace, secret.Name)
 	vs.refreshNodesForSecretChange()
 }
 
@@ -1524,7 +1524,7 @@ func (vs *VSphere) SecretUpdated(obj interface{}, newObj interface{}) {
 		return
 	}
 
-	klog.V(4).Infof("secret updated: %+v", newObj)
+	klog.V(4).Infof("refreshing node cache for secret: %s/%s", secret.Namespace, secret.Name)
 	vs.refreshNodesForSecretChange()
 }
 
