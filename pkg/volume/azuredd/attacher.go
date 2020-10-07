@@ -19,6 +19,7 @@ limitations under the License.
 package azuredd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -70,7 +71,7 @@ func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (
 	}
 
 	lun, err := diskController.GetDiskLun(volumeSource.DiskName, volumeSource.DataDiskURI, nodeName)
-	if err == cloudprovider.InstanceNotFound {
+	if errors.Is(err, cloudprovider.InstanceNotFound) {
 		// Log error and continue with attach
 		klog.Warningf(
 			"Error checking if volume is already attached to current node (%q). Will continue and try attach anyway. err=%v",

@@ -20,6 +20,7 @@ package cinder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -101,7 +102,7 @@ func (attacher *cinderDiskAttacher) waitOperationFinished(volumeID string) error
 		return !pending, nil
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if errors.Is(err, wait.ErrWaitTimeout) {
 		err = fmt.Errorf("Volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
 	}
 
@@ -123,7 +124,7 @@ func (attacher *cinderDiskAttacher) waitDiskAttached(instanceID, volumeID string
 		return attached, nil
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if errors.Is(err, wait.ErrWaitTimeout) {
 		err = fmt.Errorf("Volume %q failed to be attached within the alloted time", volumeID)
 	}
 
@@ -345,7 +346,7 @@ func (detacher *cinderDiskDetacher) waitOperationFinished(volumeID string) error
 		return !pending, nil
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if errors.Is(err, wait.ErrWaitTimeout) {
 		err = fmt.Errorf("Volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
 	}
 
@@ -367,7 +368,7 @@ func (detacher *cinderDiskDetacher) waitDiskDetached(instanceID, volumeID string
 		return !attached, nil
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if errors.Is(err, wait.ErrWaitTimeout) {
 		err = fmt.Errorf("Volume %q failed to detach within the alloted time", volumeID)
 	}
 

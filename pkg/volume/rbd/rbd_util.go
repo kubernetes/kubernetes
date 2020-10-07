@@ -23,6 +23,7 @@ package rbd
 
 import (
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -287,7 +288,7 @@ func (util *rbdUtil) MakeGlobalVDPDName(rbd rbd) string {
 
 func rbdErrors(runErr, resultErr error) error {
 	if err, ok := runErr.(*exec.Error); ok {
-		if err.Err == exec.ErrNotFound {
+		if goerrors.Is(err.Err, exec.ErrNotFound) {
 			return fmt.Errorf("rbd: rbd cmd not found")
 		}
 	}
@@ -423,7 +424,7 @@ func (util *rbdUtil) AttachDisk(b rbdMounter) (string, error) {
 				return !used, nil
 			})
 			// Return error if rbd image has not become available for the specified timeout.
-			if err == wait.ErrWaitTimeout {
+			if goerrors.Is(err, wait.ErrWaitTimeout) {
 				return "", fmt.Errorf("rbd image %s/%s is still being used", b.Pool, b.Image)
 			}
 			// Return error if any other errors were encountered during waiting for the image to become available.
@@ -715,7 +716,7 @@ func (util *rbdUtil) rbdInfo(b *rbdMounter) (int, error) {
 		"info", b.Image, "--pool", b.Pool, "-m", mon, "--id", id, "--key="+secret, "-k=/dev/null", "--format=json").Output()
 
 	if err, ok := err.(*exec.Error); ok {
-		if err.Err == exec.ErrNotFound {
+		if goerrors.Is(err.Err, exec.ErrNotFound) {
 			klog.Errorf("rbd cmd not found")
 			// fail fast if rbd command is not found.
 			return 0, err
@@ -779,7 +780,7 @@ func (util *rbdUtil) rbdStatus(b *rbdMounter) (bool, string, error) {
 	output = string(cmd)
 
 	if err, ok := err.(*exec.Error); ok {
-		if err.Err == exec.ErrNotFound {
+		if goerrors.Is(err.Err, exec.ErrNotFound) {
 			klog.Errorf("rbd cmd not found")
 			// fail fast if command not found
 			return false, output, err
