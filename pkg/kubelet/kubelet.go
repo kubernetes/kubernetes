@@ -35,9 +35,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/mount-utils"
-	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/integer"
-	utilnet "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -111,7 +109,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	sysctlwhitelist "k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
-	utilipt "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/volume"
@@ -466,11 +463,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	httpClient := &http.Client{}
 	parsedNodeIP := net.ParseIP(nodeIP)
-	protocol := utilipt.ProtocolIPv4
-	if utilnet.IsIPv6(parsedNodeIP) {
-		klog.V(0).Infof("IPv6 node IP (%s), assume IPv6 operation", nodeIP)
-		protocol = utilipt.ProtocolIPv6
-	}
 
 	klet := &Kubelet{
 		hostname:                                hostname,
@@ -518,7 +510,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeIPValidator:                         validateNodeIP,
 		clock:                                   clock.RealClock{},
 		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
-		iptClient:                               utilipt.New(utilexec.New(), protocol),
 		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
 		iptablesMasqueradeBit:                   int(kubeCfg.IPTablesMasqueradeBit),
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
@@ -819,7 +810,6 @@ type Kubelet struct {
 	runtimeCache    kubecontainer.RuntimeCache
 	kubeClient      clientset.Interface
 	heartbeatClient clientset.Interface
-	iptClient       utilipt.Interface
 	rootDirectory   string
 
 	lastObservedNodeAddressesMux sync.RWMutex
