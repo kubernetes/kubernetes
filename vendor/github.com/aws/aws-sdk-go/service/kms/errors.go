@@ -297,8 +297,8 @@ const (
 	// ErrCodeLimitExceededException for service response error code
 	// "LimitExceededException".
 	//
-	// The request was rejected because a limit was exceeded. For more information,
-	// see Limits (https://docs.aws.amazon.com/kms/latest/developerguide/limits.html)
+	// The request was rejected because a quota was exceeded. For more information,
+	// see Quotas (https://docs.aws.amazon.com/kms/latest/developerguide/limits.html)
 	// in the AWS Key Management Service Developer Guide.
 	ErrCodeLimitExceededException = "LimitExceededException"
 

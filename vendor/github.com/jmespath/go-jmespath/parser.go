@@ -137,7 +137,7 @@ func (p *Parser) Parse(expression string) (ASTNode, error) {
 	}
 	if p.current() != tEOF {
 		return ASTNode{}, p.syntaxError(fmt.Sprintf(
-			"Unexpected token at the end of the expresssion: %s", p.current()))
+			"Unexpected token at the end of the expression: %s", p.current()))
 	}
 	return parsed, nil
 }
