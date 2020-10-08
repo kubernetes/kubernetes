@@ -9,7 +9,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api/v1/pod:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/scheduler/core:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
@@ -26,6 +25,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/listers/policy/v1beta1:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
         "//staging/src/k8s.io/kube-scheduler/extender/v1:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
