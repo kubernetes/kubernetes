@@ -51,15 +51,16 @@ func TestCSI_VolumeAll(t *testing.T) {
 	defaultFSGroupPolicy := storagev1.ReadWriteOnceWithFSTypeFSGroupPolicy
 
 	tests := []struct {
-		name       string
-		specName   string
-		driver     string
-		volName    string
-		specFunc   func(specName, driver, volName string) *volume.Spec
-		podFunc    func() *api.Pod
-		isInline   bool
-		shouldFail bool
-		driverSpec *storage.CSIDriverSpec
+		name                            string
+		specName                        string
+		driver                          string
+		volName                         string
+		specFunc                        func(specName, driver, volName string) *volume.Spec
+		podFunc                         func() *api.Pod
+		isInline                        bool
+		shouldFail                      bool
+		disableFSGroupPolicyFeatureGate bool
+		driverSpec                      *storage.CSIDriverSpec
 	}{
 		{
 			name:     "PersistentVolume",
@@ -86,6 +87,25 @@ func TestCSI_VolumeAll(t *testing.T) {
 				podUID := types.UID(fmt.Sprintf("%08X", rand.Uint64()))
 				return &api.Pod{ObjectMeta: meta.ObjectMeta{UID: podUID, Namespace: testns}}
 			},
+			driverSpec: &storage.CSIDriverSpec{
+				// Required for the driver to be accepted for the persistent volume.
+				VolumeLifecycleModes: []storage.VolumeLifecycleMode{storage.VolumeLifecyclePersistent},
+				FSGroupPolicy:        &defaultFSGroupPolicy,
+			},
+		},
+		{
+			name:     "PersistentVolume with driver info and FSGroup disabled",
+			specName: "pv2",
+			driver:   "simple-driver",
+			volName:  "vol2",
+			specFunc: func(specName, driver, volName string) *volume.Spec {
+				return volume.NewSpecFromPersistentVolume(makeTestPV(specName, 20, driver, volName), false)
+			},
+			podFunc: func() *api.Pod {
+				podUID := types.UID(fmt.Sprintf("%08X", rand.Uint64()))
+				return &api.Pod{ObjectMeta: meta.ObjectMeta{UID: podUID, Namespace: testns}}
+			},
+			disableFSGroupPolicyFeatureGate: true,
 			driverSpec: &storage.CSIDriverSpec{
 				// Required for the driver to be accepted for the persistent volume.
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{storage.VolumeLifecyclePersistent},
@@ -227,6 +247,8 @@ func TestCSI_VolumeAll(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, !test.disableFSGroupPolicyFeatureGate)()
+
 			tmpDir, err := utiltesting.MkTmpdir("csi-test")
 			if err != nil {
 				t.Fatalf("can't create temp dir: %v", err)
