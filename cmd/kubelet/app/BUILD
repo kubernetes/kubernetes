@@ -124,6 +124,7 @@ go_library(
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/k8s.io/utils/inotify:go_default_library",
