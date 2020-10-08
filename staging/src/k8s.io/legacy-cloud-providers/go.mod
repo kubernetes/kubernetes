@@ -13,7 +13,7 @@ require (
 	github.com/Azure/go-autorest/autorest/to v0.2.0
 	github.com/Azure/go-autorest/autorest/validation v0.1.0 // indirect
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20200415212048-7901bc822317
-	github.com/aws/aws-sdk-go v1.28.2
+	github.com/aws/aws-sdk-go v1.35.5
 	github.com/dnaeon/go-vcr v1.0.1 // indirect
 	github.com/golang/mock v1.3.1
 	github.com/google/go-cmp v0.4.0

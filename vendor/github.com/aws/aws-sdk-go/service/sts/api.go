@@ -207,6 +207,10 @@ func (c *STS) AssumeRoleRequest(input *AssumeRoleInput) (req *request.Request, o
 //   and Deactivating AWS STS in an AWS Region (https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_enable-regions.html)
 //   in the IAM User Guide.
 //
+//   * ErrCodeExpiredTokenException "ExpiredTokenException"
+//   The web identity token that was passed is expired or is not valid. Get a
+//   new identity token from the identity provider and then retry the request.
+//
 // See also, https://docs.aws.amazon.com/goto/WebAPI/sts-2011-06-15/AssumeRole
 func (c *STS) AssumeRole(input *AssumeRoleInput) (*AssumeRoleOutput, error) {
 	req, out := c.AssumeRoleRequest(input)
@@ -626,7 +630,7 @@ func (c *STS) AssumeRoleWithWebIdentityRequest(input *AssumeRoleWithWebIdentityI
 //    * Using Web Identity Federation API Operations for Mobile Apps (https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_oidc_manual.html)
 //    and Federation Through a Web-based Identity Provider (https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_request.html#api_assumerolewithwebidentity).
 //
-//    * Web Identity Federation Playground (https://web-identity-federation-playground.s3.amazonaws.com/index.html).
+//    * Web Identity Federation Playground (https://aws.amazon.com/blogs/aws/the-aws-web-identity-federation-playground/).
 //    Walk through the process of authenticating through Login with Amazon,
 //    Facebook, or Google, getting temporary security credentials, and then
 //    using those credentials to make a request to AWS.

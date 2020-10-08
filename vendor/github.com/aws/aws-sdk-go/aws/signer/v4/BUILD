@@ -5,6 +5,8 @@ go_library(
     srcs = [
         "header_rules.go",
         "options.go",
+        "request_context_go1.5.go",
+        "request_context_go1.7.go",
         "stream.go",
         "uri_path.go",
         "v4.go",
