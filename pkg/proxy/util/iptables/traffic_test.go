@@ -166,3 +166,78 @@ func TestDetectLocalByCIDR(t *testing.T) {
 		}
 	}
 }
+
+func TestNewDetectLocalByInterface(t *testing.T) {
+	cases := []struct {
+		ifaceName   string
+		errExpected bool
+	}{
+		{
+			ifaceName:   "veth",
+			errExpected: false,
+		},
+		{
+			ifaceName:   "2002::1234:abcd:ffff:c0a8:101/64",
+			errExpected: true,
+		},
+		{
+			ifaceName:   "crb0",
+			errExpected: false,
+		},
+		{
+			ifaceName:   "",
+			errExpected: true,
+		},
+	}
+	for i, c := range cases {
+		r, err := NewDetectLocalByInterface(c.ifaceName)
+		if c.errExpected {
+			if err == nil {
+				t.Errorf("Case[%d] expected error, but succeeded with: %q", i, r)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("Case[%d] failed with error: %v", i, err)
+		}
+	}
+}
+
+func TestDetectLocalByInterface(t *testing.T) {
+	cases := []struct {
+		ifaceName               string
+		chain                   string
+		args                    []string
+		expectedJumpIfOutput    []string
+		expectedJumpIfNotOutput []string
+	}{
+		{
+			ifaceName:               "eth0",
+			chain:                   "TEST",
+			args:                    []string{"arg1", "arg2"},
+			expectedJumpIfOutput:    []string{"arg1", "arg2", "-i", "eth0+", "-j", "TEST"},
+			expectedJumpIfNotOutput: []string{"arg1", "arg2", "!", "-i", "eth0+", "-j", "TEST"},
+		},
+	}
+	for _, c := range cases {
+		localDetector, err := NewDetectLocalByInterface(c.ifaceName)
+		if err != nil {
+			t.Errorf("Error initializing localDetector: %v", err)
+			continue
+		}
+		if !localDetector.IsImplemented() {
+			t.Error("DetectLocalByInterface returns false for IsImplemented")
+		}
+
+		jumpIf := localDetector.JumpIfLocal(c.args, c.chain)
+		jumpIfNot := localDetector.JumpIfNotLocal(c.args, c.chain)
+
+		if !reflect.DeepEqual(jumpIf, c.expectedJumpIfOutput) {
+			t.Errorf("JumpIf, expected: '%v', but got: '%v'", c.expectedJumpIfOutput, jumpIf)
+		}
+
+		if !reflect.DeepEqual(jumpIfNot, c.expectedJumpIfNotOutput) {
+			t.Errorf("JumpIfNot, expected: '%v', but got: '%v'", c.expectedJumpIfNotOutput, jumpIfNot)
+		}
+	}
+}

@@ -90,3 +90,33 @@ func (d *detectLocalByCIDR) JumpIfNotLocal(args []string, toChain string) []stri
 	klog.V(4).InfoS("Detect Local By CIDR", "cidr", d.cidr, "jumpNotLocal", line)
 	return line
 }
+
+type detectLocalByInterface struct {
+	ifaceName string
+}
+
+// NewDetectLocalByInterface implements the LocalTrafficDetector interface using an interface or a bridge.
+// This can be used when a pod interface name/prefix can be used to capture the notion of local traffic.
+func NewDetectLocalByInterface(ifaceName string) (LocalTrafficDetector, error) {
+	maxIfNameSize := 16 // linux/if.h
+	if len(ifaceName)+1 > maxIfNameSize || ifaceName == "" {
+		return nil, fmt.Errorf("invalid interface name")
+	}
+	return &detectLocalByInterface{ifaceName: ifaceName}, nil
+}
+
+func (d *detectLocalByInterface) IsImplemented() bool {
+	return true
+}
+
+func (d *detectLocalByInterface) JumpIfLocal(args []string, toChain string) []string {
+	line := append(args, "-i", d.ifaceName+string('+'), "-j", toChain)
+	klog.V(4).Info("[DetectLocalByInterface (", d.ifaceName+string('+'), ")", " Jump Local: ", line)
+	return line
+}
+
+func (d *detectLocalByInterface) JumpIfNotLocal(args []string, toChain string) []string {
+	line := append(args, "!", "-i", d.ifaceName+string('+'), "-j", toChain)
+	klog.V(4).Info("[DetectLocalByInterface (", d.ifaceName+string('+'), ")]", " Jump Not Local: ", line)
+	return line
+}
