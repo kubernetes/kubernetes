@@ -168,7 +168,10 @@ function config-ip-firewall {
   # BLOCK_GCE_METADATA_SERVER blocks GCE metadata server access from all
   # non-hostnetwork pods.
   if [[ "${BLOCK_GCE_METADATA_SERVER:-}" == "true" ]]; then
-    iptables -I FORWARD -w -d 169.254.169.254 -j DROP
+    # Calico adds iptables rules that accepts all traffic. Make it a PREROUTING
+    # rule to get earlier in the chain and ensure the metadata server is
+    # blocked.
+    iptables -t mangle -A PREROUTING -d 169.254.169.254/32 -j DROP
   fi
 
   # Flush iptables nat table
