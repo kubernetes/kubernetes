@@ -57,7 +57,7 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc) error {
 func IsRetryableAPIError(err error) bool {
 	// These errors may indicate a transient error that we can retry in tests.
 	if apierrors.IsInternalError(err) || apierrors.IsTimeout(err) || apierrors.IsServerTimeout(err) ||
-		apierrors.IsTooManyRequests(err) || utilnet.IsProbableEOF(err) || utilnet.IsConnectionReset(err) {
+		apierrors.IsTooManyRequests(err) || utilnet.IsProbableEOF(err) || utilnet.IsTimeout(err) || utilnet.IsConnectionReset(err) {
 		return true
 	}
 	// If the error sends the Retry-After header, we respect it as an explicit confirmation we should retry.
