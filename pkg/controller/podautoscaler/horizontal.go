@@ -459,7 +459,6 @@ func (a *HorizontalController) computeStatusForResourceMetricGeneric(currentRepl
 
 	if target.AverageUtilization == nil {
 		errMsg := "invalid resource metric source: neither a utilization target nor a value target was set"
-		err = fmt.Errorf(errMsg)
 		return 0, nil, time.Time{}, "", condition, fmt.Errorf(errMsg)
 	}
 
