@@ -310,6 +310,23 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
 		return true
 	}
+
+	if !n.isObserved() {
+		nodeFromGraph, existsInGraph := gc.dependencyGraphBuilder.uidToNode.Read(n.identity.UID)
+		if !existsInGraph {
+			// this can happen if attemptToDelete loops on a requeued virtual node because attemptToDeleteItem returned an error,
+			// and in the meantime a deletion of the real object associated with that uid was observed
+			klog.V(5).Infof("item %s no longer in the graph, skipping attemptToDeleteItem", n)
+			return true
+		}
+		if nodeFromGraph.isObserved() {
+			// this can happen if attemptToDelete loops on a requeued virtual node because attemptToDeleteItem returned an error,
+			// and in the meantime the real object associated with that uid was observed
+			klog.V(5).Infof("item %s no longer virtual in the graph, skipping attemptToDeleteItem on virtual node", n)
+			return true
+		}
+	}
+
 	err := gc.attemptToDeleteItem(n)
 	if err == enqueuedVirtualDeleteEventErr {
 		// a virtual event was produced and will be handled by processGraphChanges, no need to requeue this node
