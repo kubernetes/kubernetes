@@ -82,6 +82,12 @@ func TestRegistryPatternMatch(t *testing.T) {
 		{"123456789012.dkr.ecr-fips.lala-land-1.amazonaws.com", true},
 		// .cn
 		{"123456789012.dkr.ecr.lala-land-1.amazonaws.com.cn", true},
+		// iso
+		{"123456789012.dkr.ecr.us-iso-east-1.c2s.ic.gov", true},
+		// iso-b
+		{"123456789012.dkr.ecr.us-isob-east-1.sc2s.sgov.gov", true},
+		// invalid gov endpoint
+		{"123456789012.dkr.ecr.us-iso-east-1.amazonaws.gov", false},
 		// registry ID too long
 		{"1234567890123.dkr.ecr.lala-land-1.amazonaws.com", false},
 		// registry ID too short
