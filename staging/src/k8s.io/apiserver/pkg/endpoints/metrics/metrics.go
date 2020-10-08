@@ -21,7 +21,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -195,8 +194,6 @@ var (
 		},
 		[]string{"verb", "resource", "subresource"},
 	)
-
-	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 
 	metrics = []resettableCollector{
 		deprecatedRequestGauge,
@@ -393,11 +390,10 @@ func InstrumentRouteFunc(verb, group, version, resource, subresource, scope, com
 
 		delegate := &ResponseWriterDelegator{ResponseWriter: response.ResponseWriter}
 
-		_, cn := response.ResponseWriter.(http.CloseNotifier)
 		_, fl := response.ResponseWriter.(http.Flusher)
 		_, hj := response.ResponseWriter.(http.Hijacker)
 		var rw http.ResponseWriter
-		if cn && fl && hj {
+		if fl && hj {
 			rw = &fancyResponseWriterDelegator{delegate}
 		} else {
 			rw = delegate
@@ -420,10 +416,9 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 
 		delegate := &ResponseWriterDelegator{ResponseWriter: w}
 
-		_, cn := w.(http.CloseNotifier)
 		_, fl := w.(http.Flusher)
 		_, hj := w.(http.Hijacker)
-		if cn && fl && hj {
+		if fl && hj {
 			w = &fancyResponseWriterDelegator{delegate}
 		} else {
 			w = delegate
@@ -548,10 +543,6 @@ func (r *ResponseWriterDelegator) ContentLength() int {
 
 type fancyResponseWriterDelegator struct {
 	*ResponseWriterDelegator
-}
-
-func (f *fancyResponseWriterDelegator) CloseNotify() <-chan bool {
-	return f.ResponseWriter.(http.CloseNotifier).CloseNotify()
 }
 
 func (f *fancyResponseWriterDelegator) Flush() {
