@@ -619,7 +619,12 @@ function append_or_replace_prefixed_line {
 function write-pki-data {
   local data="${1}"
   local path="${2}"
-  (umask 077; echo "${data}" | base64 --decode > "${path}")
+  if [[ -n "${KUBE_PKI_READERS_GROUP:-}" ]]; then
+    (umask 027; echo "${data}" | base64 --decode > "${path}")
+    chgrp "${KUBE_PKI_READERS_GROUP:-}" "${path}"
+  else
+    (umask 077; echo "${data}" | base64 --decode > "${path}")
+  fi
 }
 
 function create-node-pki {
