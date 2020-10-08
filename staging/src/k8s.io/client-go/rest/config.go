@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -140,6 +141,11 @@ type Config struct {
 	//
 	// socks5 proxying does not currently support spdy streaming endpoints.
 	Proxy func(*http.Request) (*url.URL, error)
+
+	// KeyLogWriter is where the TLS secrets should be written in
+	// the format expected by Wireshark. This is a security
+	// problem, only use for debugging.
+	KeyLogWriter io.Writer
 
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?

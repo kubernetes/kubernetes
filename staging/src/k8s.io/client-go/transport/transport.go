@@ -76,6 +76,7 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 		InsecureSkipVerify: c.TLS.Insecure,
 		ServerName:         c.TLS.ServerName,
 		NextProtos:         c.TLS.NextProtos,
+		KeyLogWriter:       c.TLS.KeyLogWriter,
 	}
 
 	if c.HasCA() {
