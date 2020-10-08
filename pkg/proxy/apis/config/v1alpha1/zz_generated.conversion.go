@@ -124,6 +124,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 	}
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
 	out.DetectLocalMode = config.LocalMode(in.DetectLocalMode)
+	out.InterfacePrefix = in.InterfacePrefix
 	return nil
 }
 
@@ -164,6 +165,7 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 	}
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
 	out.DetectLocalMode = v1alpha1.LocalMode(in.DetectLocalMode)
+	out.InterfacePrefix = in.InterfacePrefix
 	return nil
 }
 

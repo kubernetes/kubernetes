@@ -164,6 +164,12 @@ type KubeProxyConfiguration struct {
 	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion"`
 	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
 	DetectLocalMode LocalMode `json:"detectLocalMode"`
+	// InterfacePrefix is a string argument which represents the interface prefix name of the pods in the node.
+	// This could be an iface prefix name where all pod interfaces start with same prefix, or a bridge name, or
+	// a single interface name. Kube-proxy considers traffic as local if originating from an interface or a
+	// bridge which matches the given prefix. This argument should be set if DetectLocateMode is set to
+	// LocalModeInterface.
+	InterfacePrefix string `json:"interfacePrefix"`
 }
 
 // ProxyMode represents modes used by the Kubernetes proxy server.

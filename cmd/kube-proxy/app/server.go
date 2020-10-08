@@ -210,6 +210,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 
 	fs.Float32Var(&o.config.ClientConnection.QPS, "kube-api-qps", o.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver")
 	fs.Var(&o.config.DetectLocalMode, "detect-local-mode", "Mode to use to detect local traffic. This parameter is ignored if a config file is specified by --config.")
+	fs.StringVar(&o.config.InterfacePrefix, "interface-prefix", o.config.InterfacePrefix, "The interface prefix name of the pod interface in the cluster. Kube-proxy considers traffic as local if originating from an interface or a bridge which matches the given prefix. This argument should be set if DetectLocateMode is set to LocalModeInterface.")
 }
 
 // NewOptions returns initialized Options

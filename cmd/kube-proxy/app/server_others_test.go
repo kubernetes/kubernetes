@@ -197,6 +197,11 @@ func Test_getDetectLocalMode(t *testing.T) {
 			errExpected: false,
 		},
 		{
+			detectLocal: string(proxyconfigapi.LocalModeInterface),
+			expected:    proxyconfigapi.LocalModeInterface,
+			errExpected: false,
+		},
+		{
 			detectLocal: "abcd",
 			expected:    proxyconfigapi.LocalMode("abcd"),
 			errExpected: true,
@@ -450,6 +455,25 @@ func Test_getLocalDetector(t *testing.T) {
 			expected:    proxyutiliptables.NewNoOpLocalDetector(),
 			errExpected: false,
 		},
+		// LocalModeInterface, nodeInfo and ipt are not needed for these cases
+		{
+			mode:        proxyconfigapi.LocalModeInterface,
+			config:      &proxyconfigapi.KubeProxyConfiguration{InterfacePrefix: "eth"},
+			expected:    resolveLocalDetector(t)(proxyutiliptables.NewDetectLocalByInterface("eth")),
+			errExpected: false,
+		},
+		{
+			mode:        proxyconfigapi.LocalModeInterface,
+			config:      &proxyconfigapi.KubeProxyConfiguration{InterfacePrefix: ""},
+			expected:    proxyutiliptables.NewNoOpLocalDetector(),
+			errExpected: false,
+		},
+		{
+			mode:        proxyconfigapi.LocalModeInterface,
+			config:      &proxyconfigapi.KubeProxyConfiguration{InterfacePrefix: "1234567890123456789"},
+			expected:    nil,
+			errExpected: true,
+		},
 	}
 	for i, c := range cases {
 		r, err := getLocalDetector(c.mode, c.config, c.ipt, c.nodeInfo)
@@ -584,6 +608,21 @@ func Test_getDualStackLocalDetectorTuple(t *testing.T) {
 			mode:        proxyconfigapi.LocalMode("abcd"),
 			config:      &proxyconfigapi.KubeProxyConfiguration{ClusterCIDR: ""},
 			ipt:         [2]utiliptables.Interface{utiliptablestest.NewFake(), utiliptablestest.NewIPv6Fake()},
+			expected:    [2]proxyutiliptables.LocalTrafficDetector{proxyutiliptables.NewNoOpLocalDetector(), proxyutiliptables.NewNoOpLocalDetector()},
+			errExpected: false,
+		},
+		// LocalModeInterface, nodeInfo and ipt are not needed for these cases
+		{
+			mode:   proxyconfigapi.LocalModeInterface,
+			config: &proxyconfigapi.KubeProxyConfiguration{InterfacePrefix: "veth"},
+			expected: resolveDualStackLocalDetectors(t)(
+				proxyutiliptables.NewDetectLocalByInterface("veth"))(
+				proxyutiliptables.NewDetectLocalByInterface("veth")),
+			errExpected: false,
+		},
+		{
+			mode:        proxyconfigapi.LocalModeInterface,
+			config:      &proxyconfigapi.KubeProxyConfiguration{InterfacePrefix: ""},
 			expected:    [2]proxyutiliptables.LocalTrafficDetector{proxyutiliptables.NewNoOpLocalDetector(), proxyutiliptables.NewNoOpLocalDetector()},
 			errExpected: false,
 		},

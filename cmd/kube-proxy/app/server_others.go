@@ -436,7 +436,7 @@ func detectNumCPU() int {
 func getDetectLocalMode(config *proxyconfigapi.KubeProxyConfiguration) (proxyconfigapi.LocalMode, error) {
 	mode := config.DetectLocalMode
 	switch mode {
-	case proxyconfigapi.LocalModeClusterCIDR, proxyconfigapi.LocalModeNodeCIDR:
+	case proxyconfigapi.LocalModeClusterCIDR, proxyconfigapi.LocalModeNodeCIDR, proxyconfigapi.LocalModeInterface:
 		return mode, nil
 	default:
 		if strings.TrimSpace(mode.String()) != "" {
@@ -461,6 +461,12 @@ func getLocalDetector(mode proxyconfigapi.LocalMode, config *proxyconfigapi.Kube
 			break
 		}
 		return proxyutiliptables.NewDetectLocalByCIDR(nodeInfo.Spec.PodCIDR, ipt)
+	case proxyconfigapi.LocalModeInterface:
+		if config.InterfacePrefix == "" {
+			klog.Warning("detect-local-mode set to Interface, but no ifacename or bridge is defined")
+			break
+		}
+		return proxyutiliptables.NewDetectLocalByInterface(config.InterfacePrefix)
 	}
 	klog.V(0).InfoS("Defaulting to no-op detect-local", "detect-local-mode", string(mode))
 	return proxyutiliptables.NewNoOpLocalDetector(), nil
@@ -517,6 +523,18 @@ func getDualStackLocalDetectorTuple(mode proxyconfigapi.LocalMode, config *proxy
 				localDetectors[1], err = proxyutiliptables.NewDetectLocalByCIDR(nodeInfo.Spec.PodCIDRs[1], ipt[1])
 			}
 		}
+		return localDetectors, err
+	case proxyconfigapi.LocalModeInterface:
+		if config.InterfacePrefix == "" {
+			klog.Warning("detect-local-mode set to Interface, but no ifacename or bridge is defined")
+			break
+		}
+		localDetector, err := proxyutiliptables.NewDetectLocalByInterface(config.InterfacePrefix)
+		if err != nil {
+			return localDetectors, err
+		}
+		localDetectors[0] = localDetector
+		localDetectors[1] = localDetector
 		return localDetectors, err
 	default:
 		klog.InfoS("Unknown detect-local-mode", "detect-local-mode", mode)
