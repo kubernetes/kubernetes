@@ -13,7 +13,6 @@ filegroup(
         ":package-srcs",
         "//cmd/clicheck:all-srcs",
         "//cmd/cloud-controller-manager:all-srcs",
-        "//cmd/controller-manager/app:all-srcs",
         "//cmd/dependencycheck:all-srcs",
         "//cmd/gendocs:all-srcs",
         "//cmd/genkubedocs:all-srcs",

@@ -32,11 +32,12 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
+	cpoptions "k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
+	cmoptions "k8s.io/controller-manager/options"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
-	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -56,8 +57,8 @@ const (
 // KubeControllerManagerOptions is the main context object for the kube-controller manager.
 type KubeControllerManagerOptions struct {
 	Generic           *cmoptions.GenericControllerManagerConfigurationOptions
-	KubeCloudShared   *cmoptions.KubeCloudSharedOptions
-	ServiceController *cmoptions.ServiceControllerOptions
+	KubeCloudShared   *cpoptions.KubeCloudSharedOptions
+	ServiceController *cpoptions.ServiceControllerOptions
 
 	AttachDetachController           *AttachDetachControllerOptions
 	CSRSigningController             *CSRSigningControllerOptions
@@ -104,8 +105,8 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 
 	s := KubeControllerManagerOptions{
 		Generic:         cmoptions.NewGenericControllerManagerConfigurationOptions(&componentConfig.Generic),
-		KubeCloudShared: cmoptions.NewKubeCloudSharedOptions(&componentConfig.KubeCloudShared),
-		ServiceController: &cmoptions.ServiceControllerOptions{
+		KubeCloudShared: cpoptions.NewKubeCloudSharedOptions(&componentConfig.KubeCloudShared),
+		ServiceController: &cpoptions.ServiceControllerOptions{
 			ServiceControllerConfiguration: &componentConfig.ServiceController,
 		},
 		AttachDetachController: &AttachDetachControllerOptions{
