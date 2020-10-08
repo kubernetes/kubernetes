@@ -550,4 +550,9 @@ Runtime log sanitization may introduce significant computation overhead and ther
 
 	// Graduated experimental flags, kept for backward compatibility
 	fs.BoolVar(&c.KernelMemcgNotification, "experimental-kernel-memcg-notification", c.KernelMemcgNotification, "Use kernelMemcgNotification configuration, this flag will be removed in 1.23.")
+
+	// Memory Manager Flags
+	fs.StringVar(&c.MemoryManagerPolicy, "memory-manager-policy", c.MemoryManagerPolicy, "Memory Manager policy to use. Possible values: 'none', 'static'. Default: 'none'")
+	// TODO: once documentation link is available, replace KEP link with the documentation one.
+	fs.Var(cliflag.NewBracketSeparatedSliceMapStringString(&c.ReservedMemory), "reserved-memory", "A comma separated list of bracket-enclosed configuration for memory manager (e.g. {numa-node=0, type=memory, limit=1Gi}, {numa-node=1, type=memory, limit=1Gi}). The total sum for each memory type should be equal to the sum of kube-reserved, system-reserved and eviction-threshold. See more details under https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/1769-memory-manager#reserved-memory-flag")
 }

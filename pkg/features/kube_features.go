@@ -123,6 +123,12 @@ const (
 	// Enable resource managers to make NUMA aligned decisions
 	TopologyManager featuregate.Feature = "TopologyManager"
 
+	// owner: @cynepco3hahue(alukiano) @cezaryzukowski @k-wiatrzyk
+	// alpha:: v1.20
+
+	// Allows to set containers memory affinity according to NUMA topology
+	MemoryManager featuregate.Feature = "MemoryManager"
+
 	// owner: @sjenning
 	// beta: v1.11
 	//

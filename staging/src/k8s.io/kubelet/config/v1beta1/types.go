@@ -73,6 +73,13 @@ const (
 	// PodTopologyManagerScope represents that
 	// topology policy is applied on a per-pod basis.
 	PodTopologyManagerScope = "pod"
+	// NoneMemoryManagerPolicy is a memory manager none policy, under the none policy
+	// the memory manager will not pin containers memory of guaranteed pods
+	NoneMemoryManagerPolicy = "none"
+	// StaticMemoryManagerPolicy is a memory manager static policy, under the static policy
+	// the memory manager will try to pin containers memory of guaranteed pods to the smallest
+	// possible sub-set of NUMA nodes
+	StaticMemoryManagerPolicy = "static"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -433,6 +440,13 @@ type KubeletConfiguration struct {
 	// Default: "10s"
 	// +optional
 	CPUManagerReconcilePeriod metav1.Duration `json:"cpuManagerReconcilePeriod,omitempty"`
+	// MemoryManagerPolicy is the name of the policy to use by memory manager.
+	// Requires the MemoryManager feature gate to be enabled.
+	// Dynamic Kubelet Config (beta): This field should not be updated without a full node
+	// reboot. It is safest to keep this value the same as the local config.
+	// Default: "none"
+	// +optional
+	MemoryManagerPolicy string `json:"memoryManagerPolicy,omitempty"`
 	// TopologyManagerPolicy is the name of the policy to use.
 	// Policies other than "none" require the TopologyManager feature gate to be enabled.
 	// Dynamic Kubelet Config (beta): This field should not be updated without a full node
@@ -824,6 +838,14 @@ type KubeletConfiguration struct {
 	// Default: "10s"
 	// +optional
 	ShutdownGracePeriodCriticalPods metav1.Duration `json:"shutdownGracePeriodCriticalPods,omitempty"`
+	// A comma separated list of bracket-enclosed configurations for memory manager.
+	// Each configuration describes pre-reserved memory for the certain memory type on a specific NUMA node.
+	// The Memory Manager validates whether total amount of pre-reserved memory is identical to reserved-memory by the Node Allocatable feature.
+	// The format is {numa-node=integer, memory-type=string, limit=string}
+	// (e.g. {numa-node=0, type=memory, limit=1Gi}, {numa-node=1, type=memory, limit=1Gi})
+	// Default: nil
+	// +optional
+	ReservedMemory []map[string]string `json:"reservedMemory,omitempty"`
 }
 
 type KubeletAuthorizationMode string

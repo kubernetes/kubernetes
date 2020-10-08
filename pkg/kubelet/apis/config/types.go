@@ -224,6 +224,9 @@ type KubeletConfiguration struct {
 	// CPU Manager reconciliation period.
 	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerReconcilePeriod metav1.Duration
+	// MemoryManagerPolicy is the name of the policy to use.
+	// Requires the MemoryManager feature gate to be enabled.
+	MemoryManagerPolicy string
 	// TopologyManagerPolicy is the name of the policy to use.
 	// Policies other than "none" require the TopologyManager feature gate to be enabled.
 	TopologyManagerPolicy string
@@ -382,6 +385,12 @@ type KubeletConfiguration struct {
 	// Defaults to 10 seconds, requires GracefulNodeShutdown feature gate to be enabled.
 	// For example, if ShutdownGracePeriod=30s, and ShutdownGracePeriodCriticalPods=10s, during a node shutdown the first 20 seconds would be reserved for gracefully terminating normal pods, and the last 10 seconds would be reserved for terminating critical pods.
 	ShutdownGracePeriodCriticalPods metav1.Duration
+	// A comma separated list of bracket-enclosed configurations for memory manager.
+	// Each configuration describes pre-reserved memory for the particular memory type on a specific NUMA node.
+	// The Memory Manager validates whether total amount of pre-reserved memory is identical to reserved-memory by the Node Allocatable feature.
+	// The format is {numa-node=integer, memory-type=string, limit=string}
+	// (e.g. {numa-node=0, type=memory, limit=1Gi}, {numa-node=1, type=memory, limit=1Gi})
+	ReservedMemory []map[string]string
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
