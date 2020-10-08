@@ -204,6 +204,9 @@ func startMasterOrDie(masterConfig *controlplane.Config, incomingServer *httptes
 		)
 	}
 
+	if masterConfig.ExtraConfig.ServiceIPRange.IP == nil {
+		masterConfig.ExtraConfig.ServiceIPRange = net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(24, 32)}
+	}
 	m, err = masterConfig.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		// We log the error first so that even if closeFn crashes, the error is shown
