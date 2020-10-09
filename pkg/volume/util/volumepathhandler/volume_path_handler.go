@@ -23,8 +23,8 @@ import (
 	"path/filepath"
 
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 
 	"k8s.io/apimachinery/pkg/types"
 )

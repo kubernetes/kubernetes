@@ -14,6 +14,20 @@ type NamedSubModuleStatus struct {
 	SubModuleStatus
 }
 
+type ClusterHealthNode struct {
+	NodeID     string `json:"nodeID"`
+	NodeName   string `json:"nodeName"`
+	Submodules struct {
+		DirectFSInitiator SubModuleStatus `json:"directfs_initiator"`
+		Director          SubModuleStatus `json:"director"`
+		KV                SubModuleStatus `json:"kv"`
+		KVWrite           SubModuleStatus `json:"kv_write"`
+		NATS              SubModuleStatus `json:"nats"`
+		Presentation      SubModuleStatus `json:"presentation"`
+		RDB               SubModuleStatus `json:"rdb"`
+	} `json:"submodules"`
+}
+
 type CPHealthStatus struct {
 	KV        SubModuleStatus
 	KVWrite   SubModuleStatus

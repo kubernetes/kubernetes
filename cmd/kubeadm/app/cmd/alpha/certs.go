@@ -90,8 +90,8 @@ var (
 `)
 )
 
-// newCmdCertsUtility returns main command for certs phase
-func newCmdCertsUtility(out io.Writer) *cobra.Command {
+// NewCmdCertsUtility returns main command for certs phase
+func NewCmdCertsUtility(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "certs",
 		Aliases: []string{"certificates"},
@@ -286,6 +286,7 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 					return err
 				}
 			}
+			fmt.Printf("\nDone renewing certificates. You must restart the kube-apiserver, kube-controller-manager, kube-scheduler and etcd, so that they can use the new certificates.\n")
 			return nil
 		},
 		Args: cobra.NoArgs,

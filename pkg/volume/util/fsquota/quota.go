@@ -17,7 +17,7 @@ limitations under the License.
 package fsquota
 
 import (
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"

@@ -60,7 +60,7 @@ type ScaleStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.8
 // +k8s:prerelease-lifecycle-gen:deprecated=1.9
-// +k8s:prerelease-lifecycle-gen:removed=1.18
+// +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=autoscaling,v1,Scale
 
 // Scale represents a scaling request for a resource.
@@ -85,7 +85,7 @@ type Scale struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.8
 // +k8s:prerelease-lifecycle-gen:deprecated=1.9
-// +k8s:prerelease-lifecycle-gen:removed=1.18
+// +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,StatefulSet
 
 // DEPRECATED - This group version of StatefulSet is deprecated by apps/v1/StatefulSet. See the release notes for
@@ -292,7 +292,7 @@ type StatefulSetCondition struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.8
 // +k8s:prerelease-lifecycle-gen:deprecated=1.9
-// +k8s:prerelease-lifecycle-gen:removed=1.18
+// +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,StatefulSetList
 
 // StatefulSetList is a collection of StatefulSets.
@@ -307,7 +307,7 @@ type StatefulSetList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.8
 // +k8s:prerelease-lifecycle-gen:deprecated=1.9
-// +k8s:prerelease-lifecycle-gen:removed=1.18
+// +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,Deployment
 
 // DEPRECATED - This group version of Deployment is deprecated by apps/v1/Deployment. See the release notes for
@@ -510,7 +510,7 @@ type DeploymentCondition struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.8
 // +k8s:prerelease-lifecycle-gen:deprecated=1.9
-// +k8s:prerelease-lifecycle-gen:removed=1.18
+// +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,DeploymentList
 
 // DeploymentList is a list of Deployments.
@@ -681,7 +681,7 @@ type DaemonSetCondition struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.8
 // +k8s:prerelease-lifecycle-gen:deprecated=1.9
-// +k8s:prerelease-lifecycle-gen:removed=1.18
+// +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,DaemonSet
 
 // DEPRECATED - This group version of DaemonSet is deprecated by apps/v1/DaemonSet. See the release notes for
@@ -718,7 +718,7 @@ const (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.8
 // +k8s:prerelease-lifecycle-gen:deprecated=1.9
-// +k8s:prerelease-lifecycle-gen:removed=1.18
+// +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,DaemonSetList
 
 // DaemonSetList is a collection of daemon sets.
@@ -737,7 +737,7 @@ type DaemonSetList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.8
 // +k8s:prerelease-lifecycle-gen:deprecated=1.9
-// +k8s:prerelease-lifecycle-gen:removed=1.18
+// +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,ReplicaSet
 
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1/ReplicaSet. See the release notes for
@@ -769,7 +769,7 @@ type ReplicaSet struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.8
 // +k8s:prerelease-lifecycle-gen:deprecated=1.9
-// +k8s:prerelease-lifecycle-gen:removed=1.18
+// +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,ReplicaSetList
 
 // ReplicaSetList is a collection of ReplicaSets.
@@ -873,7 +873,7 @@ type ReplicaSetCondition struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.8
 // +k8s:prerelease-lifecycle-gen:deprecated=1.9
-// +k8s:prerelease-lifecycle-gen:removed=1.18
+// +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,ControllerRevision
 
 // DEPRECATED - This group version of ControllerRevision is deprecated by apps/v1/ControllerRevision. See the
@@ -904,7 +904,7 @@ type ControllerRevision struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.8
 // +k8s:prerelease-lifecycle-gen:deprecated=1.9
-// +k8s:prerelease-lifecycle-gen:removed=1.18
+// +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=apps,v1,ControllerRevisionList
 
 // ControllerRevisionList is a resource containing a list of ControllerRevision objects.

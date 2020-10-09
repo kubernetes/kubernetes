@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
+	v1 "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota/v1"
 	"k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota/validation"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
@@ -35,6 +36,8 @@ import (
 
 // PluginName is a string with the name of the plugin
 const PluginName = "ResourceQuota"
+
+var namespaceGVK = v1.SchemeGroupVersion.WithKind("Namespace").GroupKind()
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
@@ -136,9 +139,13 @@ func (a *QuotaAdmission) Validate(ctx context.Context, attr admission.Attributes
 	if attr.GetSubresource() != "" {
 		return nil
 	}
-	// ignore all operations that are not namespaced
-	if attr.GetNamespace() == "" {
+	// ignore all operations that are not namespaced or creation of namespaces
+	if attr.GetNamespace() == "" || isNamespaceCreation(attr) {
 		return nil
 	}
 	return a.evaluator.Evaluate(attr)
+}
+
+func isNamespaceCreation(attr admission.Attributes) bool {
+	return attr.GetOperation() == admission.Create && attr.GetKind().GroupKind() == namespaceGVK
 }

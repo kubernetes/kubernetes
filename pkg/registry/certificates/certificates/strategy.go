@@ -165,7 +165,7 @@ func (csrStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	populateConditionTimestamps(newCSR, oldCSR)
 }
 
-// preserveConditionInstances copies instances of the the specified condition type from oldCSR to newCSR.
+// preserveConditionInstances copies instances of the specified condition type from oldCSR to newCSR.
 // or returns false if the newCSR added or removed instances
 func preserveConditionInstances(newCSR, oldCSR *certificates.CertificateSigningRequest, conditionType certificates.RequestConditionType) bool {
 	oldIndices := findConditionIndices(oldCSR, conditionType)

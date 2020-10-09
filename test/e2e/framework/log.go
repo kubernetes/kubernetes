@@ -42,16 +42,11 @@ func Logf(format string, args ...interface{}) {
 	log("INFO", format, args...)
 }
 
-// Failf logs the fail info, including a stack trace.
+// Failf logs the fail info, including a stack trace starts at 2 levels above its caller
+// (for example, for call chain f -> g -> Failf("foo", ...) error would be logged for "f").
 func Failf(format string, args ...interface{}) {
-	FailfWithOffset(1, format, args...)
-}
-
-// FailfWithOffset calls "Fail" and logs the error with a stack trace that starts at "offset" levels above its caller
-// (for example, for call chain f -> g -> FailfWithOffset(1, ...) error would be logged for "f").
-func FailfWithOffset(offset int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	skip := offset + 1
+	skip := 2
 	log("FAIL", "%s\n\nFull Stack Trace\n%s", msg, PrunedStack(skip))
 	e2eginkgowrapper.Fail(nowStamp()+": "+msg, skip)
 }

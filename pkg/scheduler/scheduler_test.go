@@ -235,7 +235,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			expectErrorPod:   podWithID("foo", testNode.Name),
 			expectForgetPod:  podWithID("foo", testNode.Name),
 			expectAssumedPod: podWithID("foo", testNode.Name),
-			expectError:      errors.New(`error while running Reserve in "FakeReserve" reserve plugin for pod "foo": reserve error`),
+			expectError:      fmt.Errorf(`running Reserve plugin "FakeReserve": %w`, errors.New("reserve error")),
 			eventReason:      "FailedScheduling",
 		},
 		{
@@ -248,7 +248,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			expectErrorPod:   podWithID("foo", testNode.Name),
 			expectForgetPod:  podWithID("foo", testNode.Name),
 			expectAssumedPod: podWithID("foo", testNode.Name),
-			expectError:      errors.New(`error while running "FakePermit" permit plugin for pod "foo": permit error`),
+			expectError:      fmt.Errorf(`running Permit plugin "FakePermit": %w`, errors.New("permit error")),
 			eventReason:      "FailedScheduling",
 		},
 		{
@@ -261,7 +261,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			expectErrorPod:   podWithID("foo", testNode.Name),
 			expectForgetPod:  podWithID("foo", testNode.Name),
 			expectAssumedPod: podWithID("foo", testNode.Name),
-			expectError:      fmt.Errorf(`error while running "FakePreBind" prebind plugin for pod "foo": %w`, preBindErr),
+			expectError:      fmt.Errorf(`running PreBind plugin "FakePreBind": %w`, preBindErr),
 			eventReason:      "FailedScheduling",
 		},
 		{
@@ -287,7 +287,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			expectBind:       &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
 			expectAssumedPod: podWithID("foo", testNode.Name),
 			injectBindError:  errB,
-			expectError:      errors.New("Binding rejected: plugin \"DefaultBinder\" failed to bind pod \"/foo\": binder"),
+			expectError:      errors.New(`Binding rejected: running Bind plugin "DefaultBinder": binder`),
 			expectErrorPod:   podWithID("foo", testNode.Name),
 			expectForgetPod:  podWithID("foo", testNode.Name),
 			eventReason:      "FailedScheduling",
@@ -964,7 +964,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 			},
 			expectAssumeCalled: true,
 			eventReason:        "FailedScheduling",
-			expectError:        fmt.Errorf("error while running Reserve in %q reserve plugin for pod %q: %v", volumebinding.Name, "foo", assumeErr),
+			expectError:        fmt.Errorf("running Reserve plugin %q: %w", volumebinding.Name, assumeErr),
 		},
 		{
 			name: "bind error",
@@ -974,7 +974,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 			expectAssumeCalled: true,
 			expectBindCalled:   true,
 			eventReason:        "FailedScheduling",
-			expectError:        fmt.Errorf("error while running %q prebind plugin for pod %q: %v", volumebinding.Name, "foo", bindErr),
+			expectError:        fmt.Errorf("running PreBind plugin %q: %w", volumebinding.Name, bindErr),
 		},
 	}
 

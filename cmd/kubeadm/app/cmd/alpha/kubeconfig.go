@@ -19,9 +19,8 @@ package alpha
 import (
 	"io"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -39,8 +38,8 @@ var (
 	` + cmdutil.AlphaDisclaimer)
 
 	userKubeconfigExample = cmdutil.Examples(`
-	# Output a kubeconfig file for an additional user named foo
-	kubeadm alpha kubeconfig user --client-name=foo
+	# Output a kubeconfig file for an additional user named foo using a kubeadm config file bar
+	kubeadm alpha kubeconfig user --client-name=foo --config=bar
 	`)
 )
 
@@ -62,12 +61,10 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 	initCfg := &kubeadmapiv1beta2.InitConfiguration{}
 	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{}
 
-	// Default values for the cobra help text
-	kubeadmscheme.Scheme.Default(initCfg)
-	kubeadmscheme.Scheme.Default(clusterCfg)
-
-	var token, clientName string
-	var organizations []string
+	var (
+		token, clientName, cfgPath string
+		organizations              []string
+	)
 
 	// Creates the UX Command
 	cmd := &cobra.Command{
@@ -76,39 +73,31 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 		Long:    userKubeconfigLongDesc,
 		Example: userKubeconfigExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if clientName == "" {
-				return errors.New("missing required argument --client-name")
-			}
-
 			// This call returns the ready-to-use configuration based on the defaults populated by flags
-			internalcfg, err := configutil.DefaultedInitConfiguration(initCfg, clusterCfg)
+			internalCfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg)
 			if err != nil {
 				return err
 			}
 
 			// if the kubeconfig file for an additional user has to use a token, use it
 			if token != "" {
-				return kubeconfigphase.WriteKubeConfigWithToken(out, internalcfg, clientName, token)
+				return kubeconfigphase.WriteKubeConfigWithToken(out, internalCfg, clientName, token)
 			}
 
 			// Otherwise, write a kubeconfig file with a generate client cert
-			return kubeconfigphase.WriteKubeConfigWithClientCert(out, internalcfg, clientName, organizations)
+			return kubeconfigphase.WriteKubeConfigWithClientCert(out, internalCfg, clientName, organizations)
 		},
 		Args: cobra.NoArgs,
 	}
 
-	// Add ClusterConfiguration backed flags to the command
-	cmd.Flags().StringVar(&clusterCfg.CertificatesDir, options.CertificatesDir, clusterCfg.CertificatesDir, "The path where certificates are stored")
-	cmd.Flags().StringVar(&clusterCfg.ClusterName, "cluster-name", clusterCfg.ClusterName, "Cluster name to be used in kubeconfig")
-
-	// Add InitConfiguration backed flags to the command
-	cmd.Flags().StringVar(&initCfg.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, initCfg.LocalAPIEndpoint.AdvertiseAddress, "The IP address the API server is accessible on")
-	cmd.Flags().Int32Var(&initCfg.LocalAPIEndpoint.BindPort, options.APIServerBindPort, initCfg.LocalAPIEndpoint.BindPort, "The port the API server is accessible on")
+	options.AddConfigFlag(cmd.Flags(), &cfgPath)
 
 	// Add command specific flags
 	cmd.Flags().StringVar(&token, options.TokenStr, token, "The token that should be used as the authentication mechanism for this kubeconfig, instead of client certificates")
 	cmd.Flags().StringVar(&clientName, "client-name", clientName, "The name of user. It will be used as the CN if client certificates are created")
 	cmd.Flags().StringSliceVar(&organizations, "org", organizations, "The orgnizations of the client certificate. It will be used as the O if client certificates are created")
 
+	cmd.MarkFlagRequired(options.CfgPath)
+	cmd.MarkFlagRequired("client-name")
 	return cmd
 }

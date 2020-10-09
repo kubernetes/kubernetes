@@ -1640,6 +1640,17 @@ rules:
       branch: master
       dir: staging/src/k8s.io/controller-manager
     name: master
+    dependencies:
+      - repository: api
+        branch: master
+      - repository: apimachinery
+        branch: master
+      - repository: apiserver
+        branch: master
+      - repository: client-go
+        branch: master
+      - repository: component-base
+        branch: master
   - source:
       branch: release-1.19
       dir: staging/src/k8s.io/controller-manager

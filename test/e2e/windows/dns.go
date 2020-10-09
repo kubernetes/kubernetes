@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 )
@@ -45,7 +44,7 @@ var _ = SIGDescribe("DNS", func() {
 		testSearchPath := "resolv.conf.local"
 
 		ginkgo.By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
-		testUtilsPod := generateDNSUtilsPod()
+		testUtilsPod := e2epod.NewAgnhostPod(f.Namespace.Name, "e2e-dns-utils", nil, nil, nil)
 		testUtilsPod.Spec.DNSPolicy = v1.DNSNone
 		testUtilsPod.Spec.DNSConfig = &v1.PodDNSConfig{
 			Nameservers: []string{testInjectedIP},
@@ -68,7 +67,7 @@ var _ = SIGDescribe("DNS", func() {
 			Command:       cmd,
 			Namespace:     f.Namespace.Name,
 			PodName:       testUtilsPod.Name,
-			ContainerName: "util",
+			ContainerName: "agnhost-container",
 			CaptureStdout: true,
 			CaptureStderr: true,
 		})
@@ -90,23 +89,3 @@ var _ = SIGDescribe("DNS", func() {
 		// TODO: Add more test cases for other DNSPolicies.
 	})
 })
-
-func generateDNSUtilsPod() *v1.Pod {
-	return &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "Pod",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "e2e-dns-utils-",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    "util",
-					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
-					Command: []string{"sleep", "10000"},
-				},
-			},
-		},
-	}
-}

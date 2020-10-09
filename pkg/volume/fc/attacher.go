@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -164,6 +164,11 @@ func (detacher *fcDetacher) UnmountDevice(deviceMountPath string) error {
 	err = mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false)
 	if err != nil {
 		return fmt.Errorf("fc: failed to unmount: %s\nError: %v", deviceMountPath, err)
+	}
+	// GetDeviceNameFromMount from above returns an empty string if deviceMountPath is not a mount point
+	// There is no need to DetachDisk if this is the case (and DetachDisk will throw an error if we attempt)
+	if devName == "" {
+		return nil
 	}
 	unMounter := volumeSpecToUnmounter(detacher.mounter)
 	err = detacher.manager.DetachDisk(*unMounter, devName)

@@ -34,8 +34,8 @@ import (
 	cgroupfs2 "github.com/opencontainers/runc/libcontainer/cgroups/fs2"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	utilio "k8s.io/utils/io"
-	"k8s.io/utils/mount"
 	utilpath "k8s.io/utils/path"
 
 	v1 "k8s.io/api/core/v1"

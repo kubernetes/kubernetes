@@ -233,7 +233,7 @@ autoload -U +X bashcompinit && bashcompinit
 # use word boundary patterns for BSD or GNU sed
 LWORD='[[:<:]]'
 RWORD='[[:>:]]'
-if sed --help 2>&1 | grep -q 'GNU\|BusyBox'; then
+if sed --version 2>&1 | grep -q GNU; then
 	LWORD='\<'
 	RWORD='\>'
 fi

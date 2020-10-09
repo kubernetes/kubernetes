@@ -269,4 +269,7 @@ type ListOptions struct {
 	ResourceVersionMatch metav1.ResourceVersionMatch
 	// Predicate provides the selection rules for the list operation.
 	Predicate SelectionPredicate
+	// ProgressNotify determines whether storage-originated bookmark (progress notify) events should
+	// be delivered to the users. The option is ignored for non-watch requests.
+	ProgressNotify bool
 }

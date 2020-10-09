@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/pkg/errors"
 	"k8s.io/client-go/util/keyutil"
@@ -30,6 +31,12 @@ import (
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+)
+
+var (
+	// certPeriodValidation is used to store if period validation was done for a certificate
+	certPeriodValidationMutex sync.Mutex
+	certPeriodValidation      = map[string]struct{}{}
 )
 
 // CreatePKIAssets will create and write to disk all PKI assets necessary to establish the control plane.
@@ -166,6 +173,8 @@ func LoadCertificateAuthority(pkiDir string, baseName string) (*x509.Certificate
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "failure loading %s certificate authority", baseName)
 	}
+	// Validate period
+	CheckCertificatePeriodValidity(baseName, caCert)
 
 	// Make sure the loaded CA cert actually is a CA
 	if !caCert.IsCA {
@@ -189,6 +198,8 @@ func writeCertificateAuthorityFilesIfNotExist(pkiDir string, baseName string, ca
 		if err != nil {
 			return errors.Wrapf(err, "failure loading %s certificate", baseName)
 		}
+		// Validate period
+		CheckCertificatePeriodValidity(baseName, caCert)
 
 		// Check if the existing cert is a CA
 		if !caCert.IsCA {
@@ -223,6 +234,8 @@ func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert
 		if err != nil {
 			return errors.Wrapf(err, "failure loading %s certificate", baseName)
 		}
+		// Validate period
+		CheckCertificatePeriodValidity(baseName, signedCert)
 
 		// Check if the existing cert is signed by the given CA
 		if err := signedCert.CheckSignatureFrom(signingCert); err != nil {
@@ -286,6 +299,7 @@ type certKeyLocation struct {
 
 // SharedCertificateExists verifies if the shared certificates - the certificates that must be
 // equal across control-plane nodes: ca.key, ca.crt, sa.key, sa.pub + etcd/ca.key, etcd/ca.crt if local/stacked etcd
+// Missing keys are non-fatal and produce warnings.
 func SharedCertificateExists(cfg *kubeadmapi.ClusterConfiguration) (bool, error) {
 
 	if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
@@ -364,6 +378,8 @@ func validateCACert(l certKeyLocation) error {
 	if err != nil {
 		return errors.Wrapf(err, "failure loading certificate for %s", l.uxName)
 	}
+	// Validate period
+	CheckCertificatePeriodValidity(l.uxName, caCert)
 
 	// Check if cert is a CA
 	if !caCert.IsCA {
@@ -373,7 +389,7 @@ func validateCACert(l certKeyLocation) error {
 }
 
 // validateCACertAndKey tries to load a x509 certificate and private key from pkiDir,
-// and validates that the cert is a CA
+// and validates that the cert is a CA. Failure to load the key produces a warning.
 func validateCACertAndKey(l certKeyLocation) error {
 	if err := validateCACert(l); err != nil {
 		return err
@@ -381,7 +397,7 @@ func validateCACertAndKey(l certKeyLocation) error {
 
 	_, err := pkiutil.TryLoadKeyFromDisk(l.pkiDir, l.caBaseName)
 	if err != nil {
-		return errors.Wrapf(err, "failure loading key for %s", l.uxName)
+		klog.Warningf("assuming external key for %s: %v", l.uxName, err)
 	}
 	return nil
 }
@@ -394,6 +410,8 @@ func validateSignedCert(l certKeyLocation) error {
 	if err != nil {
 		return errors.Wrapf(err, "failure loading certificate authority for %s", l.uxName)
 	}
+	// Validate period
+	CheckCertificatePeriodValidity(l.uxName, caCert)
 
 	return validateSignedCertWithCA(l, caCert)
 }
@@ -405,6 +423,8 @@ func validateSignedCertWithCA(l certKeyLocation, caCert *x509.Certificate) error
 	if err != nil {
 		return errors.Wrapf(err, "failure loading certificate for %s", l.uxName)
 	}
+	// Validate period
+	CheckCertificatePeriodValidity(l.uxName, signedCert)
 
 	// Check if the cert is signed by the CA
 	if err := signedCert.CheckSignatureFrom(caCert); err != nil {
@@ -437,4 +457,22 @@ func validateCertificateWithConfig(cert *x509.Certificate, baseName string, cfg 
 		}
 	}
 	return nil
+}
+
+// CheckCertificatePeriodValidity takes a certificate and prints a warning if its period
+// is not valid related to the current time. It does so only if the certificate was not validated already
+// by keeping track with a cache.
+func CheckCertificatePeriodValidity(baseName string, cert *x509.Certificate) {
+	certPeriodValidationMutex.Lock()
+	if _, exists := certPeriodValidation[baseName]; exists {
+		certPeriodValidationMutex.Unlock()
+		return
+	}
+	certPeriodValidation[baseName] = struct{}{}
+	certPeriodValidationMutex.Unlock()
+
+	klog.V(5).Infof("validating certificate period for %s certificate", baseName)
+	if err := pkiutil.ValidateCertPeriod(cert, 0); err != nil {
+		klog.Warningf("WARNING: could not validate bounds for certificate %s: %v", baseName, err)
+	}
 }

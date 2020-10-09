@@ -136,7 +136,6 @@ pkg/registry/core/namespace/storage
 pkg/registry/core/node
 pkg/registry/core/persistentvolume
 pkg/registry/core/persistentvolumeclaim
-pkg/registry/core/replicationcontroller
 pkg/registry/core/replicationcontroller/storage
 pkg/registry/core/rest
 pkg/registry/core/secret
@@ -257,7 +256,6 @@ staging/src/k8s.io/apimachinery/pkg/apis/meta/v1beta1
 staging/src/k8s.io/apimachinery/pkg/apis/testapigroup
 staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/v1
 staging/src/k8s.io/apimachinery/pkg/conversion
-staging/src/k8s.io/apimachinery/pkg/labels
 staging/src/k8s.io/apimachinery/pkg/runtime
 staging/src/k8s.io/apimachinery/pkg/runtime/schema
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer
@@ -428,6 +426,7 @@ staging/src/k8s.io/component-base/cli/flag
 staging/src/k8s.io/component-base/config/v1alpha1
 staging/src/k8s.io/component-base/featuregate
 staging/src/k8s.io/component-base/version/verflag
+staging/src/k8s.io/controller-manager/pkg/features
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
 staging/src/k8s.io/kube-aggregator/pkg/apiserver

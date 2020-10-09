@@ -241,11 +241,11 @@ aliases:
     - derekwaynecarr
     - vishh
     - yujuhong
-    - dashpole
     - sjenning
+  # emeretus:
+  # - dashpole
   sig-node-reviewers:
     - Random-Liu
-    - dashpole
     - dchen1107
     - derekwaynecarr
     - dims

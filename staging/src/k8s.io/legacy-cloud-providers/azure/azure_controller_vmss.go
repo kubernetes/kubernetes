@@ -143,7 +143,11 @@ func (ss *scaleSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName
 			(disk.ManagedDisk != nil && diskURI != "" && strings.EqualFold(*disk.ManagedDisk.ID, diskURI)) {
 			// found the disk
 			klog.V(2).Infof("azureDisk - detach disk: name %q uri %q", diskName, diskURI)
-			disks[i].ToBeDetached = to.BoolPtr(true)
+			if strings.EqualFold(ss.cloud.Environment.Name, "AZURESTACKCLOUD") {
+				disks = append(disks[:i], disks[i+1:]...)
+			} else {
+				disks[i].ToBeDetached = to.BoolPtr(true)
+			}
 			bFoundDisk = true
 			break
 		}

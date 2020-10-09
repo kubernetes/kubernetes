@@ -43,8 +43,8 @@ import (
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/controller"
 
-	// add the kubernetes feature gates
-	_ "k8s.io/kubernetes/pkg/features"
+	// add the related feature gates
+	_ "k8s.io/controller-manager/pkg/features/register"
 )
 
 const (

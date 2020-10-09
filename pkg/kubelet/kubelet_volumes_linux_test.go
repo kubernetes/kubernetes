@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 func validateDirExists(dir string) error {

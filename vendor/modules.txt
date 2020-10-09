@@ -129,9 +129,9 @@ github.com/asaskevich/govalidator
 # github.com/auth0/go-jwt-middleware v0.0.0-20170425171159-5493cabe49f7 => github.com/auth0/go-jwt-middleware v0.0.0-20170425171159-5493cabe49f7
 ## explicit
 # github.com/auth0/go-jwt-middleware => github.com/auth0/go-jwt-middleware v0.0.0-20170425171159-5493cabe49f7
-# github.com/aws/aws-sdk-go v1.28.2 => github.com/aws/aws-sdk-go v1.28.2
+# github.com/aws/aws-sdk-go v1.35.5 => github.com/aws/aws-sdk-go v1.35.5
 ## explicit
-# github.com/aws/aws-sdk-go => github.com/aws/aws-sdk-go v1.28.2
+# github.com/aws/aws-sdk-go => github.com/aws/aws-sdk-go v1.35.5
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
 github.com/aws/aws-sdk-go/aws/awsutil
@@ -150,6 +150,7 @@ github.com/aws/aws-sdk-go/aws/endpoints
 github.com/aws/aws-sdk-go/aws/request
 github.com/aws/aws-sdk-go/aws/session
 github.com/aws/aws-sdk-go/aws/signer/v4
+github.com/aws/aws-sdk-go/internal/context
 github.com/aws/aws-sdk-go/internal/ini
 github.com/aws/aws-sdk-go/internal/sdkio
 github.com/aws/aws-sdk-go/internal/sdkmath
@@ -157,6 +158,7 @@ github.com/aws/aws-sdk-go/internal/sdkrand
 github.com/aws/aws-sdk-go/internal/sdkuri
 github.com/aws/aws-sdk-go/internal/shareddefaults
 github.com/aws/aws-sdk-go/internal/strings
+github.com/aws/aws-sdk-go/internal/sync/singleflight
 github.com/aws/aws-sdk-go/private/protocol
 github.com/aws/aws-sdk-go/private/protocol/ec2query
 github.com/aws/aws-sdk-go/private/protocol/json/jsonutil
@@ -408,7 +410,6 @@ github.com/go-bindata/go-bindata/go-bindata
 github.com/go-logr/logr
 # github.com/go-logr/logr => github.com/go-logr/logr v0.2.0
 # github.com/go-openapi/analysis v0.19.5 => github.com/go-openapi/analysis v0.19.5
-## explicit
 github.com/go-openapi/analysis
 # github.com/go-openapi/analysis => github.com/go-openapi/analysis v0.19.5
 github.com/go-openapi/analysis/internal
@@ -691,9 +692,10 @@ github.com/inconshreveable/mousetrap
 github.com/ishidawataru/sctp
 # github.com/ishidawataru/sctp => github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
 # github.com/jimstudt/http-authentication => github.com/jimstudt/http-authentication v0.0.0-20140401203705-3eca13d6893a
-# github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af => github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
+# github.com/jmespath/go-jmespath v0.4.0 => github.com/jmespath/go-jmespath v0.4.0
 github.com/jmespath/go-jmespath
-# github.com/jmespath/go-jmespath => github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
+# github.com/jmespath/go-jmespath => github.com/jmespath/go-jmespath v0.4.0
+# github.com/jmespath/go-jmespath/internal/testify => github.com/jmespath/go-jmespath/internal/testify v1.5.1
 # github.com/jonboulle/clockwork v0.1.0 => github.com/jonboulle/clockwork v0.1.0
 github.com/jonboulle/clockwork
 # github.com/jonboulle/clockwork => github.com/jonboulle/clockwork v0.1.0
@@ -1010,10 +1012,10 @@ github.com/spf13/pflag
 ## explicit
 github.com/spf13/viper
 # github.com/spf13/viper => github.com/spf13/viper v1.4.0
-# github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc => github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
+# github.com/storageos/go-api v2.2.0+incompatible => github.com/storageos/go-api v2.2.0+incompatible
 ## explicit
 github.com/storageos/go-api
-# github.com/storageos/go-api => github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
+# github.com/storageos/go-api => github.com/storageos/go-api v2.2.0+incompatible
 github.com/storageos/go-api/netutil
 github.com/storageos/go-api/serror
 github.com/storageos/go-api/types
@@ -1395,10 +1397,8 @@ google.golang.org/api/googleapi/transport
 google.golang.org/api/internal
 google.golang.org/api/internal/gensupport
 google.golang.org/api/internal/third_party/uritemplates
-google.golang.org/api/logging/v2beta1
 google.golang.org/api/monitoring/v3
 google.golang.org/api/option
-google.golang.org/api/pubsub/v1
 google.golang.org/api/tpu/v1
 google.golang.org/api/transport/http
 google.golang.org/api/transport/http/internal/propagation
@@ -2178,7 +2178,11 @@ k8s.io/component-base/metrics/testutil
 k8s.io/component-base/term
 k8s.io/component-base/version
 k8s.io/component-base/version/verflag
+# k8s.io/controller-manager v0.0.0 => ./staging/src/k8s.io/controller-manager
+## explicit
 # k8s.io/controller-manager => ./staging/src/k8s.io/controller-manager
+k8s.io/controller-manager/pkg/features
+k8s.io/controller-manager/pkg/features/register
 # k8s.io/cri-api v0.0.0 => ./staging/src/k8s.io/cri-api
 ## explicit
 # k8s.io/cri-api => ./staging/src/k8s.io/cri-api
@@ -2245,9 +2249,9 @@ k8s.io/kube-aggregator/pkg/registry/apiservice/rest
 ## explicit
 # k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
 k8s.io/kube-controller-manager/config/v1alpha1
-# k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6 => k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
+# k8s.io/kube-openapi v0.0.0-20200923155610-8b5066479488 => k8s.io/kube-openapi v0.0.0-20200923155610-8b5066479488
 ## explicit
-# k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
+# k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20200923155610-8b5066479488
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
 k8s.io/kube-openapi/pkg/aggregator
@@ -2361,6 +2365,7 @@ k8s.io/kubelet/config/v1beta1
 k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1
 k8s.io/kubelet/pkg/apis/pluginregistration/v1
 k8s.io/kubelet/pkg/apis/podresources/v1alpha1
+k8s.io/kubelet/pkg/apis/stats/v1alpha1
 # k8s.io/legacy-cloud-providers v0.0.0 => ./staging/src/k8s.io/legacy-cloud-providers
 ## explicit
 # k8s.io/legacy-cloud-providers => ./staging/src/k8s.io/legacy-cloud-providers
@@ -2429,6 +2434,9 @@ k8s.io/metrics/pkg/client/custom_metrics/fake
 k8s.io/metrics/pkg/client/custom_metrics/scheme
 k8s.io/metrics/pkg/client/external_metrics
 k8s.io/metrics/pkg/client/external_metrics/fake
+# k8s.io/mount-utils v0.0.0 => ./staging/src/k8s.io/mount-utils
+## explicit
+k8s.io/mount-utils
 # k8s.io/mount-utils => ./staging/src/k8s.io/mount-utils
 # k8s.io/sample-apiserver v0.0.0 => ./staging/src/k8s.io/sample-apiserver
 ## explicit
@@ -2459,9 +2467,9 @@ k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 # k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 # k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
-# k8s.io/system-validators v1.1.2 => k8s.io/system-validators v1.1.2
+# k8s.io/system-validators v1.2.0 => k8s.io/system-validators v1.2.0
 ## explicit
-# k8s.io/system-validators => k8s.io/system-validators v1.1.2
+# k8s.io/system-validators => k8s.io/system-validators v1.2.0
 k8s.io/system-validators/validators
 # k8s.io/utils v0.0.0-20200729134348-d5654de09c73 => k8s.io/utils v0.0.0-20200729134348-d5654de09c73
 ## explicit
@@ -2488,12 +2496,11 @@ k8s.io/utils/trace
 # modernc.org/strutil => modernc.org/strutil v1.0.0
 # modernc.org/xc => modernc.org/xc v1.0.0
 # rsc.io/pdf => rsc.io/pdf v0.1.1
-# sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.9 => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.9
-# sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.9
+# sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.12 => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.12
+# sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.12
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
 # sigs.k8s.io/kustomize v2.0.3+incompatible => sigs.k8s.io/kustomize v2.0.3+incompatible
-## explicit
 # sigs.k8s.io/kustomize => sigs.k8s.io/kustomize v2.0.3+incompatible
 sigs.k8s.io/kustomize/pkg/commands/build
 sigs.k8s.io/kustomize/pkg/constants
@@ -2517,8 +2524,8 @@ sigs.k8s.io/kustomize/pkg/transformers
 sigs.k8s.io/kustomize/pkg/transformers/config
 sigs.k8s.io/kustomize/pkg/transformers/config/defaultconfig
 sigs.k8s.io/kustomize/pkg/types
-# sigs.k8s.io/structured-merge-diff/v4 v4.0.1 => sigs.k8s.io/structured-merge-diff/v4 v4.0.1
-# sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.0.1
+# sigs.k8s.io/structured-merge-diff/v4 v4.0.2-0.20201001033253-b3cf1e8ff931 => sigs.k8s.io/structured-merge-diff/v4 v4.0.2-0.20201001033253-b3cf1e8ff931
+# sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.0.2-0.20201001033253-b3cf1e8ff931
 sigs.k8s.io/structured-merge-diff/v4/fieldpath
 sigs.k8s.io/structured-merge-diff/v4/merge
 sigs.k8s.io/structured-merge-diff/v4/schema

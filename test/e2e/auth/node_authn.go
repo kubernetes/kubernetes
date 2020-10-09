@@ -24,11 +24,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
@@ -93,19 +93,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 })
 
 func createNodeAuthTestPod(f *framework.Framework) *v1.Pod {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "test-node-authn-",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{{
-				Name:    "test-node-authn",
-				Image:   imageutils.GetE2EImage(imageutils.Agnhost),
-				Command: []string{"sleep", "3600"},
-			}},
-			RestartPolicy: v1.RestartPolicyNever,
-		},
-	}
-
+	pod := e2epod.NewAgnhostPod(f.Namespace.Name, "agnhost-pod", nil, nil, nil)
+	pod.ObjectMeta.GenerateName = "test-node-authn-"
 	return f.PodClient().CreateSync(pod)
 }

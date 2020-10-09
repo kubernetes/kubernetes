@@ -33,11 +33,11 @@ func GetNodenameForKernel(hostname string, hostDomainName string, setHostnameAsF
 	kernelHostname := hostname
 	// FQDN has to be 64 chars to fit in the Linux nodename kernel field (specification 64 chars and the null terminating char).
 	const fqdnMaxLen = 64
-	if len(hostDomainName) > 0 && setHostnameAsFQDN != nil && *setHostnameAsFQDN == true {
+	if len(hostDomainName) > 0 && setHostnameAsFQDN != nil && *setHostnameAsFQDN {
 		fqdn := fmt.Sprintf("%s.%s", hostname, hostDomainName)
 		// FQDN has to be shorter than hostnameMaxLen characters.
 		if len(fqdn) > fqdnMaxLen {
-			return "", fmt.Errorf("Failed to construct FQDN from pod hostname and cluster domain, FQDN %s is too long (%d characters is the max, %d characters requested)", fqdn, fqdnMaxLen, len(fqdn))
+			return "", fmt.Errorf("failed to construct FQDN from pod hostname and cluster domain, FQDN %s is too long (%d characters is the max, %d characters requested)", fqdn, fqdnMaxLen, len(fqdn))
 		}
 		kernelHostname = fqdn
 	}

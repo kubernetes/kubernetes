@@ -13,7 +13,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//vendor/k8s.io/utils/mount:go_default_library",
+        "//staging/src/k8s.io/mount-utils:go_default_library",
     ],
 )
 
@@ -34,5 +34,5 @@ go_test(
     name = "go_default_test",
     srcs = ["types_test.go"],
     embed = [":go_default_library"],
-    deps = ["//vendor/k8s.io/utils/mount:go_default_library"],
+    deps = ["//staging/src/k8s.io/mount-utils:go_default_library"],
 )

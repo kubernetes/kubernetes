@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/fake"
@@ -45,31 +46,171 @@ func TestNewEndpointSlice(t *testing.T) {
 	service := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
 		Spec: v1.ServiceSpec{
-			Ports:    []v1.ServicePort{{Port: 80}},
-			Selector: map[string]string{"foo": "bar"},
+			ClusterIP: "1.1.1.1",
+			Ports:     []v1.ServicePort{{Port: 80}},
+			Selector:  map[string]string{"foo": "bar"},
 		},
 	}
 
 	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
 	ownerRef := metav1.NewControllerRef(&service, gvk)
 
-	expectedSlice := discovery.EndpointSlice{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{
-				discovery.LabelServiceName: service.Name,
-				discovery.LabelManagedBy:   controllerName,
+	testCases := []struct {
+		name          string
+		updateSvc     func(svc v1.Service) v1.Service // given basic valid services, each test case can customize them
+		expectedSlice *discovery.EndpointSlice
+	}{
+		{
+			name: "Service without labels",
+			updateSvc: func(svc v1.Service) v1.Service {
+				return svc
 			},
-			GenerateName:    fmt.Sprintf("%s-", service.Name),
-			OwnerReferences: []metav1.OwnerReference{*ownerRef},
-			Namespace:       service.Namespace,
+			expectedSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						discovery.LabelServiceName: service.Name,
+						discovery.LabelManagedBy:   controllerName,
+					},
+					GenerateName:    fmt.Sprintf("%s-", service.Name),
+					OwnerReferences: []metav1.OwnerReference{*ownerRef},
+					Namespace:       service.Namespace,
+				},
+				Ports:       endpointMeta.Ports,
+				AddressType: endpointMeta.AddressType,
+				Endpoints:   []discovery.Endpoint{},
+			},
 		},
-		Ports:       endpointMeta.Ports,
-		AddressType: endpointMeta.AddressType,
-		Endpoints:   []discovery.Endpoint{},
+		{
+			name: "Service with labels",
+			updateSvc: func(svc v1.Service) v1.Service {
+				labels := map[string]string{"foo": "bar"}
+				svc.Labels = labels
+				return svc
+			},
+			expectedSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						discovery.LabelServiceName: service.Name,
+						discovery.LabelManagedBy:   controllerName,
+						"foo":                      "bar",
+					},
+					GenerateName:    fmt.Sprintf("%s-", service.Name),
+					OwnerReferences: []metav1.OwnerReference{*ownerRef},
+					Namespace:       service.Namespace,
+				},
+				Ports:       endpointMeta.Ports,
+				AddressType: endpointMeta.AddressType,
+				Endpoints:   []discovery.Endpoint{},
+			},
+		},
+		{
+			name: "Headless Service with labels",
+			updateSvc: func(svc v1.Service) v1.Service {
+				labels := map[string]string{"foo": "bar"}
+				svc.Labels = labels
+				svc.Spec.ClusterIP = v1.ClusterIPNone
+				return svc
+			},
+			expectedSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						discovery.LabelServiceName: service.Name,
+						discovery.LabelManagedBy:   controllerName,
+						v1.IsHeadlessService:       "",
+						"foo":                      "bar",
+					},
+					GenerateName:    fmt.Sprintf("%s-", service.Name),
+					OwnerReferences: []metav1.OwnerReference{*ownerRef},
+					Namespace:       service.Namespace,
+				},
+				Ports:       endpointMeta.Ports,
+				AddressType: endpointMeta.AddressType,
+				Endpoints:   []discovery.Endpoint{},
+			},
+		},
+		{
+			name: "Service with multiple labels",
+			updateSvc: func(svc v1.Service) v1.Service {
+				labels := map[string]string{"foo": "bar", "foo2": "bar2"}
+				svc.Labels = labels
+				return svc
+			},
+			expectedSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						discovery.LabelServiceName: service.Name,
+						discovery.LabelManagedBy:   controllerName,
+						"foo":                      "bar",
+						"foo2":                     "bar2",
+					},
+					GenerateName:    fmt.Sprintf("%s-", service.Name),
+					OwnerReferences: []metav1.OwnerReference{*ownerRef},
+					Namespace:       service.Namespace,
+				},
+				Ports:       endpointMeta.Ports,
+				AddressType: endpointMeta.AddressType,
+				Endpoints:   []discovery.Endpoint{},
+			},
+		},
+		{
+			name: "Evil service hijacking endpoint slices labels",
+			updateSvc: func(svc v1.Service) v1.Service {
+				labels := map[string]string{
+					discovery.LabelServiceName: "bad",
+					discovery.LabelManagedBy:   "actor",
+					"foo":                      "bar",
+				}
+				svc.Labels = labels
+				return svc
+			},
+			expectedSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						discovery.LabelServiceName: service.Name,
+						discovery.LabelManagedBy:   controllerName,
+						"foo":                      "bar",
+					},
+					GenerateName:    fmt.Sprintf("%s-", service.Name),
+					OwnerReferences: []metav1.OwnerReference{*ownerRef},
+					Namespace:       service.Namespace,
+				},
+				Ports:       endpointMeta.Ports,
+				AddressType: endpointMeta.AddressType,
+				Endpoints:   []discovery.Endpoint{},
+			},
+		},
+		{
+			name: "Service with annotations",
+			updateSvc: func(svc v1.Service) v1.Service {
+				annotations := map[string]string{"foo": "bar"}
+				svc.Annotations = annotations
+				return svc
+			},
+			expectedSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						discovery.LabelServiceName: service.Name,
+						discovery.LabelManagedBy:   controllerName,
+					},
+					GenerateName:    fmt.Sprintf("%s-", service.Name),
+					OwnerReferences: []metav1.OwnerReference{*ownerRef},
+					Namespace:       service.Namespace,
+				},
+				Ports:       endpointMeta.Ports,
+				AddressType: endpointMeta.AddressType,
+				Endpoints:   []discovery.Endpoint{},
+			},
+		},
 	}
-	generatedSlice := newEndpointSlice(&service, &endpointMeta)
 
-	assert.EqualValues(t, expectedSlice, *generatedSlice)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := tc.updateSvc(service)
+			generatedSlice := newEndpointSlice(&svc, &endpointMeta)
+			assert.EqualValues(t, tc.expectedSlice, generatedSlice)
+		})
+	}
+
 }
 
 func TestPodToEndpoint(t *testing.T) {
@@ -386,6 +527,288 @@ func TestGetEndpointPorts(t *testing.T) {
 	}
 }
 
+func TestSetEndpointSliceLabels(t *testing.T) {
+
+	service := v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
+		Spec: v1.ServiceSpec{
+			Ports:     []v1.ServicePort{{Port: 80}},
+			Selector:  map[string]string{"foo": "bar"},
+			ClusterIP: "1.1.1.1",
+		},
+	}
+
+	testCases := []struct {
+		name           string
+		epSlice        *discovery.EndpointSlice
+		updateSvc      func(svc v1.Service) v1.Service // given basic valid services, each test case can customize them
+		expectedLabels map[string]string
+		expectedUpdate bool
+	}{
+		{
+			name:    "Service without labels and empty endpoint slice",
+			epSlice: &discovery.EndpointSlice{},
+			updateSvc: func(svc v1.Service) v1.Service {
+				return svc
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+			},
+			expectedUpdate: false,
+		},
+		{
+			name:    "Headless service with labels and empty endpoint slice",
+			epSlice: &discovery.EndpointSlice{},
+			updateSvc: func(svc v1.Service) v1.Service {
+				labels := map[string]string{"foo": "bar"}
+				svc.Spec.ClusterIP = v1.ClusterIPNone
+				svc.Labels = labels
+				return svc
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+				v1.IsHeadlessService:       "",
+				"foo":                      "bar",
+			},
+			expectedUpdate: true,
+		},
+		{
+			name:    "Headless service without labels and empty endpoint slice",
+			epSlice: &discovery.EndpointSlice{},
+			updateSvc: func(svc v1.Service) v1.Service {
+				svc.Spec.ClusterIP = v1.ClusterIPNone
+				return svc
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+				v1.IsHeadlessService:       "",
+			},
+			expectedUpdate: false,
+		},
+		{
+			name:    "Non Headless service with Headless label and empty endpoint slice",
+			epSlice: &discovery.EndpointSlice{},
+			updateSvc: func(svc v1.Service) v1.Service {
+				labels := map[string]string{v1.IsHeadlessService: ""}
+				svc.Labels = labels
+				return svc
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+			},
+			expectedUpdate: false,
+		},
+		{
+			name: "Headless Service change to ClusterIP Service with headless label",
+			epSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						discovery.LabelServiceName: service.Name,
+						discovery.LabelManagedBy:   controllerName,
+						v1.IsHeadlessService:       "",
+					},
+				},
+			},
+			updateSvc: func(svc v1.Service) v1.Service {
+				labels := map[string]string{v1.IsHeadlessService: ""}
+				svc.Labels = labels
+				return svc
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+			},
+			expectedUpdate: false,
+		},
+		{
+			name: "Headless Service change to ClusterIP Service",
+			epSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						discovery.LabelServiceName: service.Name,
+						discovery.LabelManagedBy:   controllerName,
+						v1.IsHeadlessService:       "",
+					},
+				},
+			},
+			updateSvc: func(svc v1.Service) v1.Service {
+				return svc
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+			},
+			expectedUpdate: false,
+		},
+		{
+			name: "Headless service and endpoint slice with same labels",
+			epSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						discovery.LabelServiceName: service.Name,
+						discovery.LabelManagedBy:   controllerName,
+						"foo":                      "bar",
+					},
+				},
+			}, updateSvc: func(svc v1.Service) v1.Service {
+				labels := map[string]string{"foo": "bar"}
+				svc.Spec.ClusterIP = v1.ClusterIPNone
+				svc.Labels = labels
+				return svc
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+				v1.IsHeadlessService:       "",
+				"foo":                      "bar",
+			},
+			expectedUpdate: false,
+		},
+		{
+			name:    "Service with labels and empty endpoint slice",
+			epSlice: &discovery.EndpointSlice{},
+			updateSvc: func(svc v1.Service) v1.Service {
+				labels := map[string]string{"foo": "bar"}
+				svc.Labels = labels
+				return svc
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+				"foo":                      "bar",
+			},
+			expectedUpdate: true,
+		},
+		{
+			name: "Slice with labels and service without labels",
+			epSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						discovery.LabelServiceName: service.Name,
+						discovery.LabelManagedBy:   controllerName,
+						"foo":                      "bar",
+					},
+				},
+			},
+			updateSvc: func(svc v1.Service) v1.Service {
+				return svc
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+			},
+			expectedUpdate: true,
+		},
+		{
+			name: "Slice with headless label and service with ClusterIP",
+			epSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						discovery.LabelServiceName: service.Name,
+						discovery.LabelManagedBy:   controllerName,
+						v1.IsHeadlessService:       "",
+					},
+				},
+			},
+			updateSvc: func(svc v1.Service) v1.Service {
+				return svc
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+			},
+			expectedUpdate: false,
+		},
+		{
+			name: "Slice with reserved labels and service with labels",
+			epSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						discovery.LabelServiceName: service.Name,
+						discovery.LabelManagedBy:   controllerName,
+					},
+				},
+			},
+			updateSvc: func(svc v1.Service) v1.Service {
+				labels := map[string]string{"foo": "bar"}
+				svc.Labels = labels
+				return svc
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+				"foo":                      "bar",
+			},
+			expectedUpdate: true,
+		},
+		{
+			name: "Evil service trying to hijack slice labels only well-known slice labels",
+			epSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						discovery.LabelServiceName: service.Name,
+						discovery.LabelManagedBy:   controllerName,
+					},
+				},
+			},
+			updateSvc: func(svc v1.Service) v1.Service {
+				labels := map[string]string{
+					discovery.LabelServiceName: "bad",
+					discovery.LabelManagedBy:   "actor",
+					v1.IsHeadlessService:       "invalid",
+				}
+				svc.Labels = labels
+				return svc
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+			},
+			expectedUpdate: false,
+		},
+		{
+			name: "Evil service trying to hijack slice labels with updates",
+			epSlice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						discovery.LabelServiceName: service.Name,
+						discovery.LabelManagedBy:   controllerName,
+					},
+				},
+			},
+			updateSvc: func(svc v1.Service) v1.Service {
+				labels := map[string]string{
+					discovery.LabelServiceName: "bad",
+					discovery.LabelManagedBy:   "actor",
+					"foo":                      "bar",
+				}
+				svc.Labels = labels
+				return svc
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelServiceName: service.Name,
+				discovery.LabelManagedBy:   controllerName,
+				"foo":                      "bar",
+			},
+			expectedUpdate: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := tc.updateSvc(service)
+			labels, updated := setEndpointSliceLabels(tc.epSlice, &svc)
+			assert.EqualValues(t, updated, tc.expectedUpdate)
+			assert.EqualValues(t, tc.expectedLabels, labels)
+		})
+	}
+
+}
+
 // Test helpers
 
 func newPod(n int, namespace string, ready bool, nPorts int) *v1.Pod {
@@ -455,7 +878,11 @@ func newServiceAndEndpointMeta(name, namespace string) (v1.Service, endpointMeta
 	}
 
 	svc := v1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			UID:       types.UID(namespace + "-" + name),
+		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{{
 				TargetPort: portNameIntStr,
@@ -477,10 +904,14 @@ func newServiceAndEndpointMeta(name, namespace string) (v1.Service, endpointMeta
 }
 
 func newEmptyEndpointSlice(n int, namespace string, endpointMeta endpointMeta, svc v1.Service) *discovery.EndpointSlice {
+	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
+	ownerRef := metav1.NewControllerRef(&svc, gvk)
+
 	return &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s.%d", svc.Name, n),
-			Namespace: namespace,
+			Name:            fmt.Sprintf("%s-%d", svc.Name, n),
+			Namespace:       namespace,
+			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 		},
 		Ports:       endpointMeta.Ports,
 		AddressType: endpointMeta.AddressType,

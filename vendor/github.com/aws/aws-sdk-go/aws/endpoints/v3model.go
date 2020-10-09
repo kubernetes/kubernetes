@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+var regionValidationRegex = regexp.MustCompile(`^[[:alnum:]]([[:alnum:]\-]*[[:alnum:]])?$`)
+
 type partitions []partition
 
 func (ps partitions) EndpointFor(service, region string, opts ...func(*Options)) (ResolvedEndpoint, error) {
@@ -124,7 +126,7 @@ func (p partition) EndpointFor(service, region string, opts ...func(*Options)) (
 
 	defs := []endpoint{p.Defaults, s.Defaults}
 
-	return e.resolve(service, p.ID, region, p.DNSSuffix, defs, opt), nil
+	return e.resolve(service, p.ID, region, p.DNSSuffix, defs, opt)
 }
 
 func serviceList(ss services) []string {
@@ -233,7 +235,7 @@ func getByPriority(s []string, p []string, def string) string {
 	return s[0]
 }
 
-func (e endpoint) resolve(service, partitionID, region, dnsSuffix string, defs []endpoint, opts Options) ResolvedEndpoint {
+func (e endpoint) resolve(service, partitionID, region, dnsSuffix string, defs []endpoint, opts Options) (ResolvedEndpoint, error) {
 	var merged endpoint
 	for _, def := range defs {
 		merged.mergeIn(def)
@@ -260,6 +262,10 @@ func (e endpoint) resolve(service, partitionID, region, dnsSuffix string, defs [
 		region = signingRegion
 	}
 
+	if !validateInputRegion(region) {
+		return ResolvedEndpoint{}, fmt.Errorf("invalid region identifier format provided")
+	}
+
 	u := strings.Replace(hostname, "{service}", service, 1)
 	u = strings.Replace(u, "{region}", region, 1)
 	u = strings.Replace(u, "{dnsSuffix}", dnsSuffix, 1)
@@ -274,7 +280,7 @@ func (e endpoint) resolve(service, partitionID, region, dnsSuffix string, defs [
 		SigningName:        signingName,
 		SigningNameDerived: signingNameDerived,
 		SigningMethod:      getByPriority(e.SignatureVersions, signerPriority, defaultSigner),
-	}
+	}, nil
 }
 
 func getEndpointScheme(protocols []string, disableSSL bool) string {
@@ -339,3 +345,7 @@ const (
 	boxedFalse
 	boxedTrue
 )
+
+func validateInputRegion(region string) bool {
+	return regionValidationRegex.MatchString(region)
+}

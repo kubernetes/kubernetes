@@ -17,7 +17,6 @@ go_library(
         "//cmd/cloud-controller-manager/app/config:go_default_library",
         "//cmd/controller-manager/app/options:go_default_library",
         "//pkg/controller:go_default_library",
-        "//pkg/features:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
@@ -32,6 +31,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
+        "//staging/src/k8s.io/controller-manager/pkg/features/register:go_default_library",
     ],
 )
 

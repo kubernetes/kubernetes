@@ -64,6 +64,14 @@ func UnmarshalXML(v interface{}, d *xml.Decoder, wrapper string) error {
 // parse deserializes any value from the XMLNode. The type tag is used to infer the type, or reflect
 // will be used to determine the type from r.
 func parse(r reflect.Value, node *XMLNode, tag reflect.StructTag) error {
+	xml := tag.Get("xml")
+	if len(xml) != 0 {
+		name := strings.SplitAfterN(xml, ",", 2)[0]
+		if name == "-" {
+			return nil
+		}
+	}
+
 	rtype := r.Type()
 	if rtype.Kind() == reflect.Ptr {
 		rtype = rtype.Elem() // check kind of actual element type

@@ -81,8 +81,8 @@ func installFlex(c clientset.Interface, node *v1.Node, vendor, driver, filePath 
 			host, err = e2enode.GetInternalIP(node)
 		}
 	} else {
-		masterHostWithPort := framework.GetMasterHost()
-		hostName := getHostFromHostPort(masterHostWithPort)
+		instanceWithPort := framework.APIAddress()
+		hostName := getHostFromHostPort(instanceWithPort)
 		host = net.JoinHostPort(hostName, e2essh.SSHPort)
 	}
 
@@ -113,8 +113,8 @@ func uninstallFlex(c clientset.Interface, node *v1.Node, vendor, driver string) 
 			host, err = e2enode.GetInternalIP(node)
 		}
 	} else {
-		masterHostWithPort := framework.GetMasterHost()
-		hostName := getHostFromHostPort(masterHostWithPort)
+		instanceWithPort := framework.APIAddress()
+		hostName := getHostFromHostPort(instanceWithPort)
 		host = net.JoinHostPort(hostName, e2essh.SSHPort)
 	}
 

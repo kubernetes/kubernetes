@@ -42,6 +42,20 @@ kubectl port-forward deployment/mydeployment 5000 6000
 ---
 
 {% method %}
+## Pod in a Service
+
+Listen on port 8443 locally, forwarding to the targetPort of the service's port named "https" in a pod selected by the service
+{% sample lang="yaml" %}
+
+```bash
+kubectl port-forward service/myservice 8443:https
+```
+
+{% endmethod %}
+
+---
+
+{% method %}
 ## Different Local and Remote Ports
 
 Listen on port 8888 locally, forwarding to 5000 in the pod

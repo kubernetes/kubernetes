@@ -135,7 +135,7 @@ func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	o := NewDebugOptions(streams)
 
 	cmd := &cobra.Command{
-		Use:                   "debug NAME --image=image [ -- COMMAND [args...] ]",
+		Use:                   "debug (POD | TYPE[[.VERSION].GROUP]/NAME) --image=image [ -- COMMAND [args...] ]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Attach a debug container to a running pod"),
 		Long:                  debugLong,
@@ -160,7 +160,7 @@ func addDebugFlags(cmd *cobra.Command, opt *DebugOptions) {
 	cmd.Flags().StringToString("env", nil, i18n.T("Environment variables to set in the container."))
 	cmd.Flags().StringVar(&opt.Image, "image", opt.Image, i18n.T("Container image to use for debug container."))
 	cmd.MarkFlagRequired("image")
-	cmd.Flags().String("image-pull-policy", string(corev1.PullIfNotPresent), i18n.T("The image pull policy for the container."))
+	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server"))
 	cmd.Flags().BoolVarP(&opt.Interactive, "stdin", "i", opt.Interactive, i18n.T("Keep stdin open on the container(s) in the pod, even if nothing is attached."))
 	cmd.Flags().BoolVar(&opt.Quiet, "quiet", opt.Quiet, i18n.T("If true, suppress informational messages."))
 	cmd.Flags().BoolVar(&opt.SameNode, "same-node", opt.SameNode, i18n.T("When used with '--copy-to', schedule the copy of target Pod on the same node."))

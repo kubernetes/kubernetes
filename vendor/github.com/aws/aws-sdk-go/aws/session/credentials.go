@@ -3,6 +3,7 @@ package session
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -206,7 +207,14 @@ func credsFromAssumeRole(cfg aws.Config,
 		sharedCfg.RoleARN,
 		func(opt *stscreds.AssumeRoleProvider) {
 			opt.RoleSessionName = sharedCfg.RoleSessionName
-			opt.Duration = sessOpts.AssumeRoleDuration
+
+			if sessOpts.AssumeRoleDuration == 0 &&
+				sharedCfg.AssumeRoleDuration != nil &&
+				*sharedCfg.AssumeRoleDuration/time.Minute > 15 {
+				opt.Duration = *sharedCfg.AssumeRoleDuration
+			} else if sessOpts.AssumeRoleDuration != 0 {
+				opt.Duration = sessOpts.AssumeRoleDuration
+			}
 
 			// Assume role with external ID
 			if len(sharedCfg.ExternalID) > 0 {

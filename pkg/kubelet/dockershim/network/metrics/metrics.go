@@ -28,9 +28,11 @@ import (
 
 const (
 	// NetworkPluginOperationsKey is the key for operation count metrics.
-	NetworkPluginOperationsKey = "network_plugin_operations"
+	NetworkPluginOperationsKey = "network_plugin_operations_total"
 	// NetworkPluginOperationsLatencyKey is the key for the operation latency metrics.
 	NetworkPluginOperationsLatencyKey = "network_plugin_operations_duration_seconds"
+	// NetworkPluginOperationsErrorsKey is the key for the operations error metrics.
+	NetworkPluginOperationsErrorsKey = "network_plugin_operations_errors_total"
 
 	// Keep the "kubelet" subsystem for backward compatibility.
 	kubeletSubsystem = "kubelet"
@@ -49,6 +51,28 @@ var (
 		},
 		[]string{"operation_type"},
 	)
+
+	// NetworkPluginOperations collects operation counts by operation type.
+	NetworkPluginOperations = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeletSubsystem,
+			Name:           NetworkPluginOperationsKey,
+			Help:           "Cumulative number of network plugin operations by operation type.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_type"},
+	)
+
+	// NetworkPluginOperationsErrors collects operation errors by operation type.
+	NetworkPluginOperationsErrors = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeletSubsystem,
+			Name:           NetworkPluginOperationsErrorsKey,
+			Help:           "Cumulative number of network plugin operation errors by operation type.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_type"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -57,6 +81,8 @@ var registerMetrics sync.Once
 func Register() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(NetworkPluginOperationsLatency)
+		legacyregistry.MustRegister(NetworkPluginOperations)
+		legacyregistry.MustRegister(NetworkPluginOperationsErrors)
 	})
 }
 

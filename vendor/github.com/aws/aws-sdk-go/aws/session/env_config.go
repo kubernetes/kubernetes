@@ -148,6 +148,11 @@ type envConfig struct {
 	//
 	// AWS_S3_USE_ARN_REGION=true
 	S3UseARNRegion bool
+
+	// Specifies the alternative endpoint to use for EC2 IMDS.
+	//
+	// AWS_EC2_METADATA_SERVICE_ENDPOINT=http://[::1]
+	EC2IMDSEndpoint string
 }
 
 var (
@@ -210,6 +215,9 @@ var (
 	}
 	s3UseARNRegionEnvKey = []string{
 		"AWS_S3_USE_ARN_REGION",
+	}
+	ec2IMDSEndpointEnvKey = []string{
+		"AWS_EC2_METADATA_SERVICE_ENDPOINT",
 	}
 )
 
@@ -331,6 +339,8 @@ func envConfigLoad(enableSharedConfig bool) (envConfig, error) {
 				s3UseARNRegionEnvKey[0], s3UseARNRegion)
 		}
 	}
+
+	setFromEnvVal(&cfg.EC2IMDSEndpoint, ec2IMDSEndpointEnvKey)
 
 	return cfg, nil
 }

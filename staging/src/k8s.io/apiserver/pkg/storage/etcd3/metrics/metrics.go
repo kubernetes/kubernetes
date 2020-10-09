@@ -61,6 +61,14 @@ var (
 		},
 		[]string{"endpoint"},
 	)
+	etcdBookmarkCounts = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Name:           "etcd_bookmark_counts",
+			Help:           "Number of etcd bookmarks (progress notify events) split by kind.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -72,6 +80,7 @@ func Register() {
 		legacyregistry.MustRegister(etcdRequestLatency)
 		legacyregistry.MustRegister(objectCounts)
 		legacyregistry.MustRegister(dbTotalSize)
+		legacyregistry.MustRegister(etcdBookmarkCounts)
 	})
 }
 
@@ -83,6 +92,11 @@ func UpdateObjectCount(resourcePrefix string, count int64) {
 // RecordEtcdRequestLatency sets the etcd_request_duration_seconds metrics.
 func RecordEtcdRequestLatency(verb, resource string, startTime time.Time) {
 	etcdRequestLatency.WithLabelValues(verb, resource).Observe(sinceInSeconds(startTime))
+}
+
+// RecordEtcdBookmark updates the etcd_bookmark_counts metric.
+func RecordEtcdBookmark(resource string) {
+	etcdBookmarkCounts.WithLabelValues(resource).Inc()
 }
 
 // Reset resets the etcd_request_duration_seconds metric.

@@ -126,7 +126,7 @@ func TestSyncHandler(t *testing.T) {
 			informerFactory.Storage().V1().StorageClasses().Informer().GetIndexer().Add(tc.storageClass)
 		}
 		translator := csitrans.New()
-		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, storageClassInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator))
+		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, storageClassInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator), nil)
 		if err != nil {
 			t.Fatalf("error creating expand controller : %v", err)
 		}

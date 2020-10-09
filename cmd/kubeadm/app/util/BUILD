@@ -78,7 +78,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//cmd/kubeadm/app/util/apiclient:all-srcs",
-        "//cmd/kubeadm/app/util/audit:all-srcs",
         "//cmd/kubeadm/app/util/certs:all-srcs",
         "//cmd/kubeadm/app/util/config:all-srcs",
         "//cmd/kubeadm/app/util/crypto:all-srcs",
@@ -87,7 +86,6 @@ filegroup(
         "//cmd/kubeadm/app/util/image:all-srcs",
         "//cmd/kubeadm/app/util/initsystem:all-srcs",
         "//cmd/kubeadm/app/util/kubeconfig:all-srcs",
-        "//cmd/kubeadm/app/util/kustomize:all-srcs",
         "//cmd/kubeadm/app/util/output:all-srcs",
         "//cmd/kubeadm/app/util/patches:all-srcs",
         "//cmd/kubeadm/app/util/pkiutil:all-srcs",

@@ -344,6 +344,7 @@ func TestBuildTargetGroupName(t *testing.T) {
 		nodePort       int64
 		targetProtocol string
 		targetType     string
+		nlbConfig      nlbPortMapping
 	}
 	tests := []struct {
 		name      string
@@ -360,8 +361,9 @@ func TestBuildTargetGroupName(t *testing.T) {
 				nodePort:       8080,
 				targetProtocol: "TCP",
 				targetType:     "instance",
+				nlbConfig:      nlbPortMapping{},
 			},
-			want: "k8s-default-servicea-0aeb5b75af",
+			want: "k8s-default-servicea-7fa2e07508",
 		},
 		{
 			name:      "base case & clusterID changed",
@@ -372,8 +374,9 @@ func TestBuildTargetGroupName(t *testing.T) {
 				nodePort:       8080,
 				targetProtocol: "TCP",
 				targetType:     "instance",
+				nlbConfig:      nlbPortMapping{},
 			},
-			want: "k8s-default-servicea-5d3a0a69a8",
+			want: "k8s-default-servicea-719ee635da",
 		},
 		{
 			name:      "base case & serviceNamespace changed",
@@ -384,8 +387,9 @@ func TestBuildTargetGroupName(t *testing.T) {
 				nodePort:       8080,
 				targetProtocol: "TCP",
 				targetType:     "instance",
+				nlbConfig:      nlbPortMapping{},
 			},
-			want: "k8s-another-servicea-f3a3263315",
+			want: "k8s-another-servicea-f66e09847d",
 		},
 		{
 			name:      "base case & serviceName changed",
@@ -396,8 +400,9 @@ func TestBuildTargetGroupName(t *testing.T) {
 				nodePort:       8080,
 				targetProtocol: "TCP",
 				targetType:     "instance",
+				nlbConfig:      nlbPortMapping{},
 			},
-			want: "k8s-default-serviceb-9a3c03b25e",
+			want: "k8s-default-serviceb-196c19c881",
 		},
 		{
 			name:      "base case & servicePort changed",
@@ -408,8 +413,9 @@ func TestBuildTargetGroupName(t *testing.T) {
 				nodePort:       8080,
 				targetProtocol: "TCP",
 				targetType:     "instance",
+				nlbConfig:      nlbPortMapping{},
 			},
-			want: "k8s-default-servicea-6e07474ff4",
+			want: "k8s-default-servicea-06876706cb",
 		},
 		{
 			name:      "base case & nodePort changed",
@@ -420,8 +426,9 @@ func TestBuildTargetGroupName(t *testing.T) {
 				nodePort:       9090,
 				targetProtocol: "TCP",
 				targetType:     "instance",
+				nlbConfig:      nlbPortMapping{},
 			},
-			want: "k8s-default-servicea-6cb2d0201c",
+			want: "k8s-default-servicea-119f844ec0",
 		},
 		{
 			name:      "base case & targetProtocol changed",
@@ -432,8 +439,9 @@ func TestBuildTargetGroupName(t *testing.T) {
 				nodePort:       8080,
 				targetProtocol: "UDP",
 				targetType:     "instance",
+				nlbConfig:      nlbPortMapping{},
 			},
-			want: "k8s-default-servicea-70495e628e",
+			want: "k8s-default-servicea-3868761686",
 		},
 		{
 			name:      "base case & targetType changed",
@@ -444,8 +452,27 @@ func TestBuildTargetGroupName(t *testing.T) {
 				nodePort:       8080,
 				targetProtocol: "TCP",
 				targetType:     "ip",
+				nlbConfig:      nlbPortMapping{},
 			},
-			want: "k8s-default-servicea-fff6dd8028",
+			want: "k8s-default-servicea-0fa31f4b0f",
+		},
+		{
+			name:      "custom healthcheck config",
+			clusterID: "cluster-a",
+			args: args{
+				serviceName:    types.NamespacedName{Namespace: "default", Name: "service-a"},
+				servicePort:    80,
+				nodePort:       8080,
+				targetProtocol: "TCP",
+				targetType:     "ip",
+				nlbConfig: nlbPortMapping{
+					HealthCheckConfig: healthCheckConfig{
+						Protocol: "HTTP",
+						Interval: 10,
+					},
+				},
+			},
+			want: "k8s-default-servicea-4028e49618",
 		},
 	}
 	for _, tt := range tests {
@@ -453,7 +480,7 @@ func TestBuildTargetGroupName(t *testing.T) {
 			c := &Cloud{
 				tagging: awsTagging{ClusterID: tt.clusterID},
 			}
-			if got := c.buildTargetGroupName(tt.args.serviceName, tt.args.servicePort, tt.args.nodePort, tt.args.targetProtocol, tt.args.targetType); got != tt.want {
+			if got := c.buildTargetGroupName(tt.args.serviceName, tt.args.servicePort, tt.args.nodePort, tt.args.targetProtocol, tt.args.targetType, tt.args.nlbConfig); got != tt.want {
 				assert.Equal(t, tt.want, got)
 			}
 		})

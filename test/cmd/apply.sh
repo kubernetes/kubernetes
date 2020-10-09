@@ -159,7 +159,7 @@ __EOF__
   # Dry-run create the CR
   kubectl "${kube_flags[@]:?}" apply --dry-run=server -f hack/testdata/CRD/resource.yaml "${kube_flags[@]:?}"
   # Make sure that the CR doesn't exist
-  ! kubectl "${kube_flags[@]:?}" get resource/myobj || exit 1
+  ! kubectl "${kube_flags[@]:?}" get resource/myobj 2>/dev/null || exit 1
 
   # clean-up
   kubectl "${kube_flags[@]:?}" delete customresourcedefinition resources.mygroup.example.com
@@ -173,11 +173,8 @@ __EOF__
   kube::test::get_object_assert 'pods a -n nsb' "{{${id_field:?}}}" 'a'
   # apply b with namespace
   kubectl apply --namespace nsb --prune -l prune-group=true -f hack/testdata/prune/b.yaml "${kube_flags[@]:?}"
-  # check right pod exists
-  kube::test::get_object_assert 'pods b -n nsb' "{{${id_field:?}}}" 'b'
-  # check wrong pod doesn't exist
-  output_message=$(! kubectl get pods a -n nsb 2>&1 "${kube_flags[@]:?}")
-  kube::test::if_has_string "${output_message}" 'pods "a" not found'
+  # check right pod exists and wrong pod doesn't exist
+  kube::test::wait_object_assert 'pods -n nsb' "{{range.items}}{{${id_field:?}}}:{{end}}" 'b:'
 
   # cleanup
   kubectl delete pods b -n nsb
@@ -191,8 +188,7 @@ __EOF__
   # check right pod exists
   kube::test::get_object_assert 'pods a' "{{${id_field:?}}}" 'a'
   # check wrong pod doesn't exist
-  output_message=$(! kubectl get pods b -n nsb 2>&1 "${kube_flags[@]:?}")
-  kube::test::if_has_string "${output_message}" 'pods "b" not found'
+  kube::test::wait_object_assert 'pods -n nsb' "{{range.items}}{{${id_field:?}}}:{{end}}" ''
 
   # apply b
   kubectl apply -l prune-group=true -f hack/testdata/prune/b.yaml "${kube_flags[@]:?}"
@@ -254,11 +250,8 @@ __EOF__
   kube::test::get_object_assert 'pods b -n nsb' "{{${id_field:?}}}" 'b'
   # apply --prune must prune a
   kubectl apply --prune --all -f hack/testdata/prune/b.yaml
-  # check wrong pod doesn't exist
-  output_message=$(! kubectl get pods a -n nsb 2>&1 "${kube_flags[@]:?}")
-  kube::test::if_has_string "${output_message}" 'pods "a" not found'
-  # check right pod exists
-  kube::test::get_object_assert 'pods b -n nsb' "{{${id_field:?}}}" 'b'
+  # check wrong pod doesn't exist and right pod exists
+  kube::test::wait_object_assert 'pods -n nsb' "{{range.items}}{{${id_field:?}}}:{{end}}" 'b:'
 
   # cleanup
   kubectl delete ns nsb
@@ -471,7 +464,7 @@ __EOF__
   # Dry-run create the CR
   kubectl "${kube_flags[@]:?}" apply --server-side --dry-run=server -f hack/testdata/CRD/resource.yaml "${kube_flags[@]:?}"
   # Make sure that the CR doesn't exist
-  ! kubectl "${kube_flags[@]:?}" get resource/myobj || exit 1
+  ! kubectl "${kube_flags[@]:?}" get resource/myobj 2>/dev/null || exit 1
 
   # clean-up
   kubectl "${kube_flags[@]:?}" delete customresourcedefinition resources.mygroup.example.com

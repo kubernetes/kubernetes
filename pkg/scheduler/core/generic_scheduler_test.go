@@ -18,6 +18,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -512,7 +513,7 @@ func TestGenericScheduler(t *testing.T) {
 			nodes: []string{"2", "1"},
 			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 			name:  "test error with priority map",
-			wErr:  fmt.Errorf("error while running score plugin for pod \"2\": %+v", errPrioritize),
+			wErr:  fmt.Errorf("running Score plugins: %w", fmt.Errorf(`plugin "FalseMap" failed with: %w`, errPrioritize)),
 		},
 		{
 			name: "test podtopologyspread plugin - 2 nodes with maxskew=1",
@@ -721,7 +722,7 @@ func TestGenericScheduler(t *testing.T) {
 			nodes:         []string{"1", "2"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
 			expectedHosts: nil,
-			wErr:          fmt.Errorf(`prefilter plugin "FakePreFilter" failed for pod "test-prefilter": injected error status`),
+			wErr:          fmt.Errorf(`running PreFilter plugin "FakePreFilter": %w`, errors.New("injected error status")),
 		},
 	}
 	for _, test := range tests {

@@ -26,8 +26,8 @@ import (
 	"path/filepath"
 
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	"k8s.io/utils/keymutex"
-	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"

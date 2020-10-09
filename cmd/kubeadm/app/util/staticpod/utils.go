@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/kustomize"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
 )
 
@@ -148,38 +147,6 @@ func GetExtraParameters(overrides map[string]string, defaults map[string]string)
 		}
 	}
 	return command
-}
-
-// KustomizeStaticPod applies patches defined in kustomizeDir to a static Pod manifest
-func KustomizeStaticPod(pod *v1.Pod, kustomizeDir string) (*v1.Pod, error) {
-	// marshal the pod manifest into yaml
-	serialized, err := kubeadmutil.MarshalToYaml(pod, v1.SchemeGroupVersion)
-	if err != nil {
-		return pod, errors.Wrapf(err, "failed to marshal manifest to YAML")
-	}
-
-	km, err := kustomize.GetManager(kustomizeDir)
-	if err != nil {
-		return pod, errors.Wrapf(err, "failed to GetPatches from %q", kustomizeDir)
-	}
-
-	kustomized, err := km.Kustomize(serialized)
-	if err != nil {
-		return pod, errors.Wrap(err, "failed to kustomize static Pod manifest")
-	}
-
-	// unmarshal kustomized yaml back into a pod manifest
-	obj, err := kubeadmutil.UnmarshalFromYaml(kustomized, v1.SchemeGroupVersion)
-	if err != nil {
-		return pod, errors.Wrap(err, "failed to unmarshal kustomize manifest from YAML")
-	}
-
-	pod2, ok := obj.(*v1.Pod)
-	if !ok {
-		return pod, errors.Wrap(err, "kustomized manifest is not a valid Pod object")
-	}
-
-	return pod2, nil
 }
 
 // PatchStaticPod applies patches stored in patchesDir to a static Pod.

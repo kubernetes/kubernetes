@@ -167,13 +167,13 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 			expectVolumeToBeAttached(nodeName, volumePath)
 		}
 
-		ginkgo.By("Restarting kubelet on master node")
-		masterAddress := framework.GetMasterHost() + ":22"
-		err := restartKubelet(masterAddress)
-		framework.ExpectNoError(err, "Unable to restart kubelet on master node")
+		ginkgo.By("Restarting kubelet on instance node")
+		instanceAddress := framework.APIAddress() + ":22"
+		err := restartKubelet(instanceAddress)
+		framework.ExpectNoError(err, "Unable to restart kubelet on instance node")
 
-		ginkgo.By("Verifying the kubelet on master node is up")
-		err = waitForKubeletUp(masterAddress)
+		ginkgo.By("Verifying the kubelet on instance node is up")
+		err = waitForKubeletUp(instanceAddress)
 		framework.ExpectNoError(err)
 
 		for i, pod := range pods {

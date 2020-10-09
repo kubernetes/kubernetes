@@ -35,7 +35,7 @@ rules:
 - apiGroups: ["extensions", "networking.k8s.io"]
   resources: ["ingresses"]
   verbs: ["get", "list", "watch"]
-# For now, GLBC annotates ingress resources with various state and statuses: 
+# For now, GLBC annotates ingress resources with various state and statuses:
 # https://github.com/kubernetes/ingress-gce/blob/50d49b077d9ab4362a02fae05f94e433cd3f08dc/pkg/controller/controller.go#L579
 # TODO(rramkumar1): Remove unnecessary `update` permission once statuses are propagated through `ingresses/status`
 - apiGroups: ["extensions", "networking.k8s.io"]
@@ -44,12 +44,16 @@ rules:
 - apiGroups: ["extensions", "networking.k8s.io"]
   resources: ["ingresses/status"]
   verbs: ["update", "patch"]
-# GLBC ensures that the `cloud.google.com/backendconfigs` CRD exists in a desired state:
-# https://github.com/kubernetes/ingress-gce/blob/4918eb2f0f484f09ac9e5a975907a9b16ed2b344/cmd/glbc/main.go#L93
+# GLBC ensures that the `cloud.google.com/backendconfigs` and `networking.gke.io/servicenetworkendpointgroups` CRD exists in a desired state:
+# https://github.com/kubernetes/ingress-gce/blob/5c3fcb5845e74b92ea8bd52929b15fc5c9fa7970/cmd/glbc/main.go#L108
+# https://github.com/kubernetes/ingress-gce/blob/5c3fcb5845e74b92ea8bd52929b15fc5c9fa7970/cmd/glbc/main.go#L133
 # TODO(rramkumar1): https://github.com/kubernetes/ingress-gce/issues/744
 - apiGroups: ["apiextensions.k8s.io"]
   resources: ["customresourcedefinitions"]
   verbs: ["get", "list", "watch", "update", "create", "patch"]
 - apiGroups: ["cloud.google.com"]
   resources: ["backendconfigs"]
+  verbs: ["get", "list", "watch", "update", "create", "patch"]
+- apiGroups: ["networking.gke.io"]
+  resources: ["servicenetworkendpointgroups"]
   verbs: ["get", "list", "watch", "update", "create", "patch"]

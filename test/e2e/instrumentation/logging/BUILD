@@ -19,7 +19,6 @@ go_library(
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/instrumentation/common:go_default_library",
         "//test/e2e/instrumentation/logging/elasticsearch:go_default_library",
-        "//test/e2e/instrumentation/logging/stackdriver:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
     ],
@@ -37,7 +36,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//test/e2e/instrumentation/logging/elasticsearch:all-srcs",
-        "//test/e2e/instrumentation/logging/stackdriver:all-srcs",
         "//test/e2e/instrumentation/logging/utils:all-srcs",
     ],
     tags = ["automanaged"],

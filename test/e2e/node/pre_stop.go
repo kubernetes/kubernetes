@@ -44,21 +44,7 @@ type State struct {
 
 func testPreStop(c clientset.Interface, ns string) {
 	// This is the server that will receive the preStop notification
-	podDescr := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "server",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "server",
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"nettest"},
-					Ports: []v1.ContainerPort{{ContainerPort: 8080}},
-				},
-			},
-		},
-	}
+	podDescr := e2epod.NewAgnhostPod(ns, "server", nil, nil, []v1.ContainerPort{{ContainerPort: 8080}}, "nettest")
 	ginkgo.By(fmt.Sprintf("Creating server pod %s in namespace %s", podDescr.Name, ns))
 	podDescr, err := c.CoreV1().Pods(ns).Create(context.TODO(), podDescr, metav1.CreateOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
@@ -201,10 +187,11 @@ var _ = SIGDescribe("PreStop", func() {
 		err = podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(gracefulTerminationPeriodSeconds))
 		framework.ExpectNoError(err, "failed to delete pod")
 
-		//wait up to graceful termination period seconds
-		time.Sleep(30 * time.Second)
+		// wait for less than the gracePeriod termination ensuring the
+		// preStop hook is still executing.
+		time.Sleep(15 * time.Second)
 
-		ginkgo.By("verifying the pod running state after graceful termination")
+		ginkgo.By("verifying the pod is running while in the graceful period termination")
 		result := &v1.PodList{}
 		err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
 			client, err := e2ekubelet.ProxyRequest(f.ClientSet, pod.Spec.NodeName, "pods", ports.KubeletPort)

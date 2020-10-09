@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 // UniquePodName defines the type to key pods off of

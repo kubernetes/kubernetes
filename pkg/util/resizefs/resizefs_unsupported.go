@@ -21,7 +21,7 @@ package resizefs
 import (
 	"fmt"
 
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 // ResizeFs Provides support for resizing file systems

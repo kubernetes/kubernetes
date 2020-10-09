@@ -1006,7 +1006,7 @@ func NewCachedClientTestcases(url *url.URL) []CachedTest {
 			ExpectCacheMiss: true,
 		},
 		{
-			Name: "cached: service webhook, path 'allow'",
+			Name: "cached: url webhook, path 'allow'",
 			Webhooks: []registrationv1.ValidatingWebhook{{
 				Name:                    "cache5",
 				ClientConfig:            ccfgURL("allow"),

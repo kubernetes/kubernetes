@@ -49,7 +49,9 @@ const (
 	errLeaseFailed       = "AcquireDiskLeaseFailed"
 	errLeaseIDMissing    = "LeaseIdMissing"
 	errContainerNotFound = "ContainerNotFound"
-	errDiskBlobNotFound  = "DiskBlobNotFound"
+	errStatusCode400     = "statuscode=400"
+	errInvalidParameter  = `code="invalidparameter"`
+	errTargetInstanceIds = `target="instanceids"`
 	sourceSnapshot       = "snapshot"
 	sourceVolume         = "volume"
 
@@ -214,24 +216,32 @@ func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.N
 	c.diskAttachDetachMap.Delete(strings.ToLower(diskURI))
 	c.vmLockMap.UnlockEntry(strings.ToLower(string(nodeName)))
 
-	if err != nil && retry.IsErrorRetriable(err) && c.cloud.CloudProviderBackoff {
-		klog.V(2).Infof("azureDisk - update backing off: detach disk(%s, %s), err: %v", diskName, diskURI, err)
-		retryErr := kwait.ExponentialBackoff(c.cloud.RequestBackoff(), func() (bool, error) {
-			c.vmLockMap.LockEntry(strings.ToLower(string(nodeName)))
-			c.diskAttachDetachMap.Store(strings.ToLower(diskURI), "detaching")
-			err := vmset.DetachDisk(diskName, diskURI, nodeName)
-			c.diskAttachDetachMap.Delete(strings.ToLower(diskURI))
-			c.vmLockMap.UnlockEntry(strings.ToLower(string(nodeName)))
+	if err != nil {
+		if isInstanceNotFoundError(err) {
+			// if host doesn't exist, no need to detach
+			klog.Warningf("azureDisk - got InstanceNotFoundError(%v), DetachDisk(%s) will assume disk is already detached",
+				err, diskURI)
+			return nil
+		}
+		if retry.IsErrorRetriable(err) && c.cloud.CloudProviderBackoff {
+			klog.Warningf("azureDisk - update backing off: detach disk(%s, %s), err: %v", diskName, diskURI, err)
+			retryErr := kwait.ExponentialBackoff(c.cloud.RequestBackoff(), func() (bool, error) {
+				c.vmLockMap.LockEntry(strings.ToLower(string(nodeName)))
+				c.diskAttachDetachMap.Store(strings.ToLower(diskURI), "detaching")
+				err := vmset.DetachDisk(diskName, diskURI, nodeName)
+				c.diskAttachDetachMap.Delete(strings.ToLower(diskURI))
+				c.vmLockMap.UnlockEntry(strings.ToLower(string(nodeName)))
 
-			retriable := false
-			if err != nil && retry.IsErrorRetriable(err) {
-				retriable = true
+				retriable := false
+				if err != nil && retry.IsErrorRetriable(err) {
+					retriable = true
+				}
+				return !retriable, err
+			})
+			if retryErr != nil {
+				err = retryErr
+				klog.V(2).Infof("azureDisk - update abort backoff: detach disk(%s, %s), err: %v", diskName, diskURI, err)
 			}
-			return !retriable, err
-		})
-		if retryErr != nil {
-			err = retryErr
-			klog.V(2).Infof("azureDisk - update abort backoff: detach disk(%s, %s), err: %v", diskName, diskURI, err)
 		}
 	}
 	if err != nil {
@@ -425,4 +435,9 @@ func getValidCreationData(subscriptionID, resourceGroup, sourceResourceID, sourc
 		CreateOption:     compute.Copy,
 		SourceResourceID: &sourceResourceID,
 	}, nil
+}
+
+func isInstanceNotFoundError(err error) bool {
+	errMsg := strings.ToLower(err.Error())
+	return strings.Contains(errMsg, errStatusCode400) && strings.Contains(errMsg, errInvalidParameter) && strings.Contains(errMsg, errTargetInstanceIds)
 }

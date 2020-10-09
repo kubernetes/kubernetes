@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
@@ -42,24 +43,24 @@ func verifyRunAsNonRoot(pod *v1.Pod, container *v1.Container, uid *int64, userna
 		return nil
 	}
 	if effectiveSc.RunAsUser != nil {
-		klog.Warningf("Windows container does not support SecurityContext.RunAsUser, please use SecurityContext.WindowsOptions")
+		klog.Warningf("Windows container does not support SecurityContext.RunAsUser, please use SecurityContext.WindowsOptions (pod: %q, container: %s)", format.Pod(pod), container.Name)
 	}
 	if effectiveSc.SELinuxOptions != nil {
-		klog.Warningf("Windows container does not support SecurityContext.SELinuxOptions, please use SecurityContext.WindowsOptions")
+		klog.Warningf("Windows container does not support SecurityContext.SELinuxOptions, please use SecurityContext.WindowsOptions (pod: %q, container: %s)", format.Pod(pod), container.Name)
 	}
 	if effectiveSc.RunAsGroup != nil {
-		klog.Warningf("Windows container does not support SecurityContext.RunAsGroup")
+		klog.Warningf("Windows container does not support SecurityContext.RunAsGroup (pod: %q, container: %s)", format.Pod(pod), container.Name)
 	}
 	if effectiveSc.WindowsOptions != nil {
 		if effectiveSc.WindowsOptions.RunAsUserName != nil {
 			if *effectiveSc.WindowsOptions.RunAsUserName == windowsRootUserName {
-				return fmt.Errorf("container's runAsUser (%s) which will be regarded as root identity and will break non-root policy", username)
+				return fmt.Errorf("container's runAsUser (%s) which will be regarded as root identity and will break non-root policy (pod: %q, container: %s)", username, format.Pod(pod), container.Name)
 			}
 			return nil
 		}
 	}
 	if len(username) > 0 && username == windowsRootUserName {
-		return fmt.Errorf("container's runAsUser (%s) which will be regarded as root identity and will break non-root policy", username)
+		return fmt.Errorf("container's runAsUser (%s) which will be regarded as root identity and will break non-root policy (pod: %q, container: %s)", username, format.Pod(pod), container.Name)
 	}
 	return nil
 }

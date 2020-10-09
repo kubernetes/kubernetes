@@ -27,9 +27,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
 	testingexec "k8s.io/utils/exec/testing"
-	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	cloudprovider "k8s.io/cloud-provider"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -118,6 +119,7 @@ type fakeVolumeHost struct {
 	informerFactory        informers.SharedInformerFactory
 	kubeletErr             error
 	mux                    sync.Mutex
+	filteredDialOptions    *proxyutil.FilteredDialOptions
 }
 
 var _ VolumeHost = &fakeVolumeHost{}
@@ -205,6 +207,10 @@ func (f *fakeVolumeHost) GetHostUtil() hostutil.HostUtils {
 
 func (f *fakeVolumeHost) GetSubpather() subpath.Interface {
 	return f.subpather
+}
+
+func (f *fakeVolumeHost) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
+	return f.filteredDialOptions
 }
 
 func (f *fakeVolumeHost) GetPluginMgr() *VolumePluginMgr {

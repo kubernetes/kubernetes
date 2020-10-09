@@ -199,9 +199,14 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			}
 
 			deleteFlags := delete.NewDeleteFlags("to use to replace the resource.")
+			deleteOptions, err := deleteFlags.ToOptions(nil, genericclioptions.NewTestIOStreamsDiscard())
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
 			opts := &RunOptions{
 				PrintFlags:    printFlags,
-				DeleteOptions: deleteFlags.ToOptions(nil, genericclioptions.NewTestIOStreamsDiscard()),
+				DeleteOptions: deleteOptions,
 
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 
@@ -371,9 +376,14 @@ func TestGenerateService(t *testing.T) {
 
 			ioStreams, _, buff, _ := genericclioptions.NewTestIOStreams()
 			deleteFlags := delete.NewDeleteFlags("to use to replace the resource.")
+			deleteOptions, err := deleteFlags.ToOptions(nil, genericclioptions.NewTestIOStreamsDiscard())
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
 			opts := &RunOptions{
 				PrintFlags:    printFlags,
-				DeleteOptions: deleteFlags.ToOptions(nil, genericclioptions.NewTestIOStreamsDiscard()),
+				DeleteOptions: deleteOptions,
 
 				IOStreams: ioStreams,
 

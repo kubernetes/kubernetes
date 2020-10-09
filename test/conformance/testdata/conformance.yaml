@@ -244,9 +244,6 @@
     Query for the Pod with the new value for the label MUST be successful.
   release: v1.9
   file: test/e2e/common/pods.go
-  behaviors:
-  - pod/spec/label/create
-  - pod/spec/label/patch
 - testname: Pods, service environment variables
   codename: '[k8s.io] Pods should contain environment variables for services [NodeConformance]
     [Conformance]'
@@ -484,8 +481,6 @@
     have QOSClass set to PodQOSGuaranteed.
   release: v1.9
   file: test/e2e/node/pods.go
-  behaviors:
-  - pod/spec/container/resources
 - testname: Pods, prestop hook
   codename: '[k8s.io] [sig-node] PreStop should call prestop when killing a pod  [Conformance]'
   description: Create a server pod with a rest endpoint '/write' that changes state.Received
@@ -1391,9 +1386,9 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, cluster info
   codename: '[sig-cli] Kubectl client Kubectl cluster-info should check if Kubernetes
-    master services is included in cluster-info  [Conformance]'
+    control plane services is included in cluster-info  [Conformance]'
   description: Call kubectl to get cluster-info, output MUST contain cluster-info
-    returned and Kubernetes Master SHOULD be running.
+    returned and Kubernetes control plane SHOULD be running.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, describe pod or rc

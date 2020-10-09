@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/publicipclient/mockpublicipclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/vmclient/mockvmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
@@ -447,7 +448,7 @@ func TestGetFrontendIPConfigName(t *testing.T) {
 		svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = c.subnetName
 		svc.Annotations[ServiceAnnotationLoadBalancerInternal] = strconv.FormatBool(c.isInternal)
 
-		ipconfigName := az.getFrontendIPConfigName(svc)
+		ipconfigName := az.getDefaultFrontendIPConfigName(svc)
 		assert.Equal(t, c.expected, ipconfigName, c.description)
 	}
 }
@@ -1507,5 +1508,160 @@ func TestStandardEnsureHostsInPool(t *testing.T) {
 		} else {
 			assert.Nil(t, err, test.name)
 		}
+	}
+}
+
+func TestServiceOwnsFrontendIP(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cloud := GetTestCloud(ctrl)
+
+	testCases := []struct {
+		desc         string
+		existingPIPs []network.PublicIPAddress
+		fip          network.FrontendIPConfiguration
+		service      *v1.Service
+		isOwned      bool
+		isPrimary    bool
+		expectedErr  error
+	}{
+		{
+			desc: "serviceOwnsFrontendIP should detect the primary service",
+			fip: network.FrontendIPConfiguration{
+				Name: to.StringPtr("auid"),
+			},
+			service: &v1.Service{
+				ObjectMeta: meta.ObjectMeta{
+					UID: types.UID("uid"),
+				},
+			},
+			isOwned:   true,
+			isPrimary: true,
+		},
+		{
+			desc: "serviceOwnsFrontendIP should return false if the secondary external service doesn't set it's loadBalancer IP",
+			fip: network.FrontendIPConfiguration{
+				Name: to.StringPtr("auid"),
+			},
+			service: &v1.Service{
+				ObjectMeta: meta.ObjectMeta{
+					UID: types.UID("secondary"),
+				},
+			},
+		},
+		{
+			desc: "serviceOwnsFrontendIP should report a not found error if there is no public IP " +
+				"found according to the external service's loadBalancer IP but do not return the error",
+			existingPIPs: []network.PublicIPAddress{
+				{
+					ID: to.StringPtr("pip"),
+					PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+						IPAddress: to.StringPtr("4.3.2.1"),
+					},
+				},
+			},
+			fip: network.FrontendIPConfiguration{
+				Name: to.StringPtr("auid"),
+				FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+					PublicIPAddress: &network.PublicIPAddress{
+						ID: to.StringPtr("pip"),
+					},
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: meta.ObjectMeta{
+					UID: types.UID("secondary"),
+				},
+				Spec: v1.ServiceSpec{
+					LoadBalancerIP: "1.2.3.4",
+				},
+			},
+		},
+		{
+			desc: "serviceOwnsFrontendIP should return false if there is a mismatch between the PIP's ID and " +
+				"the counterpart on the frontend IP config",
+			existingPIPs: []network.PublicIPAddress{
+				{
+					ID: to.StringPtr("pip"),
+					PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+						IPAddress: to.StringPtr("4.3.2.1"),
+					},
+				},
+			},
+			fip: network.FrontendIPConfiguration{
+				Name: to.StringPtr("auid"),
+				FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+					PublicIPAddress: &network.PublicIPAddress{
+						ID: to.StringPtr("pip1"),
+					},
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: meta.ObjectMeta{
+					UID: types.UID("secondary"),
+				},
+				Spec: v1.ServiceSpec{
+					LoadBalancerIP: "4.3.2.1",
+				},
+			},
+		},
+		{
+			desc: "serviceOwnsFrontendIP should detect the secondary external service",
+			existingPIPs: []network.PublicIPAddress{
+				{
+					ID: to.StringPtr("pip"),
+					PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+						IPAddress: to.StringPtr("4.3.2.1"),
+					},
+				},
+			},
+			fip: network.FrontendIPConfiguration{
+				Name: to.StringPtr("auid"),
+				FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+					PublicIPAddress: &network.PublicIPAddress{
+						ID: to.StringPtr("pip"),
+					},
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: meta.ObjectMeta{
+					UID: types.UID("secondary"),
+				},
+				Spec: v1.ServiceSpec{
+					LoadBalancerIP: "4.3.2.1",
+				},
+			},
+			isOwned: true,
+		},
+		{
+			desc: "serviceOwnsFrontendIP should detect the secondary internal service",
+			fip: network.FrontendIPConfiguration{
+				Name: to.StringPtr("auid"),
+				FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+					PrivateIPAddress: to.StringPtr("4.3.2.1"),
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: meta.ObjectMeta{
+					UID:         types.UID("secondary"),
+					Annotations: map[string]string{ServiceAnnotationLoadBalancerInternal: "true"},
+				},
+				Spec: v1.ServiceSpec{
+					LoadBalancerIP: "4.3.2.1",
+				},
+			},
+			isOwned: true,
+		},
+	}
+
+	for _, test := range testCases {
+		mockPIPClient := mockpublicipclient.NewMockInterface(ctrl)
+		cloud.PublicIPAddressesClient = mockPIPClient
+		mockPIPClient.EXPECT().List(gomock.Any(), gomock.Any()).Return(test.existingPIPs, nil).MaxTimes(1)
+
+		isOwned, isPrimary, err := cloud.serviceOwnsFrontendIP(test.fip, test.service)
+		assert.Equal(t, test.expectedErr, err, test.desc)
+		assert.Equal(t, test.isOwned, isOwned, test.desc)
+		assert.Equal(t, test.isPrimary, isPrimary, test.desc)
 	}
 }

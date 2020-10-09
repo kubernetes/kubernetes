@@ -828,9 +828,11 @@ function start_kubelet {
 function start_kubeproxy {
     PROXY_LOG=${LOG_DIR}/kube-proxy.log
 
-    # wait for kubelet collect node information
-    echo "wait kubelet ready"
-    wait_node_ready
+    if [[ "${START_MODE}" != "nokubelet" ]]; then
+      # wait for kubelet collect node information
+      echo "wait kubelet ready"
+      wait_node_ready
+    fi
 
     cat <<EOF > /tmp/kube-proxy.yaml
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
