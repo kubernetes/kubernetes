@@ -33,6 +33,7 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
+	utilptr "k8s.io/utils/pointer"
 )
 
 // fakePodWorkers runs sync pod function in serial, so we can have
@@ -319,14 +320,38 @@ func TestFakePodWorkers(t *testing.T) {
 	}
 }
 
-// TestKillPodNowFunc tests the blocking kill pod function works with pod workers as expected.
-func TestKillPodNowFunc(t *testing.T) {
+// TestKillTestKillPodNowFuncWithOverride tests the blocking kill pod function works with pod workers as expected.
+func TestKillPodNowFuncWithOverride(t *testing.T) {
 	fakeRecorder := &record.FakeRecorder{}
 	podWorkers, processed := createPodWorkers()
 	killPodFunc := killPodNow(podWorkers, fakeRecorder)
 	pod := newPod("test", "test")
 	gracePeriodOverride := int64(0)
 	err := killPodFunc(pod, v1.PodStatus{Phase: v1.PodFailed, Reason: "reason", Message: "message"}, &gracePeriodOverride)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if len(processed) != 1 {
+		t.Errorf("len(processed) expected: %v, actual: %v", 1, len(processed))
+		return
+	}
+	syncPodRecords := processed[pod.UID]
+	if len(syncPodRecords) != 1 {
+		t.Errorf("Pod processed %v times, but expected %v", len(syncPodRecords), 1)
+	}
+	if syncPodRecords[0].updateType != kubetypes.SyncPodKill {
+		t.Errorf("Pod update type was %v, but expected %v", syncPodRecords[0].updateType, kubetypes.SyncPodKill)
+	}
+}
+
+// TestKillPodNowFuncWithoutOverride tests the blocking kill pod function works with pod workers as expected.
+func TestKillPodNowFuncTerminationGracePeriodSeconds(t *testing.T) {
+	fakeRecorder := &record.FakeRecorder{}
+	podWorkers, processed := createPodWorkers()
+	killPodFunc := killPodNow(podWorkers, fakeRecorder)
+	pod := newPod("test", "test")
+	pod.Spec.TerminationGracePeriodSeconds = utilptr.Int64Ptr(5)
+	err := killPodFunc(pod, v1.PodStatus{Phase: v1.PodFailed, Reason: "reason", Message: "message"}, nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

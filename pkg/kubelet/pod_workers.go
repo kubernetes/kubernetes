@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -35,6 +35,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
+	utilptr "k8s.io/utils/pointer"
 )
 
 // OnCompleteFunc is a function that is invoked when an operation completes.
@@ -323,7 +324,7 @@ func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.K
 				PodStatusFunc: func(p *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodStatus {
 					return status
 				},
-				PodTerminationGracePeriodSecondsOverride: gracePeriodOverride,
+				PodTerminationGracePeriodSecondsOverride: utilptr.Int64Ptr(gracePeriod),
 			},
 		})
 

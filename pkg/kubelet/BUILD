@@ -154,6 +154,7 @@ go_library(
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/integer:go_default_library",
         "//vendor/k8s.io/utils/path:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
         "//vendor/k8s.io/utils/strings:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
@@ -268,6 +269,7 @@ go_test(
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 
