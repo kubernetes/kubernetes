@@ -698,7 +698,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 
 		ginkgo.It("should allow egress access on one named port [Feature:NetworkPolicy]", func() {
 			clientPodName := "client-a"
-			protocolUDP := v1.ProtocolUDP
 			policy := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "allow-client-a-via-named-port-egress-rule",
@@ -715,11 +714,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 						Ports: []networkingv1.NetworkPolicyPort{
 							{
 								Port: &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80"},
-							},
-							// Allow DNS look-ups
-							{
-								Protocol: &protocolUDP,
-								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
 							},
 						},
 					}},
@@ -964,7 +958,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 		ginkgo.It("should work with Ingress,Egress specified together [Feature:NetworkPolicy]", func() {
 			const allowedPort = 80
 			const notAllowedPort = 81
-			protocolUDP := v1.ProtocolUDP
 
 			nsBName := f.BaseName + "-b"
 			nsB, err := f.CreateNamespace(nsBName, map[string]string{
@@ -1000,15 +993,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 						}},
 					}},
 					Egress: []networkingv1.NetworkPolicyEgressRule{
-						{
-							Ports: []networkingv1.NetworkPolicyPort{
-								// Allow DNS look-ups
-								{
-									Protocol: &protocolUDP,
-									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-								},
-							},
-						},
 						{
 							To: []networkingv1.NetworkPolicyPeer{
 								{
@@ -1079,7 +1063,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			framework.ExpectNoError(err, "Error occurred while waiting for pod status in namespace: Ready.")
 
 			ginkgo.By("Creating a network policy for the server which allows traffic only to a server in different namespace.")
-			protocolUDP := v1.ProtocolUDP
 			policyAllowToServerInNSB := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: nsA.Name,
@@ -1095,15 +1078,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 					PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeEgress},
 					// Allow traffic only to server-a in namespace-b
 					Egress: []networkingv1.NetworkPolicyEgressRule{
-						{
-							Ports: []networkingv1.NetworkPolicyPort{
-								// Allow DNS look-ups
-								{
-									Protocol: &protocolUDP,
-									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-								},
-							},
-						},
 						{
 							To: []networkingv1.NetworkPolicyPeer{
 								{
@@ -1215,8 +1189,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 				framework.ExpectNoError(err, "Error occurred while waiting for pod type: Ready.")
 			})
 
-			protocolUDP := v1.ProtocolUDP
-
 			ginkgo.By("Creating client-a which should be able to contact the server before applying policy.", func() {
 				testCanConnect(f, f.Namespace, "client-a", serviceB, 80)
 			})
@@ -1237,15 +1209,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 					PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeEgress},
 					// Allow traffic only to "server-a"
 					Egress: []networkingv1.NetworkPolicyEgressRule{
-						{
-							Ports: []networkingv1.NetworkPolicyPort{
-								// Allow DNS look-ups
-								{
-									Protocol: &protocolUDP,
-									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-								},
-							},
-						},
 						{
 							To: []networkingv1.NetworkPolicyPeer{
 								{
@@ -1374,8 +1337,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			var serviceB *v1.Service
 			var podServerB *v1.Pod
 
-			protocolUDP := v1.ProtocolUDP
-
 			// Getting podServer's status to get podServer's IP, to create the CIDR
 			podServerStatus, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), podServer.Name, metav1.GetOptions{})
 			if err != nil {
@@ -1419,15 +1380,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 					// Allow traffic to only one CIDR block.
 					Egress: []networkingv1.NetworkPolicyEgressRule{
 						{
-							Ports: []networkingv1.NetworkPolicyPort{
-								// Allow DNS look-ups
-								{
-									Protocol: &protocolUDP,
-									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-								},
-							},
-						},
-						{
 							To: []networkingv1.NetworkPolicyPeer{
 								{
 									IPBlock: &networkingv1.IPBlock{
@@ -1453,8 +1405,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 		})
 
 		ginkgo.It("should enforce except clause while egress access to server in CIDR block [Feature:NetworkPolicy]", func() {
-			protocolUDP := v1.ProtocolUDP
-
 			// Getting podServer's status to get podServer's IP, to create the CIDR with except clause
 			podServerStatus, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), podServer.Name, metav1.GetOptions{})
 			if err != nil {
@@ -1495,15 +1445,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 					// Allow traffic to only one CIDR block except subnet which includes Server.
 					Egress: []networkingv1.NetworkPolicyEgressRule{
 						{
-							Ports: []networkingv1.NetworkPolicyPort{
-								// Allow DNS look-ups
-								{
-									Protocol: &protocolUDP,
-									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-								},
-							},
-						},
-						{
 							To: []networkingv1.NetworkPolicyPeer{
 								{
 									IPBlock: &networkingv1.IPBlock{
@@ -1527,8 +1468,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 		})
 
 		ginkgo.It("should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy]", func() {
-			protocolUDP := v1.ProtocolUDP
-
 			// Getting podServer's status to get podServer's IP, to create the CIDR with except clause
 			podServerStatus, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), podServer.Name, metav1.GetOptions{})
 			if err != nil {
@@ -1566,15 +1505,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 					// Allow traffic to only one CIDR block except subnet which includes Server.
 					Egress: []networkingv1.NetworkPolicyEgressRule{
 						{
-							Ports: []networkingv1.NetworkPolicyPort{
-								// Allow DNS look-ups
-								{
-									Protocol: &protocolUDP,
-									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-								},
-							},
-						},
-						{
 							To: []networkingv1.NetworkPolicyPeer{
 								{
 									IPBlock: &networkingv1.IPBlock{
@@ -1611,15 +1541,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 					PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeEgress},
 					// Allow traffic to only one CIDR block which includes Server.
 					Egress: []networkingv1.NetworkPolicyEgressRule{
-						{
-							Ports: []networkingv1.NetworkPolicyPort{
-								// Allow DNS look-ups
-								{
-									Protocol: &protocolUDP,
-									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-								},
-							},
-						},
 						{
 							To: []networkingv1.NetworkPolicyPeer{
 								{
@@ -1664,8 +1585,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			var podA, podB *v1.Pod
 			var err error
 
-			protocolUDP := v1.ProtocolUDP
-
 			// Before applying policy, communication should be successful between pod-a and pod-b
 			podA, serviceA = createServerPodAndService(f, f.Namespace, "pod-a", []protocolPort{{80, v1.ProtocolTCP}})
 			ginkgo.By("Waiting for pod-a to be ready", func() {
@@ -1702,15 +1621,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 					PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeEgress},
 					// Allow traffic to server on pod-b
 					Egress: []networkingv1.NetworkPolicyEgressRule{
-						{
-							Ports: []networkingv1.NetworkPolicyPort{
-								// Allow DNS look-ups
-								{
-									Protocol: &protocolUDP,
-									Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
-								},
-							},
-						},
 						{
 							To: []networkingv1.NetworkPolicyPeer{
 								{
@@ -2231,7 +2141,7 @@ func createNetworkClientPodWithRestartPolicy(f *framework.Framework, namespace *
 					Command: []string{"/bin/sh"},
 					Args: []string{
 						"-c",
-						fmt.Sprintf("for i in $(seq 1 5); do /agnhost connect %s.%s:%d --protocol %s --timeout 8s && exit 0 || sleep 1; done; exit 1", targetService.Name, targetService.Namespace, targetPort, connectProtocol),
+						fmt.Sprintf("for i in $(seq 1 5); do /agnhost connect %s:%d --protocol %s --timeout 8s && exit 0 || sleep 1; done; exit 1", targetService.Spec.ClusterIP, targetPort, connectProtocol),
 					},
 				},
 			},
