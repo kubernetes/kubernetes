@@ -1413,6 +1413,14 @@ func TestLastChangeTriggerTime(t *testing.T) {
 			},
 			expected: map[types.NamespacedName][]time.Time{createName("ns", "ep1"): {t2}},
 		},
+		{
+			name: "delete",
+			scenario: func(fp *FakeProxier) {
+				e := createEndpoints("ns", "ep1", t1)
+				fp.deleteEndpoints(e)
+			},
+			expected: map[types.NamespacedName][]time.Time{},
+		},
 	}
 
 	for _, tc := range testCases {
