@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -60,12 +61,13 @@ func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.File
 
 // given a wwn and lun, find the device and associated devicemapper parent
 func findDisk(wwn, lun string, io ioHandler, deviceUtil volumeutil.DeviceUtil) (string, string) {
-	fcPath := "-fc-0x" + wwn + "-lun-" + lun
+	fcPathExp := "^(pci-.*-fc|fc)-0x" + wwn + "-lun-" + lun
+	r := regexp.MustCompile(fcPathExp)
 	devPath := byPath
 	if dirs, err := io.ReadDir(devPath); err == nil {
 		for _, f := range dirs {
 			name := f.Name()
-			if strings.Contains(name, fcPath) {
+			if r.MatchString(name) {
 				if disk, err1 := io.EvalSymlinks(devPath + name); err1 == nil {
 					dm := deviceUtil.FindMultipathDeviceForDevice(disk)
 					klog.Infof("fc: find disk: %v, dm: %v", disk, dm)
