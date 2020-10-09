@@ -1428,43 +1428,43 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			true, []int32{0}, v1.PodRunning,
 			1, 0, 0, nil, "",
 		},
-		"backoffLimit 1 with restartCount 0 should have 1 pod active": {
-			1, 1, 1,
-			true, []int32{0}, v1.PodRunning,
-			1, 0, 0, nil, "",
-		},
-		"backoffLimit 1 with restartCount 1 and podRunning should have 0 pod active": {
+		"backoffLimit 1 with restartCount 1 should have 1 pod active": {
 			1, 1, 1,
 			true, []int32{1}, v1.PodRunning,
+			1, 0, 0, nil, "",
+		},
+		"backoffLimit 1 with restartCount 2 and podRunning should have 0 pod active": {
+			1, 1, 1,
+			true, []int32{2}, v1.PodRunning,
 			0, 0, 1, &jobConditionFailed, "BackoffLimitExceeded",
 		},
-		"backoffLimit 1 with restartCount 1 and podPending should have 0 pod active": {
+		"backoffLimit 1 with restartCount 2 and podPending should have 0 pod active": {
 			1, 1, 1,
-			true, []int32{1}, v1.PodPending,
+			true, []int32{2}, v1.PodPending,
 			0, 0, 1, &jobConditionFailed, "BackoffLimitExceeded",
 		},
 		"too many job failures with podRunning - single pod": {
 			1, 5, 2,
-			true, []int32{2}, v1.PodRunning,
+			true, []int32{3}, v1.PodRunning,
 			0, 0, 1, &jobConditionFailed, "BackoffLimitExceeded",
 		},
 		"too many job failures with podPending - single pod": {
 			1, 5, 2,
-			true, []int32{2}, v1.PodPending,
+			true, []int32{3}, v1.PodPending,
 			0, 0, 1, &jobConditionFailed, "BackoffLimitExceeded",
 		},
 		"too many job failures with podRunning - multiple pods": {
-			2, 5, 2,
+			2, 5, 1,
 			true, []int32{1, 1}, v1.PodRunning,
 			0, 0, 2, &jobConditionFailed, "BackoffLimitExceeded",
 		},
 		"too many job failures with podPending - multiple pods": {
-			2, 5, 2,
+			2, 5, 1,
 			true, []int32{1, 1}, v1.PodPending,
 			0, 0, 2, &jobConditionFailed, "BackoffLimitExceeded",
 		},
 		"not enough failures": {
-			2, 5, 3,
+			2, 5, 2,
 			true, []int32{1, 1}, v1.PodRunning,
 			2, 0, 0, nil, "",
 		},

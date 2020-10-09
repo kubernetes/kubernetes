@@ -645,10 +645,7 @@ func pastBackoffLimitOnFailure(job *batch.Job, pods []*v1.Pod) bool {
 			}
 		}
 	}
-	if *job.Spec.BackoffLimit == 0 {
-		return result > 0
-	}
-	return result >= *job.Spec.BackoffLimit
+	return result > *job.Spec.BackoffLimit
 }
 
 // pastActiveDeadline checks if job has ActiveDeadlineSeconds field set and if it is exceeded.
