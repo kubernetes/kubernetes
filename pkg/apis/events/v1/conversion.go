@@ -26,7 +26,8 @@ import (
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
-func Convert_v1_Event_To_core_Event(in *v1.Event, out *k8s_api.Event, s conversion.Scope) error {
+// ConvertV1EventToCoreEvent convert *v1.Event to *k8s_api.Event.
+func ConvertV1EventToCoreEvent(in *v1.Event, out *k8s_api.Event, s conversion.Scope) error {
 	if err := autoConvert_v1_Event_To_core_Event(in, out, s); err != nil {
 		return err
 	}
@@ -43,7 +44,8 @@ func Convert_v1_Event_To_core_Event(in *v1.Event, out *k8s_api.Event, s conversi
 	return nil
 }
 
-func Convert_core_Event_To_v1_Event(in *k8s_api.Event, out *v1.Event, s conversion.Scope) error {
+// ConvertCoreEventToV1Event convert *k8s_api.Event to *v1.Event.
+func ConvertCoreEventToV1Event(in *k8s_api.Event, out *v1.Event, s conversion.Scope) error {
 	if err := autoConvert_core_Event_To_v1_Event(in, out, s); err != nil {
 		return err
 	}
@@ -60,6 +62,7 @@ func Convert_core_Event_To_v1_Event(in *k8s_api.Event, out *v1.Event, s conversi
 	return nil
 }
 
+// AddFieldLabelConversionsForEvent add numbers of FieldLabel for Event.
 func AddFieldLabelConversionsForEvent(scheme *runtime.Scheme) error {
 	mapping := map[string]string{
 		"reason":                    "reason",

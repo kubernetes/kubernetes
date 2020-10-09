@@ -58,12 +58,12 @@ func RegisterConversions(s *runtime.Scheme) error {
 		return err
 	}
 	if err := s.AddConversionFunc((*core.Event)(nil), (*v1.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_Event_To_v1_Event(a.(*core.Event), b.(*v1.Event), scope)
+		return ConvertCoreEventToV1Event(a.(*core.Event), b.(*v1.Event), scope)
 	}); err != nil {
 		return err
 	}
 	if err := s.AddConversionFunc((*v1.Event)(nil), (*core.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Event_To_core_Event(a.(*v1.Event), b.(*core.Event), scope)
+		return ConvertV1EventToCoreEvent(a.(*v1.Event), b.(*core.Event), scope)
 	}); err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func autoConvert_v1_EventList_To_core_EventList(in *v1.EventList, out *core.Even
 		in, out := &in.Items, &out.Items
 		*out = make([]core.Event, len(*in))
 		for i := range *in {
-			if err := Convert_v1_Event_To_core_Event(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := ConvertV1EventToCoreEvent(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}
@@ -135,7 +135,7 @@ func autoConvert_core_EventList_To_v1_EventList(in *core.EventList, out *v1.Even
 		in, out := &in.Items, &out.Items
 		*out = make([]v1.Event, len(*in))
 		for i := range *in {
-			if err := Convert_core_Event_To_v1_Event(&(*in)[i], &(*out)[i], s); err != nil {
+			if err := ConvertCoreEventToV1Event(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
 			}
 		}

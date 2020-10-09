@@ -34,7 +34,8 @@ func Resource(resource string) schema.GroupResource {
 
 var (
 	localSchemeBuilder = &eventsv1.SchemeBuilder
-	AddToScheme        = localSchemeBuilder.AddToScheme
+	// AddToScheme exports the function of localSchemeBuilder.AddToScheme which from eventsv1.SchemeBuilder
+	AddToScheme = localSchemeBuilder.AddToScheme
 )
 
 func init() {
