@@ -339,7 +339,7 @@ function start-kube-apiserver {
     params+=" --egress-selector-config-file=/etc/srv/kubernetes/egress_selector_configuration.yaml"
 
     # UDS socket for communication between apiserver and konnectivity-server
-    local default_konnectivity_socket_path="/etc/srv/kubernetes/konnectivity"
+    local default_konnectivity_socket_path="/etc/srv/kubernetes/konnectivity-server"
     default_konnectivity_socket_vol="{ \"name\": \"konnectivity-socket\", \"hostPath\": {\"path\": \"${default_konnectivity_socket_path}\", \"type\": \"DirectoryOrCreate\"}},"
     default_konnectivity_socket_mnt="{ \"name\": \"konnectivity-socket\", \"mountPath\": \"${default_konnectivity_socket_path}\", \"readOnly\": false},"
   fi
