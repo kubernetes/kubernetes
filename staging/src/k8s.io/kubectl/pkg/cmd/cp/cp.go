@@ -102,7 +102,7 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 		Use:                   "cp <file-spec-src> <file-spec-dest>",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Copy files and directories to and from containers."),
-		Long:                  "Copy files and directories to and from containers.",
+		Long:                  i18n.T("Copy files and directories to and from containers."),
 		Example:               cpExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))

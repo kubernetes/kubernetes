@@ -85,7 +85,7 @@ type GetOptions struct {
 }
 
 var (
-	getLong = templates.LongDesc(`
+	getLong = templates.LongDesc(i18n.T(`
 		Display one or many resources
 
 		Prints a table of the most important information about the specified resources.
@@ -96,7 +96,7 @@ var (
 		Uninitialized objects are not shown unless --include-uninitialized is passed.
 
 		By specifying the output as 'template' and providing a Go template as the value
-		of the --template flag, you can filter the attributes of the fetched resources.`)
+		of the --template flag, you can filter the attributes of the fetched resources.`))
 
 	getExample = templates.Examples(i18n.T(`
 		# List all pods in ps output format.
