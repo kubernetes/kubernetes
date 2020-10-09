@@ -31,6 +31,9 @@ import (
 // StacktracePred returns true if a stacktrace should be logged for this status.
 type StacktracePred func(httpStatus int) (logStacktrace bool)
 
+// handle to observe the http response
+type ResponseObserver func(req *http.Request, status int, hijacked bool)
+
 type logger interface {
 	Addf(format string, data ...interface{})
 }
@@ -76,7 +79,7 @@ func DefaultStacktracePred(status int) bool {
 }
 
 // WithLogging wraps the handler with logging.
-func WithLogging(handler http.Handler, pred StacktracePred) http.Handler {
+func WithLogging(handler http.Handler, pred StacktracePred, observers ...ResponseObserver) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 		if old := respLoggerFromContext(req); old != nil {
@@ -89,6 +92,12 @@ func WithLogging(handler http.Handler, pred StacktracePred) http.Handler {
 			defer func() { klog.InfoS("HTTP", rl.LogArgs()...) }()
 		}
 		handler.ServeHTTP(rl, req)
+
+		if len(observers) != 0 {
+			for _, observer := range observers {
+				observer(req, rl.status, rl.hijacked)
+			}
+		}
 	})
 }
 

@@ -927,8 +927,6 @@ var statusesNoTracePred = httplog.StatusIsNot(
 
 // ServeHTTP responds to HTTP requests on the Kubelet.
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	handler := httplog.WithLogging(s.restfulCont, statusesNoTracePred)
-
 	// monitor http requests
 	var serverType string
 	if s.auth == nil {
@@ -941,15 +939,21 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	longRunning := strconv.FormatBool(isLongRunningRequest(path))
 
-	servermetrics.HTTPRequests.WithLabelValues(method, path, serverType, longRunning).Inc()
-
 	servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Inc()
 	defer servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Dec()
 
-	startTime := time.Now()
-	defer servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, serverType, longRunning).Observe(servermetrics.SinceInSeconds(startTime))
+	var statusCode string
+	handler := httplog.WithLogging(s.restfulCont, statusesNoTracePred, func(req *http.Request, status int, hijacked bool) {
+		statusCode = strconv.Itoa(status)
+		if hijacked {
+			statusCode = "-1"
+		}
+	})
 
+	startTime := time.Now()
 	handler.ServeHTTP(w, req)
+	servermetrics.HTTPRequests.WithLabelValues(method, path, serverType, longRunning, statusCode).Inc()
+	servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, serverType, longRunning, statusCode).Observe(servermetrics.SinceInSeconds(startTime))
 }
 
 // prometheusHostAdapter adapts the HostInterface to the interface expected by the
