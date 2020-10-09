@@ -87,6 +87,10 @@ var kubeProxyDowngradeTests = []upgrades.Test{
 	&upgrades.ServiceUpgradeTest{},
 }
 
+var serviceaccountAdmissionControllerMigrationTests = []upgrades.Test{
+	&upgrades.ServiceAccountAdmissionControllerMigrationTest{},
+}
+
 var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 	f := framework.NewDefaultFramework("cluster-upgrade")
 
@@ -109,7 +113,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, masterUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(framework.MasterUpgrade(f, target))
+				framework.ExpectNoError(framework.MasterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
@@ -150,7 +154,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, clusterUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(framework.MasterUpgrade(f, target))
+				framework.ExpectNoError(framework.MasterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
@@ -183,7 +187,7 @@ var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-				framework.ExpectNoError(framework.MasterUpgrade(f, target))
+				framework.ExpectNoError(framework.MasterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -231,7 +235,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, gpuUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(framework.MasterUpgrade(f, target))
+				framework.ExpectNoError(framework.MasterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
@@ -249,7 +253,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				start := time.Now()
 				defer finalizeUpgradeTest(start, gpuUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(framework.MasterUpgrade(f, target))
+				framework.ExpectNoError(framework.MasterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
@@ -271,7 +275,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				target := upgCtx.Versions[1].Version.String()
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
-				framework.ExpectNoError(framework.MasterUpgrade(f, target))
+				framework.ExpectNoError(framework.MasterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
@@ -297,7 +301,7 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 				start := time.Now()
 				defer finalizeUpgradeTest(start, statefulUpgradeTest)
 				target := upgCtx.Versions[1].Version.String()
-				framework.ExpectNoError(framework.MasterUpgrade(f, target))
+				framework.ExpectNoError(framework.MasterUpgrade(f, target, nil))
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 				framework.ExpectNoError(nodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(checkNodesVersions(f.ClientSet, target))
@@ -366,6 +370,33 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				framework.ExpectNoError(checkMasterVersion(f.ClientSet, target))
 			}
 			runUpgradeSuite(f, kubeProxyDowngradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+		})
+	})
+})
+
+var _ = SIGDescribe("[sig-auth] ServiceAccount admission controller migration [Feature:BoundServiceAccountTokenVolume]", func() {
+	f := framework.NewDefaultFramework("serviceaccount-admission-controller-migration")
+
+	testFrameworks := createUpgradeFrameworks(serviceaccountAdmissionControllerMigrationTests)
+	ginkgo.Describe("master upgrade", func() {
+		ginkgo.It("should maintain a functioning cluster", func() {
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), *upgradeTarget)
+			framework.ExpectNoError(err)
+
+			testSuite := &junit.TestSuite{Name: "ServiceAccount admission controller migration"}
+			serviceaccountAdmissionControllerMigrationTest := &junit.TestCase{
+				Name:      "[sig-auth] serviceaccount-admission-controller-migration",
+				Classname: "upgrade_tests",
+			}
+			testSuite.TestCases = append(testSuite.TestCases, serviceaccountAdmissionControllerMigrationTest)
+
+			upgradeFunc := func() {
+				start := time.Now()
+				defer finalizeUpgradeTest(start, serviceaccountAdmissionControllerMigrationTest)
+				target := upgCtx.Versions[1].Version.String()
+				framework.ExpectNoError(framework.MasterUpgrade(f, target, []string{"KUBE_FEATURE_GATES=BoundServiceAccountTokenVolume=true"}))
+			}
+			runUpgradeSuite(f, serviceaccountAdmissionControllerMigrationTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 })

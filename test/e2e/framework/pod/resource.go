@@ -502,25 +502,33 @@ func checkPodsCondition(c clientset.Interface, ns string, podNames []string, tim
 
 // GetPodLogs returns the logs of the specified container (namespace/pod/container).
 func GetPodLogs(c clientset.Interface, namespace, podName, containerName string) (string, error) {
-	return getPodLogsInternal(c, namespace, podName, containerName, false)
+	return getPodLogsInternal(c, namespace, podName, containerName, false, nil)
+}
+
+// GetPodLogsSince returns the logs of the specified container (namespace/pod/container) since a timestamp.
+func GetPodLogsSince(c clientset.Interface, namespace, podName, containerName string, since time.Time) (string, error) {
+	sinceTime := metav1.NewTime(since)
+	return getPodLogsInternal(c, namespace, podName, containerName, false, &sinceTime)
 }
 
 // GetPreviousPodLogs returns the logs of the previous instance of the
 // specified container (namespace/pod/container).
 func GetPreviousPodLogs(c clientset.Interface, namespace, podName, containerName string) (string, error) {
-	return getPodLogsInternal(c, namespace, podName, containerName, true)
+	return getPodLogsInternal(c, namespace, podName, containerName, true, nil)
 }
 
 // utility function for gomega Eventually
-func getPodLogsInternal(c clientset.Interface, namespace, podName, containerName string, previous bool) (string, error) {
-	logs, err := c.CoreV1().RESTClient().Get().
+func getPodLogsInternal(c clientset.Interface, namespace, podName, containerName string, previous bool, sinceTime *metav1.Time) (string, error) {
+	request := c.CoreV1().RESTClient().Get().
 		Resource("pods").
 		Namespace(namespace).
 		Name(podName).SubResource("log").
 		Param("container", containerName).
-		Param("previous", strconv.FormatBool(previous)).
-		Do(context.TODO()).
-		Raw()
+		Param("previous", strconv.FormatBool(previous))
+	if sinceTime != nil {
+		request.Param("sinceTime", sinceTime.Format(time.RFC3339))
+	}
+	logs, err := request.Do(context.TODO()).Raw()
 	if err != nil {
 		return "", err
 	}
