@@ -19,6 +19,8 @@ package certs
 import (
 	"crypto"
 	"crypto/x509"
+	"fmt"
+	"io"
 
 	"github.com/pkg/errors"
 
@@ -477,14 +479,20 @@ func createKeyAndCSR(kubeadmConfig *kubeadmapi.InitConfiguration, cert *KubeadmC
 
 // CreateDefaultKeysAndCSRFiles is used in ExternalCA mode to create key files
 // and adjacent CSR files.
-func CreateDefaultKeysAndCSRFiles(config *kubeadmapi.InitConfiguration) error {
+func CreateDefaultKeysAndCSRFiles(out io.Writer, config *kubeadmapi.InitConfiguration) error {
 	certificates, err := leafCertificates(GetDefaultCertList())
 	if err != nil {
 		return err
 	}
+	if out != nil {
+		fmt.Fprintf(out, "generating keys and CSRs in %s\n", config.CertificatesDir)
+	}
 	for _, cert := range certificates {
 		if err := createKeyAndCSR(config, cert); err != nil {
 			return err
+		}
+		if out != nil {
+			fmt.Fprintf(out, "  %s\n", cert.BaseName)
 		}
 	}
 	return nil

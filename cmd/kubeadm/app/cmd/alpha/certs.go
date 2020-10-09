@@ -101,7 +101,7 @@ func NewCmdCertsUtility(out io.Writer) *cobra.Command {
 	cmd.AddCommand(newCmdCertsRenewal(out))
 	cmd.AddCommand(newCmdCertsExpiration(out, constants.KubernetesDir))
 	cmd.AddCommand(newCmdCertificateKey())
-	cmd.AddCommand(newCmdGenCSR())
+	cmd.AddCommand(newCmdGenCSR(out))
 	return cmd
 }
 
@@ -147,7 +147,7 @@ func (o *genCSRConfig) load() (err error) {
 }
 
 // newCmdGenCSR returns cobra.Command for generating keys and CSRs
-func newCmdGenCSR() *cobra.Command {
+func newCmdGenCSR(out io.Writer) *cobra.Command {
 	config := newGenCSRConfig()
 
 	cmd := &cobra.Command{
@@ -160,7 +160,7 @@ func newCmdGenCSR() *cobra.Command {
 			if err := config.load(); err != nil {
 				return err
 			}
-			return runGenCSR(config)
+			return runGenCSR(out, config)
 		},
 	}
 	config.addFlagSet(cmd.Flags())
@@ -168,11 +168,11 @@ func newCmdGenCSR() *cobra.Command {
 }
 
 // runGenCSR contains the logic of the generate-csr sub-command.
-func runGenCSR(config *genCSRConfig) error {
-	if err := certsphase.CreateDefaultKeysAndCSRFiles(config.kubeadmConfig); err != nil {
+func runGenCSR(out io.Writer, config *genCSRConfig) error {
+	if err := certsphase.CreateDefaultKeysAndCSRFiles(out, config.kubeadmConfig); err != nil {
 		return err
 	}
-	if err := kubeconfigphase.CreateDefaultKubeConfigsAndCSRFiles(config.kubeConfigDir, config.kubeadmConfig); err != nil {
+	if err := kubeconfigphase.CreateDefaultKubeConfigsAndCSRFiles(out, config.kubeConfigDir, config.kubeadmConfig); err != nil {
 		return err
 	}
 	return nil
