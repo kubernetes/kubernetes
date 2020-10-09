@@ -651,6 +651,12 @@ const (
 	// Add support for the HPA to scale based on metrics from individual containers
 	// in target pods
 	HPAContainerMetrics featuregate.Feature = "HPAContainerMetrics"
+
+	// owner: @tallclair
+	// deprecated: v1.20
+	//
+	// Enables the deprecated kubelet streaming APIs. See https://feature.k8s.io/1898
+	DeprecatedKubeletStreamingAPI featuregate.Feature = "DeprecatedKubeletStreamingAPI"
 )
 
 func init() {
@@ -764,6 +770,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
-	HPAScaleToZero:         {Default: false, PreRelease: featuregate.Alpha},
-	LegacyNodeRoleBehavior: {Default: true, PreRelease: featuregate.Beta},
+	HPAScaleToZero:                {Default: false, PreRelease: featuregate.Alpha},
+	LegacyNodeRoleBehavior:        {Default: true, PreRelease: featuregate.Beta},
+	DeprecatedKubeletStreamingAPI: {Default: false, PreRelease: featuregate.Deprecated},
 }

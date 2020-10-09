@@ -39,7 +39,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -47,11 +47,14 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/remotecommand"
 	utiltesting "k8s.io/client-go/util/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 
 	// Do some initialization to decode the query parameters correctly.
@@ -574,6 +577,8 @@ func TestServeLogs(t *testing.T) {
 }
 
 func TestServeRunInContainer(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeprecatedKubeletStreamingAPI, true)()
+
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
 	output := "foo bar"
@@ -615,6 +620,8 @@ func TestServeRunInContainer(t *testing.T) {
 }
 
 func TestServeRunInContainerWithUID(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeprecatedKubeletStreamingAPI, true)()
+
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
 	output := "foo bar"
@@ -728,6 +735,8 @@ func TestAuthzCoverage(t *testing.T) {
 }
 
 func TestAuthFilters(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeprecatedKubeletStreamingAPI, true)()
+
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
 
@@ -1076,17 +1085,15 @@ func testExecAttach(t *testing.T, verb string) {
 		stderr             bool
 		tty                bool
 		responseStatusCode int
-		uid                bool
 		redirect           bool
 	}{
-		"no input or output":           {responseStatusCode: http.StatusBadRequest},
-		"stdin":                        {stdin: true, responseStatusCode: http.StatusSwitchingProtocols},
-		"stdout":                       {stdout: true, responseStatusCode: http.StatusSwitchingProtocols},
-		"stderr":                       {stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
-		"stdout and stderr":            {stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
-		"stdin stdout and stderr":      {stdin: true, stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
-		"stdin stdout stderr with uid": {stdin: true, stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols, uid: true},
-		"stdout with redirect":         {stdout: true, responseStatusCode: http.StatusFound, redirect: true},
+		"no input or output":      {responseStatusCode: http.StatusBadRequest},
+		"stdin":                   {stdin: true, responseStatusCode: http.StatusSwitchingProtocols},
+		"stdout":                  {stdout: true, responseStatusCode: http.StatusSwitchingProtocols},
+		"stderr":                  {stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
+		"stdout and stderr":       {stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
+		"stdin stdout and stderr": {stdin: true, stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
+		"stdout with redirect":    {stdout: true, responseStatusCode: http.StatusFound, redirect: true},
 	}
 
 	for desc := range tests {
@@ -1115,9 +1122,6 @@ func testExecAttach(t *testing.T, verb string) {
 
 			checkStream := func(podFullName string, uid types.UID, containerName string, streamOpts remotecommandserver.Options) {
 				assert.Equal(t, expectedPodName, podFullName, "podFullName")
-				if test.uid {
-					assert.Equal(t, testUID, string(uid), "uid")
-				}
 				assert.Equal(t, expectedContainerName, containerName, "containerName")
 				assert.Equal(t, test.stdin, streamOpts.Stdin, "stdin")
 				assert.Equal(t, test.stdout, streamOpts.Stdout, "stdout")
@@ -1176,12 +1180,7 @@ func testExecAttach(t *testing.T, verb string) {
 				return testStream(containerID, stdin, stdout, stderr, tty, done)
 			}
 
-			var url string
-			if test.uid {
-				url = fw.testHTTPServer.URL + "/" + verb + "/" + podNamespace + "/" + podName + "/" + testUID + "/" + expectedContainerName + "?ignore=1"
-			} else {
-				url = fw.testHTTPServer.URL + "/" + verb + "/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?ignore=1"
-			}
+			url := fw.testHTTPServer.URL + "/" + verb + "/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?ignore=1"
 			if verb == "exec" {
 				url += "&command=ls&command=-a"
 			}
@@ -1332,7 +1331,6 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 func TestServePortForward(t *testing.T) {
 	tests := map[string]struct {
 		port          string
-		uid           bool
 		clientData    string
 		containerData string
 		redirect      bool
@@ -1347,7 +1345,6 @@ func TestServePortForward(t *testing.T) {
 		"normal port":                   {port: "8000", shouldError: false},
 		"normal port with data forward": {port: "8000", clientData: "client data", containerData: "container data", shouldError: false},
 		"max port":                      {port: "65535", shouldError: false},
-		"normal port with uid":          {port: "8000", uid: true, shouldError: false},
 		"normal port with redirect":     {port: "8000", redirect: true, shouldError: false},
 	}
 
@@ -1368,9 +1365,6 @@ func TestServePortForward(t *testing.T) {
 			fw.fakeKubelet.getPortForwardCheck = func(name, namespace string, uid types.UID, opts portforward.V4Options) {
 				assert.Equal(t, podName, name, "pod name")
 				assert.Equal(t, podNamespace, namespace, "pod namespace")
-				if test.uid {
-					assert.Equal(t, testUID, string(uid), "uid")
-				}
 			}
 
 			ss.fakeRuntime.portForwardFunc = func(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
@@ -1396,12 +1390,7 @@ func TestServePortForward(t *testing.T) {
 				return nil
 			}
 
-			var url string
-			if test.uid {
-				url = fmt.Sprintf("%s/portForward/%s/%s/%s", fw.testHTTPServer.URL, podNamespace, podName, testUID)
-			} else {
-				url = fmt.Sprintf("%s/portForward/%s/%s", fw.testHTTPServer.URL, podNamespace, podName)
-			}
+			url := fmt.Sprintf("%s/portForward/%s/%s", fw.testHTTPServer.URL, podNamespace, podName)
 
 			var (
 				upgradeRoundTripper httpstream.UpgradeRoundTripper

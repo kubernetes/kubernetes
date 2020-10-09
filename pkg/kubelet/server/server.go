@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/utils/clock"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -412,70 +412,76 @@ const pprofBasePath = "/debug/pprof/"
 func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 	klog.Infof("Adding debug handlers to kubelet server.")
 
+	var ws *restful.WebService
+
 	s.addMetricsBucketMatcher("run")
-	ws := new(restful.WebService)
-	ws.
-		Path("/run")
-	ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
-		To(s.getRun).
-		Operation("getRun"))
-	ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}/{containerName}").
-		To(s.getRun).
-		Operation("getRun"))
-	s.restfulCont.Add(ws)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeprecatedKubeletStreamingAPI) {
+		ws = new(restful.WebService)
+		ws.Path("/run")
+		ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
+			To(s.getRun).
+			Operation("getRun"))
+		ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}/{containerName}").
+			To(s.getRun).
+			Operation("getRun"))
+		s.restfulCont.Add(ws)
+	}
 
 	s.addMetricsBucketMatcher("exec")
 	ws = new(restful.WebService)
-	ws.
-		Path("/exec")
-	ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
-		To(s.getExec).
-		Operation("getExec"))
+	ws.Path("/exec")
 	ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
 		To(s.getExec).
 		Operation("getExec"))
-	ws.Route(ws.GET("/{podNamespace}/{podID}/{uid}/{containerName}").
-		To(s.getExec).
-		Operation("getExec"))
-	ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}/{containerName}").
-		To(s.getExec).
-		Operation("getExec"))
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeprecatedKubeletStreamingAPI) {
+		ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
+			To(s.getExec).
+			Operation("getExec"))
+		ws.Route(ws.GET("/{podNamespace}/{podID}/{uid}/{containerName}").
+			To(s.getExec).
+			Operation("getExec"))
+		ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}/{containerName}").
+			To(s.getExec).
+			Operation("getExec"))
+	}
 	s.restfulCont.Add(ws)
 
 	s.addMetricsBucketMatcher("attach")
 	ws = new(restful.WebService)
-	ws.
-		Path("/attach")
-	ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
-		To(s.getAttach).
-		Operation("getAttach"))
+	ws.Path("/attach")
 	ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
 		To(s.getAttach).
 		Operation("getAttach"))
-	ws.Route(ws.GET("/{podNamespace}/{podID}/{uid}/{containerName}").
-		To(s.getAttach).
-		Operation("getAttach"))
-	ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}/{containerName}").
-		To(s.getAttach).
-		Operation("getAttach"))
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeprecatedKubeletStreamingAPI) {
+		ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
+			To(s.getAttach).
+			Operation("getAttach"))
+		ws.Route(ws.GET("/{podNamespace}/{podID}/{uid}/{containerName}").
+			To(s.getAttach).
+			Operation("getAttach"))
+		ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}/{containerName}").
+			To(s.getAttach).
+			Operation("getAttach"))
+	}
 	s.restfulCont.Add(ws)
 
 	s.addMetricsBucketMatcher("portForward")
 	ws = new(restful.WebService)
-	ws.
-		Path("/portForward")
-	ws.Route(ws.GET("/{podNamespace}/{podID}").
-		To(s.getPortForward).
-		Operation("getPortForward"))
+	ws.Path("/portForward")
 	ws.Route(ws.POST("/{podNamespace}/{podID}").
 		To(s.getPortForward).
 		Operation("getPortForward"))
-	ws.Route(ws.GET("/{podNamespace}/{podID}/{uid}").
-		To(s.getPortForward).
-		Operation("getPortForward"))
-	ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}").
-		To(s.getPortForward).
-		Operation("getPortForward"))
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeprecatedKubeletStreamingAPI) {
+		ws.Route(ws.GET("/{podNamespace}/{podID}").
+			To(s.getPortForward).
+			Operation("getPortForward"))
+		ws.Route(ws.GET("/{podNamespace}/{podID}/{uid}").
+			To(s.getPortForward).
+			Operation("getPortForward"))
+		ws.Route(ws.POST("/{podNamespace}/{podID}/{uid}").
+			To(s.getPortForward).
+			Operation("getPortForward"))
+	}
 	s.restfulCont.Add(ws)
 
 	s.addMetricsBucketMatcher("containerLogs")
