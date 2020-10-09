@@ -36,6 +36,6 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_CloudControllerManagerConfiguration(in *CloudControllerManagerConfiguration) {
-	SetdefaultsCloudcontrollermanagerconfiguration(in)
+	SetDefaults_CloudControllerManagerConfiguration(in)
 	configv1alpha1.SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
 }
