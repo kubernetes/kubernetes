@@ -167,7 +167,10 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 		ect.items[namespacedName] = change
 	}
 
-	if t := getLastChangeTriggerTime(endpoints.Annotations); !t.IsZero() {
+	// In case of Endpoints deletion, the LastChangeTriggerTime annotation is
+	// by-definition coming from the time of last update, which is not what
+	// we want to measure. So we simply ignore it in this cases.
+	if t := getLastChangeTriggerTime(endpoints.Annotations); !t.IsZero() && current != nil {
 		ect.lastChangeTriggerTimes[namespacedName] = append(ect.lastChangeTriggerTimes[namespacedName], t)
 	}
 
@@ -222,7 +225,12 @@ func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.E
 
 	if changeNeeded {
 		metrics.EndpointChangesPending.Inc()
-		if t := getLastChangeTriggerTime(endpointSlice.Annotations); !t.IsZero() {
+		// In case of Endpoints deletion, the LastChangeTriggerTime annotation is
+		// by-definition coming from the time of last update, which is not what
+		// we want to measure. So we simply ignore it in this cases.
+		// TODO(wojtek-t, robscott): Address the problem for EndpointSlice deletion
+		// when other EndpointSlice for that service still exist.
+		if t := getLastChangeTriggerTime(endpointSlice.Annotations); !t.IsZero() && !removeSlice {
 			ect.lastChangeTriggerTimes[namespacedName] =
 				append(ect.lastChangeTriggerTimes[namespacedName], t)
 		}
