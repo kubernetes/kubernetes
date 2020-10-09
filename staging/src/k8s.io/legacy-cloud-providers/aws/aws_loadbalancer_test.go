@@ -540,3 +540,286 @@ func TestFilterTargetNodes(t *testing.T) {
 		})
 	}
 }
+
+func TestProxyProtocolPortsWithNewELB(t *testing.T) {
+	tests := []struct {
+		name                    string
+		listeners               []*elb.Listener
+		proxyProtocolAnnotation string
+		expectResults           []int64
+	}{
+		{
+			name: "All ports case",
+			listeners: []*elb.Listener{
+				{LoadBalancerPort: aws.Int64(80), InstancePort: aws.Int64(30080), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("HTTP"), SSLCertificateId: aws.String("abc-123")},
+				{LoadBalancerPort: aws.Int64(443), InstancePort: aws.Int64(30443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+				{LoadBalancerPort: aws.Int64(8443), InstancePort: aws.Int64(38443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+			},
+			proxyProtocolAnnotation: "*",
+			expectResults:           []int64{80, 443, 8443},
+		},
+		{
+			name: "Empty proxyProtocolAnnotation case",
+			listeners: []*elb.Listener{
+				{LoadBalancerPort: aws.Int64(80), InstancePort: aws.Int64(30080), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("HTTP"), SSLCertificateId: aws.String("abc-123")},
+				{LoadBalancerPort: aws.Int64(443), InstancePort: aws.Int64(30443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+				{LoadBalancerPort: aws.Int64(8443), InstancePort: aws.Int64(38443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+			},
+			proxyProtocolAnnotation: "",
+			expectResults:           []int64{},
+		},
+		{
+			name: "Comma-separated list of ports proxyProtocolAnnotation case",
+			listeners: []*elb.Listener{
+				{LoadBalancerPort: aws.Int64(80), InstancePort: aws.Int64(30080), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("HTTP"), SSLCertificateId: aws.String("abc-123")},
+				{LoadBalancerPort: aws.Int64(443), InstancePort: aws.Int64(30443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+				{LoadBalancerPort: aws.Int64(8443), InstancePort: aws.Int64(38443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+			},
+			proxyProtocolAnnotation: "80,443",
+			expectResults:           []int64{80, 443},
+		},
+	}
+
+	for _, test := range tests {
+		t.Logf("Running test case %s", test.name)
+		annotations := make(map[string]string)
+		if test.proxyProtocolAnnotation != "" {
+			annotations[ServiceAnnotationLoadBalancerProxyProtocol] = test.proxyProtocolAnnotation
+		}
+		proxyProtocolPorts := getPortSets(test.proxyProtocolAnnotation)
+		proxyProtocolAnnotation := annotations[ServiceAnnotationLoadBalancerProxyProtocol]
+		var results []int64
+		if proxyProtocolPorts != nil || proxyProtocolAnnotation == "*" {
+
+			for _, listener := range test.listeners {
+				if proxyProtocolAnnotation == "*" || (proxyProtocolPorts != nil && proxyProtocolPorts.numbers.Has(*listener.LoadBalancerPort)) {
+					results = append(results, *listener.LoadBalancerPort)
+				}
+			}
+		}
+
+		assert.ElementsMatch(t, results, test.expectResults,
+			"Incorrect (%#v vs expected %#v) for case: %s",
+			results, test.expectResults, test.name)
+
+	}
+}
+
+func TestProxyProtocolPortsWithExistsELB(t *testing.T) {
+	tests := []struct {
+		name                    string
+		listeners               []*elb.Listener
+		proxyProtocolAnnotation string
+		backendListener         []*elb.BackendServerDescription
+		expectResultsForAdd     []int64
+		expectResultsForRemove  []int64
+	}{
+		{
+			name: "Set proxy protocol on all ELB backend with *",
+			listeners: []*elb.Listener{
+				{LoadBalancerPort: aws.Int64(80), InstancePort: aws.Int64(30080), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("HTTP"), SSLCertificateId: aws.String("abc-123")},
+				{LoadBalancerPort: aws.Int64(443), InstancePort: aws.Int64(30443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+				{LoadBalancerPort: aws.Int64(8443), InstancePort: aws.Int64(38443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+			},
+			backendListener:         []*elb.BackendServerDescription{},
+			proxyProtocolAnnotation: "*",
+			expectResultsForAdd:     []int64{30080, 30443, 38443},
+			expectResultsForRemove:  []int64{},
+		},
+		{
+			name: "Set proxy protocol on all ELB backend with comma-separated ports",
+			listeners: []*elb.Listener{
+				{LoadBalancerPort: aws.Int64(80), InstancePort: aws.Int64(30080), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("HTTP"), SSLCertificateId: aws.String("abc-123")},
+				{LoadBalancerPort: aws.Int64(443), InstancePort: aws.Int64(30443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+				{LoadBalancerPort: aws.Int64(8443), InstancePort: aws.Int64(38443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+			},
+			backendListener:         []*elb.BackendServerDescription{},
+			proxyProtocolAnnotation: "80,443,8443",
+			expectResultsForAdd:     []int64{30080, 30443, 38443},
+			expectResultsForRemove:  []int64{},
+		},
+		{
+			name: "Set proxy protocol on ELB that proxy already set with *",
+			listeners: []*elb.Listener{
+				{LoadBalancerPort: aws.Int64(80), InstancePort: aws.Int64(30080), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("HTTP"), SSLCertificateId: aws.String("abc-123")},
+				{LoadBalancerPort: aws.Int64(443), InstancePort: aws.Int64(30443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+				{LoadBalancerPort: aws.Int64(8443), InstancePort: aws.Int64(38443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+			},
+			backendListener: []*elb.BackendServerDescription{
+				{InstancePort: aws.Int64(30080), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+				{InstancePort: aws.Int64(30443), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+				{InstancePort: aws.Int64(38443), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+			},
+			proxyProtocolAnnotation: "*",
+			expectResultsForAdd:     []int64{},
+			expectResultsForRemove:  []int64{},
+		},
+		{
+			name: "Set proxy protocol on ELB that proxy already set with comma-separated list",
+			listeners: []*elb.Listener{
+				{LoadBalancerPort: aws.Int64(80), InstancePort: aws.Int64(30080), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("HTTP"), SSLCertificateId: aws.String("abc-123")},
+				{LoadBalancerPort: aws.Int64(443), InstancePort: aws.Int64(30443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+				{LoadBalancerPort: aws.Int64(8443), InstancePort: aws.Int64(38443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+			},
+			backendListener: []*elb.BackendServerDescription{
+				{InstancePort: aws.Int64(30080), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+				{InstancePort: aws.Int64(30443), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+				{InstancePort: aws.Int64(38443), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+			},
+			proxyProtocolAnnotation: "80,443,8443",
+			expectResultsForAdd:     []int64{},
+			expectResultsForRemove:  []int64{},
+		},
+		{
+			name: "Set proxy protocol on new listener with *",
+			listeners: []*elb.Listener{
+				{LoadBalancerPort: aws.Int64(80), InstancePort: aws.Int64(30080), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("HTTP"), SSLCertificateId: aws.String("abc-123")},
+				{LoadBalancerPort: aws.Int64(443), InstancePort: aws.Int64(30443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+				{LoadBalancerPort: aws.Int64(8443), InstancePort: aws.Int64(38443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+			},
+			backendListener: []*elb.BackendServerDescription{
+				{InstancePort: aws.Int64(30080), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+			},
+			proxyProtocolAnnotation: "*",
+			expectResultsForAdd:     []int64{30443, 38443},
+			expectResultsForRemove:  []int64{},
+		},
+		{
+			name: "Unset proxy protocol on deleted listener",
+			listeners: []*elb.Listener{
+				{LoadBalancerPort: aws.Int64(80), InstancePort: aws.Int64(30080), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("HTTP"), SSLCertificateId: aws.String("abc-123")},
+				{LoadBalancerPort: aws.Int64(443), InstancePort: aws.Int64(30443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+				{LoadBalancerPort: aws.Int64(8443), InstancePort: aws.Int64(38443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+			},
+			backendListener: []*elb.BackendServerDescription{
+				{InstancePort: aws.Int64(30080), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+				{InstancePort: aws.Int64(30443), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+				{InstancePort: aws.Int64(38443), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+				{InstancePort: aws.Int64(39443), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+			},
+			proxyProtocolAnnotation: "*",
+			expectResultsForAdd:     []int64{},
+			expectResultsForRemove:  []int64{39443},
+		},
+		{
+			name: "Proxy protocol needs to be removed with empty proxyProtocolAnnotation",
+			listeners: []*elb.Listener{
+				{LoadBalancerPort: aws.Int64(80), InstancePort: aws.Int64(30080), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("HTTP"), SSLCertificateId: aws.String("abc-123")},
+				{LoadBalancerPort: aws.Int64(443), InstancePort: aws.Int64(30443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+				{LoadBalancerPort: aws.Int64(8443), InstancePort: aws.Int64(38443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+			},
+			backendListener: []*elb.BackendServerDescription{
+				{InstancePort: aws.Int64(30080), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+				{InstancePort: aws.Int64(30443), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+				{InstancePort: aws.Int64(38443), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+				{InstancePort: aws.Int64(39443), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+			},
+			proxyProtocolAnnotation: "",
+			expectResultsForAdd:     []int64{},
+			expectResultsForRemove:  []int64{30080, 30443, 38443, 39443},
+		},
+		{
+			name: "Empty proxyProtocolAnnotation and empty backendListener",
+			listeners: []*elb.Listener{
+				{LoadBalancerPort: aws.Int64(80), InstancePort: aws.Int64(30080), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("HTTP"), SSLCertificateId: aws.String("abc-123")},
+				{LoadBalancerPort: aws.Int64(443), InstancePort: aws.Int64(30443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+				{LoadBalancerPort: aws.Int64(8443), InstancePort: aws.Int64(38443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+			},
+			backendListener:         []*elb.BackendServerDescription{},
+			proxyProtocolAnnotation: "",
+			expectResultsForAdd:     []int64{},
+			expectResultsForRemove:  []int64{},
+		},
+		{
+			name: "Remove policy which ports not specified in annotation",
+			listeners: []*elb.Listener{
+				{LoadBalancerPort: aws.Int64(80), InstancePort: aws.Int64(30080), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("HTTP"), SSLCertificateId: aws.String("abc-123")},
+				{LoadBalancerPort: aws.Int64(443), InstancePort: aws.Int64(30443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+				{LoadBalancerPort: aws.Int64(8443), InstancePort: aws.Int64(38443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+			},
+			backendListener: []*elb.BackendServerDescription{
+				{InstancePort: aws.Int64(30080), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+				{InstancePort: aws.Int64(30443), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+				{InstancePort: aws.Int64(39443), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+			},
+			proxyProtocolAnnotation: "44444",
+			expectResultsForAdd:     []int64{},
+			expectResultsForRemove:  []int64{30080, 30443, 39443},
+		},
+		{
+			name: "proxy protocol needs to be added and removed",
+			listeners: []*elb.Listener{
+				{LoadBalancerPort: aws.Int64(80), InstancePort: aws.Int64(30080), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("HTTP"), SSLCertificateId: aws.String("abc-123")},
+				{LoadBalancerPort: aws.Int64(443), InstancePort: aws.Int64(30443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+				{LoadBalancerPort: aws.Int64(8443), InstancePort: aws.Int64(38443), InstanceProtocol: aws.String("TCP"), Protocol: aws.String("TCP"), SSLCertificateId: aws.String("def-456")},
+			},
+			backendListener: []*elb.BackendServerDescription{
+				{InstancePort: aws.Int64(38443), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+				{InstancePort: aws.Int64(39443), PolicyNames: []*string{aws.String(ProxyProtocolPolicyName)}},
+			},
+			proxyProtocolAnnotation: "80,443,8443",
+			expectResultsForAdd:     []int64{30080, 30443},
+			expectResultsForRemove:  []int64{39443},
+		},
+	}
+
+	for _, test := range tests {
+		t.Logf("Running test case %s", test.name)
+		annotations := make(map[string]string)
+		if test.proxyProtocolAnnotation != "" {
+			annotations[ServiceAnnotationLoadBalancerProxyProtocol] = test.proxyProtocolAnnotation
+		}
+		proxyProtocolPorts := getPortSets(test.proxyProtocolAnnotation)
+		proxyProtocolAnnotation := annotations[ServiceAnnotationLoadBalancerProxyProtocol]
+
+		var resultsForAdd, resultsForRemove []int64
+
+		keepProxyProtocolBackends := make(map[int64]bool)
+		proxyProtocolBackends := make(map[int64]bool)
+		for _, backendListener := range test.backendListener {
+			keepProxyProtocolBackends[*backendListener.InstancePort] = false
+			proxyProtocolBackends[*backendListener.InstancePort] = proxyProtocolEnabled(backendListener)
+		}
+
+		// test add proxy protocol
+		for _, listener := range test.listeners {
+			setPolicy := false
+			instancePort := *listener.InstancePort
+			loadBalancerPort := *listener.LoadBalancerPort
+
+			proxyProtocol := proxyProtocolAnnotation == "*" || (proxyProtocolPorts != nil && proxyProtocolPorts.numbers.Has(loadBalancerPort))
+
+			if currentState, ok := proxyProtocolBackends[instancePort]; !ok {
+				// This is a new ELB backend so we only need to worry about
+				// potentially adding a policy and not removing an
+				// existing one
+				setPolicy = proxyProtocol
+			} else {
+				keepProxyProtocolBackends[instancePort] = proxyProtocol
+				// This is an existing ELB backend so we need to determine
+				// if the state changed
+				if !currentState {
+					setPolicy = proxyProtocol
+				}
+			}
+
+			if setPolicy {
+				resultsForAdd = append(resultsForAdd, *listener.InstancePort)
+			}
+		}
+		// test remove proxy protocol on instancePort
+		for instancePort, keep := range keepProxyProtocolBackends {
+			if !keep {
+				resultsForRemove = append(resultsForRemove, instancePort)
+			}
+		}
+
+		assert.ElementsMatch(t, resultsForAdd, test.expectResultsForAdd,
+			"Incorrect add (%#v vs expected %#v) for case: %s",
+			resultsForAdd, test.expectResultsForAdd, test.name)
+
+		assert.ElementsMatch(t, resultsForRemove, test.expectResultsForRemove,
+			"Incorrect remove (%#v vs expected %#v) for case: %s",
+			resultsForRemove, test.expectResultsForRemove, test.name)
+	}
+}

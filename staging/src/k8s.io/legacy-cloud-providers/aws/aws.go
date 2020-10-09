@@ -109,10 +109,8 @@ const ServiceAnnotationLoadBalancerType = "service.beta.kubernetes.io/aws-load-b
 const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/aws-load-balancer-internal"
 
 // ServiceAnnotationLoadBalancerProxyProtocol is the annotation used on the
-// service to enable the proxy protocol on an ELB. Right now we only accept the
-// value "*" which means enable the proxy protocol on all ELB backends. In the
-// future we could adjust this to allow setting the proxy protocol only on
-// certain backends.
+// service to specify a comma-separated list of ports that will enable the
+// proxy protocol on an ELB. Defaults to '*' (all).
 const ServiceAnnotationLoadBalancerProxyProtocol = "service.beta.kubernetes.io/aws-load-balancer-proxy-protocol"
 
 // ServiceAnnotationLoadBalancerAccessLogEmitInterval is the annotation used to
@@ -3935,15 +3933,8 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		return v2toStatus(v2LoadBalancer), nil
 	}
 
-	// Determine if we need to set the Proxy protocol policy
-	proxyProtocol := false
-	proxyProtocolAnnotation := apiService.Annotations[ServiceAnnotationLoadBalancerProxyProtocol]
-	if proxyProtocolAnnotation != "" {
-		if proxyProtocolAnnotation != "*" {
-			return nil, fmt.Errorf("annotation %q=%q detected, but the only value supported currently is '*'", ServiceAnnotationLoadBalancerProxyProtocol, proxyProtocolAnnotation)
-		}
-		proxyProtocol = true
-	}
+	// Get ports to set the Proxy protocol policy
+	proxyProtocolPorts := getPortSets(annotations[ServiceAnnotationLoadBalancerProxyProtocol])
 
 	// Some load balancer attributes are required, so defaults are set. These can be overridden by annotations.
 	loadBalancerAttributes := &elb.LoadBalancerAttributes{
@@ -4110,7 +4101,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		subnetIDs,
 		securityGroupIDs,
 		internalELB,
-		proxyProtocol,
+		proxyProtocolPorts,
 		loadBalancerAttributes,
 		annotations,
 	)

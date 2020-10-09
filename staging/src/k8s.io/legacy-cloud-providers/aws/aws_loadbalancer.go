@@ -921,7 +921,7 @@ func (c *Cloud) updateInstanceSecurityGroupForNLBMTU(sgID string, sgPerms IPPerm
 	return nil
 }
 
-func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBalancerName string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string, internalELB, proxyProtocol bool, loadBalancerAttributes *elb.LoadBalancerAttributes, annotations map[string]string) (*elb.LoadBalancerDescription, error) {
+func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBalancerName string, listeners []*elb.Listener, subnetIDs []string, securityGroupIDs []string, internalELB bool, proxyProtocolPorts *portSets, loadBalancerAttributes *elb.LoadBalancerAttributes, annotations map[string]string) (*elb.LoadBalancerDescription, error) {
 	loadBalancer, err := c.describeLoadBalancer(loadBalancerName)
 	if err != nil {
 		return nil, err
@@ -972,17 +972,20 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 			return nil, err
 		}
 
-		if proxyProtocol {
+		proxyProtocolAnnotation := annotations[ServiceAnnotationLoadBalancerProxyProtocol]
+		if proxyProtocolPorts != nil || proxyProtocolAnnotation == "*" {
 			err = c.createProxyProtocolPolicy(loadBalancerName)
 			if err != nil {
 				return nil, err
 			}
 
 			for _, listener := range listeners {
-				klog.V(2).Infof("Adjusting AWS loadbalancer proxy protocol on node port %d. Setting to true", *listener.InstancePort)
-				err := c.setBackendPolicies(loadBalancerName, *listener.InstancePort, []*string{aws.String(ProxyProtocolPolicyName)})
-				if err != nil {
-					return nil, err
+				if proxyProtocolAnnotation == "*" || (proxyProtocolPorts != nil && proxyProtocolPorts.numbers.Has(*listener.LoadBalancerPort)) {
+					klog.V(2).Infof("Adjusting AWS loadbalancer proxy protocol on node port %d. Setting to true", *listener.InstancePort)
+					err := c.setBackendPolicies(loadBalancerName, *listener.InstancePort, []*string{aws.String(ProxyProtocolPolicyName)})
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
@@ -1077,7 +1080,9 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 			// Sync proxy protocol state for new and existing listeners
 
 			proxyPolicies := make([]*string, 0)
-			if proxyProtocol {
+
+			proxyProtocolAnnotation := annotations[ServiceAnnotationLoadBalancerProxyProtocol]
+			if proxyProtocolPorts != nil || proxyProtocolAnnotation == "*" {
 				// Ensure the backend policy exists
 
 				// NOTE The documentation for the AWS API indicates we could get an HTTP 400
@@ -1092,16 +1097,19 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				proxyPolicies = append(proxyPolicies, aws.String(ProxyProtocolPolicyName))
 			}
 
-			foundBackends := make(map[int64]bool)
+			keepProxyProtocolBackends := make(map[int64]bool)
 			proxyProtocolBackends := make(map[int64]bool)
 			for _, backendListener := range loadBalancer.BackendServerDescriptions {
-				foundBackends[*backendListener.InstancePort] = false
+				keepProxyProtocolBackends[*backendListener.InstancePort] = false
 				proxyProtocolBackends[*backendListener.InstancePort] = proxyProtocolEnabled(backendListener)
 			}
 
 			for _, listener := range listeners {
 				setPolicy := false
 				instancePort := *listener.InstancePort
+				loadBalancerPort := *listener.LoadBalancerPort
+
+				proxyProtocol := proxyProtocolAnnotation == "*" || (proxyProtocolPorts != nil && proxyProtocolPorts.numbers.Has(loadBalancerPort))
 
 				if currentState, ok := proxyProtocolBackends[instancePort]; !ok {
 					// This is a new ELB backend so we only need to worry about
@@ -1109,14 +1117,16 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 					// existing one
 					setPolicy = proxyProtocol
 				} else {
-					foundBackends[instancePort] = true
+					keepProxyProtocolBackends[instancePort] = proxyProtocol
 					// This is an existing ELB backend so we need to determine
 					// if the state changed
-					setPolicy = (currentState != proxyProtocol)
+					if !currentState {
+						setPolicy = proxyProtocol
+					}
 				}
 
 				if setPolicy {
-					klog.V(2).Infof("Adjusting AWS loadbalancer proxy protocol on node port %d. Setting to %t", instancePort, proxyProtocol)
+					klog.V(2).Infof("Adjusting AWS loadbalancer proxy protocol on node port %d. Setting to %t", instancePort, setPolicy)
 					err := c.setBackendPolicies(loadBalancerName, instancePort, proxyPolicies)
 					if err != nil {
 						return nil, err
@@ -1128,8 +1138,9 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 			// We now need to figure out if any backend policies need removed
 			// because these old policies will stick around even if there is no
 			// corresponding listener anymore
-			for instancePort, found := range foundBackends {
-				if !found {
+			// or ports not specified in ServiceAnnotationLoadBalancerProxyProtocol
+			for instancePort, keep := range keepProxyProtocolBackends {
+				if !keep {
 					klog.V(2).Infof("Adjusting AWS loadbalancer proxy protocol on node port %d. Setting to false", instancePort)
 					err := c.setBackendPolicies(loadBalancerName, instancePort, []*string{})
 					if err != nil {
