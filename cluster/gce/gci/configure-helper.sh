@@ -1175,7 +1175,7 @@ rules:
       - /version
       - /swagger*
 
-  # Don't log events requests.
+  # Don't log events requests because of performance impact.
   - level: None
     resources:
       - group: "" # core
