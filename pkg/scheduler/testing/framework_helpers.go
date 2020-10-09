@@ -18,8 +18,8 @@ package testing
 
 import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // NewFramework creates a Framework from the register functions and options.

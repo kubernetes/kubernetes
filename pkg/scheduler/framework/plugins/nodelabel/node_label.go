@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // Name of this plugin.
@@ -37,7 +37,7 @@ const (
 )
 
 // New initializes a new plugin and returns it.
-func New(plArgs runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
+func New(plArgs runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	args, err := getArgs(plArgs)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func getArgs(obj runtime.Object) (config.NodeLabelArgs, error) {
 
 // NodeLabel checks whether a pod can fit based on the node labels which match a filter that it requests.
 type NodeLabel struct {
-	handle framework.FrameworkHandle
+	handle framework.Handle
 	args   config.NodeLabelArgs
 }
 

@@ -22,7 +22,7 @@ import (
 	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )

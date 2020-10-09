@@ -16,7 +16,7 @@ limitations under the License.
 
 // This file defines the scheduling framework plugin interfaces.
 
-package v1alpha1
+package framework
 
 import (
 	"context"
@@ -410,7 +410,7 @@ type BindPlugin interface {
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
-	FrameworkHandle
+	Handle
 	// QueueSortFunc returns the function to sort pods in scheduling queue
 	QueueSortFunc() LessFunc
 
@@ -506,10 +506,10 @@ type Framework interface {
 	ListPlugins() map[string][]config.Plugin
 }
 
-// FrameworkHandle provides data and some tools that plugins can use. It is
+// Handle provides data and some tools that plugins can use. It is
 // passed to the plugin factories at the time of plugin initialization. Plugins
 // must store and use this handle to call framework functions.
-type FrameworkHandle interface {
+type Handle interface {
 	// SnapshotSharedLister returns listers from the latest NodeInfo Snapshot. The snapshot
 	// is taken at the beginning of a scheduling cycle and remains unchanged until
 	// a pod finishes "Permit" point. There is no guarantee that the information
@@ -536,7 +536,7 @@ type FrameworkHandle interface {
 
 	SharedInformerFactory() informers.SharedInformerFactory
 
-	// TODO: unroll the wrapped interfaces to FrameworkHandle.
+	// TODO: unroll the wrapped interfaces to Handle.
 	PreemptHandle() PreemptHandle
 }
 

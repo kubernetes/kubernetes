@@ -39,7 +39,7 @@ import (
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/core"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -52,7 +52,7 @@ const (
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
 type DefaultPreemption struct {
-	fh        framework.FrameworkHandle
+	fh        framework.Handle
 	podLister corelisters.PodLister
 	pdbLister policylisters.PodDisruptionBudgetLister
 }
@@ -65,7 +65,7 @@ func (pl *DefaultPreemption) Name() string {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 	pl := DefaultPreemption{
 		fh:        fh,
 		podLister: fh.SharedInformerFactory().Core().V1().Pods().Lister(),
@@ -596,7 +596,7 @@ func selectVictimsOnNode(
 // - Evict the victim pods
 // - Reject the victim pods if they are in waitingPod map
 // - Clear the low-priority pods' nominatedNodeName status if needed
-func PrepareCandidate(c Candidate, fh framework.FrameworkHandle, cs kubernetes.Interface, pod *v1.Pod) error {
+func PrepareCandidate(c Candidate, fh framework.Handle, cs kubernetes.Interface, pod *v1.Pod) error {
 	for _, victim := range c.Victims().Pods {
 		if err := util.DeletePod(cs, victim); err != nil {
 			klog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)

@@ -11,7 +11,7 @@ go_library(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/scheduler/core:go_default_library",
-        "//pkg/scheduler/framework/v1alpha1:go_default_library",
+        "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/internal/parallelize:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
         "//pkg/scheduler/util:go_default_library",
@@ -51,6 +51,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/controller/volume/scheduling:go_default_library",
+        "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultbinder:go_default_library",
         "//pkg/scheduler/framework/plugins/interpodaffinity:go_default_library",
         "//pkg/scheduler/framework/plugins/nodeaffinity:go_default_library",
@@ -64,7 +65,6 @@ go_test(
         "//pkg/scheduler/framework/plugins/volumerestrictions:go_default_library",
         "//pkg/scheduler/framework/plugins/volumezone:go_default_library",
         "//pkg/scheduler/framework/runtime:go_default_library",
-        "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
         "//pkg/scheduler/testing:go_default_library",
