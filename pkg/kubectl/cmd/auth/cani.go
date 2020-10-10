@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	discovery "k8s.io/client-go/discovery"
@@ -94,6 +95,9 @@ var (
 
 		# List all allowed actions in namespace "foo"
 		kubectl auth can-i --list --namespace=foo`)
+
+	resourceVerbs       = sets.NewString("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection", "use", "bind", "impersonate", "*")
+	nonResourceURLVerbs = sets.NewString("get", "put", "post", "head", "options", "delete", "patch", "*")
 )
 
 // NewCmdCanI returns an initialized Command for 'auth can-i' sub command
@@ -201,6 +205,9 @@ func (o *CanIOptions) Validate() error {
 		if o.Resource != (schema.GroupVersionResource{}) || o.ResourceName != "" {
 			return fmt.Errorf("NonResourceURL and ResourceName can not specified together")
 		}
+		if !isKnownNonResourceVerb(o.Verb) {
+			fmt.Fprintf(o.ErrOut, "Warning: verb '%s' is not a known verb\n", o.Verb)
+		}
 	} else if !o.Resource.Empty() && !o.AllNamespaces && o.DiscoveryClient != nil {
 		if namespaced, err := isNamespaced(o.Resource, o.DiscoveryClient); err == nil && !namespaced {
 			if len(o.Resource.Group) == 0 {
@@ -209,6 +216,10 @@ func (o *CanIOptions) Validate() error {
 				fmt.Fprintf(o.ErrOut, "Warning: resource '%s' is not namespace scoped in group '%s'\n", o.Resource.Resource, o.Resource.Group)
 			}
 		}
+		if !isKnownResourceVerb(o.Verb) {
+			fmt.Fprintf(o.ErrOut, "Warning: verb '%s' is not a known verb\n", o.Verb)
+		}
+
 	}
 
 	if o.NoHeaders {
@@ -263,7 +274,6 @@ func (o *CanIOptions) RunAccessCheck() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-
 	if response.Status.Allowed {
 		fmt.Fprintln(o.Out, "yes")
 	} else {
@@ -392,4 +402,12 @@ func isNamespaced(gvr schema.GroupVersionResource, discoveryClient discovery.Dis
 	}
 
 	return false, fmt.Errorf("the server doesn't have a resource type '%s' in group '%s'", gvr.Resource, gvr.Group)
+}
+
+func isKnownResourceVerb(s string) bool {
+	return resourceVerbs.Has(s)
+}
+
+func isKnownNonResourceVerb(s string) bool {
+	return nonResourceURLVerbs.Has(s)
 }
