@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
@@ -518,10 +517,8 @@ func TestPreFilterState(t *testing.T) {
 			ctx := context.Background()
 			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
 			pl := PodTopologySpread{
-				sharedLister: cache.NewSnapshot(tt.existingPods, tt.nodes),
-				args: config.PodTopologySpreadArgs{
-					DefaultConstraints: tt.defaultConstraints,
-				},
+				sharedLister:       cache.NewSnapshot(tt.existingPods, tt.nodes),
+				defaultConstraints: tt.defaultConstraints,
 			}
 			pl.setListers(informerFactory)
 			informerFactory.Start(ctx.Done())

@@ -1622,6 +1622,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 								WhenUnsatisfiable: v1.ScheduleAnyway,
 							},
 						},
+						DefaultingType: config.ListDefaulting,
 					},
 				},
 				{
@@ -1686,6 +1687,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 								WhenUnsatisfiable: v1.ScheduleAnyway,
 							},
 						},
+						DefaultingType: config.ListDefaulting,
 					},
 				},
 				{

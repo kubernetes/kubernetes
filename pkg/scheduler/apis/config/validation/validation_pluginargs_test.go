@@ -112,6 +112,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 						WhenUnsatisfiable: v1.ScheduleAnyway,
 					},
 				},
+				DefaultingType: config.ListDefaulting,
 			},
 		},
 		"maxSkew less than zero": {
@@ -123,6 +124,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 						WhenUnsatisfiable: v1.DoNotSchedule,
 					},
 				},
+				DefaultingType: config.ListDefaulting,
 			},
 			wantErr: `defaultConstraints[0].maxSkew: Invalid value: -1: must be greater than zero`,
 		},
@@ -135,6 +137,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 						WhenUnsatisfiable: v1.DoNotSchedule,
 					},
 				},
+				DefaultingType: config.ListDefaulting,
 			},
 			wantErr: `defaultConstraints[0].topologyKey: Required value: can not be empty`,
 		},
@@ -147,6 +150,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 						WhenUnsatisfiable: "",
 					},
 				},
+				DefaultingType: config.ListDefaulting,
 			},
 			wantErr: `defaultConstraints[0].whenUnsatisfiable: Required value: can not be empty`,
 		},
@@ -159,6 +163,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 						WhenUnsatisfiable: "unknown action",
 					},
 				},
+				DefaultingType: config.ListDefaulting,
 			},
 			wantErr: `defaultConstraints[0].whenUnsatisfiable: Unsupported value: "unknown action": supported values: "DoNotSchedule", "ScheduleAnyway"`,
 		},
@@ -176,6 +181,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 						WhenUnsatisfiable: v1.DoNotSchedule,
 					},
 				},
+				DefaultingType: config.ListDefaulting,
 			},
 			wantErr: `defaultConstraints[1]: Duplicate value: "{node, DoNotSchedule}"`,
 		},
@@ -193,8 +199,32 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 						},
 					},
 				},
+				DefaultingType: config.ListDefaulting,
 			},
 			wantErr: `defaultConstraints[0].labelSelector: Forbidden: constraint must not define a selector, as they deduced for each pod`,
+		},
+		"list default constraints, no constraints": {
+			args: &config.PodTopologySpreadArgs{
+				DefaultingType: config.ListDefaulting,
+			},
+		},
+		"system default constraints": {
+			args: &config.PodTopologySpreadArgs{
+				DefaultingType: config.SystemDefaulting,
+			},
+		},
+		"system default constraints, but has constraints": {
+			args: &config.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						MaxSkew:           1,
+						TopologyKey:       "key",
+						WhenUnsatisfiable: v1.DoNotSchedule,
+					},
+				},
+				DefaultingType: config.SystemDefaulting,
+			},
+			wantErr: `defaultingType: Invalid value: "System": when .defaultConstraints are not empty`,
 		},
 	}
 
