@@ -100,7 +100,7 @@ func NewCmdCertsUtility(out io.Writer) *cobra.Command {
 
 	cmd.AddCommand(newCmdCertsRenewal(out))
 	cmd.AddCommand(newCmdCertsExpiration(out, constants.KubernetesDir))
-	cmd.AddCommand(NewCmdCertificateKey())
+	cmd.AddCommand(newCmdCertificateKey())
 	cmd.AddCommand(newCmdGenCSR())
 	return cmd
 }
@@ -178,8 +178,8 @@ func runGenCSR(config *genCSRConfig) error {
 	return nil
 }
 
-// NewCmdCertificateKey returns cobra.Command for certificate key generate
-func NewCmdCertificateKey() *cobra.Command {
+// newCmdCertificateKey returns cobra.Command for certificate key generate
+func newCmdCertificateKey() *cobra.Command {
 	return &cobra.Command{
 		Use:   "certificate-key",
 		Short: "Generate certificate keys",
