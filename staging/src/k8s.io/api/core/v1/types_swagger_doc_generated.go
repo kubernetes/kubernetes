@@ -1470,6 +1470,7 @@ func (PodAntiAffinity) SwaggerDoc() map[string]string {
 
 var map_PodAttachOptions = map[string]string{
 	"":          "PodAttachOptions is the query options to a Pod's remote attach call.",
+	"pod":       "Pod is a reference to the pod being targeted for attach. Only name and namespace may be set.",
 	"stdin":     "Stdin if true, redirects the standard input stream of the pod for this call. Defaults to false.",
 	"stdout":    "Stdout if true indicates that stdout is to be redirected for the attach call. Defaults to true.",
 	"stderr":    "Stderr if true indicates that stderr is to be redirected for the attach call. Defaults to true.",
@@ -1517,6 +1518,7 @@ func (PodDNSConfigOption) SwaggerDoc() map[string]string {
 
 var map_PodExecOptions = map[string]string{
 	"":          "PodExecOptions is the query options to a Pod's remote exec call.",
+	"pod":       "Pod is a reference to the pod being targeted for exec. Only name and namespace may be set.",
 	"stdin":     "Redirect the standard input stream of the pod for this call. Defaults to false.",
 	"stdout":    "Redirect the standard output stream of the pod for this call. Defaults to true.",
 	"stderr":    "Redirect the standard error stream of the pod for this call. Defaults to true.",
@@ -1567,6 +1569,7 @@ func (PodLogOptions) SwaggerDoc() map[string]string {
 
 var map_PodPortForwardOptions = map[string]string{
 	"":      "PodPortForwardOptions is the query options to a Pod's port forward call when using WebSockets. The `port` query parameter must specify the port or ports (comma separated) to forward over. Port forwarding over SPDY does not use these options. It requires the port to be passed in the `port` header as part of request.",
+	"pod":   "Pod is a reference to the pod being targeted for exec. Only name and namespace may be set.",
 	"ports": "List of ports to forward Required when using WebSockets",
 }
 

@@ -1,7 +1,16 @@
 {
   "kind": "PodPortForwardOptions",
   "apiVersion": "v1",
+  "pod": {
+    "kind": "2",
+    "namespace": "3",
+    "name": "4",
+    "uid": "ő岅ȕHH壬%龺ǟ橸章蒪ʤǎ",
+    "apiVersion": "5",
+    "resourceVersion": "6",
+    "fieldPath": "7"
+  },
   "ports": [
-    -1477656590
+    649801091
   ]
 }

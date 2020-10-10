@@ -3398,6 +3398,11 @@ func (in *PodAntiAffinity) DeepCopy() *PodAntiAffinity {
 func (in *PodAttachOptions) DeepCopyInto(out *PodAttachOptions) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	if in.Pod != nil {
+		in, out := &in.Pod, &out.Pod
+		*out = new(ObjectReference)
+		**out = **in
+	}
 	return
 }
 
@@ -3495,6 +3500,11 @@ func (in *PodDNSConfigOption) DeepCopy() *PodDNSConfigOption {
 func (in *PodExecOptions) DeepCopyInto(out *PodExecOptions) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	if in.Pod != nil {
+		in, out := &in.Pod, &out.Pod
+		*out = new(ObjectReference)
+		**out = **in
+	}
 	if in.Command != nil {
 		in, out := &in.Command, &out.Command
 		*out = make([]string, len(*in))
@@ -3618,6 +3628,11 @@ func (in *PodLogOptions) DeepCopyObject() runtime.Object {
 func (in *PodPortForwardOptions) DeepCopyInto(out *PodPortForwardOptions) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	if in.Pod != nil {
+		in, out := &in.Pod, &out.Pod
+		*out = new(ObjectReference)
+		**out = **in
+	}
 	if in.Ports != nil {
 		in, out := &in.Ports, &out.Ports
 		*out = make([]int32, len(*in))

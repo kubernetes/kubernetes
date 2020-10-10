@@ -4435,6 +4435,11 @@ type PodLogOptions struct {
 type PodAttachOptions struct {
 	metav1.TypeMeta
 
+	// Pod is a reference to the pod being targeted for exec.
+	// Only name and namespace may be set.
+	// +optional
+	Pod *ObjectReference
+
 	// Stdin if true indicates that stdin is to be redirected for the attach call
 	// +optional
 	Stdin bool
@@ -4462,6 +4467,11 @@ type PodAttachOptions struct {
 type PodExecOptions struct {
 	metav1.TypeMeta
 
+	// Pod is a reference to the pod being targeted for exec.
+	// Only name and namespace may be set.
+	// +optional
+	Pod *ObjectReference
+
 	// Stdin if true indicates that stdin is to be redirected for the exec call
 	Stdin bool
 
@@ -4486,6 +4496,11 @@ type PodExecOptions struct {
 // PodPortForwardOptions is the query options to a Pod's port forward call
 type PodPortForwardOptions struct {
 	metav1.TypeMeta
+
+	// Pod is a reference to the pod being targeted for exec.
+	// Only name and namespace may be set.
+	// +optional
+	Pod *ObjectReference
 
 	// The list of ports to forward
 	// +optional

@@ -1,10 +1,18 @@
 {
   "kind": "PodExecOptions",
   "apiVersion": "v1",
-  "stdin": true,
-  "stderr": true,
-  "container": "2",
+  "pod": {
+    "kind": "2",
+    "namespace": "3",
+    "name": "4",
+    "uid": "ő岅ȕHH壬%龺ǟ橸章蒪ʤǎ",
+    "apiVersion": "5",
+    "resourceVersion": "6",
+    "fieldPath": "7"
+  },
+  "tty": true,
+  "container": "8",
   "command": [
-    "3"
+    "9"
   ]
 }

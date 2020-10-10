@@ -3051,6 +3051,11 @@ message PodAntiAffinity {
 // TODO: merge w/ PodExecOptions below for stdin, stdout, etc
 // and also when we cut V2, we should export a "StreamOptions" or somesuch that contains Stdin, Stdout, Stder and TTY
 message PodAttachOptions {
+  // Pod is a reference to the pod being targeted for attach.
+  // Only name and namespace may be set.
+  // +optional
+  optional ObjectReference pod = 6;
+
   // Stdin if true, redirects the standard input stream of the pod for this call.
   // Defaults to false.
   // +optional
@@ -3144,6 +3149,11 @@ message PodDNSConfigOption {
 // TODO: This is largely identical to PodAttachOptions above, make sure they stay in sync and see about merging
 // and also when we cut V2, we should export a "StreamOptions" or somesuch that contains Stdin, Stdout, Stder and TTY
 message PodExecOptions {
+  // Pod is a reference to the pod being targeted for exec.
+  // Only name and namespace may be set.
+  // +optional
+  optional ObjectReference pod = 7;
+
   // Redirect the standard input stream of the pod for this call.
   // Defaults to false.
   // +optional
@@ -3254,6 +3264,11 @@ message PodLogOptions {
 // Port forwarding over SPDY does not use these options. It requires the port
 // to be passed in the `port` header as part of request.
 message PodPortForwardOptions {
+  // Pod is a reference to the pod being targeted for exec.
+  // Only name and namespace may be set.
+  // +optional
+  optional ObjectReference pod = 2;
+
   // List of ports to forward
   // Required when using WebSockets
   // +optional

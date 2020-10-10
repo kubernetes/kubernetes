@@ -5510,6 +5510,7 @@ func Convert_core_PodAntiAffinity_To_v1_PodAntiAffinity(in *core.PodAntiAffinity
 }
 
 func autoConvert_v1_PodAttachOptions_To_core_PodAttachOptions(in *v1.PodAttachOptions, out *core.PodAttachOptions, s conversion.Scope) error {
+	out.Pod = (*core.ObjectReference)(unsafe.Pointer(in.Pod))
 	out.Stdin = in.Stdin
 	out.Stdout = in.Stdout
 	out.Stderr = in.Stderr
@@ -5524,6 +5525,7 @@ func Convert_v1_PodAttachOptions_To_core_PodAttachOptions(in *v1.PodAttachOption
 }
 
 func autoConvert_core_PodAttachOptions_To_v1_PodAttachOptions(in *core.PodAttachOptions, out *v1.PodAttachOptions, s conversion.Scope) error {
+	out.Pod = (*v1.ObjectReference)(unsafe.Pointer(in.Pod))
 	out.Stdin = in.Stdin
 	out.Stdout = in.Stdout
 	out.Stderr = in.Stderr
@@ -5540,6 +5542,11 @@ func Convert_core_PodAttachOptions_To_v1_PodAttachOptions(in *core.PodAttachOpti
 func autoConvert_url_Values_To_v1_PodAttachOptions(in *url.Values, out *v1.PodAttachOptions, s conversion.Scope) error {
 	// WARNING: Field TypeMeta does not have json tag, skipping.
 
+	if values, ok := map[string][]string(*in)["pod"]; ok && len(values) > 0 {
+		// FIXME: out.Pod is of not yet supported type and requires manual conversion
+	} else {
+		out.Pod = nil
+	}
 	if values, ok := map[string][]string(*in)["stdin"]; ok && len(values) > 0 {
 		if err := runtime.Convert_Slice_string_To_bool(&values, &out.Stdin, s); err != nil {
 			return err
@@ -5660,6 +5667,7 @@ func Convert_core_PodDNSConfigOption_To_v1_PodDNSConfigOption(in *core.PodDNSCon
 }
 
 func autoConvert_v1_PodExecOptions_To_core_PodExecOptions(in *v1.PodExecOptions, out *core.PodExecOptions, s conversion.Scope) error {
+	out.Pod = (*core.ObjectReference)(unsafe.Pointer(in.Pod))
 	out.Stdin = in.Stdin
 	out.Stdout = in.Stdout
 	out.Stderr = in.Stderr
@@ -5675,6 +5683,7 @@ func Convert_v1_PodExecOptions_To_core_PodExecOptions(in *v1.PodExecOptions, out
 }
 
 func autoConvert_core_PodExecOptions_To_v1_PodExecOptions(in *core.PodExecOptions, out *v1.PodExecOptions, s conversion.Scope) error {
+	out.Pod = (*v1.ObjectReference)(unsafe.Pointer(in.Pod))
 	out.Stdin = in.Stdin
 	out.Stdout = in.Stdout
 	out.Stderr = in.Stderr
@@ -5692,6 +5701,11 @@ func Convert_core_PodExecOptions_To_v1_PodExecOptions(in *core.PodExecOptions, o
 func autoConvert_url_Values_To_v1_PodExecOptions(in *url.Values, out *v1.PodExecOptions, s conversion.Scope) error {
 	// WARNING: Field TypeMeta does not have json tag, skipping.
 
+	if values, ok := map[string][]string(*in)["pod"]; ok && len(values) > 0 {
+		// FIXME: out.Pod is of not yet supported type and requires manual conversion
+	} else {
+		out.Pod = nil
+	}
 	if values, ok := map[string][]string(*in)["stdin"]; ok && len(values) > 0 {
 		if err := runtime.Convert_Slice_string_To_bool(&values, &out.Stdin, s); err != nil {
 			return err
@@ -5913,6 +5927,7 @@ func Convert_url_Values_To_v1_PodLogOptions(in *url.Values, out *v1.PodLogOption
 }
 
 func autoConvert_v1_PodPortForwardOptions_To_core_PodPortForwardOptions(in *v1.PodPortForwardOptions, out *core.PodPortForwardOptions, s conversion.Scope) error {
+	out.Pod = (*core.ObjectReference)(unsafe.Pointer(in.Pod))
 	out.Ports = *(*[]int32)(unsafe.Pointer(&in.Ports))
 	return nil
 }
@@ -5923,6 +5938,7 @@ func Convert_v1_PodPortForwardOptions_To_core_PodPortForwardOptions(in *v1.PodPo
 }
 
 func autoConvert_core_PodPortForwardOptions_To_v1_PodPortForwardOptions(in *core.PodPortForwardOptions, out *v1.PodPortForwardOptions, s conversion.Scope) error {
+	out.Pod = (*v1.ObjectReference)(unsafe.Pointer(in.Pod))
 	out.Ports = *(*[]int32)(unsafe.Pointer(&in.Ports))
 	return nil
 }
@@ -5935,6 +5951,11 @@ func Convert_core_PodPortForwardOptions_To_v1_PodPortForwardOptions(in *core.Pod
 func autoConvert_url_Values_To_v1_PodPortForwardOptions(in *url.Values, out *v1.PodPortForwardOptions, s conversion.Scope) error {
 	// WARNING: Field TypeMeta does not have json tag, skipping.
 
+	if values, ok := map[string][]string(*in)["pod"]; ok && len(values) > 0 {
+		// FIXME: out.Pod is of not yet supported type and requires manual conversion
+	} else {
+		out.Pod = nil
+	}
 	if values, ok := map[string][]string(*in)["ports"]; ok && len(values) > 0 {
 		if err := metav1.Convert_Slice_string_To_Slice_int32(&values, &out.Ports, s); err != nil {
 			return err

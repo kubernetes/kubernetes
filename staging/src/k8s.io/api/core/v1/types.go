@@ -5132,6 +5132,11 @@ type PodLogOptions struct {
 type PodAttachOptions struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// Pod is a reference to the pod being targeted for attach.
+	// Only name and namespace may be set.
+	// +optional
+	Pod *ObjectReference `json:"pod,omitempty" protobuf:"bytes,6,opt,name=pod"`
+
 	// Stdin if true, redirects the standard input stream of the pod for this call.
 	// Defaults to false.
 	// +optional
@@ -5169,6 +5174,11 @@ type PodAttachOptions struct {
 // and also when we cut V2, we should export a "StreamOptions" or somesuch that contains Stdin, Stdout, Stder and TTY
 type PodExecOptions struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// Pod is a reference to the pod being targeted for exec.
+	// Only name and namespace may be set.
+	// +optional
+	Pod *ObjectReference `json:"pod,omitempty" protobuf:"bytes,7,opt,name=pod"`
 
 	// Redirect the standard input stream of the pod for this call.
 	// Defaults to false.
@@ -5210,6 +5220,11 @@ type PodExecOptions struct {
 // to be passed in the `port` header as part of request.
 type PodPortForwardOptions struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// Pod is a reference to the pod being targeted for exec.
+	// Only name and namespace may be set.
+	// +optional
+	Pod *ObjectReference `json:"pod,omitempty" protobuf:"bytes,2,opt,name=pod"`
 
 	// List of ports to forward
 	// Required when using WebSockets
