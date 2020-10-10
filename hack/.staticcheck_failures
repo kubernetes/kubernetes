@@ -57,4 +57,3 @@ vendor/k8s.io/client-go/restmapper
 vendor/k8s.io/client-go/tools/leaderelection
 vendor/k8s.io/client-go/transport
 vendor/k8s.io/kubectl/pkg/cmd/scale
-vendor/k8s.io/metrics/pkg/client/custom_metrics
