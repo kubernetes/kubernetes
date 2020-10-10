@@ -284,8 +284,17 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 }
 
 // UnmountDevice unmounts the volume on the node
-func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	err := mount.CleanupMountPoint(deviceMountPath, detacher.plugin.host.GetMounter(detacher.plugin.GetPluginName()), false)
+func (d *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
+	if runtime.GOOS == "windows" {
+		// Flush data cache for windows because it does not do so automatically during unmount device
+		exec := d.plugin.host.GetExec(d.plugin.GetPluginName())
+		err := util.WriteVolumeCache(deviceMountPath, exec)
+		if err != nil {
+			return err
+		}
+	}
+
+	err := mount.CleanupMountPoint(deviceMountPath, d.plugin.host.GetMounter(d.plugin.GetPluginName()), false)
 	if err == nil {
 		klog.V(2).Infof("azureDisk - Device %s was unmounted", deviceMountPath)
 	} else {
