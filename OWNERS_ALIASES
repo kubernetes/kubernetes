@@ -134,6 +134,7 @@ aliases:
     - justaugustus # SIG Chair
     - saschagrunert # Branch Manager
     - tpepper # SIG Chair / Patch Release Team
+    - xmudrii # Branch Manager
   build-image-approvers:
     - BenTheElder
     - cblecker
