@@ -518,16 +518,6 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 	}
 
 	if jobFailed {
-		errCh := make(chan error, active)
-		jm.deleteJobPods(&job, activePods, errCh)
-		select {
-		case manageJobErr = <-errCh:
-			if manageJobErr != nil {
-				break
-			}
-		default:
-		}
-
 		// update status values accordingly
 		failed += active
 		active = 0
@@ -589,6 +579,18 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 
 		if err := jm.updateHandler(&job); err != nil {
 			return forget, err
+		}
+
+		if jobFailed {
+			errCh := make(chan error, active)
+			jm.deleteJobPods(&job, activePods, errCh)
+			select {
+			case manageJobErr = <-errCh:
+				if manageJobErr != nil {
+					break
+				}
+			default:
+			}
 		}
 
 		if jobHaveNewFailure && !IsJobFinished(&job) {
