@@ -1594,7 +1594,8 @@ function create-certs {
   local -r primary_cn="${1}"
 
   # Determine extra certificate names for master
-  local octets=($(echo "${SERVICE_CLUSTER_IP_RANGE}" | sed -e 's|/.*||' -e 's/\./ /g'))
+  local octets
+  read -r -a octets <<< "$(echo "${SERVICE_CLUSTER_IP_RANGE}" | sed -e 's|/.*||' -e 's/\./ /g')"
   ((octets[3]+=1))
   local -r service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
   local sans=""
@@ -2047,29 +2048,29 @@ function create-node-template() {
 
   local gcloud="gcloud"
 
-  local accelerator_args=""
+  local accelerator_args=()
   # VMs with Accelerators cannot be live migrated.
   # More details here - https://cloud.google.com/compute/docs/gpus/add-gpus#create-new-gpu-instance
-  if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
-    accelerator_args="--maintenance-policy TERMINATE --restart-on-failure --accelerator ${NODE_ACCELERATORS}"
+  if [[ -n "${NODE_ACCELERATORS}" ]]; then
+    accelerator_args+=(--maintenance-policy TERMINATE --restart-on-failure --accelerator "${NODE_ACCELERATORS}")
     gcloud="gcloud beta"
   fi
 
-  local preemptible_minions=""
+  local preemptible_minions=()
   if [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
-    preemptible_minions="--preemptible --maintenance-policy TERMINATE"
+    preemptible_minions+=(--preemptible --maintenance-policy TERMINATE)
   fi
 
-  local local_ssds=""
+  local local_ssds=()
   local_ssd_ext_count=0
-  if [[ ! -z ${NODE_LOCAL_SSDS_EXT:-} ]]; then
+  if [[ -n "${NODE_LOCAL_SSDS_EXT:-}" ]]; then
     IFS=";" read -r -a ssdgroups <<< "${NODE_LOCAL_SSDS_EXT:-}"
     for ssdgroup in "${ssdgroups[@]}"
     do
       IFS="," read -r -a ssdopts <<< "${ssdgroup}"
-      validate-node-local-ssds-ext "${ssdopts}"
+      validate-node-local-ssds-ext "${ssdopts[@]}"
       for ((i=1; i<=ssdopts[0]; i++)); do
-        local_ssds="$local_ssds--local-ssd=interface=${ssdopts[1]} "
+        local_ssds+=("--local-ssd=interface=${ssdopts[1]}")
       done
     done
   fi
@@ -2086,7 +2087,8 @@ function create-node-template() {
     address="no-address"
   fi
 
-  local network=$(make-gcloud-network-argument \
+  local network
+  network=$(make-gcloud-network-argument \
     "${NETWORK_PROJECT}" \
     "${REGION}" \
     "${NETWORK}" \
@@ -2095,11 +2097,11 @@ function create-node-template() {
     "${ENABLE_IP_ALIASES:-}" \
     "${IP_ALIAS_SIZE:-}")
 
-  local node_image_flags=""
+  local node_image_flags=()
   if [[ "${os}" == 'linux' ]]; then
-      node_image_flags="--image-project ${NODE_IMAGE_PROJECT} --image ${NODE_IMAGE}"
+      node_image_flags+=(--image-project "${NODE_IMAGE_PROJECT}" --image "${NODE_IMAGE}")
   elif [[ "${os}" == 'windows' ]]; then
-      node_image_flags="--image-project ${WINDOWS_NODE_IMAGE_PROJECT} --image ${WINDOWS_NODE_IMAGE}"
+      node_image_flags+=(--image-project "${WINDOWS_NODE_IMAGE_PROJECT}" --image "${WINDOWS_NODE_IMAGE}")
   else
       echo "Unknown OS ${os}" >&2
       exit 1
@@ -2116,16 +2118,16 @@ function create-node-template() {
       --machine-type "${machine_type}" \
       --boot-disk-type "${NODE_DISK_TYPE}" \
       --boot-disk-size "${NODE_DISK_SIZE}" \
-      ${node_image_flags} \
+      "${node_image_flags[@]}" \
       --service-account "${NODE_SERVICE_ACCOUNT}" \
       --tags "${NODE_TAG}" \
-      ${accelerator_args} \
-      ${local_ssds} \
+      "${accelerator_args[@]}" \
+      "${local_ssds[@]}" \
       --region "${REGION}" \
       ${network} \
-      ${preemptible_minions} \
+      "${preemptible_minions[@]}" \
       $2 \
-      --metadata-from-file $3 \
+      --metadata-from-file "$3" \
       ${metadata_flag} >&2; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to create instance template ${template_name} ${color_norm}" >&2
@@ -2420,7 +2422,7 @@ function delete-all-firewall-rules() {
 
 # Ignores firewall rule arguments that do not exist in NETWORK_PROJECT.
 function delete-firewall-rules() {
-  for fw in $@; do
+  for fw in "$@"; do
     if [[ -n $(gcloud compute firewall-rules --project "${NETWORK_PROJECT}" describe "${fw}" --format='value(name)' 2>/dev/null || true) ]]; then
       gcloud compute firewall-rules delete --project "${NETWORK_PROJECT}" --quiet "${fw}" &
     fi
@@ -3501,10 +3503,10 @@ function kube-down() {
   if [[ "${KUBE_DELETE_NODES:-}" != "false" ]]; then
     # Find out what minions are running.
     local -a minions
-    minions=( $(gcloud compute instances list \
-                  --project "${PROJECT}" \
-                  --filter="(name ~ '${NODE_INSTANCE_PREFIX}-.+' OR name ~ '${WINDOWS_NODE_INSTANCE_PREFIX}-.+') AND zone:(${ZONE})" \
-                  --format='value(name)') )
+    kube::util::read-array minions < <(gcloud compute instances list \
+      --project "${PROJECT}" \
+      --filter="(name ~ '${NODE_INSTANCE_PREFIX}-.+' OR name ~ '${WINDOWS_NODE_INSTANCE_PREFIX}-.+') AND zone:(${ZONE})" \
+      --format='value(name)')
     # If any minions are running, delete them in batches.
     while (( "${#minions[@]}" > 0 )); do
       echo Deleting nodes "${minions[*]::${batch}}"
@@ -3528,9 +3530,9 @@ function kube-down() {
     # Note that this is currently a noop, as synchronously deleting the node MIG
     # first allows the master to cleanup routes itself.
     local TRUNCATED_PREFIX="${INSTANCE_PREFIX:0:26}"
-    routes=( $(gcloud compute routes list --project "${NETWORK_PROJECT}" \
+    kube::util::read-array routes < <(gcloud compute routes list --project "${NETWORK_PROJECT}" \
       --filter="name ~ '${TRUNCATED_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}'" \
-      --format='value(name)') )
+      --format='value(name)')
     while (( "${#routes[@]}" > 0 )); do
       echo Deleting routes "${routes[*]::${batch}}"
       gcloud compute routes delete \
@@ -3692,12 +3694,12 @@ function check-resources() {
   echo "Looking for already existing resources"
   KUBE_RESOURCE_FOUND=""
 
-  if [[ -n "${INSTANCE_GROUPS[@]:-}" ]]; then
-    KUBE_RESOURCE_FOUND="Managed instance groups ${INSTANCE_GROUPS[@]}"
+  if [[ -n "${INSTANCE_GROUPS[*]:-}" ]]; then
+    KUBE_RESOURCE_FOUND="Managed instance groups ${INSTANCE_GROUPS[*]}"
     return 1
   fi
-  if [[ -n "${WINDOWS_INSTANCE_GROUPS[@]:-}" ]]; then
-    KUBE_RESOURCE_FOUND="Managed instance groups ${WINDOWS_INSTANCE_GROUPS[@]}"
+  if [[ -n "${WINDOWS_INSTANCE_GROUPS[*]:-}" ]]; then
+    KUBE_RESOURCE_FOUND="Managed instance groups ${WINDOWS_INSTANCE_GROUPS[*]}"
     return 1
   fi
 
@@ -3722,10 +3724,10 @@ function check-resources() {
 
   # Find out what minions are running.
   local -a minions
-  minions=( $(gcloud compute instances list \
-                --project "${PROJECT}" \
-                --filter="(name ~ '${NODE_INSTANCE_PREFIX}-.+' OR name ~ '${WINDOWS_NODE_INSTANCE_PREFIX}-.+') AND zone:(${ZONE})" \
-                --format='value(name)') )
+  kube::util::read-array minions < <(gcloud compute instances list \
+    --project "${PROJECT}" \
+    --filter="(name ~ '${NODE_INSTANCE_PREFIX}-.+' OR name ~ '${WINDOWS_NODE_INSTANCE_PREFIX}-.+') AND zone:(${ZONE})" \
+    --format='value(name)')
   if (( "${#minions[@]}" > 0 )); then
     KUBE_RESOURCE_FOUND="${#minions[@]} matching ${NODE_INSTANCE_PREFIX}-.+ or ${WINDOWS_NODE_INSTANCE_PREFIX}-.+"
     return 1
@@ -3742,8 +3744,8 @@ function check-resources() {
   fi
 
   local -a routes
-  routes=( $(gcloud compute routes list --project "${NETWORK_PROJECT}" \
-    --filter="name ~ '${INSTANCE_PREFIX}-minion-.{4}'" --format='value(name)') )
+  kube::util::read-array routes < <(gcloud compute routes list --project "${NETWORK_PROJECT}" \
+    --filter="name ~ '${INSTANCE_PREFIX}-minion-.{4}'" --format='value(name)')
   if (( "${#routes[@]}" > 0 )); then
     KUBE_RESOURCE_FOUND="${#routes[@]} routes matching ${INSTANCE_PREFIX}-minion-.{4}"
     return 1
