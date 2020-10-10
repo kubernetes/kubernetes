@@ -407,10 +407,17 @@ func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state *framework.Cyc
 	if err != nil {
 		return nil, framework.NewStatus(framework.Error, err.Error())
 	}
+
 	ph := pp.fh.PreemptHandle()
 	for _, nodeInfo := range nodeInfos {
 		ph.RunFilterPlugins(ctx, state, pod, nodeInfo)
 	}
+	var nodes []*v1.Node
+	for _, nodeInfo := range nodeInfos {
+		nodes = append(nodes, nodeInfo.Node())
+	}
+	ph.RunScorePlugins(ctx, state, pod, nodes)
+
 	if pp.failPostFilter {
 		return nil, framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
@@ -578,30 +585,52 @@ func TestPostFilterPlugin(t *testing.T) {
 	numNodes := 1
 	tests := []struct {
 		name                      string
+		numNodes                  int
 		rejectFilter              bool
+		failScore                 bool
 		rejectPostFilter          bool
 		expectFilterNumCalled     int
+		expectScoreNumCalled      int32
 		expectPostFilterNumCalled int
 	}{
 		{
-			name:                      "Filter passed",
+			name:                      "Filter passed and Score success",
+			numNodes:                  3,
 			rejectFilter:              false,
+			failScore:                 false,
 			rejectPostFilter:          false,
-			expectFilterNumCalled:     numNodes,
+			expectFilterNumCalled:     3,
+			expectScoreNumCalled:      3,
 			expectPostFilterNumCalled: 0,
 		},
 		{
 			name:                      "Filter failed and PostFilter passed",
+			numNodes:                  numNodes,
 			rejectFilter:              true,
+			failScore:                 false,
 			rejectPostFilter:          false,
 			expectFilterNumCalled:     numNodes * 2,
+			expectScoreNumCalled:      1,
 			expectPostFilterNumCalled: 1,
 		},
 		{
 			name:                      "Filter failed and PostFilter failed",
+			numNodes:                  numNodes,
 			rejectFilter:              true,
+			failScore:                 false,
 			rejectPostFilter:          true,
 			expectFilterNumCalled:     numNodes * 2,
+			expectScoreNumCalled:      1,
+			expectPostFilterNumCalled: 1,
+		},
+		{
+			name:                      "Score failed and PostFilter failed",
+			numNodes:                  numNodes,
+			rejectFilter:              true,
+			failScore:                 true,
+			rejectPostFilter:          true,
+			expectFilterNumCalled:     numNodes * 2,
+			expectScoreNumCalled:      1,
 			expectPostFilterNumCalled: 1,
 		},
 	}
@@ -611,12 +640,15 @@ func TestPostFilterPlugin(t *testing.T) {
 			// Create a plugin registry for testing. Register a combination of filter and postFilter plugin.
 			var (
 				filterPlugin     = &FilterPlugin{}
+				scorePlugin      = &ScorePlugin{}
 				postFilterPlugin = &PostFilterPlugin{}
 			)
 			filterPlugin.rejectFilter = tt.rejectFilter
+			scorePlugin.failScore = tt.failScore
 			postFilterPlugin.rejectPostFilter = tt.rejectPostFilter
 			registry := frameworkruntime.Registry{
 				filterPluginName:     newPlugin(filterPlugin),
+				scorePluginName:      newPlugin(scorePlugin),
 				postfilterPluginName: newPostFilterPlugin(postFilterPlugin),
 			}
 
@@ -627,6 +659,16 @@ func TestPostFilterPlugin(t *testing.T) {
 					Filter: &schedulerconfig.PluginSet{
 						Enabled: []schedulerconfig.Plugin{
 							{Name: filterPluginName},
+						},
+					},
+					Score: &schedulerconfig.PluginSet{
+						Enabled: []schedulerconfig.Plugin{
+							{Name: scorePluginName},
+						},
+						// disable default in-tree Score plugins
+						// to make it easy to control configured ScorePlugins failure
+						Disabled: []schedulerconfig.Plugin{
+							{Name: "*"},
 						},
 					},
 					PostFilter: &schedulerconfig.PluginSet{
@@ -646,7 +688,7 @@ func TestPostFilterPlugin(t *testing.T) {
 			testCtx := initTestSchedulerForFrameworkTest(
 				t,
 				testutils.InitTestMaster(t, fmt.Sprintf("postfilter%v-", i), nil),
-				numNodes,
+				tt.numNodes,
 				scheduler.WithProfiles(prof),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry),
 			)
@@ -662,8 +704,12 @@ func TestPostFilterPlugin(t *testing.T) {
 				if err = wait.Poll(10*time.Millisecond, 10*time.Second, podUnschedulable(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled.")
 				}
+
 				if filterPlugin.numFilterCalled < tt.expectFilterNumCalled {
 					t.Errorf("Expected the filter plugin to be called at least %v times, but got %v.", tt.expectFilterNumCalled, filterPlugin.numFilterCalled)
+				}
+				if numScoreCalled := atomic.LoadInt32(&scorePlugin.numScoreCalled); numScoreCalled < tt.expectScoreNumCalled {
+					t.Errorf("Expected the score plugin to be called at least %v times, but got %v.", tt.expectScoreNumCalled, numScoreCalled)
 				}
 				if postFilterPlugin.numPostFilterCalled < tt.expectPostFilterNumCalled {
 					t.Errorf("Expected the postfilter plugin to be called at least %v times, but got %v.", tt.expectPostFilterNumCalled, postFilterPlugin.numPostFilterCalled)
@@ -674,6 +720,9 @@ func TestPostFilterPlugin(t *testing.T) {
 				}
 				if filterPlugin.numFilterCalled != tt.expectFilterNumCalled {
 					t.Errorf("Expected the filter plugin to be called %v times, but got %v.", tt.expectFilterNumCalled, filterPlugin.numFilterCalled)
+				}
+				if numScoreCalled := atomic.LoadInt32(&scorePlugin.numScoreCalled); numScoreCalled != tt.expectScoreNumCalled {
+					t.Errorf("Expected the score plugin to be called %v times, but got %v.", tt.expectScoreNumCalled, numScoreCalled)
 				}
 				if postFilterPlugin.numPostFilterCalled != tt.expectPostFilterNumCalled {
 					t.Errorf("Expected the postfilter plugin to be called %v times, but got %v.", tt.expectPostFilterNumCalled, postFilterPlugin.numPostFilterCalled)
@@ -748,7 +797,7 @@ func TestScorePlugin(t *testing.T) {
 				}
 			}
 
-			if scorePlugin.numScoreCalled == 0 {
+			if numScoreCalled := atomic.LoadInt32(&scorePlugin.numScoreCalled); numScoreCalled == 0 {
 				t.Errorf("Expected the score plugin to be called.")
 			}
 
