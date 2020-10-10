@@ -50,6 +50,7 @@ go_library(
         "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
+        "//staging/src/k8s.io/kubelet/pkg/apis/podresources/v1:go_default_library",
         "//staging/src/k8s.io/kubelet/pkg/apis/podresources/v1alpha1:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/github.com/google/cadvisor/container:go_default_library",
