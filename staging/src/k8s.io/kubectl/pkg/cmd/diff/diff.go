@@ -564,6 +564,9 @@ func (o *DiffOptions) Run() error {
 				break
 			}
 		}
+
+		apply.WarnIfDeleting(info.Object, o.Diff.ErrOut)
+
 		return err
 	})
 	if err != nil {
