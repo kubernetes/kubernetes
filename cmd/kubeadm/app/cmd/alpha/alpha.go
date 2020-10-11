@@ -33,7 +33,7 @@ func NewCmdAlpha(in io.Reader, out io.Writer) *cobra.Command {
 
 	const shDeprecatedMessage = "self-hosting support in kubeadm is deprecated " +
 		"and will be removed in a future release"
-	shCommand := NewCmdSelfhosting(in)
+	shCommand := newCmdSelfhosting(in)
 	shCommand.Deprecated = shDeprecatedMessage
 	for _, cmd := range shCommand.Commands() {
 		cmd.Deprecated = shDeprecatedMessage

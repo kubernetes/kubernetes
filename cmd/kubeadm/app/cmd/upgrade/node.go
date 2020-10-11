@@ -62,8 +62,8 @@ type nodeData struct {
 	ignorePreflightErrors sets.String
 }
 
-// NewCmdNode returns the cobra command for `kubeadm upgrade node`
-func NewCmdNode() *cobra.Command {
+// newCmdNode returns the cobra command for `kubeadm upgrade node`
+func newCmdNode() *cobra.Command {
 	nodeOptions := newNodeOptions()
 	nodeRunner := workflow.NewRunner()
 
