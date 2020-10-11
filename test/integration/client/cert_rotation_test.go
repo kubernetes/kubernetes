@@ -65,6 +65,7 @@ func TestCertRotation(t *testing.T) {
 
 	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), []string{
 		"--client-ca-file=" + clientCAFilename,
+		"--anonymous-auth=false",
 	}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -135,6 +136,7 @@ func TestCertRotationContinuousRequests(t *testing.T) {
 
 	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), []string{
 		"--client-ca-file=" + clientCAFilename,
+		"--anonymous-auth=false",
 	}, framework.SharedEtcd())
 	defer server.TearDownFn()
 

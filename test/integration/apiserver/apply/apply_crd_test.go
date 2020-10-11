@@ -43,7 +43,9 @@ import (
 func TestApplyCRDNoSchema(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +202,9 @@ spec:
 func TestApplyCRDStructuralSchema(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -474,7 +478,9 @@ spec:
 func TestApplyCRDNonStructuralSchema(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -712,7 +718,9 @@ func verifyNumPorts(t *testing.T, b []byte, n int) {
 func TestApplyCRDUnhandledSchema(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -49,7 +49,10 @@ import (
 )
 
 func TestClient(t *testing.T) {
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--disable-admission-plugins", "ServiceAccount",
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	client := clientset.NewForConfigOrDie(result.ClientConfig)
@@ -118,7 +121,10 @@ func TestClient(t *testing.T) {
 }
 
 func TestAtomicPut(t *testing.T) {
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--disable-admission-plugins", "ServiceAccount",
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	c := clientset.NewForConfigOrDie(result.ClientConfig)
@@ -207,7 +213,10 @@ func TestAtomicPut(t *testing.T) {
 }
 
 func TestPatch(t *testing.T) {
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--disable-admission-plugins", "ServiceAccount",
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	c := clientset.NewForConfigOrDie(result.ClientConfig)
@@ -326,7 +335,9 @@ func TestPatch(t *testing.T) {
 }
 
 func TestPatchWithCreateOnUpdate(t *testing.T) {
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	c := clientset.NewForConfigOrDie(result.ClientConfig)
@@ -434,7 +445,9 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 }
 
 func TestAPIVersions(t *testing.T) {
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	c := clientset.NewForConfigOrDie(result.ClientConfig)
@@ -456,7 +469,9 @@ func TestAPIVersions(t *testing.T) {
 }
 
 func TestSingleWatch(t *testing.T) {
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	client := clientset.NewForConfigOrDie(result.ClientConfig)
@@ -540,7 +555,9 @@ func TestMultiWatch(t *testing.T) {
 	const watcherCount = 50
 	rt.GOMAXPROCS(watcherCount)
 
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	client := clientset.NewForConfigOrDie(result.ClientConfig)
@@ -795,7 +812,10 @@ func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace s
 func TestSelfLinkOnNamespace(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemoveSelfLink, false)()
 
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--disable-admission-plugins", "ServiceAccount",
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	c := clientset.NewForConfigOrDie(result.ClientConfig)

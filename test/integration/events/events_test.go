@@ -36,7 +36,10 @@ import (
 )
 
 func TestEventCompatibility(t *testing.T) {
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--disable-admission-plugins", "ServiceAccount",
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	client := clientset.NewForConfigOrDie(result.ClientConfig)

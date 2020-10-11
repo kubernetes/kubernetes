@@ -95,7 +95,9 @@ func TestController_AutoApproval(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			// Run an apiserver with the default configuration options.
-			s := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{""}, framework.SharedEtcd())
+			s := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
+				"--anonymous-auth=false",
+			}, framework.SharedEtcd())
 			defer s.TearDownFn()
 			client := clientset.NewForConfigOrDie(s.ClientConfig)
 			informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(s.ClientConfig, "certificatesigningrequest-informers")), time.Second)

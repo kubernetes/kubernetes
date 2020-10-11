@@ -52,7 +52,9 @@ const (
 )
 
 func TestRun(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := kubernetes.NewForConfig(server.ClientConfig)
@@ -111,7 +113,10 @@ func endpointReturnsStatusOK(client *kubernetes.Clientset, path string) (bool, e
 }
 
 func TestLivezAndReadyz(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--livez-grace-period", "0s"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--livez-grace-period", "0s",
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := kubernetes.NewForConfig(server.ClientConfig)
@@ -131,7 +136,9 @@ func TestLivezAndReadyz(t *testing.T) {
 // apiextensions-server and the kube-aggregator server, both part of
 // the delegation chain in kube-apiserver.
 func TestOpenAPIDelegationChainPlumbing(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	kubeclient, err := kubernetes.NewForConfig(server.ClientConfig)
@@ -189,7 +196,9 @@ func TestOpenAPIDelegationChainPlumbing(t *testing.T) {
 }
 
 func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	defer server.TearDownFn()
 	apiextensionsclient, err := apiextensionsclientset.NewForConfig(server.ClientConfig)
 	if err != nil {
@@ -435,6 +444,7 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 				"--endpoint-reconciler-type", "master-count",
 				"--advertise-address", fmt.Sprintf("10.0.1.%v", i+1),
 				"--apiserver-count", fmt.Sprintf("%v", masterCount),
+				"--anonymous-auth=false",
 			}, etcd)
 			masterCountServers[i] = server
 		}(i)
@@ -466,6 +476,7 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 			options := []string{
 				"--endpoint-reconciler-type", "lease",
 				"--advertise-address", fmt.Sprintf("10.0.1.%v", i+10),
+				"--anonymous-auth=false",
 			}
 			server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, options, etcd)
 			leaseServers[i] = server
@@ -533,6 +544,7 @@ func TestMultiMasterNodePortAllocation(t *testing.T) {
 		t.Logf("starting api server: %d", i)
 		server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
 			"--advertise-address", fmt.Sprintf("10.0.1.%v", i+1),
+			"--anonymous-auth=false",
 		}, etcd)
 		kubeAPIServers = append(kubeAPIServers, server)
 

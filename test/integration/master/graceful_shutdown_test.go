@@ -31,7 +31,9 @@ import (
 )
 
 func TestGracefulShutdown(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 
 	tearDownOnce := sync.Once{}
 	defer tearDownOnce.Do(server.TearDownFn)

@@ -138,6 +138,7 @@ plugins:
 		"--disable-admission-plugins=ServiceAccount",
 		fmt.Sprintf("--enable-aggregator-routing=%v", enableAggregatorRouting),
 		"--admission-control-config-file=" + admissionConfigFile.Name(),
+		"--anonymous-auth=false",
 	}, framework.SharedEtcd())
 	defer s.TearDownFn()
 

@@ -107,7 +107,10 @@ func createMapping(groupVersion string, resource metav1.APIResource) (*meta.REST
 // TestApplyStatus makes sure that applying the status works for all known types.
 func TestApplyStatus(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition"}, framework.SharedEtcd())
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{
+		"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition",
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
 	}

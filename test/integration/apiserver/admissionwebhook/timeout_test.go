@@ -160,6 +160,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 	s := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
 		"--disable-admission-plugins=ServiceAccount",
 		fmt.Sprintf("--watch-cache=%v", watchCache),
+		"--anonymous-auth=false",
 	}, framework.SharedEtcd())
 	defer s.TearDownFn()
 

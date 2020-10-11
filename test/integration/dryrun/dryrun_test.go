@@ -215,6 +215,7 @@ func TestDryRun(t *testing.T) {
 	s, err := kubeapiservertesting.StartTestServer(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
 		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
 		"--runtime-config=api/all=true",
+		"--anonymous-auth=false",
 	}, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)

@@ -37,7 +37,9 @@ import (
 
 func TestWatchBasedManager(t *testing.T) {
 	testNamespace := "test-watch-based-manager"
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	const n = 10

@@ -51,6 +51,7 @@ func TestScaleSubresources(t *testing.T) {
 	clientSet, tearDown := setupWithOptions(t, nil, []string{
 		"--runtime-config",
 		"api/all=true",
+		"--anonymous-auth=false",
 	})
 	defer tearDown()
 

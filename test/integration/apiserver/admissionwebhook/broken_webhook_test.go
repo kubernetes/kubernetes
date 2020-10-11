@@ -45,7 +45,9 @@ func TestBrokenWebhook(t *testing.T) {
 	}()
 
 	etcdConfig := framework.SharedEtcd()
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, etcdConfig)
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--anonymous-auth=false",
+	}, etcdConfig)
 	tearDownFn = server.TearDownFn
 
 	client, err := kubernetes.NewForConfig(server.ClientConfig)
@@ -80,7 +82,9 @@ func TestBrokenWebhook(t *testing.T) {
 	t.Logf("Restarting apiserver")
 	tearDownFn = nil
 	server.TearDownFn()
-	server = kubeapiservertesting.StartTestServerOrDie(t, nil, nil, etcdConfig)
+	server = kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--anonymous-auth=false",
+	}, etcdConfig)
 	tearDownFn = server.TearDownFn
 
 	client, err = kubernetes.NewForConfig(server.ClientConfig)

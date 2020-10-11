@@ -85,6 +85,7 @@ func TestWebhookLoadBalance(t *testing.T) {
 
 	s := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
 		"--disable-admission-plugins=ServiceAccount",
+		"--anonymous-auth=false",
 	}, framework.SharedEtcd())
 	defer s.TearDownFn()
 

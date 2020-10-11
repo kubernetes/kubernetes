@@ -46,7 +46,10 @@ import (
 )
 
 func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface, *apiextensionsclientset.Clientset, dynamic.Interface) {
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--disable-admission-plugins", "ServiceAccount",
+		"--anonymous-auth=false",
+	}, framework.SharedEtcd())
 
 	clientSet, err := clientset.NewForConfig(server.ClientConfig)
 	if err != nil {

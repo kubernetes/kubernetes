@@ -292,6 +292,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 		"--audit-log-version", "audit.k8s.io/v1",
 		"--audit-log-mode", "blocking",
 		"--audit-log-path", logFile.Name(),
+		"--anonymous-auth=false",
 	}, framework.SharedEtcd())
 	defer s.TearDownFn()
 
