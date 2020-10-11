@@ -338,7 +338,7 @@ function Download-HelperScripts {
 #
 # Required ${kube_env} keys:
 #   EXEC_AUTH_PLUGIN_LICENSE_URL
-#   EXEC_AUTH_PLUGIN_SHA1
+#   EXEC_AUTH_PLUGIN_HASH
 #   EXEC_AUTH_PLUGIN_URL
 function DownloadAndInstall-AuthPlugin {
   if (-not (Test-NodeUsesAuthPlugin ${kube_env})) {
@@ -350,14 +350,14 @@ function DownloadAndInstall-AuthPlugin {
   }
 
   if (-not ($kube_env.ContainsKey('EXEC_AUTH_PLUGIN_LICENSE_URL') -and
-            $kube_env.ContainsKey('EXEC_AUTH_PLUGIN_SHA1') -and
+            $kube_env.ContainsKey('EXEC_AUTH_PLUGIN_HASH') -and
             $kube_env.ContainsKey('EXEC_AUTH_PLUGIN_URL'))) {
     Log-Output -Fatal ("Missing one or more kube-env keys needed for " +
                        "downloading auth plugin: $(Out-String $kube_env)")
   }
   MustDownload-File `
       -URLs ${kube_env}['EXEC_AUTH_PLUGIN_URL'] `
-      -Hash ${kube_env}['EXEC_AUTH_PLUGIN_SHA1'] `
+      -Hash ${kube_env}['EXEC_AUTH_PLUGIN_HASH'] `
       -OutFile "${env:NODE_DIR}\gke-exec-auth-plugin.exe"
   MustDownload-File `
       -URLs ${kube_env}['EXEC_AUTH_PLUGIN_LICENSE_URL'] `
@@ -397,7 +397,7 @@ function DownloadAndInstall-KubernetesBinaries {
 }
 
 # Downloads the csi-proxy binaries from kube-env's CSI_PROXY_STORAGE_PATH and
-# CSI_PROXY_VERSION, and then puts them in a subdirectory of $env:NODE_DIR. 
+# CSI_PROXY_VERSION, and then puts them in a subdirectory of $env:NODE_DIR.
 # Note: for now the installation is skipped for non-test clusters. Will be
 # installed for all cluster after tests pass.
 # Required ${kube_env} keys:
@@ -966,13 +966,13 @@ function Install_Cni_Binaries {
   $release_url = "${env:WINDOWS_CNI_STORAGE_PATH}/${env:WINDOWS_CNI_VERSION}/"
   $tgz_url = ($release_url +
               "cni-plugins-windows-amd64-${env:WINDOWS_CNI_VERSION}.tgz")
-  $sha_url = ($tgz_url + ".sha1")
-  MustDownload-File -URLs $sha_url -OutFile $tmp_dir\cni-plugins.sha1
-  $sha1_val = ($(Get-Content $tmp_dir\cni-plugins.sha1) -split ' ',2)[0]
+  $sha_url = ($tgz_url + ".sha512")
+  MustDownload-File -URLs $sha_url -OutFile $tmp_dir\cni-plugins.sha512
+  $sha512_val = ($(Get-Content $tmp_dir\cni-plugins.sha512) -split ' ',2)[0]
   MustDownload-File `
       -URLs $tgz_url `
       -OutFile $tmp_dir\cni-plugins.tgz `
-      -Hash $sha1_val
+      -Hash $sha512_val
 
   tar xzvf $tmp_dir\cni-plugins.tgz -C $tmp_dir
   Move-Item -Force $tmp_dir\host-local.exe ${env:CNI_DIR}\
@@ -1576,7 +1576,7 @@ function IsLoggingAgentInstalled {
 }
 
 # Clean up the logging agent's registry key and root folder if they exist from a prior installation.
-# Try to uninstall it first, if it failed, remove the registry key at least, 
+# Try to uninstall it first, if it failed, remove the registry key at least,
 # as the registry key will block the silent installation later on.
 function Cleanup-LoggingAgent {
   # For 64 bits app, the registry path is 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
@@ -1594,7 +1594,7 @@ function Cleanup-LoggingAgent {
   }
 
   #  If we chose reboot after uninstallation, the root folder would be clean.
-  #  But since we couldn't reboot, so some files & folders would be left there, 
+  #  But since we couldn't reboot, so some files & folders would be left there,
   #  which could block the re-installation later on, so clean it up
   if(Test-Path $STACKDRIVER_ROOT){
     Remove-Item -Force -Recurse $STACKDRIVER_ROOT
@@ -1626,7 +1626,7 @@ function Install-LoggingAgent {
     Log-Output ("Skip: Stackdriver logging agent is already installed")
     return
   }
-  
+
   # After a crash, the StackdriverLogging service could be missing, but its files will still be present
   Cleanup-LoggingAgent
 

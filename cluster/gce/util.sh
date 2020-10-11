@@ -239,10 +239,10 @@ function copy-to-staging() {
     fi
   fi
 
-  echo "${hash}" > "${tar}.sha1"
-  gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha1" "${staging_path}"
-  gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha1" >/dev/null 2>&1 || true
-  echo "+++ ${basename_tar} uploaded (sha1 = ${hash})"
+  echo "${hash}" > "${tar}.sha512"
+  gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha512" "${staging_path}"
+  gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha512" >/dev/null 2>&1 || true
+  echo "+++ ${basename_tar} uploaded (sha512 = ${hash})"
 }
 
 
@@ -314,13 +314,13 @@ function upload-tars() {
     DOCKER_REGISTRY_MIRROR_URL="https://mirror.gcr.io"
   fi
 
-  SERVER_BINARY_TAR_HASH=$(sha1sum-file "${SERVER_BINARY_TAR}")
+  SERVER_BINARY_TAR_HASH=$(sha512sum-file "${SERVER_BINARY_TAR}")
 
   if [[ -n "${NODE_BINARY_TAR:-}" ]]; then
-    NODE_BINARY_TAR_HASH=$(sha1sum-file "${NODE_BINARY_TAR}")
+    NODE_BINARY_TAR_HASH=$(sha512sum-file "${NODE_BINARY_TAR}")
   fi
   if [[ -n "${KUBE_MANIFESTS_TAR:-}" ]]; then
-    KUBE_MANIFESTS_TAR_HASH=$(sha1sum-file "${KUBE_MANIFESTS_TAR}")
+    KUBE_MANIFESTS_TAR_HASH=$(sha512sum-file "${KUBE_MANIFESTS_TAR}")
   fi
 
   local server_binary_tar_urls=()
@@ -506,11 +506,11 @@ function load-or-gen-kube-bearertoken() {
 #   SERVER_BINARY_TAR_URL
 #   SERVER_BINARY_TAR_HASH
 function tars_from_version() {
-  local sha1sum=""
-  if which sha1sum >/dev/null 2>&1; then
-    sha1sum="sha1sum"
+  local sha512sum=""
+  if which sha512sum >/dev/null 2>&1; then
+    sha512sum="sha512sum"
   else
-    sha1sum="shasum -a1"
+    sha512sum="shasum -a512"
   fi
 
   if [[ -z "${KUBE_VERSION-}" ]]; then
@@ -520,18 +520,18 @@ function tars_from_version() {
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
     # TODO: Clean this up.
     KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
-    KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} --silent --show-error | ${sha1sum} | awk '{print $1}')
+    KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} --silent --show-error | ${sha512sum} | awk '{print $1}')
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release-dev/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
     # TODO: Clean this up.
     KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
-    KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} --silent --show-error | ${sha1sum} | awk '{print $1}')
+    KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} --silent --show-error | ${sha512sum} | awk '{print $1}')
   else
     echo "Version doesn't match regexp" >&2
     exit 1
   fi
-  if ! SERVER_BINARY_TAR_HASH=$(curl -Ss --fail "${SERVER_BINARY_TAR_URL}.sha1"); then
-    echo "Failure trying to curl release .sha1"
+  if ! SERVER_BINARY_TAR_HASH=$(curl -Ss --fail "${SERVER_BINARY_TAR_URL}.sha512"); then
+    echo "Failure trying to curl release .sha512"
   fi
 
   if ! curl -Ss --head "${SERVER_BINARY_TAR_URL}" >&/dev/null; then
@@ -1144,7 +1144,7 @@ NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS: $(yaml-quote ${NODE_PROBLEM_DETECTOR_CUSTOM_
 CNI_STORAGE_URL_BASE: $(yaml-quote ${CNI_STORAGE_URL_BASE:-})
 CNI_TAR_PREFIX: $(yaml-quote ${CNI_TAR_PREFIX:-})
 CNI_VERSION: $(yaml-quote ${CNI_VERSION:-})
-CNI_SHA1: $(yaml-quote ${CNI_SHA1:-})
+CNI_HASH: $(yaml-quote ${CNI_HASH:-})
 ENABLE_NODE_LOGGING: $(yaml-quote ${ENABLE_NODE_LOGGING:-false})
 LOGGING_DESTINATION: $(yaml-quote ${LOGGING_DESTINATION:-})
 ELASTICSEARCH_LOGGING_REPLICAS: $(yaml-quote ${ELASTICSEARCH_LOGGING_REPLICAS:-})
@@ -1550,11 +1550,11 @@ WINDOWS_INFRA_CONTAINER: $(yaml-quote ${WINDOWS_INFRA_CONTAINER})
 EOF
 }
 
-function sha1sum-file() {
-  if which sha1sum >/dev/null 2>&1; then
-    sha1sum "$1" | awk '{ print $1 }'
+function sha512sum-file() {
+  if which sha512sum >/dev/null 2>&1; then
+    sha512sum "$1" | awk '{ print $1 }'
   else
-    shasum -a1 "$1" | awk '{ print $1 }'
+    shasum -a512 "$1" | awk '{ print $1 }'
   fi
 }
 
