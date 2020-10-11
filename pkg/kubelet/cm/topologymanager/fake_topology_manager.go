@@ -17,7 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -55,4 +55,22 @@ func (m *fakeManager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	return lifecycle.PodAdmitResult{
 		Admit: true,
 	}
+}
+
+type fakeManagerWithHint struct {
+	fakeManager
+	hint *TopologyHint
+}
+
+// NewFakeManagerWithHint returns an instance of FakeManager with specified topology hints
+func NewFakeManagerWithHint(hint *TopologyHint) Manager {
+	return &fakeManagerWithHint{
+		fakeManager: fakeManager{},
+		hint:        hint,
+	}
+}
+
+func (m *fakeManagerWithHint) GetAffinity(podUID string, containerName string) TopologyHint {
+	klog.Infof("[fake topologymanager] GetAffinity podUID: %v container name:  %v", podUID, containerName)
+	return *m.hint
 }
