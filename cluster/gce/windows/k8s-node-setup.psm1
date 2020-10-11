@@ -315,7 +315,7 @@ function Download-HelperScripts {
 #
 # Required ${kube_env} keys:
 #   EXEC_AUTH_PLUGIN_LICENSE_URL
-#   EXEC_AUTH_PLUGIN_SHA1
+#   EXEC_AUTH_PLUGIN_HASH
 #   EXEC_AUTH_PLUGIN_URL
 function DownloadAndInstall-AuthPlugin {
   if (-not (Test-NodeUsesAuthPlugin ${kube_env})) {
@@ -327,14 +327,14 @@ function DownloadAndInstall-AuthPlugin {
   }
 
   if (-not ($kube_env.ContainsKey('EXEC_AUTH_PLUGIN_LICENSE_URL') -and
-            $kube_env.ContainsKey('EXEC_AUTH_PLUGIN_SHA1') -and
+            $kube_env.ContainsKey('EXEC_AUTH_PLUGIN_HASH') -and
             $kube_env.ContainsKey('EXEC_AUTH_PLUGIN_URL'))) {
     Log-Output -Fatal ("Missing one or more kube-env keys needed for " +
                        "downloading auth plugin: $(Out-String $kube_env)")
   }
   MustDownload-File `
       -URLs ${kube_env}['EXEC_AUTH_PLUGIN_URL'] `
-      -Hash ${kube_env}['EXEC_AUTH_PLUGIN_SHA1'] `
+      -Hash ${kube_env}['EXEC_AUTH_PLUGIN_HASH'] `
       -OutFile "${env:NODE_DIR}\gke-exec-auth-plugin.exe"
   MustDownload-File `
       -URLs ${kube_env}['EXEC_AUTH_PLUGIN_LICENSE_URL'] `
@@ -939,13 +939,13 @@ function Install_Cni_Binaries {
   $release_url = "${env:WINDOWS_CNI_STORAGE_PATH}/${env:WINDOWS_CNI_VERSION}/"
   $tgz_url = ($release_url +
               "cni-plugins-windows-amd64-${env:WINDOWS_CNI_VERSION}.tgz")
-  $sha_url = ($tgz_url + ".sha1")
-  MustDownload-File -URLs $sha_url -OutFile $tmp_dir\cni-plugins.sha1
-  $sha1_val = ($(Get-Content $tmp_dir\cni-plugins.sha1) -split ' ',2)[0]
+  $sha_url = ($tgz_url + ".sha512")
+  MustDownload-File -URLs $sha_url -OutFile $tmp_dir\cni-plugins.sha512
+  $sha512_val = ($(Get-Content $tmp_dir\cni-plugins.sha512) -split ' ',2)[0]
   MustDownload-File `
       -URLs $tgz_url `
       -OutFile $tmp_dir\cni-plugins.tgz `
-      -Hash $sha1_val
+      -Hash $sha512_val
 
   tar xzvf $tmp_dir\cni-plugins.tgz -C $tmp_dir
   Move-Item -Force $tmp_dir\host-local.exe ${env:CNI_DIR}\
