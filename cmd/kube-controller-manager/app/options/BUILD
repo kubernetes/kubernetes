@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "attachdetachcontroller.go",
+        "cronjobcontroller.go",
         "csrsigningcontroller.go",
         "daemonsetcontroller.go",
         "deploymentcontroller.go",
@@ -40,6 +41,7 @@ go_library(
         "//pkg/controller/apis/config:go_default_library",
         "//pkg/controller/apis/config/scheme:go_default_library",
         "//pkg/controller/certificates/signer/config:go_default_library",
+        "//pkg/controller/cronjob/config:go_default_library",
         "//pkg/controller/daemon/config:go_default_library",
         "//pkg/controller/deployment/config:go_default_library",
         "//pkg/controller/endpoint/config:go_default_library",
@@ -105,6 +107,7 @@ go_test(
         "//cmd/kube-controller-manager/app/config:go_default_library",
         "//pkg/controller/apis/config:go_default_library",
         "//pkg/controller/certificates/signer/config:go_default_library",
+        "//pkg/controller/cronjob/config:go_default_library",
         "//pkg/controller/daemon/config:go_default_library",
         "//pkg/controller/deployment/config:go_default_library",
         "//pkg/controller/endpoint/config:go_default_library",
