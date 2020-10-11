@@ -35,11 +35,17 @@ import (
 // created as an interface to allow testing.
 type cjControlInterface interface {
 	UpdateStatus(cj *batchv1beta1.CronJob) (*batchv1beta1.CronJob, error)
+	// GetCronJob retrieves a CronJob.
+	GetCronJob(namespace, name string) (*batchv1beta1.CronJob, error)
 }
 
 // realCJControl is the default implementation of cjControlInterface.
 type realCJControl struct {
 	KubeClient clientset.Interface
+}
+
+func (c *realCJControl) GetCronJob(namespace, name string) (*batchv1beta1.CronJob, error) {
+	return c.KubeClient.BatchV1beta1().CronJobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 var _ cjControlInterface = &realCJControl{}
@@ -51,6 +57,10 @@ func (c *realCJControl) UpdateStatus(cj *batchv1beta1.CronJob) (*batchv1beta1.Cr
 // fakeCJControl is the default implementation of cjControlInterface.
 type fakeCJControl struct {
 	Updates []batchv1beta1.CronJob
+}
+
+func (c *fakeCJControl) GetCronJob(namespace, name string) (*batchv1beta1.CronJob, error) {
+	panic("implement me")
 }
 
 var _ cjControlInterface = &fakeCJControl{}
