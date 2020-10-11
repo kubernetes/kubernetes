@@ -19,6 +19,8 @@ package podresources
 import (
 	"context"
 
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
+
 	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 )
 
@@ -39,6 +41,7 @@ func NewV1alpha1PodResourcesServer(podsProvider PodsProvider, devicesProvider De
 
 // List returns information about the resources assigned to pods on the node
 func (p *v1alpha1PodResourcesServer) List(ctx context.Context, req *v1alpha1.ListPodResourcesRequest) (*v1alpha1.ListPodResourcesResponse, error) {
+	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1alpha1").Inc()
 	pods := p.podsProvider.GetPods()
 	podResources := make([]*v1alpha1.PodResources, len(pods))
 	p.devicesProvider.UpdateAllocatedDevices()

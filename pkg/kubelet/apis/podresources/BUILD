@@ -12,6 +12,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/apis/podresources",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/kubelet/pkg/apis/podresources/v1:go_default_library",

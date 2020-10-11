@@ -60,6 +60,8 @@ const (
 	// Metrics keys of device plugin operations
 	DevicePluginRegistrationCountKey  = "device_plugin_registration_total"
 	DevicePluginAllocationDurationKey = "device_plugin_alloc_duration_seconds"
+	// Metrics keys of pod resources operations
+	PodResourcesEndpointRequestsTotalKey = "pod_resources_endpoint_requests_total"
 
 	// Metric keys for node config
 	AssignedConfigKey             = "node_config_assigned"
@@ -275,6 +277,18 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"resource_name"},
+	)
+
+	// PodResourcesEndpointRequestsTotalCount is a Counter that tracks the cumulative number of requests to the PodResource endpoints.
+	// Broken down by server API version.
+	PodResourcesEndpointRequestsTotalCount = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodResourcesEndpointRequestsTotalKey,
+			Help:           "Cumulative number of requests to the PodResource endpoint. Broken down by server api version.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"server_api_version"},
 	)
 
 	// Metrics for node config
