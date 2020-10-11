@@ -48,6 +48,14 @@ func justBeforeTheHour() time.Time {
 	return T1
 }
 
+func justASecondBeforeTheHour() time.Time {
+	T1, err := time.Parse(time.RFC3339, "2016-05-19T09:59:59Z")
+	if err != nil {
+		panic("test setup error")
+	}
+	return T1
+}
+
 func topOfTheHour() time.Time {
 	T1, err := time.Parse(time.RFC3339, "2016-05-19T10:00:00Z")
 	if err != nil {

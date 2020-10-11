@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	cron "github.com/robfig/cron"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
@@ -238,6 +239,151 @@ func TestGroupJobsByParent(t *testing.T) {
 		}
 		if len(jobList3) != 2 {
 			t.Errorf("Wrong number of items in map")
+		}
+	}
+}
+
+func TestGetRecentUnmetScheduleTimes2(t *testing.T) {
+	// schedule is hourly on the hour
+	schedule := "0 * * * ?"
+
+	PraseSchedule := func(schedule string) cron.Schedule {
+		sched, err := cron.ParseStandard(schedule)
+		if err != nil {
+			t.Errorf("Error parsing schedule: %#v", err)
+			return nil
+		}
+		return sched
+	}
+	// T1 is a scheduled start time of that schedule
+	T1, err := time.Parse(time.RFC3339, "2016-05-19T10:00:00Z")
+	if err != nil {
+		t.Errorf("test setup error: %v", err)
+	}
+	// T2 is a scheduled start time of that schedule after T1
+	T2, err := time.Parse(time.RFC3339, "2016-05-19T11:00:00Z")
+	if err != nil {
+		t.Errorf("test setup error: %v", err)
+	}
+
+	cj := batchv1beta1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mycronjob",
+			Namespace: metav1.NamespaceDefault,
+			UID:       types.UID("1a2b3c"),
+		},
+		Spec: batchv1beta1.CronJobSpec{
+			Schedule:          schedule,
+			ConcurrencyPolicy: batchv1beta1.AllowConcurrent,
+			JobTemplate:       batchv1beta1.JobTemplateSpec{},
+		},
+	}
+	{
+		// Case 1: no known start times, and none needed yet.
+		// Creation time is before T1.
+		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-10 * time.Minute)}
+		// Current time is more than creation time, but less than T1.
+		now := T1.Add(-7 * time.Minute)
+		times, err := getRecentUnmetScheduleTimes2(cj, now, PraseSchedule(cj.Spec.Schedule))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if len(times) != 0 {
+			t.Errorf("expected no start times, got:  %v", times)
+		}
+	}
+	{
+		// Case 2: no known start times, and one needed.
+		// Creation time is before T1.
+		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-10 * time.Minute)}
+		// Current time is after T1
+		now := T1.Add(2 * time.Second)
+		times, err := getRecentUnmetScheduleTimes2(cj, now, PraseSchedule(cj.Spec.Schedule))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if len(times) != 1 {
+			t.Errorf("expected 1 start time, got: %v", times)
+		} else if !times[0].Equal(T1) {
+			t.Errorf("expected: %v, got: %v", T1, times[0])
+		}
+	}
+	{
+		// Case 3: known LastScheduleTime, no start needed.
+		// Creation time is before T1.
+		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-10 * time.Minute)}
+		// Status shows a start at the expected time.
+		cj.Status.LastScheduleTime = &metav1.Time{Time: T1}
+		// Current time is after T1
+		now := T1.Add(2 * time.Minute)
+		times, err := getRecentUnmetScheduleTimes2(cj, now, PraseSchedule(cj.Spec.Schedule))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if len(times) != 0 {
+			t.Errorf("expected 0 start times, got: %v", times)
+		}
+	}
+	{
+		// Case 4: known LastScheduleTime, a start needed
+		// Creation time is before T1.
+		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-10 * time.Minute)}
+		// Status shows a start at the expected time.
+		cj.Status.LastScheduleTime = &metav1.Time{Time: T1}
+		// Current time is after T1 and after T2
+		now := T2.Add(5 * time.Minute)
+		times, err := getRecentUnmetScheduleTimes2(cj, now, PraseSchedule(cj.Spec.Schedule))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if len(times) != 1 {
+			t.Errorf("expected 1 start times, got: %v", times)
+		} else if !times[0].Equal(T2) {
+			t.Errorf("expected: %v, got: %v", T1, times[0])
+		}
+	}
+	{
+		// Case 5: known LastScheduleTime, two starts needed
+		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
+		cj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
+		// Current time is after T1 and after T2
+		now := T2.Add(5 * time.Minute)
+		times, err := getRecentUnmetScheduleTimes2(cj, now, PraseSchedule(cj.Spec.Schedule))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if len(times) != 2 {
+			t.Errorf("expected 2 start times, got: %v", times)
+		} else {
+			if !times[0].Equal(T1) {
+				t.Errorf("expected: %v, got: %v", T1, times[0])
+			}
+			if !times[1].Equal(T2) {
+				t.Errorf("expected: %v, got: %v", T2, times[1])
+			}
+		}
+	}
+	{
+		// Case 6: now is way way ahead of last start time, and there is no deadline.
+		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
+		cj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
+		now := T2.Add(10 * 24 * time.Hour)
+		_, err := getRecentUnmetScheduleTimes2(cj, now, PraseSchedule(cj.Spec.Schedule))
+		if err == nil {
+			t.Errorf("expected an error")
+		}
+	}
+	{
+		// Case 7: now is way way ahead of last start time, but there is a short deadline.
+		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
+		cj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
+		now := T2.Add(10 * 24 * time.Hour)
+		// Deadline is short
+		deadline := int64(2 * 60 * 60)
+		cj.Spec.StartingDeadlineSeconds = &deadline
+		_, err := getRecentUnmetScheduleTimes2(cj, now, PraseSchedule(cj.Spec.Schedule))
+		if err != nil {
+			t.Errorf("unexpected error")
 		}
 	}
 }
