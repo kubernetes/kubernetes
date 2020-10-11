@@ -163,6 +163,7 @@ func generateSelector(obj *batch.Job) {
 func (jobStrategy) Canonicalize(obj runtime.Object) {
 }
 
+// AllowUnconditionalUpdate is true for jobs.
 func (jobStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
@@ -186,20 +187,23 @@ type jobStatusStrategy struct {
 	jobStrategy
 }
 
+// StatusStrategy represents the update strategy of job.
 var StatusStrategy = jobStatusStrategy{Strategy}
 
+// PrepareForUpdate copy the second old job's Spec to the first obj job's Spec.
 func (jobStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Spec = oldJob.Spec
 }
 
+// ValidateUpdate returns a field error list that represents the error for validation of update.
 func (jobStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateJobUpdateStatus(obj.(*batch.Job), old.(*batch.Job))
 }
 
-// JobSelectableFields returns a field set that represents the object for matching purposes.
-func JobToSelectableFields(job *batch.Job) fields.Set {
+// SelectableFields returns a field set that represents the object for matching purposes.
+func SelectableFields(job *batch.Job) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&job.ObjectMeta, true)
 	specificFieldsSet := fields.Set{
 		"status.successful": strconv.Itoa(int(job.Status.Succeeded)),
@@ -211,9 +215,9 @@ func JobToSelectableFields(job *batch.Job) fields.Set {
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	job, ok := obj.(*batch.Job)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a job.")
+		return nil, nil, fmt.Errorf("given object is not a job")
 	}
-	return labels.Set(job.ObjectMeta.Labels), JobToSelectableFields(job), nil
+	return labels.Set(job.ObjectMeta.Labels), SelectableFields(job), nil
 }
 
 // MatchJob is the filter used by the generic etcd backend to route
