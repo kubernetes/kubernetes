@@ -117,6 +117,12 @@ var unpluralizedSuffixes = []string{
 	"endpoints",
 }
 
+// specialSuffixes is a list of resource suffixes that their kind and resource form are not plural relation.
+var specialSuffixes = map[string]string{
+	"podmetrics":  "pods",
+	"nodemetrics": "nodes",
+}
+
 // UnsafeGuessKindToResource converts Kind to a resource name.
 // Broken. This method only "sort of" works when used outside of this package.  It assumes that Kinds and Resources match
 // and they aren't guaranteed to do so.
@@ -131,6 +137,12 @@ func UnsafeGuessKindToResource(kind schema.GroupVersionKind) ( /*plural*/ schema
 	for _, skip := range unpluralizedSuffixes {
 		if strings.HasSuffix(singularName, skip) {
 			return singular, singular
+		}
+	}
+
+	for k, v := range specialSuffixes {
+		if strings.HasSuffix(singularName, k) {
+			return kind.GroupVersion().WithResource(v), singular
 		}
 	}
 
