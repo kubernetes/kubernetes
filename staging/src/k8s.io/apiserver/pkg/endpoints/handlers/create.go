@@ -143,7 +143,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 
 		ae := audit.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
-		audit.LogRequestObject(ae, obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
+		audit.LogRequestObject(req.Context(), obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
 
 		userInfo, _ := request.UserFrom(ctx)
 

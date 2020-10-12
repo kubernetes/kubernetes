@@ -126,7 +126,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		ae := audit.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
 
-		audit.LogRequestPatch(ae, patchBytes)
+		audit.LogRequestPatch(req.Context(), patchBytes)
 		trace.Step("Recorded the audit event")
 
 		baseContentType := runtime.ContentTypeJSON
