@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -393,9 +392,6 @@ func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		return true, nil

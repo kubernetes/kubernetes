@@ -445,9 +445,6 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 	err = wait.PollImmediate(poll, 5*time.Minute, func() (bool, error) {
 		retrievedPod, err := client.CoreV1().Pods(execPod.Namespace).Get(context.TODO(), execPod.Name, metav1.GetOptions{})
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		return retrievedPod.Status.Phase == v1.PodRunning, nil
