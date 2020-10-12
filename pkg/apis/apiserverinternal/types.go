@@ -22,7 +22,7 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-//  Storage version of a specific resource.
+// StorageVersion of a specific resource.
 type StorageVersion struct {
 	metav1.TypeMeta
 	// The name is <group>.<resource>.
@@ -39,7 +39,7 @@ type StorageVersion struct {
 // StorageVersionSpec is an empty spec.
 type StorageVersionSpec struct{}
 
-// API server instances report the versions they can decode and the version they
+// StorageVersionStatus API server instances report the versions they can decode and the version they
 // encode objects to when persisting objects in the backend.
 type StorageVersionStatus struct {
 	// The reported versions per API server instance.
@@ -57,7 +57,7 @@ type StorageVersionStatus struct {
 	Conditions []StorageVersionCondition
 }
 
-// An API server instance reports the version it can decode and the version it
+// ServerStorageVersion An API server instance reports the version it can decode and the version it
 // encodes objects to when persisting objects in the backend.
 type ServerStorageVersion struct {
 	// The ID of the reporting API server.
@@ -72,22 +72,27 @@ type ServerStorageVersion struct {
 	DecodableVersions []string
 }
 
+// StorageVersionConditionType Indicates the storage version condition type
 type StorageVersionConditionType string
 
 const (
-	// Indicates that encoding storage versions reported by all servers are equal.
+	//AllEncodingVersionsEqual Indicates that encoding storage versions reported by all servers are equal.
 	AllEncodingVersionsEqual StorageVersionConditionType = "AllEncodingVersionsEqual"
 )
 
+// ConditionStatus indicates status of condition from "True", "False", or "Unknown"
 type ConditionStatus string
 
 const (
-	ConditionTrue    ConditionStatus = "True"
-	ConditionFalse   ConditionStatus = "False"
+	// ConditionTrue indicates condition as "True"
+	ConditionTrue ConditionStatus = "True"
+	// ConditionFalse indicates condition as "False"
+	ConditionFalse ConditionStatus = "False"
+	// ConditionUnknown indicates condition as "Unknown"
 	ConditionUnknown ConditionStatus = "Unknown"
 )
 
-// Describes the state of the storageVersion at a certain point.
+// StorageVersionCondition Describes the state of the storageVersion at a certain point.
 type StorageVersionCondition struct {
 	// Type of the condition.
 	// +optional
@@ -111,7 +116,7 @@ type StorageVersionCondition struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// A list of StorageVersions.
+// StorageVersionList A list of StorageVersions.
 type StorageVersionList struct {
 	metav1.TypeMeta
 	// +optional
