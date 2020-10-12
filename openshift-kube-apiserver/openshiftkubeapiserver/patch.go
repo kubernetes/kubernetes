@@ -80,7 +80,8 @@ func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, k
 	// END HANDLER CHAIN
 
 	openshiftAPIServiceReachabilityCheck := newOpenshiftAPIServiceReachabilityCheck()
-	genericConfig.ReadyzChecks = append(genericConfig.ReadyzChecks, openshiftAPIServiceReachabilityCheck)
+	oauthAPIServiceReachabilityCheck := newOAuthPIServiceReachabilityCheck()
+	genericConfig.ReadyzChecks = append(genericConfig.ReadyzChecks, openshiftAPIServiceReachabilityCheck, oauthAPIServiceReachabilityCheck)
 
 	genericConfig.AddPostStartHookOrDie("openshift.io-startkubeinformers", func(context genericapiserver.PostStartHookContext) error {
 		go openshiftInformers.Start(context.StopCh)
@@ -88,6 +89,10 @@ func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, k
 	})
 	genericConfig.AddPostStartHookOrDie("openshift.io-openshift-apiserver-reachable", func(context genericapiserver.PostStartHookContext) error {
 		go openshiftAPIServiceReachabilityCheck.checkForConnection(context)
+		return nil
+	})
+	genericConfig.AddPostStartHookOrDie("openshift.io-oauth-apiserver-reachable", func(context genericapiserver.PostStartHookContext) error {
+		go oauthAPIServiceReachabilityCheck.checkForConnection(context)
 		return nil
 	})
 	enablement.AppendPostStartHooksOrDie(genericConfig)
