@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
@@ -352,8 +352,13 @@ func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...stri
 				RestartPolicy: v1.RestartPolicyAlways,
 				Containers: []v1.Container{
 					{
-						Name:    "busybox-container",
-						Image:   busyboxImage,
+						Name:  "busybox-container",
+						Image: busyboxImage,
+						SecurityContext: &v1.SecurityContext{
+							Capabilities: &v1.Capabilities{
+								Add: []v1.Capability{"CAP_NET_RAW"},
+							},
+						},
 						Command: getRestartingContainerCommand("/test-empty-dir-mnt", 0, numRestarts, "echo 'some bytes' >/outside_the_volume.txt; ping -c 1 google.com; echo 'hello world' >> /test-empty-dir-mnt/file;"),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
