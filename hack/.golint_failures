@@ -1,5 +1,4 @@
 # Apart from this line, only trailing comments are supported
-cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/kube-apiserver/app
 cmd/kubeadm/app/apis/kubeadm/v1beta1
 cmd/kubeadm/app/apis/kubeadm/v1beta2
@@ -77,7 +76,6 @@ pkg/controller/replicaset/config/v1alpha1
 pkg/controller/replication
 pkg/controller/replication/config/v1alpha1
 pkg/controller/resourcequota/config/v1alpha1
-pkg/controller/service/config/v1alpha1
 pkg/controller/serviceaccount/config/v1alpha1
 pkg/controller/statefulset
 pkg/controller/statefulset/config/v1alpha1
@@ -412,9 +410,11 @@ staging/src/k8s.io/client-go/util/retry
 staging/src/k8s.io/client-go/util/testing
 staging/src/k8s.io/client-go/util/workqueue
 staging/src/k8s.io/cloud-provider
+staging/src/k8s.io/cloud-provider/app/apis/config/v1alpha1
 staging/src/k8s.io/cloud-provider/controllers/node
 staging/src/k8s.io/cloud-provider/controllers/nodelifecycle
 staging/src/k8s.io/cloud-provider/controllers/route
+staging/src/k8s.io/cloud-provider/service/config/v1alpha1
 staging/src/k8s.io/code-generator/cmd/client-gen/args
 staging/src/k8s.io/code-generator/cmd/client-gen/generators/fake
 staging/src/k8s.io/code-generator/cmd/client-gen/generators/scheme
@@ -426,6 +426,7 @@ staging/src/k8s.io/component-base/cli/flag
 staging/src/k8s.io/component-base/config/v1alpha1
 staging/src/k8s.io/component-base/featuregate
 staging/src/k8s.io/component-base/version/verflag
+staging/src/k8s.io/controller-manager/config/v1alpha1
 staging/src/k8s.io/controller-manager/pkg/features
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1

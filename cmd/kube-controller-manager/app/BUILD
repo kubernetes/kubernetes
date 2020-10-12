@@ -22,7 +22,6 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kube-controller-manager/app",
     visibility = ["//visibility:public"],
     deps = [
-        "//cmd/controller-manager/app:go_default_library",
         "//cmd/kube-controller-manager/app/config:go_default_library",
         "//cmd/kube-controller-manager/app/options:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
@@ -145,6 +144,7 @@ go_library(
         "//staging/src/k8s.io/component-base/term:go_default_library",
         "//staging/src/k8s.io/component-base/version:go_default_library",
         "//staging/src/k8s.io/component-base/version/verflag:go_default_library",
+        "//staging/src/k8s.io/controller-manager/app:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib/plugins:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1:go_default_library",

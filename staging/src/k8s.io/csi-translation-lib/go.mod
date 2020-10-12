@@ -15,8 +15,10 @@ require (
 replace (
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
+	k8s.io/apiserver => ../apiserver
 	k8s.io/client-go => ../client-go
 	k8s.io/cloud-provider => ../cloud-provider
 	k8s.io/component-base => ../component-base
+	k8s.io/controller-manager => ../controller-manager
 	k8s.io/csi-translation-lib => ../csi-translation-lib
 )

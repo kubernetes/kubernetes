@@ -1097,6 +1097,101 @@ rules:
     - repository: client-go
       branch: release-1.19
 
+- destination: controller-manager
+  library: true
+  branches:
+  - source:
+      branch: master
+      dir: staging/src/k8s.io/controller-manager
+    name: master
+    dependencies:
+    - repository: api
+      branch: master
+    - repository: apimachinery
+      branch: master
+    - repository: client-go
+      branch: master
+    - repository: component-base
+      branch: master
+    - repository: apiserver
+      branch: master
+  - source:
+      branch: release-1.19
+      dir: staging/src/k8s.io/controller-manager
+    name: release-1.19
+    go: 1.15.2
+
+- destination: cloud-provider
+  library: true
+  branches:
+  - source:
+      branch: master
+      dir: staging/src/k8s.io/cloud-provider
+    name: master
+    dependencies:
+    - repository: api
+      branch: master
+    - repository: apimachinery
+      branch: master
+    - repository: apiserver
+      branch: master
+    - repository: client-go
+      branch: master
+    - repository: component-base
+      branch: master
+    - repository: controller-manager
+      branch: master
+  - source:
+      branch: release-1.16
+      dir: staging/src/k8s.io/cloud-provider
+    name: release-1.16
+    go: 1.13.15
+    dependencies:
+    - repository: api
+      branch: release-1.16
+    - repository: apimachinery
+      branch: release-1.16
+    - repository: client-go
+      branch: release-13.0
+  - source:
+      branch: release-1.17
+      dir: staging/src/k8s.io/cloud-provider
+    name: release-1.17
+    go: 1.13.15
+    dependencies:
+    - repository: api
+      branch: release-1.17
+    - repository: apimachinery
+      branch: release-1.17
+    - repository: client-go
+      branch: release-14.0
+  - source:
+      branch: release-1.18
+      dir: staging/src/k8s.io/cloud-provider
+    name: release-1.18
+    go: 1.13.15
+    dependencies:
+    - repository: api
+      branch: release-1.18
+    - repository: apimachinery
+      branch: release-1.18
+    - repository: client-go
+      branch: release-1.18
+  - source:
+      branch: release-1.19
+      dir: staging/src/k8s.io/cloud-provider
+    name: release-1.19
+    go: 1.15.2
+    dependencies:
+    - repository: api
+      branch: release-1.19
+    - repository: apimachinery
+      branch: release-1.19
+    - repository: client-go
+      branch: release-1.19
+    - repository: component-base
+      branch: release-1.19
+
 - destination: kube-controller-manager
   library: true
   branches:
@@ -1107,11 +1202,17 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
+    - repository: apiserver
+      branch: master
     - repository: component-base
       branch: master
     - repository: api
       branch: master
     - repository: client-go
+      branch: master
+    - repository: controller-manager
+      branch: master
+    - repository: cloud-provider
       branch: master
   - source:
       branch: release-1.16
@@ -1223,73 +1324,6 @@ rules:
     - repository: api
       branch: release-1.19
 
-- destination: cloud-provider
-  library: true
-  branches:
-  - source:
-      branch: master
-      dir: staging/src/k8s.io/cloud-provider
-    name: master
-    dependencies:
-    - repository: api
-      branch: master
-    - repository: apimachinery
-      branch: master
-    - repository: client-go
-      branch: master
-    - repository: component-base
-      branch: master
-  - source:
-      branch: release-1.16
-      dir: staging/src/k8s.io/cloud-provider
-    name: release-1.16
-    go: 1.13.15
-    dependencies:
-    - repository: api
-      branch: release-1.16
-    - repository: apimachinery
-      branch: release-1.16
-    - repository: client-go
-      branch: release-13.0
-  - source:
-      branch: release-1.17
-      dir: staging/src/k8s.io/cloud-provider
-    name: release-1.17
-    go: 1.13.15
-    dependencies:
-    - repository: api
-      branch: release-1.17
-    - repository: apimachinery
-      branch: release-1.17
-    - repository: client-go
-      branch: release-14.0
-  - source:
-      branch: release-1.18
-      dir: staging/src/k8s.io/cloud-provider
-    name: release-1.18
-    go: 1.13.15
-    dependencies:
-    - repository: api
-      branch: release-1.18
-    - repository: apimachinery
-      branch: release-1.18
-    - repository: client-go
-      branch: release-1.18
-  - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/cloud-provider
-    name: release-1.19
-    go: 1.15.2
-    dependencies:
-    - repository: api
-      branch: release-1.19
-    - repository: apimachinery
-      branch: release-1.19
-    - repository: client-go
-      branch: release-1.19
-    - repository: component-base
-      branch: release-1.19
-
 - destination: csi-translation-lib
   library: true
   branches:
@@ -1302,11 +1336,15 @@ rules:
       branch: master
     - repository: apimachinery
       branch: master
+    - repository: apiserver
+      branch: master
     - repository: client-go
       branch: master
     - repository: cloud-provider
       branch: master
     - repository: component-base
+      branch: master
+    - repository: controller-manager
       branch: master
   - source:
       branch: release-1.16
@@ -1388,6 +1426,8 @@ rules:
     - repository: apiserver
       branch: master
     - repository: component-base
+      branch: master
+    - repository: controller-manager
       branch: master
   - source:
       branch: release-1.16
@@ -1632,30 +1672,6 @@ rules:
       branch: release-1.19
     - repository: metrics
       branch: release-1.19
-
-- destination: controller-manager
-  library: true
-  branches:
-  - source:
-      branch: master
-      dir: staging/src/k8s.io/controller-manager
-    name: master
-    dependencies:
-      - repository: api
-        branch: master
-      - repository: apimachinery
-        branch: master
-      - repository: apiserver
-        branch: master
-      - repository: client-go
-        branch: master
-      - repository: component-base
-        branch: master
-  - source:
-      branch: release-1.19
-      dir: staging/src/k8s.io/controller-manager
-    name: release-1.19
-    go: 1.15.2
 
 - destination: mount-utils
   library: true

@@ -127,7 +127,6 @@ filegroup(
         "//pkg/controller/replicaset:all-srcs",
         "//pkg/controller/replication:all-srcs",
         "//pkg/controller/resourcequota:all-srcs",
-        "//pkg/controller/service/config:all-srcs",
         "//pkg/controller/serviceaccount:all-srcs",
         "//pkg/controller/statefulset:all-srcs",
         "//pkg/controller/testutil:all-srcs",

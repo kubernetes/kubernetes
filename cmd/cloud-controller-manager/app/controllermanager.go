@@ -40,10 +40,10 @@ import (
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
+	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/klog/v2"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
-	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 )
 
 const (

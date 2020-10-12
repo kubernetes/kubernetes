@@ -35,7 +35,6 @@ tags_values_pkgs = {"openapi-gen": {
         "staging/src/k8s.io/apiserver/pkg/apis/example2/v1",
     ],
     "true": [
-        "cmd/cloud-controller-manager/app/apis/config/v1alpha1",
         "pkg/apis/abac/v0",
         "pkg/apis/abac/v1beta1",
         "staging/src/k8s.io/api/admissionregistration/v1",
@@ -94,6 +93,7 @@ tags_values_pkgs = {"openapi-gen": {
         "staging/src/k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1",
         "staging/src/k8s.io/client-go/pkg/apis/clientauthentication/v1beta1",
         "staging/src/k8s.io/client-go/pkg/version",
+        "staging/src/k8s.io/cloud-provider/app/apis/config/v1alpha1",
         "staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1",
         "staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1",
         "staging/src/k8s.io/kube-controller-manager/config/v1alpha1",
@@ -113,7 +113,6 @@ tags_values_pkgs = {"openapi-gen": {
 
 # tags_pkgs_values is a dictionary mapping {k8s build tag: {pkg: [tag values in pkg]}}
 tags_pkgs_values = {"openapi-gen": {
-    "cmd/cloud-controller-manager/app/apis/config/v1alpha1": ["true"],
     "pkg/apis/abac/v0": ["true"],
     "pkg/apis/abac/v1beta1": ["true"],
     "staging/src/k8s.io/api/admission/v1": ["false"],
@@ -180,6 +179,7 @@ tags_pkgs_values = {"openapi-gen": {
     "staging/src/k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1": ["true"],
     "staging/src/k8s.io/client-go/pkg/apis/clientauthentication/v1beta1": ["true"],
     "staging/src/k8s.io/client-go/pkg/version": ["true"],
+    "staging/src/k8s.io/cloud-provider/app/apis/config/v1alpha1": ["true"],
     "staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1": ["true"],
     "staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1": ["true"],
     "staging/src/k8s.io/kube-controller-manager/config/v1alpha1": ["true"],
