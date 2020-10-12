@@ -127,13 +127,14 @@ aliases:
     - saschagrunert # SIG Technical Lead
     - tpepper # SIG Chair
   release-engineering-reviewers:
-    - cpanato # Branch Manager
-    - feiskyer # Patch Release Team
-    - hasheddan # Branch Manager
-    - hoegaarden # Patch Release Team
-    - justaugustus # SIG Chair
-    - saschagrunert # Branch Manager
-    - tpepper # SIG Chair / Patch Release Team
+    - cpanato # Release Manager
+    - feiskyer # Release Manager
+    - hasheddan # Release Manager
+    - hoegaarden # Release Manager
+    - justaugustus # SIG Chair / Release Manager
+    - saschagrunert # SIG Technical Lead / Release Manager
+    - tpepper # SIG Chair / Release Manager
+    - xmudrii # Release Manager
   build-image-approvers:
     - BenTheElder
     - cblecker
