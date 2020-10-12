@@ -30,7 +30,7 @@ metadata:
 spec:
   selector:
     k8s-app: kube-dns
-  clusterIP: __PILLAR__DNS__SERVER__
+  clusterIP: __DNS__SERVER__
   ports:
   - name: dns
     port: 53
@@ -123,7 +123,7 @@ spec:
           # guaranteed class. Currently, this container falls into the
           # "burstable" category so the kubelet doesn't backoff from restarting it.
           limits:
-            memory: __PILLAR__DNS__MEMORY__LIMIT__
+            memory: __DNS__MEMORY__LIMIT__
           requests:
             cpu: 100m
             memory: 70Mi
@@ -146,7 +146,7 @@ spec:
           initialDelaySeconds: 3
           timeoutSeconds: 5
         args:
-        - --domain=__PILLAR__DNS__DOMAIN__.
+        - --domain=__DNS__DOMAIN__.
         - --dns-port=10053
         - --config-dir=/kube-dns-config
         - --v=2
@@ -193,7 +193,7 @@ spec:
         - --no-negcache
         - --dns-loop-detect
         - --log-facility=-
-        - --server=/__PILLAR__DNS__DOMAIN__/127.0.0.1#10053
+        - --server=/__DNS__DOMAIN__/127.0.0.1#10053
         - --server=/in-addr.arpa/127.0.0.1#10053
         - --server=/ip6.arpa/127.0.0.1#10053
         ports:
@@ -232,8 +232,8 @@ spec:
         args:
         - --v=2
         - --logtostderr
-        - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.__PILLAR__DNS__DOMAIN__,5,SRV
-        - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.__PILLAR__DNS__DOMAIN__,5,SRV
+        - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.__DNS__DOMAIN__,5,SRV
+        - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.__DNS__DOMAIN__,5,SRV
         ports:
         - containerPort: 10054
           name: metrics
