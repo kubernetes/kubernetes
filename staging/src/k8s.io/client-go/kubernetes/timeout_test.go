@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubernetes_test
+package kubernetes
 
 import (
 	"bytes"
@@ -27,7 +27,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	manualfake "k8s.io/client-go/rest/fake"
@@ -53,7 +52,7 @@ func TestListTimeout(t *testing.T) {
 	}
 	restClient, _ := rest.RESTClientFor(clientConfig)
 	restClient.Client = fakeClient.Client
-	realClient := kubernetes.New(restClient)
+	realClient := New(restClient)
 
 	timeout := int64(21)
 	realClient.AppsV1().DaemonSets("").List(context.TODO(), metav1.ListOptions{TimeoutSeconds: &timeout})
