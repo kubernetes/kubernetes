@@ -32,7 +32,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/transport"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
@@ -52,6 +54,8 @@ const (
 
 	// We have seen one of these calls take just over 15 seconds, so putting this at 30.
 	proxyHTTPCallTimeout = 30 * time.Second
+	podRetryPeriod       = 1 * time.Second
+	podRetryTimeout      = 1 * time.Minute
 )
 
 var _ = SIGDescribe("Proxy", func() {
@@ -258,8 +262,123 @@ var _ = SIGDescribe("Proxy", func() {
 				framework.Failf(strings.Join(errs, "\n"))
 			}
 		})
+
+		ginkgo.It("A set of valid responses are returned for both pod and service ProxyWithPath", func() {
+
+			ns := f.Namespace.Name
+
+			framework.Logf("Creating pod...")
+			_, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "agnhost",
+					Labels: map[string]string{
+						"test": "response"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+						Name:    "agnhost",
+						Command: []string{"/agnhost", "porter"},
+						Env: []v1.EnvVar{{
+							Name:  "SERVE_PORT_80",
+							Value: "foo",
+						}},
+					}},
+					RestartPolicy: v1.RestartPolicyNever,
+				}}, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "failed to create pod")
+
+			err = wait.PollImmediate(podRetryPeriod, podRetryTimeout, checkPodStatus(f, "test=response"))
+			framework.ExpectNoError(err, "Pod didn't start within time out period")
+
+			framework.Logf("Creating service...")
+			_, err = f.ClientSet.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: ns,
+					Labels: map[string]string{
+						"test": "response",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
+						Port:       80,
+						TargetPort: intstr.FromInt(80),
+						Protocol:   v1.ProtocolTCP,
+					}},
+					Selector: map[string]string{
+						"test": "response",
+					},
+				}}, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "Failed to create the service")
+
+			transportCfg, err := f.ClientConfig().TransportConfig()
+			framework.ExpectNoError(err, "Error creating transportCfg")
+			restTransport, err := transport.New(transportCfg)
+			framework.ExpectNoError(err, "Error creating restTransport")
+
+			client := &http.Client{
+				CheckRedirect: func(req *http.Request, via []*http.Request) error {
+					return http.ErrUseLastResponse
+				},
+				Transport: restTransport,
+			}
+
+			// All methods for Pod ProxyWithPath return 200
+			httpVerbs := []string{"DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"}
+			for _, httpVerb := range httpVerbs {
+
+				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy/some/path/with/" + httpVerb
+				framework.Logf("Starting http.Client for %s", urlString)
+				request, err := http.NewRequest(httpVerb, urlString, nil)
+				framework.ExpectNoError(err, "processing request")
+
+				resp, err := client.Do(request)
+				framework.ExpectNoError(err, "processing response")
+				defer resp.Body.Close()
+
+				framework.Logf("http.Client request:%s StatusCode:%d", httpVerb, resp.StatusCode)
+				framework.ExpectEqual(resp.StatusCode, 200, "The resp.StatusCode returned: %d", resp.StatusCode)
+			}
+
+			// All methods for Service ProxyWithPath return 200
+			for _, httpVerb := range httpVerbs {
+
+				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/services/test-service/proxy/some/path/with/" + httpVerb
+				framework.Logf("Starting http.Client for %s", urlString)
+				request, err := http.NewRequest(httpVerb, urlString, nil)
+				framework.ExpectNoError(err, "processing request")
+
+				resp, err := client.Do(request)
+				framework.ExpectNoError(err, "processing response")
+				defer resp.Body.Close()
+
+				framework.Logf("http.Client request:%s StatusCode:%d", httpVerb, resp.StatusCode)
+				framework.ExpectEqual(resp.StatusCode, 200, "The resp.StatusCode returned: %d", resp.StatusCode)
+			}
+		})
 	})
 })
+
+func checkPodStatus(f *framework.Framework, label string) func() (bool, error) {
+	return func() (bool, error) {
+		var err error
+
+		list, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: label})
+
+		if err != nil {
+			return false, err
+		}
+
+		if list.Items[0].Status.Phase != "Running" {
+			framework.Logf("Pod Quantity: %d Status: %s", len(list.Items), list.Items[0].Status.Phase)
+			return false, err
+		}
+		framework.Logf("Pod Status: %v", list.Items[0].Status.Phase)
+		return true, nil
+	}
+}
 
 func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCode int, d time.Duration, err error) {
 	// About all of the proxy accesses in this file:
