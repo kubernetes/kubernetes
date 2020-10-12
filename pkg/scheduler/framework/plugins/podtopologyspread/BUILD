@@ -37,6 +37,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/framework/runtime:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/parallelize:go_default_library",

@@ -59,8 +59,8 @@ func (f *applyFlags) sessionIsInteractive() bool {
 	return !(f.nonInteractiveMode || f.dryRun || f.force)
 }
 
-// NewCmdApply returns the cobra command for `kubeadm upgrade apply`
-func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
+// newCmdApply returns the cobra command for `kubeadm upgrade apply`
+func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 	flags := &applyFlags{
 		applyPlanFlags:   apf,
 		imagePullTimeout: defaultImagePullTimeout,

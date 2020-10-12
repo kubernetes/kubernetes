@@ -56,8 +56,8 @@ var (
 		`)
 )
 
-// NewCmdSelfhosting returns the self-hosting Cobra command
-func NewCmdSelfhosting(in io.Reader) *cobra.Command {
+// newCmdSelfhosting returns the self-hosting Cobra command
+func newCmdSelfhosting(in io.Reader) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "selfhosting",
 		Aliases: []string{"selfhosted", "self-hosting"},

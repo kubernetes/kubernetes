@@ -127,10 +127,10 @@ type initData struct {
 	patchesDir              string
 }
 
-// NewCmdInit returns "kubeadm init" command.
+// newCmdInit returns "kubeadm init" command.
 // NB. initOptions is exposed as parameter for allowing unit testing of
 //     the newInitOptions method, that implements all the command options validation logic
-func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
+func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	if initOptions == nil {
 		initOptions = newInitOptions()
 	}

@@ -153,7 +153,7 @@ func TestNewInitData(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// initialize an external init option and inject it to the init cmd
 			initOptions := newInitOptions()
-			cmd := NewCmdInit(nil, initOptions)
+			cmd := newCmdInit(nil, initOptions)
 
 			// sets cmd flags (that will be reflected on the init options)
 			for f, v := range tc.flags {

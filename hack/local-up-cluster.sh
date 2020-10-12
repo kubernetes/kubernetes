@@ -886,22 +886,28 @@ EOF
 function start_kubedns {
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
         cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns/kube-dns.yaml.in" kube-dns.yaml
-        ${SED} -i -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" kube-dns.yaml
-        ${SED} -i -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" kube-dns.yaml
-        ${SED} -i -e "s/{{ pillar\['dns_memory_limit'\] }}/${DNS_MEMORY_LIMIT}/g" kube-dns.yaml
+        ${SED} -i -e "s/dns_domain/${DNS_DOMAIN}/g" kube-dns.yaml
+        ${SED} -i -e "s/dns_server/${DNS_SERVER_IP}/g" kube-dns.yaml
+        ${SED} -i -e "s/dns_memory_limit/${DNS_MEMORY_LIMIT}/g" kube-dns.yaml
         # TODO update to dns role once we have one.
         # use kubectl to create kubedns addon
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kube-dns.yaml
-        echo "Kube-dns addon successfully deployed."
+        if ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kube-dns.yaml ; then
+       		echo "Kube-dns addon successfully deployed."
+        else
+		echo "Something is wrong with your DNS input"
+		cat kube-dns.yaml
+		exit 1
+        fi
         rm kube-dns.yaml
     fi
 }
 
 function start_nodelocaldns {
   cp "${KUBE_ROOT}/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml" nodelocaldns.yaml
-  ${SED} -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" nodelocaldns.yaml
-  ${SED} -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" nodelocaldns.yaml
-  ${SED} -i -e "s/__PILLAR__LOCAL__DNS__/${LOCAL_DNS_IP}/g" nodelocaldns.yaml
+  # .* because of the __PILLLAR__ references that eventually will be removed
+  ${SED} -i -e "s/_.*_DNS__DOMAIN__/${DNS_DOMAIN}/g" nodelocaldns.yaml
+  ${SED} -i -e "s/_.*_DNS__SERVER__/${DNS_SERVER_IP}/g" nodelocaldns.yaml
+  ${SED} -i -e "s/_.*_LOCAL__DNS__/${LOCAL_DNS_IP}/g" nodelocaldns.yaml
   # use kubectl to create nodelocaldns addon
   ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f nodelocaldns.yaml
   echo "NodeLocalDNS addon successfully deployed."

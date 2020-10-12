@@ -209,7 +209,7 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 			return nil, fmt.Errorf("obtaining pod's hard topology spread constraints: %v", err)
 		}
 	} else {
-		constraints, err = pl.defaultConstraints(pod, v1.DoNotSchedule)
+		constraints, err = pl.buildDefaultConstraints(pod, v1.DoNotSchedule)
 		if err != nil {
 			return nil, fmt.Errorf("setting default hard topology spread constraints: %v", err)
 		}

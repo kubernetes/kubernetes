@@ -28,12 +28,13 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-scheduler/config/v1beta1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 )
 
+// TestCodecsDecodePluginConfig tests that embedded plugin args get decoded
+// into their appropriate internal types and defaults are applied.
 func TestCodecsDecodePluginConfig(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -116,6 +117,7 @@ profiles:
 								DefaultConstraints: []corev1.TopologySpreadConstraint{
 									{MaxSkew: 1, TopologyKey: "zone", WhenUnsatisfiable: corev1.ScheduleAnyway},
 								},
+								DefaultingType: config.ListDefaulting,
 							},
 						},
 						{
@@ -299,69 +301,8 @@ profiles:
 						},
 						{
 							Name: "PodTopologySpread",
-							Args: &config.PodTopologySpreadArgs{},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "empty PodTopologySpread, feature DefaultPodTopologySpread enabled",
-			data: []byte(`
-apiVersion: kubescheduler.config.k8s.io/v1beta1
-kind: KubeSchedulerConfiguration
-profiles:
-- pluginConfig:
-  - name: PodTopologySpread
-    args:
-      defaultConstraints:
-`),
-			feature: features.DefaultPodTopologySpread,
-			wantProfiles: []config.KubeSchedulerProfile{
-				{
-					SchedulerName: "default-scheduler",
-					PluginConfig: []config.PluginConfig{
-						{
-							Name: "PodTopologySpread",
 							Args: &config.PodTopologySpreadArgs{
-								DefaultConstraints: []corev1.TopologySpreadConstraint{
-									{
-										MaxSkew:           3,
-										TopologyKey:       corev1.LabelHostname,
-										WhenUnsatisfiable: corev1.ScheduleAnyway,
-									},
-									{
-										MaxSkew:           5,
-										TopologyKey:       corev1.LabelZoneFailureDomainStable,
-										WhenUnsatisfiable: corev1.ScheduleAnyway,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "empty array PodTopologySpread, feature DefaultPodTopologySpread enabled",
-			data: []byte(`
-apiVersion: kubescheduler.config.k8s.io/v1beta1
-kind: KubeSchedulerConfiguration
-profiles:
-- pluginConfig:
-  - name: PodTopologySpread
-    args:
-      defaultConstraints: []
-`),
-			feature: features.DefaultPodTopologySpread,
-			wantProfiles: []config.KubeSchedulerProfile{
-				{
-					SchedulerName: "default-scheduler",
-					PluginConfig: []config.PluginConfig{
-						{
-							Name: "PodTopologySpread",
-							Args: &config.PodTopologySpreadArgs{
-								DefaultConstraints: []corev1.TopologySpreadConstraint{},
+								DefaultingType: config.ListDefaulting,
 							},
 						},
 					},
@@ -514,7 +455,6 @@ profiles:
     name: NodeResourcesLeastAllocated
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta1
-      defaultConstraints: []
       kind: PodTopologySpreadArgs
     name: PodTopologySpread
   - args:
@@ -605,7 +545,6 @@ profiles:
     name: VolumeBinding
   - args:
       apiVersion: kubescheduler.config.k8s.io/v1beta1
-      defaultConstraints: null
       kind: PodTopologySpreadArgs
     name: PodTopologySpread
   - args:

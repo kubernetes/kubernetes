@@ -367,7 +367,9 @@ func TestPluginArgsDefaults(t *testing.T) {
 		{
 			name: "PodTopologySpreadArgs resources empty",
 			in:   &v1beta1.PodTopologySpreadArgs{},
-			want: &v1beta1.PodTopologySpreadArgs{},
+			want: &v1beta1.PodTopologySpreadArgs{
+				DefaultingType: v1beta1.ListDefaulting,
+			},
 		},
 		{
 			name: "PodTopologySpreadArgs resources with value",
@@ -388,12 +390,29 @@ func TestPluginArgsDefaults(t *testing.T) {
 						MaxSkew:           2,
 					},
 				},
+				DefaultingType: v1beta1.ListDefaulting,
 			},
 		},
 		{
-			name:    "PodTopologySpreadArgs resources empty, DefaultPodTopologySpread feature enabled",
+			name:    "PodTopologySpreadArgs empty, DefaultPodTopologySpread feature enabled",
 			feature: features.DefaultPodTopologySpread,
 			in:      &v1beta1.PodTopologySpreadArgs{},
+			want: &v1beta1.PodTopologySpreadArgs{
+				DefaultingType: v1beta1.SystemDefaulting,
+			},
+		},
+		{
+			name:    "PodTopologySpreadArgs with constraints, DefaultPodTopologySpread feature enabled",
+			feature: features.DefaultPodTopologySpread,
+			in: &v1beta1.PodTopologySpreadArgs{
+				DefaultConstraints: []v1.TopologySpreadConstraint{
+					{
+						TopologyKey:       v1.LabelHostname,
+						WhenUnsatisfiable: v1.ScheduleAnyway,
+						MaxSkew:           3,
+					},
+				},
+			},
 			want: &v1beta1.PodTopologySpreadArgs{
 				DefaultConstraints: []v1.TopologySpreadConstraint{
 					{
@@ -401,22 +420,9 @@ func TestPluginArgsDefaults(t *testing.T) {
 						WhenUnsatisfiable: v1.ScheduleAnyway,
 						MaxSkew:           3,
 					},
-					{
-						TopologyKey:       v1.LabelZoneFailureDomainStable,
-						WhenUnsatisfiable: v1.ScheduleAnyway,
-						MaxSkew:           5,
-					},
 				},
-			},
-		},
-		{
-			name:    "PodTopologySpreadArgs empty array, DefaultPodTopologySpread feature enabled",
-			feature: features.DefaultPodTopologySpread,
-			in: &v1beta1.PodTopologySpreadArgs{
-				DefaultConstraints: []v1.TopologySpreadConstraint{},
-			},
-			want: &v1beta1.PodTopologySpreadArgs{
-				DefaultConstraints: []v1.TopologySpreadConstraint{},
+				// TODO(#94008): Make SystemDefaulting in v1beta2.
+				DefaultingType: v1beta1.ListDefaulting,
 			},
 		},
 	}
