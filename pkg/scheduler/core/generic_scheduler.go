@@ -29,8 +29,8 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -389,7 +389,7 @@ func addNominatedPods(ctx context.Context, ph framework.PreemptHandle, pod *v1.P
 	stateOut := state.Clone()
 	podsAdded := false
 	for _, p := range nominatedPods {
-		if podutil.GetPodPriority(p) >= podutil.GetPodPriority(pod) && p.UID != pod.UID {
+		if corev1helpers.PodPriority(p) >= corev1helpers.PodPriority(pod) && p.UID != pod.UID {
 			nodeInfoOut.AddPod(p)
 			status := ph.RunPreFilterExtensionAddPod(ctx, stateOut, pod, p, nodeInfoOut)
 			if !status.IsSuccess() {

@@ -830,39 +830,3 @@ func TestUpdatePodCondition(t *testing.T) {
 		assert.Equal(t, test.expected, resultStatus, test.desc)
 	}
 }
-
-// TestGetPodPriority tests GetPodPriority function.
-func TestGetPodPriority(t *testing.T) {
-	p := int32(20)
-	tests := []struct {
-		name             string
-		pod              *v1.Pod
-		expectedPriority int32
-	}{
-		{
-			name: "no priority pod resolves to static default priority",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{Containers: []v1.Container{
-					{Name: "container", Image: "image"}},
-				},
-			},
-			expectedPriority: 0,
-		},
-		{
-			name: "pod with priority resolves correctly",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{Containers: []v1.Container{
-					{Name: "container", Image: "image"}},
-					Priority: &p,
-				},
-			},
-			expectedPriority: p,
-		},
-	}
-	for _, test := range tests {
-		if GetPodPriority(test.pod) != test.expectedPriority {
-			t.Errorf("expected pod priority: %v, got %v", test.expectedPriority, GetPodPriority(test.pod))
-		}
-
-	}
-}

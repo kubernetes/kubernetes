@@ -120,6 +120,7 @@ require (
 	k8s.io/cluster-bootstrap v0.0.0
 	k8s.io/code-generator v0.0.0
 	k8s.io/component-base v0.0.0
+	k8s.io/component-helpers v0.0.0
 	k8s.io/controller-manager v0.0.0
 	k8s.io/cri-api v0.0.0
 	k8s.io/csi-translation-lib v0.0.0
@@ -471,6 +472,7 @@ replace (
 	k8s.io/cluster-bootstrap => ./staging/src/k8s.io/cluster-bootstrap
 	k8s.io/code-generator => ./staging/src/k8s.io/code-generator
 	k8s.io/component-base => ./staging/src/k8s.io/component-base
+	k8s.io/component-helpers => ./staging/src/k8s.io/component-helpers
 	k8s.io/controller-manager => ./staging/src/k8s.io/controller-manager
 	k8s.io/cri-api => ./staging/src/k8s.io/cri-api
 	k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib

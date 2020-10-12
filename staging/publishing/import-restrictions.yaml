@@ -247,3 +247,9 @@
   - k8s.io/klog
   - k8s.io/cloud-provider
   - k8s.io/csi-translation-lib
+
+- baseImportPath: "./vendor/k8s.io/component-helpers/"
+  allowedImports:
+  - k8s.io/api
+  - k8s.io/apimachinery
+  - k8s.io/client-go

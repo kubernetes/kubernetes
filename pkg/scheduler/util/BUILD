@@ -39,7 +39,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/util",
     deps = [
-        "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -51,6 +50,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
         "//staging/src/k8s.io/kube-scheduler/extender/v1:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],

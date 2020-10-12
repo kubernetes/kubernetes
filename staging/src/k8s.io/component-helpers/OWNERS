@@ -1,0 +1,12 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- dims
+- deads2k
+- liggitt
+- soltysh
+reviewers:
+- dims
+- deads2k
+- liggitt
+- soltysh
