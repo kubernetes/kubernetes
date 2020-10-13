@@ -368,6 +368,8 @@ API rule violation: list_type_missing,k8s.io/apiserver/pkg/apis/audit/v1beta1,Po
 API rule violation: list_type_missing,k8s.io/apiserver/pkg/apis/audit/v1beta1,PolicyRule,UserGroups
 API rule violation: list_type_missing,k8s.io/apiserver/pkg/apis/audit/v1beta1,PolicyRule,Users
 API rule violation: list_type_missing,k8s.io/apiserver/pkg/apis/audit/v1beta1,PolicyRule,Verbs
+API rule violation: list_type_missing,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Controllers
+API rule violation: list_type_missing,k8s.io/controller-manager/config/v1alpha1,LeaderMigrationConfiguration,ControllerLeaders
 API rule violation: list_type_missing,k8s.io/kube-controller-manager/config/v1alpha1,GarbageCollectorControllerConfiguration,GCIgnoredResources
 API rule violation: list_type_missing,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeBinderControllerConfiguration,VolumeHostCIDRDenylist
 API rule violation: list_type_missing,k8s.io/kube-proxy/config/v1alpha1,KubeProxyConfiguration,NodePortAddresses
@@ -484,6 +486,14 @@ API rule violation: names_match,k8s.io/cloud-provider/app/apis/config/v1alpha1,K
 API rule violation: names_match,k8s.io/cloud-provider/app/apis/config/v1alpha1,KubeCloudSharedConfiguration,NodeSyncPeriod
 API rule violation: names_match,k8s.io/cloud-provider/app/apis/config/v1alpha1,KubeCloudSharedConfiguration,RouteReconciliationPeriod
 API rule violation: names_match,k8s.io/cloud-provider/app/apis/config/v1alpha1,KubeCloudSharedConfiguration,UseServiceAccountCredentials
+API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Address
+API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,ClientConnection
+API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,ControllerStartInterval
+API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Controllers
+API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Debugging
+API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,LeaderElection
+API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,MinResyncPeriod
+API rule violation: names_match,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Port
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,AttachDetachControllerConfiguration,DisableAttachDetachReconcilerSync
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,AttachDetachControllerConfiguration,ReconcilerSyncLoopPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,CSRSigningConfiguration,CertFile
