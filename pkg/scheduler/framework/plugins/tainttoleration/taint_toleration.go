@@ -53,7 +53,7 @@ func (pl *TaintToleration) Name() string {
 // Filter invoked at the filter extension point.
 func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	if nodeInfo == nil || nodeInfo.Node() == nil {
-		return framework.NewStatus(framework.Error, "invalid nodeInfo")
+		return framework.AsStatus(fmt.Errorf("invalid nodeInfo"))
 	}
 
 	filterPredicate := func(t *v1.Taint) bool {
@@ -138,13 +138,13 @@ func countIntolerableTaintsPreferNoSchedule(taints []v1.Taint, tolerations []v1.
 func (pl *TaintToleration) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
 	if err != nil || nodeInfo.Node() == nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
+		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 	node := nodeInfo.Node()
 
 	s, err := getPreScoreState(state)
 	if err != nil {
-		return 0, framework.NewStatus(framework.Error, err.Error())
+		return 0, framework.AsStatus(err)
 	}
 
 	score := int64(countIntolerableTaintsPreferNoSchedule(node.Spec.Taints, s.tolerationsPreferNoSchedule))
