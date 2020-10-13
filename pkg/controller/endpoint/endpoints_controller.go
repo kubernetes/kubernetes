@@ -75,9 +75,9 @@ const (
 	TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
 )
 
-// NewEndpointController returns a new *EndpointController.
+// NewEndpointController returns a new *Controller.
 func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
-	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration) *EndpointController {
+	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration) *Controller {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartStructuredLogging(0)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
@@ -86,7 +86,7 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.CoreV1().RESTClient().GetRateLimiter())
 	}
-	e := &EndpointController{
+	e := &Controller{
 		client:           client,
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "endpoint"),
 		workerLoopPeriod: time.Second,
@@ -127,8 +127,8 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 	return e
 }
 
-// EndpointController manages selector-based service endpoints.
-type EndpointController struct {
+// Controller manages selector-based service endpoints.
+type Controller struct {
 	client           clientset.Interface
 	eventBroadcaster record.EventBroadcaster
 	eventRecorder    record.EventRecorder
@@ -177,7 +177,7 @@ type EndpointController struct {
 
 // Run will not return until stopCh is closed. workers determines how many
 // endpoints will be handled in parallel.
-func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
+func (e *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer e.queue.ShutDown()
 
@@ -202,7 +202,7 @@ func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 
 // When a pod is added, figure out what services it will be a member of and
 // enqueue them. obj must have *v1.Pod type.
-func (e *EndpointController) addPod(obj interface{}) {
+func (e *Controller) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
 	services, err := e.serviceSelectorCache.GetPodServiceMemberships(e.serviceLister, pod)
 	if err != nil {
@@ -250,7 +250,7 @@ func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointA
 // When a pod is updated, figure out what services it used to be a member of
 // and what services it will be a member of, and enqueue the union of these.
 // old and cur must be *v1.Pod types.
-func (e *EndpointController) updatePod(old, cur interface{}) {
+func (e *Controller) updatePod(old, cur interface{}) {
 	services := endpointutil.GetServicesToUpdateOnPodChange(e.serviceLister, e.serviceSelectorCache, old, cur)
 	for key := range services {
 		e.queue.AddAfter(key, e.endpointUpdatesBatchPeriod)
@@ -259,7 +259,7 @@ func (e *EndpointController) updatePod(old, cur interface{}) {
 
 // When a pod is deleted, enqueue the services the pod used to be a member of.
 // obj could be an *v1.Pod, or a DeletionFinalStateUnknown marker item.
-func (e *EndpointController) deletePod(obj interface{}) {
+func (e *Controller) deletePod(obj interface{}) {
 	pod := endpointutil.GetPodFromDeleteAction(obj)
 	if pod != nil {
 		e.addPod(pod)
@@ -267,7 +267,7 @@ func (e *EndpointController) deletePod(obj interface{}) {
 }
 
 // onServiceUpdate updates the Service Selector in the cache and queues the Service for processing.
-func (e *EndpointController) onServiceUpdate(obj interface{}) {
+func (e *Controller) onServiceUpdate(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
@@ -279,7 +279,7 @@ func (e *EndpointController) onServiceUpdate(obj interface{}) {
 }
 
 // onServiceDelete removes the Service Selector from the cache and queues the Service for processing.
-func (e *EndpointController) onServiceDelete(obj interface{}) {
+func (e *Controller) onServiceDelete(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
@@ -290,7 +290,7 @@ func (e *EndpointController) onServiceDelete(obj interface{}) {
 	e.queue.Add(key)
 }
 
-func (e *EndpointController) onEndpointsDelete(obj interface{}) {
+func (e *Controller) onEndpointsDelete(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
@@ -303,12 +303,12 @@ func (e *EndpointController) onEndpointsDelete(obj interface{}) {
 // marks them done. You may run as many of these in parallel as you wish; the
 // workqueue guarantees that they will not end up processing the same service
 // at the same time.
-func (e *EndpointController) worker() {
+func (e *Controller) worker() {
 	for e.processNextWorkItem() {
 	}
 }
 
-func (e *EndpointController) processNextWorkItem() bool {
+func (e *Controller) processNextWorkItem() bool {
 	eKey, quit := e.queue.Get()
 	if quit {
 		return false
@@ -321,7 +321,7 @@ func (e *EndpointController) processNextWorkItem() bool {
 	return true
 }
 
-func (e *EndpointController) handleErr(err error, key interface{}) {
+func (e *Controller) handleErr(err error, key interface{}) {
 	if err == nil {
 		e.queue.Forget(key)
 		return
@@ -343,7 +343,7 @@ func (e *EndpointController) handleErr(err error, key interface{}) {
 	utilruntime.HandleError(err)
 }
 
-func (e *EndpointController) syncService(key string) error {
+func (e *Controller) syncService(key string) error {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing service %q endpoints. (%v)", key, time.Since(startTime))
@@ -550,7 +550,7 @@ func (e *EndpointController) syncService(key string) error {
 // do this once on startup, because in steady-state these are detected (but
 // some stragglers could have been left behind if the endpoint controller
 // reboots).
-func (e *EndpointController) checkLeftoverEndpoints() {
+func (e *Controller) checkLeftoverEndpoints() {
 	list, err := e.endpointsLister.List(labels.Everything())
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to list endpoints (%v); orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)", err))

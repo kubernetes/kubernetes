@@ -42,7 +42,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/controller"
+	controllerpkg "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 	utilnet "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
@@ -203,7 +203,7 @@ func makeBlockingEndpointDeleteTestServer(t *testing.T, controller *endpointCont
 }
 
 type endpointController struct {
-	*EndpointController
+	*Controller
 	podStore       cache.Store
 	serviceStore   cache.Store
 	endpointsStore cache.Store
@@ -211,7 +211,7 @@ type endpointController struct {
 
 func newController(url string, batchPeriod time.Duration) *endpointController {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: url, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(client, controllerpkg.NoResyncPeriodFunc())
 	endpoints := NewEndpointController(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Services(),
 		informerFactory.Core().V1().Endpoints(), client, batchPeriod)
 	endpoints.podsSynced = alwaysReady
