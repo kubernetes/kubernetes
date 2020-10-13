@@ -39,10 +39,22 @@ message PodResources {
 message ContainerResources {
     string name = 1;
     repeated ContainerDevices devices = 2;
+    repeated uint32 cpu_ids = 3;
 }
 
 // ContainerDevices contains information about the devices assigned to a container
 message ContainerDevices {
     string resource_name = 1;
     repeated string device_ids = 2;
+    TopologyInfo topology = 3;
+}
+
+// Topology describes hardware topology of the resource
+message TopologyInfo {
+	repeated NUMANode nodes = 1;
+}
+
+// NUMA representation of NUMA node
+message NUMANode {
+	int64 ID = 1;
 }
