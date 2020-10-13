@@ -270,3 +270,8 @@ func (list ErrorList) Filter(fns ...utilerrors.Matcher) ErrorList {
 	// FilterOut takes an Aggregate and returns an Aggregate
 	return fromAggregate(err.(utilerrors.Aggregate))
 }
+
+// Implementing Is error method
+func (m Error) Is(target error) bool {
+	return target.Error() == m.Error()
+}
