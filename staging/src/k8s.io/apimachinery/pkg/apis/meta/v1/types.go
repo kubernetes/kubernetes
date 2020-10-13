@@ -476,8 +476,8 @@ const (
 	// from the key-value store.  API sever will put the "foregroundDeletion"
 	// finalizer on the object, and sets its deletionTimestamp.  This policy is
 	// cascading, i.e., the dependents will be deleted with Foreground.  This
-    // policy does not cause a deletion request to wait for the object to be
-    // deleted. 
+	// policy does not cause a deletion request to wait for the object to be
+	// deleted.
 	DeletePropagationForeground DeletionPropagation = "Foreground"
 )
 
@@ -522,8 +522,8 @@ type DeleteOptions struct {
 	// allow the garbage collector to delete the dependents in the background;
 	// 'Foreground' - a cascading policy that deletes all dependents in the
 	// foreground. Note that even 'Foreground' deletion does not wait for the
-    // resource to be deleted before returning. With all available policies, the
-    // resource may still exist after the deletion request succeeds.
+	// resource to be deleted before returning. With all available policies, the
+	// resource may still exist after the deletion request succeeds.
 	// +optional
 	PropagationPolicy *DeletionPropagation `json:"propagationPolicy,omitempty" protobuf:"varint,4,opt,name=propagationPolicy"`
 

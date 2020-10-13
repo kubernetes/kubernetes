@@ -248,7 +248,9 @@ message DeleteOptions {
   // Acceptable values are: 'Orphan' - orphan the dependents; 'Background' -
   // allow the garbage collector to delete the dependents in the background;
   // 'Foreground' - a cascading policy that deletes all dependents in the
-  // foreground.
+  // foreground. Note that even 'Foreground' deletion does not wait for the
+  // resource to be deleted before returning. With all available policies, the
+  // resource may still exist after the deletion request succeeds.
   // +optional
   optional string propagationPolicy = 4;
 
