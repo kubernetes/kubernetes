@@ -344,7 +344,7 @@ function run-in-docker-container() {
 }
 
 function dump_masters() {
-  local master_names
+  local master_names=()
   if [[ -n "${use_custom_instance_list}" ]]; then
     while IFS='' read -r line; do master_names+=("$line"); done < <(log_dump_custom_get_instances master)
   elif [[ ! "${master_ssh_supported_providers}" =~ ${KUBERNETES_PROVIDER} ]]; then
