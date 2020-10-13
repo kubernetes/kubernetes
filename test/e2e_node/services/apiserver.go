@@ -27,7 +27,7 @@ import (
 
 const (
 	clusterIPRange          = "10.0.0.1/24"
-	apiserverClientURL      = "http://localhost:8080"
+	apiserverClientURL      = "https://localhost:6443"
 	apiserverHealthCheckURL = apiserverClientURL + "/healthz"
 )
 

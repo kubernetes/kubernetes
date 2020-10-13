@@ -17,13 +17,15 @@ limitations under the License.
 package services
 
 import (
+	"crypto/tls"
 	"fmt"
-	"k8s.io/klog/v2"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"k8s.io/klog/v2"
 )
 
 // terminationSignals are signals that cause the program to exit in the
@@ -37,6 +39,14 @@ func waitForTerminationSignal() {
 	<-sig
 }
 
+// newInsecureHTTPSClient returns HTTPS client that skipt the TLS verification.
+func newInsecureHTTPSClient() *http.Client {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	return &http.Client{Transport: tr}
+}
+
 // readinessCheck checks whether services are ready via the supplied health
 // check URLs. Once there is an error in errCh, the function will stop waiting
 // and return the error.
@@ -45,6 +55,7 @@ func readinessCheck(name string, urls []string, errCh <-chan error) error {
 	endTime := time.Now().Add(*serverStartTimeout)
 	blockCh := make(chan error)
 	defer close(blockCh)
+	client := newInsecureHTTPSClient()
 	for endTime.After(time.Now()) {
 		select {
 		// We *always* want to run the health check if there is no error on the channel.
@@ -67,7 +78,7 @@ func readinessCheck(name string, urls []string, errCh <-chan error) error {
 		case <-time.After(time.Second):
 			ready := true
 			for _, url := range urls {
-				resp, err := http.Head(url)
+				resp, err := client.Head(url)
 				if err != nil || resp.StatusCode != http.StatusOK {
 					ready = false
 					break

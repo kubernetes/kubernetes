@@ -1885,15 +1885,6 @@ function compute-master-manifest-variables {
     FLEXVOLUME_HOSTPATH_MOUNT="{ \"name\": \"flexvolumedir\", \"mountPath\": \"${VOLUME_PLUGIN_DIR}\", \"readOnly\": true},"
     FLEXVOLUME_HOSTPATH_VOLUME="{ \"name\": \"flexvolumedir\", \"hostPath\": {\"path\": \"${VOLUME_PLUGIN_DIR}\"}},"
   fi
-
-  INSECURE_PORT_MAPPING=""
-  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" == "true" ]]; then
-    # INSECURE_PORT_MAPPING is used by sed
-    # shellcheck disable=SC2089
-    INSECURE_PORT_MAPPING='{ "name": "local", "containerPort": 8080, "hostPort": 8080},'
-  fi
-  # shellcheck disable=SC2090
-  export INSECURE_PORT_MAPPING
 }
 
 # A helper function that bind mounts kubelet dirs for running mount in a chroot
@@ -3004,9 +2995,7 @@ function main() {
     GCE_GLBC_TOKEN="$(secure_random 32)"
   fi
   ADDON_MANAGER_TOKEN="$(secure_random 32)"
-  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
-    KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
-  fi
+  KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
   if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     KONNECTIVITY_SERVER_TOKEN="$(secure_random 32)"
   fi

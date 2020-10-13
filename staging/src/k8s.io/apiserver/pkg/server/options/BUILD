@@ -10,7 +10,6 @@ go_library(
         "authentication_dynamic_request_header.go",
         "authorization.go",
         "coreapi.go",
-        "deprecated_insecure_serving.go",
         "doc.go",
         "egress_selector.go",
         "etcd.go",

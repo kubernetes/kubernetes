@@ -57,7 +57,6 @@ go_library(
     srcs = [
         "config.go",
         "config_selfclient.go",
-        "deprecated_insecure_serving.go",
         "doc.go",
         "genericapiserver.go",
         "handler.go",

@@ -83,13 +83,11 @@ type KubeControllerManagerOptions struct {
 	SAController                     *SAControllerOptions
 	TTLAfterFinishedController       *TTLAfterFinishedControllerOptions
 
-	SecureServing *apiserveroptions.SecureServingOptionsWithLoopback
-	// TODO: remove insecure serving mode
-	InsecureServing *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback
-	Authentication  *apiserveroptions.DelegatingAuthenticationOptions
-	Authorization   *apiserveroptions.DelegatingAuthorizationOptions
-	Metrics         *metrics.Options
-	Logs            *logs.Options
+	SecureServing  *apiserveroptions.SecureServingOptionsWithLoopback
+	Authentication *apiserveroptions.DelegatingAuthenticationOptions
+	Authorization  *apiserveroptions.DelegatingAuthorizationOptions
+	Metrics        *metrics.Options
+	Logs           *logs.Options
 
 	Master                      string
 	Kubeconfig                  string
@@ -175,12 +173,7 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		TTLAfterFinishedController: &TTLAfterFinishedControllerOptions{
 			&componentConfig.TTLAfterFinishedController,
 		},
-		SecureServing: apiserveroptions.NewSecureServingOptions().WithLoopback(),
-		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
-			BindAddress: net.ParseIP(componentConfig.Generic.Address),
-			BindPort:    int(componentConfig.Generic.Port),
-			BindNetwork: "tcp",
-		}).WithLoopback(),
+		SecureServing:  apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
 		Metrics:        metrics.NewOptions(),
@@ -229,7 +222,6 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.ServiceController.AddFlags(fss.FlagSet("service controller"))
 
 	s.SecureServing.AddFlags(fss.FlagSet("secure serving"))
-	s.InsecureServing.AddUnqualifiedFlags(fss.FlagSet("insecure serving"))
 	s.Authentication.AddFlags(fss.FlagSet("authentication"))
 	s.Authorization.AddFlags(fss.FlagSet("authorization"))
 
@@ -343,9 +335,6 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 	if err := s.TTLAfterFinishedController.ApplyTo(&c.ComponentConfig.TTLAfterFinishedController); err != nil {
 		return err
 	}
-	if err := s.InsecureServing.ApplyTo(&c.InsecureServing, &c.LoopbackClientConfig); err != nil {
-		return err
-	}
 	if err := s.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
@@ -357,11 +346,6 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 			return err
 		}
 	}
-
-	// sync back to component config
-	// TODO: find more elegant way than syncing back the values.
-	c.ComponentConfig.Generic.Port = int32(s.InsecureServing.BindPort)
-	c.ComponentConfig.Generic.Address = s.InsecureServing.BindAddress.String()
 
 	return nil
 }
@@ -396,7 +380,6 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.ServiceController.Validate()...)
 	errs = append(errs, s.TTLAfterFinishedController.Validate()...)
 	errs = append(errs, s.SecureServing.Validate()...)
-	errs = append(errs, s.InsecureServing.Validate()...)
 	errs = append(errs, s.Authentication.Validate()...)
 	errs = append(errs, s.Authorization.Validate()...)
 	errs = append(errs, s.Metrics.Validate()...)

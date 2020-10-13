@@ -177,10 +177,6 @@ func TestAddFlags(t *testing.T) {
 			HTTP2MaxStreamsPerConnection: 42,
 			Required:                     true,
 		}).WithLoopback(),
-		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
-			BindAddress: net.ParseIP("127.0.0.1"),
-			BindPort:    8080,
-		}).WithLoopback(),
 		EventTTL: 1 * time.Hour,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:         10250,

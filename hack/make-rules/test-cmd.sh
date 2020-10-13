@@ -56,9 +56,7 @@ function run_kube_apiserver() {
   ENABLE_FEATURE_GATES="ServerSideApply=true"
 
   "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
-    --insecure-bind-address="127.0.0.1" \
     --bind-address="127.0.0.1" \
-    --insecure-port="${API_PORT}" \
     --authorization-mode="${AUTHORIZATION_MODE}" \
     --secure-port="${SECURE_API_PORT}" \
     --feature-gates="${ENABLE_FEATURE_GATES}" \
@@ -73,7 +71,7 @@ function run_kube_apiserver() {
     --token-auth-file=hack/testdata/auth-tokens.csv 1>&2 &
   export APISERVER_PID=$!
 
-  kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver"
+  kube::util::wait_for_url "https://127.0.0.1:${SECURE_API_PORT}/healthz" "apiserver"
 }
 
 # Runs run_kube_controller_manager
@@ -89,10 +87,10 @@ function run_kube_controller_manager() {
   "${KUBE_OUTPUT_HOSTBIN}/kube-controller-manager" \
     --port="${CTLRMGR_PORT}" \
     --kube-api-content-type="${KUBE_TEST_API_TYPE-}" \
-    --master="127.0.0.1:${API_PORT}" 1>&2 &
+    --master="127.0.0.1:${SECURE_API_PORT}" 1>&2 &
   export CTLRMGR_PID=$!
 
-  kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager"
+  kube::util::wait_for_url "https://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager"
 }
 
 # Creates a node object with name 127.0.0.1. This is required because we do not
@@ -101,7 +99,8 @@ function run_kube_controller_manager() {
 # Exports:
 #   SUPPORTED_RESOURCES(Array of all resources supported by the apiserver).
 function create_node() {
-  kubectl create -f - -s "http://127.0.0.1:${API_PORT}" << __EOF__
+  # TODO: Make this use secure connection
+  kubectl create --insecure-skip-tls-verify -f - -s "https://127.0.0.1:${SECURE_API_PORT}" << __EOF__
 {
   "kind": "Node",
   "apiVersion": "v1",

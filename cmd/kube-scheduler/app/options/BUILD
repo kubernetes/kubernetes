@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "configfile.go",
         "deprecated.go",
-        "insecure_serving.go",
         "options.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kube-scheduler/app/options",
@@ -64,17 +63,14 @@ go_test(
     name = "go_default_test",
     srcs = [
         "deprecated_test.go",
-        "insecure_serving_test.go",
         "options_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
-        "//cmd/kube-scheduler/app/config:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework/plugins/interpodaffinity:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//staging/src/k8s.io/component-base/config:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",

@@ -145,6 +145,13 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
+	// TODO: This flag is kept here to preserve the legacy behavior where many deployers used to set '--insecure-port=0' to prevent serving http.
+	// This is not wired to anything, it serves the purpose of not failing if '--insecure-port=0' on command line.
+	var insecurePort int
+	fs.IntVar(&insecurePort, "insecure-port", 0, "This flag will be removed in a future version.")
+	fs.MarkDeprecated("insecure-port", "This flag is not being used and will be removed in a future version (you don't have to set this to 0 to disable insecure serving anymore).")
+	fs.MarkHidden("insecure-port")
+
 	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, ""+
 		"The IP address on which to listen for the --secure-port port. The "+
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+

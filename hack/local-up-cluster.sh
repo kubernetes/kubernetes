@@ -265,17 +265,6 @@ mkdir -p "${CERT_DIR}" &>/dev/null || sudo mkdir -p "${CERT_DIR}"
 CONTROLPLANE_SUDO=$(test -w "${CERT_DIR}" || echo "sudo -E")
 
 function test_apiserver_off {
-    # For the common local scenario, fail fast if server is already running.
-    # this can happen if you run local-up-cluster.sh twice and kill etcd in between.
-    if [[ "${API_PORT}" -gt "0" ]]; then
-        if ! curl --silent -g "${API_HOST}:${API_PORT}" ; then
-            echo "API SERVER insecure port is free, proceeding..."
-        else
-            echo "ERROR starting API SERVER, exiting. Some process on ${API_HOST} is serving already on ${API_PORT}"
-            exit 1
-        fi
-    fi
-
     if ! curl --silent -k -g "${API_HOST}:${API_SECURE_PORT}" ; then
         echo "API SERVER secure port is free, proceeding..."
     else
@@ -576,8 +565,6 @@ EOF
       --secure-port="${API_SECURE_PORT}" \
       --tls-cert-file="${CERT_DIR}/serving-kube-apiserver.crt" \
       --tls-private-key-file="${CERT_DIR}/serving-kube-apiserver.key" \
-      --insecure-bind-address="${API_HOST_IP}" \
-      --insecure-port="${API_PORT}" \
       --storage-backend="${STORAGE_BACKEND}" \
       --storage-media-type="${STORAGE_MEDIA_TYPE}" \
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \

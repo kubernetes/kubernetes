@@ -203,7 +203,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -240,7 +239,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -285,7 +283,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -327,7 +324,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -371,7 +367,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=baz",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -417,7 +412,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",
@@ -446,50 +440,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "insecure-port extra-args",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-				CertificatesDir: testCertsDir,
-				APIServer: kubeadmapi.APIServer{
-					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
-						ExtraArgs: map[string]string{
-							"insecure-port": "1234",
-						},
-					},
-				},
-			},
-			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
-			expected: []string{
-				"kube-apiserver",
-				"--insecure-port=1234",
-				"--enable-admission-plugins=NodeRestriction",
-				"--service-cluster-ip-range=bar",
-				"--service-account-key-file=" + testCertsDir + "/sa.pub",
-				"--client-ca-file=" + testCertsDir + "/ca.crt",
-				"--tls-cert-file=" + testCertsDir + "/apiserver.crt",
-				"--tls-private-key-file=" + testCertsDir + "/apiserver.key",
-				"--kubelet-client-certificate=" + testCertsDir + "/apiserver-kubelet-client.crt",
-				"--kubelet-client-key=" + testCertsDir + "/apiserver-kubelet-client.key",
-				"--enable-bootstrap-token-auth=true",
-				"--secure-port=123",
-				"--allow-privileged=true",
-				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
-				"--proxy-client-cert-file=/var/lib/certs/front-proxy-client.crt",
-				"--proxy-client-key-file=/var/lib/certs/front-proxy-client.key",
-				"--requestheader-username-headers=X-Remote-User",
-				"--requestheader-group-headers=X-Remote-Group",
-				"--requestheader-extra-headers-prefix=X-Remote-Extra-",
-				"--requestheader-client-ca-file=" + testCertsDir + "/front-proxy-ca.crt",
-				"--requestheader-allowed-names=front-proxy-client",
-				"--authorization-mode=Node,RBAC",
-				"--advertise-address=1.2.3.4",
-				fmt.Sprintf("--etcd-servers=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
-				"--etcd-cafile=" + testCertsDir + "/etcd/ca.crt",
-				"--etcd-certfile=" + testCertsDir + "/apiserver-etcd-client.crt",
-				"--etcd-keyfile=" + testCertsDir + "/apiserver-etcd-client.key",
-			},
-		},
-		{
 			name: "authorization-mode extra-args Webhook",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
@@ -509,7 +459,6 @@ func TestGetAPIServerCommand(t *testing.T) {
 			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 			expected: []string{
 				"kube-apiserver",
-				"--insecure-port=0",
 				"--enable-admission-plugins=NodeRestriction",
 				"--service-cluster-ip-range=bar",
 				"--service-account-key-file=" + testCertsDir + "/sa.pub",

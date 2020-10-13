@@ -61,15 +61,13 @@ echo "dummy_token,admin,admin" > "${TMP_DIR}/tokenauth.csv"
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
 "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
-  --insecure-bind-address="${API_HOST}" \
   --bind-address="${API_HOST}" \
-  --insecure-port="${API_PORT}" \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
   --runtime-config="api/all=true" \
   --token-auth-file="${TMP_DIR}/tokenauth.csv" \
-  --service-account-issuer="https://kubernetes.devault.svc/" \
+  --service-account-issuer="https://kubernetes.default.svc/" \
   --service-account-signing-key-file="${KUBE_ROOT}/staging/src/k8s.io/client-go/util/cert/testdata/dontUseThisKey.pem" \
   --logtostderr \
   --v=2 \

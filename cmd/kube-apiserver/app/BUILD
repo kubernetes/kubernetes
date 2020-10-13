@@ -23,8 +23,6 @@ go_library(
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/kubeapiserver/authenticator:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
-        "//pkg/kubeapiserver/options:go_default_library",
-        "//pkg/kubeapiserver/server:go_default_library",
         "//pkg/registry/rbac/rest:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1:go_default_library",

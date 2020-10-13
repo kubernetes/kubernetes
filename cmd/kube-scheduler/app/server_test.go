@@ -384,10 +384,6 @@ profiles:
 			// use listeners instead of static ports so parallel test runs don't conflict
 			opts.SecureServing.Listener = makeListener(t)
 			defer opts.SecureServing.Listener.Close()
-			opts.CombinedInsecureServing.Metrics.Listener = makeListener(t)
-			defer opts.CombinedInsecureServing.Metrics.Listener.Close()
-			opts.CombinedInsecureServing.Healthz.Listener = makeListener(t)
-			defer opts.CombinedInsecureServing.Healthz.Listener.Close()
 
 			for _, f := range opts.Flags().FlagSets {
 				fs.AddFlagSet(f)
