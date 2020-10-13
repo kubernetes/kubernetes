@@ -334,7 +334,7 @@ func TestRunGenCSR(t *testing.T) {
 		},
 	}
 
-	err := runGenCSR(&config)
+	err := runGenCSR(nil, &config)
 	require.NoError(t, err, "expected runGenCSR to not fail")
 
 	t.Log("The command generates key and CSR files in the configured --cert-dir")

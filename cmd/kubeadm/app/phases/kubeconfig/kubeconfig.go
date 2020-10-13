@@ -508,14 +508,20 @@ func createKubeConfigAndCSR(kubeConfigDir string, kubeadmConfig *kubeadmapi.Init
 
 // CreateDefaultKubeConfigsAndCSRFiles is used in ExternalCA mode to create
 // kubeconfig files and adjacent CSR files.
-func CreateDefaultKubeConfigsAndCSRFiles(kubeConfigDir string, kubeadmConfig *kubeadmapi.InitConfiguration) error {
+func CreateDefaultKubeConfigsAndCSRFiles(out io.Writer, kubeConfigDir string, kubeadmConfig *kubeadmapi.InitConfiguration) error {
 	kubeConfigs, err := getKubeConfigSpecsBase(kubeadmConfig)
 	if err != nil {
 		return err
 	}
+	if out != nil {
+		fmt.Fprintf(out, "generating keys and CSRs in %s\n", kubeConfigDir)
+	}
 	for name, spec := range kubeConfigs {
 		if err := createKubeConfigAndCSR(kubeConfigDir, kubeadmConfig, name, spec); err != nil {
 			return err
+		}
+		if out != nil {
+			fmt.Fprintf(out, "  %s\n", name)
 		}
 	}
 	return nil
