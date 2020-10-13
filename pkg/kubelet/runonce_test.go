@@ -113,7 +113,7 @@ func TestRunOnce(t *testing.T) {
 		false, /* keepTerminatedPodVolumes */
 		volumetest.NewBlockVolumePathHandler())
 
-	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
+	// TODO: Factor out "stats.Provider" from Kubelet so we don't have a cyclic dependency
 	volumeStatsAggPeriod := time.Second * 10
 	kb.resourceAnalyzer = stats.NewResourceAnalyzer(kb, volumeStatsAggPeriod)
 	nodeRef := &v1.ObjectReference{

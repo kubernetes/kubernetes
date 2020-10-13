@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
-// NewCRIStatsProvider returns a StatsProvider that provides the node stats
+// NewCRIStatsProvider returns a Provider that provides the node stats
 // from cAdvisor and the container stats from CRI.
 func NewCRIStatsProvider(
 	cadvisor cadvisor.Interface,
@@ -43,7 +43,7 @@ func NewCRIStatsProvider(
 	imageService internalapi.ImageManagerService,
 	logMetricsService LogMetricsService,
 	osInterface kubecontainer.OSInterface,
-) *StatsProvider {
+) *Provider {
 	return newStatsProvider(cadvisor, podManager, runtimeCache, newCRIStatsProvider(cadvisor, resourceAnalyzer,
 		runtimeService, imageService, logMetricsService, osInterface))
 }
@@ -57,19 +57,19 @@ func NewCadvisorStatsProvider(
 	runtimeCache kubecontainer.RuntimeCache,
 	imageService kubecontainer.ImageService,
 	statusProvider status.PodStatusProvider,
-) *StatsProvider {
+) *Provider {
 	return newStatsProvider(cadvisor, podManager, runtimeCache, newCadvisorStatsProvider(cadvisor, resourceAnalyzer, imageService, statusProvider))
 }
 
-// newStatsProvider returns a new StatsProvider that provides node stats from
+// newStatsProvider returns a new Provider that provides node stats from
 // cAdvisor and the container stats using the containerStatsProvider.
 func newStatsProvider(
 	cadvisor cadvisor.Interface,
 	podManager kubepod.Manager,
 	runtimeCache kubecontainer.RuntimeCache,
 	containerStatsProvider containerStatsProvider,
-) *StatsProvider {
-	return &StatsProvider{
+) *Provider {
+	return &Provider{
 		cadvisor:               cadvisor,
 		podManager:             podManager,
 		runtimeCache:           runtimeCache,
@@ -77,8 +77,8 @@ func newStatsProvider(
 	}
 }
 
-// StatsProvider provides the stats of the node and the pod-managed containers.
-type StatsProvider struct {
+// Provider provides the stats of the node and the pod-managed containers.
+type Provider struct {
 	cadvisor     cadvisor.Interface
 	podManager   kubepod.Manager
 	runtimeCache kubecontainer.RuntimeCache
@@ -101,13 +101,13 @@ type rlimitStatsProvider interface {
 }
 
 // RlimitStats returns base information about process count
-func (p *StatsProvider) RlimitStats() (*statsapi.RlimitStats, error) {
+func (p *Provider) RlimitStats() (*statsapi.RlimitStats, error) {
 	return pidlimit.Stats()
 }
 
 // GetCgroupStats returns the stats of the cgroup with the cgroupName. Note that
 // this function doesn't generate filesystem stats.
-func (p *StatsProvider) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
+func (p *Provider) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	info, err := getCgroupInfo(p.cadvisor, cgroupName, updateStats)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get cgroup stats for %q: %v", cgroupName, err)
@@ -120,7 +120,7 @@ func (p *StatsProvider) GetCgroupStats(cgroupName string, updateStats bool) (*st
 
 // GetCgroupCPUAndMemoryStats returns the CPU and memory stats of the cgroup with the cgroupName. Note that
 // this function doesn't generate filesystem stats.
-func (p *StatsProvider) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
+func (p *Provider) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
 	info, err := getCgroupInfo(p.cadvisor, cgroupName, updateStats)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cgroup stats for %q: %v", cgroupName, err)
@@ -131,7 +131,7 @@ func (p *StatsProvider) GetCgroupCPUAndMemoryStats(cgroupName string, updateStat
 }
 
 // RootFsStats returns the stats of the node root filesystem.
-func (p *StatsProvider) RootFsStats() (*statsapi.FsStats, error) {
+func (p *Provider) RootFsStats() (*statsapi.FsStats, error) {
 	rootFsInfo, err := p.cadvisor.RootFsInfo()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get rootFs info: %v", err)
@@ -162,7 +162,7 @@ func (p *StatsProvider) RootFsStats() (*statsapi.FsStats, error) {
 }
 
 // GetContainerInfo returns stats (from cAdvisor) for a container.
-func (p *StatsProvider) GetContainerInfo(podFullName string, podUID types.UID, containerName string, req *cadvisorapiv1.ContainerInfoRequest) (*cadvisorapiv1.ContainerInfo, error) {
+func (p *Provider) GetContainerInfo(podFullName string, podUID types.UID, containerName string, req *cadvisorapiv1.ContainerInfoRequest) (*cadvisorapiv1.ContainerInfo, error) {
 	// Resolve and type convert back again.
 	// We need the static pod UID but the kubecontainer API works with types.UID.
 	podUID = types.UID(p.podManager.TranslatePodUID(podUID))
@@ -186,7 +186,7 @@ func (p *StatsProvider) GetContainerInfo(podFullName string, podUID types.UID, c
 
 // GetRawContainerInfo returns the stats (from cadvisor) for a non-Kubernetes
 // container.
-func (p *StatsProvider) GetRawContainerInfo(containerName string, req *cadvisorapiv1.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapiv1.ContainerInfo, error) {
+func (p *Provider) GetRawContainerInfo(containerName string, req *cadvisorapiv1.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapiv1.ContainerInfo, error) {
 	if subcontainers {
 		return p.cadvisor.SubcontainerInfo(containerName, req)
 	}
@@ -200,7 +200,7 @@ func (p *StatsProvider) GetRawContainerInfo(containerName string, req *cadvisora
 }
 
 // HasDedicatedImageFs returns true if a dedicated image filesystem exists for storing images.
-func (p *StatsProvider) HasDedicatedImageFs() (bool, error) {
+func (p *Provider) HasDedicatedImageFs() (bool, error) {
 	device, err := p.containerStatsProvider.ImageFsDevice()
 	if err != nil {
 		return false, err

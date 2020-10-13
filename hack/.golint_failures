@@ -106,7 +106,6 @@ pkg/kubelet/dockershim/network/testing
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
-pkg/kubelet/stats
 pkg/kubelet/sysctl
 pkg/kubelet/types
 pkg/kubemark

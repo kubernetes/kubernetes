@@ -58,6 +58,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog/v2"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -1118,7 +1119,7 @@ type Kubelet struct {
 	dockerLegacyService legacy.DockerLegacyService
 
 	// StatsProvider provides the node and the container stats.
-	*stats.StatsProvider
+	StatsProvider *stats.Provider
 
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
@@ -1133,6 +1134,56 @@ type Kubelet struct {
 
 	// Handles RuntimeClass objects for the Kubelet.
 	runtimeClassManager *runtimeclass.Manager
+}
+
+// ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
+func (kl *Kubelet) ListPodStats() ([]statsapi.PodStats, error) {
+	return kl.StatsProvider.ListPodStats()
+}
+
+// ListPodCPUAndMemoryStats is delegated to StatsProvider, which implements stats.Provider interface
+func (kl *Kubelet) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) {
+	return kl.StatsProvider.ListPodCPUAndMemoryStats()
+}
+
+// ListPodStatsAndUpdateCPUNanoCoreUsage is delegated to StatsProvider, which implements stats.Provider interface
+func (kl *Kubelet) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error) {
+	return kl.StatsProvider.ListPodStatsAndUpdateCPUNanoCoreUsage()
+}
+
+// ImageFsStats is delegated to StatsProvider, which implements stats.Provider interface
+func (kl *Kubelet) ImageFsStats() (*statsapi.FsStats, error) {
+	return kl.StatsProvider.ImageFsStats()
+}
+
+// GetCgroupStats is delegated to StatsProvider, which implements stats.Provider interface
+func (kl *Kubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
+	return kl.StatsProvider.GetCgroupStats(cgroupName, updateStats)
+}
+
+// GetCgroupCPUAndMemoryStats is delegated to StatsProvider, which implements stats.Provider interface
+func (kl *Kubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
+	return kl.StatsProvider.GetCgroupCPUAndMemoryStats(cgroupName, updateStats)
+}
+
+// RootFsStats is delegated to StatsProvider, which implements stats.Provider interface
+func (kl *Kubelet) RootFsStats() (*statsapi.FsStats, error) {
+	return kl.StatsProvider.RootFsStats()
+}
+
+// GetContainerInfo is delegated to StatsProvider, which implements stats.Provider interface
+func (kl *Kubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
+	return kl.StatsProvider.GetContainerInfo(podFullName, uid, containerName, req)
+}
+
+// GetRawContainerInfo is delegated to StatsProvider, which implements stats.Provider interface
+func (kl *Kubelet) GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error) {
+	return kl.StatsProvider.GetRawContainerInfo(containerName, req, subcontainers)
+}
+
+// RlimitStats is delegated to StatsProvider, which implements stats.Provider interface
+func (kl *Kubelet) RlimitStats() (*statsapi.RlimitStats, error) {
+	return kl.StatsProvider.RlimitStats()
 }
 
 // setupDataDirs creates:
