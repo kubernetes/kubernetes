@@ -206,6 +206,7 @@ const (
 	// alpha: v1.10
 	//
 	// Enable Hyper-V containers on Windows
+	// Deprecated in 1.20 and removed in 1.21
 	HyperVContainer featuregate.Feature = "HyperVContainer"
 
 	// owner: @mikedanese
@@ -677,7 +678,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StorageObjectInUseProtection:   {Default: true, PreRelease: featuregate.GA},
 	SupportPodPidsLimit:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	SupportNodePidsLimit:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
-	HyperVContainer:                {Default: false, PreRelease: featuregate.Alpha},
+	HyperVContainer:                {Default: false, PreRelease: featuregate.Deprecated},
 	TokenRequest:                   {Default: true, PreRelease: featuregate.Beta},
 	TokenRequestProjection:         {Default: true, PreRelease: featuregate.Beta},
 	BoundServiceAccountTokenVolume: {Default: false, PreRelease: featuregate.Alpha},
