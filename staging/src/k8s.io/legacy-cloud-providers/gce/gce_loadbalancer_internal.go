@@ -445,12 +445,17 @@ func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, s
 		}
 	}
 
+	b, _ := strconv.ParseBool(svc.Annotations[LogFirewallRules])
+
 	expectedFirewall := &compute.Firewall{
 		Name:         fwName,
 		Description:  fwDesc,
 		Network:      g.networkURL,
 		SourceRanges: sourceRanges,
 		TargetTags:   targetTags,
+		LogConfig: &compute.FirewallLogConfig{
+			Enable: b,
+		},
 		Allowed: []*compute.FirewallAllowed{
 			{
 				IPProtocol: strings.ToLower(string(protocol)),

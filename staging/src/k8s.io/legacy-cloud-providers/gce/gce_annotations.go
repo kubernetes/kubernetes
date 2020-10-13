@@ -73,6 +73,9 @@ const (
 
 	// NetworkTierAnnotationPremium is an annotation to indicate the Service is on the Premium network tier
 	NetworkTierAnnotationPremium = cloud.NetworkTierPremium
+
+	// LogFirewallRules is annotated with "true" when the users want to enable Firewall Logs
+	LogFirewallRules = "cloud.google.com/log-firewall-rules"
 )
 
 // GetLoadBalancerAnnotationType returns the type of GCP load balancer which should be assembled.

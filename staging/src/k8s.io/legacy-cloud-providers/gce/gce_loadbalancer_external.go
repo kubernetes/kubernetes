@@ -949,7 +949,8 @@ func createForwardingRule(s CloudForwardingRuleService, name, serviceName, regio
 }
 
 func (g *Cloud) createFirewall(svc *v1.Service, name, desc string, sourceRanges utilnet.IPNetSet, ports []v1.ServicePort, hosts []*gceInstance) error {
-	firewall, err := g.firewallObject(name, desc, sourceRanges, ports, hosts)
+	b, _ := strconv.ParseBool(svc.Annotations[LogFirewallRules])
+	firewall, err := g.firewallObject(name, desc, sourceRanges, ports, hosts, b)
 	if err != nil {
 		return err
 	}
@@ -967,7 +968,8 @@ func (g *Cloud) createFirewall(svc *v1.Service, name, desc string, sourceRanges 
 }
 
 func (g *Cloud) updateFirewall(svc *v1.Service, name, desc string, sourceRanges utilnet.IPNetSet, ports []v1.ServicePort, hosts []*gceInstance) error {
-	firewall, err := g.firewallObject(name, desc, sourceRanges, ports, hosts)
+	b, _ := strconv.ParseBool(svc.Annotations[LogFirewallRules])
+	firewall, err := g.firewallObject(name, desc, sourceRanges, ports, hosts, b)
 	if err != nil {
 		return err
 	}
@@ -985,7 +987,7 @@ func (g *Cloud) updateFirewall(svc *v1.Service, name, desc string, sourceRanges 
 	return nil
 }
 
-func (g *Cloud) firewallObject(name, desc string, sourceRanges utilnet.IPNetSet, ports []v1.ServicePort, hosts []*gceInstance) (*compute.Firewall, error) {
+func (g *Cloud) firewallObject(name, desc string, sourceRanges utilnet.IPNetSet, ports []v1.ServicePort, hosts []*gceInstance, logConfig bool) (*compute.Firewall, error) {
 	// Concatenate service ports into port ranges. This help to workaround the gce firewall limitation where only
 	// 100 ports or port ranges can be used in a firewall rule.
 	_, portRanges, _ := getPortsAndProtocol(ports)
@@ -1006,6 +1008,9 @@ func (g *Cloud) firewallObject(name, desc string, sourceRanges utilnet.IPNetSet,
 		Network:      g.networkURL,
 		SourceRanges: sourceRanges.StringSlice(),
 		TargetTags:   hostTags,
+		LogConfig: &compute.FirewallLogConfig{
+			Enable: logConfig,
+		},
 		Allowed: []*compute.FirewallAllowed{
 			{
 				// TODO: Make this more generic. Currently this method is only
