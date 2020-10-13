@@ -374,6 +374,9 @@ func autoConvert_v1beta1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in 
 	if err := metav1.Convert_Pointer_string_To_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
 		return err
 	}
+	if err := metav1.Convert_Pointer_bool_To_bool(&in.RunFiltersUntilUnresolvable, &out.RunFiltersUntilUnresolvable, s); err != nil {
+		return err
+	}
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
 		*out = new(config.Plugins)
@@ -404,6 +407,9 @@ func Convert_v1beta1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in *v1b
 
 func autoConvert_config_KubeSchedulerProfile_To_v1beta1_KubeSchedulerProfile(in *config.KubeSchedulerProfile, out *v1beta1.KubeSchedulerProfile, s conversion.Scope) error {
 	if err := metav1.Convert_string_To_Pointer_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
+		return err
+	}
+	if err := metav1.Convert_bool_To_Pointer_bool(&in.RunFiltersUntilUnresolvable, &out.RunFiltersUntilUnresolvable, s); err != nil {
 		return err
 	}
 	if in.Plugins != nil {

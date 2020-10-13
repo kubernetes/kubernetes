@@ -91,6 +91,10 @@ type frameworkImpl struct {
 	// Indicates that RunFilterPlugins should accumulate all failed statuses and not return
 	// after the first failure.
 	runAllFilters bool
+
+	// Indicates that RunFilterPlugins should stop until UnSchedulableAndUnResovelable
+	// returned from filter.
+	runAllFiltersUntilUnresolvable bool
 }
 
 // extensionPoint encapsulates desired and applied set of plugins at a specific extension
@@ -220,23 +224,24 @@ func (ph *preemptHandle) Extenders() []framework.Extender {
 var _ framework.Framework = &frameworkImpl{}
 
 // NewFramework initializes plugins given the configuration and the registry.
-func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig, opts ...Option) (framework.Framework, error) {
+func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig, runAllFiltersUntilUnresolvable bool, opts ...Option) (framework.Framework, error) {
 	options := defaultFrameworkOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
 
 	f := &frameworkImpl{
-		registry:              r,
-		snapshotSharedLister:  options.snapshotSharedLister,
-		pluginNameToWeightMap: make(map[string]int),
-		waitingPods:           newWaitingPodsMap(),
-		clientSet:             options.clientSet,
-		eventRecorder:         options.eventRecorder,
-		informerFactory:       options.informerFactory,
-		metricsRecorder:       options.metricsRecorder,
-		profileName:           options.profileName,
-		runAllFilters:         options.runAllFilters,
+		registry:                       r,
+		snapshotSharedLister:           options.snapshotSharedLister,
+		pluginNameToWeightMap:          make(map[string]int),
+		waitingPods:                    newWaitingPodsMap(),
+		clientSet:                      options.clientSet,
+		eventRecorder:                  options.eventRecorder,
+		informerFactory:                options.informerFactory,
+		metricsRecorder:                options.metricsRecorder,
+		profileName:                    options.profileName,
+		runAllFilters:                  options.runAllFilters,
+		runAllFiltersUntilUnresolvable: runAllFiltersUntilUnresolvable,
 	}
 	f.preemptHandle = &preemptHandle{
 		extenders:     options.extenders,
@@ -508,8 +513,15 @@ func (f *frameworkImpl) RunFilterPlugins(
 			}
 			statuses[pl.Name()] = pluginStatus
 			if !f.runAllFilters {
-				// Exit early if we don't need to run all filters.
-				return statuses
+				if f.runAllFiltersUntilUnresolvable {
+					// Exit early if filter return UnschedulableAndUnresolvable
+					if pluginStatus.Code() == framework.UnschedulableAndUnresolvable {
+						return statuses
+					}
+				} else {
+					// Exit early if we don't need to run all filters.
+					return statuses
+				}
 			}
 		}
 	}

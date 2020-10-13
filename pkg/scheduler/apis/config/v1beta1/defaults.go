@@ -53,6 +53,14 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 		obj.Profiles[0].SchedulerName = pointer.StringPtr(api.DefaultSchedulerName)
 	}
 
+	for i := range obj.Profiles {
+		// Set default value for RunFiltersUntilUnresolvable
+		if obj.Profiles[i].RunFiltersUntilUnresolvable == nil {
+			RunFiltersUntilUnresolvable := true
+			obj.Profiles[i].RunFiltersUntilUnresolvable = &RunFiltersUntilUnresolvable
+		}
+	}
+
 	// For Healthz and Metrics bind addresses, we want to check:
 	// 1. If the value is nil, default to 0.0.0.0 and default scheduler port
 	// 2. If there is a value set, attempt to split it. If it's just a port (ie, ":1234"), default to 0.0.0.0 with that port

@@ -69,7 +69,10 @@ func TestSchedulerDefaults(t *testing.T) {
 				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
 				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
 				Profiles: []v1beta1.KubeSchedulerProfile{
-					{SchedulerName: pointer.StringPtr("default-scheduler")},
+					{
+						SchedulerName:               pointer.StringPtr("default-scheduler"),
+						RunFiltersUntilUnresolvable: pointer.BoolPtr(true),
+					},
 				},
 			},
 		},
@@ -114,6 +117,7 @@ func TestSchedulerDefaults(t *testing.T) {
 						PluginConfig: []v1beta1.PluginConfig{
 							{Name: "FooPlugin"},
 						},
+						RunFiltersUntilUnresolvable: pointer.BoolPtr(true),
 					},
 				},
 			},
@@ -126,6 +130,7 @@ func TestSchedulerDefaults(t *testing.T) {
 						PluginConfig: []v1beta1.PluginConfig{
 							{Name: "FooPlugin"},
 						},
+						RunFiltersUntilUnresolvable: pointer.BoolPtr(false),
 					},
 					{
 						SchedulerName: pointer.StringPtr("custom-scheduler"),
@@ -168,6 +173,7 @@ func TestSchedulerDefaults(t *testing.T) {
 						PluginConfig: []v1beta1.PluginConfig{
 							{Name: "FooPlugin"},
 						},
+						RunFiltersUntilUnresolvable: pointer.BoolPtr(false),
 					},
 					{
 						SchedulerName: pointer.StringPtr("custom-scheduler"),
@@ -178,6 +184,7 @@ func TestSchedulerDefaults(t *testing.T) {
 								},
 							},
 						},
+						RunFiltersUntilUnresolvable: pointer.BoolPtr(true),
 					},
 				},
 			},
@@ -213,7 +220,10 @@ func TestSchedulerDefaults(t *testing.T) {
 				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
 				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
 				Profiles: []v1beta1.KubeSchedulerProfile{
-					{SchedulerName: pointer.StringPtr("default-scheduler")},
+					{
+						SchedulerName:               pointer.StringPtr("default-scheduler"),
+						RunFiltersUntilUnresolvable: pointer.BoolPtr(true),
+					},
 				},
 			},
 		},
@@ -248,7 +258,10 @@ func TestSchedulerDefaults(t *testing.T) {
 				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
 				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
 				Profiles: []v1beta1.KubeSchedulerProfile{
-					{SchedulerName: pointer.StringPtr("default-scheduler")},
+					{
+						SchedulerName:               pointer.StringPtr("default-scheduler"),
+						RunFiltersUntilUnresolvable: pointer.BoolPtr(true),
+					},
 				},
 			},
 		},

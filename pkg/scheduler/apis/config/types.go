@@ -115,6 +115,10 @@ type KubeSchedulerProfile struct {
 	// is scheduled with this profile.
 	SchedulerName string
 
+	// RunFiltersUntilUnresolvable is the flag to control whether framework should exit early when any filter
+	// `UnschedulableAndUnresolvable`.
+	RunFiltersUntilUnresolvable bool
+
 	// Plugins specify the set of plugins that should be enabled or disabled.
 	// Enabled plugins are the ones that should be enabled in addition to the
 	// default plugins. Disabled plugins are any of the default plugins that

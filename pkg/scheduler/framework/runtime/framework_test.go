@@ -348,7 +348,7 @@ var nodes = []*v1.Node{
 
 var errInjectedStatus = errors.New("injected status")
 
-func newFrameworkWithQueueSortAndBind(r Registry, pl *config.Plugins, plc []config.PluginConfig, opts ...Option) (v1alpha1.Framework, error) {
+func newFrameworkWithQueueSortAndBind(r Registry, pl *config.Plugins, plc []config.PluginConfig, runAllFiltersUntilUnResolvable bool, opts ...Option) (v1alpha1.Framework, error) {
 	if _, ok := r[queueSortPlugin]; !ok {
 		r[queueSortPlugin] = newQueueSortPlugin
 	}
@@ -371,7 +371,7 @@ func newFrameworkWithQueueSortAndBind(r Registry, pl *config.Plugins, plc []conf
 			},
 		})
 	}
-	return NewFramework(r, plugins, plc, opts...)
+	return NewFramework(r, plugins, plc, runAllFiltersUntilUnResolvable, opts...)
 }
 
 func TestInitFrameworkWithScorePlugins(t *testing.T) {
@@ -411,7 +411,7 @@ func TestInitFrameworkWithScorePlugins(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := newFrameworkWithQueueSortAndBind(registry, tt.plugins, emptyArgs)
+			_, err := newFrameworkWithQueueSortAndBind(registry, tt.plugins, emptyArgs, false)
 			if tt.initErr && err == nil {
 				t.Fatal("Framework initialization should fail")
 			}
@@ -463,7 +463,7 @@ func TestNewFrameworkErrors(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := NewFramework(registry, tc.plugins, tc.pluginCfg)
+			_, err := NewFramework(registry, tc.plugins, tc.pluginCfg, false)
 			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 				t.Errorf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
 			}
@@ -612,7 +612,7 @@ func TestNewFrameworkPluginDefaults(t *testing.T) {
 			for _, name := range pluginsWithArgs {
 				registry[name] = recordingPluginFactory(name, result)
 			}
-			_, err := NewFramework(registry, &plugins, tt.pluginCfg)
+			_, err := NewFramework(registry, &plugins, tt.pluginCfg, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -786,7 +786,7 @@ func TestRunScorePlugins(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Inject the results via Args in PluginConfig.
-			f, err := newFrameworkWithQueueSortAndBind(registry, tt.plugins, tt.pluginConfigs)
+			f, err := newFrameworkWithQueueSortAndBind(registry, tt.plugins, tt.pluginConfigs, false)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
@@ -824,7 +824,7 @@ func TestPreFilterPlugins(t *testing.T) {
 		})
 	plugins := &config.Plugins{PreFilter: &config.PluginSet{Enabled: []config.Plugin{{Name: preFilterWithExtensionsPluginName}, {Name: preFilterPluginName}}}}
 	t.Run("TestPreFilterPlugin", func(t *testing.T) {
-		f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs)
+		f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs, false)
 		if err != nil {
 			t.Fatalf("Failed to create framework for testing: %v", err)
 		}
@@ -849,11 +849,12 @@ func TestPreFilterPlugins(t *testing.T) {
 
 func TestFilterPlugins(t *testing.T) {
 	tests := []struct {
-		name          string
-		plugins       []*TestPlugin
-		wantStatus    *v1alpha1.Status
-		wantStatusMap v1alpha1.PluginToStatus
-		runAllFilters bool
+		name                           string
+		plugins                        []*TestPlugin
+		wantStatus                     *v1alpha1.Status
+		wantStatusMap                  v1alpha1.PluginToStatus
+		runAllFiltersUntilUnResolvable bool
+		runAllFilters                  bool
 	}{
 		{
 			name: "SuccessFilter",
@@ -1028,6 +1029,50 @@ func TestFilterPlugins(t *testing.T) {
 				"TestPlugin2": v1alpha1.NewStatus(v1alpha1.Unschedulable, "injected filter status"),
 			},
 		},
+		{
+			name: "runAllFilters override runAllFiltersUntilUnResolvable",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{FilterStatus: int(v1alpha1.UnschedulableAndUnresolvable)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{FilterStatus: int(v1alpha1.Unschedulable)},
+				},
+			},
+			runAllFilters:                  true,
+			runAllFiltersUntilUnResolvable: true,
+			wantStatus:                     v1alpha1.NewStatus(v1alpha1.UnschedulableAndUnresolvable, "injected filter status", "injected filter status"),
+			wantStatusMap: v1alpha1.PluginToStatus{
+				"TestPlugin1": v1alpha1.NewStatus(v1alpha1.UnschedulableAndUnresolvable, "injected filter status"),
+				"TestPlugin2": v1alpha1.NewStatus(v1alpha1.Unschedulable, "injected filter status"),
+			},
+		},
+		{
+			name: "runAllFiltersUntilUnResolvable only",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{FilterStatus: int(v1alpha1.Unschedulable)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{FilterStatus: int(v1alpha1.UnschedulableAndUnresolvable)},
+				},
+				{
+					name: "TestPlugin3",
+					inj:  injectedResult{FilterStatus: int(v1alpha1.Unschedulable)},
+				},
+			},
+			runAllFilters:                  false,
+			runAllFiltersUntilUnResolvable: true,
+			wantStatus:                     v1alpha1.NewStatus(v1alpha1.UnschedulableAndUnresolvable, "injected filter status", "injected filter status"),
+			wantStatusMap: v1alpha1.PluginToStatus{
+				"TestPlugin1": v1alpha1.NewStatus(v1alpha1.Unschedulable, "injected filter status"),
+				"TestPlugin2": v1alpha1.NewStatus(v1alpha1.UnschedulableAndUnresolvable, "injected filter status"),
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1049,7 +1094,7 @@ func TestFilterPlugins(t *testing.T) {
 					config.Plugin{Name: pl.name})
 			}
 
-			f, err := newFrameworkWithQueueSortAndBind(registry, cfgPls, emptyArgs, WithRunAllFilters(tt.runAllFilters))
+			f, err := newFrameworkWithQueueSortAndBind(registry, cfgPls, emptyArgs, tt.runAllFiltersUntilUnResolvable, WithRunAllFilters(tt.runAllFilters))
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
@@ -1132,7 +1177,7 @@ func TestPostFilterPlugins(t *testing.T) {
 				)
 			}
 
-			f, err := newFrameworkWithQueueSortAndBind(registry, cfgPls, emptyArgs)
+			f, err := newFrameworkWithQueueSortAndBind(registry, cfgPls, emptyArgs, false)
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
@@ -1286,7 +1331,7 @@ func TestPreBindPlugins(t *testing.T) {
 				)
 			}
 
-			f, err := newFrameworkWithQueueSortAndBind(registry, configPlugins, emptyArgs)
+			f, err := newFrameworkWithQueueSortAndBind(registry, configPlugins, emptyArgs, false)
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
@@ -1442,7 +1487,7 @@ func TestReservePlugins(t *testing.T) {
 				)
 			}
 
-			f, err := newFrameworkWithQueueSortAndBind(registry, configPlugins, emptyArgs)
+			f, err := newFrameworkWithQueueSortAndBind(registry, configPlugins, emptyArgs, false)
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
@@ -1565,7 +1610,7 @@ func TestPermitPlugins(t *testing.T) {
 			)
 		}
 
-		f, err := newFrameworkWithQueueSortAndBind(registry, configPlugins, emptyArgs)
+		f, err := newFrameworkWithQueueSortAndBind(registry, configPlugins, emptyArgs, false)
 		if err != nil {
 			t.Fatalf("fail to create framework: %s", err)
 		}
@@ -1727,7 +1772,7 @@ func TestRecordingMetrics(t *testing.T) {
 				PostBind:  pluginSet,
 			}
 			recorder := newMetricsRecorder(100, time.Nanosecond)
-			f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs, withMetricsRecorder(recorder), WithProfileName(testProfileName))
+			f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs, false, withMetricsRecorder(recorder), WithProfileName(testProfileName))
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
@@ -1832,7 +1877,7 @@ func TestRunBindPlugins(t *testing.T) {
 			}
 			plugins := &config.Plugins{Bind: pluginSet}
 			recorder := newMetricsRecorder(100, time.Nanosecond)
-			fwk, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs, withMetricsRecorder(recorder), WithProfileName(testProfileName))
+			fwk, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs, false, withMetricsRecorder(recorder), WithProfileName(testProfileName))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1885,7 +1930,7 @@ func TestPermitWaitDurationMetric(t *testing.T) {
 			plugins := &config.Plugins{
 				Permit: &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
 			}
-			f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs)
+			f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs, false)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
@@ -1942,7 +1987,7 @@ func TestWaitOnPermit(t *testing.T) {
 				Permit: &config.PluginSet{Enabled: []config.Plugin{{Name: permitPlugin, Weight: 1}}},
 			}
 
-			f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs)
+			f, err := newFrameworkWithQueueSortAndBind(r, plugins, emptyArgs, false)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
@@ -1991,7 +2036,7 @@ func TestListPlugins(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f, err := newFrameworkWithQueueSortAndBind(registry, tt.plugins, emptyArgs)
+			f, err := newFrameworkWithQueueSortAndBind(registry, tt.plugins, emptyArgs, false)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}

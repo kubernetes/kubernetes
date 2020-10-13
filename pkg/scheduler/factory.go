@@ -98,6 +98,7 @@ func (c *Configurator) buildFramework(p schedulerapi.KubeSchedulerProfile, opts 
 		c.registry,
 		p.Plugins,
 		p.PluginConfig,
+		p.RunFiltersUntilUnresolvable,
 		opts...,
 	)
 }
