@@ -17,8 +17,8 @@ limitations under the License.
 package cache
 
 import (
-	v1 "k8s.io/api/core/v1"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // Cache collects pods' information and provides node-level aggregated information.

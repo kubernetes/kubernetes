@@ -25,8 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 const (
@@ -63,7 +63,7 @@ func (s *preFilterState) Clone() framework.StateData {
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
+func New(plArgs runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	args, err := getArgs(plArgs)
 	if err != nil {
 		return nil, err

@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 const (
@@ -278,7 +278,7 @@ func (pl *VolumeBinding) Unreserve(ctx context.Context, cs *framework.CycleState
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
+func New(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 	args, ok := plArgs.(*config.VolumeBindingArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type VolumeBindingArgs, got %T", plArgs)

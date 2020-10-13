@@ -21,7 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // VolumeRestrictions is a plugin that checks volume restrictions.
@@ -130,6 +130,6 @@ func (pl *VolumeRestrictions) Filter(ctx context.Context, _ *framework.CycleStat
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &VolumeRestrictions{}, nil
 }

@@ -10,8 +10,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/framework/runtime:go_default_library",
-        "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/parallelize:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
@@ -38,6 +38,7 @@ go_test(
     deps = [
         "//pkg/controller/volume/persistentvolume/util:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultbinder:go_default_library",
         "//pkg/scheduler/framework/plugins/noderesources:go_default_library",
         "//pkg/scheduler/framework/plugins/podtopologyspread:go_default_library",
@@ -45,7 +46,6 @@ go_test(
         "//pkg/scheduler/framework/plugins/selectorspread:go_default_library",
         "//pkg/scheduler/framework/plugins/volumebinding:go_default_library",
         "//pkg/scheduler/framework/runtime:go_default_library",
-        "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
         "//pkg/scheduler/profile:go_default_library",
