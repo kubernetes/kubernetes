@@ -981,6 +981,15 @@ func (az *Cloud) findFrontendIPConfigOfService(
 	return nil, false, nil
 }
 
+func nodeNameInNodes(nodeName string, nodes []*v1.Node) bool {
+	for _, node := range nodes {
+		if strings.EqualFold(nodeName, node.Name) {
+			return true
+		}
+	}
+	return false
+}
+
 // This ensures load balancer exists and the frontend ip config is setup.
 // This also reconciles the Service's Ports  with the LoadBalancer config.
 // This entails adding rules/probes for expected Ports and removing stale rules/ports.
@@ -1022,6 +1031,42 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 			if strings.EqualFold(*bp.Name, lbBackendPoolName) {
 				klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb backendpool - found wanted backendpool. not adding anything", serviceName, wantLb)
 				foundBackendPool = true
+
+				var backendIPConfigurationsToBeDeleted []network.InterfaceIPConfiguration
+				if bp.BackendAddressPoolPropertiesFormat != nil && bp.BackendIPConfigurations != nil {
+					for _, ipConf := range *bp.BackendIPConfigurations {
+						ipConfID := to.String(ipConf.ID)
+						nodeName, err := az.VMSet.GetNodeNameByIPConfigurationID(ipConfID)
+						if err != nil {
+							return nil, err
+						}
+						// If a node is not supposed to be included in the LB, it
+						// would not be in the `nodes` slice. We need to check the nodes that
+						// have been added to the LB's backendpool, find the unwanted ones and
+						// delete them from the pool.
+						if !nodeNameInNodes(nodeName, nodes) {
+							klog.V(2).Infof("reconcileLoadBalancer for service (%s)(%t): lb backendpool - found unwanted node %s, decouple it from the LB", serviceName, wantLb, nodeName)
+							// construct a backendPool that only contains the IP config of the node to be deleted
+							backendIPConfigurationsToBeDeleted = append(backendIPConfigurationsToBeDeleted, network.InterfaceIPConfiguration{ID: to.StringPtr(ipConfID)})
+						}
+					}
+					if len(backendIPConfigurationsToBeDeleted) > 0 {
+						backendpoolToBeDeleted := &[]network.BackendAddressPool{
+							{
+								ID: to.StringPtr(lbBackendPoolID),
+								BackendAddressPoolPropertiesFormat: &network.BackendAddressPoolPropertiesFormat{
+									BackendIPConfigurations: &backendIPConfigurationsToBeDeleted,
+								},
+							},
+						}
+						vmSetName := az.mapLoadBalancerNameToVMSet(lbName, clusterName)
+						// decouple the backendPool from the node
+						err = az.VMSet.EnsureBackendPoolDeleted(service, lbBackendPoolID, vmSetName, backendpoolToBeDeleted)
+						if err != nil {
+							return nil, err
+						}
+					}
+				}
 				break
 			} else {
 				klog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb backendpool - found other backendpool %s", serviceName, wantLb, *bp.Name)
@@ -1294,6 +1339,10 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 				// Remove backend pools from vmSets. This is required for virtual machine scale sets before removing the LB.
 				vmSetName := az.mapLoadBalancerNameToVMSet(lbName, clusterName)
 				klog.V(10).Infof("EnsureBackendPoolDeleted(%s,%s) for service %s: start", lbBackendPoolID, vmSetName, serviceName)
+				if _, ok := az.VMSet.(*availabilitySet); ok {
+					// do nothing for availability set
+					lb.BackendAddressPools = nil
+				}
 				err := az.VMSet.EnsureBackendPoolDeleted(service, lbBackendPoolID, vmSetName, lb.BackendAddressPools)
 				if err != nil {
 					klog.Errorf("EnsureBackendPoolDeleted(%s) for service %s failed: %v", lbBackendPoolID, serviceName, err)
@@ -2170,8 +2219,8 @@ func equalLoadBalancingRulePropertiesFormat(s *network.LoadBalancingRuleProperti
 		reflect.DeepEqual(s.FrontendPort, t.FrontendPort) &&
 		reflect.DeepEqual(s.BackendPort, t.BackendPort) &&
 		reflect.DeepEqual(s.EnableFloatingIP, t.EnableFloatingIP) &&
-		reflect.DeepEqual(s.EnableTCPReset, t.EnableTCPReset) &&
-		reflect.DeepEqual(s.DisableOutboundSnat, t.DisableOutboundSnat)
+		reflect.DeepEqual(to.Bool(s.EnableTCPReset), to.Bool(t.EnableTCPReset)) &&
+		reflect.DeepEqual(to.Bool(s.DisableOutboundSnat), to.Bool(t.DisableOutboundSnat))
 
 	if wantLB && s.IdleTimeoutInMinutes != nil && t.IdleTimeoutInMinutes != nil {
 		return properties && reflect.DeepEqual(s.IdleTimeoutInMinutes, t.IdleTimeoutInMinutes)
