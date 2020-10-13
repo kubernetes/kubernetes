@@ -534,7 +534,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs)
 
 	klog.V(4).Infof("attempting to mount %s", dir)
 	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
-	err = m.mounter.Mount(globalPath, dir, "", mountOptions)
+	err = m.mounter.MountSensitiveWithoutSystemd(globalPath, dir, "", mountOptions, nil)
 	if err != nil {
 		klog.Errorf("Mount of volume %s failed: %v", dir, err)
 		notMnt, mntErr := mount.IsNotMountPoint(m.mounter, dir)

@@ -131,7 +131,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 		return err
 	}
 
-	mountErr := mounter.Mount(globalPDPath, dir, *volumeSource.FSType, options)
+	mountErr := mounter.MountSensitiveWithoutSystemd(globalPDPath, dir, *volumeSource.FSType, options, nil)
 	// Everything in the following control flow is meant as an
 	// attempt cleanup a failed setupAt (bind mount)
 	if mountErr != nil {

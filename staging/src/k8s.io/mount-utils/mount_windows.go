@@ -54,6 +54,12 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	return mounter.MountSensitive(source, target, fstype, options, nil /* sensitiveOptions */)
 }
 
+// MountSensitiveWithoutSystemd is the same as MountSensitive() but disable using ssytemd mount.
+// Windows not supported systemd mount, this function degrades to MountSensitive().
+func (mounter *Mounter) MountSensitiveWithoutSystemd(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
+	return mounter.MountSensitive(source, target, fstype, options, sensitiveOptions /* sensitiveOptions */)
+}
+
 // MountSensitive is the same as Mount() but this method allows
 // sensitiveOptions to be passed in a separate parameter from the normal
 // mount options and ensures the sensitiveOptions are never logged. This
