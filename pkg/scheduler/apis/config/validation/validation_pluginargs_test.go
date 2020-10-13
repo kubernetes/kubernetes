@@ -17,7 +17,6 @@ limitations under the License.
 package validation
 
 import (
-	"errors"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -484,7 +483,7 @@ func assertErr(t *testing.T, wantErr string, gotErr error) {
 		if gotErr == nil {
 			t.Fatalf("\nwant err to be:\n\t%s\ngot:\n\tnil", wantErr)
 		}
-		if !errors.Is(gotErr, errors.New(wantErr)) {
+		if gotErr.Error() != wantErr {
 			t.Errorf("\nwant err to be:\n\t%s\ngot:\n\t%s", wantErr, gotErr.Error())
 		}
 	}
