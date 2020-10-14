@@ -357,7 +357,7 @@ func (az *Cloud) serviceOwnsFrontendIP(fip network.FrontendIPConfiguration, serv
 		pipResourceGroup := az.getPublicIPAddressResourceGroup(service)
 		pip, err := az.findMatchedPIPByLoadBalancerIP(service, loadBalancerIP, pipResourceGroup)
 		if err != nil {
-			klog.Errorf("serviceOwnsFrontendIP: unexpected error when finding match public IP of the service %s with loadBalancerLP %s", service.Name, loadBalancerIP)
+			klog.Warningf("serviceOwnsFrontendIP: unexpected error when finding match public IP of the service %s with loadBalancerLP %s: %v", service.Name, loadBalancerIP, err)
 			return false, isPrimaryService, nil
 		}
 
