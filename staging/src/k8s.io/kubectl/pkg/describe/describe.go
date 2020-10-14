@@ -2465,7 +2465,7 @@ func (i *IngressDescriber) describeBackendV1(ns string, backend *networkingv1.In
 			}
 		}
 		ep := formatEndpoints(endpoints, sets.NewString(spName))
-		return fmt.Sprintf("%s\t %s)", sb, ep)
+		return fmt.Sprintf("%s (%s)", sb, ep)
 	}
 	if backend.Resource != nil {
 		ic := backend.Resource
@@ -2518,7 +2518,7 @@ func (i *IngressDescriber) describeIngressV1(ing *networkingv1.Ingress, events *
 			}
 		}
 		if count == 0 {
-			w.Write(LEVEL_1, "\t%s %s\n", "*", "*", i.describeBackendV1(ns, def))
+			w.Write(LEVEL_1, "%s\t%s\t%s\n", "*", "*", i.describeBackendV1(ns, def))
 		}
 		printAnnotationsMultiline(w, "Annotations", ing.Annotations)
 
