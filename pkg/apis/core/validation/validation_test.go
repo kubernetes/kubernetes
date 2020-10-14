@@ -4410,12 +4410,11 @@ func TestValidateResourceQuotaWithAlphaLocalStorageCapacityIsolation(t *testing.
 }
 
 func TestValidatePorts(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, true)()
 	successCase := []core.ContainerPort{
 		{Name: "abc", ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
 		{Name: "easy", ContainerPort: 82, Protocol: "TCP"},
 		{Name: "as", ContainerPort: 83, Protocol: "UDP"},
-		{Name: "do-re-me", ContainerPort: 84, Protocol: "UDP"},
+		{Name: "do-re-me", ContainerPort: 84, Protocol: "SCTP"},
 		{ContainerPort: 85, Protocol: "TCP"},
 	}
 	if errs := validateContainerPorts(successCase, field.NewPath("field")); len(errs) != 0 {
@@ -9894,7 +9893,6 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 }
 
 func TestValidateServiceCreate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTopology, true)()
 
 	testCases := []struct {
