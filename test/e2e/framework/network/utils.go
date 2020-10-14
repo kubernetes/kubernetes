@@ -686,6 +686,9 @@ func (config *NetworkingTestConfig) setupCore(selector map[string]string) {
 	config.createTestPods()
 
 	epCount := len(config.EndpointPods)
+
+	// Note that this is not O(n^2) in practice, because epCount SHOULD be < 10.  In cases that epCount is > 10, this would be prohibitively large.
+	// Check maxNetProxyPodsCount for details.
 	config.MaxTries = epCount*epCount + testTries
 	framework.Logf("Setting MaxTries for pod polling to %v for networking test based on endpoint count %v", config.MaxTries, epCount)
 }
