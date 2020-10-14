@@ -939,6 +939,27 @@ func TestReplicaCalcScaleDownIgnoresDeletionPods(t *testing.T) {
 	tc.runTest(t)
 }
 
+// Regression test for https://github.com/kubernetes/kubernetes/issues/83561
+func TestReplicaCalcScaleDownIgnoresDeletionPods_StillRunning(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:      5,
+		expectedReplicas:     3,
+		podReadiness:         []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		podPhase:             []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning},
+		podDeletionTimestamp: []bool{false, false, false, false, false, true, true},
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{100, 300, 500, 250, 250, 0, 0},
+
+			targetUtilization:   50,
+			expectedUtilization: 28,
+			expectedValue:       numContainersPerPod * 280,
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestReplicaCalcTolerance(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
@@ -1344,21 +1365,22 @@ func TestGroupPods(t *testing.T) {
 		metrics             metricsclient.PodMetricsInfo
 		resource            v1.ResourceName
 		expectReadyPodCount int
-		expectIgnoredPods   sets.String
+		expectUnreadyPods   sets.String
 		expectMissingPods   sets.String
+		expectIgnoredPods   sets.String
 	}{
 		{
-			"void",
-			[]*v1.Pod{},
-			metricsclient.PodMetricsInfo{},
-			v1.ResourceCPU,
-			0,
-			sets.NewString(),
-			sets.NewString(),
-		},
-		{
-			"count in a ready pod - memory",
-			[]*v1.Pod{
+			name:                "void",
+			pods:                []*v1.Pod{},
+			metrics:             metricsclient.PodMetricsInfo{},
+			resource:            v1.ResourceCPU,
+			expectReadyPodCount: 0,
+			expectUnreadyPods:   sets.NewString(),
+			expectMissingPods:   sets.NewString(),
+			expectIgnoredPods:   sets.NewString(),
+		}, {
+			name: "count in a ready pod - memory",
+			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "bentham",
@@ -1368,17 +1390,17 @@ func TestGroupPods(t *testing.T) {
 					},
 				},
 			},
-			metricsclient.PodMetricsInfo{
+			metrics: metricsclient.PodMetricsInfo{
 				"bentham": metricsclient.PodMetric{Value: 1, Timestamp: time.Now(), Window: time.Minute},
 			},
-			v1.ResourceMemory,
-			1,
-			sets.NewString(),
-			sets.NewString(),
-		},
-		{
-			"ignore a pod without ready condition - CPU",
-			[]*v1.Pod{
+			resource:            v1.ResourceMemory,
+			expectReadyPodCount: 1,
+			expectUnreadyPods:   sets.NewString(),
+			expectMissingPods:   sets.NewString(),
+			expectIgnoredPods:   sets.NewString(),
+		}, {
+			name: "unready a pod without ready condition - CPU",
+			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "lucretius",
@@ -1391,17 +1413,17 @@ func TestGroupPods(t *testing.T) {
 					},
 				},
 			},
-			metricsclient.PodMetricsInfo{
+			metrics: metricsclient.PodMetricsInfo{
 				"lucretius": metricsclient.PodMetric{Value: 1},
 			},
-			v1.ResourceCPU,
-			0,
-			sets.NewString("lucretius"),
-			sets.NewString(),
-		},
-		{
-			"count in a ready pod with fresh metrics during initialization period - CPU",
-			[]*v1.Pod{
+			resource:            v1.ResourceCPU,
+			expectReadyPodCount: 0,
+			expectUnreadyPods:   sets.NewString("lucretius"),
+			expectMissingPods:   sets.NewString(),
+			expectIgnoredPods:   sets.NewString(),
+		}, {
+			name: "count in a ready pod with fresh metrics during initialization period - CPU",
+			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "bentham",
@@ -1421,17 +1443,17 @@ func TestGroupPods(t *testing.T) {
 					},
 				},
 			},
-			metricsclient.PodMetricsInfo{
+			metrics: metricsclient.PodMetricsInfo{
 				"bentham": metricsclient.PodMetric{Value: 1, Timestamp: time.Now(), Window: 30 * time.Second},
 			},
-			v1.ResourceCPU,
-			1,
-			sets.NewString(),
-			sets.NewString(),
-		},
-		{
-			"ignore a ready pod without fresh metrics during initialization period - CPU",
-			[]*v1.Pod{
+			resource:            v1.ResourceCPU,
+			expectReadyPodCount: 1,
+			expectUnreadyPods:   sets.NewString(),
+			expectMissingPods:   sets.NewString(),
+			expectIgnoredPods:   sets.NewString(),
+		}, {
+			name: "unready a ready pod without fresh metrics during initialization period - CPU",
+			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "bentham",
@@ -1451,17 +1473,17 @@ func TestGroupPods(t *testing.T) {
 					},
 				},
 			},
-			metricsclient.PodMetricsInfo{
+			metrics: metricsclient.PodMetricsInfo{
 				"bentham": metricsclient.PodMetric{Value: 1, Timestamp: time.Now(), Window: 60 * time.Second},
 			},
-			v1.ResourceCPU,
-			0,
-			sets.NewString("bentham"),
-			sets.NewString(),
-		},
-		{
-			"ignore an unready pod during initialization period - CPU",
-			[]*v1.Pod{
+			resource:            v1.ResourceCPU,
+			expectReadyPodCount: 0,
+			expectUnreadyPods:   sets.NewString("bentham"),
+			expectMissingPods:   sets.NewString(),
+			expectIgnoredPods:   sets.NewString(),
+		}, {
+			name: "unready an unready pod during initialization period - CPU",
+			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "lucretius",
@@ -1481,17 +1503,17 @@ func TestGroupPods(t *testing.T) {
 					},
 				},
 			},
-			metricsclient.PodMetricsInfo{
+			metrics: metricsclient.PodMetricsInfo{
 				"lucretius": metricsclient.PodMetric{Value: 1},
 			},
-			v1.ResourceCPU,
-			0,
-			sets.NewString("lucretius"),
-			sets.NewString(),
-		},
-		{
-			"count in a ready pod without fresh metrics after initialization period - CPU",
-			[]*v1.Pod{
+			resource:            v1.ResourceCPU,
+			expectReadyPodCount: 0,
+			expectUnreadyPods:   sets.NewString("lucretius"),
+			expectMissingPods:   sets.NewString(),
+			expectIgnoredPods:   sets.NewString(),
+		}, {
+			name: "count in a ready pod without fresh metrics after initialization period - CPU",
+			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "bentham",
@@ -1511,18 +1533,17 @@ func TestGroupPods(t *testing.T) {
 					},
 				},
 			},
-			metricsclient.PodMetricsInfo{
+			metrics: metricsclient.PodMetricsInfo{
 				"bentham": metricsclient.PodMetric{Value: 1, Timestamp: time.Now().Add(-2 * time.Minute), Window: time.Minute},
 			},
-			v1.ResourceCPU,
-			1,
-			sets.NewString(),
-			sets.NewString(),
-		},
-
-		{
-			"count in an unready pod that was ready after initialization period - CPU",
-			[]*v1.Pod{
+			resource:            v1.ResourceCPU,
+			expectReadyPodCount: 1,
+			expectUnreadyPods:   sets.NewString(),
+			expectMissingPods:   sets.NewString(),
+			expectIgnoredPods:   sets.NewString(),
+		}, {
+			name: "count in an unready pod that was ready after initialization period - CPU",
+			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "lucretius",
@@ -1542,17 +1563,17 @@ func TestGroupPods(t *testing.T) {
 					},
 				},
 			},
-			metricsclient.PodMetricsInfo{
+			metrics: metricsclient.PodMetricsInfo{
 				"lucretius": metricsclient.PodMetric{Value: 1},
 			},
-			v1.ResourceCPU,
-			1,
-			sets.NewString(),
-			sets.NewString(),
-		},
-		{
-			"ignore pod that has never been ready after initialization period - CPU",
-			[]*v1.Pod{
+			resource:            v1.ResourceCPU,
+			expectReadyPodCount: 1,
+			expectUnreadyPods:   sets.NewString(),
+			expectMissingPods:   sets.NewString(),
+			expectIgnoredPods:   sets.NewString(),
+		}, {
+			name: "unready pod that has never been ready after initialization period - CPU",
+			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "lucretius",
@@ -1572,17 +1593,17 @@ func TestGroupPods(t *testing.T) {
 					},
 				},
 			},
-			metricsclient.PodMetricsInfo{
+			metrics: metricsclient.PodMetricsInfo{
 				"lucretius": metricsclient.PodMetric{Value: 1},
 			},
-			v1.ResourceCPU,
-			1,
-			sets.NewString(),
-			sets.NewString(),
-		},
-		{
-			"a missing pod",
-			[]*v1.Pod{
+			resource:            v1.ResourceCPU,
+			expectReadyPodCount: 1,
+			expectUnreadyPods:   sets.NewString(),
+			expectMissingPods:   sets.NewString(),
+			expectIgnoredPods:   sets.NewString(),
+		}, {
+			name: "a missing pod",
+			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "epicurus",
@@ -1595,15 +1616,15 @@ func TestGroupPods(t *testing.T) {
 					},
 				},
 			},
-			metricsclient.PodMetricsInfo{},
-			v1.ResourceCPU,
-			0,
-			sets.NewString(),
-			sets.NewString("epicurus"),
-		},
-		{
-			"several pods",
-			[]*v1.Pod{
+			metrics:             metricsclient.PodMetricsInfo{},
+			resource:            v1.ResourceCPU,
+			expectReadyPodCount: 0,
+			expectUnreadyPods:   sets.NewString(),
+			expectMissingPods:   sets.NewString("epicurus"),
+			expectIgnoredPods:   sets.NewString(),
+		}, {
+			name: "several pods",
+			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "lucretius",
@@ -1645,17 +1666,17 @@ func TestGroupPods(t *testing.T) {
 					},
 				},
 			},
-			metricsclient.PodMetricsInfo{
+			metrics: metricsclient.PodMetricsInfo{
 				"lucretius": metricsclient.PodMetric{Value: 1},
 				"niccolo":   metricsclient.PodMetric{Value: 1},
 			},
-			v1.ResourceCPU,
-			1,
-			sets.NewString("lucretius"),
-			sets.NewString("epicurus"),
-		},
-		{
-			name: "pending pods are ignored",
+			resource:            v1.ResourceCPU,
+			expectReadyPodCount: 1,
+			expectUnreadyPods:   sets.NewString("lucretius"),
+			expectMissingPods:   sets.NewString("epicurus"),
+			expectIgnoredPods:   sets.NewString(),
+		}, {
+			name: "pending pods are unreadied",
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1669,24 +1690,67 @@ func TestGroupPods(t *testing.T) {
 			metrics:             metricsclient.PodMetricsInfo{},
 			resource:            v1.ResourceCPU,
 			expectReadyPodCount: 0,
-			expectIgnoredPods:   sets.NewString("unscheduled"),
+			expectUnreadyPods:   sets.NewString("unscheduled"),
 			expectMissingPods:   sets.NewString(),
+			expectIgnoredPods:   sets.NewString(),
+		}, {
+			name: "ignore pods with deletion timestamps",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "deleted",
+						DeletionTimestamp: &metav1.Time{Time: time.Unix(1, 0)},
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodPending,
+					},
+				},
+			},
+			metrics: metricsclient.PodMetricsInfo{
+				"deleted": metricsclient.PodMetric{Value: 1},
+			},
+			resource:            v1.ResourceCPU,
+			expectReadyPodCount: 0,
+			expectUnreadyPods:   sets.NewString(),
+			expectMissingPods:   sets.NewString(),
+			expectIgnoredPods:   sets.NewString("deleted"),
+		}, {
+			name: "ignore pods in a failed state",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "failed",
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodFailed,
+					},
+				},
+			},
+			metrics: metricsclient.PodMetricsInfo{
+				"failed": metricsclient.PodMetric{Value: 1},
+			},
+			resource:            v1.ResourceCPU,
+			expectReadyPodCount: 0,
+			expectUnreadyPods:   sets.NewString(),
+			expectMissingPods:   sets.NewString(),
+			expectIgnoredPods:   sets.NewString("failed"),
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			readyPodCount, ignoredPods, missingPods := groupPods(tc.pods, tc.metrics, tc.resource, defaultTestingCPUInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
+			readyPodCount, unreadyPods, missingPods, ignoredPods := groupPods(tc.pods, tc.metrics, tc.resource, defaultTestingCPUInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
 			if readyPodCount != tc.expectReadyPodCount {
 				t.Errorf("%s got readyPodCount %d, expected %d", tc.name, readyPodCount, tc.expectReadyPodCount)
 			}
-			if !ignoredPods.Equal(tc.expectIgnoredPods) {
-				t.Errorf("%s got unreadyPods %v, expected %v", tc.name, ignoredPods, tc.expectIgnoredPods)
+			if !unreadyPods.Equal(tc.expectUnreadyPods) {
+				t.Errorf("%s got unreadyPods %v, expected %v", tc.name, unreadyPods, tc.expectUnreadyPods)
 			}
 			if !missingPods.Equal(tc.expectMissingPods) {
 				t.Errorf("%s got missingPods %v, expected %v", tc.name, missingPods, tc.expectMissingPods)
 			}
+			if !ignoredPods.Equal(tc.expectIgnoredPods) {
+				t.Errorf("%s got ignoredPods %v, expected %v", tc.name, ignoredPods, tc.expectIgnoredPods)
+			}
 		})
 	}
 }
-
-// TODO: add more tests
