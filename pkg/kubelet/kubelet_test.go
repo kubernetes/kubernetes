@@ -2043,6 +2043,15 @@ func runVolumeManager(kubelet *Kubelet) chan struct{} {
 	return stopCh
 }
 
+// dirExists returns true if the path exists and represents a directory.
+func dirExists(path string) bool {
+	s, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return s.IsDir()
+}
+
 // Sort pods by UID.
 type podsByUID []*v1.Pod
 
