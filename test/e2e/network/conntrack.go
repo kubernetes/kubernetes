@@ -60,7 +60,7 @@ const (
 // - when a service goes from no endpoints to new endpoint
 
 // Ref: https://api.semanticscholar.org/CorpusID:198903401
-// Boye, Magnus. “Netfilter Connection Tracking and NAT Implementation.” (2012).
+// Boye, Magnus. "Netfilter Connection Tracking and NAT Implementation." (2012).
 
 var _ = SIGDescribe("Conntrack", func() {
 
