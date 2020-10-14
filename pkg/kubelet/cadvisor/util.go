@@ -21,9 +21,9 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapi2 "github.com/google/cadvisor/info/v2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -50,7 +50,7 @@ func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
 		pageSizeBytes := int64(hugepagesInfo.PageSize * 1024)
 		hugePagesBytes := pageSizeBytes * int64(hugepagesInfo.NumPages)
 		pageSizeQuantity := resource.NewQuantity(pageSizeBytes, resource.BinarySI)
-		c[v1helper.HugePageResourceName(*pageSizeQuantity)] = *resource.NewQuantity(hugePagesBytes, resource.BinarySI)
+		c[corev1helpers.HugePageResourceName(*pageSizeQuantity)] = *resource.NewQuantity(hugePagesBytes, resource.BinarySI)
 	}
 
 	return c

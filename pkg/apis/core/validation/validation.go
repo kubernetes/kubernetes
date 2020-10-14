@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -3192,8 +3193,9 @@ func ValidatePodSingleHugePageResources(pod *core.Pod, specPath *field.Path) fie
 	allErrs := field.ErrorList{}
 	resourceSet := helper.ToPodResourcesSet(&pod.Spec)
 	hugePageResources := sets.NewString()
+
 	for resourceStr := range resourceSet {
-		if v1helper.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
+		if corev1helpers.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
 			hugePageResources.Insert(resourceStr)
 		}
 	}

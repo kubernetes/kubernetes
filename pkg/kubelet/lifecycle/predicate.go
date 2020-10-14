@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
@@ -165,7 +165,7 @@ func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.No
 		// does not use Limits.
 		podCopy.Spec.Containers[i].Resources.Requests = make(v1.ResourceList)
 		for rName, rQuant := range c.Resources.Requests {
-			if v1helper.IsExtendedResourceName(rName) {
+			if corev1helpers.IsExtendedResourceName(rName) {
 				if _, found := nodeInfo.Allocatable.ScalarResources[rName]; !found {
 					continue
 				}

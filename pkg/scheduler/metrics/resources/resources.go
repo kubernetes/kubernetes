@@ -29,8 +29,8 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/metrics"
 
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 type resourceLifecycleDescriptors struct {
@@ -143,9 +143,9 @@ func (c *podResourceCollector) CollectWithStability(ch chan<- metrics.Metric) {
 					unitName = "bytes"
 				default:
 					switch {
-					case v1helper.IsHugePageResourceName(resourceName):
+					case corev1helpers.IsHugePageResourceName(resourceName):
 						unitName = "bytes"
-					case v1helper.IsAttachableVolumeResourceName(resourceName):
+					case corev1helpers.IsAttachableVolumeResourceName(resourceName):
 						unitName = "integer"
 					}
 				}

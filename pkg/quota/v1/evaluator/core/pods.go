@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -80,7 +81,7 @@ func maskResourceWithPrefix(resource corev1.ResourceName, prefix string) corev1.
 func isExtendedResourceNameForQuota(name corev1.ResourceName) bool {
 	// As overcommit is not supported by extended resources for now,
 	// only quota objects in format of "requests.resourceName" is allowed.
-	return !helper.IsNativeResource(name) && strings.HasPrefix(string(name), corev1.DefaultResourceRequestsPrefix)
+	return !corev1helpers.IsNativeResourceName(name) && strings.HasPrefix(string(name), corev1.DefaultResourceRequestsPrefix)
 }
 
 // NOTE: it was a mistake, but if a quota tracks cpu or memory related resources,
@@ -267,7 +268,7 @@ func podComputeUsageHelper(requests corev1.ResourceList, limits corev1.ResourceL
 			result[maskResourceWithPrefix(resource, corev1.DefaultResourceRequestsPrefix)] = request
 		}
 		// for extended resources
-		if helper.IsExtendedResourceName(resource) {
+		if corev1helpers.IsExtendedResourceName(resource) {
 			// only quota objects in format of "requests.resourceName" is allowed for extended resource.
 			result[maskResourceWithPrefix(resource, corev1.DefaultResourceRequestsPrefix)] = request
 		}

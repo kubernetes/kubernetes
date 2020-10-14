@@ -24,6 +24,7 @@ import (
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -106,7 +107,7 @@ func GetHugepageLimitsFromResources(resources v1.ResourceRequirements) []*runtim
 
 	requiredHugepageLimits := map[string]uint64{}
 	for resourceObj, amountObj := range resources.Limits {
-		if !v1helper.IsHugePageResourceName(resourceObj) {
+		if !corev1helpers.IsHugePageResourceName(resourceObj) {
 			continue
 		}
 

@@ -12,7 +12,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/util:go_default_library",
@@ -26,6 +25,7 @@ go_library(
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/events:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
         "//staging/src/k8s.io/kube-scheduler/extender/v1:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],

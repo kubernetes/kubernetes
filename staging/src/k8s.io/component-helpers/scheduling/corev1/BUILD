@@ -5,23 +5,30 @@ go_library(
     srcs = [
         "doc.go",
         "helpers.go",
+        "resource_names.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/component-helpers/scheduling/corev1",
     importpath = "k8s.io/component-helpers/scheduling/corev1",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//staging/src/k8s.io/component-helpers/scheduling/corev1/nodeaffinity:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["helpers_test.go"],
+    srcs = [
+        "helpers_test.go",
+        "resource_names_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],
 )

@@ -9,7 +9,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/apis/config/validation",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/validation:go_default_library",
@@ -18,6 +17,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//staging/src/k8s.io/component-base/config/validation:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
         "//staging/src/k8s.io/component-helpers/scheduling/corev1/nodeaffinity:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
     ],

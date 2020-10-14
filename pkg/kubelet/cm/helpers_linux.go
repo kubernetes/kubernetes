@@ -27,9 +27,10 @@ import (
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
@@ -102,7 +103,7 @@ func MilliCPUToShares(milliCPU int64) uint64 {
 func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 	hugePageLimits := map[int64]int64{}
 	for k, v := range resourceList {
-		if v1helper.IsHugePageResourceName(k) {
+		if corev1helpers.IsHugePageResourceName(k) {
 			pageSize, _ := v1helper.HugePageSizeFromResourceName(k)
 			if value, exists := hugePageLimits[pageSize.Value()]; exists {
 				hugePageLimits[pageSize.Value()] = value + v.Value()

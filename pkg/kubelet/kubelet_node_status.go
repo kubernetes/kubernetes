@@ -34,9 +34,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
@@ -131,7 +131,7 @@ func (kl *Kubelet) reconcileHugePageResource(initialNode, existingNode *v1.Node)
 	supportedHugePageResources := sets.String{}
 
 	for resourceName := range initialNode.Status.Capacity {
-		if !v1helper.IsHugePageResourceName(resourceName) {
+		if !corev1helpers.IsHugePageResourceName(resourceName) {
 			continue
 		}
 		supportedHugePageResources.Insert(string(resourceName))
@@ -157,7 +157,7 @@ func (kl *Kubelet) reconcileHugePageResource(initialNode, existingNode *v1.Node)
 	}
 
 	for resourceName := range existingNode.Status.Capacity {
-		if !v1helper.IsHugePageResourceName(resourceName) {
+		if !corev1helpers.IsHugePageResourceName(resourceName) {
 			continue
 		}
 
@@ -178,7 +178,7 @@ func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
 	// Check with the device manager to see if node has been recreated, in which case extended resources should be zeroed until they are available
 	if kl.containerManager.ShouldResetExtendedResourceCapacity() {
 		for k := range node.Status.Capacity {
-			if v1helper.IsExtendedResourceName(k) {
+			if corev1helpers.IsExtendedResourceName(k) {
 				klog.Infof("Zero out resource %s capacity in existing node.", k)
 				node.Status.Capacity[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 				node.Status.Allocatable[k] = *resource.NewQuantity(int64(0), resource.DecimalSI)

@@ -28,7 +28,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/selection:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
     ],
 )
 

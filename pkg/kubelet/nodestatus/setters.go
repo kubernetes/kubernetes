@@ -35,7 +35,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	"k8s.io/component-base/version"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -367,7 +367,7 @@ func MachineInfo(nodeName string,
 		// present in capacity.
 		for k := range node.Status.Allocatable {
 			_, found := node.Status.Capacity[k]
-			if !found && v1helper.IsExtendedResourceName(k) {
+			if !found && corev1helpers.IsExtendedResourceName(k) {
 				delete(node.Status.Allocatable, k)
 			}
 		}
@@ -392,7 +392,7 @@ func MachineInfo(nodeName string,
 		}
 		// for every huge page reservation, we need to remove it from allocatable memory
 		for k, v := range node.Status.Capacity {
-			if v1helper.IsHugePageResourceName(k) {
+			if corev1helpers.IsHugePageResourceName(k) {
 				allocatableMemory := node.Status.Allocatable[v1.ResourceMemory]
 				value := v.DeepCopy()
 				allocatableMemory.Sub(value)

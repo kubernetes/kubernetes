@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -277,7 +277,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 	}
 
 	for rName, rQuant := range podRequest.ScalarResources {
-		if v1helper.IsExtendedResourceName(rName) {
+		if corev1helpers.IsExtendedResourceName(rName) {
 			// If this resource is one of the extended resources that should be ignored, we will skip checking it.
 			// rName is guaranteed to have a slash due to API validation.
 			var rNamePrefix string

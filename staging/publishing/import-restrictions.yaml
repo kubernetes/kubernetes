@@ -1,8 +1,10 @@
 - baseImportPath: "./pkg/apis/core/"
   allowedImports:
+  - k8s.io/api/apps/v1
   - k8s.io/apimachinery
   - k8s.io/apiserver/pkg/util/feature
   - k8s.io/component-base/featuregate/testing
+  - k8s.io/component-helpers/scheduling/corev1
   - k8s.io/kubernetes/pkg/apis/core
   - k8s.io/kubernetes/pkg/features
   - k8s.io/kubernetes/pkg/fieldpath
@@ -16,7 +18,6 @@
   # Main goal: pkg/apis should be as self-contained as possible.
   - k8s.io/kubernetes/pkg/apis/apps
   - k8s.io/kubernetes/pkg/api/legacyscheme
-  - k8s.io/api/apps/v1
   ignoredSubTrees:
   - "./pkg/apis/core/validation"
 

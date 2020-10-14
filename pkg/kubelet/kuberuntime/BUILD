@@ -80,11 +80,13 @@ go_library(
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/apis/core/v1/helper:go_default_library",
             "//pkg/kubelet/qos:go_default_library",
+            "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/apis/core/v1/helper:go_default_library",
             "//pkg/kubelet/qos:go_default_library",
+            "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [

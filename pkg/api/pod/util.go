@@ -23,9 +23,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
@@ -325,7 +325,7 @@ func usesMultipleHugePageResources(podSpec *api.PodSpec) bool {
 	hugePageResources := sets.NewString()
 	resourceSet := helper.ToPodResourcesSet(podSpec)
 	for resourceStr := range resourceSet {
-		if v1helper.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
+		if corev1helpers.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
 			hugePageResources.Insert(resourceStr)
 		}
 	}

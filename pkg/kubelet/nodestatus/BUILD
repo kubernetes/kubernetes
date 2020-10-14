@@ -6,7 +6,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/nodestatus",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
@@ -22,6 +21,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/api:go_default_library",
         "//staging/src/k8s.io/component-base/version:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],

@@ -33,6 +33,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/quota/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/quota/v1/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
     ],
 )
 

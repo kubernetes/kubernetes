@@ -33,7 +33,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/apis/storage/v1/util:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/controller/volume/scheduling:go_default_library",
@@ -71,6 +70,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/testutil:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/auth:go_default_library",
         "//test/e2e/framework/deployment:go_default_library",

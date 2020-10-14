@@ -18,9 +18,9 @@ package storage
 
 import (
 	"github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -54,7 +54,7 @@ func getVolumeLimit(node *v1.Node) map[v1.ResourceName]int64 {
 	volumeLimits := map[v1.ResourceName]int64{}
 	nodeAllocatables := node.Status.Allocatable
 	for k, v := range nodeAllocatables {
-		if v1helper.IsAttachableVolumeResourceName(k) {
+		if corev1helpers.IsAttachableVolumeResourceName(k) {
 			volumeLimits[k] = v.Value()
 		}
 	}

@@ -14,7 +14,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/checkpointmanager:go_default_library",
         "//pkg/kubelet/checkpointmanager/errors:go_default_library",
@@ -35,6 +34,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
         "//staging/src/k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1:go_default_library",
         "//staging/src/k8s.io/kubelet/pkg/apis/pluginregistration/v1:go_default_library",
         "//staging/src/k8s.io/kubelet/pkg/apis/podresources/v1:go_default_library",

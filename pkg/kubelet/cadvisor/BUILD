@@ -21,10 +21,10 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/cadvisor",
     deps = [
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
         "//vendor/github.com/google/cadvisor/events:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",

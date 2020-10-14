@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -401,7 +402,7 @@ func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error
 	for _, container := range append(pod.Spec.Containers, pod.Spec.InitContainers...) {
 		// We can take request because limit and requests must match.
 		for requestName := range container.Resources.Requests {
-			if !v1helper.IsHugePageResourceName(requestName) {
+			if !corev1helpers.IsHugePageResourceName(requestName) {
 				continue
 			}
 			currentPageSize, err := v1helper.HugePageSizeFromResourceName(requestName)

@@ -25,59 +25,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/util/validation"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
-
-// IsExtendedResourceName returns true if:
-// 1. the resource name is not in the default namespace;
-// 2. resource name does not have "requests." prefix,
-// to avoid confusion with the convention in quota
-// 3. it satisfies the rules in IsQualifiedName() after converted into quota resource name
-func IsExtendedResourceName(name v1.ResourceName) bool {
-	if IsNativeResource(name) || strings.HasPrefix(string(name), v1.DefaultResourceRequestsPrefix) {
-		return false
-	}
-	// Ensure it satisfies the rules in IsQualifiedName() after converted into quota resource name
-	nameForQuota := fmt.Sprintf("%s%s", v1.DefaultResourceRequestsPrefix, string(name))
-	if errs := validation.IsQualifiedName(string(nameForQuota)); len(errs) != 0 {
-		return false
-	}
-	return true
-}
-
-// IsPrefixedNativeResource returns true if the resource name is in the
-// *kubernetes.io/ namespace.
-func IsPrefixedNativeResource(name v1.ResourceName) bool {
-	return strings.Contains(string(name), v1.ResourceDefaultNamespacePrefix)
-}
-
-// IsNativeResource returns true if the resource name is in the
-// *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
-// implicitly in the kubernetes.io/ namespace.
-func IsNativeResource(name v1.ResourceName) bool {
-	return !strings.Contains(string(name), "/") ||
-		IsPrefixedNativeResource(name)
-}
-
-// IsHugePageResourceName returns true if the resource name has the huge page
-// resource prefix.
-func IsHugePageResourceName(name v1.ResourceName) bool {
-	return strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
-}
-
-// HugePageResourceName returns a ResourceName with the canonical hugepage
-// prefix prepended for the specified page size.  The page size is converted
-// to its canonical representation.
-func HugePageResourceName(pageSize resource.Quantity) v1.ResourceName {
-	return v1.ResourceName(fmt.Sprintf("%s%s", v1.ResourceHugePagesPrefix, pageSize.String()))
-}
 
 // HugePageSizeFromResourceName returns the page size for the specified huge page
 // resource name.  If the specified input is not a valid huge page resource name
 // an error is returned.
 func HugePageSizeFromResourceName(name v1.ResourceName) (resource.Quantity, error) {
-	if !IsHugePageResourceName(name) {
+	if !corev1helpers.IsHugePageResourceName(name) {
 		return resource.Quantity{}, fmt.Errorf("resource name: %s is an invalid hugepage name", name)
 	}
 	pageSize := strings.TrimPrefix(string(name), v1.ResourceHugePagesPrefix)
@@ -126,13 +82,8 @@ func HugePageSizeFromMedium(medium v1.StorageMedium) (resource.Quantity, error) 
 // IsOvercommitAllowed returns true if the resource is in the default
 // namespace and is not hugepages.
 func IsOvercommitAllowed(name v1.ResourceName) bool {
-	return IsNativeResource(name) &&
-		!IsHugePageResourceName(name)
-}
-
-// IsAttachableVolumeResourceName returns true when the resource name is prefixed in attachable volume
-func IsAttachableVolumeResourceName(name v1.ResourceName) bool {
-	return strings.HasPrefix(string(name), v1.ResourceAttachableVolumesPrefix)
+	return corev1helpers.IsNativeResourceName(name) &&
+		!corev1helpers.IsHugePageResourceName(name)
 }
 
 // IsServiceIPSet aims to check if the service's ClusterIP is set or not

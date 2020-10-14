@@ -36,9 +36,9 @@ import (
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
@@ -308,7 +308,7 @@ func (m *ManagerImpl) ValidatePlugin(pluginName string, endpoint string, version
 		return fmt.Errorf("manager version, %s, is not among plugin supported versions %v", pluginapi.Version, versions)
 	}
 
-	if !v1helper.IsExtendedResourceName(v1.ResourceName(pluginName)) {
+	if !corev1helpers.IsExtendedResourceName(v1.ResourceName(pluginName)) {
 		return fmt.Errorf("invalid name of device plugin socket: %s", fmt.Sprintf(errInvalidResourceName, pluginName))
 	}
 
@@ -428,7 +428,7 @@ func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest
 		return &pluginapi.Empty{}, fmt.Errorf(errorString)
 	}
 
-	if !v1helper.IsExtendedResourceName(v1.ResourceName(r.ResourceName)) {
+	if !corev1helpers.IsExtendedResourceName(v1.ResourceName(r.ResourceName)) {
 		errorString := fmt.Sprintf(errInvalidResourceName, r.ResourceName)
 		klog.Infof("Bad registration request from device plugin: %s", errorString)
 		return &pluginapi.Empty{}, fmt.Errorf(errorString)

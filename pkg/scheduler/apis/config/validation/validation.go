@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	componentbasevalidation "k8s.io/component-base/config/validation"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -215,7 +215,7 @@ func validateExtendedResourceName(name v1.ResourceName) []error {
 	if len(validationErrors) != 0 {
 		return validationErrors
 	}
-	if !v1helper.IsExtendedResourceName(name) {
+	if !corev1helpers.IsExtendedResourceName(name) {
 		validationErrors = append(validationErrors, fmt.Errorf("%s is an invalid extended resource name", name))
 	}
 	return validationErrors

@@ -28,7 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -39,7 +39,7 @@ var (
 	extendedResourceB     = v1.ResourceName("example.com/bbb")
 	kubernetesIOResourceA = v1.ResourceName("kubernetes.io/something")
 	kubernetesIOResourceB = v1.ResourceName("subdomain.kubernetes.io/something")
-	hugePageResourceA     = v1helper.HugePageResourceName(resource.MustParse("2Mi"))
+	hugePageResourceA     = corev1helpers.HugePageResourceName(resource.MustParse("2Mi"))
 )
 
 func makeResources(milliCPU, memory, pods, extendedA, storage, hugePageA int64) v1.NodeResources {

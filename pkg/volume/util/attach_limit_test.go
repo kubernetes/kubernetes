@@ -21,8 +21,8 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"k8s.io/api/core/v1"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1 "k8s.io/api/core/v1"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 )
 
 func TestGetCSIAttachLimitKey(t *testing.T) {
@@ -35,7 +35,7 @@ func TestGetCSIAttachLimitKey(t *testing.T) {
 	// When driver is longer than 39 chars
 	longDriverName := "com.amazon.kubernetes.eks.ec2.ebs/csi-driver"
 	csiLimitKeyLonger := GetCSIAttachLimitKey(longDriverName)
-	if !v1helper.IsAttachableVolumeResourceName(v1.ResourceName(csiLimitKeyLonger)) {
+	if !corev1helpers.IsAttachableVolumeResourceName(v1.ResourceName(csiLimitKeyLonger)) {
 		t.Errorf("Expected %s to have attachable prefix", csiLimitKeyLonger)
 	}
 

@@ -20,10 +20,10 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
@@ -117,7 +117,7 @@ func makeTestNode(allocatable v1.ResourceList) *v1.Node {
 
 var (
 	extendedResourceA = v1.ResourceName("example.com/aaa")
-	hugePageResourceA = v1helper.HugePageResourceName(resource.MustParse("2Mi"))
+	hugePageResourceA = corev1helpers.HugePageResourceName(resource.MustParse("2Mi"))
 )
 
 func makeResources(milliCPU, memory, pods, extendedA, storage, hugePageA int64) v1.NodeResources {

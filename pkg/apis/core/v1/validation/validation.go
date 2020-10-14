@@ -20,11 +20,12 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
@@ -77,8 +78,8 @@ func ValidateContainerResourceName(value string, fldPath *field.Path) field.Erro
 		if !helper.IsStandardContainerResourceName(value) {
 			return append(allErrs, field.Invalid(fldPath, value, "must be a standard resource for containers"))
 		}
-	} else if !v1helper.IsNativeResource(v1.ResourceName(value)) {
-		if !v1helper.IsExtendedResourceName(v1.ResourceName(value)) {
+	} else if !corev1helpers.IsNativeResourceName(v1.ResourceName(value)) {
+		if !corev1helpers.IsExtendedResourceName(v1.ResourceName(value)) {
 			return append(allErrs, field.Invalid(fldPath, value, "doesn't follow extended resource name standard"))
 		}
 	}

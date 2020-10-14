@@ -17,7 +17,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/lifecycle",
     deps = [
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
@@ -31,6 +30,7 @@ go_library(
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/io:go_default_library",
     ],
@@ -44,7 +44,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/scheduler/framework:go_default_library",
@@ -54,6 +53,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
     ],
 )
 
