@@ -44,6 +44,11 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults
 func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfiguration) {
+
+	if obj.Parallelism == nil {
+		obj.Parallelism = pointer.Int32Ptr(16)
+	}
+
 	if len(obj.Profiles) == 0 {
 		obj.Profiles = append(obj.Profiles, v1beta1.KubeSchedulerProfile{})
 	}
