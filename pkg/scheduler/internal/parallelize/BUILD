@@ -27,6 +27,9 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["error_channel_test.go"],
+    srcs = [
+        "error_channel_test.go",
+        "parallelism_test.go",
+    ],
     embed = [":go_default_library"],
 )

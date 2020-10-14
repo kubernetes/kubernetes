@@ -25,6 +25,7 @@ go_library(
         "//pkg/scheduler/framework/runtime:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/cache/debugger:go_default_library",
+        "//pkg/scheduler/internal/parallelize:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
         "//pkg/scheduler/profile:go_default_library",

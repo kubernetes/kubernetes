@@ -298,6 +298,7 @@ profiles:
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				Parallelism:        16,
 				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
@@ -395,6 +396,7 @@ profiles:
 			},
 			expectedUsername: "flag",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				Parallelism:        16,
 				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "", // defaults empty when not running from config file
 				MetricsBindAddress: "", // defaults empty when not running from config file
@@ -459,6 +461,7 @@ profiles:
 				Logs: logs.NewOptions(),
 			},
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				Parallelism:        16,
 				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "", // defaults empty when not running from config file
 				MetricsBindAddress: "", // defaults empty when not running from config file
@@ -498,6 +501,7 @@ profiles:
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				Parallelism:        16,
 				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
@@ -572,6 +576,7 @@ profiles:
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				Parallelism:        16,
 				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
@@ -648,6 +653,7 @@ profiles:
 			},
 			expectedUsername: "flag",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				Parallelism:     16,
 				AlgorithmSource: kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
@@ -700,6 +706,7 @@ profiles:
 			},
 			expectedUsername: "flag",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				Parallelism:     16,
 				AlgorithmSource: kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,

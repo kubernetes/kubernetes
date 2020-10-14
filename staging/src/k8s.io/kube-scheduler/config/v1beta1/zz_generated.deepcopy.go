@@ -87,6 +87,11 @@ func (in *InterPodAffinityArgs) DeepCopyObject() runtime.Object {
 func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfiguration) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
+	if in.Parallelism != nil {
+		in, out := &in.Parallelism, &out.Parallelism
+		*out = new(int32)
+		**out = **in
+	}
 	in.LeaderElection.DeepCopyInto(&out.LeaderElection)
 	out.ClientConnection = in.ClientConnection
 	if in.HealthzBindAddress != nil {

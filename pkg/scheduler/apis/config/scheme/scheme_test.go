@@ -459,6 +459,7 @@ profiles:
 			name:    "v1beta1 in-tree and out-of-tree plugins from internal",
 			version: v1beta1.SchemeGroupVersion,
 			obj: &config.KubeSchedulerConfiguration{
+				Parallelism: 8,
 				Profiles: []config.KubeSchedulerProfile{
 					{
 						PluginConfig: []config.PluginConfig{
@@ -514,6 +515,7 @@ leaderElection:
   resourceNamespace: ""
   retryPeriod: 0s
 metricsBindAddress: ""
+parallelism: 8
 percentageOfNodesToScore: 0
 podInitialBackoffSeconds: 0
 podMaxBackoffSeconds: 0

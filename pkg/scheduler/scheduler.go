@@ -42,6 +42,7 @@ import (
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -106,6 +107,14 @@ type Option func(*schedulerOptions)
 func WithProfiles(p ...schedulerapi.KubeSchedulerProfile) Option {
 	return func(o *schedulerOptions) {
 		o.profiles = p
+	}
+}
+
+// WithParallelism sets the parallelism for all scheduler algorithms. Default is 16.
+// TODO(#95952): Remove global setter in favor of a struct that holds the configuration.
+func WithParallelism(threads int32) Option {
+	return func(o *schedulerOptions) {
+		parallelize.SetParallelism(int(threads))
 	}
 }
 
