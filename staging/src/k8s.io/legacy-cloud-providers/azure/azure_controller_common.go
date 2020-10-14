@@ -31,6 +31,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	volerr "k8s.io/cloud-provider/volume/errors"
@@ -90,7 +91,9 @@ type controllerCommon struct {
 	diskAttachDetachMap sync.Map
 	// vm disk map used to lock per vm update calls
 	vmLockMap *lockMap
-	cloud     *Cloud
+	// set of LUNs that are being attacher to a node
+	vmLunAttachingMap map[types.NodeName]sets.Int32
+	cloud             *Cloud
 }
 
 // getNodeVMSet gets the VMSet interface based on config.VMType and the real virtual machine type.
@@ -187,14 +190,12 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 		return -1, fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
 	}
 
-	c.vmLockMap.LockEntry(strings.ToLower(string(nodeName)))
-	defer c.vmLockMap.UnlockEntry(strings.ToLower(string(nodeName)))
-
-	lun, err := c.GetNextDiskLun(nodeName)
+	lun, err := c.AllocateDiskLun(nodeName)
 	if err != nil {
 		klog.Warningf("no LUN available for instance %q (%v)", nodeName, err)
 		return -1, fmt.Errorf("all LUNs are used, cannot attach volume (%s, %s) to instance %q (%v)", diskName, diskURI, instanceid, err)
 	}
+	defer c.FreeAttachingDiskLun(nodeName, lun)
 
 	klog.V(2).Infof("Trying to attach volume %q lun %d to node %q.", diskURI, lun, nodeName)
 	c.diskAttachDetachMap.Store(strings.ToLower(diskURI), "attaching")
@@ -303,8 +304,8 @@ func (c *controllerCommon) GetDiskLun(diskName, diskURI string, nodeName types.N
 	return -1, fmt.Errorf("cannot find Lun for disk %s", diskName)
 }
 
-// GetNextDiskLun searches all vhd attachment on the host and find unused lun. Return -1 if all luns are used.
-func (c *controllerCommon) GetNextDiskLun(nodeName types.NodeName) (int32, error) {
+// getNextDiskLun searches all vhd attachment on the host and find unused lun. Return -1 if all luns are used.
+func (c *controllerCommon) getNextDiskLun(nodeName types.NodeName, attachingLuns sets.Int32) (int32, error) {
 	disks, err := c.getNodeDataDisks(nodeName, azcache.CacheReadTypeDefault)
 	if err != nil {
 		klog.Errorf("error of getting data disks for node %q: %v", nodeName, err)
@@ -318,11 +319,50 @@ func (c *controllerCommon) GetNextDiskLun(nodeName types.NodeName) (int32, error
 		}
 	}
 	for k, v := range used {
+		lun := int32(k)
+		if attachingLuns.Has(lun) {
+			continue
+		}
 		if !v {
-			return int32(k), nil
+			return lun, nil
 		}
 	}
 	return -1, fmt.Errorf("all luns are used")
+}
+
+// AllocateDiskLun finds the lowest free LUN on a given node.
+// It also stores the allocation of the LUN in its cache, so the
+// LUN is not allocated to any other disk while it's being attached.
+// It must be released by FreeAttachingDiskLun after disk attach finishes!
+func (c *controllerCommon) AllocateDiskLun(nodeName types.NodeName) (int32, error) {
+	c.vmLockMap.LockEntry(strings.ToLower(string(nodeName)))
+	defer c.vmLockMap.UnlockEntry(strings.ToLower(string(nodeName)))
+
+	set := c.vmLunAttachingMap[nodeName]
+	if set == nil {
+		set = sets.NewInt32()
+		c.vmLunAttachingMap[nodeName] = set
+	}
+
+	lun, err := c.getNextDiskLun(nodeName, set)
+	if err != nil {
+		return lun, err
+	}
+	set.Insert(lun)
+	return lun, nil
+}
+
+// Releases in-memory allocation of a LUN. This must be called after
+// attachment of a disk to a node either finishes or fails to make
+// the LUN available to other disks.
+func (c *controllerCommon) FreeAttachingDiskLun(nodeName types.NodeName, lun int32) {
+	c.vmLockMap.LockEntry(strings.ToLower(string(nodeName)))
+	defer c.vmLockMap.UnlockEntry(strings.ToLower(string(nodeName)))
+	set := c.vmLunAttachingMap[nodeName]
+	if set == nil {
+		return
+	}
+	set.Delete(lun)
 }
 
 // DisksAreAttached checks if a list of volumes are attached to the node with the specified NodeName.

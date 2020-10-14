@@ -54,8 +54,10 @@ type DiskController interface {
 
 	// Get the LUN number of the disk that is attached to the host
 	GetDiskLun(diskName, diskURI string, nodeName types.NodeName) (int32, error)
-	// Get the next available LUN number to attach a new VHD
-	GetNextDiskLun(nodeName types.NodeName) (int32, error)
+	// Allocate the next available LUN number to attach a new VHD.
+	AllocateDiskLun(nodeName types.NodeName) (int32, error)
+	// Free previously allocated LUN after attach finishes or fails.
+	FreeAttachingDiskLun(nodeName types.NodeName, lun int32)
 
 	// Create a VHD blob
 	CreateVolume(name, storageAccount, storageAccountType, location string, requestGB int) (string, string, int, error)

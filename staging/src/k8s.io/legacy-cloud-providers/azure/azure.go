@@ -32,6 +32,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -706,6 +707,7 @@ func initDiskControllers(az *Cloud) error {
 		subscriptionID:        az.SubscriptionID,
 		cloud:                 az,
 		vmLockMap:             newLockMap(),
+		vmLunAttachingMap:     make(map[types.NodeName]sets.Int32),
 	}
 
 	az.BlobDiskController = &BlobDiskController{common: common}

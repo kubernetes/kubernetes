@@ -28,6 +28,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -133,6 +134,7 @@ func TestCommonAttachDisk(t *testing.T) {
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
 			vmLockMap:             newLockMap(),
+			vmLunAttachingMap:     make(map[types.NodeName]sets.Int32),
 		}
 		diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/%s",
 			testCloud.SubscriptionID, testCloud.ResourceGroup, *test.existedDisk.Name)
@@ -237,6 +239,7 @@ func TestCommonAttachDiskWithVMSS(t *testing.T) {
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
 			vmLockMap:             newLockMap(),
+			vmLunAttachingMap:     make(map[types.NodeName]sets.Int32),
 		}
 		diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/%s",
 			testCloud.SubscriptionID, testCloud.ResourceGroup, *test.existedDisk.Name)
@@ -311,6 +314,7 @@ func TestCommonDetachDisk(t *testing.T) {
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
 			vmLockMap:             newLockMap(),
+			vmLunAttachingMap:     make(map[types.NodeName]sets.Int32),
 		}
 		diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/disk-name",
 			testCloud.SubscriptionID, testCloud.ResourceGroup)
@@ -369,6 +373,7 @@ func TestGetDiskLun(t *testing.T) {
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
 			vmLockMap:             newLockMap(),
+			vmLunAttachingMap:     make(map[types.NodeName]sets.Int32),
 		}
 		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
@@ -391,6 +396,7 @@ func TestGetNextDiskLun(t *testing.T) {
 		isDataDisksFull bool
 		expectedLun     int32
 		expectedErr     bool
+		attachingLuns   sets.Int32
 	}{
 		{
 			desc:            "the minimal LUN shall be returned if there's enough room for extra disks",
@@ -404,6 +410,13 @@ func TestGetNextDiskLun(t *testing.T) {
 			expectedLun:     -1,
 			expectedErr:     true,
 		},
+		{
+			desc:            "LUNs that are being attached are skipped",
+			isDataDisksFull: false,
+			expectedLun:     5,
+			expectedErr:     false,
+			attachingLuns:   sets.NewInt32(1, 2, 3, 4),
+		},
 	}
 
 	for i, test := range testCases {
@@ -415,14 +428,19 @@ func TestGetNextDiskLun(t *testing.T) {
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
 			vmLockMap:             newLockMap(),
+			vmLunAttachingMap:     make(map[types.NodeName]sets.Int32),
 		}
+		if test.attachingLuns != nil {
+			common.vmLunAttachingMap["vm1"] = test.attachingLuns
+		}
+
 		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, test.isDataDisksFull)
 		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
 		for _, vm := range expectedVMs {
 			mockVMsClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
 		}
 
-		lun, err := common.GetNextDiskLun("vm1")
+		lun, err := common.AllocateDiskLun("vm1")
 		assert.Equal(t, test.expectedLun, lun, "TestCase[%d]: %s", i, test.desc)
 		assert.Equal(t, test.expectedErr, err != nil, "TestCase[%d]: %s", i, test.desc)
 	}
@@ -464,6 +482,7 @@ func TestDisksAreAttached(t *testing.T) {
 			subscriptionID:        testCloud.SubscriptionID,
 			cloud:                 testCloud,
 			vmLockMap:             newLockMap(),
+			vmLunAttachingMap:     make(map[types.NodeName]sets.Int32),
 		}
 		expectedVMs := setTestVirtualMachines(testCloud, map[string]string{"vm1": "PowerState/Running"}, false)
 		mockVMsClient := testCloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
@@ -654,6 +673,7 @@ func TestCheckDiskExists(t *testing.T) {
 		subscriptionID:        testCloud.SubscriptionID,
 		cloud:                 testCloud,
 		vmLockMap:             newLockMap(),
+		vmLunAttachingMap:     make(map[types.NodeName]sets.Int32),
 	}
 	// create a new disk before running test
 	newDiskName := "newdisk"
@@ -708,6 +728,7 @@ func TestFilterNonExistingDisks(t *testing.T) {
 		subscriptionID:        testCloud.SubscriptionID,
 		cloud:                 testCloud,
 		vmLockMap:             newLockMap(),
+		vmLunAttachingMap:     make(map[types.NodeName]sets.Int32),
 	}
 	// create a new disk before running test
 	diskURIPrefix := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/",
@@ -770,6 +791,7 @@ func TestFilterNonExistingDisksWithSpecialHTTPStatusCode(t *testing.T) {
 		subscriptionID:        testCloud.SubscriptionID,
 		cloud:                 testCloud,
 		vmLockMap:             newLockMap(),
+		vmLunAttachingMap:     make(map[types.NodeName]sets.Int32),
 	}
 	// create a new disk before running test
 	diskURIPrefix := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/",
