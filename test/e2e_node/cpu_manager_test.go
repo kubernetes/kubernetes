@@ -210,6 +210,10 @@ func disableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.K
 }
 
 func enableCPUManagerInKubelet(f *framework.Framework, cleanStateFile bool) (oldCfg *kubeletconfig.KubeletConfiguration) {
+	return configureCPUManagerInKubelet(f, cleanStateFile, cpuset.CPUSet{})
+}
+
+func configureCPUManagerInKubelet(f *framework.Framework, cleanStateFile bool, reservedSystemCPUs cpuset.CPUSet) (oldCfg *kubeletconfig.KubeletConfiguration) {
 	// Enable CPU Manager in Kubelet with static policy.
 	oldCfg, err := getCurrentKubeletConfig()
 	framework.ExpectNoError(err)
@@ -239,15 +243,21 @@ func enableCPUManagerInKubelet(f *framework.Framework, cleanStateFile bool) (old
 	// Set the CPU Manager reconcile period to 1 second.
 	newCfg.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
 
-	// The Kubelet panics if either kube-reserved or system-reserved is not set
-	// when CPU Manager is enabled. Set cpu in kube-reserved > 0 so that
-	// kubelet doesn't panic.
-	if newCfg.KubeReserved == nil {
-		newCfg.KubeReserved = map[string]string{}
-	}
+	if reservedSystemCPUs.Size() > 0 {
+		cpus := reservedSystemCPUs.String()
+		framework.Logf("configureCPUManagerInKubelet: using reservedSystemCPUs=%q", cpus)
+		newCfg.ReservedSystemCPUs = cpus
+	} else {
+		// The Kubelet panics if either kube-reserved or system-reserved is not set
+		// when CPU Manager is enabled. Set cpu in kube-reserved > 0 so that
+		// kubelet doesn't panic.
+		if newCfg.KubeReserved == nil {
+			newCfg.KubeReserved = map[string]string{}
+		}
 
-	if _, ok := newCfg.KubeReserved["cpu"]; !ok {
-		newCfg.KubeReserved["cpu"] = "200m"
+		if _, ok := newCfg.KubeReserved["cpu"]; !ok {
+			newCfg.KubeReserved["cpu"] = "200m"
+		}
 	}
 	// Update the Kubelet configuration.
 	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
