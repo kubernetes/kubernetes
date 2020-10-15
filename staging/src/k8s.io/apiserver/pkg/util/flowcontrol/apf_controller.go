@@ -339,7 +339,7 @@ type SyncReport struct {
 	// NeedRetry indicates whether to requeue with exponential backoff
 	NeedRetry bool
 
-	// Wait, if non-zero, indicaes to requeue after this delay
+	// Wait, if non-zero, indicates to requeue after this delay
 	Wait time.Duration
 }
 
