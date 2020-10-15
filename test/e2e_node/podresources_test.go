@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
-	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -148,19 +147,7 @@ func (tpd *testPodData) createPodsForTest(f *framework.Framework, podReqs []podD
 
 /* deletePodsForTest clean up all the pods run for a testcase. Must ensure proper cleanup */
 func (tpd *testPodData) deletePodsForTest(f *framework.Framework) {
-	podNS := f.Namespace.Name
-	var wg sync.WaitGroup
-	for podName := range tpd.PodMap {
-		wg.Add(1)
-		go func(podName string) {
-			defer ginkgo.GinkgoRecover()
-			defer wg.Done()
-
-			deletePodSyncByName(f, podName)
-			waitForAllContainerRemoval(podName, podNS)
-		}(podName)
-	}
-	wg.Wait()
+	deletePodsAsync(f, tpd.PodMap)
 }
 
 /* deletePod removes pod during a test. Should do a best-effort clean up */
