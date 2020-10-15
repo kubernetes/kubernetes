@@ -19,6 +19,7 @@ limitations under the License.
 package network
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math"
@@ -266,6 +267,7 @@ var _ = SIGDescribe("Proxy", func() {
 		ginkgo.It("A set of valid responses are returned for both pod and service ProxyWithPath", func() {
 
 			ns := f.Namespace.Name
+			msg := "foo"
 
 			framework.Logf("Creating pod...")
 			_, err := f.ClientSet.CoreV1().Pods(ns).Create(context.TODO(), &v1.Pod{
@@ -281,7 +283,7 @@ var _ = SIGDescribe("Proxy", func() {
 						Command: []string{"/agnhost", "porter"},
 						Env: []v1.EnvVar{{
 							Name:  "SERVE_PORT_80",
-							Value: "foo",
+							Value: msg,
 						}},
 					}},
 					RestartPolicy: v1.RestartPolicyNever,
@@ -325,6 +327,7 @@ var _ = SIGDescribe("Proxy", func() {
 			}
 
 			// All methods for Pod ProxyWithPath return 200
+			// response body returns 'foo' for all methods but HEAD
 			httpVerbs := []string{"DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"}
 			for _, httpVerb := range httpVerbs {
 
@@ -337,11 +340,21 @@ var _ = SIGDescribe("Proxy", func() {
 				framework.ExpectNoError(err, "processing response")
 				defer resp.Body.Close()
 
+				buf := new(bytes.Buffer)
+				buf.ReadFrom(resp.Body)
+				response := buf.String()
+
 				framework.Logf("http.Client request:%s StatusCode:%d", httpVerb, resp.StatusCode)
+				framework.Logf("http.Client request:%s | StatusCode:%d | Response: %s", httpVerb, resp.StatusCode, response)
 				framework.ExpectEqual(resp.StatusCode, 200, "The resp.StatusCode returned: %d", resp.StatusCode)
+
+				if httpVerb != "HEAD" {
+					framework.ExpectEqual(response, msg, "The resp.Body returned: %v", resp.Body)
+				}
 			}
 
 			// All methods for Service ProxyWithPath return 200
+			// response body returns 'foo' for all methods but HEAD
 			for _, httpVerb := range httpVerbs {
 
 				urlString := f.ClientConfig().Host + "/api/v1/namespaces/" + ns + "/services/test-service/proxy/some/path/with/" + httpVerb
@@ -353,8 +366,16 @@ var _ = SIGDescribe("Proxy", func() {
 				framework.ExpectNoError(err, "processing response")
 				defer resp.Body.Close()
 
-				framework.Logf("http.Client request:%s StatusCode:%d", httpVerb, resp.StatusCode)
+				buf := new(bytes.Buffer)
+				buf.ReadFrom(resp.Body)
+				response := buf.String()
+
+				framework.Logf("http.Client request:%s | StatusCode:%d | Response: %s", httpVerb, resp.StatusCode, response)
 				framework.ExpectEqual(resp.StatusCode, 200, "The resp.StatusCode returned: %d", resp.StatusCode)
+
+				if httpVerb != "HEAD" {
+					framework.ExpectEqual(response, msg, "The resp.Body returned: %v", resp.Body)
+				}
 			}
 		})
 	})
