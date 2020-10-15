@@ -128,6 +128,7 @@ go_test(
         "hugepages_test.go",
         "image_id_test.go",
         "log_path_test.go",
+        "memory_manager_test.go",
         "mirror_pod_grace_period_test.go",
         "mirror_pod_test.go",
         "node_container_manager_test.go",
@@ -226,6 +227,7 @@ go_test(
         "//vendor/github.com/onsi/gomega/types:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/kubelet/stats/pidlimit:go_default_library",
