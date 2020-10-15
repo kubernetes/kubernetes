@@ -1082,10 +1082,12 @@ func (a *HorizontalController) setStatus(hpa *autoscalingv2.HorizontalPodAutosca
 		CurrentReplicas: currentReplicas,
 		DesiredReplicas: desiredReplicas,
 		LastScaleTime:   hpa.Status.LastScaleTime,
-		CurrentMetrics:  metricStatuses,
+		CurrentMetrics:  hpa.Status.CurrentMetrics,
 		Conditions:      hpa.Status.Conditions,
 	}
-
+	if metricStatuses != nil {
+		hpa.Status.CurrentMetrics = metricStatuses
+	}
 	if rescale {
 		now := metav1.NewTime(time.Now())
 		hpa.Status.LastScaleTime = &now
