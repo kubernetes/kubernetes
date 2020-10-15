@@ -21,8 +21,19 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodepreferavoidpods"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/selectorspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 )
 
@@ -91,5 +102,154 @@ func TestRegisterConfigProducers(t *testing.T) {
 
 	if diff := cmp.Diff(wantPlugins, gotPlugins); diff != "" {
 		t.Errorf("unexpected plugin configuration (-want, +got): %s", diff)
+	}
+}
+
+func TestAppendPriorityConfigs(t *testing.T) {
+	cases := []struct {
+		name             string
+		features         map[featuregate.Feature]bool
+		keys             map[string]int64
+		args             ConfigProducerArgs
+		wantPlugins      config.Plugins
+		wantPluginConfig []config.PluginConfig
+	}{
+		{
+			name: "default priorities",
+			wantPlugins: config.Plugins{
+				PreScore: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: podtopologyspread.Name},
+						{Name: interpodaffinity.Name},
+						{Name: selectorspread.Name},
+						{Name: tainttoleration.Name},
+					},
+				},
+				Score: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: noderesources.BalancedAllocationName, Weight: 1},
+						{Name: podtopologyspread.Name, Weight: 2},
+						{Name: imagelocality.Name, Weight: 1},
+						{Name: interpodaffinity.Name, Weight: 1},
+						{Name: noderesources.LeastAllocatedName, Weight: 1},
+						{Name: nodeaffinity.Name, Weight: 1},
+						{Name: nodepreferavoidpods.Name, Weight: 10000},
+						{Name: selectorspread.Name, Weight: 1},
+						{Name: tainttoleration.Name, Weight: 1},
+					},
+				},
+			},
+		},
+		{
+			name: "DefaultPodTopologySpread enabled, SelectorSpreadPriority only",
+			features: map[featuregate.Feature]bool{
+				features.DefaultPodTopologySpread: true,
+			},
+			keys: map[string]int64{
+				SelectorSpreadPriority: 3,
+			},
+			wantPlugins: config.Plugins{
+				PreScore: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: podtopologyspread.Name},
+					},
+				},
+				Score: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: podtopologyspread.Name, Weight: 3},
+					},
+				},
+			},
+			wantPluginConfig: []config.PluginConfig{
+				{
+					Name: podtopologyspread.Name,
+					Args: &config.PodTopologySpreadArgs{
+						DefaultingType: config.SystemDefaulting,
+					},
+				},
+			},
+		},
+		{
+			name: "DefaultPodTopologySpread enabled, EvenPodsSpreadPriority only",
+			features: map[featuregate.Feature]bool{
+				features.DefaultPodTopologySpread: true,
+			},
+			keys: map[string]int64{
+				EvenPodsSpreadPriority: 4,
+			},
+			wantPlugins: config.Plugins{
+				PreScore: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: podtopologyspread.Name},
+					},
+				},
+				Score: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: podtopologyspread.Name, Weight: 4},
+					},
+				},
+			},
+			wantPluginConfig: []config.PluginConfig{
+				{
+					Name: podtopologyspread.Name,
+					Args: &config.PodTopologySpreadArgs{
+						DefaultingType: config.ListDefaulting,
+					},
+				},
+			},
+		},
+		{
+			name: "DefaultPodTopologySpread enabled, SelectorSpreadPriority+EvenPodsSpreadPriority",
+			features: map[featuregate.Feature]bool{
+				features.DefaultPodTopologySpread: true,
+			},
+			keys: map[string]int64{
+				SelectorSpreadPriority: 1,
+				EvenPodsSpreadPriority: 2,
+			},
+			wantPlugins: config.Plugins{
+				PreScore: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: podtopologyspread.Name},
+					},
+				},
+				Score: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: podtopologyspread.Name, Weight: 2},
+					},
+				},
+			},
+			wantPluginConfig: []config.PluginConfig{
+				{
+					Name: podtopologyspread.Name,
+					Args: &config.PodTopologySpreadArgs{
+						DefaultingType: config.SystemDefaulting,
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for k, v := range tc.features {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
+			}
+
+			r := NewLegacyRegistry()
+			keys := tc.keys
+			if keys == nil {
+				keys = r.DefaultPriorities
+			}
+			plugins, pluginConfig, err := r.AppendPriorityConfigs(keys, &tc.args, config.Plugins{}, nil)
+			if err != nil {
+				t.Fatalf("Appending Priority Configs: %v", err)
+			}
+			if diff := cmp.Diff(tc.wantPlugins, plugins); diff != "" {
+				t.Errorf("Unexpected Plugin (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantPluginConfig, pluginConfig); diff != "" {
+				t.Errorf("Unexpected PluginConfig (-want,+got):\n%s", diff)
+			}
+		})
 	}
 }
