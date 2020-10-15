@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
-	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // cronJobStrategy implements verification logic for Replication Controllers.
@@ -84,9 +83,7 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 // Validate validates a new scheduled job.
 func (cronJobStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	cronJob := obj.(*batch.CronJob)
-	allErrs := validation.ValidateCronJob(cronJob)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&cronJob.Spec.JobTemplate.Spec.Template, nil, field.NewPath("spec.jobTemplate.spec.template"))...)
-	return allErrs
+	return validation.ValidateCronJob(cronJob)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -106,12 +103,7 @@ func (cronJobStrategy) AllowCreateOnUpdate() bool {
 func (cronJobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newCronJob := obj.(*batch.CronJob)
 	oldCronJob := old.(*batch.CronJob)
-	allErrs := validation.ValidateCronJobUpdate(newCronJob, oldCronJob)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(
-		&newCronJob.Spec.JobTemplate.Spec.Template,
-		&oldCronJob.Spec.JobTemplate.Spec.Template,
-		field.NewPath("spec.jobTemplate.spec.template"))...)
-	return allErrs
+	return validation.ValidateCronJobUpdate(newCronJob, oldCronJob)
 }
 
 type cronJobStatusStrategy struct {
