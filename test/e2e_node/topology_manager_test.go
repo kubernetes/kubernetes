@@ -518,6 +518,16 @@ func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
 	ginkgo.By(fmt.Sprintf("Deleting serviceAccount %v/%v", metav1.NamespaceSystem, sd.serviceAccount.Name))
 	err = f.ClientSet.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Delete(context.TODO(), sd.serviceAccount.Name, deleteOptions)
 	framework.ExpectNoError(err)
+
+	sriovResourceName := ""
+	var sriovResourceAmount int64
+	ginkgo.By("Waiting for devices to become UNavailable on the local node")
+	gomega.Eventually(func() bool {
+		node := getLocalNode(f)
+		sriovResourceName, sriovResourceAmount = findSRIOVResource(node)
+		return sriovResourceAmount == 0
+	}, 2*time.Minute, framework.Poll).Should(gomega.BeTrue())
+	framework.Logf("Successfully deleted device plugin pod, no more SRIOV allocatable devices %q", sriovResourceName)
 }
 
 func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs string, numaNodes, coreCount int, policy string) {
