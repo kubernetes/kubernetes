@@ -185,3 +185,16 @@ func TestToAuthenticationConfig(t *testing.T) {
 		t.Error(cmp.Diff(resultConfig, expectConfig))
 	}
 }
+
+func TestApplyAuthorization(t *testing.T) {
+	testOptions := NewBuiltInAuthenticationOptions().WithAll()
+	authorizationOptions := NewBuiltInAuthorizationOptions()
+
+	testOptions.ApplyAuthorization(authorizationOptions)
+	expectOptions:= NewBuiltInAuthenticationOptions().WithAll()
+
+	// Check ApplyAuthorization() does not change anything on default values
+	if !reflect.DeepEqual(testOptions, expectOptions) {
+		t.Error(cmp.Diff(testOptions, expectOptions))
+	}
+}
