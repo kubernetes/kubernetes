@@ -19,29 +19,86 @@ package create
 import (
 	"context"
 	"fmt"
-	"strconv"
+	"regexp"
+	"strings"
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/api/networking/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	networkingv1client "k8s.io/client-go/kubernetes/typed/networking/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 var (
+	// Explaining the Regex below:
+	// ^(?P<host>.+) -> Indicates the host - 1-N characters
+	// (?P<path>/.*) -> Indicates the path and MUST start with '/' - / + 0-N characters
+	// Separator from host/path to svcname:svcport -> "="
+	// (?P<svcname>[\w\-]+) -> Service Name (letters, numbers, '-') -> 1-N characters
+	// Separator from svcname to svcport -> ":"
+	// (?P<svcport>[\w\-]+) -> Service Port (letters, numbers, '-') -> 1-N characters
+	regexHostPathSvc = `^(?P<host>.+)(?P<path>/.*)=(?P<svcname>[\w\-]+):(?P<svcport>[\w\-]+)`
+
+	// This Regex is optional -> (....)?
+	// (?P<istls>tls) -> Verify if the argument after "," is 'tls'
+	// Optional Separator from tls to the secret name -> "=?"
+	// (?P<secretname>[\w\-]+)? -> Optional secret name after the separator -> 1-N characters
+	regexTLS = `(,(?P<istls>tls)=?(?P<secretname>[\w\-]+)?)?`
+
+	// The validation Regex is the concatenation of hostPathSvc validation regex
+	// and the TLS validation regex
+	ruleRegex = regexHostPathSvc + regexTLS
+
 	ingressLong = templates.LongDesc(i18n.T(`
-		Create an ingress with the specified name.`))
+	Create an ingress with the specified name.`))
 
 	ingressExample = templates.Examples(i18n.T(`
-		# Create a new ingress named my-app.
-		kubectl create ingress my-app --host=foo.bar.com --service-name=my-svc`))
+		# Create a single ingress called 'simple' that directs requests to foo.com/bar to svc 
+		# svc1:8080 with a tls secret "my-cert"
+		kubectl create ingress simple --rule="foo.com/bar=svc1:8080,tls=my-cert"
+
+		# Create a catch all ingress pointing to service svc:port and Ingress Class as "otheringress"
+		kubectl create ingress catch-all --class=otheringress --rule="_/=svc:port"
+
+		# Create an ingress with two annotations: ingress.annotation1 and ingress.annotations2
+		kubectl create ingress annotated --class=default --rule="foo.com/bar=svc:port" \
+			--annotation ingress.annotation1=foo \
+			--annotation ingress.annotation2=bla
+
+		# Create an ingress with the same host and multiple paths
+		kubectl create ingress multipath --class=default \ 
+			--rule="foo.com/=svc:port" \
+			--rule="foo.com/admin/=svcadmin:portadmin"
+
+		# Create an ingress with multiple hosts and the pathType as Prefix
+		kubectl create ingress ingress1 --class=default \
+			--rule="foo.com/path*=svc:8080" \
+			--rule="bar.com/admin*=svc2:http"
+
+		# Create an ingress with TLS enabled using the default ingress certificate and different path types
+		kubectl create ingress ingtls --class=default \
+		   --rule="foo.com/=svc:https,tls" \
+		   --rule="foo.com/path/subpath*=othersvc:8080"
+		
+		# Create an ingress with TLS enabled using a specific secret and pathType as Prefix
+		kubectl create ingress ingsecret --class=default \
+		   --rule="foo.com/*=svc:8080,tls=secret1"
+		
+		# Create an ingress with a default backend
+		kubectl create ingress ingdefault --class=default \
+		   --default-backend=defaultsvc:http \
+		   --rule="foo.com/*=svc:8080,tls=secret1"
+
+		`))
 )
 
 // CreateIngressOptions is returned by NewCmdCreateIngress
@@ -50,24 +107,26 @@ type CreateIngressOptions struct {
 
 	PrintObj func(obj runtime.Object) error
 
-	Name        string
-	Host        string
-	ServiceName string
-	ServicePort string
-	Path        string
+	Name             string
+	IngressClass     string
+	Rules            []string
+	Annotations      []string
+	DefaultBackend   string
+	Namespace        string
+	EnforceNamespace bool
+	CreateAnnotation bool
 
-	Namespace      string
-	Client         *networkingv1client.NetworkingV1Client
+	Client         networkingv1client.NetworkingV1Interface
 	DryRunStrategy cmdutil.DryRunStrategy
 	DryRunVerifier *resource.DryRunVerifier
-	Builder        *resource.Builder
-	Cmd            *cobra.Command
+
+	FieldManager string
 
 	genericclioptions.IOStreams
 }
 
-// NewCreateCreateIngressOptions creates and returns an instance of CreateIngressOptions
-func NewCreateCreateIngressOptions(ioStreams genericclioptions.IOStreams) *CreateIngressOptions {
+// NewCreateIngressOptions creates the CreateIngressOptions to be used later
+func NewCreateIngressOptions(ioStreams genericclioptions.IOStreams) *CreateIngressOptions {
 	return &CreateIngressOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
@@ -75,15 +134,17 @@ func NewCreateCreateIngressOptions(ioStreams genericclioptions.IOStreams) *Creat
 }
 
 // NewCmdCreateIngress is a macro command to create a new ingress.
+// This command is better known to users as `kubectl create ingress`.
 func NewCmdCreateIngress(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewCreateCreateIngressOptions(ioStreams)
+	o := NewCreateIngressOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use:     "ingress NAME --host=hostname| --service-name=servicename [--service-port=serviceport] [--path=path] [--dry-run]",
-		Aliases: []string{"ing"},
-		Short:   i18n.T("Create an ingress with the specified name."),
-		Long:    ingressLong,
-		Example: ingressExample,
+		Use:                   "ingress NAME --rule=host/path=service:port[,tls[=secret]] ",
+		DisableFlagsInUseLine: true,
+		Aliases:               []string{"ing"},
+		Short:                 ingressLong,
+		Long:                  ingressLong,
+		Example:               ingressExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -95,13 +156,12 @@ func NewCmdCreateIngress(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddDryRunFlag(cmd)
-	cmd.Flags().StringVar(&o.Host, "host", o.Host, i18n.T("Host name this Ingress should route traffic on"))
-	cmd.Flags().StringVar(&o.ServiceName, "service-name", o.ServiceName, i18n.T("Service this Ingress should route traffic to"))
-	cmd.Flags().StringVar(&o.ServicePort, "service-port", o.ServicePort, "Port name or number of the Service to route traffic to")
-	cmd.Flags().StringVar(&o.Path, "path", o.Path, "Path on which to route traffic to")
-	cmd.MarkFlagRequired("host")
-	cmd.MarkFlagRequired("service-name")
+	cmd.Flags().StringVar(&o.IngressClass, "class", o.IngressClass, "Ingress Class to be used")
+	cmd.Flags().StringArrayVar(&o.Rules, "rule", o.Rules, "Rule in format host/path=service:port[,tls=secretname]. Paths containing the leading character '*' are considered pathType=Prefix. tls argument is optional.")
+	cmd.Flags().StringVar(&o.DefaultBackend, "default-backend", o.DefaultBackend, "Default service for backend, in format of svcname:port")
+	cmd.Flags().StringArrayVar(&o.Annotations, "annotation", o.Annotations, "Annotation to insert in the ingress object, in the format annotation=value")
+	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
+
 	return cmd
 }
 
@@ -122,12 +182,12 @@ func (o *CreateIngressOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 		return err
 	}
 
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
-	o.Builder = f.NewBuilder()
-	o.Cmd = cmd
+
+	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 
 	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
 	if err != nil {
@@ -143,6 +203,7 @@ func (o *CreateIngressOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	}
 	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
+
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -150,21 +211,46 @@ func (o *CreateIngressOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	o.PrintObj = func(obj runtime.Object) error {
 		return printer.PrintObj(obj, o.Out)
 	}
-
 	return nil
 }
 
+// Validate validates the Ingress object to be created
 func (o *CreateIngressOptions) Validate() error {
+	if len(o.DefaultBackend) == 0 && len(o.Rules) == 0 {
+		return fmt.Errorf("not enough information provided: every ingress has to either specify a default-backend (which catches all traffic) or a list of rules (which catch specific paths)")
+	}
+
+	rulevalidation, err := regexp.Compile(ruleRegex)
+	if err != nil {
+		return fmt.Errorf("failed to compile the regex")
+	}
+
+	for _, rule := range o.Rules {
+		if match := rulevalidation.MatchString(rule); !match {
+			return fmt.Errorf("rule %s is invalid and should be in format host/path=svcname:svcport[,tls[=secret]]", rule)
+		}
+	}
+
+	if len(o.DefaultBackend) > 0 && len(strings.Split(o.DefaultBackend, ":")) != 2 {
+		return fmt.Errorf("default-backend should be in format servicename:serviceport")
+	}
+
 	return nil
 }
 
 // Run performs the execution of 'create ingress' sub command
 func (o *CreateIngressOptions) Run() error {
-	var ingress *v1.Ingress
-	ingress = o.createIngress()
+	ingress := o.createIngress()
+
+	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, ingress, scheme.DefaultJSONEncoder()); err != nil {
+		return err
+	}
 
 	if o.DryRunStrategy != cmdutil.DryRunClient {
 		createOptions := metav1.CreateOptions{}
+		if o.FieldManager != "" {
+			createOptions.FieldManager = o.FieldManager
+		}
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			if err := o.DryRunVerifier.HasSupport(ingress.GroupVersionKind()); err != nil {
 				return err
@@ -177,47 +263,199 @@ func (o *CreateIngressOptions) Run() error {
 			return fmt.Errorf("failed to create ingress: %v", err)
 		}
 	}
-
 	return o.PrintObj(ingress)
 }
 
-func (o *CreateIngressOptions) createIngress() *v1.Ingress {
-	i := &v1.Ingress{
-		TypeMeta: metav1.TypeMeta{APIVersion: v1.SchemeGroupVersion.String(), Kind: "Ingress"},
+func (o *CreateIngressOptions) createIngress() *networkingv1.Ingress {
+	namespace := ""
+	if o.EnforceNamespace {
+		namespace = o.Namespace
+	}
+
+	annotations := o.buildAnnotations()
+	spec := o.buildIngressSpec()
+
+	ingress := &networkingv1.Ingress{
+		TypeMeta: metav1.TypeMeta{APIVersion: networkingv1.SchemeGroupVersion.String(), Kind: "Ingress"},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: o.Name,
+			Name:        o.Name,
+			Namespace:   namespace,
+			Annotations: annotations,
 		},
-		Spec: v1.IngressSpec{
-			Rules: []v1.IngressRule{
-				{
-					Host: o.Host,
-					IngressRuleValue: v1.IngressRuleValue{
-						HTTP: &v1.HTTPIngressRuleValue{
-							Paths: []v1.HTTPIngressPath{
-								{
-									Path: o.Path,
-									Backend: v1.IngressBackend{
-										Service: &v1.IngressServiceBackend{
-											Name: o.ServiceName,
-										},
-									},
-								},
-							},
-						},
-					},
+		Spec: spec,
+	}
+	return ingress
+}
+
+func (o *CreateIngressOptions) buildAnnotations() map[string]string {
+	var annotations map[string]string
+	annotations = make(map[string]string)
+
+	for _, annotation := range o.Annotations {
+		an := strings.SplitN(annotation, "=", 2)
+		annotations[an[0]] = an[1]
+	}
+	return annotations
+}
+
+// buildIngressSpec builds the .spec from the diverse arguments passed to kubectl
+func (o *CreateIngressOptions) buildIngressSpec() networkingv1.IngressSpec {
+	var ingressSpec networkingv1.IngressSpec
+
+	if len(o.IngressClass) > 0 {
+		ingressSpec.IngressClassName = &o.IngressClass
+	}
+
+	if len(o.DefaultBackend) > 0 {
+		defaultbackend := buildIngressBackendSvc(o.DefaultBackend)
+		ingressSpec.DefaultBackend = &defaultbackend
+	}
+	ingressSpec.TLS = o.buildTLSRules()
+	ingressSpec.Rules = o.buildIngressRules()
+
+	return ingressSpec
+}
+
+func (o *CreateIngressOptions) buildTLSRules() []networkingv1.IngressTLS {
+	var hostAlreadyPresent map[string]struct{}
+	hostAlreadyPresent = make(map[string]struct{})
+
+	ingressTLSs := []networkingv1.IngressTLS{}
+	var secret string
+
+	for _, rule := range o.Rules {
+		tls := strings.Split(rule, ",")
+
+		if len(tls) == 2 {
+			ingressTLS := networkingv1.IngressTLS{}
+			host := strings.SplitN(rule, "/", 2)[0]
+			secret = ""
+			secretName := strings.Split(tls[1], "=")
+
+			if len(secretName) > 1 {
+				secret = secretName[1]
+			}
+
+			idxSecret := getIndexSecret(secret, ingressTLSs)
+			// We accept the same host into TLS secrets only once
+			if _, ok := hostAlreadyPresent[host]; !ok {
+				if idxSecret > -1 {
+					ingressTLSs[idxSecret].Hosts = append(ingressTLSs[idxSecret].Hosts, host)
+					hostAlreadyPresent[host] = struct{}{}
+					continue
+				}
+				if host != "_" {
+					ingressTLS.Hosts = append(ingressTLS.Hosts, host)
+				}
+				if secret != "" {
+					ingressTLS.SecretName = secret
+				}
+				if len(ingressTLS.SecretName) > 0 || len(ingressTLS.Hosts) > 0 {
+					ingressTLSs = append(ingressTLSs, ingressTLS)
+				}
+				hostAlreadyPresent[host] = struct{}{}
+			}
+		}
+	}
+	return ingressTLSs
+}
+
+// buildIngressRules builds the .spec.rules for an ingress object.
+func (o *CreateIngressOptions) buildIngressRules() []networkingv1.IngressRule {
+	ingressRules := []networkingv1.IngressRule{}
+
+	for _, rule := range o.Rules {
+		removeTLS := strings.Split(rule, ",")[0]
+		hostSplit := strings.SplitN(removeTLS, "/", 2)
+		host := hostSplit[0]
+		ingressPath := buildHTTPIngressPath(hostSplit[1])
+		ingressRule := networkingv1.IngressRule{}
+
+		if host != "_" {
+			ingressRule.Host = host
+		}
+
+		idxHost := getIndexHost(ingressRule.Host, ingressRules)
+		if idxHost > -1 {
+			ingressRules[idxHost].IngressRuleValue.HTTP.Paths = append(ingressRules[idxHost].IngressRuleValue.HTTP.Paths, ingressPath)
+			continue
+		}
+
+		ingressRule.IngressRuleValue = networkingv1.IngressRuleValue{
+			HTTP: &networkingv1.HTTPIngressRuleValue{
+				Paths: []networkingv1.HTTPIngressPath{
+					ingressPath,
 				},
 			},
+		}
+		ingressRules = append(ingressRules, ingressRule)
+	}
+	return ingressRules
+}
+
+func buildHTTPIngressPath(pathsvc string) networkingv1.HTTPIngressPath {
+	pathsvcsplit := strings.Split(pathsvc, "=")
+	path := "/" + pathsvcsplit[0]
+	service := pathsvcsplit[1]
+
+	var pathType networkingv1.PathType
+	pathType = "Exact"
+
+	// If * in the End, turn pathType=Prefix but remove the * from the end
+	if path[len(path)-1:] == "*" {
+		pathType = "Prefix"
+		path = path[0 : len(path)-1]
+	}
+
+	httpIngressPath := networkingv1.HTTPIngressPath{
+		Path:     path,
+		PathType: &pathType,
+		Backend:  buildIngressBackendSvc(service),
+	}
+	return httpIngressPath
+}
+
+func buildIngressBackendSvc(service string) networkingv1.IngressBackend {
+	svcname := strings.Split(service, ":")[0]
+	svcport := strings.Split(service, ":")[1]
+
+	ingressBackend := networkingv1.IngressBackend{
+		Service: &networkingv1.IngressServiceBackend{
+			Name: svcname,
+			Port: parseServiceBackendPort(svcport),
 		},
 	}
+	return ingressBackend
+}
 
-	var port v1.ServiceBackendPort
-	if n, err := strconv.Atoi(o.ServicePort); err != nil {
-		port.Name = o.ServicePort
-	} else {
-		port.Number = int32(n)
+func parseServiceBackendPort(port string) networkingv1.ServiceBackendPort {
+	var backendPort networkingv1.ServiceBackendPort
+	portIntOrStr := intstr.Parse(port)
+
+	if portIntOrStr.Type == intstr.Int {
+		backendPort.Number = portIntOrStr.IntVal
 	}
 
-	i.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Backend.Service.Port = port
+	if portIntOrStr.Type == intstr.String {
+		backendPort.Name = portIntOrStr.StrVal
+	}
+	return backendPort
+}
 
-	return i
+func getIndexHost(host string, rules []networkingv1.IngressRule) int {
+	for index, v := range rules {
+		if v.Host == host {
+			return index
+		}
+	}
+	return -1
+}
+
+func getIndexSecret(secretname string, tls []networkingv1.IngressTLS) int {
+	for index, v := range tls {
+		if v.SecretName == secretname {
+			return index
+		}
+	}
+	return -1
 }
