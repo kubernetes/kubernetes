@@ -118,7 +118,7 @@ func Test_NestedPendingOperations_Positive_SecondOpAfterFirstCompletes(t *testin
 	// Arrange
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateCallbackFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -150,7 +150,7 @@ func Test_NestedPendingOperations_Positive_SecondOpAfterFirstCompletesWithExpBac
 	// Arrange
 	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateCallbackFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -242,7 +242,7 @@ func Test_NestedPendingOperations_Negative_SecondOpBeforeFirstCompletes(t *testi
 	// Arrange
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -309,7 +309,7 @@ func Test_NestedPendingOperations_Negative_SecondSubOpBeforeFirstCompletes2(t *t
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operationPodName := volumetypes.UniquePodName("operation-podname")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName, operationPodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -334,7 +334,7 @@ func Test_NestedPendingOperations_Negative_SecondSubOpBeforeFirstCompletes(t *te
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operationPodName := volumetypes.UniquePodName("operation-podname")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName, operationPodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -358,7 +358,7 @@ func Test_NestedPendingOperations_Negative_SecondOpBeforeFirstCompletesWithExpBa
 	// Arrange
 	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -382,7 +382,7 @@ func Test_NestedPendingOperations_Positive_ThirdOpAfterFirstCompletes(t *testing
 	// Arrange
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -426,7 +426,7 @@ func Test_NestedPendingOperations_Positive_ThirdOpAfterFirstCompletesWithExpBack
 	// Arrange
 	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -509,7 +509,7 @@ func Test_NestedPendingOperations_Positive_Wait(t *testing.T) {
 	// Arrange
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err != nil {
@@ -538,7 +538,7 @@ func Test_NestedPendingOperations_Positive_WaitWithExpBackoff(t *testing.T) {
 	// Arrange
 	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err != nil {
@@ -710,9 +710,9 @@ func Test_NestedPendingOperations_Positive_Issue_88355(t *testing.T) {
 	)
 
 	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
-	opZContinueCh := make(chan interface{}, 0 /* bufferSize */)
-	op1ContinueCh := make(chan interface{}, 0 /* bufferSize */)
-	op2ContinueCh := make(chan interface{}, 0 /* bufferSize */)
+	opZContinueCh := make(chan interface{})
+	op1ContinueCh := make(chan interface{})
+	op2ContinueCh := make(chan interface{})
 	operationZ := generateWaitFunc(opZContinueCh)
 	operation1 := generateWaitFunc(op1ContinueCh)
 	operation2 := generateWaitWithErrorFunc(op2ContinueCh)
@@ -772,7 +772,7 @@ func testConcurrentOperationsPositive(
 
 	// Arrange
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName1, podName1, nodeName1 /* nodeName */, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -802,7 +802,7 @@ func testConcurrentOperationsNegative(
 
 	// Arrange
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName1, podName1, nodeName1 /* nodeName */, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
