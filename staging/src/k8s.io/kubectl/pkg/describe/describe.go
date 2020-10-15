@@ -1525,17 +1525,17 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 
 	pc := d.CoreV1().Pods(namespace)
 
-	mountPods, err := getMountPods(pc, pvc.Name)
+	pods, err := getPodsForPVC(pc, pvc.Name)
 	if err != nil {
 		return "", err
 	}
 
 	events, _ := d.CoreV1().Events(namespace).Search(scheme.Scheme, pvc)
 
-	return describePersistentVolumeClaim(pvc, events, mountPods)
+	return describePersistentVolumeClaim(pvc, events, pods)
 }
 
-func getMountPods(c corev1client.PodInterface, pvcName string) ([]corev1.Pod, error) {
+func getPodsForPVC(c corev1client.PodInterface, pvcName string) ([]corev1.Pod, error) {
 	nsPods, err := c.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return []corev1.Pod{}, err
@@ -1544,10 +1544,8 @@ func getMountPods(c corev1client.PodInterface, pvcName string) ([]corev1.Pod, er
 	var pods []corev1.Pod
 
 	for _, pod := range nsPods.Items {
-		pvcs := getPvcs(pod.Spec.Volumes)
-
-		for _, pvc := range pvcs {
-			if pvc.PersistentVolumeClaim.ClaimName == pvcName {
+		for _, volume := range pod.Spec.Volumes {
+			if volume.VolumeSource.PersistentVolumeClaim != nil && volume.VolumeSource.PersistentVolumeClaim.ClaimName == pvcName {
 				pods = append(pods, pod)
 			}
 		}
@@ -1556,23 +1554,11 @@ func getMountPods(c corev1client.PodInterface, pvcName string) ([]corev1.Pod, er
 	return pods, nil
 }
 
-func getPvcs(volumes []corev1.Volume) []corev1.Volume {
-	var pvcs []corev1.Volume
-
-	for _, volume := range volumes {
-		if volume.VolumeSource.PersistentVolumeClaim != nil {
-			pvcs = append(pvcs, volume)
-		}
-	}
-
-	return pvcs
-}
-
-func describePersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, events *corev1.EventList, mountPods []corev1.Pod) (string, error) {
+func describePersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, events *corev1.EventList, pods []corev1.Pod) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		printPersistentVolumeClaim(w, pvc, true)
-		printPodsMultiline(w, "Mounted By", mountPods)
+		printPodsMultiline(w, "Used By", pods)
 
 		if len(pvc.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n")
