@@ -581,21 +581,21 @@ func TestGetNodeNameByIPConfigurationID(t *testing.T) {
 		expectError       bool
 	}{
 		{
-			description:       "getNodeNameByIPConfigurationID should get node's Name when the node is existing",
+			description:       "GetNodeNameByIPConfigurationID should get node's Name when the node is existing",
 			scaleSet:          "scaleset1",
 			ipConfigurationID: fmt.Sprintf(ipConfigurationIDTemplate, "scaleset1", "0", "scaleset1"),
 			vmList:            []string{"vmssee6c2000000", "vmssee6c2000001"},
 			expected:          "vmssee6c2000000",
 		},
 		{
-			description:       "getNodeNameByIPConfigurationID should return error for non-exist nodes",
+			description:       "GetNodeNameByIPConfigurationID should return error for non-exist nodes",
 			scaleSet:          "scaleset2",
 			ipConfigurationID: fmt.Sprintf(ipConfigurationIDTemplate, "scaleset2", "3", "scaleset1"),
 			vmList:            []string{"vmssee6c2000002", "vmssee6c2000003"},
 			expectError:       true,
 		},
 		{
-			description:       "getNodeNameByIPConfigurationID should return error for wrong ipConfigurationID",
+			description:       "GetNodeNameByIPConfigurationID should return error for wrong ipConfigurationID",
 			scaleSet:          "scaleset3",
 			ipConfigurationID: "invalid-configuration-id",
 			vmList:            []string{"vmssee6c2000004", "vmssee6c2000005"},
@@ -618,7 +618,7 @@ func TestGetNodeNameByIPConfigurationID(t *testing.T) {
 		expectedVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, test.scaleSet, "", 0, test.vmList, "", false)
 		mockVMSSVMClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(expectedVMs, nil).AnyTimes()
 
-		nodeName, err := ss.getNodeNameByIPConfigurationID(test.ipConfigurationID)
+		nodeName, err := ss.GetNodeNameByIPConfigurationID(test.ipConfigurationID)
 		if test.expectError {
 			assert.Error(t, err, test.description)
 			continue
@@ -2113,7 +2113,7 @@ func TestEnsureBackendPoolDeletedFromNode(t *testing.T) {
 		mockVMSSVMClient := ss.cloud.VirtualMachineScaleSetVMsClient.(*mockvmssvmclient.MockInterface)
 		mockVMSSVMClient.EXPECT().List(gomock.Any(), ss.ResourceGroup, testVMSSName, gomock.Any()).Return(expectedVMSSVMs, nil).AnyTimes()
 
-		nodeResourceGroup, ssName, instanceID, vm, err := ss.ensureBackendPoolDeletedFromNode(&v1.Service{}, test.nodeName, test.backendpoolID)
+		nodeResourceGroup, ssName, instanceID, vm, err := ss.ensureBackendPoolDeletedFromNode(test.nodeName, test.backendpoolID)
 		assert.Equal(t, test.expectedErr, err, test.description+", but an error occurs")
 		assert.Equal(t, test.expectedNodeResourceGroup, nodeResourceGroup, test.description)
 		assert.Equal(t, test.expectedVMSSName, ssName, test.description)

@@ -1665,3 +1665,81 @@ func TestServiceOwnsFrontendIP(t *testing.T) {
 		assert.Equal(t, test.isPrimary, isPrimary, test.desc)
 	}
 }
+
+func TestStandardEnsureBackendPoolDeleted(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cloud := GetTestCloud(ctrl)
+	service := getTestService("test", v1.ProtocolTCP, nil, false, 80)
+	backendPoolID := "backendPoolID"
+	vmSetName := "AS"
+
+	tests := []struct {
+		desc                string
+		backendAddressPools *[]network.BackendAddressPool
+		loadBalancerSKU     string
+		existingVM          compute.VirtualMachine
+		existingNIC         network.Interface
+	}{
+		{
+			desc: "",
+			backendAddressPools: &[]network.BackendAddressPool{
+				{
+					ID: to.StringPtr(backendPoolID),
+					BackendAddressPoolPropertiesFormat: &network.BackendAddressPoolPropertiesFormat{
+						BackendIPConfigurations: &[]network.InterfaceIPConfiguration{
+							{
+								ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/k8s-agentpool1-00000000-nic-1/ipConfigurations/ipconfig1"),
+							},
+						},
+					},
+				},
+			},
+			existingVM: compute.VirtualMachine{
+				VirtualMachineProperties: &compute.VirtualMachineProperties{
+					AvailabilitySet: &compute.SubResource{
+						ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/availabilitySets/as"),
+					},
+					NetworkProfile: &compute.NetworkProfile{
+						NetworkInterfaces: &[]compute.NetworkInterfaceReference{
+							{
+								ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/k8s-agentpool1-00000000-nic-1"),
+							},
+						},
+					},
+				},
+			},
+			existingNIC: network.Interface{
+				InterfacePropertiesFormat: &network.InterfacePropertiesFormat{
+					ProvisioningState: to.StringPtr("Succeeded"),
+					IPConfigurations: &[]network.InterfaceIPConfiguration{
+						{
+							InterfaceIPConfigurationPropertiesFormat: &network.InterfaceIPConfigurationPropertiesFormat{
+								Primary: to.BoolPtr(true),
+								LoadBalancerBackendAddressPools: &[]network.BackendAddressPool{
+									{
+										ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/k8s-agentpool1-00000000-nic-1/ipConfigurations/ipconfig1"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		cloud.LoadBalancerSku = test.loadBalancerSKU
+		mockVMClient := mockvmclient.NewMockInterface(ctrl)
+		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "k8s-agentpool1-00000000-1", gomock.Any()).Return(test.existingVM, nil)
+		cloud.VirtualMachinesClient = mockVMClient
+		mockNICClient := mockinterfaceclient.NewMockInterface(ctrl)
+		mockNICClient.EXPECT().Get(gomock.Any(), "rg", "k8s-agentpool1-00000000-nic-1", gomock.Any()).Return(test.existingNIC, nil)
+		mockNICClient.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		cloud.InterfacesClient = mockNICClient
+
+		err := cloud.VMSet.EnsureBackendPoolDeleted(&service, backendPoolID, vmSetName, test.backendAddressPools)
+		assert.NoError(t, err, test.desc)
+	}
+}
