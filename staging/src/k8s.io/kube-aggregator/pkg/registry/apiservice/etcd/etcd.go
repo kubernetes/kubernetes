@@ -59,6 +59,14 @@ func NewREST(scheme *runtime.Scheme, optsGetter generic.RESTOptionsGetter) *REST
 	return &REST{store}
 }
 
+// Implement CategoriesProvider
+var _ rest.CategoriesProvider = &REST{}
+
+// Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
+func (c *REST) Categories() []string {
+	return []string{"api-extensions"}
+}
+
 var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
 
 // ConvertToTable implements the TableConvertor interface for REST.
