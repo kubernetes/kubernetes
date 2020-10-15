@@ -19,6 +19,7 @@ package csidriver
 import (
 	"context"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -55,6 +56,7 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy) {
 		csiDriver.Spec.FSGroupPolicy = nil
 	}
+	csiDriver.Generation = 1
 }
 
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -78,20 +80,24 @@ func (csiDriverStrategy) AllowCreateOnUpdate() bool {
 // existing object does not already have that field set. This allows the field to remain when
 // downgrading to a version that has the feature disabled.
 func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	if old.(*storage.CSIDriver).Spec.StorageCapacity == nil &&
+	newCSIDriverObj := obj.(*storage.CSIDriver)
+	oldCSIDriverObj := old.(*storage.CSIDriver)
+
+	if oldCSIDriverObj.Spec.StorageCapacity == nil &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
-		newCSIDriver := obj.(*storage.CSIDriver)
-		newCSIDriver.Spec.StorageCapacity = nil
+		newCSIDriverObj.Spec.StorageCapacity = nil
 	}
-	if old.(*storage.CSIDriver).Spec.VolumeLifecycleModes == nil &&
+	if oldCSIDriverObj.Spec.VolumeLifecycleModes == nil &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-		newCSIDriver := obj.(*storage.CSIDriver)
-		newCSIDriver.Spec.VolumeLifecycleModes = nil
+		newCSIDriverObj.Spec.VolumeLifecycleModes = nil
 	}
-	if old.(*storage.CSIDriver).Spec.FSGroupPolicy == nil &&
+	if oldCSIDriverObj.Spec.FSGroupPolicy == nil &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy) {
-		newCSIDriver := obj.(*storage.CSIDriver)
-		newCSIDriver.Spec.FSGroupPolicy = nil
+		newCSIDriverObj.Spec.FSGroupPolicy = nil
+	}
+
+	if !apiequality.Semantic.DeepEqual(oldCSIDriverObj.Spec, newCSIDriverObj.Spec) {
+		newCSIDriverObj.Generation = oldCSIDriverObj.Generation + 1
 	}
 }
 

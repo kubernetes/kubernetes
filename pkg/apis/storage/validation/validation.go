@@ -404,12 +404,11 @@ func ValidateCSIDriver(csiDriver *storage.CSIDriver) field.ErrorList {
 // ValidateCSIDriverUpdate validates a CSIDriver.
 func ValidateCSIDriverUpdate(new, old *storage.CSIDriver) field.ErrorList {
 	allErrs := ValidateCSIDriver(new)
-
-	// Spec is read-only
-	// If this ever relaxes in the future, make sure to increment the Generation number in PrepareForUpdate
-	if !apiequality.Semantic.DeepEqual(old.Spec, new.Spec) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec"), new.Spec, "field is immutable"))
-	}
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(old.Spec.AttachRequired, new.Spec.AttachRequired, field.NewPath("spec", "attachRequired"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(old.Spec.FSGroupPolicy, new.Spec.FSGroupPolicy, field.NewPath("spec", "fsGroupPolicy"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(old.Spec.VolumeLifecycleModes, new.Spec.VolumeLifecycleModes, field.NewPath("spec", "volumeLifecycleModes"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(old.Spec.StorageCapacity, new.Spec.StorageCapacity, field.NewPath("spec", "storageCapacity"))...)
+	// PodInfoOnMount is excluded because it is mutable.
 	return allErrs
 }
 

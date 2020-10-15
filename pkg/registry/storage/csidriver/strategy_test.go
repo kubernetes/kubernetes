@@ -65,17 +65,63 @@ func TestCSIDriverStrategy(t *testing.T) {
 		t.Errorf("unexpected error validating %v", errs)
 	}
 
-	// Update of spec is disallowed
-	newCSIDriver := csiDriver.DeepCopy()
 	attachNotRequired := false
-	newCSIDriver.Spec.AttachRequired = &attachNotRequired
+	noPodInfoOnMount := false
 
-	Strategy.PrepareForUpdate(ctx, newCSIDriver, csiDriver)
-
-	errs = Strategy.ValidateUpdate(ctx, newCSIDriver, csiDriver)
-	if len(errs) == 0 {
-		t.Errorf("Expected a validation error")
+	successCases := []struct {
+		name   string
+		modify func(new *storage.CSIDriver)
+	}{
+		{
+			name:   "Nothing changed",
+			modify: func(new *storage.CSIDriver) {},
+		},
+		{
+			name: "PodInfoOnMount changed",
+			modify: func(new *storage.CSIDriver) {
+				new.Spec.PodInfoOnMount = &noPodInfoOnMount
+			},
+		},
 	}
+
+	for _, test := range successCases {
+		t.Run(test.name, func(t *testing.T) {
+			newCSIDriver := csiDriver.DeepCopy()
+			test.modify(newCSIDriver)
+
+			Strategy.PrepareForUpdate(ctx, newCSIDriver, csiDriver)
+
+			if errs := Strategy.ValidateUpdate(ctx, newCSIDriver, csiDriver); len(errs) != 0 {
+				t.Errorf("Expected no validation errors for test: %v", newCSIDriver)
+			}
+		})
+	}
+
+	errorCases := []struct {
+		name   string
+		modify func(new *storage.CSIDriver)
+	}{
+		{
+			name: "AttachRequired changed",
+			modify: func(new *storage.CSIDriver) {
+				new.Spec.AttachRequired = &attachNotRequired
+			},
+		},
+	}
+
+	for _, test := range errorCases {
+		t.Run(test.name, func(t *testing.T) {
+			newCSIDriver := csiDriver.DeepCopy()
+			test.modify(newCSIDriver)
+
+			Strategy.PrepareForUpdate(ctx, newCSIDriver, csiDriver)
+
+			if errs := Strategy.ValidateUpdate(ctx, newCSIDriver, csiDriver); len(errs) == 0 {
+				t.Errorf("Expected a validation error for test: %v", newCSIDriver)
+			}
+		})
+	}
+
 }
 
 func TestCSIDriverPrepareForCreate(t *testing.T) {

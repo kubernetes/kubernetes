@@ -1855,6 +1855,8 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 	attachNotRequired := false
 	podInfoOnMount := true
 	notPodInfoOnMount := false
+	storageCapacity := true
+	fsGroupPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
 	old := storage.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storage.CSIDriverSpec{
@@ -1867,16 +1869,35 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 		},
 	}
 
-	// Currently there is only one success case: exactly the same
-	// as the existing object.
-	successCases := []storage.CSIDriver{old}
-	for _, csiDriver := range successCases {
-		if errs := ValidateCSIDriverUpdate(&csiDriver, &old); len(errs) != 0 {
-			t.Errorf("expected success for %+v: %v", csiDriver, errs)
-		}
+	// Currently there are only two success cases: exactly the same
+	// as the existing object, and changing podInfoOnMount.
+	successCases := []struct {
+		name   string
+		modify func(new *storage.CSIDriver)
+	}{
+		{
+			name:   "Nothing changed",
+			modify: func(new *storage.CSIDriver) {},
+		},
+		{
+			name: "PodInfoOnMount changed",
+			modify: func(new *storage.CSIDriver) {
+				new.Spec.PodInfoOnMount = &podInfoOnMount
+			},
+		},
 	}
 
-	// Each test case changes exactly one field. None of that is valid.
+	for _, test := range successCases {
+		t.Run(test.name, func(t *testing.T) {
+			new := old.DeepCopy()
+			test.modify(new)
+			if errs := ValidateCSIDriverUpdate(new, &old); len(errs) != 0 {
+				t.Errorf("Expected success for test: %v", new)
+			}
+		})
+	}
+
+	// Each test case changes exactly one field. None are valid.
 	errorCases := []struct {
 		name   string
 		modify func(new *storage.CSIDriver)
@@ -1912,12 +1933,6 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "PodInfoOnMount changed",
-			modify: func(new *storage.CSIDriver) {
-				new.Spec.PodInfoOnMount = &podInfoOnMount
-			},
-		},
-		{
 			name: "invalid volume lifecycle mode",
 			modify: func(new *storage.CSIDriver) {
 				new.Spec.VolumeLifecycleModes = []storage.VolumeLifecycleMode{
@@ -1945,6 +1960,18 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 				new.Spec.VolumeLifecycleModes = []storage.VolumeLifecycleMode{
 					storage.VolumeLifecyclePersistent,
 				}
+			},
+		},
+		{
+			name: "StorageCapacity changed",
+			modify: func(new *storage.CSIDriver) {
+				new.Spec.StorageCapacity = &storageCapacity
+			},
+		},
+		{
+			name: "FSGroupPolicy changed",
+			modify: func(new *storage.CSIDriver) {
+				new.Spec.FSGroupPolicy = &fsGroupPolicy
 			},
 		},
 	}
