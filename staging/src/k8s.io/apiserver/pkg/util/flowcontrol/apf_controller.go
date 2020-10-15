@@ -333,7 +333,7 @@ type SyncReport struct {
 	// TriedWrites indicates whether status updates were attempted
 	TriedWrites bool
 
-	// DidWrites indicates whether status udates were successful
+	// DidWrites indicates whether status updates were successful
 	DidWrites bool
 
 	// NeedRetry indicates whether to requeue with exponential backoff
