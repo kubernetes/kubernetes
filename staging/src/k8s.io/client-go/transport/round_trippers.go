@@ -146,6 +146,7 @@ type userAgentRoundTripper struct {
 	rt    http.RoundTripper
 }
 
+// NewUserAgentRoundTripper will add User-Agent header to a request unless it has already been set.
 func NewUserAgentRoundTripper(agent string, rt http.RoundTripper) http.RoundTripper {
 	return &userAgentRoundTripper{agent, rt}
 }
@@ -260,7 +261,7 @@ func NewBearerAuthRoundTripper(bearer string, rt http.RoundTripper) http.RoundTr
 	return &bearerAuthRoundTripper{bearer, nil, rt}
 }
 
-// NewBearerAuthRoundTripper adds the provided bearer token to a request
+// NewBearerAuthWithRefreshRoundTripper adds the provided bearer token to a request
 // unless the authorization header has already been set.
 // If tokenFile is non-empty, it is periodically read,
 // and the last successfully read content is used as the bearer token.

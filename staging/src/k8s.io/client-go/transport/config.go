@@ -108,7 +108,7 @@ func (c *Config) HasCertAuth() bool {
 	return (len(c.TLS.CertData) != 0 || len(c.TLS.CertFile) != 0) && (len(c.TLS.KeyData) != 0 || len(c.TLS.KeyFile) != 0)
 }
 
-// HasCertCallbacks returns whether the configuration has certificate callback or not.
+// HasCertCallback returns whether the configuration has certificate callback or not.
 func (c *Config) HasCertCallback() bool {
 	return c.TLS.GetCert != nil
 }
