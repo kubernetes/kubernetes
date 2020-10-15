@@ -156,7 +156,10 @@ function download_tarball() {
   fi
   url="${DOWNLOAD_URL_PREFIX}/${file}"
   mkdir -p "${download_path}"
-  if [[ $(which curl) ]]; then
+
+  if [[ $(which gsutil) ]] && [[ "$url" =~ ^https://storage.googleapis.com/.* ]]; then
+    gsutil cp "${url//'https://storage.googleapis.com/'/'gs://'}" "${download_path}/${file}"
+  elif [[ $(which curl) ]]; then
     # if the url belongs to GCS API we should use oauth2_token in the headers
     curl_headers=""
     if { [[ "${KUBERNETES_PROVIDER:-gce}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]] ; } &&
@@ -167,7 +170,7 @@ function download_tarball() {
   elif [[ $(which wget) ]]; then
     wget "${url}" -O "${download_path}/${file}"
   else
-    echo "Couldn't find curl or wget.  Bailing out." >&2
+    echo "Couldn't find gsutil, curl, or wget.  Bailing out." >&2
     exit 4
   fi
   echo
