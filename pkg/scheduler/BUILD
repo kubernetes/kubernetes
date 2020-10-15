@@ -60,7 +60,6 @@ go_test(
         "//pkg/apis/core:go_default_library",
         "//pkg/controller/volume/scheduling:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
-        "//pkg/scheduler/apis/config/scheme:go_default_library",
         "//pkg/scheduler/core:go_default_library",
         "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/framework/plugins:go_default_library",
