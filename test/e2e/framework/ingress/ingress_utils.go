@@ -732,9 +732,6 @@ func (j *TestJig) WaitForIngressAddress(c clientset.Interface, ns, ingName strin
 		ipOrNameList, err := getIngressAddress(c, ns, ingName, j.Class)
 		if err != nil || len(ipOrNameList) == 0 {
 			j.Logger.Errorf("Waiting for Ingress %s/%s to acquire IP, error: %v, ipOrNameList: %v", ns, ingName, err, ipOrNameList)
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		address = ipOrNameList[0]
@@ -892,9 +889,6 @@ func getPortURL(client clientset.Interface, ns, name string, svcPort int) (strin
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		return true, nil
