@@ -93,8 +93,28 @@ type KMSConfiguration struct {
 	// +optional
 	CacheSize *int32
 	// endpoint is the gRPC server listening address, for example "unix:///var/run/kms-provider.sock".
+	// If endpoint's scheme is unix, then TLSConfig should be nil.
 	Endpoint string
 	// timeout for gRPC calls to kms-plugin (ex. 5s). The default is 3 seconds.
 	// +optional
 	Timeout *metav1.Duration
+	// TLSConfig is the TLS configuration to connect KMS Service.
+	// Defaults to nil, which means use unix socket address to connect KMS Service.
+	// +optional
+	TLSConfig *KMSTLSClientConfig
+}
+
+// KMSTLSClientConfig is the TLS configuration to connect KMS Service.
+type KMSTLSClientConfig struct {
+	// ServerName is passed to the server for SNI and is used in the client to check server
+	// certificates against. If ServerName is empty, the hostname used to contact the
+	// server is used.
+	ServerName string
+
+	// Server requires TLS client certificate authentication
+	CertFile string
+	// Server requires TLS client certificate authentication
+	KeyFile string
+	// Trusted root certificates for server
+	CAFile string
 }

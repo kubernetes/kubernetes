@@ -107,7 +107,7 @@ func getKMSPluginProbes(reader io.Reader) ([]*kmsPluginProbe, error) {
 	for _, r := range config.Resources {
 		for _, p := range r.Providers {
 			if p.KMS != nil {
-				s, err := envelope.NewGRPCService(p.KMS.Endpoint, p.KMS.Timeout.Duration)
+				s, err := envelope.NewGRPCService(p.KMS.Endpoint, p.KMS.Timeout.Duration, p.KMS.TLSConfig)
 				if err != nil {
 					return nil, fmt.Errorf("could not configure KMS-Plugin's probe %q, error: %v", p.KMS.Name, err)
 				}
@@ -241,7 +241,7 @@ func prefixTransformers(config *apiserverconfig.ResourceConfiguration) ([]value.
 		case provider.Secretbox != nil:
 			transformer, err = secretboxPrefixTransformer(provider.Secretbox)
 		case provider.KMS != nil:
-			envelopeService, err := envelopeServiceFactory(provider.KMS.Endpoint, provider.KMS.Timeout.Duration)
+			envelopeService, err := envelopeServiceFactory(provider.KMS.Endpoint, provider.KMS.Timeout.Duration, provider.KMS.TLSConfig)
 			if err != nil {
 				return nil, fmt.Errorf("could not configure KMS plugin %q, error: %v", provider.KMS.Name, err)
 			}

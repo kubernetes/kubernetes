@@ -19,22 +19,27 @@ package envelope
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
+	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	kmsapi "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
+	"k8s.io/klog/v2"
 )
 
 const (
-	// Now only supported unix domain socket.
+	// Now supported unix domain socket and TCP connection with TLS credentials.
+	// If endpoint's scheme is unix, then no TLS credentials will be used.
 	unixProtocol = "unix"
 
 	// Current version for the protocol interface definition.
@@ -53,19 +58,36 @@ type gRPCService struct {
 }
 
 // NewGRPCService returns an envelope.Service which use gRPC to communicate the remote KMS provider.
-func NewGRPCService(endpoint string, callTimeout time.Duration) (Service, error) {
+func NewGRPCService(endpoint string, callTimeout time.Duration, tlsConfig *apiserverconfig.KMSTLSClientConfig) (Service, error) {
 	klog.V(4).Infof("Configure KMS provider with endpoint: %s", endpoint)
 
+	var err error
+	s := &gRPCService{callTimeout: callTimeout}
+	if tlsConfig == nil {
+		s.connection, err = s.unixSocketConnection(endpoint)
+	} else {
+		s.connection, err = s.tlsConnection(endpoint, tlsConfig)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection to %s, tlsConfig: %v, error: %v", endpoint, tlsConfig, err)
+	}
+
+	s.kmsClient = kmsapi.NewKeyManagementServiceClient(s.connection)
+	return s, nil
+}
+
+// unixSocketConnection returns unix socket gRPC connection according to the given unix socket endpoint.
+func (g *gRPCService) unixSocketConnection(endpoint string) (*grpc.ClientConn, error) {
 	addr, err := parseEndpoint(endpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	s := &gRPCService{callTimeout: callTimeout}
-	s.connection, err = grpc.Dial(
+	conn, err := grpc.Dial(
 		addr,
 		grpc.WithInsecure(),
-		grpc.WithUnaryInterceptor(s.interceptor),
+		grpc.WithUnaryInterceptor(g.interceptor),
 		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 		grpc.WithContextDialer(
 			func(context.Context, string) (net.Conn, error) {
@@ -84,8 +106,47 @@ func NewGRPCService(endpoint string, callTimeout time.Duration) (Service, error)
 		return nil, fmt.Errorf("failed to create connection to %s, error: %v", endpoint, err)
 	}
 
-	s.kmsClient = kmsapi.NewKeyManagementServiceClient(s.connection)
-	return s, nil
+	return conn, nil
+}
+
+// tlsConnection returns TLS gRPC connection according to the given endpoint and client TLS configuration.
+func (g *gRPCService) tlsConnection(endpoint string, clientTLSConfig *apiserverconfig.KMSTLSClientConfig) (*grpc.ClientConn, error) {
+	clientCertificate, err := tls.LoadX509KeyPair(clientTLSConfig.CertFile, clientTLSConfig.KeyFile)
+	if err != nil {
+		return nil, err
+	}
+
+	certPool := x509.NewCertPool()
+	serverCABytes, err := ioutil.ReadFile(clientTLSConfig.CAFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read server CA cert: %v", err)
+	}
+
+	ok := certPool.AppendCertsFromPEM(serverCABytes)
+	if !ok {
+		return nil, fmt.Errorf("failed to append server CA cert to ca-pool")
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{clientCertificate},
+		RootCAs:      certPool,
+	}
+
+	if clientTLSConfig.ServerName != "" {
+		tlsConfig.ServerName = clientTLSConfig.ServerName
+	}
+
+	conn, err := grpc.Dial(
+		endpoint,
+		grpc.WithUnaryInterceptor(g.interceptor),
+		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
+		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection to %s, error: %v", endpoint, err)
+	}
+
+	return conn, nil
 }
 
 // Parse the endpoint to extract schema, host or path.

@@ -81,7 +81,7 @@ func (t *testEnvelopeService) Encrypt(data []byte) ([]byte, error) {
 }
 
 // The factory method to create mock envelope service.
-func newMockEnvelopeService(endpoint string, timeout time.Duration) (envelope.Service, error) {
+func newMockEnvelopeService(endpoint string, timeout time.Duration, tlsConfig *apiserverconfig.KMSTLSClientConfig) (envelope.Service, error) {
 	return &testEnvelopeService{nil}, nil
 }
 
@@ -220,7 +220,7 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 }
 
 func TestKMSPluginHealthz(t *testing.T) {
-	service, err := envelope.NewGRPCService("unix:///tmp/testprovider.sock", 3*time.Second)
+	service, err := envelope.NewGRPCService("unix:///tmp/testprovider.sock", 3*time.Second, nil)
 	if err != nil {
 		t.Fatalf("Could not initialize envelopeService, error: %v", err)
 	}
@@ -276,7 +276,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 }
 
 func TestKMSPluginHealthzTTL(t *testing.T) {
-	service, _ := newMockEnvelopeService("unix:///tmp/testprovider.sock", 3*time.Second)
+	service, _ := newMockEnvelopeService("unix:///tmp/testprovider.sock", 3*time.Second, nil)
 	errService, _ := newMockErrorEnvelopeService("unix:///tmp/testprovider.sock", 3*time.Second)
 
 	testCases := []struct {

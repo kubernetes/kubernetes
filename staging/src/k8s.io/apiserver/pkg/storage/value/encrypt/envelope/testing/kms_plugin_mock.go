@@ -20,8 +20,11 @@ package testing
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"runtime"
@@ -31,6 +34,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/status"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -66,6 +70,40 @@ func NewBase64Plugin(socketPath string) (*Base64Plugin, error) {
 		mu:         &sync.Mutex{},
 		ver:        kmsapiVersion,
 		socketPath: socketPath,
+	}
+
+	kmsapi.RegisterKeyManagementServiceServer(server, result)
+	return result, nil
+}
+
+// NewTLSBase64Plugin is a constructor for Base64Plugin which gRPC server use the provided TLS credentials.
+func NewTLSBase64Plugin(ca, cert, key string) (*Base64Plugin, error) {
+	serverCertificate, err := tls.LoadX509KeyPair(cert, key)
+	if err != nil {
+		return nil, err
+	}
+
+	certPool := x509.NewCertPool()
+	serverCABytes, err := ioutil.ReadFile(ca)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read client CA cert: %v", err)
+	}
+
+	ok := certPool.AppendCertsFromPEM(serverCABytes)
+	if !ok {
+		return nil, fmt.Errorf("failed to append client CA cert to ca-pool")
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{serverCertificate},
+		RootCAs:      certPool,
+	}
+
+	server := grpc.NewServer(grpc.Creds(credentials.NewTLS(tlsConfig)))
+	result := &Base64Plugin{
+		grpcServer: server,
+		mu:         &sync.Mutex{},
+		ver:        kmsapiVersion,
 	}
 
 	kmsapi.RegisterKeyManagementServiceServer(server, result)
@@ -110,10 +148,28 @@ func (s *Base64Plugin) Start() error {
 	return nil
 }
 
+// StartTLS starts plugin's gRPC service listen on a random TCP port.
+func (s *Base64Plugin) StartTLS() (string, error) {
+	var err error
+	s.listener, err = net.Listen("tcp", ":0")
+	if err != nil {
+		return "", fmt.Errorf("failed to listen on the unix socket, error: %v", err)
+	}
+	klog.Infof("Listening on %s", s.listener.Addr().String())
+
+	go s.grpcServer.Serve(s.listener)
+	return s.listener.Addr().String(), nil
+}
+
 // CleanUp stops gRPC server and the underlying listener.
 func (s *Base64Plugin) CleanUp() {
 	s.grpcServer.Stop()
 	s.listener.Close()
+
+	if s.socketPath == "" {
+		return
+	}
+
 	if !strings.HasPrefix(s.socketPath, "@") || runtime.GOOS != "linux" {
 		os.Remove(s.socketPath)
 	}
