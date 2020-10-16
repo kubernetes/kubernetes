@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"reflect"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -191,7 +192,7 @@ type innerEventRecorder struct {
 }
 
 func (irecorder *innerEventRecorder) shouldRecordEvent(object runtime.Object) (*v1.ObjectReference, bool) {
-	if object == nil {
+	if reflect.ValueOf(object).IsNil() {
 		return nil, false
 	}
 	if ref, ok := object.(*v1.ObjectReference); ok {
@@ -212,7 +213,6 @@ func (irecorder *innerEventRecorder) Eventf(object runtime.Object, eventtype, re
 	if ref, ok := irecorder.shouldRecordEvent(object); ok {
 		irecorder.recorder.Eventf(ref, eventtype, reason, messageFmt, args...)
 	}
-
 }
 
 func (irecorder *innerEventRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
