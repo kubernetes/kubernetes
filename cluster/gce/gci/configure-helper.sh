@@ -1453,6 +1453,7 @@ function create-master-etcd-apiserver-auth {
    fi
 }
 
+
 function docker-installed {
     if systemctl cat docker.service &> /dev/null ; then
         return 0
@@ -1460,41 +1461,68 @@ function docker-installed {
         return 1
     fi
 }
+function addockeropt {
+	DOCKER_OPTS_FILE=/etc/docker/daemon.json
+	if [ "$#" -lt 1 ]; then
+	echo "No arguments are passed while adding docker options. Expect one argument"
+	exit 1
+	else if [ "$#" -gt 1 ];
+	echo "Only one argument is accepeted"
+	exit 1
+	fi
+	if [ -f "$DOCKER_OPTS_FILE" ]; then
+	cat >> "${DOCKER_OPTS_FILE}" <<EOF
+  $1
+EOF
+	else
+	cat > "${DOCKER_OPTS_FILE}" <<EOF
+EOF
+	fi	
+}
 
 function assemble-docker-flags {
-  echo "Assemble docker command line flags"
-  local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
+  echo "Assemble docker options"
+  cat <<EOF >/etc/docker/daemon.json
+{
+EOF
+  
+addockeropt '"pidfile": "/var/run/docker.pid",
+  "iptables": false,
+  "ip-masq": false,'
+  
   if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
-    docker_opts+=" --log-level=debug"
+    addockeropt '"log-level": "debug",'
   else
-    docker_opts+=" --log-level=warn"
+    addockeropt '"log-level": "warn",'
   fi
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" || "${NETWORK_PROVIDER:-}" == "cni" ]]; then
     # set docker0 cidr to private ip address range to avoid conflict with cbr0 cidr range
-    docker_opts+=" --bip=169.254.123.1/24"
+    addockeropt '"bip": "169.254.123.1/24",'
   else
-    docker_opts+=" --bridge=cbr0"
+   addockeropt '"bridge": "cbr0",'
   fi
-
   # Decide whether to enable a docker registry mirror. This is taken from
   # the "kube-env" metadata value.
   if [[ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]]; then
     echo "Enable docker registry mirror at: ${DOCKER_REGISTRY_MIRROR_URL}"
-    docker_opts+=" --registry-mirror=${DOCKER_REGISTRY_MIRROR_URL}"
+    addockeropt '"registry-mirrors": ["'${DOCKER_REGISTRY_MIRROR_URL}'"],'
   fi
-
-  # Configure docker logging
-  docker_opts+=" --log-driver=${DOCKER_LOG_DRIVER:-json-file}"
-  docker_opts+=" --log-opt=max-size=${DOCKER_LOG_MAX_SIZE:-10m}"
-  docker_opts+=" --log-opt=max-file=${DOCKER_LOG_MAX_FILE:-5}"
-
-  # Disable live-restore if the environment variable is set.
-
+    # Disable live-restore if the environment variable is set.
   if [[ "${DISABLE_DOCKER_LIVE_RESTORE:-false}" == "true" ]]; then
-    docker_opts+=" --live-restore=false"
+    addockeropt '"live-restore": "false",'
   fi
+  # Configure docker logging
+  addockeropt '"log-driver": "'${DOCKER_LOG_DRIVER:-json-file}'",'
+  addockeropt '"log-opts": {
+      "max-size": "'${DOCKER_LOG_MAX_SIZE:-10m}'",
+      "max-file": "'${DOCKER_LOG_MAX_FILE:-5}'"
+    }'
+  
+  cat <<EOF >>/usr/local/google/home/teratipally/Desktop/daemon.json
+}
+EOF
 
-  echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
+  echo "DOCKER_OPTS=\"${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
 
   # Ensure TasksMax is sufficient for docker.
   # (https://github.com/kubernetes/kubernetes/issues/51977)
