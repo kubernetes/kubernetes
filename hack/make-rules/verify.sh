@@ -90,8 +90,8 @@ QUICK_PATTERNS+=(
   "verify-test-images.sh"
 )
 
-while IFS='' read -r line; do EXCLUDED_CHECKS+=("$line"); done < <(ls "${EXCLUDED_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/}" 2>/dev/null || true)
-while IFS='' read -r line; do QUICK_CHECKS+=("$line"); done < <(ls "${QUICK_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/}" 2>/dev/null || true)
+while IFS='' read -r line; do EXCLUDED_CHECKS+=("$line"); done < <(ls "${EXCLUDED_PATTERNS[@]/#/${KUBE_ROOT}/hack/}" 2>/dev/null || true)
+while IFS='' read -r line; do QUICK_CHECKS+=("$line"); done < <(ls "${QUICK_PATTERNS[@]/#/${KUBE_ROOT}/hack/}" 2>/dev/null || true)
 TARGET_LIST=()
 IFS=" " read -r -a TARGET_LIST <<< "${WHAT:-}"
 
