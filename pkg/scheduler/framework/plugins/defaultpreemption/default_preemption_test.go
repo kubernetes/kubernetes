@@ -664,10 +664,12 @@ func TestDryRunPreemption(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			)
 			registeredPlugins = append(registeredPlugins, tt.registerPlugins...)
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(), 0)
 			fwk, err := st.NewFramework(
 				registeredPlugins,
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithInformerFactory(informerFactory),
 			)
 			if err != nil {
 				t.Fatal(err)

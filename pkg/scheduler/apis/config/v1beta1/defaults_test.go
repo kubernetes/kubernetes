@@ -265,10 +265,10 @@ func TestSchedulerDefaults(t *testing.T) {
 
 func TestPluginArgsDefaults(t *testing.T) {
 	tests := []struct {
-		name    string
-		feature featuregate.Feature
-		in      runtime.Object
-		want    runtime.Object
+		name     string
+		features map[featuregate.Feature]bool
+		in       runtime.Object
+		want     runtime.Object
 	}{
 		{
 			name: "InterPodAffinityArgs empty",
@@ -368,7 +368,7 @@ func TestPluginArgsDefaults(t *testing.T) {
 			name: "PodTopologySpreadArgs resources empty",
 			in:   &v1beta1.PodTopologySpreadArgs{},
 			want: &v1beta1.PodTopologySpreadArgs{
-				DefaultingType: v1beta1.ListDefaulting,
+				DefaultingType: v1beta1.SystemDefaulting,
 			},
 		},
 		{
@@ -390,38 +390,17 @@ func TestPluginArgsDefaults(t *testing.T) {
 						MaxSkew:           2,
 					},
 				},
+				// TODO(#94008): Make SystemDefaulting in v1beta2.
 				DefaultingType: v1beta1.ListDefaulting,
 			},
 		},
 		{
-			name:    "PodTopologySpreadArgs empty, DefaultPodTopologySpread feature enabled",
-			feature: features.DefaultPodTopologySpread,
-			in:      &v1beta1.PodTopologySpreadArgs{},
-			want: &v1beta1.PodTopologySpreadArgs{
-				DefaultingType: v1beta1.SystemDefaulting,
+			name: "PodTopologySpreadArgs empty, DefaultPodTopologySpread feature disabled",
+			features: map[featuregate.Feature]bool{
+				features.DefaultPodTopologySpread: false,
 			},
-		},
-		{
-			name:    "PodTopologySpreadArgs with constraints, DefaultPodTopologySpread feature enabled",
-			feature: features.DefaultPodTopologySpread,
-			in: &v1beta1.PodTopologySpreadArgs{
-				DefaultConstraints: []v1.TopologySpreadConstraint{
-					{
-						TopologyKey:       v1.LabelHostname,
-						WhenUnsatisfiable: v1.ScheduleAnyway,
-						MaxSkew:           3,
-					},
-				},
-			},
+			in: &v1beta1.PodTopologySpreadArgs{},
 			want: &v1beta1.PodTopologySpreadArgs{
-				DefaultConstraints: []v1.TopologySpreadConstraint{
-					{
-						TopologyKey:       v1.LabelHostname,
-						WhenUnsatisfiable: v1.ScheduleAnyway,
-						MaxSkew:           3,
-					},
-				},
-				// TODO(#94008): Make SystemDefaulting in v1beta2.
 				DefaultingType: v1beta1.ListDefaulting,
 			},
 		},
@@ -430,8 +409,8 @@ func TestPluginArgsDefaults(t *testing.T) {
 		scheme := runtime.NewScheme()
 		utilruntime.Must(AddToScheme(scheme))
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.feature != "" {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, tc.feature, true)()
+			for k, v := range tc.features {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
 			}
 			scheme.Default(tc.in)
 			if diff := cmp.Diff(tc.in, tc.want); diff != "" {
