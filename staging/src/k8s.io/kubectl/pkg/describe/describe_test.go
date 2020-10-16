@@ -3993,6 +3993,18 @@ func TestDescribeNode(t *testing.T) {
 			Status: corev1.NodeStatus{
 				Capacity:    nodeCapacity,
 				Allocatable: nodeAllocatable,
+				NodeInfo: corev1.NodeSystemInfo{
+					MachineID:               "55d2ccaefc9847c9a69356e7f3bd23f4",
+					SystemUUID:              "fe312784-2364-4bba-a55e-f56051539c21",
+					BootID:                  "b6c44522-c4d5-443d-924b-b54d6831b5e8",
+					KernelVersion:           "4.19.76-linuxkit",
+					OSImage:                 "Ubuntu 20.04 LTS",
+					ContainerRuntimeVersion: "docker://19.3.8",
+					KubeletVersion:          "v1.19.2",
+					KubeProxyVersion:        "v1.19.2",
+					OperatingSystem:         "linux",
+					Architecture:            "amd64",
+				},
 			},
 		},
 		&coordinationv1.Lease{
@@ -4047,6 +4059,27 @@ func TestDescribeNode(t *testing.T) {
 	}
 
 	expectedOut := []string{"Unschedulable", "true", "holder",
+		`Capacity:
+  cpu:            8
+  hugepages-1Gi:  0
+  hugepages-2Mi:  4Gi
+  memory:         24Gi
+Allocatable:
+  cpu:            4
+  hugepages-1Gi:  0
+  hugepages-2Mi:  2Gi
+  memory:         12Gi
+System Info:
+  Machine ID:                 55d2ccaefc9847c9a69356e7f3bd23f4
+  System UUID:                fe312784-2364-4bba-a55e-f56051539c21
+  Boot ID:                    b6c44522-c4d5-443d-924b-b54d6831b5e8
+  Kernel Version:             4.19.76-linuxkit
+  OS Image:                   Ubuntu 20.04 LTS
+  Operating System:           linux
+  Architecture:               amd64
+  Container Runtime Version:  docker://19.3.8
+  Kubelet Version:            v1.19.2
+  Kube-Proxy Version:         v1.19.2`,
 		`Allocated resources:
   (Total limits may be over 100 percent, i.e., overcommitted.)
   Resource           Requests     Limits
