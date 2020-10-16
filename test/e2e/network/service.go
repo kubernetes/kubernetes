@@ -981,7 +981,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("Creating a webserver pod to be part of the TCP service which echoes back source ip")
 		serverPodName := "echo-sourceip"
-		pod := newAgnhostPod(serverPodName, "netexec", "--http-port", strconv.Itoa(servicePort))
+		pod := e2epod.NewAgnhostPod(ns, serverPodName, nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort))
 		pod.Labels = jig.Labels
 		_, err = cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
@@ -1039,7 +1039,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("creating a client/server pod")
 		serverPodName := "hairpin"
-		podTemplate := newAgnhostPod(serverPodName, "netexec", "--http-port", strconv.Itoa(servicePort))
+		podTemplate := e2epod.NewAgnhostPod(ns, serverPodName, nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort))
 		podTemplate.Labels = jig.Labels
 		pod, err := cs.CoreV1().Pods(ns).Create(context.TODO(), podTemplate, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
@@ -3602,22 +3602,8 @@ func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, n
 
 // proxyMode returns a proxyMode of a kube-proxy.
 func proxyMode(f *framework.Framework) (string, error) {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-proxy-mode-detector",
-			Namespace: f.Namespace.Name,
-		},
-		Spec: v1.PodSpec{
-			HostNetwork: true,
-			Containers: []v1.Container{
-				{
-					Name:  "detector",
-					Image: agnHostImage,
-					Args:  []string{"pause"},
-				},
-			},
-		},
-	}
+	pod := e2epod.NewAgnhostPod(f.Namespace.Name, "kube-proxy-mode-detector", nil, nil, nil)
+	pod.Spec.HostNetwork = true
 	f.PodClient().CreateSync(pod)
 	defer f.PodClient().DeleteSync(pod.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 
@@ -3900,32 +3886,8 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 
 		ginkgo.By("creating a pod with hostport on the selected node")
 		podName := "hostport"
-
-		podSpec := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      podName,
-				Namespace: f.Namespace.Name,
-				Labels:    map[string]string{"app": "hostport-pod"},
-			},
-			Spec: v1.PodSpec{
-				NodeName: node.Name,
-				Containers: []v1.Container{
-					{
-						Name:  "hostport",
-						Image: imageutils.GetE2EImage(imageutils.Agnhost),
-						Args:  []string{"pause"},
-						Ports: []v1.ContainerPort{
-							{
-								Protocol:      v1.ProtocolSCTP,
-								ContainerPort: 5060,
-								HostPort:      5060,
-							},
-						},
-						ImagePullPolicy: "IfNotPresent",
-					},
-				},
-			},
-		}
+		ports := []v1.ContainerPort{{Protocol: v1.ProtocolSCTP, ContainerPort: 5060, HostPort: 5060}}
+		podSpec := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, ports)
 
 		ginkgo.By(fmt.Sprintf("Launching the pod on node %v", node.Name))
 		f.PodClient().CreateSync(podSpec)
