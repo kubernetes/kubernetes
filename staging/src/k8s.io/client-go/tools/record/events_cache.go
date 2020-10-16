@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 )
 
 const (
@@ -499,7 +500,7 @@ func (c *EventCorrelator) EventCorrelate(newEvent *v1.Event) (*EventCorrelateRes
 	}
 	aggregateEvent, ckey := c.aggregator.EventAggregate(newEvent)
 	observedEvent, patch, err := c.logger.eventObserve(aggregateEvent, ckey)
-	if c.filterFunc(observedEvent) {
+	if c.filterFunc(observedEvent) && newEvent.Reason != events.ContainerHealthy{
 		return &EventCorrelateResult{Skip: true}, nil
 	}
 	return &EventCorrelateResult{Event: observedEvent, Patch: patch}, err
