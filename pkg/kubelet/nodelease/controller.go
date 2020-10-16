@@ -147,7 +147,21 @@ func (c *controller) ensureLease() (*coordinationv1.Lease, bool, error) {
 	if apierrors.IsNotFound(err) {
 		// lease does not exist, create it.
 		leaseToCreate := c.newLease(nil)
-		if len(leaseToCreate.OwnerReferences) == 0 {
+		// Setting owner reference needs node's UID. Note that it is different from
+		// kubelet.nodeRef.UID. When lease is initially created, it is possible that
+		// the connection between master and node is not ready yet. So try to set
+		// owner reference every time when renewing the lease, until successful.
+		if node, err := c.client.CoreV1().Nodes().Get(context.TODO(), c.holderIdentity, metav1.GetOptions{}); err == nil {
+			leaseToCreate.OwnerReferences = []metav1.OwnerReference{
+				{
+					APIVersion: corev1.SchemeGroupVersion.WithKind("Node").Version,
+					Kind:       corev1.SchemeGroupVersion.WithKind("Node").Kind,
+					Name:       c.holderIdentity,
+					UID:        node.UID,
+				},
+			}
+		} else {
+			klog.Errorf("failed to get node %q when trying to set owner ref to the node lease: %v", c.holderIdentity, err)
 			// We want to ensure that a lease will always have OwnerReferences set.
 			// Thus, given that we weren't able to set it correctly, we simply
 			// not create it this time - we will retry in the next iteration.
@@ -209,25 +223,6 @@ func (c *controller) newLease(base *coordinationv1.Lease) *coordinationv1.Lease 
 		lease = base.DeepCopy()
 	}
 	lease.Spec.RenewTime = &metav1.MicroTime{Time: c.clock.Now()}
-
-	// Setting owner reference needs node's UID. Note that it is different from
-	// kubelet.nodeRef.UID. When lease is initially created, it is possible that
-	// the connection between master and node is not ready yet. So try to set
-	// owner reference every time when renewing the lease, until successful.
-	if len(lease.OwnerReferences) == 0 {
-		if node, err := c.client.CoreV1().Nodes().Get(context.TODO(), c.holderIdentity, metav1.GetOptions{}); err == nil {
-			lease.OwnerReferences = []metav1.OwnerReference{
-				{
-					APIVersion: corev1.SchemeGroupVersion.WithKind("Node").Version,
-					Kind:       corev1.SchemeGroupVersion.WithKind("Node").Kind,
-					Name:       c.holderIdentity,
-					UID:        node.UID,
-				},
-			}
-		} else {
-			klog.Errorf("failed to get node %q when trying to set owner ref to the node lease: %v", c.holderIdentity, err)
-		}
-	}
 
 	return lease
 }
