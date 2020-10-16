@@ -24,7 +24,7 @@ esac
 
 # Support serial and parallel test suites
 TEST_SUITE="${TEST_SUITE:-parallel}"
-COMMON_SKIPS="\[Slow\]|\[Disruptive\]|\[Flaky\]|\[Disabled:.+\]|\[Skipped:${PLATFORM}\]"
+COMMON_SKIPS="\[Slow\]|\[Disruptive\]|\[Flaky\]|\[Disabled:.+\]|\[Skipped:${PLATFORM}\]|\[Skipped:Network/OpenShiftSDN\]"
 case "${TEST_SUITE}" in
 serial)
   DEFAULT_TEST_ARGS="-focus=\[Serial\] -skip=${COMMON_SKIPS}"
