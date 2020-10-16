@@ -1627,16 +1627,17 @@ function DownloadAndInstall-LoggingAgents {
       Log-Output 'Extracting Logging agent'
       Expand-Archive td.zip
       mv .\td\td-agent-bit-${LOGGINGAGENT_VERSION}-win64\ $LOGGINGAGENT_ROOT
+      cd C:\
       Remove-Item -Force -Recurse $install_dir
   }
 
   # Download Logging exporter if needed
   if (ShouldWrite-File $LOGGINGEXPORTER_ROOT\flb-exporter.exe) {
+      $url = ("https://storage.googleapis.com/gke-release/winnode/fluentbit-exporter/${LOGGINGEXPORTER_VERSION}/flb-exporter-${LOGGINGEXPORTER_VERSION}.exe")
       Log-Output 'Downloading logging exporter'
       New-Item $LOGGINGEXPORTER_ROOT -ItemType 'directory' -Force | Out-Null
       MustDownload-File `
-          -OutFile $LOGGINGEXPORTER_ROOT\flb-exporter.exe `
-          -URLs 'https://storage.googleapis.com/gke-release/winnode/fluentbit-exporter/${LOGGINGEXPORTER_VERSION}/flb-exporter-${LOGGINGEXPORTER_VERSION}.exe'
+          -OutFile $LOGGINGEXPORTER_ROOT\flb-exporter.exe -URLs $url
   }
 }
 
