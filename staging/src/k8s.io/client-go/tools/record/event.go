@@ -155,21 +155,21 @@ func (a *EventRecorderAdapter) Eventf(regarding, _ runtime.Object, eventtype, re
 // Creates a new event broadcaster.
 func NewBroadcaster() EventBroadcaster {
 	return &eventBroadcasterImpl{
-		Broadcaster:   watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
+		Broadcaster:   watch.NewLongQueueBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
 		sleepDuration: defaultSleepDuration,
 	}
 }
 
 func NewBroadcasterForTests(sleepDuration time.Duration) EventBroadcaster {
 	return &eventBroadcasterImpl{
-		Broadcaster:   watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
+		Broadcaster:   watch.NewLongQueueBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
 		sleepDuration: sleepDuration,
 	}
 }
 
 func NewBroadcasterWithCorrelatorOptions(options CorrelatorOptions) EventBroadcaster {
 	return &eventBroadcasterImpl{
-		Broadcaster:   watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
+		Broadcaster:   watch.NewLongQueueBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
 		sleepDuration: defaultSleepDuration,
 		options:       options,
 	}
@@ -338,11 +338,14 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, annotations m
 	event := recorder.makeEvent(ref, annotations, eventtype, reason, message)
 	event.Source = recorder.source
 
-	go func() {
-		// NOTE: events should be a non-blocking operation
-		defer utilruntime.HandleCrash()
-		recorder.Action(watch.Added, event)
-	}()
+	// NOTE: events should be a non-blocking operation, but we also need to not
+	// put this in a goroutine, otherwise we'll race to write to a closed channel
+	// when we go to shut down this broadcaster.  Just drop events if we get overloaded,
+	// and log an error if that happens (we've configured the broadcaster to drop
+	// outgoing events anyway).
+	if sent := recorder.ActionOrDrop(watch.Added, event); !sent {
+		klog.Errorf("unable to record event: too many queued events, dropped event %#v", event)
+	}
 }
 
 func (recorder *recorderImpl) Event(object runtime.Object, eventtype, reason, message string) {
