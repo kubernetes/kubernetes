@@ -676,3 +676,26 @@ func TestHashContainer(t *testing.T) {
 		assert.Equal(t, tc.expectedHash, hashVal, "the hash value here should not be changed.")
 	}
 }
+
+func TestShouldRecordEvent(t *testing.T) {
+	var innerEventRecorder = &innerEventRecorder{
+		recorder: nil,
+	}
+
+	_, actual := innerEventRecorder.shouldRecordEvent(nil)
+	assert.Equal(t, false, actual)
+
+	var obj = &v1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"}
+
+	_, actual = innerEventRecorder.shouldRecordEvent(obj)
+	assert.Equal(t, true, actual)
+
+	obj = &v1.ObjectReference{Namespace: "system", Name: "infra", FieldPath: "implicitly required container "}
+
+	_, actual = innerEventRecorder.shouldRecordEvent(obj)
+	assert.Equal(t, false, actual)
+
+	var nilObj *v1.ObjectReference = nil
+	_, actual = innerEventRecorder.shouldRecordEvent(nilObj)
+	assert.Equal(t, false, actual, "should not panic if the typed nil was used, see https://github.com/kubernetes/kubernetes/issues/95552")
+}
