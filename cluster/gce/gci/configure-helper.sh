@@ -1504,7 +1504,6 @@ EOF
 EOF
 
   echo "DOCKER_OPTS=\"${EXTRA_DOCKER_OPTS:-}\"" >/etc/default/docker
-
   # Ensure TasksMax is sufficient for docker.
   # (https://github.com/kubernetes/kubernetes/issues/51977)
   echo "Extend the docker.service configuration to set a higher pids limit"
