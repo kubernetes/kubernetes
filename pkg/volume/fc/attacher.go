@@ -165,6 +165,11 @@ func (detacher *fcDetacher) UnmountDevice(deviceMountPath string) error {
 	if err != nil {
 		return fmt.Errorf("fc: failed to unmount: %s\nError: %v", deviceMountPath, err)
 	}
+	// GetDeviceNameFromMount from above returns an empty string if deviceMountPath is not a mount point
+	// There is no need to DetachDisk if this is the case (and DetachDisk will throw an error if we attempt)
+	if devName == "" {
+		return nil
+	}
 	unMounter := volumeSpecToUnmounter(detacher.mounter)
 	err = detacher.manager.DetachDisk(*unMounter, devName)
 	if err != nil {
