@@ -216,6 +216,7 @@ func Convert_batch_CronJobSpec_To_v2alpha1_CronJobSpec(in *batch.CronJobSpec, ou
 func autoConvert_v2alpha1_CronJobStatus_To_batch_CronJobStatus(in *v2alpha1.CronJobStatus, out *batch.CronJobStatus, s conversion.Scope) error {
 	out.Active = *(*[]core.ObjectReference)(unsafe.Pointer(&in.Active))
 	out.LastScheduleTime = (*v1.Time)(unsafe.Pointer(in.LastScheduleTime))
+	out.NextScheduleTime = (*v1.Time)(unsafe.Pointer(in.NextScheduleTime))
 	return nil
 }
 
@@ -227,6 +228,7 @@ func Convert_v2alpha1_CronJobStatus_To_batch_CronJobStatus(in *v2alpha1.CronJobS
 func autoConvert_batch_CronJobStatus_To_v2alpha1_CronJobStatus(in *batch.CronJobStatus, out *v2alpha1.CronJobStatus, s conversion.Scope) error {
 	out.Active = *(*[]corev1.ObjectReference)(unsafe.Pointer(&in.Active))
 	out.LastScheduleTime = (*v1.Time)(unsafe.Pointer(in.LastScheduleTime))
+	out.NextScheduleTime = (*v1.Time)(unsafe.Pointer(in.NextScheduleTime))
 	return nil
 }
 

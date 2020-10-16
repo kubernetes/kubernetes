@@ -147,6 +147,19 @@ func getRecentUnmetScheduleTimes(cj batchv1beta1.CronJob, now time.Time) ([]time
 	return starts, nil
 }
 
+// getNextScheduleTime get the next schedule time after now
+//
+// This func must be after getRecentUnmetScheduleTimes calls
+// because this func ignore parse schedule string error
+func getNextScheduleTime(cj batchv1beta1.CronJob, now time.Time) time.Time {
+	sched, err := cron.ParseStandard(cj.Spec.Schedule)
+	if err != nil {
+		// if error, return zero time
+		return time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC)
+	}
+	return sched.Next(now)
+}
+
 // getJobFromTemplate makes a Job from a CronJob
 func getJobFromTemplate(cj *batchv1beta1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
 	labels := copyLabels(&cj.Spec.JobTemplate)

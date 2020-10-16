@@ -378,6 +378,43 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 	}
 }
 
+func TestGetNextScheduleTime(t *testing.T) {
+	// T1 is a scheduled start time of that schedule
+	T1, err := time.Parse(time.RFC3339, "2016-05-19T10:00:00Z")
+	if err != nil {
+		t.Errorf("test setup error: %v", err)
+	}
+	// T2 is a scheduled start time of that schedule after T1
+	T2, err := time.Parse(time.RFC3339, "2016-05-19T11:00:00Z")
+	if err != nil {
+		t.Errorf("test setup error: %v", err)
+	}
+	testCases := map[string]struct{
+		schedule string
+		now time.Time
+		next time.Time
+		isZero bool
+	} {
+		"the critical point": {schedule: "0 * * * ?", now: T1, next: T2},
+		"the critical point before": {schedule: "0 * * * ?", now: T1.Add(-time.Second * 1), next: T1},
+		"the critical point after": {schedule: "0 * * * ?", now: T1.Add(time.Second * 1), next: T2},
+		"error schedule string" : {schedule: "x * * * ?", now: T1, next: time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC), isZero: true},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			cronJob := cronJob()
+			cronJob.Spec.Schedule = tc.schedule
+			nextScheduleTime := getNextScheduleTime(cronJob, tc.now)
+			if tc.next != nextScheduleTime {
+				t.Errorf("case: %s ; nextScheduleTime expected: %s but got: %s", name, tc.next, nextScheduleTime)
+			}
+			if tc.isZero != nextScheduleTime.IsZero() {
+				t.Errorf("case: %s ; isZero expected: %v but got: %v", name, tc.isZero, nextScheduleTime.IsZero())
+			}
+		})
+	}
+}
+
 func TestByJobStartTime(t *testing.T) {
 	now := metav1.NewTime(time.Date(2018, time.January, 1, 2, 3, 4, 5, time.UTC))
 	later := metav1.NewTime(time.Date(2019, time.January, 1, 2, 3, 4, 5, time.UTC))

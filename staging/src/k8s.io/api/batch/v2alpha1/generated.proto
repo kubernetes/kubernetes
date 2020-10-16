@@ -105,6 +105,12 @@ message CronJobStatus {
   // Information when was the last time the job was successfully scheduled.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastScheduleTime = 4;
+
+  // Information when was the next time will schedule.
+  // This time is not absolutely accurate,
+  // just as scheduling does not always follow the plan absolutely.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time nextScheduleTime = 5;
 }
 
 // JobTemplate describes a template for creating copies of a predefined pod.

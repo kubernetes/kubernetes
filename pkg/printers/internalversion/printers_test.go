@@ -4440,6 +4440,7 @@ func TestPrintComponentStatus(t *testing.T) {
 func TestPrintCronJob(t *testing.T) {
 	completions := int32(2)
 	suspend := false
+	zero := time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC)
 	tests := []struct {
 		cronjob  batch.CronJob
 		options  printers.GenerateOptions
@@ -4478,11 +4479,12 @@ func TestPrintCronJob(t *testing.T) {
 				},
 				Status: batch.CronJobStatus{
 					LastScheduleTime: &metav1.Time{Time: time.Now().Add(1.9e9)},
+					NextScheduleTime: &metav1.Time{Time: time.Now().Add(-1.9e9)},
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, Schedule, Suspend, Active, Last Schedule, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob1", "0/5 * * * ?", "False", int64(0), "0s", "0s"}}},
+			// Columns: Name, Schedule, Suspend, Active, Last Schedule, Next Schedule, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob1", "0/5 * * * ?", "False", int64(0), "0s", "0s", "0s"}}},
 		},
 		// Generate options: Wide; prints containers, images, and labels.
 		{
@@ -4517,13 +4519,14 @@ func TestPrintCronJob(t *testing.T) {
 				},
 				Status: batch.CronJobStatus{
 					LastScheduleTime: &metav1.Time{Time: time.Now().Add(1.9e9)},
+					NextScheduleTime: &metav1.Time{Time: time.Now().Add(-1.9e9)},
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
-			// Columns: Name, Schedule, Suspend, Active, Last Schedule, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob1", "0/5 * * * ?", "False", int64(0), "0s", "0s", "fake-job-container1,fake-job-container2", "fake-job-image1,fake-job-image2", "a=b"}}},
+			// Columns: Name, Schedule, Suspend, Active, Last Schedule, Next Schedule, Age, Containers, Images, Selector
+			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob1", "0/5 * * * ?", "False", int64(0), "0s", "0s", "0s", "fake-job-container1,fake-job-container2", "fake-job-image1,fake-job-image2", "a=b"}}},
 		},
-		// CronJob with Last Schedule and Age
+		// CronJob with Last Schedule and Next Schedule and Age
 		{
 			cronjob: batch.CronJob{
 				ObjectMeta: metav1.ObjectMeta{
@@ -4536,13 +4539,14 @@ func TestPrintCronJob(t *testing.T) {
 				},
 				Status: batch.CronJobStatus{
 					LastScheduleTime: &metav1.Time{Time: time.Now().Add(-3e10)},
+					NextScheduleTime: &metav1.Time{Time: time.Now().Add(3.1e10)},
 				},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, Schedule, Suspend, Active, Last Schedule, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob2", "0/5 * * * ?", "False", int64(0), "30s", "5m"}}},
+			// Columns: Name, Schedule, Suspend, Active, Last Schedule, Next Schedule, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob2", "0/5 * * * ?", "False", int64(0), "30s", "30s", "5m"}}},
 		},
-		// CronJob without Last Schedule
+		// CronJob without Last Schedule and Next Schedule
 		{
 			cronjob: batch.CronJob{
 				ObjectMeta: metav1.ObjectMeta{
@@ -4556,8 +4560,28 @@ func TestPrintCronJob(t *testing.T) {
 				Status: batch.CronJobStatus{},
 			},
 			options: printers.GenerateOptions{},
-			// Columns: Name, Schedule, Suspend, Active, Last Schedule, Age
-			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob3", "0/5 * * * ?", "False", int64(0), "<none>", "5m"}}},
+			// Columns: Name, Schedule, Suspend, Active, Last Schedule, Next Schedule, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob3", "0/5 * * * ?", "False", int64(0), "<none>", "<none>", "5m"}}},
+		},
+		// CronJob with Last Schedule and Next Schedule and Age unknown
+		{
+			cronjob: batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "cronjob3",
+					CreationTimestamp: metav1.Time{Time: zero},
+				},
+				Spec: batch.CronJobSpec{
+					Schedule: "0/5 * * * ?",
+					Suspend:  &suspend,
+				},
+				Status: batch.CronJobStatus{
+					LastScheduleTime: &metav1.Time{Time: zero},
+					NextScheduleTime: &metav1.Time{Time: zero},
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Schedule, Suspend, Active, Last Schedule, Next Schedule, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"cronjob3", "0/5 * * * ?", "False", int64(0), "<unknown>", "<unknown>", "<unknown>"}}},
 		},
 	}
 

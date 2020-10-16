@@ -67,6 +67,7 @@ var map_CronJobStatus = map[string]string{
 	"":                 "CronJobStatus represents the current state of a cron job.",
 	"active":           "A list of pointers to currently running jobs.",
 	"lastScheduleTime": "Information when was the last time the job was successfully scheduled.",
+	"nextScheduleTime": "Information when was the next time will schedule. This time is not absolutely accurate, just as scheduling does not always follow the plan absolutely.",
 }
 
 func (CronJobStatus) SwaggerDoc() map[string]string {
