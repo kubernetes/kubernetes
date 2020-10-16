@@ -1452,40 +1452,58 @@ function create-master-etcd-apiserver-auth {
    fi
 }
 
-function assemble-docker-flags {
-  echo "Assemble docker command line flags"
-  local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
+function assemble-docker-options() {
+  echo "Assemble docker options"
+  cat <<EOF >/etc/docker/daemon.json
+{
+  "pidfile": "/var/run/docker.pid",
+  "iptables": false,
+  "ip-masq": false,
+EOF
   if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
-    docker_opts+=" --log-level=debug"
+    cat <<EOF >>/etc/docker/daemon.json
+  "log-level": "debug",
+EOF
   else
-    docker_opts+=" --log-level=warn"
+    cat <<EOF >>/etc/docker/daemon.json
+  "log-level": "warn",
+EOF
   fi
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" || "${NETWORK_PROVIDER:-}" == "cni" ]]; then
     # set docker0 cidr to private ip address range to avoid conflict with cbr0 cidr range
-    docker_opts+=" --bip=169.254.123.1/24"
+    cat <<EOF >>/etc/docker/daemon.json
+  "bip": "169.254.123.1/24",
+EOF
   else
-    docker_opts+=" --bridge=cbr0"
+    cat <<EOF >>/etc/docker/daemon.json
+  "bridge": "cbr0",
+EOF
   fi
-
   # Decide whether to enable a docker registry mirror. This is taken from
   # the "kube-env" metadata value.
   if [[ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]]; then
     echo "Enable docker registry mirror at: ${DOCKER_REGISTRY_MIRROR_URL}"
-    docker_opts+=" --registry-mirror=${DOCKER_REGISTRY_MIRROR_URL}"
+    cat <<EOF >>/etc/docker/daemon.json
+  "registry-mirrors": ["${DOCKER_REGISTRY_MIRROR_URL}"],
+EOF
   fi
-
-  # Configure docker logging
-  docker_opts+=" --log-driver=${DOCKER_LOG_DRIVER:-json-file}"
-  docker_opts+=" --log-opt=max-size=${DOCKER_LOG_MAX_SIZE:-10m}"
-  docker_opts+=" --log-opt=max-file=${DOCKER_LOG_MAX_FILE:-5}"
-
-  # Disable live-restore if the environment variable is set.
-
+    # Disable live-restore if the environment variable is set.
   if [[ "${DISABLE_DOCKER_LIVE_RESTORE:-false}" == "true" ]]; then
-    docker_opts+=" --live-restore=false"
+    cat <<EOF >>/etc/docker/daemon.json
+  "live-restore": "false",
+EOF
   fi
+  # Configure docker logging
+  cat <<EOF >>/etc/docker/daemon.json
+  "log-driver": "${DOCKER_LOG_DRIVER:-json-file}",
+  "log-opts": {
+      "max-size": "${DOCKER_LOG_MAX_SIZE:-10m}",
+      "max-file": "${DOCKER_LOG_MAX_FILE:-5}"
+    }
+}
+EOF
 
-  echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
+  echo "${EXTRA_DOCKER_OPTS:-}\"" >/etc/default/docker
 
   # Ensure TasksMax is sufficient for docker.
   # (https://github.com/kubernetes/kubernetes/issues/51977)
@@ -1496,9 +1514,9 @@ function assemble-docker-flags {
 TasksMax=infinity
 EOF
 
-    systemctl daemon-reload
-    echo "Docker command line is updated. Restart docker to pick it up"
-    systemctl restart docker
+  systemctl daemon-reload
+  echo "Docker command line is updated. Restart docker to pick it up"
+  systemctl restart docker
 }
 
 # This function assembles the kubelet systemd service file and starts it
