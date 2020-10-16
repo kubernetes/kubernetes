@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// package taints implements utilities for working with taints
+// Package taints implements utilities for working with taints
 package taints
 
 import (
@@ -30,8 +30,11 @@ import (
 )
 
 const (
+	// MODIFIED -
 	MODIFIED  = "modified"
+	// TAINTED -
 	TAINTED   = "tainted"
+	// UNTAINTED -
 	UNTAINTED = "untainted"
 )
 
@@ -90,17 +93,19 @@ func validateTaintEffect(effect v1.TaintEffect) error {
 
 // NewTaintsVar wraps []api.Taint in a struct that implements flag.Value to allow taints to be
 // bound to command line flags.
-func NewTaintsVar(ptr *[]api.Taint) taintsVar {
-	return taintsVar{
+func NewTaintsVar(ptr *[]api.Taint) Var {
+	return Var{
 		ptr: ptr,
 	}
 }
 
-type taintsVar struct {
+// Var is wrapper set for []api.Taint
+type Var struct {
 	ptr *[]api.Taint
 }
 
-func (t taintsVar) Set(s string) error {
+// Set add taint in Taints by every taint parse from a string split by comma.
+func (t Var) Set(s string) error {
 	if len(s) == 0 {
 		*t.ptr = nil
 		return nil
@@ -118,7 +123,8 @@ func (t taintsVar) Set(s string) error {
 	return nil
 }
 
-func (t taintsVar) String() string {
+// String -
+func (t Var) String() string {
 	if len(*t.ptr) == 0 {
 		return ""
 	}
@@ -129,7 +135,8 @@ func (t taintsVar) String() string {
 	return strings.Join(taints, ",")
 }
 
-func (t taintsVar) Type() string {
+// Type return TaintsVar's type string.
+func (t Var) Type() string {
 	return "[]api.Taint"
 }
 
@@ -321,6 +328,8 @@ func TaintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 	return false
 }
 
+// TaintSetDiff compared the two set of taints, if taints in t1 but not in t2, add it to first slices,
+// if taints in t2 but not in t1, add it to second slices.
 func TaintSetDiff(t1, t2 []v1.Taint) (taintsToAdd []*v1.Taint, taintsToRemove []*v1.Taint) {
 	for _, taint := range t1 {
 		if !TaintExists(t2, &taint) {
@@ -339,6 +348,7 @@ func TaintSetDiff(t1, t2 []v1.Taint) (taintsToAdd []*v1.Taint, taintsToRemove []
 	return
 }
 
+// TaintSetFilter use fn to filter taint set.
 func TaintSetFilter(taints []v1.Taint, fn func(*v1.Taint) bool) []v1.Taint {
 	res := []v1.Taint{}
 
