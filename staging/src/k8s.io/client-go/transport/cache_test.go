@@ -36,14 +36,22 @@ func TestTLSConfigKey(t *testing.T) {
 	}
 	for nameA, valueA := range identicalConfigurations {
 		for nameB, valueB := range identicalConfigurations {
-			keyA, err := tlsConfigKey(valueA)
+			keyA, canCache, err := tlsConfigKey(valueA)
 			if err != nil {
 				t.Errorf("Unexpected error for %q: %v", nameA, err)
 				continue
 			}
-			keyB, err := tlsConfigKey(valueB)
+			if !canCache {
+				t.Errorf("Unexpected canCache=false")
+				continue
+			}
+			keyB, canCache, err := tlsConfigKey(valueB)
 			if err != nil {
 				t.Errorf("Unexpected error for %q: %v", nameB, err)
+				continue
+			}
+			if !canCache {
+				t.Errorf("Unexpected canCache=false")
 				continue
 			}
 			if keyA != keyB {
@@ -131,12 +139,12 @@ func TestTLSConfigKey(t *testing.T) {
 	}
 	for nameA, valueA := range uniqueConfigurations {
 		for nameB, valueB := range uniqueConfigurations {
-			keyA, err := tlsConfigKey(valueA)
+			keyA, canCacheA, err := tlsConfigKey(valueA)
 			if err != nil {
 				t.Errorf("Unexpected error for %q: %v", nameA, err)
 				continue
 			}
-			keyB, err := tlsConfigKey(valueB)
+			keyB, canCacheB, err := tlsConfigKey(valueB)
 			if err != nil {
 				t.Errorf("Unexpected error for %q: %v", nameB, err)
 				continue
@@ -147,12 +155,17 @@ func TestTLSConfigKey(t *testing.T) {
 				if keyA != keyB {
 					t.Errorf("Expected identical cache keys for %q and %q, got:\n\t%s\n\t%s", nameA, nameB, keyA, keyB)
 				}
+				if canCacheA != canCacheB {
+					t.Errorf("Expected identical canCache %q and %q, got:\n\t%v\n\t%v", nameA, nameB, canCacheA, canCacheB)
+				}
 				continue
 			}
 
-			if keyA == keyB {
-				t.Errorf("Expected unique cache keys for %q and %q, got:\n\t%s\n\t%s", nameA, nameB, keyA, keyB)
-				continue
+			if canCacheA && canCacheB {
+				if keyA == keyB {
+					t.Errorf("Expected unique cache keys for %q and %q, got:\n\t%s\n\t%s", nameA, nameB, keyA, keyB)
+					continue
+				}
 			}
 		}
 	}
