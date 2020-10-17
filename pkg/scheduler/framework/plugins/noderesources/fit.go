@@ -30,7 +30,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 var _ framework.PreFilterPlugin = &Fit{}
@@ -94,7 +94,7 @@ func validateFitArgs(args config.NodeResourcesFitArgs) error {
 }
 
 // NewFit initializes a new plugin and returns it.
-func NewFit(plArgs runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func NewFit(plArgs runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	args, err := getFitArgs(plArgs)
 	if err != nil {
 		return nil, err

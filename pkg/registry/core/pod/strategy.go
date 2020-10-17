@@ -95,10 +95,7 @@ func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 		// Allow multiple huge pages on pod create if feature is enabled
 		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
 	}
-	allErrs := validation.ValidatePodCreate(pod, opts)
-	allErrs = append(allErrs, validation.ValidateConditionalPod(pod, nil, field.NewPath(""))...)
-
-	return allErrs
+	return validation.ValidatePodCreate(pod, opts)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -117,9 +114,7 @@ func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 		// Allow multiple huge pages on pod create if feature is enabled or if the old pod already has multiple hugepages specified
 		AllowMultipleHugePageResources: oldFailsSingleHugepagesValidation || utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
 	}
-	errorList := validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
-	errorList = append(errorList, validation.ValidateConditionalPod(obj.(*api.Pod), old.(*api.Pod), field.NewPath(""))...)
-	return errorList
+	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 }
 
 // AllowUnconditionalUpdate allows pods to be overwritten

@@ -2463,10 +2463,10 @@ function setup-nodelocaldns-manifest {
   setup-addon-manifests "addons" "0-dns/nodelocaldns"
   local -r localdns_file="${dst_dir}/0-dns/nodelocaldns/nodelocaldns.yaml"
   setup-addon-custom-yaml "addons" "0-dns/nodelocaldns" "nodelocaldns.yaml" "${CUSTOM_NODELOCAL_DNS_YAML:-}"
-  # Replace the sed configurations with variable values.
-  sed -i -e "s/_.*_DNS__DOMAIN__/${DNS_DOMAIN}/g" "${localdns_file}"
-  sed -i -e "s/_.*_DNS__SERVER__/${DNS_SERVER_IP}/g" "${localdns_file}"
-  sed -i -e "s/_.*_LOCAL__DNS__/${LOCAL_DNS_IP}/g" "${localdns_file}"
+  # eventually all the __PILLAR__ stuff will be gone, but theyre still in nodelocaldns for backward compat.
+  sed -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" "${localdns_file}"
+  sed -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" "${localdns_file}"
+  sed -i -e "s/__PILLAR__LOCAL__DNS__/${LOCAL_DNS_IP}/g" "${localdns_file}"
 }
 
 # Sets up the manifests of netd for k8s addons.

@@ -19,7 +19,7 @@ package queuesort
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // Name is the name of the plugin used in the plugin registry and configurations.
@@ -45,6 +45,6 @@ func (pl *PrioritySort) Less(pInfo1, pInfo2 *framework.QueuedPodInfo) bool {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	return &PrioritySort{}, nil
 }

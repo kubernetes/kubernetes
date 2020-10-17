@@ -25,8 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -197,7 +197,7 @@ func (pl *SelectorSpread) PreScore(ctx context.Context, cycleState *framework.Cy
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	sharedLister := handle.SnapshotSharedLister()
 	if sharedLister == nil {
 		return nil, fmt.Errorf("SnapshotSharedLister is nil")

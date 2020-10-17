@@ -188,9 +188,6 @@ type LeaderElector struct {
 	clock clock.Clock
 
 	metrics leaderMetricsAdapter
-
-	// name is the name of the resource lock for debugging
-	name string
 }
 
 // Run starts the leader election loop. Run will not return

@@ -71,10 +71,14 @@ const (
 	loadBalancerRuleNameMaxLength = 80
 )
 
-var errNotInVMSet = errors.New("vm is not in the vmset")
-var providerIDRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/Microsoft.Compute/virtualMachines/(.+)$`)
-var backendPoolIDRE = regexp.MustCompile(`^/subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Network/loadBalancers/(.+)/backendAddressPools/(?:.*)`)
-var nicResourceGroupRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Network/networkInterfaces/(?:.*)`)
+var (
+	errNotInVMSet      = errors.New("vm is not in the vmset")
+	providerIDRE       = regexp.MustCompile(`.*/subscriptions/(?:.*)/Microsoft.Compute/virtualMachines/(.+)$`)
+	backendPoolIDRE    = regexp.MustCompile(`^/subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Network/loadBalancers/(.+)/backendAddressPools/(?:.*)`)
+	nicResourceGroupRE = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(.+)/providers/Microsoft.Network/networkInterfaces/(?:.*)`)
+	nicIDRE            = regexp.MustCompile(`/subscriptions/(?:.*)/resourceGroups/(?:.+)/providers/Microsoft.Network/networkInterfaces/(.+)-nic-(.+)/ipConfigurations/(?:.*)`)
+	vmasIDRE           = regexp.MustCompile(`/subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Compute/availabilitySets/(.+)`)
+)
 
 // getStandardMachineID returns the full identifier of a virtual machine.
 func (az *Cloud) getStandardMachineID(subscriptionID, resourceGroup, machineName string) string {
@@ -700,7 +704,8 @@ func (as *availabilitySet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) 
 
 // GetPrimaryInterface gets machine primary network interface by node name.
 func (as *availabilitySet) GetPrimaryInterface(nodeName string) (network.Interface, error) {
-	return as.getPrimaryInterfaceWithVMSet(nodeName, "")
+	nic, _, err := as.getPrimaryInterfaceWithVMSet(nodeName, "")
+	return nic, err
 }
 
 // extractResourceGroupByNicID extracts the resource group name by nicID.
@@ -714,26 +719,26 @@ func extractResourceGroupByNicID(nicID string) (string, error) {
 }
 
 // getPrimaryInterfaceWithVMSet gets machine primary network interface by node name and vmSet.
-func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName string) (network.Interface, error) {
+func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName string) (network.Interface, string, error) {
 	var machine compute.VirtualMachine
 
 	machine, err := as.GetVirtualMachineWithRetry(types.NodeName(nodeName), azcache.CacheReadTypeDefault)
 	if err != nil {
 		klog.V(2).Infof("GetPrimaryInterface(%s, %s) abort backoff", nodeName, vmSetName)
-		return network.Interface{}, err
+		return network.Interface{}, "", err
 	}
 
 	primaryNicID, err := getPrimaryInterfaceID(machine)
 	if err != nil {
-		return network.Interface{}, err
+		return network.Interface{}, "", err
 	}
 	nicName, err := getLastSegment(primaryNicID, "/")
 	if err != nil {
-		return network.Interface{}, err
+		return network.Interface{}, "", err
 	}
 	nodeResourceGroup, err := as.GetNodeResourceGroup(nodeName)
 	if err != nil {
-		return network.Interface{}, err
+		return network.Interface{}, "", err
 	}
 
 	// Check availability set name. Note that vmSetName is empty string when getting
@@ -748,23 +753,27 @@ func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName stri
 		if machine.AvailabilitySet == nil || !strings.EqualFold(*machine.AvailabilitySet.ID, expectedAvailabilitySetName) {
 			klog.V(3).Infof(
 				"GetPrimaryInterface: nic (%s) is not in the availabilitySet(%s)", nicName, vmSetName)
-			return network.Interface{}, errNotInVMSet
+			return network.Interface{}, "", errNotInVMSet
 		}
 	}
 
 	nicResourceGroup, err := extractResourceGroupByNicID(primaryNicID)
 	if err != nil {
-		return network.Interface{}, err
+		return network.Interface{}, "", err
 	}
 
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 	nic, rerr := as.InterfacesClient.Get(ctx, nicResourceGroup, nicName, "")
 	if rerr != nil {
-		return network.Interface{}, rerr.Error()
+		return network.Interface{}, "", rerr.Error()
 	}
 
-	return nic, nil
+	var availabilitySetID string
+	if machine.VirtualMachineProperties != nil && machine.AvailabilitySet != nil {
+		availabilitySetID = to.String(machine.AvailabilitySet.ID)
+	}
+	return nic, availabilitySetID, nil
 }
 
 // EnsureHostInPool ensures the given VM's Primary NIC's Primary IP Configuration is
@@ -772,7 +781,7 @@ func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName stri
 func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID string, vmSetName string, isInternal bool) (string, string, string, *compute.VirtualMachineScaleSetVM, error) {
 	vmName := mapNodeNameToVMName(nodeName)
 	serviceName := getServiceName(service)
-	nic, err := as.getPrimaryInterfaceWithVMSet(vmName, vmSetName)
+	nic, _, err := as.getPrimaryInterfaceWithVMSet(vmName, vmSetName)
 	if err != nil {
 		if err == errNotInVMSet {
 			klog.V(3).Infof("EnsureHostInPool skips node %s because it is not in the vmSet %s", nodeName, vmSetName)
@@ -895,7 +904,111 @@ func (as *availabilitySet) EnsureHostsInPool(service *v1.Service, nodes []*v1.No
 
 // EnsureBackendPoolDeleted ensures the loadBalancer backendAddressPools deleted from the specified nodes.
 func (as *availabilitySet) EnsureBackendPoolDeleted(service *v1.Service, backendPoolID, vmSetName string, backendAddressPools *[]network.BackendAddressPool) error {
-	// Do nothing for availability set.
+	// Returns nil if backend address pools already deleted.
+	if backendAddressPools == nil {
+		return nil
+	}
+
+	mc := metrics.NewMetricContext("services", "vmas_ensure_backend_pool_deleted", as.ResourceGroup, as.SubscriptionID, service.Name)
+	isOperationSucceeded := false
+	defer func() {
+		mc.ObserveOperationWithResult(isOperationSucceeded)
+	}()
+
+	ipConfigurationIDs := []string{}
+	for _, backendPool := range *backendAddressPools {
+		if strings.EqualFold(to.String(backendPool.ID), backendPoolID) &&
+			backendPool.BackendAddressPoolPropertiesFormat != nil &&
+			backendPool.BackendIPConfigurations != nil {
+			for _, ipConf := range *backendPool.BackendIPConfigurations {
+				if ipConf.ID == nil {
+					continue
+				}
+
+				ipConfigurationIDs = append(ipConfigurationIDs, *ipConf.ID)
+			}
+		}
+	}
+	nicUpdaters := make([]func() error, 0)
+	errors := make([]error, 0)
+	for i := range ipConfigurationIDs {
+		ipConfigurationID := ipConfigurationIDs[i]
+		nodeName, err := as.GetNodeNameByIPConfigurationID(ipConfigurationID)
+		if err != nil {
+			klog.Errorf("Failed to GetNodeNameByIPConfigurationID(%s): %v", ipConfigurationID, err)
+			errors = append(errors, err)
+			continue
+		}
+
+		vmName := mapNodeNameToVMName(types.NodeName(nodeName))
+		nic, vmasID, err := as.getPrimaryInterfaceWithVMSet(vmName, vmSetName)
+		if err != nil {
+			if err == errNotInVMSet {
+				klog.V(3).Infof("EnsureBackendPoolDeleted skips node %s because it is not in the vmSet %s", nodeName, vmSetName)
+				return nil
+			}
+
+			klog.Errorf("error: az.EnsureBackendPoolDeleted(%s), az.VMSet.GetPrimaryInterface.Get(%s, %s), err=%v", nodeName, vmName, vmSetName, err)
+			return err
+		}
+		matches := vmasIDRE.FindStringSubmatch(vmasID)
+		if len(matches) != 2 {
+			return fmt.Errorf("EnsureBackendPoolDeleted: failed to parse the VMAS ID %s: %v", vmasID, err)
+		}
+		vmasName := matches[1]
+		// Only remove nodes belonging to specified vmSet to basic LB backends.
+		if !strings.EqualFold(vmasName, vmSetName) {
+			klog.V(2).Infof("EnsureBackendPoolDeleted: skipping the node %s belonging to another vm set %s", nodeName, vmasName)
+			continue
+		}
+
+		if nic.ProvisioningState != nil && *nic.ProvisioningState == nicFailedState {
+			klog.Warningf("EnsureBackendPoolDeleted skips node %s because its primary nic %s is in Failed state", nodeName, *nic.Name)
+			return nil
+		}
+
+		if nic.InterfacePropertiesFormat != nil && nic.InterfacePropertiesFormat.IPConfigurations != nil {
+			newIPConfigs := *nic.IPConfigurations
+			for j, ipConf := range newIPConfigs {
+				if !to.Bool(ipConf.Primary) {
+					continue
+				}
+				// found primary ip configuration
+				if ipConf.LoadBalancerBackendAddressPools != nil {
+					newLBAddressPools := *ipConf.LoadBalancerBackendAddressPools
+					for k, pool := range newLBAddressPools {
+						if strings.EqualFold(to.String(pool.ID), backendPoolID) {
+							newLBAddressPools = append(newLBAddressPools[:k], newLBAddressPools[k+1:]...)
+							break
+						}
+					}
+					newIPConfigs[j].LoadBalancerBackendAddressPools = &newLBAddressPools
+				}
+			}
+			nic.IPConfigurations = &newIPConfigs
+			nicUpdaters = append(nicUpdaters, func() error {
+				ctx, cancel := getContextWithCancel()
+				defer cancel()
+				klog.V(2).Infof("EnsureBackendPoolDeleted begins to CreateOrUpdate for NIC(%s, %s) with backendPoolID %s", as.resourceGroup, to.String(nic.Name), backendPoolID)
+				rerr := as.InterfacesClient.CreateOrUpdate(ctx, as.ResourceGroup, to.String(nic.Name), nic)
+				if rerr != nil {
+					klog.Errorf("EnsureBackendPoolDeleted CreateOrUpdate for NIC(%s, %s) failed with error %v", as.resourceGroup, to.String(nic.Name), rerr.Error())
+					return rerr.Error()
+				}
+				return nil
+			})
+		}
+	}
+	errs := utilerrors.AggregateGoroutines(nicUpdaters...)
+	if errs != nil {
+		return utilerrors.Flatten(errs)
+	}
+	// Fail if there are other errors.
+	if len(errors) > 0 {
+		return utilerrors.Flatten(utilerrors.NewAggregate(errors))
+	}
+
+	isOperationSucceeded = true
 	return nil
 }
 
@@ -907,4 +1020,17 @@ func generateStorageAccountName(accountNamePrefix string) string {
 		return accountName[:storageAccountNameMaxLength-1]
 	}
 	return accountName
+}
+
+// GetNodeNameByIPConfigurationID gets the node name by IP configuration ID.
+func (as *availabilitySet) GetNodeNameByIPConfigurationID(ipConfigurationID string) (string, error) {
+	matches := nicIDRE.FindStringSubmatch(ipConfigurationID)
+	if len(matches) != 3 {
+		klog.V(4).Infof("Can not extract VM name from ipConfigurationID (%s)", ipConfigurationID)
+		return "", fmt.Errorf("invalid ip config ID %s", ipConfigurationID)
+	}
+
+	prefix := matches[1]
+	suffix := matches[2]
+	return fmt.Sprintf("%s-%s", prefix, suffix), nil
 }
