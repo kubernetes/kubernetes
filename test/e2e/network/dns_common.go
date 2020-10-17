@@ -128,7 +128,7 @@ func (t *dnsTestCommon) runDig(dnsName, target string) []string {
 		Command:       cmd,
 		Namespace:     t.f.Namespace.Name,
 		PodName:       t.utilPod.Name,
-		ContainerName: "util",
+		ContainerName: t.utilPod.Spec.Containers[0].Name,
 		CaptureStdout: true,
 		CaptureStderr: true,
 	})
