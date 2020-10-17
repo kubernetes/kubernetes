@@ -131,7 +131,8 @@ func ReorganizeTaints(node *v1.Node, overwrite bool, taintsToAdd []v1.Taint, tai
 	newTaints := append([]v1.Taint{}, taintsToAdd...)
 	oldTaints := node.Spec.Taints
 	// add taints that already existing but not updated to newTaints
-	added := addTaints(oldTaints, &newTaints)
+	addedTaints, added := addedTaints(oldTaints, newTaints)
+	newTaints = append(newTaints, addedTaints...)
 	allErrs, deleted := deleteTaints(taintsToRemove, &newTaints)
 	if (added && deleted) || overwrite {
 		return MODIFIED, newTaints, utilerrors.NewAggregate(allErrs)
@@ -159,22 +160,27 @@ func deleteTaints(taintsToRemove []v1.Taint, newTaints *[]v1.Taint) ([]error, bo
 	return allErrs, removed
 }
 
-// addTaints adds the newTaints list to existing ones and updates the newTaints List.
-// TODO: This needs a rewrite to take only the new values instead of appended newTaints list to be consistent.
-func addTaints(oldTaints []v1.Taint, newTaints *[]v1.Taint) bool {
+// addedTaints returns the taints that exists in oldTaints but not in newTaints.
+// It returns true when len(oldTains) != (len(*newTaints) + len(addedTaints)).
+// If there are taints in the newTaints but not the oldTaints, return nil and true.
+func addedTaints(oldTaints []v1.Taint, newTaints []v1.Taint) ([]v1.Taint, bool) {
+	addedTaints := []v1.Taint{}
+	added := false
+
 	for _, oldTaint := range oldTaints {
 		existsInNew := false
-		for _, taint := range *newTaints {
+		for _, taint := range newTaints {
 			if taint.MatchTaint(&oldTaint) {
 				existsInNew = true
 				break
 			}
 		}
 		if !existsInNew {
-			*newTaints = append(*newTaints, oldTaint)
+			addedTaints = append(addedTaints, oldTaint)
 		}
 	}
-	return len(oldTaints) != len(*newTaints)
+	added = len(oldTaints) != (len(newTaints) + len(addedTaints))
+	return addedTaints, added
 }
 
 // CheckIfTaintsAlreadyExists checks if the node already has taints that we want to add and returns a string with taint keys.
