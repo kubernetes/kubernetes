@@ -273,7 +273,8 @@ func TestAddFlags(t *testing.T) {
 			},
 			RequestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{},
 			ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
-				Lookup: true,
+				Lookup:           true,
+				ExtendExpiration: true,
 			},
 			TokenFile:            &kubeoptions.TokenFileAuthenticationOptions{},
 			TokenSuccessCacheTTL: 10 * time.Second,

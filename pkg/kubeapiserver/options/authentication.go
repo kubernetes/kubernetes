@@ -165,7 +165,7 @@ func (o *BuiltInAuthenticationOptions) WithRequestHeader() *BuiltInAuthenticatio
 
 // WithServiceAccounts set default value for service account authentication
 func (o *BuiltInAuthenticationOptions) WithServiceAccounts() *BuiltInAuthenticationOptions {
-	o.ServiceAccounts = &ServiceAccountAuthenticationOptions{Lookup: true}
+	o.ServiceAccounts = &ServiceAccountAuthenticationOptions{Lookup: true, ExtendExpiration: true}
 	return o
 }
 
