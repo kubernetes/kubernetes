@@ -1503,11 +1503,12 @@ metadata:
 			Description: The command 'kubectl version' MUST return the major, minor versions,  GitCommit, etc of the Client and the Server that the kubectl is configured to connect to.
 		*/
 		framework.ConformanceIt("should check is all data is printed ", func() {
-			version := framework.RunKubectlOrDie(ns, "version")
-			requiredItems := []string{"Client Version:", "Server Version:", "Major:", "Minor:", "GitCommit:"}
+			versionString := framework.RunKubectlOrDie(ns, "version")
+			// we expect following values for: Major -> digit, Minor -> numeric followed by an optional '+',  GitCommit -> alphanumeric
+			requiredItems := []string{"Client Version: ", "Server Version: "}
 			for _, item := range requiredItems {
-				if !strings.Contains(version, item) {
-					framework.Failf("Required item %s not found in %s", item, version)
+				if matched, _ := regexp.MatchString(item+`version.Info\{Major:"\d", Minor:"\d+\+?", GitVersion:"v\d\.\d+\.[\d\w\-\.\+]+", GitCommit:"[0-9a-f]+"`, versionString); !matched {
+					framework.Failf("Item %s value is not valid in %s\n", item, versionString)
 				}
 			}
 		})
