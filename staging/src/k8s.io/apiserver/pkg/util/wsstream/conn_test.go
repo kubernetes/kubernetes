@@ -18,6 +18,7 @@ package wsstream
 
 import (
 	"encoding/base64"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -52,6 +53,7 @@ func TestRawConn(t *testing.T) {
 
 	<-conn.ready
 	wg := sync.WaitGroup{}
+	errorCh := make(chan error, 3)
 
 	// verify we can read a client write
 	wg.Add(1)
@@ -59,10 +61,11 @@ func TestRawConn(t *testing.T) {
 		defer wg.Done()
 		data, err := ioutil.ReadAll(conn.channels[0])
 		if err != nil {
-			t.Fatal(err)
+			errorCh <- err
+			return
 		}
 		if !reflect.DeepEqual(data, []byte("client")) {
-			t.Errorf("unexpected server read: %v", data)
+			errorCh <- fmt.Errorf("unexpected server read: %v", data)
 		}
 	}()
 
@@ -75,7 +78,7 @@ func TestRawConn(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		if n, err := conn.channels[1].Write([]byte("server")); err != nil && n != 6 {
-			t.Fatalf("%d: %v", n, err)
+			errorCh <- fmt.Errorf("%d: %v", n, err)
 		}
 	}()
 
@@ -113,7 +116,15 @@ func TestRawConn(t *testing.T) {
 	}
 
 	client.Close()
-	wg.Wait()
+
+	go func() {
+		wg.Wait()
+		close(errorCh)
+	}()
+
+	if err = <-errorCh; err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestBase64Conn(t *testing.T) {
@@ -136,15 +147,17 @@ func TestBase64Conn(t *testing.T) {
 
 	<-conn.ready
 	wg := sync.WaitGroup{}
+	errorCh := make(chan error, 1)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		data, err := ioutil.ReadAll(conn.channels[0])
 		if err != nil {
-			t.Fatal(err)
+			errorCh <- err
+			return
 		}
 		if !reflect.DeepEqual(data, []byte("client")) {
-			t.Errorf("unexpected server read: %s", string(data))
+			errorCh <- fmt.Errorf("unexpected server read: %s", string(data))
 		}
 	}()
 
@@ -157,7 +170,7 @@ func TestBase64Conn(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		if n, err := conn.channels[1].Write([]byte("server")); err != nil && n != 6 {
-			t.Fatalf("%d: %v", n, err)
+			errorCh <- fmt.Errorf("%d: %v", n, err)
 		}
 	}()
 
@@ -172,7 +185,15 @@ func TestBase64Conn(t *testing.T) {
 	}
 
 	client.Close()
-	wg.Wait()
+
+	go func() {
+		wg.Wait()
+		close(errorCh)
+	}()
+
+	if err = <-errorCh; err != nil {
+		t.Fatal(err)
+	}
 }
 
 type versionTest struct {

@@ -131,6 +131,8 @@ func TestCachingObjectRaces(t *testing.T) {
 
 	numWorkers := 1000
 	wg := &sync.WaitGroup{}
+	errorCh := make(chan error, numWorkers)
+
 	wg.Add(numWorkers)
 
 	for i := 0; i < numWorkers; i++ {
@@ -141,20 +143,34 @@ func TestCachingObjectRaces(t *testing.T) {
 			for _, encoder := range encoders {
 				buffer.Reset()
 				if err := object.CacheEncode(encoder.identifier, encoder.encode, buffer); err != nil {
-					t.Errorf("unexpected error: %v", err)
+					errorCh <- fmt.Errorf("unexpected error: %v", err)
+					return
 				}
 				if callsNumber := atomic.LoadInt32(&encoder.callsNumber); callsNumber != 1 {
-					t.Errorf("unexpected number of serializations: %d", callsNumber)
+					errorCh <- fmt.Errorf("unexpected number of serializations: %d", callsNumber)
+					return
 				}
 			}
 			accessor, err := meta.Accessor(object.GetObject())
 			if err != nil {
-				t.Fatalf("failed to get accessor: %v", err)
+				errorCh <- fmt.Errorf("failed to get accessor: %v", err)
+				return
 			}
 			if selfLink := accessor.GetSelfLink(); selfLink != "selfLink" {
-				t.Errorf("unexpected selfLink: %s", selfLink)
+				errorCh <- fmt.Errorf("unexpected selfLink: %s", selfLink)
+				return
 			}
 		}()
 	}
-	wg.Wait()
+
+	go func() {
+		wg.Wait()
+		close(errorCh)
+	}()
+
+	for err := range errorCh {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 }

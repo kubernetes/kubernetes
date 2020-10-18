@@ -121,6 +121,7 @@ func TestTimeouts(t *testing.T) {
 			var (
 				service         Service
 				err             error
+				errorCh         = make(chan error, 1)
 				data            = []byte("test data")
 				kubeAPIServerWG sync.WaitGroup
 				kmsPluginWG     sync.WaitGroup
@@ -138,8 +139,10 @@ func TestTimeouts(t *testing.T) {
 
 				service, err = NewGRPCService(socketName.endpoint, tt.callTimeout)
 				if err != nil {
-					t.Fatalf("failed to create envelope service, error: %v", err)
+					errorCh <- fmt.Errorf("failed to create envelope service, error: %v", err)
+					return
 				}
+				errorCh <- nil
 				defer destroyService(service)
 				kubeAPIServerWG.Done()
 				// Keeping kube-apiserver up to process requests.
@@ -153,16 +156,24 @@ func TestTimeouts(t *testing.T) {
 
 				f, err := mock.NewBase64Plugin(socketName.path)
 				if err != nil {
-					t.Fatalf("failed to construct test KMS provider server, error: %v", err)
+					errorCh <- fmt.Errorf("failed to construct test KMS provider server, error: %v", err)
+					return
 				}
 				if err := f.Start(); err != nil {
-					t.Fatalf("Failed to start test KMS provider server, error: %v", err)
+					errorCh <- fmt.Errorf("Failed to start test KMS provider server, error: %v", err)
+					return
 				}
+				errorCh <- nil
 				defer f.CleanUp()
 				kmsPluginWG.Done()
 				// Keeping plugin up to process requests.
 				testCompletedWG.Wait()
 			}()
+
+			// Error from kubeAPIServerWG goroutine
+			if err := <-errorCh; err != nil {
+				t.Fatal(err)
+			}
 
 			kubeAPIServerWG.Wait()
 			_, err = service.Encrypt(data)
@@ -175,6 +186,10 @@ func TestTimeouts(t *testing.T) {
 				t.Fatalf("got %q, want nil", err.Error())
 			}
 
+			// Error from kmsPluginWG goroutine
+			if err := <-errorCh; err != nil {
+				t.Fatal(err)
+			}
 			// Collecting kms-plugin - allowing plugin to clean-up.
 			kmsPluginWG.Wait()
 		})
@@ -228,7 +243,7 @@ func TestIntermittentConnectionLoss(t *testing.T) {
 		wg1.Done()
 		_, err := service.Encrypt(data)
 		if err != nil {
-			t.Fatalf("failed when executing encrypt, error: %v", err)
+			t.Errorf("failed when executing encrypt, error: %v", err)
 		}
 	}()
 

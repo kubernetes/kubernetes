@@ -650,6 +650,7 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 	stopCh := make(chan struct{})
 	time.AfterFunc(3*time.Second, func() { close(stopCh) })
 
+	errorCh := make(chan error, 1)
 	wg := &sync.WaitGroup{}
 
 	wg.Add(1)
@@ -663,7 +664,8 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 				ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
 				w, err := cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred})
 				if err != nil {
-					t.Fatalf("Failed to create watch: %v", err)
+					errorCh <- fmt.Errorf("Failed to create watch: %v", err)
+					return
 				}
 				w.Stop()
 			}
@@ -682,9 +684,15 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 			}
 		}
 	}()
+	go func() {
+		// wait for adding/removing watchers to end
+		wg.Wait()
+		close(errorCh)
+	}()
 
-	// wait for adding/removing watchers to end
-	wg.Wait()
+	if err = <-errorCh; err != nil {
+		t.Fatal(err)
+	}
 
 	// wait out the expiration period and pop expired watchers
 	time.Sleep(2 * time.Second)
@@ -720,6 +728,7 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 		t.Fatalf("Failed to create watch: %v", err)
 	}
 
+	errorCh := make(chan error, 1)
 	resourceVersion := uint64(1000)
 	go func() {
 		deadline := time.Now().Add(time.Second)
@@ -731,7 +740,7 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 					ResourceVersion: fmt.Sprintf("%v", resourceVersion+uint64(i)),
 				}})
 			if err != nil {
-				t.Fatalf("failed to add a pod: %v", err)
+				errorCh <- fmt.Errorf("failed to add a pod: %v", err)
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
@@ -765,6 +774,10 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 				t.Fatal("Unexpected timeout to receive a bookmark event")
 			}
 			return
+		case err = <-errorCh: // Error from goroutine
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 }
@@ -924,7 +937,6 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 
 		select {
 		case <-done:
-			break
 		case <-time.After(time.Second):
 			t.Fatal("receive result timeout")
 		}
@@ -974,20 +986,29 @@ func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
 	expectedRV := 2000
 
 	wg := sync.WaitGroup{}
+	done := make(chan struct{})
+	errorCh := make(chan error, 1)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for {
-			event, ok := <-w.ResultChan()
-			if !ok {
-				t.Fatalf("Unexpected closed channel")
-			}
-			rv, err := cacher.versioner.ObjectResourceVersion(event.Object)
-			if err != nil {
-				t.Errorf("failed to parse resource version from %#v: %v", event.Object, err)
-			}
-			if event.Type == watch.Bookmark && rv == uint64(expectedRV) {
+			select {
+			case <-done:
 				return
+			default:
+				event, ok := <-w.ResultChan()
+				if !ok {
+					errorCh <- fmt.Errorf("Unexpected closed channel")
+					return
+				}
+				rv, err := cacher.versioner.ObjectResourceVersion(event.Object)
+				if err != nil {
+					errorCh <- fmt.Errorf("failed to parse resource version from %#v: %v", event.Object, err)
+					return
+				}
+				if event.Type == watch.Bookmark && rv == uint64(expectedRV) {
+					return
+				}
 			}
 		}
 	}()
@@ -995,7 +1016,15 @@ func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
 	// Simulate progress notify event.
 	cacher.watchCache.UpdateResourceVersion(strconv.Itoa(expectedRV))
 
-	wg.Wait()
+	go func() {
+		wg.Wait()
+		close(errorCh)
+	}()
+
+	if err = <-errorCh; err != nil {
+		close(done)
+		t.Fatal(err)
+	}
 }
 
 type fakeTimeBudget struct{}

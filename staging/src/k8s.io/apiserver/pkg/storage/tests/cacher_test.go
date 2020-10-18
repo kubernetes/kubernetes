@@ -942,10 +942,10 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 	defer watcher.Stop()
 
 	done := make(chan struct{})
+	errorCh := make(chan error)
 	var wg sync.WaitGroup
-	wg.Add(1)
-	defer wg.Wait()   // We must wait for the waitgroup to exit before we terminate the cache or the server in prior defers
-	defer close(done) // call close first, so the goroutine knows to exit
+	wg.Add(2)
+
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 100; i++ {
@@ -956,36 +956,62 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 				pod := fmt.Sprintf("foo-%d", i)
 				err := createPod(etcdStorage, makeTestPod(pod))
 				if err != nil {
-					t.Fatalf("failed to create pod %v: %v", pod, err)
+					errorCh <- fmt.Errorf("failed to create pod %v: %v", pod, err)
+					return
 				}
 				time.Sleep(time.Second / 100)
 			}
 		}
 	}()
 
-	bookmarkReceived := false
-	lastObservedResourceVersion := uint64(0)
-	for event := range watcher.ResultChan() {
-		rv, err := v.ObjectResourceVersion(event.Object)
+	go func() {
+		defer wg.Done()
+		bookmarkReceived := false
+		lastObservedResourceVersion := uint64(0)
+		for event := range watcher.ResultChan() {
+			select {
+			case <-done:
+				return
+			default:
+				rv, err := v.ObjectResourceVersion(event.Object)
+				if err != nil {
+					errorCh <- fmt.Errorf("failed to parse resourceVersion from %#v", event)
+					return
+				}
+				if event.Type == watch.Bookmark {
+					bookmarkReceived = true
+					// bookmark event has a RV greater than or equal to the before one
+					if rv < lastObservedResourceVersion {
+						errorCh <- fmt.Errorf("Unexpected bookmark resourceVersion %v less than observed %v)", rv, lastObservedResourceVersion)
+						return
+					}
+				} else {
+					// non-bookmark event has a RV greater than anything before
+					if rv <= lastObservedResourceVersion {
+						errorCh <- fmt.Errorf("Unexpected event resourceVersion %v less than or equal to bookmark %v)", rv, lastObservedResourceVersion)
+						return
+					}
+				}
+				lastObservedResourceVersion = rv
+			}
+		}
+		// Make sure we have received a bookmark event
+		if !bookmarkReceived {
+			errorCh <- fmt.Errorf("Unpexected error, we did not received a bookmark event")
+			return
+		}
+
+	}()
+
+	go func() {
+		wg.Wait() // We must wait for the waitgroup to exit before we terminate the cache or the server
+		close(errorCh)
+	}()
+
+	for err := range errorCh {
 		if err != nil {
-			t.Fatalf("failed to parse resourceVersion from %#v", event)
+			close(done) // call close first, so the goroutine knows to exit
+			t.Fatal(err)
 		}
-		if event.Type == watch.Bookmark {
-			bookmarkReceived = true
-			// bookmark event has a RV greater than or equal to the before one
-			if rv < lastObservedResourceVersion {
-				t.Fatalf("Unexpected bookmark resourceVersion %v less than observed %v)", rv, lastObservedResourceVersion)
-			}
-		} else {
-			// non-bookmark event has a RV greater than anything before
-			if rv <= lastObservedResourceVersion {
-				t.Fatalf("Unexpected event resourceVersion %v less than or equal to bookmark %v)", rv, lastObservedResourceVersion)
-			}
-		}
-		lastObservedResourceVersion = rv
-	}
-	// Make sure we have received a bookmark event
-	if !bookmarkReceived {
-		t.Fatalf("Unpexected error, we did not received a bookmark event")
 	}
 }

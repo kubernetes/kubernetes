@@ -36,13 +36,6 @@ vendor/k8s.io/apiserver/pkg/server/options
 vendor/k8s.io/apiserver/pkg/server/options/encryptionconfig
 vendor/k8s.io/apiserver/pkg/server/routes
 vendor/k8s.io/apiserver/pkg/server/storage
-vendor/k8s.io/apiserver/pkg/storage
-vendor/k8s.io/apiserver/pkg/storage/cacher
-vendor/k8s.io/apiserver/pkg/storage/etcd3
-vendor/k8s.io/apiserver/pkg/storage/tests
-vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope
-vendor/k8s.io/apiserver/pkg/util/webhook
-vendor/k8s.io/apiserver/pkg/util/wsstream
 vendor/k8s.io/cli-runtime/pkg/printers
 vendor/k8s.io/client-go/discovery
 vendor/k8s.io/client-go/rest
