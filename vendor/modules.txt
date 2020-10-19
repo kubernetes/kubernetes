@@ -40,9 +40,9 @@ github.com/Azure/go-autorest/autorest/azure
 # github.com/Azure/go-autorest/autorest/date v0.3.0 => github.com/Azure/go-autorest/autorest/date v0.3.0
 github.com/Azure/go-autorest/autorest/date
 # github.com/Azure/go-autorest/autorest/date => github.com/Azure/go-autorest/autorest/date v0.3.0
-# github.com/Azure/go-autorest/autorest/mocks v0.4.1 => github.com/Azure/go-autorest/autorest/mocks v0.4.0
+# github.com/Azure/go-autorest/autorest/mocks v0.4.1 => github.com/Azure/go-autorest/autorest/mocks v0.4.1
 github.com/Azure/go-autorest/autorest/mocks
-# github.com/Azure/go-autorest/autorest/mocks => github.com/Azure/go-autorest/autorest/mocks v0.4.0
+# github.com/Azure/go-autorest/autorest/mocks => github.com/Azure/go-autorest/autorest/mocks v0.4.1
 # github.com/Azure/go-autorest/autorest/to v0.2.0 => github.com/Azure/go-autorest/autorest/to v0.2.0
 ## explicit
 github.com/Azure/go-autorest/autorest/to
@@ -1227,9 +1227,9 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0 => golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
+# golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0 => golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
 ## explicit
-# golang.org/x/crypto => golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
+# golang.org/x/crypto => golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/chacha20
