@@ -108,6 +108,12 @@ func TestCreateIngressValidation(t *testing.T) {
 			},
 			expected: "rule foo.com=othersvc:8080 is invalid and should be in format host/path=svcname:svcport[,tls[=secret]]",
 		},
+		"valid catch all rule": {
+			rules: []string{
+				"/path/subpath*=svc:redis,tls=blo",
+			},
+			expected: "",
+		},
 	}
 
 	for name, tc := range tests {
@@ -144,7 +150,7 @@ func TestCreateIngress(t *testing.T) {
 	}{
 		"catch all host and default backend with default TLS returns empty TLS": {
 			rules: []string{
-				"_/=catchall:8080,tls=",
+				"/=catchall:8080,tls=",
 			},
 			ingressclass:   ingressClass,
 			defaultbackend: "service1:https",
@@ -178,6 +184,63 @@ func TestCreateIngress(t *testing.T) {
 										{
 											Path:     "/",
 											PathType: &pathTypeExact,
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: "catchall",
+													Port: networkingv1.ServiceBackendPort{
+														Number: 8080,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"catch all with path of type prefix and secret name": {
+			rules: []string{
+				"/path*=catchall:8080,tls=secret1",
+			},
+			ingressclass:   ingressClass,
+			defaultbackend: "service1:https",
+			annotations:    []string{},
+			expected: &networkingv1.Ingress{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: networkingv1.SchemeGroupVersion.String(),
+					Kind:       "Ingress",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        ingressName,
+					Annotations: map[string]string{},
+				},
+				Spec: networkingv1.IngressSpec{
+					IngressClassName: &ingressClass,
+					DefaultBackend: &networkingv1.IngressBackend{
+						Service: &networkingv1.IngressServiceBackend{
+							Name: "service1",
+							Port: networkingv1.ServiceBackendPort{
+								Name: "https",
+							},
+						},
+					},
+					TLS: []v1.IngressTLS{
+						{
+							SecretName: "secret1",
+						},
+					},
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											Path:     "/path",
+											PathType: &pathTypePrefix,
 											Backend: networkingv1.IngressBackend{
 												Service: &networkingv1.IngressServiceBackend{
 													Name: "catchall",
