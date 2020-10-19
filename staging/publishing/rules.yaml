@@ -1094,16 +1094,6 @@ rules:
       branch: master
     - repository: apimachinery
       branch: master
-    - repository: apiserver
-      branch: master
-    - repository: client-go
-      branch: master
-    - repository: cloud-provider
-      branch: master
-    - repository: component-base
-      branch: master
-    - repository: controller-manager
-      branch: master
   - source:
       branch: release-1.17
       dir: staging/src/k8s.io/csi-translation-lib

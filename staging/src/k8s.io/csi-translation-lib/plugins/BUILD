@@ -6,6 +6,7 @@ go_library(
         "aws_ebs.go",
         "azure_disk.go",
         "azure_file.go",
+        "const.go",
         "gce_pd.go",
         "in_tree_volume.go",
         "openstack_cinder.go",
@@ -19,7 +20,6 @@ go_library(
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//staging/src/k8s.io/cloud-provider/volume:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
