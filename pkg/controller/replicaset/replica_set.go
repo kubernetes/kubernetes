@@ -325,7 +325,11 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
 		if rs := rsc.resolveControllerRef(oldPod.Namespace, oldControllerRef); rs != nil {
-			rsc.enqueueReplicaSet(rs)
+			if labelChanged {
+				rsc.enqueueReplicaSetAfter(rs, time.Millisecond*500)
+			} else {
+				rsc.enqueueReplicaSet(rs)
+			}
 		}
 	}
 
@@ -336,7 +340,11 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 			return
 		}
 		klog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
-		rsc.enqueueReplicaSet(rs)
+		if labelChanged {
+			rsc.enqueueReplicaSetAfter(rs, time.Millisecond*500)
+		} else {
+			rsc.enqueueReplicaSet(rs)
+		}
 		// TODO: MinReadySeconds in the Pod will generate an Available condition to be added in
 		// the Pod status which in turn will trigger a requeue of the owning replica set thus
 		// having its status updated with the newly available replica. For now, we can fake the
@@ -362,7 +370,11 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		}
 		klog.V(4).Infof("Orphan Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
 		for _, rs := range rss {
-			rsc.enqueueReplicaSet(rs)
+			if labelChanged {
+				rsc.enqueueReplicaSetAfter(rs, time.Millisecond*500)
+			} else {
+				rsc.enqueueReplicaSet(rs)
+			}
 		}
 	}
 }

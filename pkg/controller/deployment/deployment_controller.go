@@ -204,7 +204,6 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 		dc.deleteReplicaSet(rs)
 		return
 	}
-
 	// If it has a ControllerRef, that's all that matters.
 	if controllerRef := metav1.GetControllerOf(rs); controllerRef != nil {
 		d := dc.resolveControllerRef(rs.Namespace, controllerRef)
@@ -633,8 +632,21 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	if err != nil {
 		return err
 	}
-	if scalingEvent {
+
+	isInPlace := util.IsInPlaceUpdate(d.Annotations)
+	if scalingEvent && !isInPlace {
 		return dc.sync(d, rsList)
+	}
+
+	if isInPlace {
+		switch d.Spec.Strategy.Type {
+		case apps.RecreateDeploymentStrategyType:
+			return dc.rolloutRecreateInPlace(d, rsList, podMap)
+		case apps.RollingUpdateDeploymentStrategyType:
+			err := dc.rolloutRollingInPlace(d, rsList, podMap)
+			return err
+		}
+		return fmt.Errorf("unexpected deployment strategy type: %s", d.Spec.Strategy.Type)
 	}
 
 	switch d.Spec.Strategy.Type {

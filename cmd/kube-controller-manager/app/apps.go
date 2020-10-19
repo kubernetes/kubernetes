@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/controller/containerrestart"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
@@ -75,6 +76,16 @@ func startReplicaSetController(ctx ControllerContext) (http.Handler, bool, error
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("replicaset-controller"),
 		replicaset.BurstReplicas,
+	).Run(int(ctx.ComponentConfig.ReplicaSetController.ConcurrentRSSyncs), ctx.Stop)
+	return nil, true, nil
+}
+
+func startContainerRestartController(ctx ControllerContext) (http.Handler, bool, error) {
+	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}] {
+		return nil, false, nil
+	}
+	go containerrestart.NewContainerRestartController(ctx.InformerFactory.Core().V1().Pods(),
+		ctx.ClientBuilder.ClientOrDie("container-restart-controller"),
 	).Run(int(ctx.ComponentConfig.ReplicaSetController.ConcurrentRSSyncs), ctx.Stop)
 	return nil, true, nil
 }

@@ -42,6 +42,11 @@ import (
 )
 
 const (
+	PodUpdateInplaceRSHistory = "deployment.kubernetes.io/rs-history"
+	OriginPodTemplateSpecHash = "OriginPodTemplateSpecHash"
+
+	InPlaceUpdate = "deployment.kubernetes.io/inplace-update"
+
 	// RevisionAnnotation is the revision annotation of a deployment's replica sets which records its rollout sequence
 	RevisionAnnotation = "deployment.kubernetes.io/revision"
 	// RevisionHistoryAnnotation maintains the history of all old revisions that a replica set has served for a deployment.
@@ -97,6 +102,25 @@ const (
 	// available.
 	MinimumReplicasUnavailable = "MinimumReplicasUnavailable"
 )
+
+func CanUpdateInplace(pod v1.Pod) bool {
+	podTemplateSpecHash, ok := pod.Labels[apps.DefaultDeploymentUniqueLabelKey]
+	if !ok {
+		return false
+	}
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == OriginPodTemplateSpecHash && string(condition.Status) == podTemplateSpecHash {
+			return true
+		}
+	}
+	return false
+}
+func IsInPlaceUpdate(deploy map[string]string) bool {
+	if _, ok := deploy[InPlaceUpdate]; ok {
+		return true
+	}
+	return false
+}
 
 // NewDeploymentCondition creates a new deployment condition.
 func NewDeploymentCondition(condType apps.DeploymentConditionType, status v1.ConditionStatus, reason, message string) *apps.DeploymentCondition {
