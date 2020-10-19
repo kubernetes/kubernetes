@@ -998,6 +998,7 @@ func calculateScaleUpLimitWithScalingRules(currentReplicas int32, scaleEvents []
 	if *scalingRules.SelectPolicy == autoscalingv2.DisabledPolicySelect {
 		return currentReplicas // Scaling is disabled
 	} else if *scalingRules.SelectPolicy == autoscalingv2.MinPolicySelect {
+		result = math.MaxInt32
 		selectPolicyFn = min // For scaling up, the lowest change ('min' policy) produces a minimum value
 	} else {
 		selectPolicyFn = max // Use the default policy otherwise to produce a highest possible change
