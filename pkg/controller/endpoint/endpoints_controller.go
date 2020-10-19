@@ -216,22 +216,49 @@ func (e *Controller) addPod(obj interface{}) {
 
 func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointAddress, error) {
 	var endpointIP string
+	ipFamily := v1.IPv4Protocol
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 		// In a legacy cluster, the pod IP is guaranteed to be usable
 		endpointIP = pod.Status.PodIP
 	} else {
-		ipv6Service := endpointutil.IsIPv6Service(svc)
+		//feature flag enabled and pods may have multiple IPs
+		if len(svc.Spec.IPFamilies) > 0 {
+			// controller is connected to an api-server that correctly sets IPFamilies
+			ipFamily = svc.Spec.IPFamilies[0] // this works for headful and headless
+		} else {
+			// controller is connected to an api server that does not correctly
+			// set IPFamilies (e.g. old api-server during an upgrade)
+			if len(svc.Spec.ClusterIP) > 0 && svc.Spec.ClusterIP != v1.ClusterIPNone {
+				// headful service. detect via service clusterIP
+				if utilnet.IsIPv6String(svc.Spec.ClusterIP) {
+					ipFamily = v1.IPv6Protocol
+				}
+			} else {
+				// Since this is a headless service we use podIP to identify the family.
+				// This assumes that status.PodIP is assigned correctly (follows pod cidr and
+				// pod cidr list order is same as service cidr list order). The expectation is
+				// this is *most probably* the case.
+
+				// if the family was incorrectly indentified then this will be corrected once the
+				// the upgrade is completed (controller connects to api-server that correctly defaults services)
+				if utilnet.IsIPv6String(pod.Status.PodIP) {
+					ipFamily = v1.IPv6Protocol
+				}
+			}
+		}
+
+		// find an ip that matches the family
 		for _, podIP := range pod.Status.PodIPs {
-			ipv6PodIP := utilnet.IsIPv6String(podIP.IP)
-			if ipv6Service == ipv6PodIP {
+			if (ipFamily == v1.IPv6Protocol) == utilnet.IsIPv6String(podIP.IP) {
 				endpointIP = podIP.IP
 				break
 			}
 		}
-		if endpointIP == "" {
-			return nil, fmt.Errorf("failed to find a matching endpoint for service %v", svc.Name)
-		}
+	}
+
+	if endpointIP == "" {
+		return nil, fmt.Errorf("failed to find a matching endpoint for service %v", svc.Name)
 	}
 
 	return &v1.EndpointAddress{
