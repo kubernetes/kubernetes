@@ -17,6 +17,7 @@ limitations under the License.
 package genericclioptions
 
 import (
+	"k8s.io/klog/v2"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -141,6 +142,8 @@ func (f *ConfigFlags) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 
 func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	loadingRules.Warner = klog.Warning
+
 	// use the standard defaults for this client command
 	// DEPRECATED: remove and replace with something more accurate
 	loadingRules.DefaultClientConfig = &clientcmd.DefaultClientConfig
