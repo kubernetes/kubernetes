@@ -134,7 +134,7 @@ func TestCreateRole(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdCreateRole(tf, ioStreams)
-			cmd.Flags().Set("dry-run", "true")
+			cmd.Flags().Set("dry-run", "client")
 			cmd.Flags().Set("output", "yaml")
 			cmd.Flags().Set("verb", test.verbs)
 			cmd.Flags().Set("resource", test.resources)
