@@ -344,7 +344,6 @@ var _ = SIGDescribe("Proxy", func() {
 				buf.ReadFrom(resp.Body)
 				response := buf.String()
 
-				framework.Logf("http.Client request:%s StatusCode:%d", httpVerb, resp.StatusCode)
 				framework.Logf("http.Client request:%s | StatusCode:%d | Response: %s", httpVerb, resp.StatusCode, response)
 				framework.ExpectEqual(resp.StatusCode, 200, "The resp.StatusCode returned: %d", resp.StatusCode)
 
