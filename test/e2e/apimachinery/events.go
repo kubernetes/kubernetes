@@ -39,7 +39,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Events", func() {
 	f := framework.NewDefaultFramework("events")
 
 	/*
-			   Release: v1.19
+			   Release: v1.20
 			   Testname: Event resource lifecycle
 			   Description: Create an event, the event MUST exist.
 		           The event is patched with a new message, the check MUST have the update message.
@@ -124,7 +124,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Events", func() {
 	})
 
 	/*
-	   Release: v1.19
+	   Release: v1.20
 	   Testname: Event, delete a collection
 	   Description: A set of events is created with a label selector which MUST be found when listed.
 	   The set of events is deleted and MUST NOT show up when listed by its label selector.
