@@ -1348,7 +1348,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			}
 
 			defProf := sched.Profiles["default-scheduler"]
-			gotPlugins := defProf.Framework.ListPlugins()
+			gotPlugins := defProf.ListPlugins()
 			if diff := cmp.Diff(tc.wantPlugins, gotPlugins); diff != "" {
 				t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
 			}

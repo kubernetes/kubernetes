@@ -504,6 +504,9 @@ type Framework interface {
 
 	// ListPlugins returns a map of extension point name to list of configured Plugins.
 	ListPlugins() map[string][]config.Plugin
+
+	// ProfileName returns the profile name associated to this framework.
+	ProfileName() string
 }
 
 // Handle provides data and some tools that plugins can use. It is

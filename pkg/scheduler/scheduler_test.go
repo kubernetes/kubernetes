@@ -112,7 +112,7 @@ type mockScheduler struct {
 	err    error
 }
 
-func (es mockScheduler) Schedule(ctx context.Context, profile *profile.Profile, state *framework.CycleState, pod *v1.Pod) (core.ScheduleResult, error) {
+func (es mockScheduler) Schedule(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (core.ScheduleResult, error) {
 	return es.result, es.err
 }
 
@@ -340,7 +340,10 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			)
-			fwk, err := st.NewFramework(registerPluginFuncs, frameworkruntime.WithClientSet(client))
+			fwk, err := st.NewFramework(registerPluginFuncs,
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
+				frameworkruntime.WithProfileName(testSchedulerName))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -357,11 +360,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 					return &framework.QueuedPodInfo{Pod: item.sendPod}
 				},
 				Profiles: profile.Map{
-					testSchedulerName: &profile.Profile{
-						Framework: fwk,
-						Recorder:  eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName),
-						Name:      testSchedulerName,
-					},
+					testSchedulerName: fwk,
 				},
 			}
 			called := make(chan struct{})
@@ -808,23 +807,21 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		return true, b, nil
 	})
 
+	var recorder events.EventRecorder
+	if broadcaster != nil {
+		recorder = broadcaster.NewRecorder(scheme.Scheme, testSchedulerName)
+	} else {
+		recorder = &events.FakeRecorder{}
+	}
+
 	fwk, _ := st.NewFramework(
 		fns,
 		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithEventRecorder(recorder),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+		frameworkruntime.WithProfileName(testSchedulerName),
 	)
-	prof := &profile.Profile{
-		Framework: fwk,
-		Recorder:  &events.FakeRecorder{},
-		Name:      testSchedulerName,
-	}
-	if broadcaster != nil {
-		prof.Recorder = broadcaster.NewRecorder(scheme.Scheme, testSchedulerName)
-	}
-	profiles := profile.Map{
-		testSchedulerName: prof,
-	}
 
 	algo := core.NewGenericScheduler(
 		scache,
@@ -843,8 +840,10 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		Error: func(p *framework.QueuedPodInfo, err error) {
 			errChan <- err
 		},
-		Profiles: profiles,
-		client:   client,
+		Profiles: profile.Map{
+			testSchedulerName: fwk,
+		},
+		client: client,
 	}
 
 	return sched, bindingChan, errChan
@@ -1164,13 +1163,9 @@ func TestSchedulerBinding(t *testing.T) {
 			fwk, err := st.NewFramework([]st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			}, frameworkruntime.WithClientSet(client))
+			}, frameworkruntime.WithClientSet(client), frameworkruntime.WithEventRecorder(&events.FakeRecorder{}))
 			if err != nil {
 				t.Fatal(err)
-			}
-			prof := &profile.Profile{
-				Framework: fwk,
-				Recorder:  &events.FakeRecorder{},
 			}
 			stop := make(chan struct{})
 			defer close(stop)
@@ -1185,7 +1180,7 @@ func TestSchedulerBinding(t *testing.T) {
 				Algorithm:      algo,
 				SchedulerCache: scache,
 			}
-			err = sched.bind(context.Background(), prof, pod, "node", nil)
+			err = sched.bind(context.Background(), fwk, pod, "node", nil)
 			if err != nil {
 				t.Error(err)
 			}
