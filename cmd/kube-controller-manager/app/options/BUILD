@@ -32,6 +32,7 @@ go_library(
         "resourcequotacontroller.go",
         "serviceaccountcontroller.go",
         "statefulsetcontroller.go",
+        "tokencontroller.go",
         "ttlafterfinishedcontroller.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kube-controller-manager/app/options",

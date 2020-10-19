@@ -91,6 +91,20 @@ func serviceAccount(secretRefs []v1.ObjectReference) *v1.ServiceAccount {
 	}
 }
 
+// systemServiceAccount returns a service account with the given secret refs in the kube-system
+// namespace.
+func systemServiceAccount(secretRefs []v1.ObjectReference) *v1.ServiceAccount {
+	return &v1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "default",
+			UID:             "12345",
+			Namespace:       "kube-system",
+			ResourceVersion: "1",
+		},
+		Secrets: secretRefs,
+	}
+}
+
 // updatedServiceAccount returns a service account with the resource version modified
 func updatedServiceAccount(secretRefs []v1.ObjectReference) *v1.ServiceAccount {
 	sa := serviceAccount(secretRefs)
@@ -118,6 +132,19 @@ func opaqueSecret() *v1.Secret {
 // Named "default-token-xn8fg", since that is the first generated name after rand.Seed(1)
 func createdTokenSecret(overrideName ...string) *v1.Secret {
 	return namedCreatedTokenSecret("default-token-xn8fg")
+}
+
+// redactToken replaces the secret's token with a redacted string.
+func redactToken(secret *v1.Secret) *v1.Secret {
+	secret.Data["token"] = []byte(redactedToken)
+	return secret
+}
+
+// systemSecret changes a secret's namespace to the system namespace.
+func systemSecret(secret *v1.Secret) *v1.Secret {
+	secret.Namespace = metav1.NamespaceSystem
+	secret.Data["namespace"] = []byte(metav1.NamespaceSystem)
+	return secret
 }
 
 // namedTokenSecret returns the ServiceAccountToken secret posted when creating a new token secret with the given name.
@@ -209,6 +236,8 @@ func TestTokenCreation(t *testing.T) {
 
 		IsAsync    bool
 		MaxRetries int
+
+		RedactSystemTokens bool
 
 		Reactors []reaction
 
@@ -565,6 +594,28 @@ func TestTokenCreation(t *testing.T) {
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
 			},
 		},
+		"new kube-system serviceaccount with no secrets, feature flag disabled": {
+			ClientObjects:      []runtime.Object{systemServiceAccount(emptySecretReferences())},
+			RedactSystemTokens: false,
+
+			AddedServiceAccount: systemServiceAccount(emptySecretReferences()),
+			ExpectedActions: []core.Action{
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceSystem, "default"),
+				core.NewCreateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceSystem, systemSecret(createdTokenSecret())),
+				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceSystem, systemServiceAccount(addTokenSecretReference(emptySecretReferences()))),
+			},
+		},
+		"new kube-system serviceaccount with no secrets, feature flag enabled": {
+			ClientObjects:      []runtime.Object{systemServiceAccount(emptySecretReferences())},
+			RedactSystemTokens: true,
+
+			AddedServiceAccount: systemServiceAccount(emptySecretReferences()),
+			ExpectedActions: []core.Action{
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceSystem, "default"),
+				core.NewCreateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceSystem, redactToken(systemSecret(createdTokenSecret()))),
+				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceSystem, systemServiceAccount(addTokenSecretReference(emptySecretReferences()))),
+			},
+		},
 	}
 
 	for k, tc := range testcases {
@@ -583,7 +634,7 @@ func TestTokenCreation(t *testing.T) {
 		secretInformer := informers.Core().V1().Secrets().Informer()
 		secrets := secretInformer.GetStore()
 		serviceAccounts := informers.Core().V1().ServiceAccounts().Informer().GetStore()
-		controller, err := NewTokensController(informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
+		controller, err := NewTokensController(informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries, RedactSystemTokens: tc.RedactSystemTokens})
 		if err != nil {
 			t.Fatalf("error creating Tokens controller: %v", err)
 		}

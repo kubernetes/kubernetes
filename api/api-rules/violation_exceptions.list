@@ -568,6 +568,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,K
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,ServiceController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,StatefulSetController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,TTLAfterFinishedController
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,TokenController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NamespaceControllerConfiguration,ConcurrentNamespaceSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NamespaceControllerConfiguration,NamespaceSyncPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeIPAMControllerConfiguration,NodeCIDRMaskSize
@@ -604,6 +605,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,S
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,SAControllerConfiguration,ServiceAccountKeyFile
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,StatefulSetControllerConfiguration,ConcurrentStatefulSetSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,TTLAfterFinishedControllerConfiguration,ConcurrentTTLSyncs
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,TokenControllerConfiguration,RedactSystemTokens
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,VolumeConfiguration,EnableDynamicProvisioning
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,VolumeConfiguration,EnableHostPathProvisioning
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,VolumeConfiguration,FlexVolumePluginDir

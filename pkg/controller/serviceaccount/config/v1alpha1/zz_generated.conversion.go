@@ -50,8 +50,18 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*config.TokenControllerConfiguration)(nil), (*v1alpha1.TokenControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_TokenControllerConfiguration_To_v1alpha1_TokenControllerConfiguration(a.(*config.TokenControllerConfiguration), b.(*v1alpha1.TokenControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*v1alpha1.SAControllerConfiguration)(nil), (*config.SAControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_SAControllerConfiguration_To_config_SAControllerConfiguration(a.(*v1alpha1.SAControllerConfiguration), b.(*config.SAControllerConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1alpha1.TokenControllerConfiguration)(nil), (*config.TokenControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_TokenControllerConfiguration_To_config_TokenControllerConfiguration(a.(*v1alpha1.TokenControllerConfiguration), b.(*config.TokenControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
@@ -91,5 +101,15 @@ func autoConvert_config_SAControllerConfiguration_To_v1alpha1_SAControllerConfig
 	out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
 	out.ConcurrentSATokenSyncs = in.ConcurrentSATokenSyncs
 	out.RootCAFile = in.RootCAFile
+	return nil
+}
+
+func autoConvert_v1alpha1_TokenControllerConfiguration_To_config_TokenControllerConfiguration(in *v1alpha1.TokenControllerConfiguration, out *config.TokenControllerConfiguration, s conversion.Scope) error {
+	out.RedactSystemTokens = in.RedactSystemTokens
+	return nil
+}
+
+func autoConvert_config_TokenControllerConfiguration_To_v1alpha1_TokenControllerConfiguration(in *config.TokenControllerConfiguration, out *v1alpha1.TokenControllerConfiguration, s conversion.Scope) error {
+	out.RedactSystemTokens = in.RedactSystemTokens
 	return nil
 }

@@ -34,3 +34,9 @@ func RecommendedDefaultSAControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.
 		obj.ConcurrentSATokenSyncs = 5
 	}
 }
+
+// RecommendedDefaultTokenControllerConfiguration defaults a pointer to a
+// TokenControllerConfiguration struct.
+func RecommendedDefaultTokenControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.TokenControllerConfiguration) {
+	// The zero value of RedactSystemTokens is already the default.
+}

@@ -156,6 +156,8 @@ type KubeControllerManagerConfiguration struct {
 	// SAControllerConfiguration holds configuration for ServiceAccountController
 	// related features.
 	SAController SAControllerConfiguration
+	// TokenControllerConfiguration holds configuration for TokenController related features.
+	TokenController TokenControllerConfiguration
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
 	ServiceController serviceconfigv1alpha1.ServiceControllerConfiguration
@@ -470,6 +472,12 @@ type SAControllerConfiguration struct {
 	// rootCAFile is the root certificate authority will be included in service
 	// account's token secret. This must be a valid PEM-encoded CA bundle.
 	RootCAFile string
+}
+
+// TokeControllerConfiguration contains elements describing TokenController.
+type TokenControllerConfiguration struct {
+	// When true, system tokens are redacted.
+	RedactSystemTokens bool
 }
 
 // TTLAfterFinishedControllerConfiguration contains elements describing TTLAfterFinishedController.

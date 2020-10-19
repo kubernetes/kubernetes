@@ -82,6 +82,7 @@ type KubeControllerManagerOptions struct {
 	ReplicationController            *ReplicationControllerOptions
 	ResourceQuotaController          *ResourceQuotaControllerOptions
 	SAController                     *SAControllerOptions
+	TokenController                  *TokenControllerOptions
 	TTLAfterFinishedController       *TTLAfterFinishedControllerOptions
 
 	SecureServing *apiserveroptions.SecureServingOptionsWithLoopback
@@ -176,6 +177,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		SAController: &SAControllerOptions{
 			&componentConfig.SAController,
 		},
+		TokenController: &TokenControllerOptions{
+			&componentConfig.TokenController,
+		},
 		TTLAfterFinishedController: &TTLAfterFinishedControllerOptions{
 			&componentConfig.TTLAfterFinishedController,
 		},
@@ -259,6 +263,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.ReplicationController.AddFlags(fss.FlagSet("replicationcontroller"))
 	s.ResourceQuotaController.AddFlags(fss.FlagSet("resourcequota controller"))
 	s.SAController.AddFlags(fss.FlagSet("serviceaccount controller"))
+	s.TokenController.AddFlags(fss.FlagSet("token controller"))
 	s.TTLAfterFinishedController.AddFlags(fss.FlagSet("ttl-after-finished controller"))
 	s.Metrics.AddFlags(fss.FlagSet("metrics"))
 	s.Logs.AddFlags(fss.FlagSet("logs"))
@@ -345,6 +350,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 	if err := s.SAController.ApplyTo(&c.ComponentConfig.SAController); err != nil {
 		return err
 	}
+	if err := s.TokenController.ApplyTo(&c.ComponentConfig.TokenController); err != nil {
+		return err
+	}
 	if err := s.ServiceController.ApplyTo(&c.ComponentConfig.ServiceController); err != nil {
 		return err
 	}
@@ -402,6 +410,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.ReplicationController.Validate()...)
 	errs = append(errs, s.ResourceQuotaController.Validate()...)
 	errs = append(errs, s.SAController.Validate()...)
+	errs = append(errs, s.TokenController.Validate()...)
 	errs = append(errs, s.ServiceController.Validate()...)
 	errs = append(errs, s.TTLAfterFinishedController.Validate()...)
 	errs = append(errs, s.SecureServing.Validate()...)

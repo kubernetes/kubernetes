@@ -107,6 +107,8 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 	serviceconfigv1alpha1.RecommendedDefaultServiceControllerConfiguration(&obj.ServiceController)
 	// Use the default RecommendedDefaultSAControllerConfiguration options
 	serviceaccountconfigv1alpha1.RecommendedDefaultSAControllerConfiguration(&obj.SAController)
+	// Use the default RecommendedDefaultTokenControllerConfiguration options
+	serviceaccountconfigv1alpha1.RecommendedDefaultTokenControllerConfiguration(&obj.TokenController)
 	// Use the default RecommendedDefaultTTLAfterFinishedControllerConfiguration options
 	ttlafterfinishedconfigv1alpha1.RecommendedDefaultTTLAfterFinishedControllerConfiguration(&obj.TTLAfterFinishedController)
 	// Use the default RecommendedDefaultPersistentVolumeBinderControllerConfiguration options

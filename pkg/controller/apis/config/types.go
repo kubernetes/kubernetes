@@ -120,6 +120,8 @@ type KubeControllerManagerConfiguration struct {
 	// SAControllerConfiguration holds configuration for ServiceAccountController
 	// related features.
 	SAController serviceaccountconfig.SAControllerConfiguration
+	// TokenControllerConfiguration holds configuration for TokenController related features.
+	TokenController serviceaccountconfig.TokenControllerConfiguration
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
 	ServiceController serviceconfig.ServiceControllerConfiguration

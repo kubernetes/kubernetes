@@ -52,6 +52,10 @@ var RemoveTokenBackoff = wait.Backoff{
 	Jitter:   1.0,
 }
 
+// RedactedToken is used to censor tokens in the system namespace.
+// AutoGKE policy requires system tokens to be inaccessible.
+const redactedToken = "REDACTED"
+
 // TokensControllerOptions contains options for the TokensController
 type TokensControllerOptions struct {
 	// TokenGenerator is the generator to use to create new tokens
@@ -68,6 +72,9 @@ type TokensControllerOptions struct {
 	// MaxRetries controls the maximum number of times a particular key is retried before giving up
 	// If zero, a default max is used
 	MaxRetries int
+
+	// When true, system tokens are redacted.
+	RedactSystemTokens bool
 }
 
 // NewTokensController returns a new *TokensController.
@@ -86,6 +93,8 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 		syncSecretQueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount_tokens_secret"),
 
 		maxRetries: maxRetries,
+
+		redactSystemTokens: options.RedactSystemTokens,
 	}
 	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_tokens_controller", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
@@ -161,6 +170,9 @@ type TokensController struct {
 	syncSecretQueue workqueue.RateLimitingInterface
 
 	maxRetries int
+
+	// when true, the tokens controller should redact system tokens.
+	redactSystemTokens bool
 }
 
 // Run runs controller blocks until stopCh is closed
@@ -405,6 +417,11 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 	secret.Data[v1.ServiceAccountNamespaceKey] = []byte(serviceAccount.Namespace)
 	if e.rootCA != nil && len(e.rootCA) > 0 {
 		secret.Data[v1.ServiceAccountRootCAKey] = e.rootCA
+	}
+
+	// Redact system tokens for AutoGKE policy
+	if e.redactSystemTokens {
+		redactSystemToken(serviceAccount, secret)
 	}
 
 	// Save the secret
@@ -773,4 +790,12 @@ func parseSecretQueueKey(key interface{}) (secretQueueKey, error) {
 // produce the same key format as cache.MetaNamespaceKeyFunc
 func makeCacheKey(namespace, name string) string {
 	return namespace + "/" + name
+}
+
+// redactSystemToken replaces tokens with a REDACTED string if the token will be in the system
+// namespace.
+func redactSystemToken(serviceAccount *v1.ServiceAccount, secret *v1.Secret) {
+	if serviceAccount.Namespace == metav1.NamespaceSystem {
+		secret.Data[v1.ServiceAccountTokenKey] = []byte(redactedToken)
+	}
 }

@@ -28,3 +28,9 @@ type SAControllerConfiguration struct {
 	// account's token secret. This must be a valid PEM-encoded CA bundle.
 	RootCAFile string
 }
+
+// TokenControllerConfiguration contains elements describing TokenController.
+type TokenControllerConfiguration struct {
+	// When true, system tokens are redacted.
+	RedactSystemTokens bool
+}
