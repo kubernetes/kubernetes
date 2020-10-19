@@ -340,7 +340,6 @@ func TestSyncServiceFull(t *testing.T) {
 	client, esController := newController([]string{"node-1"}, time.Duration(0))
 	namespace := metav1.NamespaceDefault
 	serviceName := "all-the-protocols"
-	ipv6Family := v1.IPv6Protocol
 
 	pod1 := newPod(1, namespace, true, 0)
 	pod1.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}}
@@ -364,8 +363,8 @@ func TestSyncServiceFull(t *testing.T) {
 				{Name: "udp-example", TargetPort: intstr.FromInt(161), Protocol: v1.ProtocolUDP},
 				{Name: "sctp-example", TargetPort: intstr.FromInt(3456), Protocol: v1.ProtocolSCTP},
 			},
-			Selector: map[string]string{"foo": "bar"},
-			IPFamily: &ipv6Family,
+			Selector:   map[string]string{"foo": "bar"},
+			IPFamilies: []v1.IPFamily{v1.IPv6Protocol},
 		},
 	}
 	esController.serviceStore.Add(service)
@@ -491,8 +490,9 @@ func TestPodAddsBatching(t *testing.T) {
 			esController.serviceStore.Add(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 				Spec: v1.ServiceSpec{
-					Selector: map[string]string{"foo": "bar"},
-					Ports:    []v1.ServicePort{{Port: 80}},
+					Selector:   map[string]string{"foo": "bar"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+					Ports:      []v1.ServicePort{{Port: 80}},
 				},
 			})
 
@@ -624,8 +624,9 @@ func TestPodUpdatesBatching(t *testing.T) {
 			esController.serviceStore.Add(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 				Spec: v1.ServiceSpec{
-					Selector: map[string]string{"foo": "bar"},
-					Ports:    []v1.ServicePort{{Port: 80}},
+					Selector:   map[string]string{"foo": "bar"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+					Ports:      []v1.ServicePort{{Port: 80}},
 				},
 			})
 
@@ -758,8 +759,9 @@ func TestPodDeleteBatching(t *testing.T) {
 			esController.serviceStore.Add(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 				Spec: v1.ServiceSpec{
-					Selector: map[string]string{"foo": "bar"},
-					Ports:    []v1.ServicePort{{Port: 80}},
+					Selector:   map[string]string{"foo": "bar"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+					Ports:      []v1.ServicePort{{Port: 80}},
 				},
 			})
 
@@ -810,8 +812,9 @@ func createService(t *testing.T, esController *endpointSliceController, namespac
 			UID:               types.UID(namespace + "-" + serviceName),
 		},
 		Spec: v1.ServiceSpec{
-			Ports:    []v1.ServicePort{{TargetPort: intstr.FromInt(80)}},
-			Selector: map[string]string{"foo": "bar"},
+			Ports:      []v1.ServicePort{{TargetPort: intstr.FromInt(80)}},
+			Selector:   map[string]string{"foo": "bar"},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	}
 	esController.serviceStore.Add(service)
