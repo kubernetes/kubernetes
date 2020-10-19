@@ -1625,11 +1625,13 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Finish housekeeping.
 	// TODO: these could be made more consistent.
+	klog.V(4).Infof("Deleting stale services IPs: %v", staleServices.UnsortedList())
 	for _, svcIP := range staleServices.UnsortedList() {
 		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
 			klog.Errorf("Failed to delete stale service IP %s connections, error: %v", svcIP, err)
 		}
 	}
+	klog.V(4).Infof("Deleting stale endpoint connections: %v", endpointUpdateResult.StaleEndpoints)
 	proxier.deleteEndpointConnections(endpointUpdateResult.StaleEndpoints)
 }
 
