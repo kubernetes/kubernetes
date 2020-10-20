@@ -37,7 +37,8 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/cloud-provider/api:all-srcs",
-        "//staging/src/k8s.io/cloud-provider/app/apis/config:all-srcs",
+        "//staging/src/k8s.io/cloud-provider/app:all-srcs",
+        "//staging/src/k8s.io/cloud-provider/config:all-srcs",
         "//staging/src/k8s.io/cloud-provider/controllers/node:all-srcs",
         "//staging/src/k8s.io/cloud-provider/controllers/nodelifecycle:all-srcs",
         "//staging/src/k8s.io/cloud-provider/controllers/route:all-srcs",

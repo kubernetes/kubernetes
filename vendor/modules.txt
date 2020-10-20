@@ -2127,9 +2127,12 @@ k8s.io/client-go/util/workqueue
 k8s.io/cloud-provider
 # k8s.io/cloud-provider => ./staging/src/k8s.io/cloud-provider
 k8s.io/cloud-provider/api
-k8s.io/cloud-provider/app/apis/config
-k8s.io/cloud-provider/app/apis/config/scheme
-k8s.io/cloud-provider/app/apis/config/v1alpha1
+k8s.io/cloud-provider/app
+k8s.io/cloud-provider/app/config
+k8s.io/cloud-provider/app/testing
+k8s.io/cloud-provider/config
+k8s.io/cloud-provider/config/install
+k8s.io/cloud-provider/config/v1alpha1
 k8s.io/cloud-provider/controllers/node
 k8s.io/cloud-provider/controllers/nodelifecycle
 k8s.io/cloud-provider/controllers/route

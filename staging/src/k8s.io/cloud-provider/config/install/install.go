@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheme
+package install
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/cloud-provider/app/apis/config"
-	"k8s.io/cloud-provider/app/apis/config/v1alpha1"
+	"k8s.io/cloud-provider/config"
+	"k8s.io/cloud-provider/config/v1alpha1"
 )
 
 var (
@@ -33,11 +33,11 @@ var (
 )
 
 func init() {
-	AddToScheme(Scheme)
+	Install(Scheme)
 }
 
-// AddToScheme adds the types of this group into the given scheme.
-func AddToScheme(scheme *runtime.Scheme) {
+// Install adds the types of this group into the given scheme.
+func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(config.AddToScheme(scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(scheme.SetVersionPriority(v1alpha1.SchemeGroupVersion))
