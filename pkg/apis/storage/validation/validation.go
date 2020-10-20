@@ -404,7 +404,7 @@ func ValidateCSIDriver(csiDriver *storage.CSIDriver) field.ErrorList {
 
 // ValidateCSIDriverUpdate validates a CSIDriver.
 func ValidateCSIDriverUpdate(new, old *storage.CSIDriver) field.ErrorList {
-	allErrs := ValidateCSIDriver(new)
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
 
 	// Spec is read-only
 	// If this ever relaxes in the future, make sure to increment the Generation number in PrepareForUpdate

@@ -1869,9 +1869,13 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 	attachNotRequired := false
 	podInfoOnMount := true
 	notPodInfoOnMount := false
+<<<<<<< HEAD
 	notRequiresRepublish := false
+=======
+	resourceVersion := "1"
+>>>>>>> Relax validation for CSIVolumeFSGroupPolicy
 	old := storage.CSIDriver{
-		ObjectMeta: metav1.ObjectMeta{Name: driverName},
+		ObjectMeta: metav1.ObjectMeta{Name: driverName, ResourceVersion: resourceVersion},
 		Spec: storage.CSIDriverSpec{
 			AttachRequired:    &attachNotRequired,
 			PodInfoOnMount:    &notPodInfoOnMount,

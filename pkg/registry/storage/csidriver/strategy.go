@@ -113,8 +113,7 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 func (csiDriverStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newCSIDriverObj := obj.(*storage.CSIDriver)
 	oldCSIDriverObj := old.(*storage.CSIDriver)
-	errorList := validation.ValidateCSIDriver(newCSIDriverObj)
-	return append(errorList, validation.ValidateCSIDriverUpdate(newCSIDriverObj, oldCSIDriverObj)...)
+	return validation.ValidateCSIDriverUpdate(newCSIDriverObj, oldCSIDriverObj)
 }
 
 func (csiDriverStrategy) AllowUnconditionalUpdate() bool {
