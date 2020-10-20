@@ -69,9 +69,8 @@ def get_all_files(rootdir):
 
         for name in files:
             pathname = os.path.join(root, name)
-            if is_binary(pathname):
-                continue
-            all_files.append(pathname)
+            if not is_binary(pathname):
+                all_files.append(pathname)
     return all_files
 
 # Collects all the flags used in golang files and verifies the flags do
