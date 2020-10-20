@@ -40,6 +40,9 @@ type TransportConfig struct {
 	KeyFile       string
 	CertFile      string
 	TrustedCAFile string
+	// BasicAuth
+	Username string
+	Password string
 	// function to determine the egress dialer. (i.e. konnectivity server dialer)
 	EgressLookup egressselector.Lookup
 }

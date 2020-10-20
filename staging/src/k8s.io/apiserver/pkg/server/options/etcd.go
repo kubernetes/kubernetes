@@ -165,6 +165,12 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.StorageConfig.Transport.TrustedCAFile, "etcd-cafile", s.StorageConfig.Transport.TrustedCAFile,
 		"SSL Certificate Authority file used to secure etcd communication.")
 
+	fs.StringVar(&s.StorageConfig.Transport.Username, "etcd-username", s.StorageConfig.Transport.Username,
+		"Username to use for etcd v3 BasicAuth.")
+
+	fs.StringVar(&s.StorageConfig.Transport.Password, "etcd-password", s.StorageConfig.Transport.Password,
+		"Password to use for etcd v3 BasicAuth.")
+
 	fs.StringVar(&s.EncryptionProviderConfigFilepath, "experimental-encryption-provider-config", s.EncryptionProviderConfigFilepath,
 		"The file containing configuration for encryption providers to be used for storing secrets in etcd")
 	fs.MarkDeprecated("experimental-encryption-provider-config", "use --encryption-provider-config.")

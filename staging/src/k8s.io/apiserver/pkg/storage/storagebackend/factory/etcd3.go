@@ -148,6 +148,8 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 		DialOptions:          dialOptions,
 		Endpoints:            c.ServerList,
 		TLS:                  tlsConfig,
+		Username:             c.Username,
+		Password:             c.Password,
 	}
 
 	return clientv3.New(cfg)

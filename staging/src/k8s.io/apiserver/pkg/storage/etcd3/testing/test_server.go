@@ -303,3 +303,22 @@ func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storageb
 	}
 	return server, config
 }
+
+// NewBasicAuthEtcd3TestClientServer creates a new client and server for testing
+func NewBasicAuthEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storagebackend.Config) {
+	server := &EtcdTestServer{
+		v3Cluster: integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1}),
+	}
+	server.V3Client = server.v3Cluster.RandClient()
+	config := &storagebackend.Config{
+		Type:   "etcd3",
+		Prefix: PathPrefix(),
+		Transport: storagebackend.TransportConfig{
+			ServerList: server.V3Client.Endpoints(),
+			Username:   server.V3Client.Username,
+			Password:   server.V3Client.Password,
+		},
+		Paging: true,
+	}
+	return server, config
+}

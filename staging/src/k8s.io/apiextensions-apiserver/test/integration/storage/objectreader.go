@@ -118,7 +118,9 @@ func GetEtcdClients(config storagebackend.TransportConfig) (*clientv3.Client, cl
 		DialOptions: []grpc.DialOption{
 			grpc.WithBlock(), // block until the underlying connection is up
 		},
-		TLS: tlsConfig,
+		TLS:      tlsConfig,
+		Username: config.Username,
+		Password: config.Password,
 	}
 
 	c, err := clientv3.New(cfg)
