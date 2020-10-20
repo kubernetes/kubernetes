@@ -409,6 +409,32 @@ func TestSortingPrinter(t *testing.T) {
 			field:       "{.invalid}",
 			expectedErr: "couldn't find any field with path \"{.invalid}\" in the list of objects",
 		},
+		{
+			name: "empty fields",
+			obj: &corev1.EventList{
+				Items: []corev1.Event{
+					{
+						ObjectMeta:    metav1.ObjectMeta{CreationTimestamp: metav1.Unix(300, 0)},
+						LastTimestamp: metav1.Unix(300, 0),
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{CreationTimestamp: metav1.Unix(200, 0)},
+					},
+				},
+			},
+			sort: &corev1.EventList{
+				Items: []corev1.Event{
+					{
+						ObjectMeta: metav1.ObjectMeta{CreationTimestamp: metav1.Unix(200, 0)},
+					},
+					{
+						ObjectMeta:    metav1.ObjectMeta{CreationTimestamp: metav1.Unix(300, 0)},
+						LastTimestamp: metav1.Unix(300, 0),
+					},
+				},
+			},
+			field: "{.lastTimestamp}",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name+" table", func(t *testing.T) {
