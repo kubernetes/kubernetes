@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
@@ -96,7 +95,7 @@ func NewSubresourceTestFieldManager(gvk schema.GroupVersionKind) TestFieldManage
 func NewTestFieldManager(gvk schema.GroupVersionKind, ignoreManagedFieldsFromRequestObject bool, chainFieldManager func(fieldmanager.Manager) fieldmanager.Manager) TestFieldManager {
 	m := NewFakeOpenAPIModels()
 	typeConverter := NewFakeTypeConverter(m)
-	converter := internal.NewVersionConverter(typeConverter, &fakeObjectConvertor{}, gvk.GroupVersion())
+	converter := fieldmanager.NewVersionConverter(typeConverter, &fakeObjectConvertor{}, gvk.GroupVersion())
 	apiVersion := fieldpath.APIVersion(gvk.GroupVersion().String())
 	objectConverter := &fakeObjectConvertor{converter, apiVersion}
 	f, err := fieldmanager.NewStructuredMergeManager(
@@ -128,8 +127,8 @@ func NewTestFieldManager(gvk schema.GroupVersionKind, ignoreManagedFieldsFromReq
 	}
 }
 
-func NewFakeTypeConverter(m proto.Models) internal.TypeConverter {
-	tc, err := internal.NewTypeConverter(m, false)
+func NewFakeTypeConverter(m proto.Models) fieldmanager.TypeConverter {
+	tc, err := fieldmanager.NewTypeConverter(m, false)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to build TypeConverter: %v", err))
 	}

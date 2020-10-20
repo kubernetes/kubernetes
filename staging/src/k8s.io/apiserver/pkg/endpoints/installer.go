@@ -564,7 +564,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	if a.group.OpenAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		reqScope.FieldManager, err = fieldmanager.NewDefaultFieldManager(
-			a.group.OpenAPIModels,
+			a.group.TypeConverter,
 			a.group.UnsafeConvertor,
 			a.group.Defaulter,
 			a.group.Creater,
