@@ -524,3 +524,8 @@ export KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE="${KUBE_KONNECTIVITY_SERVICE_PRO
 
 # Optional: Enable Windows CSI-Proxy
 export ENABLE_CSI_PROXY="${ENABLE_CSI_PROXY:-true}"
+
+# ETCD_LISTEN_ON_HOST_IP decides whether etcd servers should also listen on host IP, 
+# in addition to listening to 127.0.0.1, and whether kube-apiserver should connect to etcd servers
+# through host IP.
+export ETCD_LISTEN_ON_HOST_IP="${ETCD_LISTEN_ON_HOST_IP:-false}"
