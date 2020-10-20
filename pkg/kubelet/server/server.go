@@ -924,13 +924,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	longRunning := strconv.FormatBool(isLongRunningRequest(path))
 
-	servermetrics.HTTPRequests.WithLabelValues(method, path, serverType, longRunning).Inc()
+	servermetrics.HTTPRequests.WithLabelValues(method, path, serverType, longRunning, strconv.Itoa(http.StatusOK)).Inc()
 
-	servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Inc()
-	defer servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Dec()
+	servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning, strconv.Itoa(http.StatusOK)).Inc()
+	defer servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning, strconv.Itoa(http.StatusOK)).Dec()
 
 	startTime := time.Now()
-	defer servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, serverType, longRunning).Observe(servermetrics.SinceInSeconds(startTime))
+	defer servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, serverType, longRunning, strconv.Itoa(http.StatusOK)).Observe(servermetrics.SinceInSeconds(startTime))
 
 	handler.ServeHTTP(w, req)
 }
