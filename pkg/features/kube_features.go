@@ -206,7 +206,6 @@ const (
 	// alpha: v1.10
 	//
 	// Enable Hyper-V containers on Windows
-	// Deprecated in 1.20 and removed in 1.21
 	HyperVContainer featuregate.Feature = "HyperVContainer"
 
 	// owner: @mikedanese
@@ -297,7 +296,7 @@ const (
 	CSIStorageCapacity featuregate.Feature = "CSIStorageCapacity"
 
 	// owner: @alculquicondor
-	// beta: v1.20
+	// alpha: v1.19
 	//
 	// Enables the use of PodTopologySpread scheduling plugin to do default
 	// spreading and disables legacy SelectorSpread plugin.
@@ -452,21 +451,6 @@ const (
 	//
 	// Implement support for limiting pids in nodes
 	SupportNodePidsLimit featuregate.Feature = "SupportNodePidsLimit"
-
-	// owner: @wk8
-	// alpha: v1.14
-	// beta: v1.16
-	//
-	// Enables GMSA support for Windows workloads.
-	WindowsGMSA featuregate.Feature = "WindowsGMSA"
-
-	// owner: @bclau
-	// alpha: v1.16
-	// beta: v1.17
-	// GA: v1.18
-	//
-	// Enables support for running container entrypoints as different usernames than their default ones.
-	WindowsRunAsUserName featuregate.Feature = "WindowsRunAsUserName"
 
 	// owner: @adisky
 	// alpha: v1.14
@@ -678,7 +662,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StorageObjectInUseProtection:   {Default: true, PreRelease: featuregate.GA},
 	SupportPodPidsLimit:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	SupportNodePidsLimit:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
-	HyperVContainer:                {Default: false, PreRelease: featuregate.Deprecated},
+	HyperVContainer:                {Default: false, PreRelease: featuregate.Alpha},
 	TokenRequest:                   {Default: true, PreRelease: featuregate.Beta},
 	TokenRequestProjection:         {Default: true, PreRelease: featuregate.Beta},
 	BoundServiceAccountTokenVolume: {Default: false, PreRelease: featuregate.Alpha},
@@ -713,8 +697,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ProcMountType:                  {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:               {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:            {Default: true, PreRelease: featuregate.Beta},
-	WindowsGMSA:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
-	WindowsRunAsUserName:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	ServiceLoadBalancerFinalizer:   {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: true, PreRelease: featuregate.Beta},
@@ -734,7 +716,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	HugePageStorageMediumSize:                      {Default: true, PreRelease: featuregate.Beta},
 	ExternalPolicyForExternalIP:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
-	DefaultPodTopologySpread:                       {Default: true, PreRelease: featuregate.Beta},
+	DefaultPodTopologySpread:                       {Default: false, PreRelease: featuregate.Alpha},
 	SetHostnameAsFQDN:                              {Default: true, PreRelease: featuregate.Beta},
 	WinOverlay:                                     {Default: true, PreRelease: featuregate.Beta},
 	WinDSR:                                         {Default: false, PreRelease: featuregate.Alpha},

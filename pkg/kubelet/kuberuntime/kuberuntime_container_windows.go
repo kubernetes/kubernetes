@@ -128,11 +128,6 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	if username != "" {
 		wc.SecurityContext.RunAsUsername = username
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsGMSA) &&
-		effectiveSc.WindowsOptions != nil &&
-		effectiveSc.WindowsOptions.GMSACredentialSpec != nil {
-		wc.SecurityContext.CredentialSpec = *effectiveSc.WindowsOptions.GMSACredentialSpec
-	}
 
 	// override with Windows options if present
 	if effectiveSc.WindowsOptions != nil && effectiveSc.WindowsOptions.RunAsUserName != nil {
