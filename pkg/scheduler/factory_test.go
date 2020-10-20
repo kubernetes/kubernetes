@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -239,7 +240,12 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	prof := factory.profiles[0]
-	wantConfig := []schedulerapi.PluginConfig{}
+	wantConfig := []schedulerapi.PluginConfig{
+		{
+			Name: podtopologyspread.Name,
+			Args: &schedulerapi.PodTopologySpreadArgs{DefaultingType: schedulerapi.SystemDefaulting},
+		},
+	}
 	if diff := cmp.Diff(wantConfig, prof.PluginConfig); diff != "" {
 		t.Errorf("wrong plugin config (-want, +got): %s", diff)
 	}

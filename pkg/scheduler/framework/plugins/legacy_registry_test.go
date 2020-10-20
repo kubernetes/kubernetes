@@ -121,7 +121,6 @@ func TestAppendPriorityConfigs(t *testing.T) {
 					Enabled: []config.Plugin{
 						{Name: podtopologyspread.Name},
 						{Name: interpodaffinity.Name},
-						{Name: selectorspread.Name},
 						{Name: tainttoleration.Name},
 					},
 				},
@@ -134,17 +133,21 @@ func TestAppendPriorityConfigs(t *testing.T) {
 						{Name: noderesources.LeastAllocatedName, Weight: 1},
 						{Name: nodeaffinity.Name, Weight: 1},
 						{Name: nodepreferavoidpods.Name, Weight: 10000},
-						{Name: selectorspread.Name, Weight: 1},
 						{Name: tainttoleration.Name, Weight: 1},
+					},
+				},
+			},
+			wantPluginConfig: []config.PluginConfig{
+				{
+					Name: podtopologyspread.Name,
+					Args: &config.PodTopologySpreadArgs{
+						DefaultingType: config.SystemDefaulting,
 					},
 				},
 			},
 		},
 		{
 			name: "DefaultPodTopologySpread enabled, SelectorSpreadPriority only",
-			features: map[featuregate.Feature]bool{
-				features.DefaultPodTopologySpread: true,
-			},
 			keys: map[string]int64{
 				SelectorSpreadPriority: 3,
 			},
@@ -171,9 +174,6 @@ func TestAppendPriorityConfigs(t *testing.T) {
 		},
 		{
 			name: "DefaultPodTopologySpread enabled, EvenPodsSpreadPriority only",
-			features: map[featuregate.Feature]bool{
-				features.DefaultPodTopologySpread: true,
-			},
 			keys: map[string]int64{
 				EvenPodsSpreadPriority: 4,
 			},
@@ -199,9 +199,9 @@ func TestAppendPriorityConfigs(t *testing.T) {
 			},
 		},
 		{
-			name: "DefaultPodTopologySpread enabled, SelectorSpreadPriority+EvenPodsSpreadPriority",
+			name: "DefaultPodTopologySpread disabled, SelectorSpreadPriority+EvenPodsSpreadPriority",
 			features: map[featuregate.Feature]bool{
-				features.DefaultPodTopologySpread: true,
+				features.DefaultPodTopologySpread: false,
 			},
 			keys: map[string]int64{
 				SelectorSpreadPriority: 1,
@@ -211,19 +211,13 @@ func TestAppendPriorityConfigs(t *testing.T) {
 				PreScore: &config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: podtopologyspread.Name},
+						{Name: selectorspread.Name},
 					},
 				},
 				Score: &config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: podtopologyspread.Name, Weight: 2},
-					},
-				},
-			},
-			wantPluginConfig: []config.PluginConfig{
-				{
-					Name: podtopologyspread.Name,
-					Args: &config.PodTopologySpreadArgs{
-						DefaultingType: config.SystemDefaulting,
+						{Name: selectorspread.Name, Weight: 1},
 					},
 				},
 			},

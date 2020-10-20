@@ -531,7 +531,7 @@ func TestNewFrameworkPluginDefaults(t *testing.T) {
 					Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
 				},
 				"PodTopologySpread": &config.PodTopologySpreadArgs{
-					DefaultingType: config.ListDefaulting,
+					DefaultingType: config.SystemDefaulting,
 				},
 				"VolumeBinding": &config.VolumeBindingArgs{
 					BindTimeoutSeconds: 600,
@@ -593,7 +593,7 @@ func TestNewFrameworkPluginDefaults(t *testing.T) {
 					Resources: []config.ResourceSpec{{Name: "resource", Weight: 3}},
 				},
 				"PodTopologySpread": &config.PodTopologySpreadArgs{
-					DefaultingType: config.ListDefaulting,
+					DefaultingType: config.SystemDefaulting,
 				},
 				"RequestedToCapacityRatio": &config.RequestedToCapacityRatioArgs{
 					Resources: []config.ResourceSpec{{Name: "resource", Weight: 2}},
