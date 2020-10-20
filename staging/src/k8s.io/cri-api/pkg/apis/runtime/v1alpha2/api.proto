@@ -984,6 +984,12 @@ message UpdateContainerResourcesRequest {
     string container_id = 1;
     // Resource configuration specific to Linux containers.
     LinuxContainerResources linux = 2;
+    // Resource configuration specific to Windows containers. 
+    WindowsContainerResources windows = 3;
+    // Unstructured key-value map holding arbitrary additional information for 
+    // container resources updating. This can be used for specifying experimental 
+    // resources to update or other options to use when updating the container.
+    map<string, string> annotations = 4;
 }
 
 message UpdateContainerResourcesResponse {}
