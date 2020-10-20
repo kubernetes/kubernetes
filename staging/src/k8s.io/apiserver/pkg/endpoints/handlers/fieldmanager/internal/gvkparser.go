@@ -30,12 +30,12 @@ import (
 // definition's "extensions" map.
 const groupVersionKindExtensionKey = "x-kubernetes-group-version-kind"
 
-type gvkParser struct {
+type GvkParser struct {
 	gvks   map[schema.GroupVersionKind]string
 	parser typed.Parser
 }
 
-func (p *gvkParser) Type(gvk schema.GroupVersionKind) *typed.ParseableType {
+func (p *GvkParser) Type(gvk schema.GroupVersionKind) *typed.ParseableType {
 	typeName, ok := p.gvks[gvk]
 	if !ok {
 		return nil
@@ -44,12 +44,12 @@ func (p *gvkParser) Type(gvk schema.GroupVersionKind) *typed.ParseableType {
 	return &t
 }
 
-func newGVKParser(models proto.Models, preserveUnknownFields bool) (*gvkParser, error) {
+func NewGVKParser(models proto.Models, preserveUnknownFields bool) (*GvkParser, error) {
 	typeSchema, err := schemaconv.ToSchemaWithPreserveUnknownFields(models, preserveUnknownFields)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert models to schema: %v", err)
 	}
-	parser := gvkParser{
+	parser := GvkParser{
 		gvks: map[schema.GroupVersionKind]string{},
 	}
 	parser.parser = typed.Parser{Schema: *typeSchema}

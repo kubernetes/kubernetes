@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/registry/rest"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 )
@@ -71,6 +72,7 @@ type APIGroupVersion struct {
 	Defaulter       runtime.ObjectDefaulter
 	Linker          runtime.SelfLinker
 	UnsafeConvertor runtime.ObjectConvertor
+	TypeConverter   fieldmanager.TypeConverter
 
 	EquivalentResourceRegistry runtime.EquivalentResourceRegistry
 

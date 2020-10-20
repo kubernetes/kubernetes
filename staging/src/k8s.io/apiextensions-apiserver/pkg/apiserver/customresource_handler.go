@@ -669,6 +669,14 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		openAPIModels = nil
 	}
 
+	var typeConverter fieldmanager.TypeConverter = fieldmanager.DeducedTypeConverter{}
+	if openAPIModels != nil {
+		typeConverter, err = fieldmanager.NewTypeConverter(openAPIModels, crd.Spec.PreserveUnknownFields)
+		if err != nil {
+			typeConverter = nil
+		}
+	}
+
 	safeConverter, unsafeConverter, err := r.converterFactory.NewConverter(crd)
 	if err != nil {
 		return nil, err
@@ -842,13 +850,12 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 			reqScope := *requestScopes[v.Name]
 			reqScope.FieldManager, err = fieldmanager.NewDefaultCRDFieldManager(
-				openAPIModels,
+				typeConverter,
 				reqScope.Convertor,
 				reqScope.Defaulter,
 				reqScope.Creater,
 				reqScope.Kind,
 				reqScope.HubGroupVersion,
-				crd.Spec.PreserveUnknownFields,
 				false,
 			)
 			if err != nil {
@@ -879,13 +886,12 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		statusScope := *requestScopes[v.Name]
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 			statusScope.FieldManager, err = fieldmanager.NewDefaultCRDFieldManager(
-				openAPIModels,
+				typeConverter,
 				statusScope.Convertor,
 				statusScope.Defaulter,
 				statusScope.Creater,
 				statusScope.Kind,
 				statusScope.HubGroupVersion,
-				crd.Spec.PreserveUnknownFields,
 				true,
 			)
 			if err != nil {

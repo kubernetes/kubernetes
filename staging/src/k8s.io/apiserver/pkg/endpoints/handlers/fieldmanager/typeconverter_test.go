@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package internal_test
+package fieldmanager_test
 
 import (
 	"fmt"
@@ -26,17 +26,17 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
 )
 
-var fakeSchema = prototesting.Fake{
+var fakeSchema2 = prototesting.Fake{
 	Path: filepath.Join("testdata", "swagger.json"),
 }
 
 func TestTypeConverter(t *testing.T) {
-	d, err := fakeSchema.OpenAPISchema()
+	d, err := fakeSchema2.OpenAPISchema()
 	if err != nil {
 		t.Fatalf("Failed to parse OpenAPI schema: %v", err)
 	}
@@ -45,12 +45,12 @@ func TestTypeConverter(t *testing.T) {
 		t.Fatalf("Failed to build OpenAPI models: %v", err)
 	}
 
-	tc, err := internal.NewTypeConverter(m, false)
+	tc, err := fieldmanager.NewTypeConverter(m, false)
 	if err != nil {
 		t.Fatalf("Failed to build TypeConverter: %v", err)
 	}
 
-	dtc := internal.DeducedTypeConverter{}
+	dtc := fieldmanager.DeducedTypeConverter{}
 
 	testCases := []struct {
 		name string
@@ -127,7 +127,7 @@ spec:
 	}
 }
 
-func testObjectToTyped(t *testing.T, tc internal.TypeConverter, y string) {
+func testObjectToTyped(t *testing.T, tc fieldmanager.TypeConverter, y string) {
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(y), &obj.Object); err != nil {
 		t.Fatalf("Failed to parse yaml object: %v", err)
@@ -177,7 +177,7 @@ spec:
 		b.Fatalf("Failed to parse yaml object: %v", err)
 	}
 
-	d, err := fakeSchema.OpenAPISchema()
+	d, err := fakeSchema2.OpenAPISchema()
 	if err != nil {
 		b.Fatalf("Failed to parse OpenAPI schema: %v", err)
 	}
@@ -186,7 +186,7 @@ spec:
 		b.Fatalf("Failed to build OpenAPI models: %v", err)
 	}
 
-	tc, err := internal.NewTypeConverter(m, false)
+	tc, err := fieldmanager.NewTypeConverter(m, false)
 	if err != nil {
 		b.Fatalf("Failed to build TypeConverter: %v", err)
 	}

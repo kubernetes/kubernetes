@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package internal_test
+package fieldmanager_test
 
 import (
 	"fmt"
@@ -24,14 +24,14 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // TestVersionConverter tests the version converter
 func TestVersionConverter(t *testing.T) {
-	d, err := fakeSchema.OpenAPISchema()
+	d, err := fakeSchema2.OpenAPISchema()
 	if err != nil {
 		t.Fatalf("Failed to parse OpenAPI schema: %v", err)
 	}
@@ -39,15 +39,15 @@ func TestVersionConverter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to build OpenAPI models: %v", err)
 	}
-	tc, err := internal.NewTypeConverter(m, false)
+	tc, err := fieldmanager.NewTypeConverter(m, false)
 	if err != nil {
 		t.Fatalf("Failed to build TypeConverter: %v", err)
 	}
-	oc := fakeObjectConvertor{
+	oc := fakeObjectConvertorForTestSchema{
 		gvkForVersion("v1beta1"): objForGroupVersion("apps/v1beta1"),
 		gvkForVersion("v1"):      objForGroupVersion("apps/v1"),
 	}
-	vc := internal.NewVersionConverter(tc, oc, schema.GroupVersion{Group: "apps", Version: runtime.APIVersionInternal})
+	vc := fieldmanager.NewVersionConverter(tc, oc, schema.GroupVersion{Group: "apps", Version: runtime.APIVersionInternal})
 
 	input, err := tc.ObjectToTyped(objForGroupVersion("apps/v1beta1"))
 	if err != nil {
@@ -85,11 +85,11 @@ func objForGroupVersion(gv string) runtime.Object {
 	}
 }
 
-type fakeObjectConvertor map[schema.GroupVersionKind]runtime.Object
+type fakeObjectConvertorForTestSchema map[schema.GroupVersionKind]runtime.Object
 
-var _ runtime.ObjectConvertor = fakeObjectConvertor{}
+var _ runtime.ObjectConvertor = fakeObjectConvertorForTestSchema{}
 
-func (c fakeObjectConvertor) ConvertToVersion(_ runtime.Object, gv runtime.GroupVersioner) (runtime.Object, error) {
+func (c fakeObjectConvertorForTestSchema) ConvertToVersion(_ runtime.Object, gv runtime.GroupVersioner) (runtime.Object, error) {
 	allKinds := make([]schema.GroupVersionKind, 0)
 	for kind := range c {
 		allKinds = append(allKinds, kind)
@@ -98,10 +98,10 @@ func (c fakeObjectConvertor) ConvertToVersion(_ runtime.Object, gv runtime.Group
 	return c[gvk], nil
 }
 
-func (fakeObjectConvertor) Convert(_, _, _ interface{}) error {
+func (fakeObjectConvertorForTestSchema) Convert(_, _, _ interface{}) error {
 	return fmt.Errorf("function not implemented")
 }
 
-func (fakeObjectConvertor) ConvertFieldLabel(_ schema.GroupVersionKind, _, _ string) (string, string, error) {
+func (fakeObjectConvertorForTestSchema) ConvertFieldLabel(_ schema.GroupVersionKind, _, _ string) (string, string, error) {
 	return "", "", fmt.Errorf("function not implemented")
 }
