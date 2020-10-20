@@ -25,13 +25,13 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	"k8s.io/cloud-provider/app"
+	"k8s.io/cloud-provider/app/config"
+	"k8s.io/cloud-provider/options"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/cmd/cloud-controller-manager/app"
-	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
-	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
 )
 
 // TearDownFunc is to be called to tear down a test server.
@@ -41,7 +41,7 @@ type TearDownFunc func()
 type TestServer struct {
 	LoopbackClientConfig *restclient.Config // Rest client config using the magic token
 	Options              *options.CloudControllerManagerOptions
-	Config               *cloudcontrollerconfig.Config
+	Config               *config.Config
 	TearDownFn           TearDownFunc // TearDown function
 	TmpDir               string       // Temp Dir used, by the apiserver
 }

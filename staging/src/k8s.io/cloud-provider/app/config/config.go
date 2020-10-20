@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package app
+package config
 
 import (
 	apiserver "k8s.io/apiserver/pkg/server"
@@ -23,12 +23,12 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
-	ccmconfig "k8s.io/cloud-provider/app/apis/config"
+	"k8s.io/cloud-provider/config"
 )
 
 // Config is the main context object for the cloud controller manager.
 type Config struct {
-	ComponentConfig ccmconfig.CloudControllerManagerConfiguration
+	ComponentConfig config.CloudControllerManagerConfiguration
 
 	SecureServing *apiserver.SecureServingInfo
 	// LoopbackClientConfig is a config for a privileged loopback connection

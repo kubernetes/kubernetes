@@ -2,16 +2,16 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["scheme.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/app/apis/config/scheme",
-    importpath = "k8s.io/cloud-provider/app/apis/config/scheme",
+    srcs = ["install.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/config/install",
+    importpath = "k8s.io/cloud-provider/config/install",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//staging/src/k8s.io/cloud-provider/app/apis/config:go_default_library",
-        "//staging/src/k8s.io/cloud-provider/app/apis/config/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/config:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/config/v1alpha1:go_default_library",
     ],
 )
 
