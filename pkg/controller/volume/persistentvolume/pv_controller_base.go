@@ -317,7 +317,7 @@ func (ctrl *PersistentVolumeController) Run(stopCh <-chan struct{}) {
 	go wait.Until(ctrl.volumeWorker, time.Second, stopCh)
 	go wait.Until(ctrl.claimWorker, time.Second, stopCh)
 
-	metrics.Register(ctrl.volumes.store, ctrl.claims)
+	metrics.Register(ctrl.volumes.store, ctrl.claims, &ctrl.volumePluginMgr)
 
 	<-stopCh
 }

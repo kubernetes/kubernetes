@@ -6,6 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
