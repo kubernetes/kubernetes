@@ -3653,6 +3653,26 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 					}
 					w.Write(LEVEL_1, "(as a percentage of request):\t%s / %s\n", current, target)
 				}
+			case autoscalingv2beta2.ContainerResourceMetricSourceType:
+				w.Write(LEVEL_1, "resource %s of container \"%s\" on pods", string(metric.ContainerResource.Name), metric.ContainerResource.Container)
+				if metric.ContainerResource.Target.AverageValue != nil {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].ContainerResource != nil {
+						current = hpa.Status.CurrentMetrics[i].ContainerResource.Current.AverageValue.String()
+					}
+					w.Write(LEVEL_0, ":\t%s / %s\n", current, metric.ContainerResource.Target.AverageValue.String())
+				} else {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].ContainerResource != nil && hpa.Status.CurrentMetrics[i].ContainerResource.Current.AverageUtilization != nil {
+						current = fmt.Sprintf("%d%% (%s)", *hpa.Status.CurrentMetrics[i].ContainerResource.Current.AverageUtilization, hpa.Status.CurrentMetrics[i].ContainerResource.Current.AverageValue.String())
+					}
+
+					target := "<auto>"
+					if metric.ContainerResource.Target.AverageUtilization != nil {
+						target = fmt.Sprintf("%d%%", *metric.ContainerResource.Target.AverageUtilization)
+					}
+					w.Write(LEVEL_1, "(as a percentage of request):\t%s / %s\n", current, target)
+				}
 			default:
 				w.Write(LEVEL_1, "<unknown metric type %q>\n", string(metric.Type))
 			}
