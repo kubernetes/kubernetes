@@ -414,7 +414,10 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(ctx context.Co
 		err           error
 	)
 
-	if node.Spec.ProviderID == "" {
+	// skip the provider ID check for InstancesV2, GetInstanceProviderID only builds a ProviderID for Instances
+	// we will set up providerID for InstancesV2 if instanceMeta has non-empty providerID
+	_, instancesV2Enabled := cnc.cloud.InstancesV2()
+	if node.Spec.ProviderID == "" && !instancesV2Enabled {
 		providerID, err = cloudprovider.GetInstanceProviderID(ctx, cnc.cloud, types.NodeName(node.Name))
 		if err == nil {
 			nodeModifiers = append(nodeModifiers, func(n *v1.Node) {
@@ -464,6 +467,10 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(ctx context.Co
 	instanceMeta, err := instanceMetadataGetter(providerID, node.Name, node)
 	if err != nil {
 		return nil, err
+	}
+
+	if node.Spec.ProviderID == "" && instanceMeta.ProviderID != "" {
+		nodeModifiers = append(nodeModifiers, func(n *v1.Node) { n.Spec.ProviderID = instanceMeta.ProviderID })
 	}
 
 	// If user provided an IP address, ensure that IP address is found
