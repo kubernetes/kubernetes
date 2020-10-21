@@ -113,29 +113,19 @@ type handler struct {
 }
 
 // CreateHandlers creates the REST handlers for the stats.
-func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryProvider, enableCAdvisorJSONEndpoints bool) *restful.WebService {
+func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryProvider) *restful.WebService {
 	h := &handler{provider, summaryProvider}
 
 	ws := &restful.WebService{}
 	ws.Path(rootPath).
 		Produces(restful.MIME_JSON)
 
-	type endpoint struct {
+	endpoints := []struct {
 		path    string
 		handler restful.RouteFunction
-	}
-
-	endpoints := []endpoint{
+	}{
+		{"", h.handleStats},
 		{"/summary", h.handleSummary},
-	}
-
-	if enableCAdvisorJSONEndpoints {
-		endpoints = append(endpoints,
-			endpoint{"", h.handleStats},
-			endpoint{"/container", h.handleSystemContainer},
-			endpoint{"/{podName}/{containerName}", h.handlePodContainer},
-			endpoint{"/{namespace}/{podName}/{uid}/{containerName}", h.handlePodContainer},
-		)
 	}
 
 	for _, e := range endpoints {
