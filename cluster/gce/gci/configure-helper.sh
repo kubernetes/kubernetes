@@ -1606,11 +1606,17 @@ EOF
 #
 # $1 is the file to create.
 # $2: the log owner uid to set for the log file.
-# $3: the log owner gid to set for the log file.
+# $3: the log owner gid to set for the log file. If $KUBE_POD_LOG_READERS_GROUP
+# is set then this value will not be used.
 function prepare-log-file {
   touch "$1"
-  chmod 644 "$1"
-  chown "${2:-${LOG_OWNER_USER:-root}}":"${3:-${LOG_OWNER_GROUP:-root}}" "$1"
+  if [[ -n "${KUBE_POD_LOG_READERS_GROUP:-}" ]]; then
+    chmod 640 "$1"
+    chown "${2:-root}":"${KUBE_POD_LOG_READERS_GROUP}" "$1"
+  else
+    chmod 644 "$1"
+    chown "${2:-${LOG_OWNER_USER:-root}}":"${3:-${LOG_OWNER_GROUP:-root}}" "$1"
+  fi
 }
 
 # Prepares parameters for kube-proxy manifest.
@@ -1965,7 +1971,7 @@ function update-node-label() {
 # User and group should never contain characters that need to be quoted
 # shellcheck disable=SC2086
 function run-kube-controller-manager-as-non-root {
-  prepare-log-file /var/log/kube-controller-manager.log ${KUBE_CONTROLLER_MANAGER_RUNASUSER} ${KUBE_CONTROLLER_MANAGER_RUNASGROUP}
+  prepare-log-file /var/log/kube-controller-manager.log ${KUBE_CONTROLLER_MANAGER_RUNASUSER}
   setfacl -m u:${KUBE_CONTROLLER_MANAGER_RUNASUSER}:r "${CA_CERT_BUNDLE_PATH}"
   setfacl -m u:${KUBE_CONTROLLER_MANAGER_RUNASUSER}:r "${SERVICEACCOUNT_CERT_PATH}"
   setfacl -m u:${KUBE_CONTROLLER_MANAGER_RUNASUSER}:r "${SERVICEACCOUNT_KEY_PATH}"
@@ -2093,7 +2099,7 @@ function start-kube-scheduler {
   create-kubeconfig "kube-scheduler" "${KUBE_SCHEDULER_TOKEN}"
   # User and group should never contain characters that need to be quoted
   # shellcheck disable=SC2086
-  prepare-log-file /var/log/kube-scheduler.log ${KUBE_SCHEDULER_RUNASUSER:-2001} ${KUBE_SCHEDULER_RUNASGROUP:-2001}
+  prepare-log-file /var/log/kube-scheduler.log ${KUBE_SCHEDULER_RUNASUSER:-2001}
 
   # Calculate variables and set them in the manifest.
   params=("${SCHEDULER_TEST_LOG_LEVEL:-"--v=2"}" "${SCHEDULER_TEST_ARGS:-}")
@@ -2531,7 +2537,7 @@ function start-kube-addons {
   create-kubeconfig "addon-manager" "${ADDON_MANAGER_TOKEN}"
   # User and group should never contain characters that need to be quoted
   # shellcheck disable=SC2086
-  prepare-log-file /var/log/kube-addon-manager.log ${KUBE_ADDON_MANAGER_RUNASUSER:-2002} ${KUBE_ADDON_MANAGER_RUNASGROUP:-2002}
+  prepare-log-file /var/log/kube-addon-manager.log ${KUBE_ADDON_MANAGER_RUNASUSER:-2002}
 
   # prep addition kube-up specific rbac objects
   setup-addon-manifests "addons" "rbac/kubelet-api-auth"
@@ -3080,6 +3086,13 @@ function main() {
     systemctl stop docker || echo "unable to stop docker"
     setup-containerd
   fi
+
+  if [[ -n "${KUBE_POD_LOG_READERS_GROUP:-}" ]]; then
+     mkdir -p /var/log/pods/
+     chgrp -R "${KUBE_POD_LOG_READERS_GROUP:-}" /var/log/pods/
+     chmod -R g+s /var/log/pods/
+  fi
+
   start-kubelet
 
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
