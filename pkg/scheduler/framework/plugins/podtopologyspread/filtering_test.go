@@ -1076,7 +1076,7 @@ func BenchmarkFilter(b *testing.B) {
 		{
 			name: "1000nodes/single-constraint-zone",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, v1.LabelZoneFailureDomain, v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, v1.LabelZoneFailureDomainStable, v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPodsNum:  10000,
 			allNodesNum:      1000,
@@ -1094,7 +1094,7 @@ func BenchmarkFilter(b *testing.B) {
 		{
 			name: "1000nodes/two-Constraints-zone-node",
 			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
-				SpreadConstraint(1, v1.LabelZoneFailureDomain, v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, v1.LabelZoneFailureDomainStable, v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
 				SpreadConstraint(1, v1.LabelHostname, v1.DoNotSchedule, st.MakeLabelSelector().Exists("bar").Obj()).
 				Obj(),
 			existingPodsNum:  10000,
