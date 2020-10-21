@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/component-helpers/auth/rbac/validation"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 )
 
@@ -65,7 +66,7 @@ func ConfirmNoEscalation(ctx context.Context, ruleResolver AuthorizationRuleReso
 		ruleResolutionErrors = append(ruleResolutionErrors, err)
 	}
 
-	ownerRightsCover, missingRights := Covers(ownerRules, rules)
+	ownerRightsCover, missingRights := validation.Covers(ownerRules, rules)
 	if !ownerRightsCover {
 		compactMissingRights := missingRights
 		if compact, err := CompactRules(missingRights); err == nil {
@@ -266,6 +267,15 @@ func appliesTo(user user.Info, bindingSubjects []rbacv1.Subject, namespace strin
 		}
 	}
 	return 0, false
+}
+
+func has(set []string, ele string) bool {
+	for _, s := range set {
+		if s == ele {
+			return true
+		}
+	}
+	return false
 }
 
 func appliesToUser(user user.Info, subject rbacv1.Subject, namespace string) bool {
