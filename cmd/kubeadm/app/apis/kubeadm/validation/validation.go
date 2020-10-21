@@ -403,6 +403,25 @@ func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool,
 	return allErrs
 }
 
+// ValidateServiceSubnetSize validates that the maximum subnet size is not exceeded
+// Should be a small cidr due to how it is stored in etcd.
+// bigger cidr (specially those offered by IPv6) will add no value
+// and significantly increase snapshotting time.
+// NOTE: This is identical to validation performed in the apiserver.
+func ValidateServiceSubnetSize(subnetStr string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// subnets were already validated
+	subnets, _ := utilnet.ParseCIDRs(strings.Split(subnetStr, ","))
+	for _, serviceSubnet := range subnets {
+		ones, bits := serviceSubnet.Mask.Size()
+		if bits-ones > constants.MaximumBitsForServiceSubnet {
+			errMsg := fmt.Sprintf("specified service subnet is too large; for %d-bit addresses, the mask must be >= %d", bits, bits-constants.MaximumBitsForServiceSubnet)
+			allErrs = append(allErrs, field.Invalid(fldPath, serviceSubnet.String(), errMsg))
+		}
+	}
+	return allErrs
+}
+
 // ValidatePodSubnetNodeMask validates that the relation between podSubnet and node-masks is correct
 func ValidatePodSubnetNodeMask(subnetStr string, c *kubeadm.ClusterConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -468,6 +487,8 @@ func ValidateNetworking(c *kubeadm.ClusterConfiguration, fldPath *field.Path) fi
 
 	if len(c.Networking.ServiceSubnet) != 0 {
 		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, isDualStack, field.NewPath("serviceSubnet"))...)
+		// Service subnet was already validated, we need to validate now the subnet size
+		allErrs = append(allErrs, ValidateServiceSubnetSize(c.Networking.ServiceSubnet, field.NewPath("serviceSubnet"))...)
 	}
 	if len(c.Networking.PodSubnet) != 0 {
 		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.PodSubnet, constants.MinimumAddressesInPodSubnet, isDualStack, field.NewPath("podSubnet"))...)

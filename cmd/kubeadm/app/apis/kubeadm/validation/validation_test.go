@@ -287,6 +287,37 @@ func TestValidatePodSubnetNodeMask(t *testing.T) {
 	}
 }
 
+func TestValidateServiceSubnetSize(t *testing.T) {
+	var tests = []struct {
+		name     string
+		subnet   string
+		expected bool
+	}{
+		{"single IPv4, but mask too large.", "10.0.0.16/2", false},
+		{"single IPv6, but mask too large.", "2001:db8::1/64", false},
+		{"single IPv4 CIDR", "10.0.0.16/12", true},
+		{"single IPv6 CIDR", "2001:db8::/112", true},
+		// dual-stack:
+		{"dual, but IPv4 mask too large.", "2001:db8::1/112,10.0.0.16/6", false},
+		{"dual, but IPv6 mask too large.", "2001:db8::1/12,10.0.0.16/16", false},
+		{"dual IPv4 IPv6", "10.0.0.16/12,2001:db8::/112", true},
+		{"dual IPv6 IPv4", "2001:db8::/112,10.0.0.16/12", true},
+	}
+	for _, rt := range tests {
+
+		actual := ValidateServiceSubnetSize(rt.subnet, nil)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"%s test case failed :\n\texpected: %t\n\t  actual: %t\n\t  err(s): %v\n\t",
+				rt.name,
+				rt.expected,
+				(len(actual) == 0),
+				actual,
+			)
+		}
+	}
+}
+
 func TestValidateHostPort(t *testing.T) {
 	var tests = []struct {
 		name     string
@@ -521,7 +552,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 						},
 					},
 					Networking: kubeadm.Networking{
-						ServiceSubnet: "2001:db8::1/98",
+						ServiceSubnet: "2001:db8::1/112",
 						DNSDomain:     "cluster.local",
 					},
 					CertificatesDir: "/some/other/cert/dir",
