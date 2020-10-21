@@ -923,7 +923,7 @@ metadata:
 			if !strings.Contains(podJSON, busyboxImage) {
 				framework.Failf("Failed replacing image from %s to %s in:\n%s\n", httpdImage, busyboxImage, podJSON)
 			}
-			framework.RunKubectlOrDieInput(ns, podJSON, "replace", "-f", "-", "--dry-run", "server")
+			framework.RunKubectlOrDieInput(ns, podJSON, "replace", "-f", "-", "--dry-run=server")
 
 			ginkgo.By("verifying the pod " + podName + " has the right image " + httpdImage)
 			pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
