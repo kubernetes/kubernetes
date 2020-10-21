@@ -296,7 +296,7 @@ const (
 	CSIStorageCapacity featuregate.Feature = "CSIStorageCapacity"
 
 	// owner: @alculquicondor
-	// alpha: v1.19
+	// alpha: v1.20
 	//
 	// Enables the use of PodTopologySpread scheduling plugin to do default
 	// spreading and disables legacy SelectorSpread plugin.
@@ -662,7 +662,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StorageObjectInUseProtection:   {Default: true, PreRelease: featuregate.GA},
 	SupportPodPidsLimit:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	SupportNodePidsLimit:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
-	HyperVContainer:                {Default: false, PreRelease: featuregate.Alpha},
+	HyperVContainer:                {Default: false, PreRelease: featuregate.Deprecated},
 	TokenRequest:                   {Default: true, PreRelease: featuregate.Beta},
 	TokenRequestProjection:         {Default: true, PreRelease: featuregate.Beta},
 	BoundServiceAccountTokenVolume: {Default: false, PreRelease: featuregate.Alpha},
