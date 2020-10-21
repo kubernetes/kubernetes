@@ -63,6 +63,4 @@ rules:
       - k8s.io/kubernetes/pkg/apis/storage/v1beta1
       - k8s.io/kubernetes/pkg/features
       - k8s.io/kubernetes/pkg/kubectl
-      - k8s.io/kubernetes/pkg/registry/rbac/reconciliation
-      - k8s.io/kubernetes/pkg/registry/rbac/validation
       - k8s.io/kubernetes/pkg/util/parsers
