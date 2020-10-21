@@ -502,7 +502,7 @@ function ensure-local-ssds-ephemeral-storage() {
 function setup-logrotate() {
   mkdir -p /etc/logrotate.d/
 
-  if [[ "${ENABLE_LOGROTATE_FILES:-false}" = "true" ]]; then
+  if [[ "${ENABLE_LOGROTATE_FILES:-true}" = "true" ]]; then
     # Configure log rotation for all logs in /var/log, which is where k8s services
     # are configured to write their log files. Whenever logrotate is ran, this
     # config will:
