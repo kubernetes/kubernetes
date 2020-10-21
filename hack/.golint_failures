@@ -150,7 +150,6 @@ pkg/registry/policy/rest
 pkg/registry/rbac/clusterrole/policybased
 pkg/registry/rbac/clusterrolebinding
 pkg/registry/rbac/clusterrolebinding/policybased
-pkg/registry/rbac/reconciliation
 pkg/registry/rbac/rest
 pkg/registry/rbac/role/policybased
 pkg/registry/rbac/rolebinding
@@ -408,6 +407,8 @@ staging/src/k8s.io/component-base/cli/flag
 staging/src/k8s.io/component-base/config/v1alpha1
 staging/src/k8s.io/component-base/featuregate
 staging/src/k8s.io/component-base/version/verflag
+staging/src/k8s.io/component-helpers/auth/rbac/reconciliation
+staging/src/k8s.io/component-helpers/auth/rbac/validation
 staging/src/k8s.io/controller-manager/config/v1alpha1
 staging/src/k8s.io/controller-manager/pkg/features
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1

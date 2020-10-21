@@ -32,10 +32,10 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	rbacv1client "k8s.io/client-go/kubernetes/typed/rbac/v1"
+	"k8s.io/component-helpers/auth/rbac/reconciliation"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubernetes/pkg/registry/rbac/reconciliation"
 )
 
 // ReconcileOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of

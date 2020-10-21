@@ -18,6 +18,7 @@ package reconciliation
 
 import (
 	"context"
+
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,7 +27,7 @@ import (
 )
 
 // +k8s:deepcopy-gen=true
-// +k8s:deepcopy-gen:interfaces=k8s.io/kubernetes/pkg/registry/rbac/reconciliation.RoleBinding
+// +k8s:deepcopy-gen:interfaces=k8s.io/component-helpers/auth/rbac/reconciliation.RoleBinding
 // +k8s:deepcopy-gen:nonpointer-interfaces=true
 type ClusterRoleBindingAdapter struct {
 	ClusterRoleBinding *rbacv1.ClusterRoleBinding
