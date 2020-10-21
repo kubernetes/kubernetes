@@ -427,7 +427,7 @@ METADATA_CLOBBERS_CONFIG="${METADATA_CLOBBERS_CONFIG:-false}"
 ENABLE_BIG_CLUSTER_SUBNETS="${ENABLE_BIG_CLUSTER_SUBNETS:-false}"
 
 # Optional: Enable log rotation for k8s services
-ENABLE_LOGROTATE_FILES="${ENABLE_LOGROTATE_FILES:-false}"
+ENABLE_LOGROTATE_FILES="${ENABLE_LOGROTATE_FILES:-true}"
 PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_LOGROTATE_FILES"
 if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_FILES_MAX_COUNT"
@@ -525,7 +525,7 @@ export KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE="${KUBE_KONNECTIVITY_SERVICE_PRO
 # Optional: Enable Windows CSI-Proxy
 export ENABLE_CSI_PROXY="${ENABLE_CSI_PROXY:-true}"
 
-# ETCD_LISTEN_ON_HOST_IP decides whether etcd servers should also listen on host IP, 
+# ETCD_LISTEN_ON_HOST_IP decides whether etcd servers should also listen on host IP,
 # in addition to listening to 127.0.0.1, and whether kube-apiserver should connect to etcd servers
 # through host IP.
 export ETCD_LISTEN_ON_HOST_IP="${ETCD_LISTEN_ON_HOST_IP:-false}"
