@@ -20,6 +20,7 @@ package azure
 
 import (
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
@@ -42,6 +43,12 @@ const (
 
 	// operationCancledErrorMessage means the operation is canceled by another new operation.
 	operationCancledErrorMessage = "canceledandsupersededduetoanotheroperation"
+
+	referencedResourceNotProvisionedMessageCode = "ReferencedResourceNotProvisioned"
+)
+
+var (
+	pipErrorMessageRE = regexp.MustCompile(`(?:.*)/subscriptions/(?:.*)/resourceGroups/(.*)/providers/Microsoft.Network/publicIPAddresses/([^\s]+)(?:.*)`)
 )
 
 // RequestBackoff if backoff is disabled in cloud provider it
@@ -193,9 +200,36 @@ func (az *Cloud) CreateOrUpdateLB(service *v1.Service, lb network.LoadBalancer) 
 		klog.V(3).Infof("LoadBalancer cache for %s is cleanup because of http.StatusPreconditionFailed", *lb.Name)
 		az.lbCache.Delete(*lb.Name)
 	}
+
+	retryErrorMessage := rerr.Error().Error()
 	// Invalidate the cache because another new operation has canceled the current request.
 	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCancledErrorMessage) {
 		klog.V(3).Infof("LoadBalancer cache for %s is cleanup because CreateOrUpdate is canceled by another operation", *lb.Name)
+		az.lbCache.Delete(*lb.Name)
+	}
+
+	// The LB update may fail because the referenced PIP is not in the Succeeded provisioning state
+	if strings.Contains(strings.ToLower(retryErrorMessage), strings.ToLower(referencedResourceNotProvisionedMessageCode)) {
+		matches := pipErrorMessageRE.FindStringSubmatch(retryErrorMessage)
+		if len(matches) != 3 {
+			klog.Warningf("Failed to parse the retry error message %s", retryErrorMessage)
+			return rerr.Error()
+		}
+		pipRG, pipName := matches[1], matches[2]
+		klog.V(3).Infof("The public IP %s referenced by load balancer %s is not in Succeeded provisioning state, will try to update it", pipName, to.String(lb.Name))
+		pip, _, err := az.getPublicIPAddress(pipRG, pipName)
+		if err != nil {
+			klog.Warningf("Failed to get the public IP %s in resource group %s: %v", pipName, pipRG, err)
+			return rerr.Error()
+		}
+		// Perform a dummy update to fix the provisioning state
+		err = az.CreateOrUpdatePIP(service, pipRG, pip)
+		if err != nil {
+			klog.Warningf("Failed to update the public IP %s in resource group %s: %v", pipName, pipRG, err)
+			return rerr.Error()
+		}
+		// Invalidate the LB cache, return the error, and the controller manager
+		// would retry the LB update in the next reconcile loop
 		az.lbCache.Delete(*lb.Name)
 	}
 
