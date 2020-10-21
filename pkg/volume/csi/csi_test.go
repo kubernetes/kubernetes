@@ -27,6 +27,7 @@ import (
 	api "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,6 +48,7 @@ import (
 // based on operations from the volume manager/reconciler/operation executor
 func TestCSI_VolumeAll(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defaultFSGroupPolicy := storagev1.ReadWriteOnceWithFSTypeFSGroupPolicy
 
 	tests := []struct {
 		name       string
@@ -87,6 +89,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			driverSpec: &storage.CSIDriverSpec{
 				// Required for the driver to be accepted for the persistent volume.
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{storage.VolumeLifecyclePersistent},
+				FSGroupPolicy:        &defaultFSGroupPolicy,
 			},
 		},
 		{
@@ -104,6 +107,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			driverSpec: &storage.CSIDriverSpec{
 				// This will cause the volume to be rejected.
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{storage.VolumeLifecycleEphemeral},
+				FSGroupPolicy:        &defaultFSGroupPolicy,
 			},
 			shouldFail: true,
 		},
@@ -122,6 +126,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			driverSpec: &storage.CSIDriverSpec{
 				// Required for the driver to be accepted for the inline volume.
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{storage.VolumeLifecycleEphemeral},
+				FSGroupPolicy:        &defaultFSGroupPolicy,
 			},
 		},
 		{
@@ -139,6 +144,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			driverSpec: &storage.CSIDriverSpec{
 				// Required for the driver to be accepted for the inline volume.
 				VolumeLifecycleModes: []storage.VolumeLifecycleMode{storage.VolumeLifecyclePersistent, storage.VolumeLifecycleEphemeral},
+				FSGroupPolicy:        &defaultFSGroupPolicy,
 			},
 		},
 		{
