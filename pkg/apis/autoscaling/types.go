@@ -204,6 +204,12 @@ const (
 	// (for example length of queue in cloud messaging service, or
 	// QPS from loadbalancer running outside of cluster).
 	ExternalMetricSourceType MetricSourceType = "External"
+	// ContainerResourceMetricSourceType is a resource metric known to Kubernetes, as
+	// specified in requests and limits, describing a single container in each pod in the current
+	// scale target (e.g. CPU or memory).  Such metrics are built in to
+	// Kubernetes, and have special scaling options on top of those available
+	// to normal per-pod metrics (the "pods" source).
+	ContainerResourceMetricSourceType MetricSourceType = "ContainerResource"
 )
 
 // MetricSpec specifies how to scale based on a single metric
@@ -229,6 +235,13 @@ type MetricSpec struct {
 	// to normal per-pod metrics using the "pods" source.
 	// +optional
 	Resource *ResourceMetricSource
+	// ContainerResource refers to a resource metric (such as those specified in
+	// requests and limits) known to Kubernetes describing a single container in each pod of the
+	// current scale target (e.g. CPU or memory). Such metrics are built in to
+	// Kubernetes, and have special scaling options on top of those available
+	// to normal per-pod metrics using the "pods" source.
+	// +optional
+	ContainerResource *ContainerResourceMetricSource
 	// External refers to a global metric that is not associated
 	// with any Kubernetes object. It allows autoscaling based on information
 	// coming from components running outside of cluster
@@ -268,6 +281,22 @@ type ResourceMetricSource struct {
 	// Name is the name of the resource in question.
 	Name api.ResourceName
 	// Target specifies the target value for the given metric
+	Target MetricTarget
+}
+
+// ContainerResourceMetricSource indicates how to scale on a resource metric known to
+// Kubernetes, as specified in the requests and limits, describing a single container in
+// each of the pods of the current scale target(e.g. CPU or memory). The values will be
+// averaged together before being compared to the target. Such metrics are built into
+// Kubernetes, and have special scaling options on top of those available to
+// normal per-pod metrics using the "pods" source. Only one "target" type
+// should be set.
+type ContainerResourceMetricSource struct {
+	// name is the name of the of the resource
+	Name api.ResourceName
+	// container is the name of the container in the pods of the scaling target.
+	Container string
+	// target specifies the target value for the given metric
 	Target MetricTarget
 }
 
@@ -420,6 +449,13 @@ type MetricStatus struct {
 	// to normal per-pod metrics using the "pods" source.
 	// +optional
 	Resource *ResourceMetricStatus
+	// ContainerResource refers to a resource metric (such as those specified in
+	// requests and limits) known to Kubernetes describing a single container in each pod in the
+	// current scale target (e.g. CPU or memory). Such metrics are built in to
+	// Kubernetes, and have special scaling options on top of those available
+	// to normal per-pod metrics using the "pods" source.
+	// +optional
+	ContainerResource *ContainerResourceMetricStatus
 	// External refers to a global metric that is not associated
 	// with any Kubernetes object. It allows autoscaling based on information
 	// coming from components running outside of cluster
@@ -454,6 +490,18 @@ type ResourceMetricStatus struct {
 	// Name is the name of the resource in question.
 	Name    api.ResourceName
 	Current MetricValueStatus
+}
+
+// ContainerResourceMetricStatus indicates the current value of a resource metric known to
+// Kubernetes, as specified in requests and limits, describing each pod in the
+// current scale target (e.g. CPU or memory).  Such metrics are built in to
+// Kubernetes, and have special scaling options on top of those available to
+// normal per-pod metrics using the "pods" source.
+type ContainerResourceMetricStatus struct {
+	// Name is the name of the resource in question.
+	Name      api.ResourceName
+	Container string
+	Current   MetricValueStatus
 }
 
 // ExternalMetricStatus indicates the current value of a global metric

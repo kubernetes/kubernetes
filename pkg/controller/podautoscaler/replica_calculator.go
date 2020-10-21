@@ -61,8 +61,8 @@ func NewReplicaCalculator(metricsClient metricsclient.MetricsClient, podLister c
 
 // GetResourceReplicas calculates the desired replica count based on a target resource utilization percentage
 // of the given resource for pods matching the given selector in the given namespace, and the current replica count
-func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUtilization int32, resource v1.ResourceName, namespace string, selector labels.Selector) (replicaCount int32, utilization int32, rawUtilization int64, timestamp time.Time, err error) {
-	metrics, timestamp, err := c.metricsClient.GetResourceMetric(resource, namespace, selector)
+func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUtilization int32, resource v1.ResourceName, namespace string, selector labels.Selector, container string) (replicaCount int32, utilization int32, rawUtilization int64, timestamp time.Time, err error) {
+	metrics, timestamp, err := c.metricsClient.GetResourceMetric(resource, namespace, selector, container)
 	if err != nil {
 		return 0, 0, 0, time.Time{}, fmt.Errorf("unable to get metrics for resource %s: %v", resource, err)
 	}
@@ -79,7 +79,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 	readyPodCount, unreadyPods, missingPods, ignoredPods := groupPods(podList, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
 	removeMetricsForPods(metrics, ignoredPods)
 	removeMetricsForPods(metrics, unreadyPods)
-	requests, err := calculatePodRequests(podList, resource)
+	requests, err := calculatePodRequests(podList, container, resource)
 	if err != nil {
 		return 0, 0, 0, time.Time{}, err
 	}
@@ -150,8 +150,8 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 
 // GetRawResourceReplicas calculates the desired replica count based on a target resource utilization (as a raw milli-value)
 // for pods matching the given selector in the given namespace, and the current replica count
-func (c *ReplicaCalculator) GetRawResourceReplicas(currentReplicas int32, targetUtilization int64, resource v1.ResourceName, namespace string, selector labels.Selector) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
-	metrics, timestamp, err := c.metricsClient.GetResourceMetric(resource, namespace, selector)
+func (c *ReplicaCalculator) GetRawResourceReplicas(currentReplicas int32, targetUtilization int64, resource v1.ResourceName, namespace string, selector labels.Selector, container string) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
+	metrics, timestamp, err := c.metricsClient.GetResourceMetric(resource, namespace, selector, container)
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metrics for resource %s: %v", resource, err)
 	}
@@ -414,15 +414,17 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 	return
 }
 
-func calculatePodRequests(pods []*v1.Pod, resource v1.ResourceName) (map[string]int64, error) {
+func calculatePodRequests(pods []*v1.Pod, container string, resource v1.ResourceName) (map[string]int64, error) {
 	requests := make(map[string]int64, len(pods))
 	for _, pod := range pods {
 		podSum := int64(0)
-		for _, container := range pod.Spec.Containers {
-			if containerRequest, ok := container.Resources.Requests[resource]; ok {
-				podSum += containerRequest.MilliValue()
-			} else {
-				return nil, fmt.Errorf("missing request for %s", resource)
+		for _, c := range pod.Spec.Containers {
+			if container == "" || container == c.Name {
+				if containerRequest, ok := c.Resources.Requests[resource]; ok {
+					podSum += containerRequest.MilliValue()
+				} else {
+					return nil, fmt.Errorf("missing request for %s", resource)
+				}
 			}
 		}
 		requests[pod.Name] = podSum
