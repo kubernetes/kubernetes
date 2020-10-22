@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/http"
 	"strings"
 	"time"
 
@@ -77,7 +76,7 @@ const (
 	defaultNodeMaskCIDRIPv6 = 64
 )
 
-func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
+func startServiceController(ctx ControllerContext) (interface{}, bool, error) {
 	serviceController, err := servicecontroller.New(
 		ctx.Cloud,
 		ctx.ClientBuilder.ClientOrDie("service-controller"),
@@ -95,7 +94,7 @@ func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
 	return nil, true, nil
 }
 
-func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) {
+func startNodeIpamController(ctx ControllerContext) (interface{}, bool, error) {
 	var serviceCIDR *net.IPNet
 	var secondaryServiceCIDR *net.IPNet
 
@@ -189,10 +188,10 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 		return nil, true, err
 	}
 	go nodeIpamController.Run(ctx.Stop)
-	return nil, true, nil
+	return nodeIpamController, true, nil
 }
 
-func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, error) {
+func startNodeLifecycleController(ctx ControllerContext) (interface{}, bool, error) {
 	lifecycleController, err := lifecyclecontroller.NewNodeLifecycleController(
 		ctx.InformerFactory.Coordination().V1().Leases(),
 		ctx.InformerFactory.Core().V1().Pods(),
@@ -214,10 +213,10 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 		return nil, true, err
 	}
 	go lifecycleController.Run(ctx.Stop)
-	return nil, true, nil
+	return lifecycleController, true, nil
 }
 
-func startCloudNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, error) {
+func startCloudNodeLifecycleController(ctx ControllerContext) (interface{}, bool, error) {
 	cloudNodeLifecycleController, err := cloudnodelifecyclecontroller.NewCloudNodeLifecycleController(
 		ctx.InformerFactory.Core().V1().Nodes(),
 		// cloud node lifecycle controller uses existing cluster role from node-controller
@@ -236,7 +235,7 @@ func startCloudNodeLifecycleController(ctx ControllerContext) (http.Handler, boo
 	return nil, true, nil
 }
 
-func startRouteController(ctx ControllerContext) (http.Handler, bool, error) {
+func startRouteController(ctx ControllerContext) (interface{}, bool, error) {
 	if !ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs || !ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes {
 		klog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs, ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes)
 		return nil, false, nil
@@ -278,10 +277,10 @@ func startRouteController(ctx ControllerContext) (http.Handler, bool, error) {
 		ctx.ComponentConfig.KubeCloudShared.ClusterName,
 		clusterCIDRs)
 	go routeController.Run(ctx.Stop, ctx.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration)
-	return nil, true, nil
+	return routeController, true, nil
 }
 
-func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler, bool, error) {
+func startPersistentVolumeBinderController(ctx ControllerContext) (interface{}, bool, error) {
 	plugins, err := ProbeControllerVolumePlugins(ctx.Cloud, ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to probe volume plugins when starting persistentvolume controller: %v", err)
@@ -314,7 +313,7 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler,
 	return nil, true, nil
 }
 
-func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, error) {
+func startAttachDetachController(ctx ControllerContext) (interface{}, bool, error) {
 	if ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration < time.Second {
 		return nil, true, fmt.Errorf("duration time must be greater than one second as set via command line option reconcile-sync-loop-period")
 	}
@@ -364,7 +363,7 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 	return nil, true, nil
 }
 
-func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, error) {
+func startVolumeExpandController(ctx ControllerContext) (interface{}, bool, error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
 		plugins, err := ProbeExpandableVolumePlugins(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
 		if err != nil {
@@ -397,7 +396,7 @@ func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, err
 	return nil, false, nil
 }
 
-func startEphemeralVolumeController(ctx ControllerContext) (http.Handler, bool, error) {
+func startEphemeralVolumeController(ctx ControllerContext) (interface{}, bool, error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
 		ephemeralController, err := ephemeral.NewController(
 			ctx.ClientBuilder.ClientOrDie("ephemeral-volume-controller"),
@@ -413,28 +412,31 @@ func startEphemeralVolumeController(ctx ControllerContext) (http.Handler, bool, 
 	return nil, false, nil
 }
 
-func startEndpointController(ctx ControllerContext) (http.Handler, bool, error) {
-	go endpointcontroller.NewEndpointController(
+func startEndpointController(ctx ControllerContext) (interface{}, bool, error) {
+	c := endpointcontroller.NewEndpointController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Services(),
 		ctx.InformerFactory.Core().V1().Endpoints(),
 		ctx.ClientBuilder.ClientOrDie("endpoint-controller"),
 		ctx.ComponentConfig.EndpointController.EndpointUpdatesBatchPeriod.Duration,
-	).Run(int(ctx.ComponentConfig.EndpointController.ConcurrentEndpointSyncs), ctx.Stop)
-	return nil, true, nil
+	)
+
+	go c.Run(int(ctx.ComponentConfig.EndpointController.ConcurrentEndpointSyncs), ctx.Stop)
+	return c, true, nil
 }
 
-func startReplicationController(ctx ControllerContext) (http.Handler, bool, error) {
-	go replicationcontroller.NewReplicationManager(
+func startReplicationController(ctx ControllerContext) (interface{}, bool, error) {
+	c := replicationcontroller.NewReplicationManager(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().ReplicationControllers(),
 		ctx.ClientBuilder.ClientOrDie("replication-controller"),
 		replicationcontroller.BurstReplicas,
-	).Run(int(ctx.ComponentConfig.ReplicationController.ConcurrentRCSyncs), ctx.Stop)
-	return nil, true, nil
+	)
+	go c.Run(int(ctx.ComponentConfig.ReplicationController.ConcurrentRCSyncs), ctx.Stop)
+	return c, true, nil
 }
 
-func startPodGCController(ctx ControllerContext) (http.Handler, bool, error) {
+func startPodGCController(ctx ControllerContext) (interface{}, bool, error) {
 	go podgc.NewPodGC(
 		ctx.ClientBuilder.ClientOrDie("pod-garbage-collector"),
 		ctx.InformerFactory.Core().V1().Pods(),
@@ -444,7 +446,7 @@ func startPodGCController(ctx ControllerContext) (http.Handler, bool, error) {
 	return nil, true, nil
 }
 
-func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, error) {
+func startResourceQuotaController(ctx ControllerContext) (interface{}, bool, error) {
 	resourceQuotaControllerClient := ctx.ClientBuilder.ClientOrDie("resourcequota-controller")
 	discoveryFunc := resourceQuotaControllerClient.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(ctx.InformerFactory.ForResource)
@@ -479,7 +481,7 @@ func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, er
 	return nil, true, nil
 }
 
-func startNamespaceController(ctx ControllerContext) (http.Handler, bool, error) {
+func startNamespaceController(ctx ControllerContext) (interface{}, bool, error) {
 	// the namespace cleanup controller is very chatty.  It makes lots of discovery calls and then it makes lots of delete calls
 	// the ratelimiter negatively affects its speed.  Deleting 100 total items in a namespace (that's only a few of each resource
 	// including events), takes ~10 seconds by default.
@@ -490,7 +492,7 @@ func startNamespaceController(ctx ControllerContext) (http.Handler, bool, error)
 	return startModifiedNamespaceController(ctx, namespaceKubeClient, nsKubeconfig)
 }
 
-func startModifiedNamespaceController(ctx ControllerContext, namespaceKubeClient clientset.Interface, nsKubeconfig *restclient.Config) (http.Handler, bool, error) {
+func startModifiedNamespaceController(ctx ControllerContext, namespaceKubeClient clientset.Interface, nsKubeconfig *restclient.Config) (interface{}, bool, error) {
 
 	metadataClient, err := metadata.NewForConfig(nsKubeconfig)
 	if err != nil {
@@ -512,7 +514,7 @@ func startModifiedNamespaceController(ctx ControllerContext, namespaceKubeClient
 	return nil, true, nil
 }
 
-func startServiceAccountController(ctx ControllerContext) (http.Handler, bool, error) {
+func startServiceAccountController(ctx ControllerContext) (interface{}, bool, error) {
 	sac, err := serviceaccountcontroller.NewServiceAccountsController(
 		ctx.InformerFactory.Core().V1().ServiceAccounts(),
 		ctx.InformerFactory.Core().V1().Namespaces(),
@@ -526,7 +528,7 @@ func startServiceAccountController(ctx ControllerContext) (http.Handler, bool, e
 	return nil, true, nil
 }
 
-func startTTLController(ctx ControllerContext) (http.Handler, bool, error) {
+func startTTLController(ctx ControllerContext) (interface{}, bool, error) {
 	go ttlcontroller.NewTTLController(
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.ClientBuilder.ClientOrDie("ttl-controller"),
@@ -534,7 +536,7 @@ func startTTLController(ctx ControllerContext) (http.Handler, bool, error) {
 	return nil, true, nil
 }
 
-func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool, error) {
+func startGarbageCollectorController(ctx ControllerContext) (interface{}, bool, error) {
 	if !ctx.ComponentConfig.GarbageCollectorController.EnableGarbageCollector {
 		return nil, false, nil
 	}
@@ -570,10 +572,10 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 	// the garbage collector.
 	go garbageCollector.Sync(gcClientset.Discovery(), 30*time.Second, ctx.Stop)
 
-	return garbagecollector.NewDebugHandler(garbageCollector), true, nil
+	return garbageCollector, true, nil
 }
 
-func startPVCProtectionController(ctx ControllerContext) (http.Handler, bool, error) {
+func startPVCProtectionController(ctx ControllerContext) (interface{}, bool, error) {
 	pvcProtectionController, err := pvcprotection.NewPVCProtectionController(
 		ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		ctx.InformerFactory.Core().V1().Pods(),
@@ -585,10 +587,10 @@ func startPVCProtectionController(ctx ControllerContext) (http.Handler, bool, er
 		return nil, true, fmt.Errorf("failed to start the pvc protection controller: %v", err)
 	}
 	go pvcProtectionController.Run(1, ctx.Stop)
-	return nil, true, nil
+	return pvcProtectionController, true, nil
 }
 
-func startPVProtectionController(ctx ControllerContext) (http.Handler, bool, error) {
+func startPVProtectionController(ctx ControllerContext) (interface{}, bool, error) {
 	go pvprotection.NewPVProtectionController(
 		ctx.InformerFactory.Core().V1().PersistentVolumes(),
 		ctx.ClientBuilder.ClientOrDie("pv-protection-controller"),
@@ -597,7 +599,7 @@ func startPVProtectionController(ctx ControllerContext) (http.Handler, bool, err
 	return nil, true, nil
 }
 
-func startTTLAfterFinishedController(ctx ControllerContext) (http.Handler, bool, error) {
+func startTTLAfterFinishedController(ctx ControllerContext) (interface{}, bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
 		return nil, false, nil
 	}

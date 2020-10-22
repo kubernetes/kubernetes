@@ -23,14 +23,12 @@ package app
 import (
 	"fmt"
 
-	"net/http"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
 )
 
-func startJobController(ctx ControllerContext) (http.Handler, bool, error) {
+func startJobController(ctx ControllerContext) (interface{}, bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}] {
 		return nil, false, nil
 	}
@@ -42,7 +40,7 @@ func startJobController(ctx ControllerContext) (http.Handler, bool, error) {
 	return nil, true, nil
 }
 
-func startCronJobController(ctx ControllerContext) (http.Handler, bool, error) {
+func startCronJobController(ctx ControllerContext) (interface{}, bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}] {
 		return nil, false, nil
 	}

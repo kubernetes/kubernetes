@@ -21,8 +21,6 @@ limitations under the License.
 package app
 
 import (
-	"net/http"
-
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -33,7 +31,7 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
-func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error) {
+func startDisruptionController(ctx ControllerContext) (interface{}, bool, error) {
 	var group = "policy"
 	var version = "v1beta1"
 	var resource = "poddisruptionbudgets"

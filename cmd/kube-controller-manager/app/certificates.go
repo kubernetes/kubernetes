@@ -22,8 +22,6 @@ package app
 
 import (
 	"fmt"
-	"net/http"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
@@ -35,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error) {
+func startCSRSigningController(ctx ControllerContext) (interface{}, bool, error) {
 	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1", Resource: "certificatesigningrequests"}
 	if !ctx.AvailableResources[gvr] {
 		klog.Warningf("Resource %s is not available now", gvr.String())
@@ -167,7 +165,7 @@ func getLegacyUnknownSignerFiles(config csrsigningconfig.CSRSigningControllerCon
 	return config.ClusterSigningCertFile, config.ClusterSigningKeyFile
 }
 
-func startCSRApprovingController(ctx ControllerContext) (http.Handler, bool, error) {
+func startCSRApprovingController(ctx ControllerContext) (interface{}, bool, error) {
 	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1", Resource: "certificatesigningrequests"}
 	if !ctx.AvailableResources[gvr] {
 		klog.Warningf("Resource %s is not available now", gvr.String())
@@ -183,7 +181,7 @@ func startCSRApprovingController(ctx ControllerContext) (http.Handler, bool, err
 	return nil, true, nil
 }
 
-func startCSRCleanerController(ctx ControllerContext) (http.Handler, bool, error) {
+func startCSRCleanerController(ctx ControllerContext) (interface{}, bool, error) {
 	cleaner := cleaner.NewCSRCleanerController(
 		ctx.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1().CertificateSigningRequests(),
 		ctx.InformerFactory.Certificates().V1().CertificateSigningRequests(),
@@ -192,7 +190,7 @@ func startCSRCleanerController(ctx ControllerContext) (http.Handler, bool, error
 	return nil, true, nil
 }
 
-func startRootCACertPublisher(ctx ControllerContext) (http.Handler, bool, error) {
+func startRootCACertPublisher(ctx ControllerContext) (interface{}, bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
 		return nil, false, nil
 	}

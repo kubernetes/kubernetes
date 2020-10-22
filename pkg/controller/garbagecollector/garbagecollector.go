@@ -19,6 +19,7 @@ package garbagecollector
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"reflect"
 	"sync"
 	"time"
@@ -70,6 +71,8 @@ type GarbageCollector struct {
 	absentOwnerCache *UIDCache
 
 	workerLock sync.RWMutex
+
+	http.Handler
 }
 
 // NewGarbageCollector creates a new GarbageCollector.
@@ -90,6 +93,7 @@ func NewGarbageCollector(
 		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
 	}
+	gc.Handler = NewDebugHandler(gc)
 	gc.dependencyGraphBuilder = &GraphBuilder{
 		metadataClient:   metadataClient,
 		informersStarted: informersStarted,

@@ -22,7 +22,6 @@ package app
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -33,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 )
 
-func startDaemonSetController(ctx ControllerContext) (http.Handler, bool, error) {
+func startDaemonSetController(ctx ControllerContext) (interface{}, bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}] {
 		return nil, false, nil
 	}
@@ -52,7 +51,7 @@ func startDaemonSetController(ctx ControllerContext) (http.Handler, bool, error)
 	return nil, true, nil
 }
 
-func startStatefulSetController(ctx ControllerContext) (http.Handler, bool, error) {
+func startStatefulSetController(ctx ControllerContext) (interface{}, bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "statefulsets"}] {
 		return nil, false, nil
 	}
@@ -66,7 +65,7 @@ func startStatefulSetController(ctx ControllerContext) (http.Handler, bool, erro
 	return nil, true, nil
 }
 
-func startReplicaSetController(ctx ControllerContext) (http.Handler, bool, error) {
+func startReplicaSetController(ctx ControllerContext) (interface{}, bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "replicasets"}] {
 		return nil, false, nil
 	}
@@ -79,7 +78,7 @@ func startReplicaSetController(ctx ControllerContext) (http.Handler, bool, error
 	return nil, true, nil
 }
 
-func startDeploymentController(ctx ControllerContext) (http.Handler, bool, error) {
+func startDeploymentController(ctx ControllerContext) (interface{}, bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}] {
 		return nil, false, nil
 	}

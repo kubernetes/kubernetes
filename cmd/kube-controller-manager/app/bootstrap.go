@@ -19,12 +19,10 @@ package app
 import (
 	"fmt"
 
-	"net/http"
-
 	"k8s.io/kubernetes/pkg/controller/bootstrap"
 )
 
-func startBootstrapSignerController(ctx ControllerContext) (http.Handler, bool, error) {
+func startBootstrapSignerController(ctx ControllerContext) (interface{}, bool, error) {
 	bsc, err := bootstrap.NewSigner(
 		ctx.ClientBuilder.ClientOrDie("bootstrap-signer"),
 		ctx.InformerFactory.Core().V1().Secrets(),
@@ -38,7 +36,7 @@ func startBootstrapSignerController(ctx ControllerContext) (http.Handler, bool, 
 	return nil, true, nil
 }
 
-func startTokenCleanerController(ctx ControllerContext) (http.Handler, bool, error) {
+func startTokenCleanerController(ctx ControllerContext) (interface{}, bool, error) {
 	tcc, err := bootstrap.NewTokenCleaner(
 		ctx.ClientBuilder.ClientOrDie("token-cleaner"),
 		ctx.InformerFactory.Core().V1().Secrets(),

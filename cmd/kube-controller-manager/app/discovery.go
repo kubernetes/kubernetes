@@ -21,8 +21,6 @@ limitations under the License.
 package app
 
 import (
-	"net/http"
-
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
@@ -31,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-func startEndpointSliceController(ctx ControllerContext) (http.Handler, bool, error) {
+func startEndpointSliceController(ctx ControllerContext) (interface{}, bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
 		klog.V(2).Infof("Not starting endpointslice-controller since EndpointSlice feature gate is disabled")
 		return nil, false, nil
@@ -54,7 +52,7 @@ func startEndpointSliceController(ctx ControllerContext) (http.Handler, bool, er
 	return nil, true, nil
 }
 
-func startEndpointSliceMirroringController(ctx ControllerContext) (http.Handler, bool, error) {
+func startEndpointSliceMirroringController(ctx ControllerContext) (interface{}, bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
 		klog.V(2).Infof("Not starting endpointslicemirroring-controller since EndpointSlice feature gate is disabled")
 		return nil, false, nil

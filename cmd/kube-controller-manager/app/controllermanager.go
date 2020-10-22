@@ -354,7 +354,7 @@ func (c ControllerContext) IsControllerEnabled(name string) bool {
 // InitFunc is used to launch a particular controller.  It may run additional "should I activate checks".
 // Any error returned will cause the controller process to `Fatal`
 // The bool indicates whether the controller was enabled.
-type InitFunc func(ctx ControllerContext) (debuggingHandler http.Handler, enabled bool, err error)
+type InitFunc func(ctx ControllerContext) (controller interface{}, enabled bool, err error)
 
 // KnownControllers returns all known controllers's name
 func KnownControllers() []string {
@@ -532,7 +532,7 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 		time.Sleep(wait.Jitter(ctx.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
 
 		klog.V(1).Infof("Starting %q", controllerName)
-		debugHandler, started, err := initFn(ctx)
+		controllerInstance, started, err := initFn(ctx)
 		if err != nil {
 			klog.Errorf("Error starting %q", controllerName)
 			return err
@@ -541,10 +541,12 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 			klog.Warningf("Skipping %q", controllerName)
 			continue
 		}
-		if debugHandler != nil && unsecuredMux != nil {
-			basePath := "/debug/controllers/" + controllerName
-			unsecuredMux.UnlistedHandle(basePath, http.StripPrefix(basePath, debugHandler))
-			unsecuredMux.UnlistedHandlePrefix(basePath+"/", http.StripPrefix(basePath, debugHandler))
+		if controllerInstance != nil {
+			if debugHandler, ok := controllerInstance.(http.Handler); ok && unsecuredMux != nil {
+				basePath := "/debug/controllers/" + controllerName
+				unsecuredMux.UnlistedHandle(basePath, http.StripPrefix(basePath, debugHandler))
+				unsecuredMux.UnlistedHandlePrefix(basePath+"/", http.StripPrefix(basePath, debugHandler))
+			}
 		}
 		klog.Infof("Started %q", controllerName)
 	}
@@ -559,7 +561,7 @@ type serviceAccountTokenControllerStarter struct {
 	rootClientBuilder controller.ControllerClientBuilder
 }
 
-func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController(ctx ControllerContext) (http.Handler, bool, error) {
+func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController(ctx ControllerContext) (interface{}, bool, error) {
 	if !ctx.IsControllerEnabled(saTokenControllerName) {
 		klog.Warningf("%q is disabled", saTokenControllerName)
 		return nil, false, nil
@@ -587,7 +589,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to build token generator: %v", err)
 	}
-	controller, err := serviceaccountcontroller.NewTokensController(
+	controllerInstance, err := serviceaccountcontroller.NewTokensController(
 		ctx.InformerFactory.Core().V1().ServiceAccounts(),
 		ctx.InformerFactory.Core().V1().Secrets(),
 		c.rootClientBuilder.ClientOrDie("tokens-controller"),
@@ -599,7 +601,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating Tokens controller: %v", err)
 	}
-	go controller.Run(int(ctx.ComponentConfig.SAController.ConcurrentSATokenSyncs), ctx.Stop)
+	go controllerInstance.Run(int(ctx.ComponentConfig.SAController.ConcurrentSATokenSyncs), ctx.Stop)
 
 	// start the first set of informers now so that other controllers can start
 	ctx.InformerFactory.Start(ctx.Stop)

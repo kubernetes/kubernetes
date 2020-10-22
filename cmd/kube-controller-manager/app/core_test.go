@@ -17,7 +17,6 @@ limitations under the License.
 package app
 
 import (
-	"net/http"
 	"testing"
 	"time"
 
@@ -93,7 +92,7 @@ func possibleDiscoveryResource() []*metav1.APIResourceList {
 	}
 }
 
-type controllerInitFunc func(ControllerContext) (http.Handler, bool, error)
+type controllerInitFunc func(ControllerContext) (interface{}, bool, error)
 
 func TestController_DiscoveryError(t *testing.T) {
 	controllerInitFuncMap := map[string]controllerInitFunc{
