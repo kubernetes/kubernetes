@@ -2993,6 +2993,50 @@ func TestConvertDesiredReplicasWithRules(t *testing.T) {
 	}
 }
 
+func TestCalculateScaleUpLimitWithScalingRules(t *testing.T) {
+	policy := autoscalingv2.MinPolicySelect
+
+	calculated := calculateScaleUpLimitWithScalingRules(1, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
+		StabilizationWindowSeconds: utilpointer.Int32Ptr(300),
+		SelectPolicy:               &policy,
+		Policies: []autoscalingv2.HPAScalingPolicy{
+			{
+				Type:          autoscalingv2.PodsScalingPolicy,
+				Value:         2,
+				PeriodSeconds: 60,
+			},
+			{
+				Type:          autoscalingv2.PercentScalingPolicy,
+				Value:         50,
+				PeriodSeconds: 60,
+			},
+		},
+	})
+	assert.Equal(t, calculated, int32(2))
+}
+
+func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
+	policy := autoscalingv2.MinPolicySelect
+
+	calculated := calculateScaleDownLimitWithBehaviors(5, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
+		StabilizationWindowSeconds: utilpointer.Int32Ptr(300),
+		SelectPolicy:               &policy,
+		Policies: []autoscalingv2.HPAScalingPolicy{
+			{
+				Type:          autoscalingv2.PodsScalingPolicy,
+				Value:         2,
+				PeriodSeconds: 60,
+			},
+			{
+				Type:          autoscalingv2.PercentScalingPolicy,
+				Value:         50,
+				PeriodSeconds: 60,
+			},
+		},
+	})
+	assert.Equal(t, calculated, int32(3))
+}
+
 func generateScalingRules(pods, podsPeriod, percent, percentPeriod, stabilizationWindow int32) *autoscalingv2.HPAScalingRules {
 	policy := autoscalingv2.MaxPolicySelect
 	directionBehavior := autoscalingv2.HPAScalingRules{
