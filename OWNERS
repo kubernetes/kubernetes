@@ -28,3 +28,4 @@ filters:
   "^vendor/.*":
     labels:
     - "vendor-update"
+component: kube-apiserver
