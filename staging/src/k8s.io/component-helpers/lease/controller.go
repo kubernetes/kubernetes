@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package nodelease
+package lease
 
 import (
 	"context"
@@ -22,7 +22,6 @@ import (
 	"time"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -35,9 +34,7 @@ import (
 )
 
 const (
-	// renewIntervalFraction is the fraction of lease duration to renew the lease
-	renewIntervalFraction = 0.25
-	// maxUpdateRetries is the number of immediate, successive retries the Kubelet will attempt
+	// maxUpdateRetries is the number of immediate, successive retries the controller will attempt
 	// when renewing the lease before it waits for the renewal interval before trying again,
 	// similar to what we do for node status retries
 	maxUpdateRetries = 5
@@ -45,46 +42,57 @@ const (
 	maxBackoff = 7 * time.Second
 )
 
-// Controller manages creating and renewing the lease for this Kubelet
+// Controller manages creating and renewing the lease for this component (kube-apiserver, kubelet, etc.)
 type Controller interface {
 	Run(stopCh <-chan struct{})
 }
+
+// ProcessLeaseFunc processes the given lease in-place
+type ProcessLeaseFunc func(*coordinationv1.Lease) error
 
 type controller struct {
 	client                     clientset.Interface
 	leaseClient                coordclientset.LeaseInterface
 	holderIdentity             string
+	leaseNamespace             string
 	leaseDurationSeconds       int32
 	renewInterval              time.Duration
 	clock                      clock.Clock
 	onRepeatedHeartbeatFailure func()
 
-	// latestLease is the latest node lease which Kubelet updated or created
+	// latestLease is the latest lease which the controller updated or created
 	latestLease *coordinationv1.Lease
+
+	// newLeasePostProcessFunc allows customizing a lease object (e.g. setting OwnerReference)
+	// before every time the lease is created/refreshed(updated). Note that an error will block
+	// a lease CREATE, causing the controller to retry next time, but an error won't block a
+	// lease UPDATE.
+	newLeasePostProcessFunc ProcessLeaseFunc
 }
 
 // NewController constructs and returns a controller
-func NewController(clock clock.Clock, client clientset.Interface, holderIdentity string, leaseDurationSeconds int32, onRepeatedHeartbeatFailure func()) Controller {
+func NewController(clock clock.Clock, client clientset.Interface, holderIdentity string, leaseDurationSeconds int32, onRepeatedHeartbeatFailure func(), renewInterval time.Duration, leaseNamespace string, newLeasePostProcessFunc ProcessLeaseFunc) Controller {
 	var leaseClient coordclientset.LeaseInterface
 	if client != nil {
-		leaseClient = client.CoordinationV1().Leases(corev1.NamespaceNodeLease)
+		leaseClient = client.CoordinationV1().Leases(leaseNamespace)
 	}
-	leaseDuration := time.Duration(leaseDurationSeconds) * time.Second
 	return &controller{
 		client:                     client,
 		leaseClient:                leaseClient,
 		holderIdentity:             holderIdentity,
+		leaseNamespace:             leaseNamespace,
 		leaseDurationSeconds:       leaseDurationSeconds,
-		renewInterval:              time.Duration(float64(leaseDuration) * renewIntervalFraction),
+		renewInterval:              renewInterval,
 		clock:                      clock,
 		onRepeatedHeartbeatFailure: onRepeatedHeartbeatFailure,
+		newLeasePostProcessFunc:    newLeasePostProcessFunc,
 	}
 }
 
 // Run runs the controller
 func (c *controller) Run(stopCh <-chan struct{}) {
 	if c.leaseClient == nil {
-		klog.Infof("node lease controller has nil lease client, will not claim or renew leases")
+		klog.Infof("lease controller has nil lease client, will not claim or renew leases")
 		return
 	}
 	wait.Until(c.sync, c.renewInterval, stopCh)
@@ -92,14 +100,14 @@ func (c *controller) Run(stopCh <-chan struct{}) {
 
 func (c *controller) sync() {
 	if c.latestLease != nil {
-		// As long as node lease is not (or very rarely) updated by any other agent than Kubelet,
+		// As long as the lease is not (or very rarely) updated by any other agent than the component itself,
 		// we can optimistically assume it didn't change since our last update and try updating
 		// based on the version from that time. Thanks to it we avoid GET call and reduce load
 		// on etcd and kube-apiserver.
 		// If at some point other agents will also be frequently updating the Lease object, this
 		// can result in performance degradation, because we will end up with calling additional
 		// GET/PUT - at this point this whole "if" should be removed.
-		err := c.retryUpdateLease(c.newLease(c.latestLease))
+		err := c.retryUpdateLease(c.latestLease)
 		if err == nil {
 			return
 		}
@@ -133,7 +141,7 @@ func (c *controller) backoffEnsureLease() (*coordinationv1.Lease, bool) {
 			break
 		}
 		sleep = minDuration(2*sleep, maxBackoff)
-		klog.Errorf("failed to ensure node lease exists, will retry in %v, error: %v", sleep, err)
+		klog.Errorf("failed to ensure lease exists, will retry in %v, error: %v", sleep, err)
 		// backoff wait
 		c.clock.Sleep(sleep)
 	}
@@ -146,11 +154,11 @@ func (c *controller) ensureLease() (*coordinationv1.Lease, bool, error) {
 	lease, err := c.leaseClient.Get(context.TODO(), c.holderIdentity, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		// lease does not exist, create it.
-		leaseToCreate := c.newLease(nil)
-		if len(leaseToCreate.OwnerReferences) == 0 {
-			// We want to ensure that a lease will always have OwnerReferences set.
-			// Thus, given that we weren't able to set it correctly, we simply
-			// not create it this time - we will retry in the next iteration.
+		leaseToCreate, err := c.newLease(nil)
+		// An error occurred during allocating the new lease (likely from newLeasePostProcessFunc).
+		// Given that we weren't able to set the lease correctly, we simply
+		// not create it this time - we will retry in the next iteration.
+		if err != nil {
 			return nil, false, nil
 		}
 		lease, err := c.leaseClient.Create(context.TODO(), leaseToCreate, metav1.CreateOptions{})
@@ -170,12 +178,13 @@ func (c *controller) ensureLease() (*coordinationv1.Lease, bool, error) {
 // call this once you're sure the lease has been created
 func (c *controller) retryUpdateLease(base *coordinationv1.Lease) error {
 	for i := 0; i < maxUpdateRetries; i++ {
-		lease, err := c.leaseClient.Update(context.TODO(), c.newLease(base), metav1.UpdateOptions{})
+		leaseToUpdate, _ := c.newLease(base)
+		lease, err := c.leaseClient.Update(context.TODO(), leaseToUpdate, metav1.UpdateOptions{})
 		if err == nil {
 			c.latestLease = lease
 			return nil
 		}
-		klog.Errorf("failed to update node lease, error: %v", err)
+		klog.Errorf("failed to update lease, error: %v", err)
 		// OptimisticLockError requires getting the newer version of lease to proceed.
 		if apierrors.IsConflict(err) {
 			base, _ = c.backoffEnsureLease()
@@ -185,20 +194,22 @@ func (c *controller) retryUpdateLease(base *coordinationv1.Lease) error {
 			c.onRepeatedHeartbeatFailure()
 		}
 	}
-	return fmt.Errorf("failed %d attempts to update node lease", maxUpdateRetries)
+	return fmt.Errorf("failed %d attempts to update lease", maxUpdateRetries)
 }
 
 // newLease constructs a new lease if base is nil, or returns a copy of base
 // with desired state asserted on the copy.
-func (c *controller) newLease(base *coordinationv1.Lease) *coordinationv1.Lease {
+// Note that an error will block lease CREATE, causing the CREATE to be retried in
+// the next iteration; but the error won't block lease refresh (UPDATE).
+func (c *controller) newLease(base *coordinationv1.Lease) (*coordinationv1.Lease, error) {
 	// Use the bare minimum set of fields; other fields exist for debugging/legacy,
-	// but we don't need to make node heartbeats more complicated by using them.
+	// but we don't need to make component heartbeats more complicated by using them.
 	var lease *coordinationv1.Lease
 	if base == nil {
 		lease = &coordinationv1.Lease{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      c.holderIdentity,
-				Namespace: corev1.NamespaceNodeLease,
+				Namespace: c.leaseNamespace,
 			},
 			Spec: coordinationv1.LeaseSpec{
 				HolderIdentity:       pointer.StringPtr(c.holderIdentity),
@@ -210,26 +221,12 @@ func (c *controller) newLease(base *coordinationv1.Lease) *coordinationv1.Lease 
 	}
 	lease.Spec.RenewTime = &metav1.MicroTime{Time: c.clock.Now()}
 
-	// Setting owner reference needs node's UID. Note that it is different from
-	// kubelet.nodeRef.UID. When lease is initially created, it is possible that
-	// the connection between master and node is not ready yet. So try to set
-	// owner reference every time when renewing the lease, until successful.
-	if len(lease.OwnerReferences) == 0 {
-		if node, err := c.client.CoreV1().Nodes().Get(context.TODO(), c.holderIdentity, metav1.GetOptions{}); err == nil {
-			lease.OwnerReferences = []metav1.OwnerReference{
-				{
-					APIVersion: corev1.SchemeGroupVersion.WithKind("Node").Version,
-					Kind:       corev1.SchemeGroupVersion.WithKind("Node").Kind,
-					Name:       c.holderIdentity,
-					UID:        node.UID,
-				},
-			}
-		} else {
-			klog.Errorf("failed to get node %q when trying to set owner ref to the node lease: %v", c.holderIdentity, err)
-		}
+	if c.newLeasePostProcessFunc != nil {
+		err := c.newLeasePostProcessFunc(lease)
+		return lease, err
 	}
 
-	return lease
+	return lease, nil
 }
 
 func minDuration(a, b time.Duration) time.Duration {
