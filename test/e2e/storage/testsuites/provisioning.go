@@ -45,6 +45,7 @@ import (
 // Not all parameters are used by all tests.
 type StorageClassTest struct {
 	Client               clientset.Interface
+	Timeouts             *framework.TimeoutContext
 	Claim                *v1.PersistentVolumeClaim
 	SourceClaim          *v1.PersistentVolumeClaim
 	Class                *storagev1.StorageClass
@@ -129,7 +130,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 	// registers its own BeforeEach which creates the namespace. Beware that it
 	// also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("provisioning")
+	f := framework.NewFrameworkWithCustomTimeouts("provisioning", getDriverTimeouts(driver))
 
 	init := func() {
 		l = local{}
@@ -160,6 +161,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		framework.Logf("In creating storage class object and pvc objects for driver - sc: %v, pvc: %v, src-pvc: %v", l.sc, l.pvc, l.sourcePVC)
 		l.testCase = &StorageClassTest{
 			Client:       l.config.Framework.ClientSet,
+			Timeouts:     f.Timeouts,
 			Claim:        l.pvc,
 			SourceClaim:  l.sourcePVC,
 			Class:        l.sc,
@@ -406,7 +408,7 @@ func getBoundPV(client clientset.Interface, pvc *v1.PersistentVolumeClaim) (*v1.
 
 // checkProvisioning verifies that the claim is bound and has the correct properities
 func (t StorageClassTest) checkProvisioning(client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storagev1.StorageClass) *v1.PersistentVolume {
-	err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+	err := e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, t.Timeouts.ClaimProvision)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("checking the claim")
@@ -595,7 +597,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 
 	// Wait for ClaimProvisionTimeout (across all PVCs in parallel) and make sure the phase did not become Bound i.e. the Wait errors out
 	ginkgo.By("checking the claims are in pending state")
-	err = e2epv.WaitForPersistentVolumeClaimsPhase(v1.ClaimBound, t.Client, namespace, claimNames, 2*time.Second /* Poll */, framework.ClaimProvisionShortTimeout, true)
+	err = e2epv.WaitForPersistentVolumeClaimsPhase(v1.ClaimBound, t.Client, namespace, claimNames, 2*time.Second /* Poll */, t.Timeouts.ClaimProvisionShort, true)
 	framework.ExpectError(err)
 	verifyPVCsPending(t.Client, createdClaims)
 
@@ -610,7 +612,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	framework.ExpectNoError(err)
 	defer func() {
 		e2epod.DeletePodOrFail(t.Client, pod.Namespace, pod.Name)
-		e2epod.WaitForPodToDisappear(t.Client, pod.Namespace, pod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+		e2epod.WaitForPodToDisappear(t.Client, pod.Namespace, pod.Name, labels.Everything(), framework.Poll, t.Timeouts.PodDelete)
 	}()
 	if expectUnschedulable {
 		// Verify that no claims are provisioned.
@@ -629,7 +631,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 		claim, err = t.Client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(context.TODO(), claim.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		// make sure claim did bind
-		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, t.Client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, t.Client, claim.Namespace, claim.Name, framework.Poll, t.Timeouts.ClaimProvision)
 		framework.ExpectNoError(err)
 
 		pv, err := t.Client.CoreV1().PersistentVolumes().Get(context.TODO(), claim.Spec.VolumeName, metav1.GetOptions{})
@@ -715,7 +717,7 @@ func StopPod(c clientset.Interface, pod *v1.Pod) {
 // StopPodAndDependents first tries to log the output of the pod's container,
 // then deletes the pod and waits for that to succeed. Also waits for all owned
 // resources to be deleted.
-func StopPodAndDependents(c clientset.Interface, pod *v1.Pod) {
+func StopPodAndDependents(c clientset.Interface, timeouts *framework.TimeoutContext, pod *v1.Pod) {
 	if pod == nil {
 		return
 	}
@@ -762,14 +764,14 @@ func StopPodAndDependents(c clientset.Interface, pod *v1.Pod) {
 		}
 		framework.Logf("pod Delete API error: %v", err)
 	}
-	framework.Logf("Wait up to %v for pod %q to be fully deleted", e2epod.PodDeleteTimeout, pod.Name)
-	e2epod.WaitForPodNotFoundInNamespace(c, pod.Name, pod.Namespace, e2epod.PodDeleteTimeout)
+	framework.Logf("Wait up to %v for pod %q to be fully deleted", timeouts.PodDelete, pod.Name)
+	e2epod.WaitForPodNotFoundInNamespace(c, pod.Name, pod.Namespace, timeouts.PodDelete)
 	if len(podPVs) > 0 {
 		for _, pv := range podPVs {
 			// As with CSI inline volumes, we use the pod delete timeout here because conceptually
 			// the volume deletion needs to be that fast (whatever "that" is).
-			framework.Logf("Wait up to %v for pod PV %s to be fully deleted", e2epod.PodDeleteTimeout, pv.Name)
-			e2epv.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, e2epod.PodDeleteTimeout)
+			framework.Logf("Wait up to %v for pod PV %s to be fully deleted", timeouts.PodDelete, pv.Name)
+			e2epv.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, timeouts.PodDelete)
 		}
 	}
 }
@@ -818,7 +820,7 @@ func prepareSnapshotDataSourceForProvisioning(
 	}
 	e2evolume.InjectContent(f, config, nil, "", tests)
 
-	snapshotResource := CreateSnapshotResource(sDriver, perTestConfig, pattern, updatedClaim.GetName(), updatedClaim.GetNamespace())
+	snapshotResource := CreateSnapshotResource(sDriver, perTestConfig, pattern, updatedClaim.GetName(), updatedClaim.GetNamespace(), f.Timeouts)
 
 	group := "snapshot.storage.k8s.io"
 	dataSourceRef := &v1.TypedLocalObjectReference{
@@ -834,7 +836,7 @@ func prepareSnapshotDataSourceForProvisioning(
 			framework.Failf("Error deleting initClaim %q. Error: %v", updatedClaim.Name, err)
 		}
 
-		err = snapshotResource.CleanupResource()
+		err = snapshotResource.CleanupResource(f.Timeouts)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("deleting StorageClass " + class.Name)

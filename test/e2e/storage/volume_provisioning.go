@@ -140,11 +140,13 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 	// filled in BeforeEach
 	var c clientset.Interface
+	var timeouts *framework.TimeoutContext
 	var ns string
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
+		timeouts = f.Timeouts
 	})
 
 	ginkgo.Describe("DynamicProvisioner [Slow]", func() {
@@ -157,6 +159,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				{
 					Name:           "SSD PD on GCE/GKE",
 					CloudProviders: []string{"gce", "gke"},
+					Timeouts:       f.Timeouts,
 					Provisioner:    "kubernetes.io/gce-pd",
 					Parameters: map[string]string{
 						"type": "pd-ssd",
@@ -175,6 +178,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				{
 					Name:           "HDD PD on GCE/GKE",
 					CloudProviders: []string{"gce", "gke"},
+					Timeouts:       f.Timeouts,
 					Provisioner:    "kubernetes.io/gce-pd",
 					Parameters: map[string]string{
 						"type": "pd-standard",
@@ -193,6 +197,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				{
 					Name:           "gp2 EBS on AWS",
 					CloudProviders: []string{"aws"},
+					Timeouts:       f.Timeouts,
 					Provisioner:    "kubernetes.io/aws-ebs",
 					Parameters: map[string]string{
 						"type": "gp2",
@@ -211,6 +216,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				{
 					Name:           "io1 EBS on AWS",
 					CloudProviders: []string{"aws"},
+					Timeouts:       f.Timeouts,
 					Provisioner:    "kubernetes.io/aws-ebs",
 					Parameters: map[string]string{
 						"type":      "io1",
@@ -229,6 +235,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				{
 					Name:           "sc1 EBS on AWS",
 					CloudProviders: []string{"aws"},
+					Timeouts:       f.Timeouts,
 					Provisioner:    "kubernetes.io/aws-ebs",
 					Parameters: map[string]string{
 						"type": "sc1",
@@ -246,6 +253,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				{
 					Name:           "st1 EBS on AWS",
 					CloudProviders: []string{"aws"},
+					Timeouts:       f.Timeouts,
 					Provisioner:    "kubernetes.io/aws-ebs",
 					Parameters: map[string]string{
 						"type": "st1",
@@ -263,6 +271,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				{
 					Name:           "encrypted EBS on AWS",
 					CloudProviders: []string{"aws"},
+					Timeouts:       f.Timeouts,
 					Provisioner:    "kubernetes.io/aws-ebs",
 					Parameters: map[string]string{
 						"encrypted": "true",
@@ -281,6 +290,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				{
 					Name:           "generic Cinder volume on OpenStack",
 					CloudProviders: []string{"openstack"},
+					Timeouts:       f.Timeouts,
 					Provisioner:    "kubernetes.io/cinder",
 					Parameters:     map[string]string{},
 					ClaimSize:      "1.5Gi",
@@ -292,6 +302,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				{
 					Name:           "Cinder volume with empty volume type and zone on OpenStack",
 					CloudProviders: []string{"openstack"},
+					Timeouts:       f.Timeouts,
 					Provisioner:    "kubernetes.io/cinder",
 					Parameters: map[string]string{
 						"type":         "",
@@ -307,6 +318,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				{
 					Name:           "generic vSphere volume",
 					CloudProviders: []string{"vsphere"},
+					Timeouts:       f.Timeouts,
 					Provisioner:    "kubernetes.io/vsphere-volume",
 					Parameters:     map[string]string{},
 					ClaimSize:      "1.5Gi",
@@ -319,6 +331,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				{
 					Name:           "Azure disk volume with empty sku and location",
 					CloudProviders: []string{"azure"},
+					Timeouts:       f.Timeouts,
 					Provisioner:    "kubernetes.io/azure-disk",
 					Parameters:     map[string]string{},
 					ClaimSize:      "1Gi",
@@ -384,6 +397,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				Name:           "HDD PD on GCE/GKE",
 				CloudProviders: []string{"gce", "gke"},
 				Provisioner:    "kubernetes.io/gce-pd",
+				Timeouts:       f.Timeouts,
 				Parameters: map[string]string{
 					"type": "pd-standard",
 				},
@@ -452,6 +466,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			test := testsuites.StorageClassTest{
 				Name:        "unmanaged_zone",
 				Provisioner: "kubernetes.io/gce-pd",
+				Timeouts:    f.Timeouts,
 				Parameters:  map[string]string{"zone": unmanagedZone},
 				ClaimSize:   "1Gi",
 			}
@@ -473,7 +488,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}()
 
 			// The claim should timeout phase:Pending
-			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
+			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, timeouts.ClaimProvisionShort)
 			framework.ExpectError(err)
 			framework.Logf(err.Error())
 		})
@@ -492,6 +507,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			test := testsuites.StorageClassTest{
 				Name:        "deletion race",
 				Provisioner: "", // Use a native one based on current cloud provider
+				Timeouts:    f.Timeouts,
 				ClaimSize:   "1Gi",
 			}
 
@@ -572,7 +588,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("waiting for the PV to get Released")
-			err = e2epv.WaitForPersistentVolumePhase(v1.VolumeReleased, c, pv.Name, 2*time.Second, e2epv.PVReclaimingTimeout)
+			err = e2epv.WaitForPersistentVolumePhase(v1.VolumeReleased, c, pv.Name, 2*time.Second, timeouts.PVReclaim)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("deleting the PD")
@@ -587,7 +603,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("waiting for the PV to get deleted")
-			err = e2epv.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, e2epv.PVDeletingTimeout)
+			err = e2epv.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, timeouts.PVDelete)
 			framework.ExpectNoError(err)
 		})
 	})
@@ -636,6 +652,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				Client:       c,
 				Name:         "external provisioner test",
 				Provisioner:  externalPluginName,
+				Timeouts:     f.Timeouts,
 				ClaimSize:    "1500Mi",
 				ExpectedSize: "1500Mi",
 			}
@@ -659,6 +676,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			test := testsuites.StorageClassTest{
 				Client:       c,
 				Name:         "default",
+				Timeouts:     f.Timeouts,
 				ClaimSize:    "2Gi",
 				ExpectedSize: "2Gi",
 			}
@@ -679,6 +697,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			test := testsuites.StorageClassTest{
 				Name:      "default",
+				Timeouts:  f.Timeouts,
 				ClaimSize: "2Gi",
 			}
 
@@ -716,6 +735,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			test := testsuites.StorageClassTest{
 				Name:      "default",
+				Timeouts:  f.Timeouts,
 				ClaimSize: "2Gi",
 			}
 
@@ -756,6 +776,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				Client:       c,
 				Name:         "Gluster Dynamic provisioner test",
 				Provisioner:  "kubernetes.io/glusterfs",
+				Timeouts:     f.Timeouts,
 				ClaimSize:    "2Gi",
 				ExpectedSize: "2Gi",
 				Parameters:   map[string]string{"resturl": serverURL},
@@ -780,6 +801,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			test := testsuites.StorageClassTest{
 				Name:        "AWS EBS with invalid KMS key",
 				Provisioner: "kubernetes.io/aws-ebs",
+				Timeouts:    f.Timeouts,
 				ClaimSize:   "2Gi",
 				Parameters:  map[string]string{"kmsKeyId": "arn:aws:kms:us-east-1:123456789012:key/55555555-5555-5555-5555-555555555555"},
 			}

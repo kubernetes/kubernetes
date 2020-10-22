@@ -109,7 +109,7 @@ func (t *volumeStressTestSuite) DefineTests(driver TestDriver, pattern testpatte
 	// registers its own BeforeEach which creates the namespace. Beware that it
 	// also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("volume-stress")
+	f := framework.NewFrameworkWithCustomTimeouts("stress", getDriverTimeouts(driver))
 
 	init := func() {
 		cs = f.ClientSet
@@ -194,7 +194,7 @@ func (t *volumeStressTestSuite) DefineTests(driver TestDriver, pattern testpatte
 							framework.Failf("Failed to create pod-%v [%+v]. Error: %v", podIndex, pod, err)
 						}
 
-						err = e2epod.WaitForPodRunningInNamespace(cs, pod)
+						err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 						if err != nil {
 							l.cancel()
 							framework.Failf("Failed to wait for pod-%v [%+v] turn into running status. Error: %v", podIndex, pod, err)

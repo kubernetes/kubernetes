@@ -44,7 +44,7 @@ import (
 func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) {
 	// 1. verify that the PV and PVC have bound correctly
 	ginkgo.By("Validating the PV-PVC binding")
-	framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, ns, pv, pvc))
+	framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv, pvc))
 
 	// 2. create the nfs writer pod, test if the write was successful,
 	//    then delete the pod and verify that it was deleted
@@ -53,7 +53,7 @@ func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *
 
 	// 3. delete the PVC, wait for PV to become "Released"
 	ginkgo.By("Deleting the PVC to invoke the reclaim policy.")
-	framework.ExpectNoError(e2epv.DeletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeReleased))
+	framework.ExpectNoError(e2epv.DeletePVCandValidatePV(c, f.Timeouts, ns, pvc, pv, v1.VolumeReleased))
 }
 
 // Validate pairs of PVs and PVCs, create and verify writer pod, delete PVC and validate
@@ -87,7 +87,7 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 
 	// 2. delete each PVC, wait for its bound PV to reach `expectedPhase`
 	ginkgo.By("Deleting PVCs to invoke reclaim policy")
-	if err = e2epv.DeletePVCandValidatePVGroup(c, ns, pvols, claims, expectPhase); err != nil {
+	if err = e2epv.DeletePVCandValidatePVGroup(c, f.Timeouts, ns, pvols, claims, expectPhase); err != nil {
 		return err
 	}
 	return nil
@@ -234,7 +234,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				numPVs, numPVCs := 2, 4
 				pvols, claims, err = e2epv.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig, pvcConfig)
 				framework.ExpectNoError(err)
-				framework.ExpectNoError(e2epv.WaitAndVerifyBinds(c, ns, pvols, claims, true))
+				framework.ExpectNoError(e2epv.WaitAndVerifyBinds(c, f.Timeouts, ns, pvols, claims, true))
 				framework.ExpectNoError(completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased))
 			})
 
@@ -244,7 +244,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				numPVs, numPVCs := 3, 3
 				pvols, claims, err = e2epv.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig, pvcConfig)
 				framework.ExpectNoError(err)
-				framework.ExpectNoError(e2epv.WaitAndVerifyBinds(c, ns, pvols, claims, true))
+				framework.ExpectNoError(e2epv.WaitAndVerifyBinds(c, f.Timeouts, ns, pvols, claims, true))
 				framework.ExpectNoError(completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased))
 			})
 
@@ -254,7 +254,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				numPVs, numPVCs := 4, 2
 				pvols, claims, err = e2epv.CreatePVsPVCs(numPVs, numPVCs, c, ns, pvConfig, pvcConfig)
 				framework.ExpectNoError(err)
-				framework.ExpectNoError(e2epv.WaitAndVerifyBinds(c, ns, pvols, claims, true))
+				framework.ExpectNoError(e2epv.WaitAndVerifyBinds(c, f.Timeouts, ns, pvols, claims, true))
 				framework.ExpectNoError(completeMultiTest(f, c, ns, pvols, claims, v1.VolumeReleased))
 			})
 		})
@@ -267,7 +267,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				pvConfig.ReclaimPolicy = v1.PersistentVolumeReclaimRecycle
 				pv, pvc, err = e2epv.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
 				framework.ExpectNoError(err, "BeforeEach: Failed to create PV/PVC")
-				framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, ns, pv, pvc), "BeforeEach: WaitOnPVandPVC failed")
+				framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv, pvc), "BeforeEach: WaitOnPVandPVC failed")
 			})
 
 			ginkgo.AfterEach(func() {
@@ -289,7 +289,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 				ginkgo.By("Deleting the claim")
 				framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
-				framework.ExpectNoError(e2epv.DeletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeAvailable))
+				framework.ExpectNoError(e2epv.DeletePVCandValidatePV(c, f.Timeouts, ns, pvc, pv, v1.VolumeAvailable))
 
 				ginkgo.By("Re-mounting the volume.")
 				pvc = e2epv.MakePersistentVolumeClaim(pvcConfig, ns)
@@ -310,7 +310,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 				// Delete the PVC and wait for the recycler to finish before the NFS server gets shutdown during cleanup.
 				framework.Logf("Removing second PVC, waiting for the recycler to finish before cleanup.")
-				framework.ExpectNoError(e2epv.DeletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeAvailable))
+				framework.ExpectNoError(e2epv.DeletePVCandValidatePV(c, f.Timeouts, ns, pvc, pv, v1.VolumeAvailable))
 				pvc = nil
 			})
 		})

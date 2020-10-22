@@ -420,7 +420,7 @@ func createPVCPV(
 	pv, pvc, err := e2epv.CreatePVCPV(f.ClientSet, pvConfig, pvcConfig, f.Namespace.Name, false)
 	framework.ExpectNoError(err, "PVC, PV creation failed")
 
-	err = e2epv.WaitOnPVandPVC(f.ClientSet, f.Namespace.Name, pv, pvc)
+	err = e2epv.WaitOnPVandPVC(f.ClientSet, f.Timeouts, f.Namespace.Name, pv, pvc)
 	framework.ExpectNoError(err, "PVC, PV failed to bind")
 
 	return pv, pvc
@@ -453,7 +453,7 @@ func createPVCPVFromDynamicProvisionSC(
 	framework.ExpectNoError(err)
 
 	if !isDelayedBinding(sc) {
-		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, f.Timeouts.ClaimProvision)
 		framework.ExpectNoError(err)
 	}
 

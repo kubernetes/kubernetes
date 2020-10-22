@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
@@ -107,6 +108,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			Name:           "HDD Regional PD on GCE/GKE",
 			CloudProviders: []string{"gce", "gke"},
 			Provisioner:    "kubernetes.io/gce-pd",
+			Timeouts:       framework.NewTimeoutContextWithDefaults(),
 			Parameters: map[string]string{
 				"type":             "pd-standard",
 				"zones":            strings.Join(cloudZones, ","),
@@ -129,6 +131,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			Name:           "HDD Regional PD with auto zone selection on GCE/GKE",
 			CloudProviders: []string{"gce", "gke"},
 			Provisioner:    "kubernetes.io/gce-pd",
+			Timeouts:       framework.NewTimeoutContextWithDefaults(),
 			Parameters: map[string]string{
 				"type":             "pd-standard",
 				"replication-type": "regional-pd",
@@ -166,6 +169,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	testSpec := testsuites.StorageClassTest{
 		Name:           "Regional PD Failover on GCE/GKE",
 		CloudProviders: []string{"gce", "gke"},
+		Timeouts:       framework.NewTimeoutContextWithDefaults(),
 		Provisioner:    "kubernetes.io/gce-pd",
 		Parameters: map[string]string{
 			"type":             "pd-standard",
@@ -326,6 +330,7 @@ func testRegionalDelayedBinding(c clientset.Interface, ns string, pvcCount int) 
 		Client:      c,
 		Name:        "Regional PD storage class with waitForFirstConsumer test on GCE",
 		Provisioner: "kubernetes.io/gce-pd",
+		Timeouts:    framework.NewTimeoutContextWithDefaults(),
 		Parameters: map[string]string{
 			"type":             "pd-standard",
 			"replication-type": "regional-pd",
@@ -362,6 +367,7 @@ func testRegionalAllowedTopologies(c clientset.Interface, ns string) {
 	test := testsuites.StorageClassTest{
 		Name:        "Regional PD storage class with allowedTopologies test on GCE",
 		Provisioner: "kubernetes.io/gce-pd",
+		Timeouts:    framework.NewTimeoutContextWithDefaults(),
 		Parameters: map[string]string{
 			"type":             "pd-standard",
 			"replication-type": "regional-pd",
@@ -389,6 +395,7 @@ func testRegionalAllowedTopologies(c clientset.Interface, ns string) {
 func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns string, pvcCount int) {
 	test := testsuites.StorageClassTest{
 		Client:      c,
+		Timeouts:    framework.NewTimeoutContextWithDefaults(),
 		Name:        "Regional PD storage class with allowedTopologies and waitForFirstConsumer test on GCE",
 		Provisioner: "kubernetes.io/gce-pd",
 		Parameters: map[string]string{

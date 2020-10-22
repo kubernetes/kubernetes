@@ -97,7 +97,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 	// registers its own BeforeEach which creates the namespace. Beware that it
 	// also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("multivolume")
+	f := framework.NewFrameworkWithCustomTimeouts("multivolume", getDriverTimeouts(driver))
 
 	init := func() {
 		l = local{}
@@ -346,7 +346,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		l.resources = append(l.resources, resource)
 
 		// Initialize the volume with a filesystem - it's going to be mounted as read-only below.
-		initializeVolume(l.cs, l.ns.Name, resource.Pvc, l.config.ClientNodeSelection)
+		initializeVolume(l.cs, f.Timeouts, l.ns.Name, resource.Pvc, l.config.ClientNodeSelection)
 
 		// Test access to the volume from pods on a single node
 		TestConcurrentAccessToSingleVolume(l.config.Framework, l.cs, l.ns.Name,
@@ -408,7 +408,7 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 		NodeSelection: node,
 		ImageID:       e2evolume.GetDefaultTestImageID(),
 	}
-	pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, framework.PodStartTimeout)
+	pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, f.Timeouts.PodStart)
 	defer func() {
 		framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 	}()
@@ -488,7 +488,7 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 			PVCsReadOnly:  readOnly,
 			ImageID:       e2evolume.GetTestImageID(imageutils.DebianIptables),
 		}
-		pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, framework.PodStartTimeout)
+		pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, f.Timeouts.PodStart)
 		defer func() {
 			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 		}()
@@ -637,7 +637,7 @@ func ensureTopologyRequirements(nodeSelection *e2epod.NodeSelection, nodes *v1.N
 }
 
 // initializeVolume creates a filesystem on given volume, so it can be used as read-only later
-func initializeVolume(cs clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, node e2epod.NodeSelection) {
+func initializeVolume(cs clientset.Interface, t *framework.TimeoutContext, ns string, pvc *v1.PersistentVolumeClaim, node e2epod.NodeSelection) {
 	if pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == v1.PersistentVolumeBlock {
 		// Block volumes do not need to be initialized.
 		return
@@ -653,7 +653,7 @@ func initializeVolume(cs clientset.Interface, ns string, pvc *v1.PersistentVolum
 		NodeSelection: node,
 		ImageID:       e2evolume.GetDefaultTestImageID(),
 	}
-	pod, err := e2epod.CreateSecPod(cs, &podConfig, framework.PodStartTimeout)
+	pod, err := e2epod.CreateSecPod(cs, &podConfig, t.PodStart)
 	defer func() {
 		framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
 	}()
