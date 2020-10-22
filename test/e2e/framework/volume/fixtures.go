@@ -343,7 +343,7 @@ func startVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 		}
 	}
 	if config.ServerReadyMessage != "" {
-		_, err := framework.LookForStringInLog(pod.Namespace, pod.Name, serverPodName, config.ServerReadyMessage, VolumeServerPodStartupTimeout)
+		_, err := e2epod.LookForStringInLog(client, config.Namespace, pod.Name, serverPodName, config.ServerReadyMessage, VolumeServerPodStartupTimeout)
 		framework.ExpectNoError(err, "Failed to find %q in pod logs: %s", config.ServerReadyMessage, err)
 	}
 	return pod
@@ -458,7 +458,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 			// Block: check content
 			deviceName := fmt.Sprintf("/opt/%d", i)
 			commands := generateReadBlockCmd(deviceName, len(test.ExpectedContent))
-			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
+			_, err := framework.LookForStringInPodExec(f.ClientSet, pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the block device %s.", deviceName)
 
 			// Check that it's a real block device
@@ -467,7 +467,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 			// Filesystem: check content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
 			commands := GenerateReadFileCmd(fileName)
-			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
+			_, err := framework.LookForStringInPodExec(f.ClientSet, pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
 
 			// Check that a directory has been mounted
@@ -478,14 +478,14 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 				// Filesystem: check fsgroup
 				if fsGroup != nil {
 					ginkgo.By("Checking fsGroup is correct.")
-					_, err = framework.LookForStringInPodExec(pod.Namespace, pod.Name, []string{"ls", "-ld", dirName}, strconv.Itoa(int(*fsGroup)), time.Minute)
+					_, err = framework.LookForStringInPodExec(f.ClientSet, pod.Namespace, pod.Name, []string{"ls", "-ld", dirName}, strconv.Itoa(int(*fsGroup)), time.Minute)
 					framework.ExpectNoError(err, "failed: getting the right privileges in the file %v", int(*fsGroup))
 				}
 
 				// Filesystem: check fsType
 				if fsType != "" {
 					ginkgo.By("Checking fsType is correct.")
-					_, err = framework.LookForStringInPodExec(pod.Namespace, pod.Name, []string{"grep", " " + dirName + " ", "/proc/mounts"}, fsType, time.Minute)
+					_, err = framework.LookForStringInPodExec(f.ClientSet, pod.Namespace, pod.Name, []string{"grep", " " + dirName + " ", "/proc/mounts"}, fsType, time.Minute)
 					framework.ExpectNoError(err, "failed: getting the right fsType %s", fsType)
 				}
 			}
@@ -546,19 +546,19 @@ func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fs
 
 	ginkgo.By("Writing text file contents in the container.")
 	for i, test := range tests {
-		commands := []string{"exec", injectorPod.Name, fmt.Sprintf("--namespace=%v", injectorPod.Namespace), "--"}
+		var commands []string
 		if test.Mode == v1.PersistentVolumeBlock {
 			// Block: write content
 			deviceName := fmt.Sprintf("/opt/%d", i)
-			commands = append(commands, generateWriteBlockCmd(test.ExpectedContent, deviceName)...)
+			commands = generateWriteBlockCmd(test.ExpectedContent, deviceName)
 
 		} else {
 			// Filesystem: write content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
-			commands = append(commands, generateWriteFileCmd(test.ExpectedContent, fileName)...)
+			commands = generateWriteFileCmd(test.ExpectedContent, fileName)
 		}
-		out, err := framework.RunKubectl(injectorPod.Namespace, commands...)
-		framework.ExpectNoError(err, "failed: writing the contents: %s", out)
+		stdout, stderr, err := f.ExecCommandInContainerWithFullOutput(injectorPod.Name, injectorPod.Spec.Containers[0].Name, commands...)
+		framework.ExpectNoError(err, "failed: writing the contents: stdout: %s; stderr: %s", stdout, stderr)
 	}
 
 	// Check that the data have been really written in this pod.

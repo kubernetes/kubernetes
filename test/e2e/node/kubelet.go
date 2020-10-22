@@ -418,7 +418,7 @@ var _ = SIGDescribe("kubelet", func() {
 
 			ginkgo.BeforeEach(func() {
 				e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-				_, nfsServerPod, nfsIP = e2evolume.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
+				_, nfsServerPod, nfsIP = e2evolume.NewNFSServer(f.ClientSet, ns, []string{"-G", "777", "/exports"})
 			})
 
 			ginkgo.AfterEach(func() {

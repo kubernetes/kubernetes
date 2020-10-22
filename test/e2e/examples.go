@@ -125,7 +125,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("checking if secret was read correctly")
-			_, err = framework.LookForStringInLog(ns, "secret-test-pod", "test-container", "value-1", serverStartTimeout)
+			_, err = e2epod.LookForStringInLog(c, ns, "secret-test-pod", "test-container", "value-1", serverStartTimeout)
 			framework.ExpectNoError(err)
 		})
 	})
@@ -142,9 +142,9 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("checking if name and namespace were passed correctly")
-			_, err = framework.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAMESPACE=%v", ns), serverStartTimeout)
+			_, err = e2epod.LookForStringInLog(c, ns, podName, "test-container", fmt.Sprintf("MY_POD_NAMESPACE=%v", ns), serverStartTimeout)
 			framework.ExpectNoError(err)
-			_, err = framework.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAME=%v", podName), serverStartTimeout)
+			_, err = e2epod.LookForStringInLog(c, ns, podName, "test-container", fmt.Sprintf("MY_POD_NAME=%v", podName), serverStartTimeout)
 			framework.ExpectNoError(err)
 		})
 	})

@@ -511,21 +511,27 @@ func RandomSuffix() string {
 // LookForStringInPodExec looks for the given string in the output of a command
 // executed in the first container of specified pod.
 // TODO(alejandrox1): move to pod/ subpkg once kubectl methods are refactored.
-func LookForStringInPodExec(ns, podName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
-	return LookForStringInPodExecToContainer(ns, podName, "", command, expectedString, timeout)
+func LookForStringInPodExec(cs clientset.Interface, ns, podName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
+	return LookForStringInPodExecToContainer(cs, ns, podName, "", command, expectedString, timeout)
 }
 
 // LookForStringInPodExecToContainer looks for the given string in the output of a
 // command executed in specified pod container, or first container if not specified.
-func LookForStringInPodExecToContainer(ns, podName, containerName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
+func LookForStringInPodExecToContainer(cs clientset.Interface, ns, podName, containerName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
 	return lookForString(expectedString, timeout, func() string {
-		args := []string{"exec", podName, fmt.Sprintf("--namespace=%v", ns)}
-		if len(containerName) > 0 {
-			args = append(args, fmt.Sprintf("--container=%s", containerName))
+		opts := ExecOptions{
+			Command:            command,
+			Namespace:          ns,
+			PodName:            podName,
+			ContainerName:      containerName,
+			Stdin:              nil,
+			CaptureStdout:      true,
+			CaptureStderr:      true,
+			PreserveWhitespace: false,
 		}
-		args = append(args, "--")
-		args = append(args, command...)
-		return RunKubectlOrDie(ns, args...)
+		stdout, stderr, err := execWithClientOptions(cs, opts)
+		ExpectNoError(err, "when running command %s\nstdout: %s\nstderr: %s\n", command[0], stdout, stderr)
+		return stdout
 	})
 }
 
@@ -1155,13 +1161,6 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 		return fmt.Errorf("Not ready nodes: %#v", msg)
 	}
 	return nil
-}
-
-// LookForStringInLog looks for the given string in the log of a specific pod container
-func LookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
-	return lookForString(expectedString, timeout, func() string {
-		return RunKubectlOrDie(ns, "logs", podName, container)
-	})
 }
 
 // EnsureLoadBalancerResourcesDeleted ensures that cloud load balancer resources that were created

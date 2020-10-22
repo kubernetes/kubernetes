@@ -23,8 +23,9 @@ import (
 	"net/url"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
@@ -50,6 +51,10 @@ type ExecOptions struct {
 // returning stdout, stderr and error. `options` allowed for
 // additional parameters to be passed.
 func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error) {
+	return execWithClientOptions(f.ClientSet, options)
+}
+
+func execWithClientOptions(cs clientset.Interface, options ExecOptions) (string, string, error) {
 	if !options.Quiet {
 		Logf("ExecWithOptions %+v", options)
 	}
@@ -58,7 +63,7 @@ func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error)
 
 	const tty = false
 
-	req := f.ClientSet.CoreV1().RESTClient().Post().
+	req := cs.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(options.PodName).
 		Namespace(options.Namespace).

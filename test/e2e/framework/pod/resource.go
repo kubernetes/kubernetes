@@ -545,6 +545,26 @@ func GetPreviousPodLogs(c clientset.Interface, namespace, podName, containerName
 	return getPodLogsInternal(c, namespace, podName, containerName, true, nil)
 }
 
+// LookForStringInLog looks for the given string in the log of a specific pod container.
+func LookForStringInLog(cs clientset.Interface, namespace, podName, container, expectedString string, timeout time.Duration) (string, error) {
+	var log string
+	err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
+		var err error
+		log, err = GetPodLogs(cs, namespace, podName, container)
+		if err != nil {
+			return false, err
+		}
+		if strings.Contains(log, expectedString) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return log, fmt.Errorf("error waiting for %q in pod logs: %s\nLast output: %s", expectedString, err, log)
+	}
+	return log, nil
+}
+
 // utility function for gomega Eventually
 func getPodLogsInternal(c clientset.Interface, namespace, podName, containerName string, previous bool, sinceTime *metav1.Time) (string, error) {
 	request := c.CoreV1().RESTClient().Get().
