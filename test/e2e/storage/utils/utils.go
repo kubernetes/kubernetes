@@ -33,6 +33,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -805,4 +806,38 @@ func WaitUntil(poll, timeout time.Duration, checkDone func() bool) bool {
 
 	framework.Logf("WaitUntil failed after reaching the timeout %v", timeout)
 	return false
+}
+
+// WaitForGVRFinalizer waits until a object from a given GVR contains a finalizer
+// If namespace is empty, assume it is a non-namespaced object
+func WaitForGVRFinalizer(ctx context.Context, c dynamic.Interface, gvr schema.GroupVersionResource, objectName, objectNamespace, finalizer string, poll, timeout time.Duration) error {
+	framework.Logf("Waiting up to %v for object %s %s of resource %s to contain finalizer %s", timeout, objectNamespace, objectName, gvr.Resource, finalizer)
+	var (
+		err      error
+		resource *unstructured.Unstructured
+	)
+	if successful := WaitUntil(poll, timeout, func() bool {
+		switch objectNamespace {
+		case "":
+			resource, err = c.Resource(gvr).Get(ctx, objectName, metav1.GetOptions{})
+		default:
+			resource, err = c.Resource(gvr).Namespace(objectNamespace).Get(ctx, objectName, metav1.GetOptions{})
+		}
+		if err != nil {
+			framework.Logf("Failed to get object %s %s with err: %v. Will retry in %v", objectNamespace, objectName, err, timeout)
+			return false
+		}
+		for _, f := range resource.GetFinalizers() {
+			if f == finalizer {
+				return true
+			}
+		}
+		return false
+	}); successful {
+		return nil
+	}
+	if err == nil {
+		err = fmt.Errorf("finalizer %s not added to object %s %s of resource %s", finalizer, objectNamespace, objectName, gvr)
+	}
+	return err
 }

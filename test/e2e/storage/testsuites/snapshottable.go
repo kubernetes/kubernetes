@@ -355,53 +355,76 @@ type SnapshotResource struct {
 	Vsclass   *unstructured.Unstructured
 }
 
-// CreateSnapshotResource creates a snapshot resource for the current test. It knows how to deal with
-// different test pattern snapshot provisioning and deletion policy
-func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConfig, pattern testpatterns.TestPattern, pvcName string, pvcNamespace string) *SnapshotResource {
+// CreateSnapshot creates a VolumeSnapshotClass with given SnapshotDeletionPolicy and a VolumeSnapshot
+// from the VolumeSnapshotClass using a dynamic client.
+// Returns the unstructured VolumeSnapshotClass and VolumeSnapshot objects.
+func CreateSnapshot(sDriver SnapshottableTestDriver, config *PerTestConfig, pattern testpatterns.TestPattern, pvcName string, pvcNamespace string) (*unstructured.Unstructured, *unstructured.Unstructured) {
+	defer ginkgo.GinkgoRecover()
 	var err error
 	if pattern.SnapshotType != testpatterns.DynamicCreatedSnapshot && pattern.SnapshotType != testpatterns.PreprovisionedCreatedSnapshot {
 		err = fmt.Errorf("SnapshotType must be set to either DynamicCreatedSnapshot or PreprovisionedCreatedSnapshot")
 		framework.ExpectNoError(err)
 	}
-	r := SnapshotResource{
-		Config:  config,
-		Pattern: pattern,
-	}
-	dc := r.Config.Framework.DynamicClient
+	dc := config.Framework.DynamicClient
 
 	ginkgo.By("creating a SnapshotClass")
-	r.Vsclass = sDriver.GetSnapshotClass(config)
-	if r.Vsclass == nil {
+	sclass := sDriver.GetSnapshotClass(config)
+	if sclass == nil {
 		framework.Failf("Failed to get snapshot class based on test config")
 	}
-	r.Vsclass.Object["deletionPolicy"] = pattern.SnapshotDeletionPolicy.String()
+	sclass.Object["deletionPolicy"] = pattern.SnapshotDeletionPolicy.String()
 
-	r.Vsclass, err = dc.Resource(SnapshotClassGVR).Create(context.TODO(), r.Vsclass, metav1.CreateOptions{})
+	sclass, err = dc.Resource(SnapshotClassGVR).Create(context.TODO(), sclass, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	r.Vsclass, err = dc.Resource(SnapshotClassGVR).Get(context.TODO(), r.Vsclass.GetName(), metav1.GetOptions{})
+	sclass, err = dc.Resource(SnapshotClassGVR).Get(context.TODO(), sclass.GetName(), metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
 	ginkgo.By("creating a dynamic VolumeSnapshot")
 	// prepare a dynamically provisioned volume snapshot with certain data
-	r.Vs = getSnapshot(pvcName, pvcNamespace, r.Vsclass.GetName())
+	snapshot := getSnapshot(pvcName, pvcNamespace, sclass.GetName())
 
-	r.Vs, err = dc.Resource(SnapshotGVR).Namespace(r.Vs.GetNamespace()).Create(context.TODO(), r.Vs, metav1.CreateOptions{})
+	snapshot, err = dc.Resource(SnapshotGVR).Namespace(snapshot.GetNamespace()).Create(context.TODO(), snapshot, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	err = WaitForSnapshotReady(dc, r.Vs.GetNamespace(), r.Vs.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
+	return sclass, snapshot
+}
+
+// GetSnapshotContentFromSnapshot returns the VolumeSnapshotContent object Bound to a
+// given VolumeSnapshot
+func GetSnapshotContentFromSnapshot(dc dynamic.Interface, snapshot *unstructured.Unstructured) *unstructured.Unstructured {
+	defer ginkgo.GinkgoRecover()
+	err := WaitForSnapshotReady(dc, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
 	framework.ExpectNoError(err)
 
-	r.Vs, err = dc.Resource(SnapshotGVR).Namespace(r.Vs.GetNamespace()).Get(context.TODO(), r.Vs.GetName(), metav1.GetOptions{})
+	vs, err := dc.Resource(SnapshotGVR).Namespace(snapshot.GetNamespace()).Get(context.TODO(), snapshot.GetName(), metav1.GetOptions{})
 
-	snapshotStatus := r.Vs.Object["status"].(map[string]interface{})
+	snapshotStatus := vs.Object["status"].(map[string]interface{})
 	snapshotContentName := snapshotStatus["boundVolumeSnapshotContentName"].(string)
 	framework.Logf("received snapshotStatus %v", snapshotStatus)
 	framework.Logf("snapshotContentName %s", snapshotContentName)
 	framework.ExpectNoError(err)
 
-	r.Vscontent, err = dc.Resource(SnapshotContentGVR).Get(context.TODO(), snapshotContentName, metav1.GetOptions{})
+	vscontent, err := dc.Resource(SnapshotContentGVR).Get(context.TODO(), snapshotContentName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
+
+	return vscontent
+
+}
+
+// CreateSnapshotResource creates a snapshot resource for the current test. It knows how to deal with
+// different test pattern snapshot provisioning and deletion policy
+func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConfig, pattern testpatterns.TestPattern, pvcName string, pvcNamespace string) *SnapshotResource {
+	var err error
+	r := SnapshotResource{
+		Config:  config,
+		Pattern: pattern,
+	}
+	r.Vsclass, r.Vs = CreateSnapshot(sDriver, config, pattern, pvcName, pvcNamespace)
+
+	dc := r.Config.Framework.DynamicClient
+
+	r.Vscontent = GetSnapshotContentFromSnapshot(dc, r.Vs)
 
 	if pattern.SnapshotType == testpatterns.PreprovisionedCreatedSnapshot {
 		// prepare a pre-provisioned VolumeSnapshotContent with certain data
