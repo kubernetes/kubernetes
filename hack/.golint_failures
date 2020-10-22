@@ -311,9 +311,7 @@ staging/src/k8s.io/apiserver/pkg/authentication/request/anonymous
 staging/src/k8s.io/apiserver/pkg/authentication/request/bearertoken
 staging/src/k8s.io/apiserver/pkg/authentication/request/headerrequest
 staging/src/k8s.io/apiserver/pkg/authentication/request/websocket
-staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount
 staging/src/k8s.io/apiserver/pkg/authentication/token/tokenfile
-staging/src/k8s.io/apiserver/pkg/authentication/user
 staging/src/k8s.io/apiserver/pkg/authorization/authorizer
 staging/src/k8s.io/apiserver/pkg/authorization/authorizerfactory
 staging/src/k8s.io/apiserver/pkg/endpoints
@@ -422,6 +420,8 @@ staging/src/k8s.io/component-base/cli/flag
 staging/src/k8s.io/component-base/config/v1alpha1
 staging/src/k8s.io/component-base/featuregate
 staging/src/k8s.io/component-base/version/verflag
+staging/src/k8s.io/component-helpers/auth/serviceaccount
+staging/src/k8s.io/component-helpers/auth/user
 staging/src/k8s.io/controller-manager/config/v1alpha1
 staging/src/k8s.io/controller-manager/pkg/features
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
