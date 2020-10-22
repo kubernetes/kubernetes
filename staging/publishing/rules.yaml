@@ -184,6 +184,21 @@ rules:
     - repository: client-go
       branch: release-1.19
 
+- destination: component-helpers
+  library: true
+  branches:
+  - source:
+      branch: master
+      dir: staging/src/k8s.io/component-helpers
+    name: master
+    dependencies:
+    - repository: apimachinery
+      branch: master
+    - repository: api
+      branch: master
+    - repository: client-go
+      branch: master
+
 - destination: apiserver
   library: true
   branches:
@@ -199,6 +214,8 @@ rules:
     - repository: client-go
       branch: master
     - repository: component-base
+      branch: master
+    - repository: component-helpers
       branch: master
   - source:
       branch: release-1.17
@@ -259,6 +276,8 @@ rules:
     - repository: apiserver
       branch: master
     - repository: component-base
+      branch: master
+    - repository: component-helpers
       branch: master
     - repository: code-generator
       branch: master
@@ -335,6 +354,8 @@ rules:
     - repository: code-generator
       branch: master
     - repository: component-base
+      branch: master
+    - repository: component-helpers
       branch: master
     required-packages:
     - k8s.io/code-generator
@@ -489,6 +510,8 @@ rules:
     - repository: code-generator
       branch: master
     - repository: component-base
+      branch: master
+    - repository: component-helpers
       branch: master
     required-packages:
     - k8s.io/code-generator
@@ -907,6 +930,8 @@ rules:
       branch: master
     - repository: component-base
       branch: master
+    - repository: component-helpers
+      branch: master
     - repository: apiserver
       branch: master
   - source:
@@ -932,6 +957,8 @@ rules:
     - repository: client-go
       branch: master
     - repository: component-base
+      branch: master
+    - repository: component-helpers
       branch: master
     - repository: controller-manager
       branch: master
@@ -987,6 +1014,8 @@ rules:
     - repository: apiserver
       branch: master
     - repository: component-base
+      branch: master
+    - repository: component-helpers
       branch: master
     - repository: api
       branch: master
@@ -1160,6 +1189,8 @@ rules:
     - repository: apiserver
       branch: master
     - repository: component-base
+      branch: master
+    - repository: component-helpers
       branch: master
     - repository: controller-manager
       branch: master
@@ -1355,16 +1386,3 @@ rules:
       branch: master
       dir: staging/src/k8s.io/mount-utils
     name: master
-
-- destination: component-helpers
-  library: true
-  branches:
-  - source:
-      branch: master
-      dir: staging/src/k8s.io/component-helpers
-    name: master
-    dependencies:
-    - repository: apimachinery
-      branch: master
-    - repository: api
-      branch: master
