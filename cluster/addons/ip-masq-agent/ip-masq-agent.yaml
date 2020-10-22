@@ -8,7 +8,6 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 ---
-# https://github.com/kubernetes-incubator/ip-masq-agent/blob/v2.4.1/README.md
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -30,7 +29,7 @@ spec:
       hostNetwork: true
       containers:
       - name: ip-masq-agent
-        image: k8s.gcr.io/ip-masq-agent-amd64:v2.4.1
+        image: k8s.gcr.io/networking/ip-masq-agent-amd64:v2.6.0
         args:
           - --masq-chain=IP-MASQ
           - --nomasq-all-reserved-ranges
