@@ -36,6 +36,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/klog/v2 v2.2.0
+	k8s.io/mount-utils v0.0.0
 	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
 	sigs.k8s.io/yaml v1.2.0
 )
@@ -50,4 +51,5 @@ replace (
 	k8s.io/controller-manager => ../controller-manager
 	k8s.io/csi-translation-lib => ../csi-translation-lib
 	k8s.io/legacy-cloud-providers => ../legacy-cloud-providers
+	k8s.io/mount-utils => ../mount-utils
 )
