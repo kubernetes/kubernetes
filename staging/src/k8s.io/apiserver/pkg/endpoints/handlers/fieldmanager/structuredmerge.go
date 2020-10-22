@@ -49,7 +49,7 @@ func NewStructuredMergeManager(typeConverter TypeConverter, objectConverter runt
 		groupVersion:    gv,
 		hubVersion:      hub,
 		updater: merge.Updater{
-			Converter: NewVersionConverter(typeConverter, objectConverter, hub), // This is the converter provided to SMD from k8s
+			Converter: newVersionConverter(typeConverter, objectConverter, hub), // This is the converter provided to SMD from k8s
 		},
 	}, nil
 }
@@ -65,7 +65,7 @@ func NewCRDStructuredMergeManager(typeConverter TypeConverter, objectConverter r
 		groupVersion:    gv,
 		hubVersion:      hub,
 		updater: merge.Updater{
-			Converter: NewCRDVersionConverter(typeConverter, objectConverter, hub),
+			Converter: newCRDVersionConverter(typeConverter, objectConverter, hub),
 		},
 	}, nil
 }
