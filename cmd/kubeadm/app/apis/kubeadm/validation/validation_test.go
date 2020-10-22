@@ -1130,10 +1130,11 @@ func TestValidateEtcd(t *testing.T) {
 
 func TestGetClusterNodeMask(t *testing.T) {
 	tests := []struct {
-		name         string
-		cfg          *kubeadmapi.ClusterConfiguration
-		isIPv6       bool
-		expectedMask int
+		name          string
+		cfg           *kubeadmapi.ClusterConfiguration
+		isIPv6        bool
+		expectedMask  int
+		expectedError bool
 	}{
 		{
 			name:         "ipv4 default mask",
@@ -1150,6 +1151,16 @@ func TestGetClusterNodeMask(t *testing.T) {
 			},
 			isIPv6:       false,
 			expectedMask: 23,
+		},
+		{
+			name: "ipv4 wrong mask",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ControllerManager: kubeadmapi.ControlPlaneComponent{
+					ExtraArgs: map[string]string{"node-cidr-mask-size": "aa23"},
+				},
+			},
+			isIPv6:        false,
+			expectedError: true,
 		},
 		{
 			name:         "ipv6 default mask",
@@ -1217,6 +1228,17 @@ func TestGetClusterNodeMask(t *testing.T) {
 			expectedMask: 23,
 		},
 		{
+			name: "dual ipv4 wrong mask",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				FeatureGates: map[string]bool{features.IPv6DualStack: true},
+				ControllerManager: kubeadmapi.ControlPlaneComponent{
+					ExtraArgs: map[string]string{"node-cidr-mask-size-ipv4": "aa"},
+				},
+			},
+			isIPv6:        false,
+			expectedError: true,
+		},
+		{
 			name: "dual ipv6 default mask and legacy flag",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				FeatureGates: map[string]bool{features.IPv6DualStack: true},
@@ -1238,10 +1260,25 @@ func TestGetClusterNodeMask(t *testing.T) {
 			isIPv6:       true,
 			expectedMask: 83,
 		},
+		{
+			name: "dual ipv6 custom mask and wrong flag",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				FeatureGates: map[string]bool{features.IPv6DualStack: true},
+				ControllerManager: kubeadmapi.ControlPlaneComponent{
+					ExtraArgs: map[string]string{"node-cidr-mask-size": "23", "node-cidr-mask-size-ipv6": "a83"},
+				},
+			},
+			isIPv6:        true,
+			expectedError: true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if mask := getClusterNodeMask(test.cfg, test.isIPv6); mask != test.expectedMask {
+			mask, err := getClusterNodeMask(test.cfg, test.isIPv6)
+			if (err == nil) == test.expectedError {
+				t.Errorf("expected error: %v, got %v", test.expectedError, err)
+			}
+			if mask != test.expectedMask {
 				t.Errorf("expected mask: %d, got %d", test.expectedMask, mask)
 			}
 		})

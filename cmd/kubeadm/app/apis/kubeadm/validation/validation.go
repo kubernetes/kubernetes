@@ -432,7 +432,11 @@ func ValidatePodSubnetNodeMask(subnetStr string, c *kubeadm.ClusterConfiguration
 		mask := podSubnet.Mask
 		maskSize, _ := mask.Size()
 		// obtain node-cidr-mask
-		nodeMask := getClusterNodeMask(c, utilnet.IsIPv6(podSubnet.IP))
+		nodeMask, err := getClusterNodeMask(c, utilnet.IsIPv6(podSubnet.IP))
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, podSubnet.String(), err.Error()))
+			continue
+		}
 		// the pod subnet mask needs to allow one or multiple node-masks
 		// i.e. if it has a /24 the node mask must be between 24 and 32 for ipv4
 		if maskSize > nodeMask {
@@ -447,13 +451,14 @@ func ValidatePodSubnetNodeMask(subnetStr string, c *kubeadm.ClusterConfiguration
 // getClusterNodeMask returns the corresponding node-cidr-mask
 // based on the Cluster configuration and the IP family
 // Default is 24 for IPv4 and 64 for IPv6
-func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) int {
+func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) (int, error) {
 	// defaultNodeMaskCIDRIPv4 is default mask size for IPv4 node cidr for use by the controller manager
 	const defaultNodeMaskCIDRIPv4 = 24
 	// DefaultNodeMaskCIDRIPv6 is default mask size for IPv6 node cidr for use by the controller manager
 	const defaultNodeMaskCIDRIPv6 = 64
 	var maskSize int
 	var maskArg string
+	var err error
 	isDualStack := features.Enabled(c.FeatureGates, features.IPv6DualStack)
 
 	if isDualStack && isIPv6 {
@@ -466,13 +471,17 @@ func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) int {
 
 	if v, ok := c.ControllerManager.ExtraArgs[maskArg]; ok && v != "" {
 		// assume it is an integer, if not it will fail later
-		maskSize, _ = strconv.Atoi(v)
+		maskSize, err = strconv.Atoi(v)
+		if err != nil {
+			errors.Wrapf(err, "could not parse the value of the kube-controller-manager flag %s as an integer: %v", maskArg, err)
+			return 0, err
+		}
 	} else if isIPv6 {
 		maskSize = defaultNodeMaskCIDRIPv6
 	} else {
 		maskSize = defaultNodeMaskCIDRIPv4
 	}
-	return maskSize
+	return maskSize, nil
 }
 
 // ValidateNetworking validates networking configuration
