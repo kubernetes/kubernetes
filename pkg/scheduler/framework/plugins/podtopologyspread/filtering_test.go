@@ -1264,6 +1264,20 @@ func TestSingleConstraint(t *testing.T) {
 			},
 		},
 		{
+			name: "pod cannot be scheduled as all nodes don't have label 'rack'",
+			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
+				1, "rack", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj(),
+			).Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+			},
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.UnschedulableAndUnresolvable,
+				"node-x": framework.UnschedulableAndUnresolvable,
+			},
+		},
+		{
 			name: "pods spread across nodes as 2/1/0/3, only node-x fits",
 			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
 				1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj(),
