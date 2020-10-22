@@ -3972,10 +3972,10 @@ type LoadBalancerIngress struct {
 	// +optional
 	Hostname string `json:"hostname,omitempty" protobuf:"bytes,2,opt,name=hostname"`
 
-	// RouteType specifies the type of route to use for this ingress
-	// Defaults to `VIP`
+	// IPMode specifies the IP mode to use for this ingress
+	// Defaults to `VIP` if IP is set, null otherwise
 	// +optional
-	RouteType LoadBalancerRouteType `json:"routeType,omitempty" protobuf:"bytes,3,opt,name=routeType"`
+	IPMode *LoadBalancerIPMode `json:"ipMode,omitempty" protobuf:"bytes,3,opt,name=ipMode"`
 }
 
 const (
@@ -3983,14 +3983,16 @@ const (
 	MaxServiceTopologyKeys = 16
 )
 
-// LoadBalancerRouteType represents the type of route available for a LoadBalancer ingress
-type LoadBalancerRouteType string
+// LoadBalancerIPMode represents the mode of the LoadBalancer ingress IP
+type LoadBalancerIPMode string
 
 const (
-	// LoadBalancerRouteTypeVIP is the type of route used by a LoadBalancer where dstIP = lbIP
-	LoadBalancerRouteTypeVIP LoadBalancerRouteType = "VIP"
-	// LoadBalancerRouteTypeProxy is the type of route used by a proxy like LoadBalancer
-	LoadBalancerRouteTypeProxy LoadBalancerRouteType = "Proxy"
+	// LoadBalancerIPModeVIP indicates that the traffic passing through this LoadBalancer
+	// is delivered with the destination IP set to the specified LoadBalancer IP
+	LoadBalancerIPModeVIP LoadBalancerIPMode = "VIP"
+	// LoadBalancerIPModeProxy indicates that the specified LoadBalancer acts like a proxy,
+	// changing the destination IP to the node IP and the source IP to the LoadBalaner (mostly private) IP
+	LoadBalancerIPModeProxy LoadBalancerIPMode = "Proxy"
 )
 
 // IPFamily represents the IP Family (IPv4 or IPv6). This type is used

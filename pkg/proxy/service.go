@@ -164,22 +164,24 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	}
 
 	// Obtain Load Balancer Ingress IPs
-	var ips []string
+	var allIncorrectIPs []string
 	for _, ing := range service.Status.LoadBalancer.Ingress {
-		ips = append(ips, ing.IP)
+		correctIPs, incorrectIPs := utilproxy.FilterIncorrectIPVersion([]string{ing.IP}, sct.ipFamily)
+
+		// len is either 1 or 0
+		if len(correctIPs) == 1 {
+			// Update the LoadBalancerStatus with the filtered IPs
+			info.loadBalancerStatus.Ingress = append(info.loadBalancerStatus.Ingress, ing)
+			continue
+		}
+
+		// here len(incorrectIPs) == 1
+		allIncorrectIPs = append(allIncorrectIPs, incorrectIPs[0])
 	}
 
-	if len(ips) > 0 {
-		correctIPs, incorrectIPs := utilproxy.FilterIncorrectIPVersion(ips, sct.ipFamily)
+	if len(incorrectIPs) > 0 {
+		klog.V(4).Infof("service change tracker(%v) ignored the following load balancer(%s) ingress ips for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(incorrectIPs, ","), service.Namespace, service.Name)
 
-		if len(incorrectIPs) > 0 {
-			klog.V(4).Infof("service change tracker(%v) ignored the following load balancer(%s) ingress ips for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(incorrectIPs, ","), service.Namespace, service.Name)
-
-		}
-		// Create the LoadBalancerStatus with the filtered IPs
-		for _, ip := range correctIPs {
-			info.loadBalancerStatus.Ingress = append(info.loadBalancerStatus.Ingress, v1.LoadBalancerIngress{IP: ip})
-		}
 	}
 
 	if apiservice.NeedsHealthCheck(service) {
