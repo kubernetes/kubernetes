@@ -55,41 +55,34 @@
       "22": "23"
     },
     "clusterIP": "24",
-    "clusterIPs": [
+    "type": ".蘯6ċV夸",
+    "externalIPs": [
       "25"
     ],
-    "type": "鮽ort昍řČ扷5ƗǸƢ6/ʕVŚ(Ŀ",
-    "externalIPs": [
-      "26"
-    ],
-    "sessionAffinity": "甞谐颋ǅS",
-    "loadBalancerIP": "27",
+    "sessionAffinity": "ɑ",
+    "loadBalancerIP": "26",
     "loadBalancerSourceRanges": [
-      "28"
+      "27"
     ],
-    "externalName": "29",
-    "externalTrafficPolicy": "ƏS$+½H牗洝尿",
-    "healthCheckNodePort": -1965738697,
+    "externalName": "28",
+    "externalTrafficPolicy": "ʤ脽ěĂ凗蓏Ŋ蛊ĉy緅縕\u003eŽ",
+    "healthCheckNodePort": -1095807277,
     "publishNotReadyAddresses": true,
     "sessionAffinityConfig": {
       "clientIP": {
-        "timeoutSeconds": 2072604405
+        "timeoutSeconds": -1973740160
       }
     },
-    "ipFamilies": [
-      "x"
-    ],
     "topologyKeys": [
-      "30"
-    ],
-    "ipFamilyPolicy": ";Ơ歿:狞夌碕ʂ"
+      "29"
+    ]
   },
   "status": {
     "loadBalancer": {
       "ingress": [
         {
-          "ip": "31",
-          "hostname": "32"
+          "ip": "30",
+          "hostname": "31"
         }
       ]
     }
