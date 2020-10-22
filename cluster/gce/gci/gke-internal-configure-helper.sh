@@ -493,6 +493,7 @@ Description=Google Container File System service
 After=network.target
 [Service]
 Type=simple
+ExecStartPre=-/bin/umount ${gcfsd_mnt_dir}
 ExecStartPre=/bin/mkdir -p ${gcfsd_mnt_dir}
 ExecStart=${KUBE_HOME}/bin/gcfsd --mount_point=${gcfsd_mnt_dir}
 ExecStop=/bin/umount ${gcfsd_mnt_dir}
