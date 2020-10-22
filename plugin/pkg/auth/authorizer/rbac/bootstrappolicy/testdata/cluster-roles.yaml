@@ -744,6 +744,12 @@ items:
   - apiGroups:
     - ""
     resources:
+    - configmaps
+    verbs:
+    - get
+  - apiGroups:
+    - ""
+    resources:
     - pods
     verbs:
     - delete
