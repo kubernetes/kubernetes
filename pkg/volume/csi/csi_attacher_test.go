@@ -45,6 +45,7 @@ import (
 	core "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
@@ -201,7 +202,7 @@ func TestAttacherAttach(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("test case: %s", tc.name)
-			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil, false)
+			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil, true)
 			defer os.RemoveAll(tmpDir)
 
 			attacher, err := plug.NewAttacher()
@@ -286,7 +287,7 @@ func TestAttacherAttachWithInline(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("test case: %s", tc.name)
-			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil, false)
+			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil, true)
 			defer os.RemoveAll(tmpDir)
 
 			attacher, err := plug.NewAttacher()
@@ -1611,8 +1612,13 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset, setupInf
 	if err != nil {
 		t.Fatalf("can't find plugin %v", CSIPluginName)
 	}
-
+	fmt.Printf("init plugin")
+	klog.Warning("init ")
+	plug.Init(host)
 	csiPlug, ok := plug.(*csiPlugin)
+	klog.Warning("csi")
+	csiPlug.Init(host)
+
 	if !ok {
 		t.Fatalf("cannot assert plugin to be type csiPlugin")
 	}

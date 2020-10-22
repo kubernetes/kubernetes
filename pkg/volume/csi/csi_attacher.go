@@ -106,7 +106,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		},
 	}
 
-	_, err = c.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
+	/*_, err = c.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
 	alreadyExist := false
 	if err != nil {
 		if !apierrors.IsAlreadyExists(err) {
@@ -118,6 +118,27 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 	if alreadyExist {
 		klog.V(4).Info(log("attachment [%v] for volume [%v] already exists (will not be recreated)", attachID, pvSrc.VolumeHandle))
 	} else {
+		klog.V(4).Info(log("attachment [%v] for volume [%v] created successfully", attachID, pvSrc.VolumeHandle))
+	}*/
+
+	alreadyExist := false
+	// CHRISHENZIE: In master, the objects do not previously exist and are created.
+	if _, err = c.plugin.volumeAttachmentLister.Get(attachID); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return "", errors.New(log("attacher.Attach list failed: %v", err))
+		}
+	} else {
+		alreadyExist = true
+	}
+
+	if alreadyExist {
+		klog.V(4).Info(log("attachment [%v] for volume [%v] already exists (will not be recreated)", attachID, pvSrc.VolumeHandle))
+	} else {
+		if _, err = c.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{}); err != nil {
+			return "", errors.New(log("attacher.Attach failed to create VolumeAttachment: %v", err))
+		}
+		// CHRISHENZIE: Problem here. After the object is created, it still doesn't exist in the VolumeAttachmentLister.
+
 		klog.V(4).Info(log("attachment [%v] for volume [%v] created successfully", attachID, pvSrc.VolumeHandle))
 	}
 
@@ -154,11 +175,27 @@ func (c *csiAttacher) waitForVolumeAttachment(volumeHandle, attachID string, tim
 func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID string, timer *time.Timer, timeout time.Duration) (string, error) {
 
 	klog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
-	attach, err := c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, meta.GetOptions{})
-	if err != nil {
-		klog.Error(log("attacher.WaitForAttach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
-		return "", fmt.Errorf("volume %v has GET error for volume attachment %v: %v", volumeHandle, attachID, err)
+
+	var attach *storage.VolumeAttachment
+	var err error
+	if c.plugin.volumeAttachmentLister != nil {
+		attach, err = c.plugin.volumeAttachmentLister.Get(attachID)
+		if !apierrors.IsNotFound(err) {
+			return "", errors.New(log("attacher.Attach failed: %v", err))
+		}
 	}
+	if attach == nil {
+		attach, err = c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, meta.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				//object deleted or never existed, done
+				klog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] not found, object deleted", attachID, volumeHandle))
+				return "", nil
+			}
+			return "", errors.New(log("detacher.WaitForDetach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
+		}
+	}
+
 	err = c.waitForVolumeAttachDetachStatus(attach, volumeHandle, attachID, timer, timeout, verifyAttachmentStatus)
 	if err != nil {
 		return "", err
@@ -431,14 +468,25 @@ func (c *csiAttacher) waitForVolumeDetachment(volumeHandle, attachID string, tim
 func (c *csiAttacher) waitForVolumeDetachmentInternal(volumeHandle, attachID string, timer *time.Timer,
 	timeout time.Duration) error {
 	klog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
-	attach, err := c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, meta.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			//object deleted or never existed, done
-			klog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] not found, object deleted", attachID, volumeHandle))
-			return nil
+
+	var attach *storage.VolumeAttachment
+	var err error
+	if c.plugin.volumeAttachmentLister != nil {
+		attach, err = c.plugin.volumeAttachmentLister.Get(attachID)
+		if !apierrors.IsNotFound(err) {
+			return errors.New(log("attacher.Attach failed: %v", err))
 		}
-		return errors.New(log("detacher.WaitForDetach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
+	}
+	if attach == nil {
+		attach, err = c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, meta.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				//object deleted or never existed, done
+				klog.V(4).Info(log("VolumeAttachment object [%v] for volume [%v] not found, object deleted", attachID, volumeHandle))
+				return nil
+			}
+			return errors.New(log("detacher.WaitForDetach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
+		}
 	}
 	err = c.waitForVolumeAttachDetachStatus(attach, volumeHandle, attachID, timer, timeout, verifyDetachmentStatus)
 	if err != nil {
@@ -457,6 +505,7 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatus(attach *storage.VolumeAtta
 		return nil
 	}
 
+	// Here is a main thing we want to use informer instead of creating a wtch for each volume status check
 	watcher, err := c.k8s.StorageV1().VolumeAttachments().Watch(context.TODO(), meta.SingleObject(meta.ObjectMeta{Name: attachID, ResourceVersion: attach.ResourceVersion}))
 	if err != nil {
 		return fmt.Errorf("watch error:%v for volume %v", err, volumeHandle)

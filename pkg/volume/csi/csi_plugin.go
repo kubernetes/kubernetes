@@ -206,7 +206,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 				klog.Error(log("CSIDriverLister not found on KubeletVolumeHost"))
 			}
 			// We don't run the volumeAttachmentLister in the kubelet context
-			p.volumeAttachmentLister = nil
+			//p.volumeAttachmentLister = nil
 		}
 	}
 
