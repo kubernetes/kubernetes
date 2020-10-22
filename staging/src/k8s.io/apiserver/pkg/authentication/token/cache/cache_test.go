@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/component-helpers/auth/user"
 )
 
 func TestSimpleCache(t *testing.T) {

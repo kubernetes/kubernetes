@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/component-helpers/auth/user"
 )
 
 const (

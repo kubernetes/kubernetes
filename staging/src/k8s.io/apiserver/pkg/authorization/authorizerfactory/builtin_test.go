@@ -20,8 +20,8 @@ import (
 	"context"
 	"testing"
 
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/component-helpers/auth/user"
 )
 
 func TestNewAlwaysAllowAuthorizer(t *testing.T) {

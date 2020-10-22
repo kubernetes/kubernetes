@@ -21,7 +21,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
-	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -33,13 +32,15 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+
 	"golang.org/x/net/websocket"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/component-helpers/auth/user"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/utils/pointer"
 )

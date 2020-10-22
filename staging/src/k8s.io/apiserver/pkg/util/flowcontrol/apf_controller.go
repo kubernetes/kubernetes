@@ -36,7 +36,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/util/apihelpers"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
@@ -45,6 +44,7 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-helpers/auth/user"
 	"k8s.io/klog/v2"
 
 	fctypesv1a1 "k8s.io/api/flowcontrol/v1alpha1"

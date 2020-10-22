@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/component-helpers/auth/user"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 

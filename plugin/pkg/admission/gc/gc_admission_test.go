@@ -29,11 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/restmapper"
 	coretesting "k8s.io/client-go/testing"
+	"k8s.io/component-helpers/auth/user"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )

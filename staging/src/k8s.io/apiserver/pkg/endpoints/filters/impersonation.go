@@ -29,12 +29,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/audit"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/component-helpers/auth/serviceaccount"
+	"k8s.io/component-helpers/auth/user"
 )
 
 // WithImpersonation is a filter that will inspect and check requests that attempt to change the user.Info for their requests

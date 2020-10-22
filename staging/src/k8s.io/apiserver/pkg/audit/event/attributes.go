@@ -22,8 +22,8 @@ import (
 
 	authnv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apiserver/pkg/apis/audit"
-	authuser "k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	authuser "k8s.io/component-helpers/auth/user"
 )
 
 var _ authorizer.Attributes = &attributes{}

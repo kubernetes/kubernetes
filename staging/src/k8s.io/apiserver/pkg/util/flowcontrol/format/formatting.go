@@ -22,8 +22,8 @@ import (
 	"fmt"
 
 	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/component-helpers/auth/user"
 )
 
 // This file provides an easy way to mark a value for formatting to

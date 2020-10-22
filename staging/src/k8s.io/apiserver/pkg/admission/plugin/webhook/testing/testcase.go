@@ -33,10 +33,10 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/component-helpers/auth/user"
 )
 
 var matchEverythingRules = []registrationv1.RuleWithOperations{{

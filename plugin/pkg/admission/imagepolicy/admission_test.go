@@ -32,8 +32,8 @@ import (
 	"k8s.io/api/imagepolicy/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/authentication/user"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
+	"k8s.io/component-helpers/auth/user"
 	api "k8s.io/kubernetes/pkg/apis/core"
 
 	"fmt"

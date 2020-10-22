@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/component-helpers/auth/user"
 )
 
 type attributesRecord struct {

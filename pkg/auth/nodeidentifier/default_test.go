@@ -19,7 +19,7 @@ package nodeidentifier
 import (
 	"testing"
 
-	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/component-helpers/auth/user"
 )
 
 func TestDefaultNodeIdentifier_NodeIdentity(t *testing.T) {

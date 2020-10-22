@@ -20,9 +20,9 @@ import (
 	"strings"
 
 	fctypesv1a1 "k8s.io/api/flowcontrol/v1alpha1"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/component-helpers/auth/serviceaccount"
+	"k8s.io/component-helpers/auth/user"
 )
 
 // Tests whether a given request and FlowSchema match.  Nobody mutates

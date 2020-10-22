@@ -30,10 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/kubernetes/scheme"
 	authenticationv1client "k8s.io/client-go/kubernetes/typed/authentication/v1"
+	"k8s.io/component-helpers/auth/user"
 	"k8s.io/klog/v2"
 )
 

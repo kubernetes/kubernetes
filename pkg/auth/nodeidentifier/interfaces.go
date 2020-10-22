@@ -17,7 +17,7 @@ limitations under the License.
 package nodeidentifier
 
 import (
-	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/component-helpers/auth/user"
 )
 
 // NodeIdentifier determines node information from a given user

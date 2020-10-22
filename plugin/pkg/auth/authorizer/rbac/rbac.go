@@ -27,9 +27,9 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	rbaclisters "k8s.io/client-go/listers/rbac/v1"
+	"k8s.io/component-helpers/auth/user"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )

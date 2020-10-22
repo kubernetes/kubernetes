@@ -34,8 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/component-helpers/auth/user"
 )
 
 const (

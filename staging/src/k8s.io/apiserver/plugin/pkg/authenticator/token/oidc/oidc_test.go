@@ -37,7 +37,7 @@ import (
 
 	oidc "github.com/coreos/go-oidc"
 	jose "gopkg.in/square/go-jose.v2"
-	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/component-helpers/auth/user"
 	"k8s.io/klog/v2"
 )
 

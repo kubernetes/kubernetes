@@ -26,8 +26,8 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
-	"k8s.io/apiserver/pkg/authentication/user"
 	utilcert "k8s.io/client-go/util/cert"
+	"k8s.io/component-helpers/auth/user"
 )
 
 // StringSliceProvider is a way to get a string slice value.  It is heavily used for authentication headers among other places.

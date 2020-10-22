@@ -23,7 +23,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/rbac"
 )
 
-// allAuthenticated matches k8s.io/apiserver/pkg/authentication/user.AllAuthenticated,
+// allAuthenticated matches k8s.io/component-helpers/auth/user.AllAuthenticated,
 // but we don't want an client library (which must include types), depending on a server library
 const allAuthenticated = "system:authenticated"
 

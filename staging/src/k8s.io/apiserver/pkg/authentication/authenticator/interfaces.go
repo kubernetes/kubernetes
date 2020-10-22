@@ -20,7 +20,7 @@ import (
 	"context"
 	"net/http"
 
-	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/component-helpers/auth/user"
 )
 
 // Token checks a string value against a backing authentication store and

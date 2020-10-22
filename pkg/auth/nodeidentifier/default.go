@@ -19,7 +19,7 @@ package nodeidentifier
 import (
 	"strings"
 
-	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/component-helpers/auth/user"
 )
 
 // NewDefaultNodeIdentifier returns a default NodeIdentifier implementation,

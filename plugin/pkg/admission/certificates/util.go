@@ -20,8 +20,8 @@ import (
 	"context"
 	"strings"
 
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/component-helpers/auth/user"
 	"k8s.io/klog/v2"
 )
 

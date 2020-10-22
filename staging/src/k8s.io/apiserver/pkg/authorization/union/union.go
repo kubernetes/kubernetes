@@ -29,8 +29,8 @@ import (
 	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/component-helpers/auth/user"
 )
 
 // unionAuthzHandler authorizer against a chain of authorizer.Authorizer

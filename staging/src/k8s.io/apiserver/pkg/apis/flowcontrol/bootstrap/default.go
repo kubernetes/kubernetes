@@ -21,8 +21,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	flowcontrol "k8s.io/api/flowcontrol/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/component-helpers/auth/serviceaccount"
+	"k8s.io/component-helpers/auth/user"
 )
 
 // The objects that define an apiserver's initial behavior.  The

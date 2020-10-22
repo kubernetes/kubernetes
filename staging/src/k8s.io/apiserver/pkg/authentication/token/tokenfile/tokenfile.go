@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/component-helpers/auth/user"
 	"k8s.io/klog/v2"
 )
 

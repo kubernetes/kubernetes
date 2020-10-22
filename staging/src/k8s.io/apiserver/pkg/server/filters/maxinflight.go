@@ -24,10 +24,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	fcmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+	"k8s.io/component-helpers/auth/user"
 
 	"k8s.io/klog/v2"
 )

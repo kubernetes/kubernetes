@@ -35,8 +35,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/token/cache"
-	"k8s.io/apiserver/pkg/authentication/user"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
+	"k8s.io/component-helpers/auth/user"
 )
 
 var apiAuds = authenticator.Audiences{"api"}

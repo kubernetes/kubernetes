@@ -20,7 +20,7 @@ import (
 	"context"
 	"net/http"
 
-	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/component-helpers/auth/user"
 )
 
 // Attributes is an interface used by an Authorizer to get information about a request

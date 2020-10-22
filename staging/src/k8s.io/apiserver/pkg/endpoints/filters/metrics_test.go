@@ -24,9 +24,9 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/component-helpers/auth/user"
 )
 
 func TestMetrics(t *testing.T) {

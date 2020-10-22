@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/component-helpers/auth/user"
 )
 
 func TestAuthenticate(t *testing.T) {

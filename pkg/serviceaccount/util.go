@@ -18,8 +18,8 @@ package serviceaccount
 
 import (
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apiserver/pkg/authentication/user"
 	apiserverserviceaccount "k8s.io/component-helpers/auth/serviceaccount"
+	"k8s.io/component-helpers/auth/user"
 )
 
 const (

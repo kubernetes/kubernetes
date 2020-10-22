@@ -48,8 +48,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authentication/user"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/component-helpers/auth/user"
 )
 
 var (

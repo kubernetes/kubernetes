@@ -20,7 +20,7 @@ import (
 	"net/http"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/component-helpers/auth/user"
 )
 
 // GroupAdder adds groups to an authenticated user.Info

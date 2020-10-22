@@ -25,8 +25,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/authentication/user"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/component-helpers/auth/user"
 
 	"k8s.io/klog/v2"
 )

@@ -27,11 +27,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	fqtesting "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
 	fcfmt "k8s.io/apiserver/pkg/util/flowcontrol/format"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+	"k8s.io/component-helpers/auth/user"
 )
 
 var noRestraintQSF = fqtesting.NewNoRestraintFactory()

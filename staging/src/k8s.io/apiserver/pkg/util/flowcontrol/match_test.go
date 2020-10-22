@@ -24,9 +24,9 @@ import (
 	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	fcfmt "k8s.io/apiserver/pkg/util/flowcontrol/format"
+	"k8s.io/component-helpers/auth/user"
 )
 
 func TestMatching(t *testing.T) {

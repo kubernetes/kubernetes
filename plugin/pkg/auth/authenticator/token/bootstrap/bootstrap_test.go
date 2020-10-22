@@ -26,8 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/authentication/user"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	"k8s.io/component-helpers/auth/user"
 )
 
 type lister struct {

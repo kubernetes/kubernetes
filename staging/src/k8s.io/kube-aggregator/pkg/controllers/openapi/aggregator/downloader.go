@@ -25,8 +25,8 @@ import (
 	"github.com/go-openapi/spec"
 	jsoniter "github.com/json-iterator/go"
 
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/component-helpers/auth/user"
 )
 
 // Downloader is the OpenAPI downloader type. It will try to download spec from /openapi/v2 or /swagger.json endpoint.
