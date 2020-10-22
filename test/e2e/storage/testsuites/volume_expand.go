@@ -36,6 +36,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -68,6 +69,8 @@ func InitVolumeExpandTestSuite() TestSuite {
 				testpatterns.BlockVolModeDynamicPV,
 				testpatterns.DefaultFsDynamicPVAllowExpansion,
 				testpatterns.BlockVolModeDynamicPVAllowExpansion,
+				testpatterns.NtfsDynamicPV,
+				testpatterns.NtfsDynamicPVAllowExpansion,
 			},
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Gi",
@@ -176,6 +179,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 				PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
 				SeLinuxLabel:  e2epv.SELinuxLabel,
 				NodeSelection: l.config.ClientNodeSelection,
+				ImageID:       getTestImage(),
 			}
 			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, framework.PodStartTimeout)
 			defer func() {
@@ -219,6 +223,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 				PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
 				SeLinuxLabel:  e2epv.SELinuxLabel,
 				NodeSelection: l.config.ClientNodeSelection,
+				ImageID:       getTestImage(),
 			}
 			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, resizedPodStartupTimeout)
 			defer func() {
@@ -246,6 +251,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 				PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
 				SeLinuxLabel:  e2epv.SELinuxLabel,
 				NodeSelection: l.config.ClientNodeSelection,
+				ImageID:       getTestImage(),
 			}
 			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, framework.PodStartTimeout)
 			defer func() {
@@ -419,4 +425,13 @@ func WaitForFSResize(pvc *v1.PersistentVolumeClaim, c clientset.Interface) (*v1.
 		return nil, fmt.Errorf("error waiting for pvc %q filesystem resize to finish: %v", pvc.Name, waitErr)
 	}
 	return updatedPVC, nil
+}
+
+// TODO: after issue https://github.com/kubernetes/kubernetes/issues/81245 is resolved
+// this utility can be moved to e2epod
+func getTestImage() int {
+	if framework.NodeOSDistroIs("windows") {
+		return imageutils.Agnhost
+	}
+	return imageutils.BusyBox
 }
