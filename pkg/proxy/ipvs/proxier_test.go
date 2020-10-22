@@ -3611,8 +3611,17 @@ func Test_syncService(t *testing.T) {
 				t.Errorf("Case [%d], unexpected add IPVS virtual server error: %v", i, err)
 			}
 		}
-		if err := proxier.syncService(testCases[i].svcName, testCases[i].newVirtualServer, testCases[i].bindAddr, testCases[i].bindedAddrs); err != nil {
+		err := proxier.refreshCurrentIPVSServices()
+		if err != nil {
+			t.Errorf("Case [%d], refresh IPVS service failed, err: %v", i, err)
+		}
+
+		appliedServ, err := proxier.syncService(testCases[i].svcName, testCases[i].newVirtualServer, testCases[i].bindAddr, testCases[i].bindedAddrs)
+		if err != nil {
 			t.Errorf("Case [%d], unexpected sync IPVS virtual server error: %v", i, err)
+		}
+		if !appliedServ.Equal(testCases[i].newVirtualServer) {
+			t.Errorf("Case [%d], unexpected mismatch, expect: %#v, got: %#v", i, testCases[i].newVirtualServer, appliedServ)
 		}
 		// check
 		list, err := proxier.ipvs.GetVirtualServers()
@@ -3779,6 +3788,7 @@ func TestCleanLegacyService(t *testing.T) {
 	for v := range currentServices {
 		fp.ipvs.AddVirtualServer(currentServices[v])
 	}
+	fp.currentIPVSServices = currentServices
 
 	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
 	activeBindAddrs := map[string]bool{"1.1.1.1": true, "2.2.2.2": true, "3.3.3.3": true, "4.4.4.4": true}
@@ -3788,7 +3798,7 @@ func TestCleanLegacyService(t *testing.T) {
 		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
 	}
 
-	fp.cleanLegacyService(activeServices, currentServices, map[string]bool{"5.5.5.5": true, "6.6.6.6": true})
+	fp.cleanLegacyService(activeServices, map[string]bool{"5.5.5.5": true, "6.6.6.6": true})
 	// ipvs4 and ipvs5 should have been cleaned.
 	remainingVirtualServers, _ := fp.ipvs.GetVirtualServers()
 	if len(remainingVirtualServers) != 4 {
@@ -3874,6 +3884,7 @@ func TestCleanLegacyServiceWithRealServers(t *testing.T) {
 	for v := range currentServices {
 		fp.ipvs.AddVirtualServer(currentServices[v])
 	}
+	fp.currentIPVSServices = currentServices
 
 	for v, r := range realServers {
 		fp.ipvs.AddRealServer(v, r)
@@ -3886,7 +3897,7 @@ func TestCleanLegacyServiceWithRealServers(t *testing.T) {
 		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
 	}
 
-	fp.cleanLegacyService(activeServices, currentServices, map[string]bool{"1.1.1.1": true, "2.2.2.2": true})
+	fp.cleanLegacyService(activeServices, map[string]bool{"1.1.1.1": true, "2.2.2.2": true})
 	remainingVirtualServers, _ := fp.ipvs.GetVirtualServers()
 	if len(remainingVirtualServers) != 1 {
 		t.Errorf("Expected number of remaining IPVS services after cleanup to be %v. Got %v", 1, len(remainingVirtualServers))
@@ -3935,6 +3946,8 @@ func TestCleanLegacyRealServersExcludeCIDRs(t *testing.T) {
 
 	fp.ipvs.AddVirtualServer(vs)
 
+	fp.currentIPVSServices = map[string]*utilipvs.VirtualServer{"ipvs0": vs}
+
 	rss := []*utilipvs.RealServer{
 		{
 			Address:      net.ParseIP("10.10.10.10"),
@@ -3959,7 +3972,6 @@ func TestCleanLegacyRealServersExcludeCIDRs(t *testing.T) {
 
 	fp.cleanLegacyService(
 		map[string]bool{},
-		map[string]*utilipvs.VirtualServer{"ipvs0": vs},
 		map[string]bool{"4.4.4.4": true},
 	)
 
@@ -4036,6 +4048,7 @@ func TestCleanLegacyService6(t *testing.T) {
 	for v := range currentServices {
 		fp.ipvs.AddVirtualServer(currentServices[v])
 	}
+	fp.currentIPVSServices = currentServices
 
 	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
 	activeBindAddrs := map[string]bool{"1000::1": true, "1000::2": true, "3000::1": true, "4000::1": true}
@@ -4045,7 +4058,7 @@ func TestCleanLegacyService6(t *testing.T) {
 		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
 	}
 
-	fp.cleanLegacyService(activeServices, currentServices, map[string]bool{"5000::1": true, "1000::6": true})
+	fp.cleanLegacyService(activeServices, map[string]bool{"5000::1": true, "1000::6": true})
 	// ipvs4 and ipvs5 should have been cleaned.
 	remainingVirtualServers, _ := fp.ipvs.GetVirtualServers()
 	if len(remainingVirtualServers) != 4 {
