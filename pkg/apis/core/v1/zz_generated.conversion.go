@@ -7582,6 +7582,7 @@ func autoConvert_v1_ServiceSpec_To_core_ServiceSpec(in *v1.ServiceSpec, out *cor
 	out.Ports = *(*[]core.ServicePort)(unsafe.Pointer(&in.Ports))
 	out.Selector = *(*map[string]string)(unsafe.Pointer(&in.Selector))
 	out.ClusterIP = in.ClusterIP
+	out.ClusterIPs = *(*[]string)(unsafe.Pointer(&in.ClusterIPs))
 	out.Type = core.ServiceType(in.Type)
 	out.ExternalIPs = *(*[]string)(unsafe.Pointer(&in.ExternalIPs))
 	out.SessionAffinity = core.ServiceAffinity(in.SessionAffinity)
@@ -7592,8 +7593,9 @@ func autoConvert_v1_ServiceSpec_To_core_ServiceSpec(in *v1.ServiceSpec, out *cor
 	out.HealthCheckNodePort = in.HealthCheckNodePort
 	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
 	out.SessionAffinityConfig = (*core.SessionAffinityConfig)(unsafe.Pointer(in.SessionAffinityConfig))
-	out.IPFamily = (*core.IPFamily)(unsafe.Pointer(in.IPFamily))
+	out.IPFamilies = *(*[]core.IPFamily)(unsafe.Pointer(&in.IPFamilies))
 	out.TopologyKeys = *(*[]string)(unsafe.Pointer(&in.TopologyKeys))
+	out.IPFamilyPolicy = (*core.IPFamilyPolicyType)(unsafe.Pointer(in.IPFamilyPolicy))
 	return nil
 }
 
@@ -7607,6 +7609,9 @@ func autoConvert_core_ServiceSpec_To_v1_ServiceSpec(in *core.ServiceSpec, out *v
 	out.Ports = *(*[]v1.ServicePort)(unsafe.Pointer(&in.Ports))
 	out.Selector = *(*map[string]string)(unsafe.Pointer(&in.Selector))
 	out.ClusterIP = in.ClusterIP
+	out.ClusterIPs = *(*[]string)(unsafe.Pointer(&in.ClusterIPs))
+	out.IPFamilies = *(*[]v1.IPFamily)(unsafe.Pointer(&in.IPFamilies))
+	out.IPFamilyPolicy = (*v1.IPFamilyPolicyType)(unsafe.Pointer(in.IPFamilyPolicy))
 	out.ExternalName = in.ExternalName
 	out.ExternalIPs = *(*[]string)(unsafe.Pointer(&in.ExternalIPs))
 	out.LoadBalancerIP = in.LoadBalancerIP
@@ -7616,7 +7621,6 @@ func autoConvert_core_ServiceSpec_To_v1_ServiceSpec(in *core.ServiceSpec, out *v
 	out.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyType(in.ExternalTrafficPolicy)
 	out.HealthCheckNodePort = in.HealthCheckNodePort
 	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
-	out.IPFamily = (*v1.IPFamily)(unsafe.Pointer(in.IPFamily))
 	out.TopologyKeys = *(*[]string)(unsafe.Pointer(&in.TopologyKeys))
 	return nil
 }
