@@ -648,14 +648,7 @@ func NewDualStackProxier(
 
 	// Return a meta-proxier that dispatch calls between the two
 	// single-stack proxier instances
-	return metaproxier.NewMetaProxier(
-		ipv4Proxier,
-		ipv6Proxier,
-		hostname,
-		[]string{"0.0.0.0", "::"}, /* dual stack proxy will work on 0.0.0.0 and ::0 */
-		syncPeriod,
-		minSyncPeriod,
-		recorder), nil
+	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
 // CleanupLeftovers removes all hns rules created by the Proxier

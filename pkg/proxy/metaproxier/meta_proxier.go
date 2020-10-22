@@ -18,65 +18,22 @@ package metaproxier
 
 import (
 	"fmt"
-	"net"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
-
-	"k8s.io/apimachinery/pkg/types"
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/config"
-	"k8s.io/kubernetes/pkg/util/async"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/utils/net"
 )
 
-type localPortWithFamily struct {
-	localPort  utilproxy.LocalPort
-	family     v1.IPFamily
-	serviceKey string
-}
-
 type metaProxier struct {
-	mu sync.Mutex
-
-	hostname string
-	// used to publish events in case of failures to hold
-	// alternative family port open
-	recorder record.EventRecorder
-
-	// periods for syncing open ports
-	syncPeriod    time.Duration
-	minSyncPeriod time.Duration
-
-	// port syncing runner
-	syncRunner *async.BoundedFrequencyRunner
-
-	// cidrs that node port operates on
-	nodePortAddresses []string
-
-	// current ports held (alternative families)
-	portsMap map[utilproxy.LocalPort]utilproxy.Closeable
-
-	// interface for net libs to operate on
-	networkInterfacer utilproxy.NetworkInterfacer
-
-	// node address
-	nodeAddresses sets.String
 	// actual, wrapped
 	ipv4Proxier proxy.Provider
 	// actual, wrapped
 	ipv6Proxier proxy.Provider
-	// service that metaproxier operates on
-	services map[string]*v1.Service
 	// TODO(imroc): implement node handler for meta proxier.
 	config.NoopNodeHandler
 }
@@ -84,42 +41,14 @@ type metaProxier struct {
 // NewMetaProxier returns a dual-stack "meta-proxier". Proxier API
 // calls will be dispatched to the ProxyProvider instances depending
 // on address family.
-func NewMetaProxier(ipv4Proxier, ipv6Proxier proxy.Provider, hostname string, nodePortAddresses []string, syncPeriod time.Duration, minSyncPeriod time.Duration, recorder record.EventRecorder) proxy.Provider {
+func NewMetaProxier(ipv4Proxier, ipv6Proxier proxy.Provider) proxy.Provider {
 	metaProxy := &metaProxier{
-		hostname:          hostname,
-		recorder:          recorder,
-		syncPeriod:        syncPeriod,
-		minSyncPeriod:     minSyncPeriod,
-		nodePortAddresses: nodePortAddresses,
-		networkInterfacer: utilproxy.RealNetwork{}, // must use an alternative during tests
-
 		ipv4Proxier: ipv4Proxier,
 		ipv6Proxier: ipv6Proxier,
-		services:    make(map[string]*v1.Service),
 	}
-	burstSyncs := 2
-	metaProxy.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", metaProxy.syncPorts, minSyncPeriod, syncPeriod, burstSyncs)
 
 	provider := proxy.Provider(metaProxy)
 	return provider
-}
-
-func (proxier *metaProxier) addService(svc *v1.Service) {
-	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
-	proxier.services[getServiceKey(svc)] = svc
-}
-
-func (proxier *metaProxier) updateService(svc *v1.Service) {
-	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
-	proxier.services[getServiceKey(svc)] = svc
-}
-
-func (proxier *metaProxier) deleteService(svc *v1.Service) {
-	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
-	delete(proxier.services, getServiceKey(svc))
 }
 
 // getProxierByIPFamily returns the proxy selected for a specific ipfamily
@@ -161,14 +90,6 @@ func (proxier *metaProxier) OnServiceAdd(service *v1.Service) {
 		return
 	}
 
-	// we need to force a pre port sync before we call actuals. if actual raced
-	// to lock a port that we hold (for a service that was recently deleted)
-	// it will fail since we are holding it. so we sync our ports then call
-	// let actual know about the service update
-	// note: we do release port in a lazy way (no forced sync on delete)
-	proxier.addService(service)
-	proxier.syncPorts()
-
 	// this allows skew between new proxy and old apiserver
 	if len(service.Spec.IPFamilies) == 0 {
 		actual := proxier.getProxierByClusterIP(service)
@@ -188,13 +109,6 @@ func (proxier *metaProxier) OnServiceUpdate(oldService, service *v1.Service) {
 	if utilproxy.ShouldSkipService(service) {
 		return
 	}
-
-	// we need to force a pre port sync before we call actuals. if actual raced
-	// to lock a port that we hold (service was single stack. then upgraded)
-	// it will fail since we are holding it. so we sync our ports then call
-	// let actual know about the service update
-	proxier.updateService(service)
-	proxier.syncPorts()
 
 	// case zero: this allows skew between new proxy and old apiserver
 	if len(service.Spec.IPFamilies) == 0 {
@@ -278,12 +192,6 @@ func (proxier *metaProxier) OnServiceDelete(service *v1.Service) {
 	if utilproxy.ShouldSkipService(service) {
 		return
 	}
-
-	// we don't need to force a port sync here
-	// the assumption is, if ports was reused
-	// then it will be either visibile in onAdd*
-	// or regular sync.
-	proxier.deleteService(service)
 
 	// this allows skew between new proxy and old apiserver
 	if len(service.Spec.IPFamilies) == 0 {
@@ -433,201 +341,4 @@ func endpointsIPFamily(endpoints *v1.Endpoints) (*v1.IPFamily, error) {
 	}
 
 	return &ipv4, nil
-}
-
-// returns a consistent key for service
-func getServiceKey(svc *v1.Service) string {
-	key := "%s/%s"
-	return fmt.Sprintf(key, svc.Namespace, svc.Name)
-}
-
-func getServiceAlterantiveIPFamily(svc *v1.Service) []v1.IPFamily {
-	allIPFamilies := map[v1.IPFamily]int{v1.IPv4Protocol: 0, v1.IPv6Protocol: 0}
-	svcIPFamilies := make([]v1.IPFamily, 0)
-	// get families for service
-
-	if len(svc.Spec.IPFamilies) == 0 {
-		if utilnet.IsIPv6String(svc.Spec.ClusterIP) {
-			svcIPFamilies = append(svcIPFamilies, v1.IPv6Protocol)
-		} else {
-			svcIPFamilies = append(svcIPFamilies, v1.IPv4Protocol)
-		}
-	} else {
-		svcIPFamilies = svc.Spec.IPFamilies
-	}
-	// filter them out
-	for _, family := range svcIPFamilies {
-		delete(allIPFamilies, family)
-	}
-
-	filtered := make([]v1.IPFamily, 0)
-	for family := range allIPFamilies {
-		filtered = append(filtered, family)
-	}
-
-	return filtered
-}
-
-// getLocalPortsForServices return ports to open for services
-func (proxier *metaProxier) getLocalPortsForServices() []localPortWithFamily {
-	localPorts := make([]localPortWithFamily, 0)
-
-	if proxier.nodeAddresses == nil {
-		nodeAddresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
-		if err != nil {
-			klog.Infof("Failed to get node ip address matching nodeport cidrs %v, services with nodeport may not work as intended: %v", proxier.nodePortAddresses, err)
-			proxier.nodeAddresses = sets.NewString() // empty
-		} else {
-			proxier.nodeAddresses = nodeAddresses
-		}
-	}
-	if len(proxier.nodeAddresses) == 0 {
-		return nil // if we don't have node address to operate on, then we can not do node ports
-	}
-
-	// now that we have node address, we need to collect node ports for each service
-	for svcKey, svc := range proxier.services {
-
-		svcAltFamilies := getServiceAlterantiveIPFamily(svc)
-		if len(svcAltFamilies) == 0 {
-			continue // no need to process this service, it has two families
-		}
-
-		// for each port on service
-		for _, svcPort := range svc.Spec.Ports {
-
-			// if and only if it has a node port
-			if svcPort.NodePort == 0 {
-				continue
-			}
-
-			// if and only if it is not sctp
-			if svcPort.Protocol == v1.ProtocolSCTP {
-				continue
-			}
-			// for each family we need to lock port for
-			for _, family := range svcAltFamilies {
-				// open a port for each of the local node address
-				for nodeAddress := range proxier.nodeAddresses {
-
-					// if and only if node address match the family
-					if (family == v1.IPv6Protocol) != utilnet.IsIPv6String(nodeAddress) {
-						continue
-					}
-
-					lp := localPortWithFamily{
-						localPort: utilproxy.LocalPort{
-							Description: fmt.Sprintf("node port[%v] for %s on %v", svcPort.NodePort, svcKey, nodeAddress),
-							IP:          nodeAddress,
-							Port:        int(svcPort.NodePort),
-							Protocol:    strings.ToLower(string(svcPort.Protocol)),
-						},
-
-						family:     family,
-						serviceKey: getServiceKey(svc),
-					}
-					localPorts = append(localPorts, lp)
-				}
-			}
-		}
-	}
-
-	return localPorts
-}
-
-//syncPorts ensures that ports are held across ip families
-// even when services specifically didn't ask for. This ensure
-// that services that can upgrade to dual stack knowing that the port
-// will always be ready for them
-func (proxier *metaProxier) syncPorts() {
-	proxier.mu.Lock()
-	defer proxier.mu.Unlock()
-
-	newPortsList := make(map[utilproxy.LocalPort]utilproxy.Closeable)
-	portsForServices := proxier.getLocalPortsForServices()
-	for _, portToCheck := range portsForServices {
-		// if port was already open by this service || other services
-		if _, ok := proxier.portsMap[portToCheck.localPort]; !ok {
-			closable, err := openLocalPort(&portToCheck.localPort, portToCheck.family == v1.IPv6Protocol)
-			if err != nil {
-				msg := fmt.Sprintf("meta proxier failed to open port on alternative family (%v) for service (%v) port:%v", portToCheck.family, portToCheck.serviceKey, portToCheck.localPort.String())
-				// log to node
-				klog.V(2).Infof(msg)
-
-				// log to node object
-				proxier.recorder.Eventf(
-					&v1.ObjectReference{
-						Kind:      "Node",
-						Name:      proxier.hostname,
-						UID:       types.UID(proxier.hostname),
-						Namespace: "",
-					}, v1.EventTypeWarning, err.Error(), msg)
-				continue
-			}
-			newPortsList[portToCheck.localPort] = closable
-
-		} else {
-			// copy closable around
-			newPortsList[portToCheck.localPort] = proxier.portsMap[portToCheck.localPort]
-		}
-	}
-
-	// check exist ports, if they are not in new ports, then they need
-	// to be closed
-	for openPort, closable := range proxier.portsMap {
-		if _, ok := newPortsList[openPort]; !ok {
-			// close it
-			closable.Close()
-		}
-	}
-
-	// reset to current list
-	proxier.portsMap = newPortsList
-}
-
-// copy from iptables proxier
-func openLocalPort(lp *utilproxy.LocalPort, isIPv6 bool) (utilproxy.Closeable, error) {
-	// For ports on node IPs, open the actual port and hold it, even though we
-	// use iptables to redirect traffic.
-	// This ensures a) that it's safe to use that port and b) that (a) stays
-	// true.  The risk is that some process on the node (e.g. sshd or kubelet)
-	// is using a port and we give that same port out to a Service.  That would
-	// be bad because iptables would silently claim the traffic but the process
-	// would never know.
-	// NOTE: We should not need to have a real listen()ing socket - bind()
-	// should be enough, but I can't figure out a way to e2e test without
-	// it.  Tools like 'ss' and 'netstat' do not show sockets that are
-	// bind()ed but not listen()ed, and at least the default debian netcat
-	// has no way to avoid about 10 seconds of retries.
-	var socket utilproxy.Closeable
-	switch lp.Protocol {
-	case "tcp":
-		network := "tcp4"
-		if isIPv6 {
-			network = "tcp6"
-		}
-		listener, err := net.Listen(network, net.JoinHostPort(lp.IP, strconv.Itoa(lp.Port)))
-		if err != nil {
-			return nil, err
-		}
-		socket = listener
-	case "udp":
-		network := "udp4"
-		if isIPv6 {
-			network = "udp6"
-		}
-		addr, err := net.ResolveUDPAddr(network, net.JoinHostPort(lp.IP, strconv.Itoa(lp.Port)))
-		if err != nil {
-			return nil, err
-		}
-		conn, err := net.ListenUDP(network, addr)
-		if err != nil {
-			return nil, err
-		}
-		socket = conn
-	default:
-		return nil, fmt.Errorf("unknown protocol %q", lp.Protocol)
-	}
-	klog.V(2).Infof("Opened local port %s", lp.String())
-	return socket, nil
 }
