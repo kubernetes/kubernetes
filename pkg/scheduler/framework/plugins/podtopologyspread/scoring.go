@@ -30,6 +30,7 @@ import (
 )
 
 const preScoreStateKey = "PreScore" + Name
+const invalidScore = -1
 
 // preScoreState computed at PreScore and used at Score.
 // Fields are exported for comparison during testing.
@@ -219,9 +220,10 @@ func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState *fra
 	// Calculate <minScore> and <maxScore>
 	var minScore int64 = math.MaxInt64
 	var maxScore int64
-	for _, score := range scores {
+	for i, score := range scores {
 		// it's mandatory to check if <score.Name> is present in m.IgnoredNodes
 		if s.IgnoredNodes.Has(score.Name) {
+			scores[i].Score = invalidScore
 			continue
 		}
 		if score.Score < minScore {
@@ -233,22 +235,14 @@ func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState *fra
 	}
 
 	for i := range scores {
-		nodeInfo, err := pl.sharedLister.NodeInfos().Get(scores[i].Name)
-		if err != nil {
-			return framework.AsStatus(err)
-		}
-		node := nodeInfo.Node()
-
-		if s.IgnoredNodes.Has(node.Name) {
+		if scores[i].Score == invalidScore {
 			scores[i].Score = 0
 			continue
 		}
-
 		if maxScore == 0 {
 			scores[i].Score = framework.MaxNodeScore
 			continue
 		}
-
 		s := scores[i].Score
 		scores[i].Score = framework.MaxNodeScore * (maxScore + minScore - s) / maxScore
 	}
