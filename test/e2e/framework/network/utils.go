@@ -44,7 +44,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
-	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -1037,7 +1036,7 @@ func WaitForService(c clientset.Interface, namespace, name string, exist bool, i
 		case apierrors.IsNotFound(err):
 			framework.Logf("Service %s in namespace %s disappeared.", name, namespace)
 			return !exist, nil
-		case !testutils.IsRetryableAPIError(err):
+		case err != nil:
 			framework.Logf("Non-retryable failure while getting service.")
 			return false, err
 		default:

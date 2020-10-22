@@ -27,10 +27,9 @@ import (
 	batch "k8s.io/api/batch/v1"
 	storage "k8s.io/api/storage/v1"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -54,19 +53,6 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc) error {
 	return wait.ExponentialBackoff(backoff, fn)
 }
 
-func IsRetryableAPIError(err error) bool {
-	// These errors may indicate a transient error that we can retry in tests.
-	if apierrors.IsInternalError(err) || apierrors.IsTimeout(err) || apierrors.IsServerTimeout(err) ||
-		apierrors.IsTooManyRequests(err) || utilnet.IsProbableEOF(err) || utilnet.IsConnectionReset(err) {
-		return true
-	}
-	// If the error sends the Retry-After header, we respect it as an explicit confirmation we should retry.
-	if _, shouldRetry := apierrors.SuggestsClientDelay(err); shouldRetry {
-		return true
-	}
-	return false
-}
-
 func CreatePodWithRetries(c clientset.Interface, namespace string, obj *v1.Pod) error {
 	if obj == nil {
 		return fmt.Errorf("Object provided to create is empty")
@@ -75,9 +61,6 @@ func CreatePodWithRetries(c clientset.Interface, namespace string, obj *v1.Pod) 
 		_, err := c.CoreV1().Pods(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
-		}
-		if IsRetryableAPIError(err) {
-			return false, nil
 		}
 		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
 	}
@@ -93,9 +76,6 @@ func CreateRCWithRetries(c clientset.Interface, namespace string, obj *v1.Replic
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		if IsRetryableAPIError(err) {
-			return false, nil
-		}
 		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
@@ -109,9 +89,6 @@ func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *a
 		_, err := c.AppsV1().ReplicaSets(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
-		}
-		if IsRetryableAPIError(err) {
-			return false, nil
 		}
 		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
 	}
@@ -127,9 +104,6 @@ func CreateDeploymentWithRetries(c clientset.Interface, namespace string, obj *a
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		if IsRetryableAPIError(err) {
-			return false, nil
-		}
 		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
@@ -143,9 +117,6 @@ func CreateDaemonSetWithRetries(c clientset.Interface, namespace string, obj *ap
 		_, err := c.AppsV1().DaemonSets(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
-		}
-		if IsRetryableAPIError(err) {
-			return false, nil
 		}
 		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
 	}
@@ -161,9 +132,6 @@ func CreateJobWithRetries(c clientset.Interface, namespace string, obj *batch.Jo
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		if IsRetryableAPIError(err) {
-			return false, nil
-		}
 		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
@@ -177,9 +145,6 @@ func CreateSecretWithRetries(c clientset.Interface, namespace string, obj *v1.Se
 		_, err := c.CoreV1().Secrets(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
-		}
-		if IsRetryableAPIError(err) {
-			return false, nil
 		}
 		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
 	}
@@ -195,9 +160,6 @@ func CreateConfigMapWithRetries(c clientset.Interface, namespace string, obj *v1
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		if IsRetryableAPIError(err) {
-			return false, nil
-		}
 		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
@@ -211,9 +173,6 @@ func CreateServiceWithRetries(c clientset.Interface, namespace string, obj *v1.S
 		_, err := c.CoreV1().Services(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
-		}
-		if IsRetryableAPIError(err) {
-			return false, nil
 		}
 		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
 	}
@@ -229,9 +188,6 @@ func CreateStorageClassWithRetries(c clientset.Interface, obj *storage.StorageCl
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		if IsRetryableAPIError(err) {
-			return false, nil
-		}
 		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
@@ -245,9 +201,6 @@ func CreateResourceQuotaWithRetries(c clientset.Interface, namespace string, obj
 		_, err := c.CoreV1().ResourceQuotas(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
-		}
-		if IsRetryableAPIError(err) {
-			return false, nil
 		}
 		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
 	}
@@ -263,9 +216,6 @@ func CreatePersistentVolumeWithRetries(c clientset.Interface, obj *v1.Persistent
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		if IsRetryableAPIError(err) {
-			return false, nil
-		}
 		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(createFunc)
@@ -279,9 +229,6 @@ func CreatePersistentVolumeClaimWithRetries(c clientset.Interface, namespace str
 		_, err := c.CoreV1().PersistentVolumeClaims(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
-		}
-		if IsRetryableAPIError(err) {
-			return false, nil
 		}
 		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
 	}

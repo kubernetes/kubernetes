@@ -19,7 +19,7 @@ package framework
 import (
 	"context"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -90,7 +90,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 		var err error
 		for retry := 0; retry < retries; retry++ {
 			_, err = p.client.CoreV1().Nodes().Create(context.TODO(), baseNode, metav1.CreateOptions{})
-			if err == nil || !testutils.IsRetryableAPIError(err) {
+			if err == nil {
 				break
 			}
 		}

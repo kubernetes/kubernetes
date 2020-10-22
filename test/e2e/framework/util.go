@@ -1114,9 +1114,6 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 		// It should be OK to list unschedulable Nodes here.
 		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		for i := range nodes.Items {

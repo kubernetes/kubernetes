@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const sleepTime = 20 * time.Second
@@ -58,9 +57,6 @@ func WaitForTotalHealthy(c clientset.Interface, timeout time.Duration) error {
 		// It should be OK to list unschedulable Nodes here.
 		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		for _, node := range nodes.Items {
@@ -186,9 +182,6 @@ func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		return true, nil
@@ -222,9 +215,6 @@ func CheckReadyForTests(c clientset.Interface, nonblockingTaints string, allowed
 		nodes, err := c.CoreV1().Nodes().List(context.TODO(), opts)
 		if err != nil {
 			e2elog.Logf("Unexpected error listing nodes: %v", err)
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		for i := range nodes.Items {
