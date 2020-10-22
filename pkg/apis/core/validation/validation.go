@@ -5973,6 +5973,10 @@ func ValidatePodLogOptions(opts *core.PodLogOptions) field.ErrorList {
 	return allErrs
 }
 
+var (
+	supportedLoadBalancerIPMode = sets.NewString(string(core.LoadBalancerIPModeVIP), string(core.LoadBalancerIPModeProxy))
+)
+
 // ValidateLoadBalancerStatus validates required fields on a LoadBalancerStatus
 func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -5983,6 +5987,22 @@ func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("ip"), ingress.IP, "must be a valid IP address"))
 			}
 		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) {
+			if len(ingress.IP) > 0 && ingress.IPMode != nil {
+				switch *ingress.IPMode {
+				case core.LoadBalancerIPModeVIP, core.LoadBalancerIPModeProxy:
+					break
+				default:
+					allErrs = append(allErrs, field.NotSupported(idxPath.Child("ipMode"), ingress.IPMode, supportedLoadBalancerIPMode.List()))
+				}
+			} else if len(ingress.IP) > 0 && ingress.IPMode == nil {
+				allErrs = append(allErrs, field.Required(idxPath.Child("ipMode"), "must be specified when `ip` is set"))
+			} else if len(ingress.IP) == 0 && ingress.IPMode != nil {
+				allErrs = append(allErrs, field.Forbidden(idxPath.Child("ipMode"), "may not be used when `ip` is not set"))
+			}
+		}
+
 		if len(ingress.Hostname) > 0 {
 			for _, msg := range validation.IsDNS1123Subdomain(ingress.Hostname) {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, msg))
@@ -5991,6 +6011,7 @@ func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, "must be a DNS name, not an IP address"))
 			}
 		}
+
 	}
 	return allErrs
 }
