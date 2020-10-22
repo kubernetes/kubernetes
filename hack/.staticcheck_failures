@@ -43,9 +43,6 @@ vendor/k8s.io/apiserver/pkg/storage/tests
 vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope
 vendor/k8s.io/apiserver/pkg/util/webhook
 vendor/k8s.io/apiserver/pkg/util/wsstream
-vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc
-vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
-vendor/k8s.io/apiserver/plugin/pkg/authorizer/webhook
 vendor/k8s.io/cli-runtime/pkg/printers
 vendor/k8s.io/client-go/discovery
 vendor/k8s.io/client-go/rest
