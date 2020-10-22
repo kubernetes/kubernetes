@@ -285,7 +285,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 	}
 
 	// However, "empty" preFilterState is legit which tolerates every toSchedule Pod.
-	if len(s.TpPairToMatchNum) == 0 || len(s.Constraints) == 0 {
+	if len(s.Constraints) == 0 {
 		return nil
 	}
 
