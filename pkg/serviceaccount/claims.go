@@ -26,7 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/klog/v2"
 
-	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	apiserverserviceaccount "k8s.io/component-helpers/auth/serviceaccount"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 

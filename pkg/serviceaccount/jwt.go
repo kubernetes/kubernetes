@@ -35,7 +35,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	apiserverserviceaccount "k8s.io/component-helpers/auth/serviceaccount"
 )
 
 // ServiceAccountTokenGetter defines functions to retrieve a named service account and secret

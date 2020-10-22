@@ -27,9 +27,9 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/component-helpers/auth/serviceaccount"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 )
 

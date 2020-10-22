@@ -20,9 +20,9 @@ import (
 	"strings"
 
 	fctypesv1a1 "k8s.io/api/flowcontrol/v1alpha1"
-	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/component-helpers/auth/serviceaccount"
 )
 
 // Tests whether a given request and FlowSchema match.  Nobody mutates
@@ -88,7 +88,7 @@ func matchesSubject(user user.Info, subject fctypesv1a1.Subject) bool {
 
 // serviceAccountMatchesNamespace checks whether the provided service account username matches the namespace, without
 // allocating. Use this when checking a service account namespace against a known string.
-// This is copied from `k8s.io/apiserver/pkg/authentication/serviceaccount::MatchesUsername` and simplified to not check the name part.
+// This is copied from `k8s.io/component-helpers/auth/serviceaccount::MatchesUsername` and simplified to not check the name part.
 func serviceAccountMatchesNamespace(namespace string, username string) bool {
 	const (
 		ServiceAccountUsernamePrefix    = "system:serviceaccount:"

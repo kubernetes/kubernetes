@@ -25,8 +25,8 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
-	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
+	v1 "k8s.io/api/core/v1"
+	apiserverserviceaccount "k8s.io/component-helpers/auth/serviceaccount"
 )
 
 func LegacyClaims(serviceAccount v1.ServiceAccount, secret v1.Secret) (*jwt.Claims, interface{}) {

@@ -39,7 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/component-helpers/auth/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2eingress "k8s.io/kubernetes/test/e2e/framework/ingress"
