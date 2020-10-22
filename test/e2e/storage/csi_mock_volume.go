@@ -33,6 +33,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -47,7 +48,9 @@ import (
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
+	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -106,6 +109,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		enableNodeExpansion bool   // enable node expansion for CSI mock driver
 		// just disable resizing on driver it overrides enableResizing flag for CSI mock driver
 		disableResizingOnDriver bool
+		enableSnapshot          bool
 		javascriptHooks         map[string]string
 	}
 
@@ -116,6 +120,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		pods         []*v1.Pod
 		pvcs         []*v1.PersistentVolumeClaim
 		sc           map[string]*storagev1.StorageClass
+		vsc          map[string]*unstructured.Unstructured
 		driver       testsuites.TestDriver
 		provisioner  string
 		tp           testParameters
@@ -127,9 +132,10 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 	init := func(tp testParameters) {
 		m = mockDriverSetup{
-			cs: f.ClientSet,
-			sc: make(map[string]*storagev1.StorageClass),
-			tp: tp,
+			cs:  f.ClientSet,
+			sc:  make(map[string]*storagev1.StorageClass),
+			vsc: make(map[string]*unstructured.Unstructured),
+			tp:  tp,
 		}
 		cs := f.ClientSet
 		var err error
@@ -142,6 +148,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			DisableAttach:       tp.disableAttach,
 			EnableResizing:      tp.enableResizing,
 			EnableNodeExpansion: tp.enableNodeExpansion,
+			EnableSnapshot:      tp.enableSnapshot,
 			JavascriptHooks:     tp.javascriptHooks,
 		}
 
@@ -244,6 +251,10 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			cs.StorageV1().StorageClasses().Delete(context.TODO(), sc.Name, metav1.DeleteOptions{})
 		}
 
+		for _, vsc := range m.vsc {
+			ginkgo.By(fmt.Sprintf("Deleting volumesnapshotclass %s", vsc.GetName()))
+			m.config.Framework.DynamicClient.Resource(testsuites.SnapshotClassGVR).Delete(context.TODO(), vsc.GetName(), metav1.DeleteOptions{})
+		}
 		ginkgo.By("Cleaning up resources")
 		for _, cleanupFunc := range m.testCleanups {
 			cleanupFunc()
@@ -1165,6 +1176,131 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			})
 		}
 	})
+	ginkgo.Context("CSI Volume Snapshots [Feature:VolumeSnapshotDataSource]", func() {
+		// Global variable in all scripts (called before each test)
+		globalScript := `counter=0; console.log("globals loaded", OK, DEADLINEEXCEEDED)`
+		tests := []struct {
+			name                 string
+			createVolumeScript   string
+			createSnapshotScript string
+		}{
+			{
+				name:                 "volumesnapshotcontent and pvc in Bound state with deletion timestamp set should not get deleted while snapshot finalizer exists",
+				createVolumeScript:   `OK`,
+				createSnapshotScript: `console.log("Counter:", ++counter); if (counter < 8) { DEADLINEEXCEEDED; } else { OK; }`,
+			},
+		}
+		for _, test := range tests {
+			ginkgo.It(test.name, func() {
+				scripts := map[string]string{
+					"globals":             globalScript,
+					"createVolumeStart":   test.createVolumeScript,
+					"createSnapshotStart": test.createSnapshotScript,
+				}
+				init(testParameters{
+					disableAttach:   true,
+					registerDriver:  true,
+					enableSnapshot:  true,
+					javascriptHooks: scripts,
+				})
+				sDriver, ok := m.driver.(testsuites.SnapshottableTestDriver)
+				if !ok {
+					e2eskipper.Skipf("mock driver %s does not support snapshots -- skipping", m.driver.GetDriverInfo().Name)
+
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), csiPodRunningTimeout)
+				defer cancel()
+				defer cleanup()
+
+				var sc *storagev1.StorageClass
+				if dDriver, ok := m.driver.(testsuites.DynamicPVTestDriver); ok {
+					sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
+				}
+				ginkgo.By("Creating storage class")
+				class, err := m.cs.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
+				framework.ExpectNoError(err, "Failed to create class: %v", err)
+				m.sc[class.Name] = class
+				claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
+					// Use static name so that the volumesnapshot can be created before the pvc.
+					Name:             "snapshot-test-pvc",
+					StorageClassName: &(class.Name),
+				}, f.Namespace.Name)
+
+				ginkgo.By("Creating snapshot")
+				// TODO: Test VolumeSnapshots with Retain policy
+				snapshotClass, snapshot := testsuites.CreateSnapshot(sDriver, m.config, testpatterns.DynamicSnapshotDelete, claim.Name, claim.Namespace)
+				framework.ExpectNoError(err, "failed to create snapshot")
+				m.vsc[snapshotClass.GetName()] = snapshotClass
+				volumeSnapshotName := snapshot.GetName()
+
+				ginkgo.By(fmt.Sprintf("Creating PVC %s/%s", claim.Namespace, claim.Name))
+				claim, err = m.cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(context.TODO(), claim, metav1.CreateOptions{})
+				framework.ExpectNoError(err, "Failed to create claim: %v", err)
+
+				ginkgo.By(fmt.Sprintf("Wait for finalizer to be added to claim %s/%s", claim.Namespace, claim.Name))
+				err = e2epv.WaitForPVCFinalizer(ctx, m.cs, claim.Name, claim.Namespace, pvcAsSourceProtectionFinalizer, 1*time.Millisecond, 1*time.Minute)
+				framework.ExpectNoError(err)
+
+				ginkgo.By("Wait for PVC to be Bound")
+				_, err = e2epv.WaitForPVClaimBoundPhase(m.cs, []*v1.PersistentVolumeClaim{claim}, 1*time.Minute)
+				framework.ExpectNoError(err, "Failed to create claim: %v", err)
+
+				ginkgo.By(fmt.Sprintf("Delete PVC %s", claim.Name))
+				err = e2epv.DeletePersistentVolumeClaim(m.cs, claim.Name, claim.Namespace)
+				framework.ExpectNoError(err, "failed to delete pvc")
+
+				ginkgo.By("Get PVC from API server and verify deletion timestamp is set")
+				claim, err = m.cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Get(context.TODO(), claim.Name, metav1.GetOptions{})
+				if err != nil {
+					if !apierrors.IsNotFound(err) {
+						framework.ExpectNoError(err, "Failed to get claim: %v", err)
+					}
+					framework.Logf("PVC not found. Continuing to test VolumeSnapshotContent finalizer")
+				}
+				if claim != nil && claim.DeletionTimestamp == nil {
+					framework.Failf("Expected deletion timestamp to be set on PVC %s", claim.Name)
+				}
+
+				ginkgo.By(fmt.Sprintf("Get VolumeSnapshotContent bound to VolumeSnapshot %s", snapshot.GetName()))
+				snapshotContent := testsuites.GetSnapshotContentFromSnapshot(m.config.Framework.DynamicClient, snapshot)
+				volumeSnapshotContentName := snapshotContent.GetName()
+
+				ginkgo.By(fmt.Sprintf("Verify VolumeSnapshotContent %s contains finalizer %s", snapshot.GetName(), volumeSnapshotContentFinalizer))
+				err = utils.WaitForGVRFinalizer(ctx, m.config.Framework.DynamicClient, testsuites.SnapshotContentGVR, volumeSnapshotContentName, "", volumeSnapshotContentFinalizer, 1*time.Millisecond, 1*time.Minute)
+				framework.ExpectNoError(err)
+
+				ginkgo.By(fmt.Sprintf("Delete VolumeSnapshotContent %s", snapshotContent.GetName()))
+				err = m.config.Framework.DynamicClient.Resource(testsuites.SnapshotContentGVR).Delete(ctx, snapshotContent.GetName(), metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "Failed to delete snapshotcontent: %v", err)
+
+				ginkgo.By("Get VolumeSnapshotContent from API server and verify deletion timestamp is set")
+				snapshotContent, err = m.config.Framework.DynamicClient.Resource(testsuites.SnapshotContentGVR).Get(context.TODO(), snapshotContent.GetName(), metav1.GetOptions{})
+				framework.ExpectNoError(err)
+
+				if snapshotContent.GetDeletionTimestamp() == nil {
+					framework.Failf("Expected deletion timestamp to be set on snapshotcontent")
+				}
+
+				if claim != nil {
+					ginkgo.By(fmt.Sprintf("Wait for PV %s to be deleted", claim.Spec.VolumeName))
+					err = e2epv.WaitForPersistentVolumeDeleted(m.cs, claim.Spec.VolumeName, framework.Poll, 3*time.Minute)
+					framework.ExpectNoError(err, fmt.Sprintf("failed to delete PV %s", claim.Spec.VolumeName))
+				}
+
+				ginkgo.By(fmt.Sprintf("Verify VolumeSnapshot %s contains finalizer %s", snapshot.GetName(), volumeSnapshotBoundFinalizer))
+				err = utils.WaitForGVRFinalizer(ctx, m.config.Framework.DynamicClient, testsuites.SnapshotGVR, volumeSnapshotName, f.Namespace.Name, volumeSnapshotBoundFinalizer, 1*time.Millisecond, 1*time.Minute)
+				framework.ExpectNoError(err)
+
+				ginkgo.By("Delete VolumeSnapshot")
+				err = testsuites.DeleteAndWaitSnapshot(m.config.Framework.DynamicClient, f.Namespace.Name, volumeSnapshotName, framework.Poll, framework.SnapshotDeleteTimeout)
+				framework.ExpectNoError(err, fmt.Sprintf("failed to delete VolumeSnapshot %s", volumeSnapshotName))
+
+				ginkgo.By(fmt.Sprintf("Wait for VolumeSnapshotContent %s to be deleted", volumeSnapshotContentName))
+				err = utils.WaitForGVRDeletion(m.config.Framework.DynamicClient, testsuites.SnapshotContentGVR, volumeSnapshotContentName, framework.Poll, framework.SnapshotDeleteTimeout)
+				framework.ExpectNoError(err, fmt.Sprintf("failed to delete VolumeSnapshotContent %s", volumeSnapshotContentName))
+			})
+		}
+	})
 })
 
 // A lot of this code was copied from e2e/framework. It would be nicer
@@ -1186,8 +1322,11 @@ func podRunning(ctx context.Context, c clientset.Interface, podName, namespace s
 }
 
 const (
-	podStartTimeout = 5 * time.Minute
-	poll            = 2 * time.Second
+	podStartTimeout                = 5 * time.Minute
+	poll                           = 2 * time.Second
+	pvcAsSourceProtectionFinalizer = "snapshot.storage.kubernetes.io/pvc-as-source-protection"
+	volumeSnapshotContentFinalizer = "snapshot.storage.kubernetes.io/volumesnapshotcontent-bound-protection"
+	volumeSnapshotBoundFinalizer   = "snapshot.storage.kubernetes.io/volumesnapshot-bound-protection"
 )
 
 var (
