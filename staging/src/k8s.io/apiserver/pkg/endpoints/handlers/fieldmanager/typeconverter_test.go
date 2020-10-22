@@ -31,12 +31,12 @@ import (
 	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
 )
 
-var fakeSchema2 = prototesting.Fake{
+var testSchema = prototesting.Fake{
 	Path: filepath.Join("testdata", "swagger.json"),
 }
 
 func TestTypeConverter(t *testing.T) {
-	d, err := fakeSchema2.OpenAPISchema()
+	d, err := testSchema.OpenAPISchema()
 	if err != nil {
 		t.Fatalf("Failed to parse OpenAPI schema: %v", err)
 	}
@@ -177,7 +177,7 @@ spec:
 		b.Fatalf("Failed to parse yaml object: %v", err)
 	}
 
-	d, err := fakeSchema2.OpenAPISchema()
+	d, err := testSchema.OpenAPISchema()
 	if err != nil {
 		b.Fatalf("Failed to parse OpenAPI schema: %v", err)
 	}
