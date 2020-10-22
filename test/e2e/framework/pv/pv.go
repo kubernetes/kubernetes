@@ -19,8 +19,9 @@ package framework
 import (
 	"context"
 	"fmt"
-	"k8s.io/kubernetes/test/e2e/storage/utils"
 	"time"
+
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
@@ -37,18 +38,6 @@ import (
 const (
 	pdRetryTimeout  = 5 * time.Minute
 	pdRetryPollTime = 5 * time.Second
-
-	// PVBindingTimeout is how long PVs have to become bound.
-	PVBindingTimeout = 3 * time.Minute
-
-	// ClaimBindingTimeout is how long claims have to become bound.
-	ClaimBindingTimeout = 3 * time.Minute
-
-	// PVReclaimingTimeout is how long PVs have to beome reclaimed.
-	PVReclaimingTimeout = 3 * time.Minute
-
-	// PVDeletingTimeout is how long PVs have to become deleted.
-	PVDeletingTimeout = 3 * time.Minute
 
 	// VolumeSelectorKey is the key for volume selector.
 	VolumeSelectorKey = "e2e-pv-pool"
