@@ -26,9 +26,40 @@ import (
 	"strings"
 	"unicode"
 
+	jsonutil "k8s.io/apimachinery/pkg/util/json"
+
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
 )
+
+// Unmarshal unmarshals the given data
+// If v is a *map[string]interface{}, *[]interface{}, or *interface{} numbers
+// are converted to int64 or float64
+func Unmarshal(data []byte, v interface{}) error {
+	preserveIntFloat := func(d *json.Decoder) *json.Decoder {
+		d.UseNumber()
+		return d
+	}
+	switch v := v.(type) {
+	case *map[string]interface{}:
+		if err := yaml.Unmarshal(data, v, preserveIntFloat); err != nil {
+			return err
+		}
+		return jsonutil.ConvertMapNumbers(*v, 0)
+	case *[]interface{}:
+		if err := yaml.Unmarshal(data, v, preserveIntFloat); err != nil {
+			return err
+		}
+		return jsonutil.ConvertSliceNumbers(*v, 0)
+	case *interface{}:
+		if err := yaml.Unmarshal(data, v, preserveIntFloat); err != nil {
+			return err
+		}
+		return jsonutil.ConvertInterfaceNumbers(v, 0)
+	default:
+		return yaml.Unmarshal(data, v)
+	}
+}
 
 // ToJSON converts a single YAML document into a JSON document
 // or returns an error. If the document appears to be JSON the

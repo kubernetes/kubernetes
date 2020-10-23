@@ -430,3 +430,44 @@ stuff: 1
 		t.Fatalf("expected %q to be of type YAMLSyntaxError", err.Error())
 	}
 }
+
+func TestUnmarshal(t *testing.T) {
+	mapWithIntegerBytes := []byte(`replicas: 1`)
+	mapWithInteger := make(map[string]interface{})
+	if err := Unmarshal(mapWithIntegerBytes, &mapWithInteger); err != nil {
+		t.Fatalf("unexpected error unmarshaling yaml: %v", err)
+	}
+	if _, ok := mapWithInteger["replicas"].(int64); !ok {
+		t.Fatalf(`Expected number in map to be int64 but got "%T"`, mapWithInteger["replicas"])
+	}
+
+	sliceWithIntegerBytes := []byte(`- 1`)
+	var sliceWithInteger []interface{}
+	if err := Unmarshal(sliceWithIntegerBytes, &sliceWithInteger); err != nil {
+		t.Fatalf("unexpected error unmarshaling yaml: %v", err)
+	}
+	if _, ok := sliceWithInteger[0].(int64); !ok {
+		t.Fatalf(`Expected number in slice to be int64 but got "%T"`, sliceWithInteger[0])
+	}
+
+	integerBytes := []byte(`1`)
+	var integer interface{}
+	if err := Unmarshal(integerBytes, &integer); err != nil {
+		t.Fatalf("unexpected error unmarshaling yaml: %v", err)
+	}
+	if _, ok := integer.(int64); !ok {
+		t.Fatalf(`Expected number to be int64 but got "%T"`, integer)
+	}
+
+	otherTypeBytes := []byte(`123: 2`)
+	otherType := make(map[int]interface{})
+	if err := Unmarshal(otherTypeBytes, &otherType); err != nil {
+		t.Fatalf("unexpected error unmarshaling yaml: %v", err)
+	}
+	if _, ok := otherType[123].(int64); ok {
+		t.Fatalf(`Expected number not to be converted to int64`)
+	}
+	if _, ok := otherType[123].(float64); !ok {
+		t.Fatalf(`Expected number to be float64 but got "%T"`, otherType[123])
+	}
+}

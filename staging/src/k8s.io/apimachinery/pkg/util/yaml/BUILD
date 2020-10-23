@@ -18,6 +18,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/yaml",
     importpath = "k8s.io/apimachinery/pkg/util/yaml",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
