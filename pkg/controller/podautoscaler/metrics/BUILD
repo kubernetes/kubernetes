@@ -20,6 +20,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta2:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/apis/metrics/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/metrics/pkg/apis/metrics/v1beta1:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/client/custom_metrics:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/client/external_metrics:go_default_library",

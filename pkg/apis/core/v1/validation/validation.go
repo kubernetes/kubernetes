@@ -42,7 +42,7 @@ func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath
 	for resourceName, quantity := range requirements.Limits {
 		fldPath := limPath.Key(string(resourceName))
 		// Validate resource name.
-		allErrs = append(allErrs, validateContainerResourceName(string(resourceName), fldPath)...)
+		allErrs = append(allErrs, ValidateContainerResourceName(string(resourceName), fldPath)...)
 
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
@@ -51,7 +51,7 @@ func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath
 	for resourceName, quantity := range requirements.Requests {
 		fldPath := reqPath.Key(string(resourceName))
 		// Validate resource name.
-		allErrs = append(allErrs, validateContainerResourceName(string(resourceName), fldPath)...)
+		allErrs = append(allErrs, ValidateContainerResourceName(string(resourceName), fldPath)...)
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
 
@@ -70,7 +70,8 @@ func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath
 	return allErrs
 }
 
-func validateContainerResourceName(value string, fldPath *field.Path) field.ErrorList {
+// ValidateContainerResourceName checks the name of resource specified for a container
+func ValidateContainerResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
 	if len(strings.Split(value, "/")) == 1 {
 		if !helper.IsStandardContainerResourceName(value) {

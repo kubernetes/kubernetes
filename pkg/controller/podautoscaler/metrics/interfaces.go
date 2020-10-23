@@ -38,8 +38,9 @@ type PodMetricsInfo map[string]PodMetric
 // resource metrics as well as pod-level arbitrary metrics
 type MetricsClient interface {
 	// GetResourceMetric gets the given resource metric (and an associated oldest timestamp)
-	// for all pods matching the specified selector in the given namespace
-	GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error)
+	// for the specified named container in all pods matching the specified selector in the given namespace and when
+	// the container is an empty string it returns the sum of all the container metrics.
+	GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector, container string) (PodMetricsInfo, time.Time, error)
 
 	// GetRawMetric gets the given metric (and an associated oldest timestamp)
 	// for all pods matching the specified selector in the given namespace
