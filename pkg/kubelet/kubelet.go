@@ -434,8 +434,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if kubeDeps.KubeClient != nil {
 		fieldSelector := fields.Set{api.ObjectNameField: string(nodeName)}.AsSelector()
 		nodeLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.CoreV1().RESTClient(), "nodes", metav1.NamespaceAll, fieldSelector)
-		r := cache.NewReflector(nodeLW, &v1.Node{}, nodeIndexer, 0)
-		go r.Run(wait.NeverStop)
+		informer := cache.NewSharedIndexInformer(nodeLW, &v1.Node{}, 0, cache.Indexers{})
+		go informer.Run(wait.NeverStop)
+		cache.WaitForCacheSync(wait.NeverStop, informer.HasSynced)
+		nodeIndexer = informer.GetIndexer()
 	}
 	nodeLister := corelisters.NewNodeLister(nodeIndexer)
 
