@@ -849,14 +849,16 @@ func (rs *REST) tryDefaultValidateServiceClusterIPFields(service *api.Service) e
 		return nil
 	}
 
-	// two families or two IPs with Single or PreferDualStack is not allowed
-	if service.Spec.IPFamilyPolicy != nil && *(service.Spec.IPFamilyPolicy) != api.IPFamilyPolicyRequireDualStack {
+	// two families or two IPs with SingleStack
+	if service.Spec.IPFamilyPolicy != nil {
 		el := make(field.ErrorList, 0)
-		if len(service.Spec.ClusterIPs) == 2 {
-			el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy, "must be RequireDualStack when multiple 'clusterIPs' are specified"))
-		}
-		if len(service.Spec.IPFamilies) == 2 {
-			el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy, "must be RequireDualStack when multiple 'ipFamilies' are specified"))
+		if *(service.Spec.IPFamilyPolicy) == api.IPFamilyPolicySingleStack {
+			if len(service.Spec.ClusterIPs) == 2 {
+				el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy, "must be RequireDualStack or PreferDualStack when multiple 'clusterIPs' are specified"))
+			}
+			if len(service.Spec.IPFamilies) == 2 {
+				el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy, "must be RequireDualStack or PreferDualStack when multiple 'ipFamilies' are specified"))
+			}
 		}
 
 		if len(el) > 0 {

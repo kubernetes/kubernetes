@@ -703,6 +703,7 @@ func TestNormalizeClusterIPs(t *testing.T) {
 	}
 
 }
+
 func TestClearClusterIPRelatedFields(t *testing.T) {
 	//
 	// NOTE the data fed to this test assums that ClusterIPs normalization is
@@ -864,7 +865,6 @@ func TestClearClusterIPRelatedFields(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			// this func only works with dual stack feature gate on.
 			clearClusterIPRelatedFields(testCase.newService, testCase.oldService)
 
 			if testCase.shouldClear && len(testCase.newService.Spec.ClusterIPs) != 0 {
@@ -893,5 +893,113 @@ func TestClearClusterIPRelatedFields(t *testing.T) {
 
 		})
 	}
+}
 
+func TestTrimFieldsForDualStackDowngrade(t *testing.T) {
+	singleStack := api.IPFamilyPolicySingleStack
+	preferDualStack := api.IPFamilyPolicyPreferDualStack
+	requireDualStack := api.IPFamilyPolicyRequireDualStack
+	testCases := []struct {
+		name          string
+		oldPolicy     *api.IPFamilyPolicyType
+		oldClusterIPs []string
+		oldFamilies   []api.IPFamily
+
+		newPolicy          *api.IPFamilyPolicyType
+		expectedClusterIPs []string
+		expectedIPFamilies []api.IPFamily
+	}{
+
+		{
+			name:               "no change single to single",
+			oldPolicy:          &singleStack,
+			oldClusterIPs:      []string{"10.10.10.10"},
+			oldFamilies:        []api.IPFamily{api.IPv4Protocol},
+			newPolicy:          &singleStack,
+			expectedClusterIPs: []string{"10.10.10.10"},
+			expectedIPFamilies: []api.IPFamily{api.IPv4Protocol},
+		},
+
+		{
+			name:               "dualstack to dualstack (preferred)",
+			oldPolicy:          &preferDualStack,
+			oldClusterIPs:      []string{"10.10.10.10", "2000::1"},
+			oldFamilies:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+			newPolicy:          &preferDualStack,
+			expectedClusterIPs: []string{"10.10.10.10", "2000::1"},
+			expectedIPFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		},
+
+		{
+			name:               "dualstack to dualstack (required)",
+			oldPolicy:          &requireDualStack,
+			oldClusterIPs:      []string{"10.10.10.10", "2000::1"},
+			oldFamilies:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+			newPolicy:          &preferDualStack,
+			expectedClusterIPs: []string{"10.10.10.10", "2000::1"},
+			expectedIPFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		},
+
+		{
+			name:               "dualstack (preferred) to single",
+			oldPolicy:          &preferDualStack,
+			oldClusterIPs:      []string{"10.10.10.10", "2000::1"},
+			oldFamilies:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+			newPolicy:          &singleStack,
+			expectedClusterIPs: []string{"10.10.10.10"},
+			expectedIPFamilies: []api.IPFamily{api.IPv4Protocol},
+		},
+
+		{
+			name:               "dualstack (require) to single",
+			oldPolicy:          &requireDualStack,
+			oldClusterIPs:      []string{"2000::1", "10.10.10.10"},
+			oldFamilies:        []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+			newPolicy:          &singleStack,
+			expectedClusterIPs: []string{"2000::1"},
+			expectedIPFamilies: []api.IPFamily{api.IPv6Protocol},
+		},
+	}
+	// only when gate is on
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			oldService := &api.Service{
+				Spec: api.ServiceSpec{
+					IPFamilyPolicy: tc.oldPolicy,
+					ClusterIPs:     tc.oldClusterIPs,
+					IPFamilies:     tc.oldFamilies,
+				},
+			}
+
+			newService := oldService.DeepCopy()
+			newService.Spec.IPFamilyPolicy = tc.newPolicy
+
+			trimFieldsForDualStackDowngrade(newService, oldService)
+
+			if len(newService.Spec.ClusterIPs) != len(tc.expectedClusterIPs) {
+				t.Fatalf("unexpected clusterIPs. expected %v and got %v", tc.expectedClusterIPs, newService.Spec.ClusterIPs)
+			}
+
+			// compare clusterIPS
+			for i, expectedIP := range tc.expectedClusterIPs {
+				if expectedIP != newService.Spec.ClusterIPs[i] {
+					t.Fatalf("unexpected clusterIPs. expected %v and got %v", tc.expectedClusterIPs, newService.Spec.ClusterIPs)
+				}
+			}
+
+			// families
+			if len(newService.Spec.IPFamilies) != len(tc.expectedIPFamilies) {
+				t.Fatalf("unexpected ipfamilies. expected %v and got %v", tc.expectedIPFamilies, newService.Spec.IPFamilies)
+			}
+
+			// compare clusterIPS
+			for i, expectedIPFamily := range tc.expectedIPFamilies {
+				if expectedIPFamily != newService.Spec.IPFamilies[i] {
+					t.Fatalf("unexpected ipfamilies. expected %v and got %v", tc.expectedIPFamilies, newService.Spec.IPFamilies)
+				}
+			}
+
+		})
+	}
 }
