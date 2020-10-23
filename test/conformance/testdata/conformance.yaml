@@ -1476,9 +1476,9 @@
   codename: '[sig-cli] Kubectl client Kubectl server-side dry-run should check if
     kubectl can dry-run update Pods [Conformance]'
   description: The command 'kubectl run' must create a pod with the specified image
-    name. After, the command 'kubectl replace --dry-run=server' should update the
-    Pod with the new image name and server-side dry-run enabled. The image name must
-    not change.
+    name. After, the command 'kubectl patch pod -p {...} --dry-run=server' should
+    update the Pod with the new image name and server-side dry-run enabled. The image
+    name must not change.
   release: v1.19
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, version
