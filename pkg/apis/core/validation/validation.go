@@ -6209,19 +6209,6 @@ func validateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorLi
 		}
 	}
 
-	// Now do inter-field dependencies
-	// if families > 1  or clusterips > 1 then .spec.ipFamilyPolicy must be set to RequireDualStack || PreferDualStack
-	if service.Spec.IPFamilyPolicy != nil && *(service.Spec.IPFamilyPolicy) == core.IPFamilyPolicySingleStack {
-		if len(service.Spec.IPFamilies) > 1 {
-			allErrs = append(allErrs, field.Invalid(ipFamilyPolicyField, service.Spec.IPFamilyPolicy, "must be set to RequireDualStack or PreferDualStack when multiple IP families are provided"))
-		}
-
-		// if clusterIPs > 1 then .spec.ipFamilyPolicy must be set to RequireDualStack
-		if len(service.Spec.ClusterIPs) > 1 {
-			allErrs = append(allErrs, field.Invalid(ipFamilyPolicyField, service.Spec.IPFamilyPolicy, "must be set to RequireDualStack or PreferDualStack when multiple cluster ips are provided"))
-		}
-	}
-
 	// match clusterIPs to their families, if they were provided
 	if !isHeadlessService(service) && len(service.Spec.ClusterIPs) > 0 && len(service.Spec.IPFamilies) > 0 {
 		for i, ip := range service.Spec.ClusterIPs {

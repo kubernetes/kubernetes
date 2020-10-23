@@ -10578,12 +10578,12 @@ func TestValidateServiceCreate(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "invalid, wrong IPFamilyPolicy(singleStack) is set for two families",
+			name: "IPFamilyPolicy(singleStack) is set for two families",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.IPFamilyPolicy = &singleStack
 				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
 			},
-			numErrs: 1,
+			numErrs: 0, // this validated in alloc code.
 		},
 		{
 			name: "valid, IPFamilyPolicy(preferDualStack) is set for two families (note: alloc sets families)",
@@ -10759,14 +10759,14 @@ func TestValidateServiceCreate(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "invalid, multi ip, dualstack not set",
+			name: " multi ip, dualstack not set (request for downgrade)",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.IPFamilyPolicy = &singleStack
 				s.Spec.ClusterIP = "10.0.0.1"
 				s.Spec.ClusterIPs = []string{"10.0.0.1", "2001::1"}
 				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
 			},
-			numErrs: 2,
+			numErrs: 0,
 		},
 		{
 			name: "valid, headless-no-selector + multi family + gate off",
@@ -13344,7 +13344,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "invalid, downgrade keeping the families",
+			name: "downgrade keeping the families",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
@@ -13358,7 +13358,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.IPFamilyPolicy = &singleStack
 				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
 			},
-			numErrs: 1,
+			numErrs: 0, // families and ips are trimmed in strategy
 		},
 		{
 			name: "invalid, downgrade keeping the preferDualStack:true",
