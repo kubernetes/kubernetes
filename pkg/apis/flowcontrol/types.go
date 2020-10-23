@@ -28,7 +28,8 @@ const (
 	NonResourceAll = "*"
 	NameAll        = "*"
 
-	NamespaceEvery = "*" // matches every particular namespace
+	NamespaceEvery    = "*" // matches every particular namespace
+	ResourceNameEvery = "*" // matches every particular resource name
 )
 
 // System preset priority level names
@@ -265,6 +266,15 @@ type ResourcePolicyRule struct {
 	// +optional
 	// +listType=set
 	Namespaces []string
+
+	// `resourceNames` is a list of target resource names that restricts
+	// matches. A (get, update, patch, delete) request that specifies
+	// a target name matches if either (a) this list contains that target
+	// names or (b) this list contains "*".
+	// If not set, this list will be defaulted to ["*"].
+	// +optional
+	// +listType=set
+	ResourceNames []string
 }
 
 // NonResourcePolicyRule is a predicate that matches non-resource requests according to their verb and the

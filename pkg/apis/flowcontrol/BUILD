@@ -28,6 +28,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/apis/flowcontrol/fuzzer:all-srcs",
         "//pkg/apis/flowcontrol/install:all-srcs",
         "//pkg/apis/flowcontrol/internalbootstrap:all-srcs",
         "//pkg/apis/flowcontrol/util:all-srcs",

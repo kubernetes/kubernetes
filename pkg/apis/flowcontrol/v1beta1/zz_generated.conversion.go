@@ -699,6 +699,7 @@ func autoConvert_v1beta1_ResourcePolicyRule_To_flowcontrol_ResourcePolicyRule(in
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
 	out.ClusterScope = in.ClusterScope
 	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
+	out.ResourceNames = *(*[]string)(unsafe.Pointer(&in.ResourceNames))
 	return nil
 }
 
@@ -713,6 +714,7 @@ func autoConvert_flowcontrol_ResourcePolicyRule_To_v1beta1_ResourcePolicyRule(in
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
 	out.ClusterScope = in.ClusterScope
 	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
+	out.ResourceNames = *(*[]string)(unsafe.Pointer(&in.ResourceNames))
 	return nil
 }
 

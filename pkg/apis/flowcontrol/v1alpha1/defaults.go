@@ -38,6 +38,19 @@ func SetDefaults_FlowSchemaSpec(spec *v1alpha1.FlowSchemaSpec) {
 	if spec.MatchingPrecedence == 0 {
 		spec.MatchingPrecedence = FlowSchemaDefaultMatchingPrecedence
 	}
+
+	// For data-plane 1.18, 1.19, 1.20 compatibility
+	for i := range spec.Rules {
+		for j := range spec.Rules[i].ResourceRules {
+			SetDefaults_ResourcePolicyRule(&spec.Rules[i].ResourceRules[j])
+		}
+	}
+}
+
+func SetDefaults_ResourcePolicyRule(r *v1alpha1.ResourcePolicyRule) {
+	if len(r.ResourceNames) == 0 {
+		r.ResourceNames = []string{v1alpha1.ResourceNameEvery}
+	}
 }
 
 func SetDefaults_LimitedPriorityLevelConfiguration(lplc *v1alpha1.LimitedPriorityLevelConfiguration) {

@@ -394,6 +394,15 @@ message ResourcePolicyRule {
   // +optional
   // +listType=set
   repeated string namespaces = 5;
+
+  // `resourceNames` is a list of target resource names that restricts
+  // matches. A (get, update, patch, delete) request that specifies
+  // a target name matches if either (a) this list contains that target
+  // names or (b) this list contains "*".
+  // If not set, this list will be defaulted to ["*"].
+  // +optional
+  // +listType=set
+  repeated string resourceNames = 6;
 }
 
 // ServiceAccountSubject holds detailed information for service-account-kind subject.

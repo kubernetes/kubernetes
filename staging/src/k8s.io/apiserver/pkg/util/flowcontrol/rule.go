@@ -126,10 +126,10 @@ func matchesResourcePolicyRule(ri *request.RequestInfo, policyRule flowcontrol.R
 	if !matchPolicyRuleAPIGroup(policyRule.APIGroups, ri.APIGroup) {
 		return false
 	}
-	if len(ri.Namespace) == 0 {
-		return policyRule.ClusterScope
+	if !matchPolicyRuleNamespaces(policyRule.Namespaces, ri.Namespace, policyRule.ClusterScope) {
+		return false
 	}
-	return containsString(ri.Namespace, policyRule.Namespaces, flowcontrol.NamespaceEvery)
+	return matchPolicyRuleResourceNames(policyRule.ResourceNames, ri.Name)
 }
 
 func matchesANonResourceRule(ri *request.RequestInfo, rules []flowcontrol.NonResourcePolicyRule) bool {
@@ -182,6 +182,17 @@ func rsJoin(requestResource, requestSubresource string) string {
 
 func matchPolicyRuleResource(policyRuleRequestResources []string, requestResource, requestSubresource string) bool {
 	return containsString(rsJoin(requestResource, requestSubresource), policyRuleRequestResources, flowcontrol.ResourceAll)
+}
+
+func matchPolicyRuleNamespaces(policyRuleRequestNamespaces []string, requestNamespace string, isClusterScope bool) bool {
+	if len(requestNamespace) == 0 {
+		return isClusterScope
+	}
+	return containsString(requestNamespace, policyRuleRequestNamespaces, flowcontrol.NamespaceEvery)
+}
+
+func matchPolicyRuleResourceNames(policyRuleRequestResourceNames []string, requestResourceName string) bool {
+	return containsString(requestResourceName, policyRuleRequestResourceNames, flowcontrol.ResourceNameEvery)
 }
 
 // containsString returns true if either `x` or `wildcard` is in

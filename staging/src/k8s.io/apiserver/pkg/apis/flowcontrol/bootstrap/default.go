@@ -113,6 +113,7 @@ var (
 					[]string{flowcontrol.ResourceAll},
 					[]string{flowcontrol.NamespaceEvery},
 					true,
+					[]string{flowcontrol.ResourceNameEvery},
 				),
 			},
 			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
@@ -139,6 +140,7 @@ var (
 					[]string{flowcontrol.ResourceAll},
 					[]string{flowcontrol.NamespaceEvery},
 					true,
+					[]string{flowcontrol.ResourceNameEvery},
 				),
 			},
 			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
@@ -252,7 +254,9 @@ var (
 				[]string{flowcontrol.APIGroupAll},
 				[]string{flowcontrol.ResourceAll},
 				[]string{flowcontrol.NamespaceEvery},
-				true)},
+				true,
+				[]string{flowcontrol.ResourceNameEvery},
+			)},
 			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
 				nonResourceRule(
 					[]string{flowcontrol.VerbAll},
@@ -273,13 +277,17 @@ var (
 					[]string{corev1.GroupName},
 					[]string{"endpoints", "configmaps"},
 					[]string{"kube-system"},
-					false),
+					false,
+					[]string{flowcontrol.ResourceNameEvery},
+				),
 				resourceRule(
 					[]string{"get", "create", "update"},
 					[]string{coordinationv1.GroupName},
 					[]string{"leases"},
 					[]string{flowcontrol.NamespaceEvery},
-					false),
+					false,
+					[]string{flowcontrol.ResourceNameEvery},
+				),
 			},
 		},
 	)
@@ -294,13 +302,17 @@ var (
 					[]string{corev1.GroupName},
 					[]string{"endpoints", "configmaps"},
 					[]string{flowcontrol.NamespaceEvery},
-					false),
+					false,
+					[]string{flowcontrol.ResourceNameEvery},
+				),
 				resourceRule(
 					[]string{"get", "create", "update"},
 					[]string{coordinationv1.GroupName},
 					[]string{"leases"},
 					[]string{flowcontrol.NamespaceEvery},
-					false),
+					false,
+					[]string{flowcontrol.ResourceNameEvery},
+				),
 			},
 		},
 	)
@@ -314,7 +326,9 @@ var (
 				[]string{flowcontrol.APIGroupAll},
 				[]string{flowcontrol.ResourceAll},
 				[]string{flowcontrol.NamespaceEvery},
-				true)},
+				true,
+				[]string{flowcontrol.ResourceNameEvery},
+			)},
 			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
 				nonResourceRule(
 					[]string{flowcontrol.VerbAll},
@@ -332,7 +346,9 @@ var (
 				[]string{flowcontrol.APIGroupAll},
 				[]string{flowcontrol.ResourceAll},
 				[]string{flowcontrol.NamespaceEvery},
-				true)},
+				true,
+				[]string{flowcontrol.ResourceNameEvery},
+			)},
 			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
 				nonResourceRule(
 					[]string{flowcontrol.VerbAll},
@@ -350,7 +366,9 @@ var (
 				[]string{flowcontrol.APIGroupAll},
 				[]string{flowcontrol.ResourceAll},
 				[]string{flowcontrol.NamespaceEvery},
-				true)},
+				true,
+				[]string{flowcontrol.ResourceNameEvery},
+			)},
 			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
 				nonResourceRule(
 					[]string{flowcontrol.VerbAll},
@@ -368,7 +386,9 @@ var (
 				[]string{flowcontrol.APIGroupAll},
 				[]string{flowcontrol.ResourceAll},
 				[]string{flowcontrol.NamespaceEvery},
-				true)},
+				true,
+				[]string{flowcontrol.ResourceNameEvery},
+			)},
 			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
 				nonResourceRule(
 					[]string{flowcontrol.VerbAll},
@@ -386,7 +406,9 @@ var (
 				[]string{flowcontrol.APIGroupAll},
 				[]string{flowcontrol.ResourceAll},
 				[]string{flowcontrol.NamespaceEvery},
-				true)},
+				true,
+				[]string{flowcontrol.ResourceNameEvery},
+			)},
 			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
 				nonResourceRule(
 					[]string{flowcontrol.VerbAll},
@@ -460,13 +482,14 @@ func kubeSystemServiceAccount(names ...string) []flowcontrol.Subject {
 	return subjects
 }
 
-func resourceRule(verbs []string, groups []string, resources []string, namespaces []string, clusterScoped bool) flowcontrol.ResourcePolicyRule {
+func resourceRule(verbs []string, groups []string, resources []string, namespaces []string, clusterScoped bool, resourceNames []string) flowcontrol.ResourcePolicyRule {
 	return flowcontrol.ResourcePolicyRule{
-		Verbs:        verbs,
-		APIGroups:    groups,
-		Resources:    resources,
-		Namespaces:   namespaces,
-		ClusterScope: clusterScoped,
+		Verbs:         verbs,
+		APIGroups:     groups,
+		Resources:     resources,
+		Namespaces:    namespaces,
+		ClusterScope:  clusterScoped,
+		ResourceNames: resourceNames,
 	}
 }
 

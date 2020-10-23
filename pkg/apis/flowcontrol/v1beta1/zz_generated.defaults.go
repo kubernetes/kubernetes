@@ -42,6 +42,13 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_FlowSchema(in *v1beta1.FlowSchema) {
 	SetDefaults_FlowSchemaSpec(&in.Spec)
+	for i := range in.Spec.Rules {
+		a := &in.Spec.Rules[i]
+		for j := range a.ResourceRules {
+			b := &a.ResourceRules[j]
+			SetDefaults_ResourcePolicyRule(b)
+		}
+	}
 }
 
 func SetObjectDefaults_FlowSchemaList(in *v1beta1.FlowSchemaList) {

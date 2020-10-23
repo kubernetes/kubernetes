@@ -44,11 +44,12 @@ func TestFlowSchemaValidation(t *testing.T) {
 				},
 				ResourceRules: []flowcontrol.ResourcePolicyRule{
 					{
-						Verbs:        []string{flowcontrol.VerbAll},
-						APIGroups:    []string{flowcontrol.APIGroupAll},
-						Resources:    []string{flowcontrol.ResourceAll},
-						ClusterScope: true,
-						Namespaces:   []string{flowcontrol.NamespaceEvery},
+						Verbs:         []string{flowcontrol.VerbAll},
+						APIGroups:     []string{flowcontrol.APIGroupAll},
+						Resources:     []string{flowcontrol.ResourceAll},
+						ClusterScope:  true,
+						Namespaces:    []string{flowcontrol.NamespaceEvery},
+						ResourceNames: []string{flowcontrol.ResourceNameEvery},
 					},
 				},
 				NonResourceRules: []flowcontrol.NonResourcePolicyRule{
@@ -80,11 +81,12 @@ func TestFlowSchemaValidation(t *testing.T) {
 				},
 				ResourceRules: []flowcontrol.ResourcePolicyRule{
 					{
-						Verbs:        []string{flowcontrol.VerbAll},
-						APIGroups:    []string{flowcontrol.APIGroupAll},
-						Resources:    []string{flowcontrol.ResourceAll},
-						ClusterScope: true,
-						Namespaces:   []string{flowcontrol.NamespaceEvery},
+						Verbs:         []string{flowcontrol.VerbAll},
+						APIGroups:     []string{flowcontrol.APIGroupAll},
+						Resources:     []string{flowcontrol.ResourceAll},
+						ClusterScope:  true,
+						Namespaces:    []string{flowcontrol.NamespaceEvery},
+						ResourceNames: []string{flowcontrol.ResourceNameEvery},
 					},
 				},
 				NonResourceRules: []flowcontrol.NonResourcePolicyRule{
@@ -149,10 +151,11 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:      []string{flowcontrol.VerbAll},
-									APIGroups:  []string{flowcontrol.APIGroupAll},
-									Resources:  []string{flowcontrol.ResourceAll},
-									Namespaces: []string{flowcontrol.NamespaceEvery},
+									Verbs:         []string{flowcontrol.VerbAll},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									Namespaces:    []string{flowcontrol.NamespaceEvery},
+									ResourceNames: []string{flowcontrol.ResourceNameEvery},
 								},
 							},
 						},
@@ -290,11 +293,12 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:        []string{flowcontrol.VerbAll},
-									APIGroups:    []string{flowcontrol.APIGroupAll},
-									Resources:    []string{flowcontrol.ResourceAll},
-									ClusterScope: true,
-									Namespaces:   []string{flowcontrol.NamespaceEvery},
+									Verbs:         []string{flowcontrol.VerbAll},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									ClusterScope:  true,
+									Namespaces:    []string{flowcontrol.NamespaceEvery},
+									ResourceNames: []string{flowcontrol.ResourceNameEvery},
 								},
 							},
 							NonResourceRules: []flowcontrol.NonResourcePolicyRule{
@@ -355,11 +359,12 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:        []string{flowcontrol.VerbAll},
-									APIGroups:    []string{flowcontrol.APIGroupAll},
-									Resources:    []string{flowcontrol.ResourceAll},
-									ClusterScope: true,
-									Namespaces:   []string{flowcontrol.NamespaceEvery},
+									Verbs:         []string{flowcontrol.VerbAll},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									ClusterScope:  true,
+									Namespaces:    []string{flowcontrol.NamespaceEvery},
+									ResourceNames: []string{flowcontrol.ResourceNameEvery},
 								},
 							},
 							NonResourceRules: []flowcontrol.NonResourcePolicyRule{
@@ -427,10 +432,11 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:      []string{flowcontrol.VerbAll, "create"},
-									APIGroups:  []string{flowcontrol.APIGroupAll, "tak"},
-									Resources:  []string{flowcontrol.ResourceAll, "tok"},
-									Namespaces: []string{flowcontrol.NamespaceEvery},
+									Verbs:         []string{flowcontrol.VerbAll, "create"},
+									APIGroups:     []string{flowcontrol.APIGroupAll, "tak"},
+									Resources:     []string{flowcontrol.ResourceAll, "tok"},
+									Namespaces:    []string{flowcontrol.NamespaceEvery},
+									ResourceNames: []string{flowcontrol.ResourceNameEvery},
 								},
 							},
 						},
@@ -464,10 +470,11 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:      []string{flowcontrol.VerbAll},
-									APIGroups:  []string{flowcontrol.APIGroupAll},
-									Resources:  []string{flowcontrol.ResourceAll},
-									Namespaces: []string{flowcontrol.NamespaceEvery},
+									Verbs:         []string{flowcontrol.VerbAll},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									Namespaces:    []string{flowcontrol.NamespaceEvery},
+									ResourceNames: []string{flowcontrol.ResourceNameEvery},
 								},
 							},
 							NonResourceRules: []flowcontrol.NonResourcePolicyRule{
@@ -568,10 +575,11 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:      []string{"feed"},
-									APIGroups:  []string{flowcontrol.APIGroupAll},
-									Resources:  []string{flowcontrol.ResourceAll},
-									Namespaces: []string{flowcontrol.NamespaceEvery},
+									Verbs:         []string{"feed"},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									Namespaces:    []string{flowcontrol.NamespaceEvery},
+									ResourceNames: []string{flowcontrol.ResourceNameEvery},
 								},
 							},
 						},
@@ -603,10 +611,11 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:      []string{flowcontrol.VerbAll},
-									APIGroups:  []string{flowcontrol.APIGroupAll},
-									Resources:  []string{flowcontrol.ResourceAll},
-									Namespaces: []string{flowcontrol.NamespaceEvery},
+									Verbs:         []string{flowcontrol.VerbAll},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									Namespaces:    []string{flowcontrol.NamespaceEvery},
+									ResourceNames: []string{flowcontrol.ResourceNameEvery},
 								},
 							},
 						},
@@ -640,10 +649,11 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:      []string{flowcontrol.VerbAll},
-									APIGroups:  []string{flowcontrol.APIGroupAll},
-									Resources:  []string{flowcontrol.ResourceAll},
-									Namespaces: []string{flowcontrol.NamespaceEvery},
+									Verbs:         []string{flowcontrol.VerbAll},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									Namespaces:    []string{flowcontrol.NamespaceEvery},
+									ResourceNames: []string{flowcontrol.ResourceNameEvery},
 								},
 							},
 						},
@@ -674,10 +684,11 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:      []string{flowcontrol.VerbAll},
-									APIGroups:  []string{flowcontrol.APIGroupAll},
-									Resources:  []string{flowcontrol.ResourceAll},
-									Namespaces: []string{flowcontrol.NamespaceEvery},
+									Verbs:         []string{flowcontrol.VerbAll},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									Namespaces:    []string{flowcontrol.NamespaceEvery},
+									ResourceNames: []string{flowcontrol.ResourceNameEvery},
 								},
 							},
 						},
@@ -709,10 +720,11 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:      []string{flowcontrol.VerbAll},
-									APIGroups:  []string{flowcontrol.APIGroupAll},
-									Resources:  []string{flowcontrol.ResourceAll},
-									Namespaces: nil,
+									Verbs:         []string{flowcontrol.VerbAll},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									Namespaces:    nil,
+									ResourceNames: []string{flowcontrol.ResourceNameEvery},
 								},
 							},
 						},
@@ -744,10 +756,11 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:        []string{flowcontrol.VerbAll},
-									APIGroups:    []string{flowcontrol.APIGroupAll},
-									Resources:    []string{flowcontrol.ResourceAll},
-									ClusterScope: true,
+									Verbs:         []string{flowcontrol.VerbAll},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									ClusterScope:  true,
+									ResourceNames: []string{flowcontrol.ResourceNameEvery},
 								},
 							},
 						},
@@ -777,11 +790,12 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:        []string{flowcontrol.VerbAll},
-									APIGroups:    []string{flowcontrol.APIGroupAll},
-									Resources:    []string{flowcontrol.ResourceAll},
-									ClusterScope: true,
-									Namespaces:   []string{flowcontrol.NamespaceEvery},
+									Verbs:         []string{flowcontrol.VerbAll},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									ClusterScope:  true,
+									Namespaces:    []string{flowcontrol.NamespaceEvery},
+									ResourceNames: []string{flowcontrol.ResourceNameEvery},
 								},
 							},
 						},
@@ -811,10 +825,11 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:      []string{flowcontrol.VerbAll},
-									APIGroups:  []string{flowcontrol.APIGroupAll},
-									Resources:  []string{flowcontrol.ResourceAll},
-									Namespaces: []string{"foo", flowcontrol.NamespaceEvery},
+									Verbs:         []string{flowcontrol.VerbAll},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									Namespaces:    []string{"foo", flowcontrol.NamespaceEvery},
+									ResourceNames: []string{flowcontrol.ResourceNameEvery},
 								},
 							},
 						},
@@ -846,10 +861,11 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:      []string{flowcontrol.VerbAll},
-									APIGroups:  []string{flowcontrol.APIGroupAll},
-									Resources:  []string{flowcontrol.ResourceAll},
-									Namespaces: []string{"-foo"},
+									Verbs:         []string{flowcontrol.VerbAll},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									Namespaces:    []string{"-foo"},
+									ResourceNames: []string{flowcontrol.ResourceNameEvery},
 								},
 							},
 						},
@@ -858,6 +874,115 @@ func TestFlowSchemaValidation(t *testing.T) {
 			},
 			expectedErrors: field.ErrorList{
 				field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("resourceRules").Index(0).Child("namespaces").Index(0), "-foo", nsErrIntro+`a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')`),
+			},
+		},
+		{
+			name: "Omitted ResourceRule.ResourceNames should fail",
+			flowSchema: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo",
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					MatchingPrecedence: 50,
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+						Name: "system-bar",
+					},
+					Rules: []flowcontrol.PolicyRulesWithSubjects{
+						{
+							Subjects: []flowcontrol.Subject{
+								{
+									Kind: flowcontrol.SubjectKindUser,
+									User: &flowcontrol.UserSubject{Name: "noxu"},
+								},
+							},
+							ResourceRules: []flowcontrol.ResourcePolicyRule{
+								{
+									Verbs:         []string{flowcontrol.VerbAll},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									ClusterScope:  true,
+									ResourceNames: []string{},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{
+				field.Required(field.NewPath("spec").Child("rules").Index(0).Child("resourceRules").Index(0).Child("resourceNames"), "resource names must supply at least one resource name"),
+			},
+		},
+		{
+			name: "ResourceNameEvery may not be combined with particulars",
+			flowSchema: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo",
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					MatchingPrecedence: 50,
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+						Name: "system-bar",
+					},
+					Rules: []flowcontrol.PolicyRulesWithSubjects{
+						{
+							Subjects: []flowcontrol.Subject{
+								{
+									Kind: flowcontrol.SubjectKindUser,
+									User: &flowcontrol.UserSubject{Name: "noxu"},
+								},
+							},
+							ResourceRules: []flowcontrol.ResourcePolicyRule{
+								{
+									Verbs:         []string{flowcontrol.VerbAll},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									ClusterScope:  true,
+									ResourceNames: []string{flowcontrol.ResourceNameEvery, "foo"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("resourceRules").Index(0).Child("resourceNames"), []string{flowcontrol.ResourceNameEvery, "foo"}, "if '*' is present, must not specify other resource names"),
+			},
+		},
+		{
+			name: "ResourceRule.ResourceNames must be well formed",
+			flowSchema: &flowcontrol.FlowSchema{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "system-foo",
+				},
+				Spec: flowcontrol.FlowSchemaSpec{
+					MatchingPrecedence: 50,
+					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+						Name: "system-bar",
+					},
+					Rules: []flowcontrol.PolicyRulesWithSubjects{
+						{
+							Subjects: []flowcontrol.Subject{
+								{
+									Kind: flowcontrol.SubjectKindUser,
+									User: &flowcontrol.UserSubject{Name: "noxu"},
+								},
+							},
+							ResourceRules: []flowcontrol.ResourcePolicyRule{
+								{
+									Verbs:         []string{flowcontrol.VerbAll},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									ClusterScope:  true,
+									ResourceNames: []string{"", ""},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("resourceRules").Index(0).Child("resourceNames").Index(0), "", `each member of this list must not be an empty string`),
+				field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("resourceRules").Index(0).Child("resourceNames").Index(1), "", `each member of this list must not be an empty string`),
 			},
 		},
 		{
@@ -881,10 +1006,11 @@ func TestFlowSchemaValidation(t *testing.T) {
 							},
 							ResourceRules: []flowcontrol.ResourcePolicyRule{
 								{
-									Verbs:      []string{flowcontrol.VerbAll},
-									APIGroups:  []string{flowcontrol.APIGroupAll},
-									Resources:  []string{flowcontrol.ResourceAll},
-									Namespaces: []string{flowcontrol.NamespaceEvery},
+									Verbs:         []string{flowcontrol.VerbAll},
+									APIGroups:     []string{flowcontrol.APIGroupAll},
+									Resources:     []string{flowcontrol.ResourceAll},
+									Namespaces:    []string{flowcontrol.NamespaceEvery},
+									ResourceNames: []string{flowcontrol.ResourceNameEvery},
 								},
 							},
 						},

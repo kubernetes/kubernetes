@@ -303,6 +303,20 @@ func ValidateFlowSchemaResourcePolicyRule(rule *flowcontrol.ResourcePolicyRule, 
 		}
 	}
 
+	if len(rule.ResourceNames) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("resourceNames"), `resource names must supply at least one resource name`))
+	} else if hasWildcard(rule.ResourceNames) {
+		if len(rule.ResourceNames) > 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceNames"), rule.ResourceNames, "if '*' is present, must not specify other resource names"))
+		}
+	} else {
+		for idx, tgtName := range rule.ResourceNames {
+			if len(tgtName) == 0 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceNames").Index(idx), tgtName, "each member of this list must not be an empty string"))
+			}
+		}
+	}
+
 	return allErrs
 }
 

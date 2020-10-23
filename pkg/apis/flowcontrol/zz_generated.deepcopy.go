@@ -464,6 +464,11 @@ func (in *ResourcePolicyRule) DeepCopyInto(out *ResourcePolicyRule) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.ResourceNames != nil {
+		in, out := &in.ResourceNames, &out.ResourceNames
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

@@ -537,12 +537,14 @@ func genResourceRule(rng *rand.Rand, pfx string, mayMatchClusterScope, matchAllR
 		rnamespaces = namespaces[1:]
 	}
 	rr := flowcontrol.ResourcePolicyRule{
-		Verbs:        []string{pfx + "-v1", pfx + "-v2", pfx + "-v3"},
-		APIGroups:    []string{pfx + ".g1", pfx + ".g2", pfx + ".g3"},
-		Resources:    []string{pfx + "-r1s", pfx + "-r2s", pfx + "-r3s"},
-		ClusterScope: namespaces[0] == "",
-		Namespaces:   rnamespaces}
-	matchingRIs := genRRIs(rng, 3, rr.Verbs, rr.APIGroups, rr.Resources, namespaces)
+		Verbs:         []string{pfx + "-v1", pfx + "-v2", pfx + "-v3"},
+		APIGroups:     []string{pfx + ".g1", pfx + ".g2", pfx + ".g3"},
+		Resources:     []string{pfx + "-r1s", pfx + "-r2s", pfx + "-r3s"},
+		ClusterScope:  namespaces[0] == "",
+		Namespaces:    rnamespaces,
+		ResourceNames: []string{pfx + "-nn1", pfx + "-nn2", pfx + "-nn3"},
+	}
+	matchingRIs := genRRIs(rng, 3, rr.Verbs, rr.APIGroups, rr.Resources, namespaces, rr.ResourceNames)
 	var skippingRIs []*request.RequestInfo
 	if !someMatchesAllResources {
 		skipNSs := []string{pfx + "-n4", pfx + "-n5", pfx + "-n6"}
@@ -553,10 +555,12 @@ func genResourceRule(rng *rand.Rand, pfx string, mayMatchClusterScope, matchAllR
 			[]string{pfx + "-v4", pfx + "-v5", pfx + "-v6"},
 			[]string{pfx + ".g4", pfx + ".g5", pfx + ".g6"},
 			[]string{pfx + "-r4s", pfx + "-r5s", pfx + "-r6s"},
-			skipNSs)
+			skipNSs,
+			[]string{pfx + "-nn4", pfx + "-nn5", pfx + "-nn6"},
+		)
 	}
 	// choose a proper subset of fields to wildcard; only matters if not matching all
-	starMask := rng.Intn(15)
+	starMask := rng.Intn(31)
 	if matchAllResources || starMask&1 == 1 && rng.Float32() < 0.1 {
 		rr.Verbs = []string{flowcontrol.VerbAll}
 	}
@@ -570,15 +574,19 @@ func genResourceRule(rng *rand.Rand, pfx string, mayMatchClusterScope, matchAllR
 		rr.ClusterScope = true
 		rr.Namespaces = []string{flowcontrol.NamespaceEvery}
 	}
+	if matchAllResources || starMask&16 == 16 && rng.Float32() < 0.1 {
+		rr.ResourceNames = []string{flowcontrol.ResourceNameEvery}
+	}
 	return rr, matchingRIs, skippingRIs
 }
 
-func genRRIs(rng *rand.Rand, m int, verbs, apiGroups, resources, namespaces []string) []*request.RequestInfo {
+func genRRIs(rng *rand.Rand, m int, verbs, apiGroups, resources, namespaces, names []string) []*request.RequestInfo {
 	nv := len(verbs)
 	ng := len(apiGroups)
 	nr := len(resources)
-	nn := len(namespaces)
-	coords := chooseInts(rng, nv*ng*nr*nn, m)
+	nns := len(namespaces)
+	nn := len(names)
+	coords := chooseInts(rng, nv*ng*nr*nns*nn, m)
 	ans := make([]*request.RequestInfo, 0, m)
 	for _, coord := range coords {
 		ans = append(ans, &request.RequestInfo{
@@ -586,7 +594,9 @@ func genRRIs(rng *rand.Rand, m int, verbs, apiGroups, resources, namespaces []st
 			Verb:              verbs[coord%nv],
 			APIGroup:          apiGroups[coord/nv%ng],
 			Resource:          resources[coord/nv/ng%nr],
-			Namespace:         namespaces[coord/nv/ng/nr]})
+			Namespace:         namespaces[coord/nv/ng/nr%nns],
+			Name:              names[coord/nv/ng/nr/nns%nn],
+		})
 	}
 	return ans
 }
