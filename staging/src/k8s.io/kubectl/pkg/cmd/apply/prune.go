@@ -83,9 +83,11 @@ func (p *pruner) pruneAll(o *ApplyOptions) error {
 			}
 		}
 	}
-	for _, m := range nonNamespacedRESTMappings {
-		if err := p.prune(metav1.NamespaceNone, m); err != nil {
-			return fmt.Errorf("error pruning nonNamespaced object %v: %v", m.GroupVersionKind, err)
+	if !o.EnforceNamespace {
+		for _, m := range nonNamespacedRESTMappings {
+			if err := p.prune(metav1.NamespaceNone, m); err != nil {
+				return fmt.Errorf("error pruning nonNamespaced object %v: %v", m.GroupVersionKind, err)
+			}
 		}
 	}
 

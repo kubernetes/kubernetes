@@ -256,6 +256,29 @@ __EOF__
   # cleanup
   kubectl delete ns nsb
 
+  ## kubectl apply --prune --all --namespace NS can only prune resources in the namespace
+  # Pre-Condition: namespace nsb exists; no POD exists
+  kubectl create ns nsb
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # apply a into namespace nsb
+  kubectl apply --namespace nsb -f hack/testdata/prune/a.yaml "${kube_flags[@]:?}"
+  kube::test::get_object_assert 'pods a -n nsb' "{{${id_field:?}}}" 'a'
+  # apply b with namespace
+  kubectl apply --namespace nsb -f hack/testdata/prune/b.yaml "${kube_flags[@]:?}"
+  kube::test::get_object_assert 'pods b -n nsb' "{{${id_field:?}}}" 'b'
+  # apply non-reapable type
+  kubectl apply --all --prune -f hack/testdata/prune-reap/a.yml 2>&1 "${kube_flags[@]:?}"
+  kube::test::get_object_assert 'pvc a-pvc' "{{${id_field:?}}}" 'a-pvc'
+  # apply --prune must prune a
+  kubectl apply --prune --all --namespace nsb -f hack/testdata/prune/b.yaml
+  # check wrong pod doesn't exist and right pod exists
+  kube::test::wait_object_assert 'pods -n nsb' "{{range.items}}{{${id_field:?}}}:{{end}}" 'b:'
+  kube::test::get_object_assert 'pvc a-pvc' "{{${id_field:?}}}" 'a-pvc'
+
+  # cleanup
+  kubectl delete ns nsb
+  kubectl delete svc prune-svc 2>&1 "${kube_flags[@]:?}"
+
   ## kubectl apply -n must fail if input file contains namespace other than the one given in -n
   output_message=$(! kubectl apply -n foo -f hack/testdata/prune/b.yaml 2>&1 "${kube_flags[@]:?}")
   kube::test::if_has_string "${output_message}" 'the namespace from the provided object "nsb" does not match the namespace "foo".'
