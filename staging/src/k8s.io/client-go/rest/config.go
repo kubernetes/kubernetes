@@ -42,7 +42,6 @@ import (
 )
 
 const (
-	DefaultQPS   float32 = 5.0
 	DefaultBurst int     = 10
 )
 
@@ -113,7 +112,7 @@ type Config struct {
 	WrapTransport transport.WrapperFunc
 
 	// QPS indicates the maximum QPS to the master from this client.
-	// If it's zero, the created RESTClient will use DefaultQPS: 5
+	// If it's zero, means no limits of QPS
 	QPS float32
 
 	// Maximum burst for throttle.
@@ -321,9 +320,6 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 	rateLimiter := config.RateLimiter
 	if rateLimiter == nil {
 		qps := config.QPS
-		if config.QPS == 0.0 {
-			qps = DefaultQPS
-		}
 		burst := config.Burst
 		if config.Burst == 0 {
 			burst = DefaultBurst
