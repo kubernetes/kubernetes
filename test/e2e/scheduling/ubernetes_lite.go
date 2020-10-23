@@ -54,11 +54,11 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 		// TODO: SkipUnlessDefaultScheduler() // Non-default schedulers might not spread
 	})
 	ginkgo.It("should spread the pods of a service across zones", func() {
-		SpreadServiceOrFail(f, (2*zoneCount)+1, imageutils.GetPauseImageName())
+		SpreadServiceOrFail(f, 5*zoneCount, imageutils.GetPauseImageName())
 	})
 
 	ginkgo.It("should spread the pods of a replication controller across zones", func() {
-		SpreadRCOrFail(f, int32((2*zoneCount)+1), framework.ServeHostnameImage, []string{"serve-hostname"})
+		SpreadRCOrFail(f, int32(5*zoneCount), framework.ServeHostnameImage, []string{"serve-hostname"})
 	})
 })
 
@@ -171,7 +171,7 @@ func checkZoneSpreading(c clientset.Interface, pods *v1.PodList, zoneNames []str
 			maxPodsPerZone = podCount
 		}
 	}
-	gomega.Expect(minPodsPerZone).To(gomega.BeNumerically("~", maxPodsPerZone, 1),
+	gomega.Expect(maxPodsPerZone-minPodsPerZone).To(gomega.BeNumerically("~", 0, 2),
 		"Pods were not evenly spread across zones.  %d in one zone and %d in another zone",
 		minPodsPerZone, maxPodsPerZone)
 }
