@@ -196,8 +196,7 @@ func detectSystemd() bool {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		klog.V(2).Infof("Cannot run systemd-run, assuming non-systemd OS")
-		klog.V(4).Infof("systemd-run failed with: %v", err)
-		klog.V(4).Infof("systemd-run output: %s", string(output))
+		klog.V(4).Infof("systemd-run output: %s, failed with: %v", string(output), err)
 		return false
 	}
 	klog.V(2).Infof("Detected OS with systemd")
@@ -430,7 +429,7 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 	klog.V(4).Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
 	dataOut, err := mounter.Exec.Command("blkid", args...).CombinedOutput()
 	output := string(dataOut)
-	klog.V(4).Infof("Output: %q, err: %v", output, err)
+	klog.V(4).Infof("Output: %q", output)
 
 	if err != nil {
 		if exit, ok := err.(utilexec.ExitError); ok {
