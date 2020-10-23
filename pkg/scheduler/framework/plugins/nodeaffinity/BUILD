@@ -6,6 +6,8 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/apis/config/validation:go_default_library",
         "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/framework/plugins/helper:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -34,10 +36,12 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/framework/runtime:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
     ],
 )

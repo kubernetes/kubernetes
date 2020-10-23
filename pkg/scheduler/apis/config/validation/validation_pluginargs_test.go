@@ -19,9 +19,16 @@ package validation
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+)
+
+var (
+	ignoreBadValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 )
 
 func TestValidateDefaultPreemptionArgs(t *testing.T) {
@@ -549,6 +556,98 @@ func TestValidateNodeResourcesMostAllocatedArgs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			err := ValidateNodeResourcesMostAllocatedArgs(tc.args)
 			assertErr(t, tc.wantErr, err)
+		})
+	}
+}
+
+func TestValidateNodeAffinityArgs(t *testing.T) {
+	cases := []struct {
+		name    string
+		args    config.NodeAffinityArgs
+		wantErr error
+	}{
+		{
+			name: "empty",
+		},
+		{
+			name: "valid added affinity",
+			args: config.NodeAffinityArgs{
+				AddedAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "label-1",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"label-1-val"},
+									},
+								},
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
+						{
+							Weight: 1,
+							Preference: v1.NodeSelectorTerm{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      "metadata.name",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"node-1"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "invalid added affinity",
+			args: config.NodeAffinityArgs{
+				AddedAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "invalid/label/key",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"label-1-val"},
+									},
+								},
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
+						{
+							Weight: 1,
+							Preference: v1.NodeSelectorTerm{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      "metadata.name",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"node-1", "node-2"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: field.ErrorList{
+				field.Invalid(field.NewPath("addedAffinity", "requiredDuringSchedulingIgnoredDuringExecution"), nil, ""),
+				field.Invalid(field.NewPath("addedAffinity", "preferredDuringSchedulingIgnoredDuringExecution"), nil, ""),
+			}.ToAggregate(),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateNodeAffinityArgs(&tc.args)
+			if diff := cmp.Diff(err, tc.wantErr, ignoreBadValueDetail); diff != "" {
+				t.Fatalf("ValidatedNodeAffinityArgs returned err (-want,+got):\n%s", diff)
+			}
 		})
 	}
 }

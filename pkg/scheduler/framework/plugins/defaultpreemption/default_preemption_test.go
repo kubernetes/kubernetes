@@ -1284,7 +1284,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 		{
 			name: "No node should be attempted",
 			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeaffinity.ErrReason),
+				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeaffinity.ErrReasonPod),
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, tainttoleration.ErrReasonNotMatch),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodelabel.ErrReasonPresenceViolated),
