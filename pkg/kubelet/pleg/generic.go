@@ -18,6 +18,7 @@ package pleg
 
 import (
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -233,35 +234,40 @@ func (g *GenericPLEG) relist() {
 		needsReinspection = make(map[types.UID]*kubecontainer.Pod)
 	}
 
-	// If there are events associated with a pod, we should update the
-	// podCache.
-	for pid, events := range eventsByPodID {
-		pod := g.podRecords.getCurrent(pid)
-		if g.cacheEnabled() {
-			// updateCache() will inspect the pod and update the cache. If an
-			// error occurs during the inspection, we want PLEG to retry again
-			// in the next relist. To achieve this, we do not update the
-			// associated podRecord of the pod, so that the change will be
-			// detect again in the next relist.
-			// TODO: If many pods changed during the same relist period,
-			// inspecting the pod and getting the PodStatus to update the cache
-			// serially may take a while. We should be aware of this and
-			// parallelize if needed.
-			if err := g.updateCache(pod, pid); err != nil {
-				// Rely on updateCache calling GetPodStatus to log the actual error.
-				klog.V(4).Infof("PLEG: Ignoring events for pod %s/%s: %v", pod.Name, pod.Namespace, err)
+	// If there are events associated with a pod, we should update the podCache.
+	if g.cacheEnabled() {
+		wg := sync.WaitGroup{}
+		wg.Add(len(eventsByPodID))
+		for pid := range eventsByPodID {
+			pod := g.podRecords.getCurrent(pid)
+			go func() {
+				defer wg.Done()
+				// updateCache() will inspect the pod and update the cache. If an
+				// error occurs during the inspection, we want PLEG to retry again
+				// in the next relist. To achieve this, we do not update the
+				// associated podRecord of the pod, so that the change will be
+				// detect again in the next relist.
+				if err := g.updateCache(pod, pid); err != nil {
+					// Rely on updateCache calling GetPodStatus to log the actual error.
+					klog.V(4).Infof("PLEG: Ignoring events for pod %s/%s: %v", pod.Name, pod.Namespace, err)
 
-				// make sure we try to reinspect the pod during the next relisting
-				needsReinspection[pid] = pod
+					// make sure we try to reinspect the pod during the next relisting
+					needsReinspection[pid] = pod
 
-				continue
-			} else {
-				// this pod was in the list to reinspect and we did so because it had events, so remove it
-				// from the list (we don't want the reinspection code below to inspect it a second time in
-				// this relist execution)
-				delete(g.podsToReinspect, pid)
-			}
+					// if error occured, do not generate any event
+					delete(eventsByPodID, pid)
+				} else {
+					// this pod was in the list to reinspect and we did so because it had events, so remove it
+					// from the list (we don't want the reinspection code below to inspect it a second time in
+					// this relist execution)
+					delete(g.podsToReinspect, pid)
+				}
+			}()
 		}
+		wg.Wait()
+	}
+
+	for pid, events := range eventsByPodID {
 		// Update the internal storage and send out the events.
 		g.podRecords.update(pid)
 		for i := range events {
@@ -282,13 +288,19 @@ func (g *GenericPLEG) relist() {
 		// reinspect any pods that failed inspection during the previous relist
 		if len(g.podsToReinspect) > 0 {
 			klog.V(5).Infof("GenericPLEG: Reinspecting pods that previously failed inspection")
+			wg := sync.WaitGroup{}
+			wg.Add(len(g.podsToReinspect))
 			for pid, pod := range g.podsToReinspect {
-				if err := g.updateCache(pod, pid); err != nil {
-					// Rely on updateCache calling GetPodStatus to log the actual error.
-					klog.V(5).Infof("PLEG: pod %s/%s failed reinspection: %v", pod.Name, pod.Namespace, err)
-					needsReinspection[pid] = pod
-				}
+				go func() {
+					defer wg.Done()
+					if err := g.updateCache(pod, pid); err != nil {
+						// Rely on updateCache calling GetPodStatus to log the actual error.
+						klog.V(5).Infof("PLEG: pod %s/%s failed reinspection: %v", pod.Name, pod.Namespace, err)
+						needsReinspection[pid] = pod
+					}
+				}()
 			}
+			wg.Wait()
 		}
 
 		// Update the cache timestamp.  This needs to happen *after*
