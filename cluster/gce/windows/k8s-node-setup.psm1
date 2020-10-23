@@ -387,14 +387,12 @@ function DownloadAndInstall-GKEMetadataServer {
     return
   }
 
-  if (-not ($kube_env.ContainsKey('GKE_METADATA_SERVER_URL') -and
-            $kube_env.ContainsKey('GKE_METADATA_SERVER_SHA'))) {
-    Log-Output -Fatal ("Missing GKE_METADATA_SERVER_URL and/or GKE_METADATA_SERVER_SHA " +
+  if (-not ($kube_env.ContainsKey('GKE_METADATA_SERVER_URL'))) {
+    Log-Output -Fatal ("Missing GKE_METADATA_SERVER_URL " +
                        "for downloading gke-metadata-server: $(Out-String $kube_env)")
   }
   MustDownload-File `
       -URLs ${kube_env}['GKE_METADATA_SERVER_URL'] `
-      -Hash ${kube_env}['GKE_METADATA_SERVER_SHA'] `
       -OutFile "${env:NODE_DIR}\gke-metadata-server.exe"
 }
 
