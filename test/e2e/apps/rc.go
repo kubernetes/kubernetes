@@ -99,7 +99,12 @@ var _ = SIGDescribe("ReplicationController", func() {
 		testRCReleaseControlledNotMatching(f)
 	})
 
-	ginkgo.It("[Flaky] should test the lifecycle of a ReplicationController", func() {
+	/*
+		Release: v1.20
+		Testname: Replication Controller, lifecycle
+		Description: A Replication Controller (RC) is created, read, patched, and deleted with verification.
+	*/
+	framework.ConformanceIt("should test the lifecycle of a ReplicationController", func() {
 		testRcName := "rc-test"
 		testRcNamespace := ns
 		testRcInitialReplicaCount := int32(1)

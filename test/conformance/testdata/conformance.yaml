@@ -1260,6 +1260,13 @@
     namespace quota. The creation MUST fail
   release: v1.15
   file: test/e2e/apps/rc.go
+- testname: Replication Controller, lifecycle
+  codename: '[sig-apps] ReplicationController should test the lifecycle of a ReplicationController
+    [Conformance]'
+  description: A Replication Controller (RC) is created, read, patched, and deleted
+    with verification.
+  release: v1.20
+  file: test/e2e/apps/rc.go
 - testname: StatefulSet, Burst Scaling
   codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
     Burst scaling should run to completion even with unhealthy pods [Slow] [Conformance]'
