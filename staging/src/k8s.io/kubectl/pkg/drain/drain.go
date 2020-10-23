@@ -250,7 +250,6 @@ func (d *Helper) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodF
 			if err != nil {
 				errors = append(errors, err)
 			}
-		default:
 		}
 	}
 
