@@ -1374,20 +1374,6 @@ func TestIsFrontendIPChanged(t *testing.T) {
 			expectedError:          false,
 		},
 		{
-			desc: "isFrontendIPChanged shall return false if no loadbalancerIP is given",
-			config: network.FrontendIPConfiguration{
-				Name: to.StringPtr("btest1-name"),
-				FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
-					PrivateIPAllocationMethod: network.IPAllocationMethod("static"),
-					PrivateIPAddress:          to.StringPtr("1.1.1.2"),
-				},
-			},
-			lbFrontendIPConfigName: "btest1-name",
-			service:                getTestService("test1", v1.ProtocolTCP, nil, false, 80),
-			expectedFlag:           false,
-			expectedError:          false,
-		},
-		{
 			desc: "isFrontendIPChanged shall return false if config.PublicIPAddress == nil",
 			config: network.FrontendIPConfiguration{
 				Name: to.StringPtr("btest1-name"),

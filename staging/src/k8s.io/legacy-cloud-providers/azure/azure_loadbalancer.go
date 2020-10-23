@@ -531,6 +531,10 @@ func (az *Cloud) findServiceIPAddress(ctx context.Context, clusterName string, s
 		return service.Spec.LoadBalancerIP, nil
 	}
 
+	if len(service.Status.LoadBalancer.Ingress) > 0 && len(service.Status.LoadBalancer.Ingress[0].IP) > 0 {
+		return service.Status.LoadBalancer.Ingress[0].IP, nil
+	}
+
 	_, lbStatus, existsLb, err := az.getServiceLoadBalancer(service, clusterName, nil, false)
 	if err != nil {
 		return "", err
@@ -664,9 +668,7 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 		klog.V(2).Infof("service(%s): pip(%s) - creating as ipv4 for clusterIP:%v", serviceName, *pip.Name, service.Spec.ClusterIP)
 	}
 
-	klog.V(2).Infof("ensurePublicIPExists for service(%s): pip(%s) - creating", serviceName, *pip.Name)
-
-	klog.V(10).Infof("CreateOrUpdatePIP(%s, %q): start", pipResourceGroup, *pip.Name)
+	klog.V(2).Infof("CreateOrUpdatePIP(%s, %q): start", pipResourceGroup, *pip.Name)
 	err = az.CreateOrUpdatePIP(service, pipResourceGroup, pip)
 	if err != nil {
 		klog.V(2).Infof("ensure(%s) abort backoff: pip(%s)", serviceName, *pip.Name)
@@ -834,9 +836,6 @@ func (az *Cloud) isFrontendIPChanged(clusterName string, config network.Frontend
 			return config.PrivateIPAllocationMethod == network.Static, nil
 		}
 		return config.PrivateIPAllocationMethod != network.Static || !strings.EqualFold(loadBalancerIP, to.String(config.PrivateIPAddress)), nil
-	}
-	if loadBalancerIP == "" {
-		return false, nil
 	}
 	pipName, _, err := az.determinePublicIPName(clusterName, service)
 	if err != nil {
@@ -1212,7 +1211,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 					ID:                                      to.StringPtr(fmt.Sprintf(frontendIPConfigIDTemplate, az.SubscriptionID, az.ResourceGroup, *lb.Name, defaultLBFrontendIPConfigName)),
 					FrontendIPConfigurationPropertiesFormat: fipConfigurationProperties,
 				})
-			klog.Infof("reconcileLoadBalancer for service (%s)(%t): lb frontendconfig(%s) - adding", serviceName, wantLb, defaultLBFrontendIPConfigName)
+			klog.V(2).Infof("reconcileLoadBalancer for service (%s)(%t): lb frontendconfig(%s) - adding", serviceName, wantLb, defaultLBFrontendIPConfigName)
 			dirtyConfigs = true
 		}
 	}
