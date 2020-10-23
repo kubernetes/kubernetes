@@ -35,6 +35,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 )
 
 // ServiceAccountTokenGetter defines functions to retrieve a named service account and secret
@@ -245,7 +246,7 @@ type Validator interface {
 	// Validate validates a token and returns user information or an error.
 	// Validator can assume that the issuer and signature of a token are already
 	// verified when this function is called.
-	Validate(ctx context.Context, tokenData string, public *jwt.Claims, private interface{}) (*ServiceAccountInfo, error)
+	Validate(ctx context.Context, tokenData string, public *jwt.Claims, private interface{}) (*apiserverserviceaccount.ServiceAccountInfo, error)
 	// NewPrivateClaims returns a struct that the authenticator should
 	// deserialize the JWT payload into. The authenticator may then pass this
 	// struct back to the Validator as the 'private' argument to a Validate()
