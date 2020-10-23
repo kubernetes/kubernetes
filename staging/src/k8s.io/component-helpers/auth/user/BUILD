@@ -11,8 +11,8 @@ go_library(
         "doc.go",
         "user.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authentication/user",
-    importpath = "k8s.io/apiserver/pkg/authentication/user",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/component-helpers/auth/user",
+    importpath = "k8s.io/component-helpers/auth/user",
 )
 
 filegroup(

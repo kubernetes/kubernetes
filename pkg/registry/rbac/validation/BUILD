@@ -19,7 +19,7 @@ go_test(
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//staging/src/k8s.io/component-helpers/auth/user:go_default_library",
     ],
 )
 
@@ -38,9 +38,9 @@ go_library(
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
+        "//staging/src/k8s.io/component-helpers/auth/serviceaccount:go_default_library",
+        "//staging/src/k8s.io/component-helpers/auth/user:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )

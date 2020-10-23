@@ -33,7 +33,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/abac:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//staging/src/k8s.io/component-helpers/auth/user:go_default_library",
     ],
 )
 

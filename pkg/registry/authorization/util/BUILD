@@ -12,8 +12,8 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/authorization/util",
     deps = [
         "//pkg/apis/authorization:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
+        "//staging/src/k8s.io/component-helpers/auth/user:go_default_library",
     ],
 )
 

@@ -52,7 +52,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//staging/src/k8s.io/component-helpers/auth/user:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],

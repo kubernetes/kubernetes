@@ -23,9 +23,9 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/filters:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
+        "//staging/src/k8s.io/component-helpers/auth/user:go_default_library",
         "//vendor/golang.org/x/net/http2:go_default_library",
     ],
 )
@@ -56,7 +56,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/waitgroup:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/metrics:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
@@ -64,6 +63,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/metrics:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
+        "//staging/src/k8s.io/component-helpers/auth/user:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )

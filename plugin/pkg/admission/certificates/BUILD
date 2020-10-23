@@ -25,8 +25,8 @@ go_library(
     srcs = ["util.go"],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/certificates",
     deps = [
-        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
+        "//staging/src/k8s.io/component-helpers/auth/user:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )
