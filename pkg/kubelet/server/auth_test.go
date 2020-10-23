@@ -138,8 +138,6 @@ func AuthzTestCases() []AuthzTestCase {
 		"/stats/":          "stats",
 		"/stats/container": "stats",
 		"/stats/summary":   "stats",
-		"/stats/{namespace}/{podName}/{uid}/{containerName}": "stats",
-		"/stats/{podName}/{containerName}":                   "stats",
 	}
 	testCases := []AuthzTestCase{}
 	for path, subresource := range testPaths {
