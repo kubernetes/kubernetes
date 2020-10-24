@@ -502,7 +502,7 @@ function ensure-local-ssds-ephemeral-storage() {
 function setup-logrotate() {
   mkdir -p /etc/logrotate.d/
 
-  if [[ "${ENABLE_LOGROTATE_FILES:-false}" = "true" ]]; then
+  if [[ "${ENABLE_LOGROTATE_FILES:-true}" = "true" ]]; then
     # Configure log rotation for all logs in /var/log, which is where k8s services
     # are configured to write their log files. Whenever logrotate is ran, this
     # config will:
@@ -922,7 +922,7 @@ contexts:
   name: webhook
 EOF
   fi
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${PREPARE_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'grpc' ]]; then
       cat <<EOF >/etc/srv/kubernetes/egress_selector_configuration.yaml
 apiVersion: apiserver.k8s.io/v1beta1
@@ -1265,11 +1265,18 @@ EOF
   fi
 }
 
+# Create kubeconfig files for control plane components.
 function create-kubeconfig {
   local component=$1
   local token=$2
   echo "Creating kubeconfig file for component ${component}"
   mkdir -p "/etc/srv/kubernetes/${component}"
+
+  local kube_apiserver="localhost"
+  if [[ ${KUBECONFIG_USE_HOST_IP:-} == "true" ]] ; then
+    kube_apiserver=$(hostname -i)
+  fi
+  
   cat <<EOF >"/etc/srv/kubernetes/${component}/kubeconfig"
 apiVersion: v1
 kind: Config
@@ -1281,7 +1288,7 @@ clusters:
 - name: local
   cluster:
     insecure-skip-tls-verify: true
-    server: https://localhost:443
+    server: https://${kube_apiserver}:443
 contexts:
 - context:
     cluster: local
@@ -1686,8 +1693,8 @@ function start-kube-proxy {
 # Replaces the variables in the etcd manifest file with the real values, and then
 # copy the file to the manifest dir
 # $1: value for variable 'suffix'
-# $2: value for variable 'port'
-# $3: value for variable 'server_port'
+# $2: value for variable 'port', for listening to clients
+# $3: value for variable 'server_port', for etcd peering
 # $4: value for variable 'cpulimit'
 # $5: pod name, which should be either etcd or etcd-events
 function prepare-etcd-manifest {
@@ -1706,19 +1713,39 @@ function prepare-etcd-manifest {
   if [[ -n "${INITIAL_ETCD_CLUSTER_STATE:-}" ]]; then
     cluster_state="${INITIAL_ETCD_CLUSTER_STATE}"
   fi
+
+  # Configure mTLS for etcd peers.
   if [[ -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
     etcd_creds=" --peer-trusted-ca-file /etc/srv/kubernetes/etcd-ca.crt --peer-cert-file /etc/srv/kubernetes/etcd-peer.crt --peer-key-file /etc/srv/kubernetes/etcd-peer.key -peer-client-cert-auth "
     etcd_protocol="https"
   fi
 
-  # mTLS should only be enabled for etcd server but not etcd-events. if $1 suffix is empty, it's etcd server.
+  # host_primary_ip is the primary internal IP of the host.
+  # Override host primary IP if specifically provided.
+  local host_primary_ip
+  host_primary_ip="${HOST_PRIMARY_IP:-$(hostname -i)}"
+
+  # Configure mTLS for clients (e.g. kube-apiserver).
+  # mTLS should only be enabled for etcd server but not etcd-events. If $1 suffix is empty, it's etcd server.
+  local etcd_listen_metrics_urls=""
   if [[ -z "${suffix}" && -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
     etcd_apiserver_creds=" --client-cert-auth --trusted-ca-file ${ETCD_APISERVER_CA_CERT_PATH} --cert-file ${ETCD_APISERVER_SERVER_CERT_PATH} --key-file ${ETCD_APISERVER_SERVER_KEY_PATH} "
     etcd_apiserver_protocol="https"
     etcd_livenessprobe_port="2382"
-    etcd_extra_args+=" --listen-metrics-urls=http://${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}:${etcd_livenessprobe_port} "
+    etcd_listen_metrics_urls="http://${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}:${etcd_livenessprobe_port}"
+    if [[ ${ETCD_LISTEN_ON_HOST_IP:-} == "true" ]]; then
+      etcd_listen_metrics_urls+=",http://${host_primary_ip}:${etcd_livenessprobe_port}"
+    fi
+    etcd_extra_args+=" --listen-metrics-urls=${etcd_listen_metrics_urls} "
   fi
 
+  # If etcd is configured to listen on host IP, an additional client listening URL is added.
+  local etcd_listen_client_urls="${etcd_apiserver_protocol}://${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}:$2"
+  if [[ ${ETCD_LISTEN_ON_HOST_IP:-} == "true" ]] ; then
+    etcd_listen_client_urls+=",${etcd_apiserver_protocol}://${host_primary_ip}:$2"
+  fi
+
+  # Generate etcd member URLs.
   for host in $(echo "${INITIAL_ETCD_CLUSTER:-${host_name}}" | tr "," "\n"); do
     etcd_host="etcd-${host}=${etcd_protocol}://${host}:$3"
     if [[ -n "${etcd_cluster}" ]]; then
@@ -1738,6 +1765,7 @@ function prepare-etcd-manifest {
   sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${temp_file}"
   sed -i -e "s@{{ *liveness_probe_initial_delay *}}@${ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC:-15}@g" "${temp_file}"
   sed -i -e "s@{{ *listen_client_ip *}}@${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}@g" "${temp_file}"
+  sed -i -e "s@{{ *etcd_listen_client_urls *}}@${etcd_listen_client_urls:-}@g" "${temp_file}"
   # Get default storage backend from manifest file.
   local -r default_storage_backend=$( \
     grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" "${temp_file}" | \
@@ -2127,12 +2155,14 @@ function start-cluster-autoscaler {
     # Remove salt comments and replace variables with values
     local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
 
-    local params=("${AUTOSCALER_MIG_CONFIG}" "${CLOUD_CONFIG_OPT}" "${AUTOSCALER_EXPANDER_CONFIG:---expander=price}")
+    local params
+    read -r -a params <<< "${AUTOSCALER_MIG_CONFIG}"
+    params+=("${CLOUD_CONFIG_OPT}" "${AUTOSCALER_EXPANDER_CONFIG:---expander=price}")
     params+=("--kubeconfig=/etc/srv/kubernetes/cluster-autoscaler/kubeconfig")
 
     # split the params into separate arguments passed to binary
     local params_split
-    params_split=$(eval 'for param in "${params[@]}"; do echo -n "$param",; done')
+    params_split=$(eval 'for param in "${params[@]}"; do echo -n \""$param"\",; done')
     params_split=${params_split%?}
 
     sed -i -e "s@{{params}}@${params_split}@g" "${src_file}"
@@ -2578,7 +2608,7 @@ EOF
       setup-node-termination-handler-manifest ''
   fi
   # Setting up the konnectivity-agent daemonset
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${RUN_KONNECTIVITY_PODS:-false}" == "true" ]]; then
     setup-addon-manifests "addons" "konnectivity-agent"
     setup-konnectivity-agent-manifest
   fi
@@ -3007,7 +3037,7 @@ function main() {
   if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
     KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
   fi
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${PREPARE_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     KONNECTIVITY_SERVER_TOKEN="$(secure_random 32)"
   fi
   if [[ "${ENABLE_MONITORING_TOKEN:-false}" == "true" ]]; then
@@ -3068,7 +3098,7 @@ function main() {
     fi
     source ${KUBE_BIN}/configure-kubeapiserver.sh
     start-kube-apiserver
-    if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+    if [[ "${RUN_KONNECTIVITY_PODS:-false}" == "true" ]]; then
       start-konnectivity-server
     fi
     start-kube-controller-manager

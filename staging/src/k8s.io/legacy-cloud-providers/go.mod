@@ -8,8 +8,8 @@ require (
 	cloud.google.com/go v0.51.0
 	github.com/Azure/azure-sdk-for-go v43.0.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.11.1
-	github.com/Azure/go-autorest/autorest/adal v0.9.0
-	github.com/Azure/go-autorest/autorest/mocks v0.4.0
+	github.com/Azure/go-autorest/autorest/adal v0.9.5
+	github.com/Azure/go-autorest/autorest/mocks v0.4.1
 	github.com/Azure/go-autorest/autorest/to v0.2.0
 	github.com/Azure/go-autorest/autorest/validation v0.1.0 // indirect
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20200415212048-7901bc822317
@@ -23,7 +23,7 @@ require (
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/stretchr/testify v1.4.0
 	github.com/vmware/govmomi v0.20.3
-	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
+	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 	google.golang.org/api v0.15.1
 	gopkg.in/gcfg.v1 v1.2.0

@@ -17,6 +17,7 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/controller-manager/config
 // +k8s:conversion-gen=k8s.io/controller-manager/config/v1alpha1
+// +k8s:openapi-gen=true
 // +groupName=controllermanager.config.k8s.io
 
 package v1alpha1 // import "k8s.io/controller-manager/config/v1alpha1"

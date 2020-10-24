@@ -1506,9 +1506,19 @@ EOF
 MAX_PODS_PER_NODE: $(yaml-quote "${MAX_PODS_PER_NODE}")
 EOF
   fi
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
-      cat >>"$file" <<EOF
-ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE: $(yaml-quote "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE}")
+  if [[ "${PREPARE_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+      cat >>$file <<EOF
+PREPARE_KONNECTIVITY_SERVICE: $(yaml-quote "${PREPARE_KONNECTIVITY_SERVICE}")
+EOF
+  fi
+  if [[ "${EGRESS_VIA_KONNECTIVITY:-false}" == "true" ]]; then
+      cat >>$file <<EOF
+EGRESS_VIA_KONNECTIVITY: $(yaml-quote "${EGRESS_VIA_KONNECTIVITY}")
+EOF
+  fi
+  if [[ "${RUN_KONNECTIVITY_PODS:-false}" == "true" ]]; then
+      cat >>$file <<EOF
+RUN_KONNECTIVITY_PODS: $(yaml-quote "${RUN_KONNECTIVITY_PODS}")
 EOF
   fi
   if [[ -n "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-}" ]]; then
@@ -2573,7 +2583,7 @@ function create-master() {
     --allow tcp:443 &
 
   echo "Configuring firewall for apiserver konnectivity server"
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${PREPARE_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     gcloud compute firewall-rules create "${MASTER_NAME}-konnectivity-server" \
       --project "${NETWORK_PROJECT}" \
       --network "${NETWORK}" \

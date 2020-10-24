@@ -2042,6 +2042,25 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 				}
 				list = append(list, fmt.Sprintf("%s/%s", current, target))
 			}
+		case autoscaling.ContainerResourceMetricSourceType:
+			if spec.ContainerResource.Target.AverageValue != nil {
+				current := "<unknown>"
+				if len(statuses) > i && statuses[i].ContainerResource != nil {
+					current = statuses[i].ContainerResource.Current.AverageValue.String()
+				}
+				list = append(list, fmt.Sprintf("%s/%s", current, spec.ContainerResource.Target.AverageValue.String()))
+			} else {
+				current := "<unknown>"
+				if len(statuses) > i && statuses[i].ContainerResource != nil && statuses[i].ContainerResource.Current.AverageUtilization != nil {
+					current = fmt.Sprintf("%d%%", *statuses[i].ContainerResource.Current.AverageUtilization)
+				}
+
+				target := "<auto>"
+				if spec.ContainerResource.Target.AverageUtilization != nil {
+					target = fmt.Sprintf("%d%%", *spec.ContainerResource.Target.AverageUtilization)
+				}
+				list = append(list, fmt.Sprintf("%s/%s", current, target))
+			}
 		default:
 			list = append(list, "<unknown type>")
 		}

@@ -47,7 +47,6 @@ const (
 	// cleaned up.
 	approvedExpiration = 1 * time.Hour
 	deniedExpiration   = 1 * time.Hour
-	failedExpiration   = 1 * time.Hour
 	pendingExpiration  = 24 * time.Hour
 )
 

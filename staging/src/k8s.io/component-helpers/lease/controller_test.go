@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package nodelease
+package lease
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -32,12 +33,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/utils/pointer"
+
+	"k8s.io/klog/v2"
 )
 
-func TestNewLease(t *testing.T) {
+func TestNewNodeLease(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
 	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -191,7 +195,9 @@ func TestNewLease(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			newLease := tc.controller.newLease(tc.base)
+			tc.controller.newLeasePostProcessFunc = setNodeOwnerFunc(tc.controller.client, node.Name)
+			tc.controller.leaseNamespace = corev1.NamespaceNodeLease
+			newLease, _ := tc.controller.newLease(tc.base)
 			if newLease == tc.base {
 				t.Fatalf("the new lease must be newly allocated, but got same address as base")
 			}
@@ -202,7 +208,7 @@ func TestNewLease(t *testing.T) {
 	}
 }
 
-func TestRetryUpdateLease(t *testing.T) {
+func TestRetryUpdateNodeLease(t *testing.T) {
 	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -274,8 +280,10 @@ func TestRetryUpdateLease(t *testing.T) {
 				client:                     cl,
 				leaseClient:                cl.CoordinationV1().Leases(corev1.NamespaceNodeLease),
 				holderIdentity:             node.Name,
+				leaseNamespace:             corev1.NamespaceNodeLease,
 				leaseDurationSeconds:       10,
 				onRepeatedHeartbeatFailure: tc.onRepeatedHeartbeatFailure,
+				newLeasePostProcessFunc:    setNodeOwnerFunc(cl, node.Name),
 			}
 			if err := c.retryUpdateLease(nil); tc.expectErr != (err != nil) {
 				t.Fatalf("got %v, expected %v", err != nil, tc.expectErr)
@@ -406,12 +414,14 @@ func TestUpdateUsingLatestLease(t *testing.T) {
 				cl.PrependReactor("create", "leases", tc.createReactor)
 			}
 			c := &controller{
-				clock:                clock.NewFakeClock(time.Now()),
-				client:               cl,
-				leaseClient:          cl.CoordinationV1().Leases(corev1.NamespaceNodeLease),
-				holderIdentity:       node.Name,
-				leaseDurationSeconds: 10,
-				latestLease:          tc.latestLease,
+				clock:                   clock.NewFakeClock(time.Now()),
+				client:                  cl,
+				leaseClient:             cl.CoordinationV1().Leases(corev1.NamespaceNodeLease),
+				holderIdentity:          node.Name,
+				leaseNamespace:          corev1.NamespaceNodeLease,
+				leaseDurationSeconds:    10,
+				latestLease:             tc.latestLease,
+				newLeasePostProcessFunc: setNodeOwnerFunc(cl, node.Name),
 			}
 
 			c.sync()
@@ -426,5 +436,32 @@ func TestUpdateUsingLatestLease(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// setNodeOwnerFunc helps construct a newLeasePostProcessFunc which sets
+// a node OwnerReference to the given lease object
+func setNodeOwnerFunc(c clientset.Interface, nodeName string) func(lease *coordinationv1.Lease) error {
+	return func(lease *coordinationv1.Lease) error {
+		// Setting owner reference needs node's UID. Note that it is different from
+		// kubelet.nodeRef.UID. When lease is initially created, it is possible that
+		// the connection between master and node is not ready yet. So try to set
+		// owner reference every time when renewing the lease, until successful.
+		if len(lease.OwnerReferences) == 0 {
+			if node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{}); err == nil {
+				lease.OwnerReferences = []metav1.OwnerReference{
+					{
+						APIVersion: corev1.SchemeGroupVersion.WithKind("Node").Version,
+						Kind:       corev1.SchemeGroupVersion.WithKind("Node").Kind,
+						Name:       nodeName,
+						UID:        node.UID,
+					},
+				}
+			} else {
+				klog.Errorf("failed to get node %q when trying to set owner ref to the node lease: %v", nodeName, err)
+				return err
+			}
+		}
+		return nil
 	}
 }

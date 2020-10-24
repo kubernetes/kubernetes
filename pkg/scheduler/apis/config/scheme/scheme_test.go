@@ -24,9 +24,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/utils/pointer"
@@ -39,7 +36,6 @@ func TestCodecsDecodePluginConfig(t *testing.T) {
 	testCases := []struct {
 		name         string
 		data         []byte
-		feature      featuregate.Feature
 		wantErr      string
 		wantProfiles []config.KubeSchedulerProfile
 	}{
@@ -302,7 +298,7 @@ profiles:
 						{
 							Name: "PodTopologySpread",
 							Args: &config.PodTopologySpreadArgs{
-								DefaultingType: config.ListDefaulting,
+								DefaultingType: config.SystemDefaulting,
 							},
 						},
 					},
@@ -313,9 +309,6 @@ profiles:
 	decoder := Codecs.UniversalDecoder()
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.feature != "" {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, tt.feature, true)()
-			}
 			obj, gvk, err := decoder.Decode(tt.data, nil, nil)
 			if err != nil {
 				if tt.wantErr != err.Error() {

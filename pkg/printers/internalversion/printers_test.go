@@ -2813,6 +2813,161 @@ func TestPrintHPA(t *testing.T) {
 			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
 			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50%/80%", "2", int64(10), int64(4), "<unknown>"}}},
 		},
+		// container resource source type, targetVal (no current)
+		{
+			hpa: autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ContainerResourceMetricSourceType,
+							ContainerResource: &autoscaling.ContainerResourceMetricSource{
+								Name:      api.ResourceCPU,
+								Container: "application",
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+				Status: autoscaling.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "<unknown>/100m", "2", int64(10), int64(4), "<unknown>"}}},
+		},
+		// container resource source type, targetVal
+		{
+			hpa: autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ContainerResourceMetricSourceType,
+							ContainerResource: &autoscaling.ContainerResourceMetricSource{
+								Name: api.ResourceCPU,
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+				Status: autoscaling.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+					CurrentMetrics: []autoscaling.MetricStatus{
+						{
+							Type: autoscaling.ContainerResourceMetricSourceType,
+							ContainerResource: &autoscaling.ContainerResourceMetricStatus{
+								Name:      api.ResourceCPU,
+								Container: "application",
+								Current: autoscaling.MetricValueStatus{
+									AverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+			},
+			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50m/100m", "2", int64(10), int64(4), "<unknown>"}}},
+		},
+		// container resource source type, targetUtil (no current)
+		{
+			hpa: autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ContainerResourceMetricSourceType,
+							ContainerResource: &autoscaling.ContainerResourceMetricSource{
+								Name:      api.ResourceCPU,
+								Container: "application",
+								Target: autoscaling.MetricTarget{
+									Type:               autoscaling.UtilizationMetricType,
+									AverageUtilization: &targetUtilizationVal,
+								},
+							},
+						},
+					},
+				},
+				Status: autoscaling.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "<unknown>/80%", "2", int64(10), int64(4), "<unknown>"}}},
+		},
+		// container resource source type, targetUtil
+		{
+			hpa: autoscaling.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{Name: "some-hpa"},
+				Spec: autoscaling.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscaling.MetricSpec{
+						{
+							Type: autoscaling.ContainerResourceMetricSourceType,
+							ContainerResource: &autoscaling.ContainerResourceMetricSource{
+								Name: api.ResourceCPU,
+								Target: autoscaling.MetricTarget{
+									Type:               autoscaling.UtilizationMetricType,
+									AverageUtilization: &targetUtilizationVal,
+								},
+							},
+						},
+					},
+				},
+				Status: autoscaling.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+					CurrentMetrics: []autoscaling.MetricStatus{
+						{
+							Type: autoscaling.ContainerResourceMetricSourceType,
+							ContainerResource: &autoscaling.ContainerResourceMetricStatus{
+								Name:      api.ResourceCPU,
+								Container: "application",
+								Current: autoscaling.MetricValueStatus{
+									AverageUtilization: &currentUtilizationVal,
+									AverageValue:       resource.NewMilliQuantity(40, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+			},
+			// Columns: Name, Reference, Targets, MinPods, MaxPods, Replicas, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"some-hpa", "ReplicationController/some-rc", "50%/80%", "2", int64(10), int64(4), "<unknown>"}}},
+		},
 		// multiple specs
 		{
 			hpa: autoscaling.HorizontalPodAutoscaler{

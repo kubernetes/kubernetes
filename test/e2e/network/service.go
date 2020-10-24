@@ -3408,7 +3408,19 @@ func execAffinityTestForSessionAffinityTimeout(f *framework.Framework, cs client
 			if hosts.Len() > 1 {
 				return
 			}
-			time.Sleep(time.Duration(svcSessionAffinityTimeout) * time.Second)
+			// In some case, ipvs didn't deleted the persistent connection after timeout expired,
+			// use 'ipvsadm -lnc' command can found the expire time become '13171233:02' after '00:00'
+			//
+			// pro expire state       source             virtual            destination
+			// TCP 00:00  NONE        10.105.253.160:0   10.105.253.160:80  10.244.1.25:9376
+			//
+			// pro expire state       source             virtual            destination
+			// TCP 13171233:02 NONE        10.105.253.160:0   10.105.253.160:80  10.244.1.25:9376
+			//
+			// And 2 seconds later, the connection will be ensure deleted,
+			// so we sleep 'svcSessionAffinityTimeout+5' seconds to avoid this issue.
+			// TODO: figure out why the expired connection didn't be deleted and fix this issue in ipvs side.
+			time.Sleep(time.Duration(svcSessionAffinityTimeout+5) * time.Second)
 		}
 	}
 	framework.Fail("Session is sticky after reaching the timeout")

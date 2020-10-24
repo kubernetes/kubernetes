@@ -194,12 +194,12 @@ func TestEnsureProxyAddon(t *testing.T) {
 				controlPlaneConfig.LocalAPIEndpoint.AdvertiseAddress = "1.2.3"
 			case IPv6SetBindAddress:
 				controlPlaneConfig.LocalAPIEndpoint.AdvertiseAddress = "1:2::3:4"
-				controlPlaneClusterConfig.Networking.PodSubnet = "2001:101::/96"
+				controlPlaneClusterConfig.Networking.PodSubnet = "2001:101::/48"
 			}
 
 			intControlPlane, err := configutil.DefaultedInitConfiguration(controlPlaneConfig, controlPlaneClusterConfig)
 			if err != nil {
-				t.Errorf("test failed to convert external to internal version")
+				t.Errorf("test failed to convert external to internal version: %v", err)
 				return
 			}
 			err = EnsureProxyAddon(&intControlPlane.ClusterConfiguration, &intControlPlane.LocalAPIEndpoint, client)

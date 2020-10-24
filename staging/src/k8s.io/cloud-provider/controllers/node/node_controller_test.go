@@ -843,6 +843,9 @@ func Test_syncNode(t *testing.T) {
 				ExtID: map[types.NodeName]string{
 					types.NodeName("node0"): "12345",
 				},
+				ProviderID: map[types.NodeName]string{
+					types.NodeName("node0"): "fake://12345",
+				},
 				Addresses: []v1.NodeAddress{
 					{
 						Type:    v1.NodeHostName,
@@ -901,6 +904,9 @@ func Test_syncNode(t *testing.T) {
 						"topology.kubernetes.io/zone":              "us-west-1a",
 					},
 				},
+				Spec: v1.NodeSpec{
+					ProviderID: "fake://12345",
+				},
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
 						{
@@ -934,6 +940,9 @@ func Test_syncNode(t *testing.T) {
 				InstanceTypes:     map[types.NodeName]string{},
 				ExtID: map[types.NodeName]string{
 					types.NodeName("node0"): "12345",
+				},
+				ProviderID: map[types.NodeName]string{
+					types.NodeName("node0"): "fake://12345",
 				},
 				Addresses: []v1.NodeAddress{
 					{
@@ -996,6 +1005,7 @@ func Test_syncNode(t *testing.T) {
 							Effect: v1.TaintEffectNoSchedule,
 						},
 					},
+					ProviderID: "fake://12345",
 				},
 				Status: v1.NodeStatus{
 					Addresses: []v1.NodeAddress{
@@ -1273,6 +1283,69 @@ func Test_syncNode(t *testing.T) {
 				},
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{},
+				},
+			},
+		},
+		{
+			name: "[instanceV2] error getting InstanceMetadata",
+			fakeCloud: &fakecloud.Cloud{
+				EnableInstancesV2: true,
+				InstanceTypes:     map[types.NodeName]string{},
+				Provider:          "test",
+				ExtID:             map[types.NodeName]string{},
+				ExtIDErr: map[types.NodeName]error{
+					types.NodeName("node0"): cloudprovider.NotImplemented,
+				},
+				MetadataErr: errors.New("metadata error"),
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			updatedNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{
+							Key:    cloudproviderapi.TaintExternalCloudProvider,
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
 				},
 			},
 		},

@@ -109,6 +109,7 @@ filegroup(
         "//vendor/github.com/evanphx/json-patch:all-srcs",
         "//vendor/github.com/exponent-io/jsonpath:all-srcs",
         "//vendor/github.com/fatih/camelcase:all-srcs",
+        "//vendor/github.com/form3tech-oss/jwt-go:all-srcs",
         "//vendor/github.com/fsnotify/fsnotify:all-srcs",
         "//vendor/github.com/fvbommel/sortorder:all-srcs",
         "//vendor/github.com/ghodss/yaml:all-srcs",

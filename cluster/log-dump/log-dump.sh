@@ -63,6 +63,14 @@ readonly windows_node_otherfiles="C:\\Windows\\MEMORY.dmp"
 # file descriptors for large clusters.
 readonly max_dump_processes=25
 
+# Indicator variable whether we experienced a significant failure during
+# logexporter creation or execution.
+logexporter_failed=0
+
+# Percentage of nodes that must be logexported successfully (otherwise the
+# process will exit with a non-zero exit code).
+readonly log_dump_expected_success_percentage="${LOG_DUMP_EXPECTED_SUCCESS_PERCENTAGE:-0}"
+
 # TODO: Get rid of all the sourcing of bash dependencies eventually.
 function setup() {
   KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
@@ -546,6 +554,7 @@ function dump_nodes_with_logexporter() {
     echo 'Failed to create logexporter daemonset.. falling back to logdump through SSH'
     "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
     dump_nodes "${NODE_NAMES[@]}"
+    logexporter_failed=1
     return
   fi
 
@@ -595,6 +604,7 @@ function dump_nodes_with_logexporter() {
         echo 'Final attempt to list marker files failed.. falling back to logdump through SSH'
         "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
         dump_nodes "${NODE_NAMES[@]}"
+        logexporter_failed=1
         return
       fi
       sleep 2
@@ -609,6 +619,11 @@ function dump_nodes_with_logexporter() {
       echo "Logexporter didn't succeed on node ${node}. Queuing it for logdump through SSH."
       failed_nodes+=("${node}")
     done
+  fi
+
+  # If less than a certain ratio of the nodes got logexported, report an error.
+  if [[ $(((${#NODE_NAMES[@]} - ${#failed_nodes[@]}) * 100)) -lt $((${#NODE_NAMES[@]} * log_dump_expected_success_percentage )) ]]; then
+    logexporter_failed=1
   fi
 
   # Delete the logexporter resources and dump logs for the failed nodes (if any) through SSH.
@@ -675,6 +690,9 @@ function main() {
   fi
 
   detect_node_failures
+  if [[ ${logexporter_failed} -ne 0 && ${log_dump_expected_success_percentage} -gt 0 ]]; then
+    return 1
+  fi
 }
 
 main

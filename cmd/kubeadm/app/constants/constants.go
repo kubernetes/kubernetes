@@ -199,6 +199,21 @@ const (
 	// We need at least ten, because the DNS service is always at the tenth cluster clusterIP
 	MinimumAddressesInServiceSubnet = 10
 
+	// MaximumBitsForServiceSubnet defines maximum possible size of the service subnet in terms of bits.
+	// For example, if the value is 20, then the largest supported service subnet is /12 for IPv4 and /108 for IPv6.
+	// Note however that anything in between /108 and /112 will be clamped to /112 due to the limitations of the underlying allocation logic.
+	// TODO: https://github.com/kubernetes/enhancements/pull/1881
+	MaximumBitsForServiceSubnet = 20
+
+	// MinimumAddressesInPodSubnet defines minimum amount of pods in the cluster.
+	// We need at least more than services, an IPv4 /28 or IPv6 /128 subnet means 14 util addresses
+	MinimumAddressesInPodSubnet = 14
+
+	// PodSubnetNodeMaskMaxDiff is limited to 16 due to an issue with uncompressed IP bitmap in core:
+	// xref: #44918
+	// The node subnet mask size must be no more than the pod subnet mask size + 16
+	PodSubnetNodeMaskMaxDiff = 16
+
 	// DefaultTokenDuration specifies the default amount of time that a bootstrap token will be valid
 	// Default behaviour is 24 hours
 	DefaultTokenDuration = 24 * time.Hour

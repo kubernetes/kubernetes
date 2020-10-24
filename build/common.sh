@@ -422,6 +422,7 @@ function kube::build::build_image() {
   chown -R "${USER_ID}":"${GROUP_ID}" "${LOCAL_OUTPUT_BUILD_CONTEXT}"
 
   cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
+  chmod u+w "${LOCAL_OUTPUT_BUILD_CONTEXT}/localtime"
 
   cp "${KUBE_ROOT}/build/build-image/Dockerfile" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
   cp "${KUBE_ROOT}/build/build-image/rsyncd.sh" "${LOCAL_OUTPUT_BUILD_CONTEXT}/"

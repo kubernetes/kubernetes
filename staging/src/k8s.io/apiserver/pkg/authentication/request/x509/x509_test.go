@@ -881,6 +881,8 @@ func getCertsFromFile(t *testing.T, names ...string) []*x509.Certificate {
 }
 
 func getCert(t *testing.T, pemData string) *x509.Certificate {
+	t.Helper()
+
 	pemBlock, _ := pem.Decode([]byte(pemData))
 	cert, err := x509.ParseCertificate(pemBlock.Bytes)
 	if err != nil {
@@ -896,4 +898,59 @@ func getCerts(t *testing.T, pemData ...string) []*x509.Certificate {
 		certs = append(certs, getCert(t, pemData))
 	}
 	return certs
+}
+
+func TestCertificateIdentifier(t *testing.T) {
+	tt := []struct {
+		name               string
+		cert               *x509.Certificate
+		expectedIdentifier string
+	}{
+		{
+			name:               "client cert",
+			cert:               getCert(t, clientCNCert),
+			expectedIdentifier: "SN=1, SKID=E7:FB:1F:45:F0:71:77:AF:8C:10:4A:0A:42:03:F5:1F:1F:07:CF:DF, AKID=3D:F0:F7:30:3D:3B:EB:3A:55:68:FA:F5:43:C9:C7:AC:E1:3F:10:78",
+		},
+		{
+			name: "nil serial",
+			cert: func() *x509.Certificate {
+				c := getCert(t, clientCNCert)
+				c.SerialNumber = nil
+				return c
+			}(),
+			expectedIdentifier: "SN=<nil>, SKID=E7:FB:1F:45:F0:71:77:AF:8C:10:4A:0A:42:03:F5:1F:1F:07:CF:DF, AKID=3D:F0:F7:30:3D:3B:EB:3A:55:68:FA:F5:43:C9:C7:AC:E1:3F:10:78",
+		},
+		{
+			name: "empty SKID",
+			cert: func() *x509.Certificate {
+				c := getCert(t, clientCNCert)
+				c.SubjectKeyId = nil
+				return c
+			}(),
+			expectedIdentifier: "SN=1, SKID=, AKID=3D:F0:F7:30:3D:3B:EB:3A:55:68:FA:F5:43:C9:C7:AC:E1:3F:10:78",
+		},
+		{
+			name: "empty AKID",
+			cert: func() *x509.Certificate {
+				c := getCert(t, clientCNCert)
+				c.AuthorityKeyId = nil
+				return c
+			}(),
+			expectedIdentifier: "SN=1, SKID=E7:FB:1F:45:F0:71:77:AF:8C:10:4A:0A:42:03:F5:1F:1F:07:CF:DF, AKID=",
+		},
+		{
+			name:               "self-signed",
+			cert:               getCert(t, selfSignedCert),
+			expectedIdentifier: "SN=14307769263086146430, SKID=7C:AB:02:A8:45:3F:B0:28:2F:71:91:52:A2:71:EE:D9:40:2B:43:71, AKID=7C:AB:02:A8:45:3F:B0:28:2F:71:91:52:A2:71:EE:D9:40:2B:43:71",
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			got := certificateIdentifier(tc.cert)
+			if got != tc.expectedIdentifier {
+				t.Errorf("expected %q, got %q", tc.expectedIdentifier, got)
+			}
+		})
+	}
 }

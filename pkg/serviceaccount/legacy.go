@@ -63,7 +63,7 @@ type legacyValidator struct {
 
 var _ = Validator(&legacyValidator{})
 
-func (v *legacyValidator) Validate(ctx context.Context, tokenData string, public *jwt.Claims, privateObj interface{}) (*ServiceAccountInfo, error) {
+func (v *legacyValidator) Validate(ctx context.Context, tokenData string, public *jwt.Claims, privateObj interface{}) (*apiserverserviceaccount.ServiceAccountInfo, error) {
 	private, ok := privateObj.(*legacyPrivateClaims)
 	if !ok {
 		klog.Errorf("jwt validator expected private claim of type *legacyPrivateClaims but got: %T", privateObj)
@@ -128,7 +128,7 @@ func (v *legacyValidator) Validate(ctx context.Context, tokenData string, public
 		}
 	}
 
-	return &ServiceAccountInfo{
+	return &apiserverserviceaccount.ServiceAccountInfo{
 		Namespace: private.Namespace,
 		Name:      private.ServiceAccountName,
 		UID:       private.ServiceAccountUID,

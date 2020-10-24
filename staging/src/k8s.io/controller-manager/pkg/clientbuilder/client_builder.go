@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package clientbuilder
 
 import (
 	"context"
@@ -30,15 +30,18 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1authentication "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/serviceaccount"
+)
+
+const (
+	// SecretTypeField is copied from pkg/apis/cores/field_constants.go
+	SecretTypeField = "type"
 )
 
 // ControllerClientBuilder allows you to get clients and configs for controllers
@@ -57,11 +60,14 @@ type SimpleControllerClientBuilder struct {
 	ClientConfig *restclient.Config
 }
 
+// Config returns a client config for a fixed client
 func (b SimpleControllerClientBuilder) Config(name string) (*restclient.Config, error) {
 	clientConfig := *b.ClientConfig
 	return restclient.AddUserAgent(&clientConfig, name), nil
 }
 
+// ConfigOrDie returns a client config if no error from previous config func.
+// If it gets an error getting the client, it will log the error and kill the process it's running in.
 func (b SimpleControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
 	clientConfig, err := b.Config(name)
 	if err != nil {
@@ -70,6 +76,7 @@ func (b SimpleControllerClientBuilder) ConfigOrDie(name string) *restclient.Conf
 	return clientConfig
 }
 
+// Client returns a clientset.Interface built from the ClientBuilder
 func (b SimpleControllerClientBuilder) Client(name string) (clientset.Interface, error) {
 	clientConfig, err := b.Config(name)
 	if err != nil {
@@ -78,6 +85,8 @@ func (b SimpleControllerClientBuilder) Client(name string) (clientset.Interface,
 	return clientset.NewForConfig(clientConfig)
 }
 
+// ClientOrDie returns a clientset.interface built from the ClientBuilder with no error.
+// If it gets an error getting the client, it will log the error and kill the process it's running in.
 func (b SimpleControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
 	client, err := b.Client(name)
 	if err != nil {
@@ -105,17 +114,17 @@ type SAControllerClientBuilder struct {
 	Namespace string
 }
 
-// config returns a complete clientConfig for constructing clients.  This is separate in anticipation of composition
+// Config returns a complete clientConfig for constructing clients.  This is separate in anticipation of composition
 // which means that not all clientsets are known here
 func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, error) {
-	sa, err := getOrCreateServiceAccount(b.CoreClient, b.Namespace, name)
+	sa, err := apiserverserviceaccount.GetOrCreateServiceAccount(b.CoreClient, b.Namespace, name)
 	if err != nil {
 		return nil, err
 	}
 
 	var clientConfig *restclient.Config
 	fieldSelector := fields.SelectorFromSet(map[string]string{
-		api.SecretTypeField: string(v1.SecretTypeServiceAccountToken),
+		SecretTypeField: string(v1.SecretTypeServiceAccountToken),
 	}).String()
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -142,7 +151,7 @@ func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, erro
 				if !ok {
 					return false, fmt.Errorf("unexpected object type: %T", event.Object)
 				}
-				if !serviceaccount.IsServiceAccountToken(secret, sa) {
+				if !apiserverserviceaccount.IsServiceAccountToken(secret, sa) {
 					return false, nil
 				}
 				if len(secret.Data[v1.ServiceAccountTokenKey]) == 0 {
@@ -202,7 +211,7 @@ func (b SAControllerClientBuilder) getAuthenticatedConfig(sa *v1.ServiceAccount,
 	// If we couldn't run the token review, the API might be disabled or we might not have permission.
 	// Try to make a request to /apis with the token. If we get a 401 we should consider the token invalid.
 	clientConfigCopy := *clientConfig
-	clientConfigCopy.NegotiatedSerializer = legacyscheme.Codecs
+	clientConfigCopy.NegotiatedSerializer = scheme.Codecs
 	client, err := restclient.UnversionedRESTClientFor(&clientConfigCopy)
 	if err != nil {
 		return nil, false, err
@@ -216,6 +225,8 @@ func (b SAControllerClientBuilder) getAuthenticatedConfig(sa *v1.ServiceAccount,
 	return clientConfig, true, nil
 }
 
+// ConfigOrDie returns clientConfig for constructing clients.
+// If it gets an error, it will log the error and kill the process it's running in.
 func (b SAControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
 	clientConfig, err := b.Config(name)
 	if err != nil {
@@ -224,6 +235,7 @@ func (b SAControllerClientBuilder) ConfigOrDie(name string) *restclient.Config {
 	return clientConfig
 }
 
+// Client returns clientset.Interface built from ClientBuilder
 func (b SAControllerClientBuilder) Client(name string) (clientset.Interface, error) {
 	clientConfig, err := b.Config(name)
 	if err != nil {
@@ -232,6 +244,8 @@ func (b SAControllerClientBuilder) Client(name string) (clientset.Interface, err
 	return clientset.NewForConfig(clientConfig)
 }
 
+// ClientOrDie will return clientset.Interface built from ClientBuilder.
+// If it gets an error getting the client, it will log the error and kill the process it's running in.
 func (b SAControllerClientBuilder) ClientOrDie(name string) clientset.Interface {
 	client, err := b.Client(name)
 	if err != nil {

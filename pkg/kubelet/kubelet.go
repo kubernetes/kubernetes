@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	sysruntime "runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -55,6 +56,7 @@ import (
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/component-helpers/lease"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog/v2"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
@@ -83,7 +85,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
-	"k8s.io/kubernetes/pkg/kubelet/nodelease"
 	oomwatcher "k8s.io/kubernetes/pkg/kubelet/oom"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
@@ -168,6 +169,9 @@ const (
 
 	// Minimum number of dead containers to keep in a pod
 	minDeadContainerInPod = 1
+
+	// nodeLeaseRenewIntervalFraction is the fraction of lease duration to renew the lease
+	nodeLeaseRenewIntervalFraction = 0.25
 )
 
 // SyncHandler is an interface implemented by Kubelet, for testability
@@ -775,12 +779,25 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		opt(klet)
 	}
 
-	klet.appArmorValidator = apparmor.NewValidator(containerRuntime)
-	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
+	if sysruntime.GOOS == "linux" {
+		// AppArmor is a Linux kernel security module and it does not support other operating systems.
+		klet.appArmorValidator = apparmor.NewValidator(containerRuntime)
+		klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
+	}
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewNoNewPrivsAdmitHandler(klet.containerRuntime))
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewProcMountAdmitHandler(klet.containerRuntime))
 
-	klet.nodeLeaseController = nodelease.NewController(klet.clock, klet.heartbeatClient, string(klet.nodeName), kubeCfg.NodeLeaseDurationSeconds, klet.onRepeatedHeartbeatFailure)
+	leaseDuration := time.Duration(kubeCfg.NodeLeaseDurationSeconds) * time.Second
+	renewInterval := time.Duration(float64(leaseDuration) * nodeLeaseRenewIntervalFraction)
+	klet.nodeLeaseController = lease.NewController(
+		klet.clock,
+		klet.heartbeatClient,
+		string(klet.nodeName),
+		kubeCfg.NodeLeaseDurationSeconds,
+		klet.onRepeatedHeartbeatFailure,
+		renewInterval,
+		v1.NamespaceNodeLease,
+		util.SetNodeOwnerFunc(klet.heartbeatClient, string(klet.nodeName)))
 
 	// Finally, put the most recent version of the config on the Kubelet, so
 	// people can see how it was configured.
@@ -986,7 +1003,7 @@ type Kubelet struct {
 	updateRuntimeMux sync.Mutex
 
 	// nodeLeaseController claims and renews the node lease for this Kubelet
-	nodeLeaseController nodelease.Controller
+	nodeLeaseController lease.Controller
 
 	// Generates pod events.
 	pleg pleg.PodLifecycleEventGenerator

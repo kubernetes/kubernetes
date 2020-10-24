@@ -131,7 +131,13 @@ func (c *Sender) Do(r *http.Request) (resp *http.Response, err error) {
 		} else {
 			err = c.responses[0].e
 		}
-		time.Sleep(c.responses[0].d)
+		select {
+		case <-time.After(c.responses[0].d):
+			// do nothing
+		case <-r.Context().Done():
+			err = r.Context().Err()
+			return
+		}
 		c.repeatResponse[0]--
 		if c.repeatResponse[0] == 0 {
 			c.responses = c.responses[1:]
