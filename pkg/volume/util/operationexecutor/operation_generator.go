@@ -1346,7 +1346,8 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 		for r := range w.ResultChan() {
 			node, ok := r.Object.(*v1.Node)
 			if !ok {
-				return volumeToMount.GenerateError("VerifyControllerAttachedVolume received unexpected object while watching", nil)
+				klog.Error(volumeToMount.GenerateErrorDetailed("VerifyControllerAttachedVolume received unexpected object while watching", nil).Error())
+				continue
 			}
 
 			if node == nil {

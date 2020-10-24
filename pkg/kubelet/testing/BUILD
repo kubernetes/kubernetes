@@ -12,7 +12,7 @@ go_library(
     srcs = ["fake_node_watching.go"],
     tags = ["automanaged"],
     deps = [
-        "//pkg/client/clientset_generated/clientset/fake:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",

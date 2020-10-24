@@ -36,7 +36,6 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/features"
 	kubetest "k8s.io/kubernetes/pkg/kubelet/testing"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
@@ -245,6 +244,11 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 	generatedVolumeName, err := dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 
+	// Assert
+	if err != nil {
+		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+	}
+
 	// Fake node status update
 	stopCh := make(chan struct{})
 	go kubetest.SimulateVolumeInUseUpdate(
@@ -254,11 +258,6 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 	defer func() {
 		stopCh <- struct{}{}
 	}()
-
-	// Assert
-	if err != nil {
-		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
-	}
 
 	// Act
 	runReconciler(reconciler)
@@ -513,7 +512,9 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc)
+	kubeClient, fnw := createtestClientWithPVPVC(gcepv, gcepvc)
+	defer fnw.Close()
+
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -548,6 +549,16 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
+
+	// Fake node status update
+	stopCh := make(chan struct{})
+	go kubetest.SimulateVolumeInUseUpdate(
+		v1.UniqueVolumeName(generatedVolumeName),
+		stopCh,
+		fnw)
+	defer func() {
+		stopCh <- struct{}{}
+	}()
 
 	// Act
 	runReconciler(reconciler)
@@ -613,10 +624,12 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc, v1.AttachedVolume{
+	kubeClient, fnw := createtestClientWithPVPVC(gcepv, gcepvc, v1.AttachedVolume{
 		Name:       "fake-plugin/fake-device1",
 		DevicePath: "/fake/path",
 	})
+	defer fnw.Close()
+
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -649,6 +662,16 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
+
+	// Fake node status update
+	stopCh := make(chan struct{})
+	go kubetest.SimulateVolumeInUseUpdate(
+		v1.UniqueVolumeName(generatedVolumeName),
+		stopCh,
+		fnw)
+	defer func() {
+		stopCh <- struct{}{}
+	}()
 
 	// Act
 	runReconciler(reconciler)
@@ -714,7 +737,9 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc)
+	kubeClient, fnw := createtestClientWithPVPVC(gcepv, gcepvc)
+	defer fnw.Close()
+
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -777,11 +802,10 @@ func createTestNode() *v1.Node {
 		Status: v1.NodeStatus{
 			VolumesAttached: []v1.AttachedVolume{
 				{
-					Name:       "fake-plugin/volume-name",
+					Name:       "fake-plugin/fake-device1",
 					DevicePath: "fake/path",
 				},
 			}},
-		Spec: v1.NodeSpec{ExternalID: string(nodeName)},
 	}
 }
 
@@ -847,10 +871,12 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc, v1.AttachedVolume{
+	kubeClient, fnw := createtestClientWithPVPVC(gcepv, gcepvc, v1.AttachedVolume{
 		Name:       "fake-plugin/fake-device1",
 		DevicePath: "/fake/path",
 	})
+	defer fnw.Close()
+
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -882,6 +908,16 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
+
+	// Fake node status update
+	stopCh := make(chan struct{})
+	go kubetest.SimulateVolumeInUseUpdate(
+		v1.UniqueVolumeName(generatedVolumeName),
+		stopCh,
+		fnw)
+	defer func() {
+		stopCh <- struct{}{}
+	}()
 
 	// Act
 	runReconciler(reconciler)
@@ -958,7 +994,6 @@ func Test_GenerateMapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 		})
 	}
 }
-
 func Test_GenerateUnmapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 	testCases := map[string]struct {
 		volumePlugins  []volume.VolumePlugin
@@ -1152,10 +1187,12 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 			dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 			asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-			kubeClient := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
+			kubeClient, fnw := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
 				Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.pvName)),
 				DevicePath: "fake/path",
 			})
+			defer fnw.Close()
+
 			fakeRecorder := &record.FakeRecorder{}
 			fakeHandler := volumetesting.NewBlockVolumePathHandler()
 			oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -1189,6 +1226,16 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 			}
 			dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{volumeName})
+
+			// Fake node status update
+			stopCh := make(chan struct{})
+			go kubetest.SimulateVolumeInUseUpdate(
+				v1.UniqueVolumeName(volumeName),
+				stopCh,
+				fnw)
+			defer func() {
+				stopCh <- struct{}{}
+			}()
 
 			// Start the reconciler to fill ASW.
 			stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
@@ -1326,10 +1373,12 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 
 				dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 				asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-				kubeClient := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
+				kubeClient, fnw := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
 					Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.volumeName)),
 					DevicePath: "fake/path",
 				})
+				defer fnw.Close()
+
 				fakeRecorder := &record.FakeRecorder{}
 				fakeHandler := volumetesting.NewBlockVolumePathHandler()
 				oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -1362,6 +1411,16 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 					t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 				}
 				dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{volumeName})
+
+				// Fake node status update
+				stopCh := make(chan struct{})
+				go kubetest.SimulateVolumeInUseUpdate(
+					v1.UniqueVolumeName(volumeName),
+					stopCh,
+					fnw)
+				defer func() {
+					stopCh <- struct{}{}
+				}()
 
 				// Start the reconciler to fill ASW.
 				stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
@@ -1505,10 +1564,12 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 				fakePlugin.SupportsRemount = tc.supportRemount
 				dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 				asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-				kubeClient := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
+				kubeClient, fnw := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
 					Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.volumeName)),
 					DevicePath: "fake/path",
 				})
+				defer fnw.Close()
+
 				fakeRecorder := &record.FakeRecorder{}
 				fakeHandler := volumetesting.NewBlockVolumePathHandler()
 				oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -1541,6 +1602,16 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 					t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 				}
 				dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{volumeName})
+
+				// Fake node status update
+				stopCh := make(chan struct{})
+				go kubetest.SimulateVolumeInUseUpdate(
+					v1.UniqueVolumeName(volumeName),
+					stopCh,
+					fnw)
+				defer func() {
+					stopCh <- struct{}{}
+				}()
 
 				// Start the reconciler to fill ASW.
 				stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
@@ -1714,32 +1785,11 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 	return wait.ExponentialBackoff(backoff, fn)
 }
 
-func createTestClient() *fake.Clientset {
-	fakeClient := &fake.Clientset{}
-	fakeClient.AddReactor("get", "nodes",
-		func(action core.Action) (bool, runtime.Object, error) {
-			return true, &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: string(nodeName)},
-				Status: v1.NodeStatus{
-					VolumesAttached: []v1.AttachedVolume{
-						{
-							Name:       "fake-plugin/fake-device1",
-							DevicePath: "/fake/path",
-						},
-					}},
-			}, nil
-		})
-	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
-	})
-	return fakeClient
-}
-
 func runReconciler(reconciler Reconciler) {
 	go reconciler.Run(wait.NeverStop)
 }
 
-func createtestClientWithPVPVC(pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, attachedVolumes ...v1.AttachedVolume) *fake.Clientset {
+func createtestClientWithPVPVC(pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, attachedVolumes ...v1.AttachedVolume) (*fake.Clientset, *kubetest.FakeNodeWatchReactor) {
 	fakeClient := &fake.Clientset{}
 	if len(attachedVolumes) == 0 {
 		attachedVolumes = append(attachedVolumes, v1.AttachedVolume{
@@ -1747,14 +1797,17 @@ func createtestClientWithPVPVC(pv *v1.PersistentVolume, pvc *v1.PersistentVolume
 			DevicePath: "fake/path",
 		})
 	}
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: string(nodeName)},
+		Status: v1.NodeStatus{
+			VolumesAttached: attachedVolumes,
+		},
+	}
+
 	fakeClient.AddReactor("get", "nodes",
 		func(action core.Action) (bool, runtime.Object, error) {
-			return true, &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{Name: string(nodeName)},
-				Status: v1.NodeStatus{
-					VolumesAttached: attachedVolumes,
-				},
-			}, nil
+			return true, node, nil
 		})
 	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 		return true, pvc, nil
@@ -1771,7 +1824,8 @@ func createtestClientWithPVPVC(pv *v1.PersistentVolume, pvc *v1.PersistentVolume
 	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
 	})
-	return fakeClient
+	fnw := kubetest.AddFakeNodeWatchReactor(fakeClient, node)
+	return fakeClient, fnw
 }
 
 func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
@@ -1780,7 +1834,10 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createTestClient()
+	node := createTestNode()
+	kubeClient, fnw := createTestClient(node)
+	defer fnw.Close()
+
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -1834,6 +1891,16 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 	}
+	// Fake node status update
+	stopCh := make(chan struct{})
+	go kubetest.SimulateVolumeInUseUpdate(
+		v1.UniqueVolumeName(generatedVolumeName),
+		stopCh,
+		fnw)
+	defer func() {
+		stopCh <- struct{}{}
+	}()
+
 	// Start the reconciler to fill ASW.
 	stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
 	go func() {

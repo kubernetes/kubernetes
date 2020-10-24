@@ -106,11 +106,13 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 
 			podManager.SetPods([]*v1.Pod{pod})
 
-			// Fake node status update
-			go kubetest.SimulateVolumeInUseUpdate(
-				v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
-				stopCh,
-				fnw)
+			if test.expectMount {
+				// Fake node status update
+				go kubetest.SimulateVolumeInUseUpdate(
+					v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
+					stopCh,
+					fnw)
+			}
 
 			err = manager.WaitForAttachAndMount(pod)
 			if err != nil && !test.expectError {

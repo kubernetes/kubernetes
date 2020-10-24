@@ -348,11 +348,10 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		Status: v1.NodeStatus{
 			VolumesAttached: []v1.AttachedVolume{
 				{
-					Name:       "fake/vol1",
+					Name:       "fake/fake-device",
 					DevicePath: "fake/path",
 				},
 			}},
-		Spec: v1.NodeSpec{ExternalID: testKubeletHostname},
 	})
 	defer fnw.Close()
 
@@ -391,7 +390,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 
 	// Fake node status update
 	go kubetest.SimulateVolumeInUseUpdate(
-		v1.UniqueVolumeName("fake/vol1"),
+		v1.UniqueVolumeName("fake/fake-device"),
 		stopCh,
 		fnw)
 
@@ -426,11 +425,10 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		Status: v1.NodeStatus{
 			VolumesAttached: []v1.AttachedVolume{
 				{
-					Name:       "fake/vol1",
+					Name:       "fake/fake-device",
 					DevicePath: "fake/path",
 				},
 			}},
-		Spec: v1.NodeSpec{ExternalID: testKubeletHostname},
 	})
 	defer fnw.Close()
 
@@ -470,7 +468,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 
 	// Fake node status update
 	go kubetest.SimulateVolumeInUseUpdate(
-		v1.UniqueVolumeName("fake/vol1"),
+		v1.UniqueVolumeName("fake/fake-device"),
 		stopCh,
 		fnw)
 
