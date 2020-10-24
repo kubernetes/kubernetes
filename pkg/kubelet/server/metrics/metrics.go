@@ -40,7 +40,8 @@ var (
 		// server_type aims to differentiate the readonly server and the readwrite server.
 		// long_running marks whether the request is long-running or not.
 		// Currently, long-running requests include exec/attach/portforward/debug.
-		[]string{"method", "path", "server_type", "long_running"},
+		// status_code is the http response status code of header
+		[]string{"method", "path", "server_type", "long_running", "status_code"},
 	)
 	// HTTPRequestsDuration tracks the duration in seconds to serve http requests.
 	HTTPRequestsDuration = metrics.NewHistogramVec(
@@ -52,7 +53,7 @@ var (
 			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"method", "path", "server_type", "long_running"},
+		[]string{"method", "path", "server_type", "long_running", "status_code"},
 	)
 	// HTTPInflightRequests tracks the number of the inflight http requests.
 	HTTPInflightRequests = metrics.NewGaugeVec(
@@ -62,7 +63,7 @@ var (
 			Help:           "Number of the inflight http requests",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"method", "path", "server_type", "long_running"},
+		[]string{"method", "path", "server_type", "long_running", "status_code"},
 	)
 )
 

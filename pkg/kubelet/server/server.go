@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -925,8 +926,26 @@ var statusesNoTracePred = httplog.StatusIsNot(
 	http.StatusSwitchingProtocols,
 )
 
+type StatusCodeWriter struct {
+	http.ResponseWriter
+	StatusCode int
+}
+
+func (scw *StatusCodeWriter) WriteHeader(statusCode int) {
+	scw.StatusCode = statusCode
+	scw.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (scw *StatusCodeWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if hj, ok := scw.ResponseWriter.(http.Hijacker); ok {
+		return hj.Hijack()
+	}
+	return nil, nil, fmt.Errorf("http.Hijacker interface is not supported")
+}
+
 // ServeHTTP responds to HTTP requests on the Kubelet.
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	rw := StatusCodeWriter{w, http.StatusOK}
 	handler := httplog.WithLogging(s.restfulCont, statusesNoTracePred)
 
 	// monitor http requests
@@ -938,18 +957,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	method, path := s.getMetricMethodBucket(req.Method), s.getMetricBucket(req.URL.Path)
-
 	longRunning := strconv.FormatBool(isLongRunningRequest(path))
 
-	servermetrics.HTTPRequests.WithLabelValues(method, path, serverType, longRunning).Inc()
-
-	servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Inc()
-	defer servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Dec()
-
 	startTime := time.Now()
-	defer servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, serverType, longRunning).Observe(servermetrics.SinceInSeconds(startTime))
 
-	handler.ServeHTTP(w, req)
+	handler.ServeHTTP(&rw, req)
+
+	servermetrics.HTTPRequests.WithLabelValues(method, path, serverType, longRunning, strconv.Itoa(rw.StatusCode)).Inc()
+
+	servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning, strconv.Itoa(rw.StatusCode)).Inc()
+	defer servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning, strconv.Itoa(rw.StatusCode)).Dec()
+
+	defer servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, serverType, longRunning, strconv.Itoa(rw.StatusCode)).Observe(servermetrics.SinceInSeconds(startTime))
 }
 
 // prometheusHostAdapter adapts the HostInterface to the interface expected by the
