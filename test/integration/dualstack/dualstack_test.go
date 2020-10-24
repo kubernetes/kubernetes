@@ -42,8 +42,114 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-// TestCreateServiceSingleStackIPv4 test the Service dualstackness in an IPv4 SingleStack cluster
+// TestCreateServiceSingleStackIPv4 test the Service creation in an IPv4 SingleStack cluster
 func TestCreateServiceSingleStackIPv4(t *testing.T) {
+	// Create an IPv4 single stack control-plane
+	serviceCIDR := "10.0.0.0/16"
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, false)()
+
+	cfg := framework.NewIntegrationTestMasterConfig()
+	_, cidr, err := net.ParseCIDR(serviceCIDR)
+	if err != nil {
+		t.Fatalf("bad cidr: %v", err)
+	}
+	cfg.ExtraConfig.ServiceIPRange = *cidr
+	_, s, closeFn := framework.RunAMaster(cfg)
+	defer closeFn()
+
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+
+	// Wait until the default "kubernetes" service is created.
+	if err = wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+		return !apierrors.IsNotFound(err), nil
+	}); err != nil {
+		t.Fatalf("creating kubernetes service timed out")
+	}
+
+	var testcases = []struct {
+		name        string
+		serviceType v1.ServiceType
+		clusterIP   string
+		expectError bool
+	}{
+		{
+			name:        "Type ClusterIP - Headless",
+			serviceType: v1.ServiceTypeClusterIP,
+			clusterIP:   "None",
+			expectError: false,
+		},
+		{
+			name:        "Type ClusterIP - Invalid ClusterIP",
+			serviceType: v1.ServiceTypeClusterIP,
+			clusterIP:   "INVALID",
+			expectError: true,
+		},
+		{
+			name:        "Type ClusterIP - request IP",
+			serviceType: v1.ServiceTypeClusterIP,
+			clusterIP:   "10.0.2.2",
+			expectError: false,
+		},
+		{
+			name:        "Type ClusterIP - request IP out of range",
+			serviceType: v1.ServiceTypeClusterIP,
+			clusterIP:   "192.0.2.2",
+			expectError: true,
+		},
+		{
+			name:        "Type ClusterIP - request IP wrong IP family",
+			serviceType: v1.ServiceTypeClusterIP,
+			clusterIP:   "2001:db8:1::2",
+			expectError: true,
+		},
+	}
+
+	for i, tc := range testcases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("svc-test-%d", i), // use different services for each test
+				},
+				Spec: v1.ServiceSpec{
+					Type:      tc.serviceType,
+					ClusterIP: tc.clusterIP,
+					Ports: []v1.ServicePort{
+						{
+							Name:       fmt.Sprintf("port-test-%d", i),
+							Port:       443,
+							TargetPort: intstr.IntOrString{IntVal: 443},
+							Protocol:   "TCP",
+						},
+					},
+				},
+			}
+
+			// create the service
+			_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc, metav1.CreateOptions{})
+			if (err != nil) != tc.expectError {
+				t.Errorf("Test failed expected result: %v received %v ", tc.expectError, err)
+			}
+			// if no error was expected validate the service otherwise return
+			if err != nil {
+				return
+			}
+			// validate the service was created correctly if it was not expected to fail
+			svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("Unexpected error to get the service %s %v", svc.Name, err)
+			}
+		})
+	}
+}
+
+// TestCreateServiceDualStackIPv4 test the Service dualstackness in an IPv4 only DualStack cluster
+func TestCreateServiceDualStackIPv4(t *testing.T) {
 	// Create an IPv4 single stack control-plane
 	serviceCIDR := "10.0.0.0/16"
 	defaultIPFamily := v1.IPv4Protocol
@@ -74,18 +180,29 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 	var testcases = []struct {
 		name           string
 		serviceType    v1.ServiceType
+		clusterIP      string
 		clusterIPs     []string
 		ipFamilies     []v1.IPFamily
 		ipFamilyPolicy v1.IPFamilyPolicyType
 		expectError    bool
 	}{
 		{
-			name:           "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Single Stack",
+			name:           "Type ClusterIP - Headless",
 			serviceType:    v1.ServiceTypeClusterIP,
+			clusterIP:      "None",
 			clusterIPs:     []string{},
 			ipFamilies:     []v1.IPFamily{},
 			ipFamilyPolicy: v1.IPFamilyPolicySingleStack,
 			expectError:    false,
+		},
+		{
+			name:           "Type ClusterIP - Invalid ClusterIP",
+			serviceType:    v1.ServiceTypeClusterIP,
+			clusterIP:      "INVALID",
+			clusterIPs:     []string{},
+			ipFamilies:     []v1.IPFamily{},
+			ipFamilyPolicy: v1.IPFamilyPolicySingleStack,
+			expectError:    true,
 		},
 		{
 			name:           "Type ClusterIP - Server Allocated IP - Default IP Family - Policy Prefer Dual Stack",
@@ -211,6 +328,7 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:           tc.serviceType,
+					ClusterIP:      tc.clusterIP,
 					ClusterIPs:     tc.clusterIPs,
 					IPFamilies:     tc.ipFamilies,
 					IPFamilyPolicy: &tc.ipFamilyPolicy,

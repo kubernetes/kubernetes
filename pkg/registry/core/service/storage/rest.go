@@ -208,6 +208,10 @@ func (rs *REST) Export(ctx context.Context, name string, opts metav1.ExportOptio
 func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	service := obj.(*api.Service)
 
+	// Make sure ClusterIP and ClusterIPs are in sync.  This has to happen
+	// early, before anyone looks at them.
+	normalizeClusterIPs(service, nil)
+
 	// bag of clusterIPs allocated in the process of creation
 	// failed allocation will automatically trigger release
 	var toReleaseClusterIPs map[api.IPFamily]string
@@ -435,6 +439,10 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 
 	service := obj.(*api.Service)
 
+	// Make sure ClusterIP and ClusterIPs are in sync.  This has to happen
+	// early, before anyone looks at them.
+	normalizeClusterIPs(service, oldService)
+
 	if !rest.ValidNamespace(ctx, &service.ObjectMeta) {
 		return nil, false, errors.NewConflict(api.Resource("services"), service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
 	}
@@ -615,7 +623,7 @@ func (rs *REST) allocClusterIPs(service *api.Service, toAlloc map[api.IPFamily]s
 		} else {
 			parsedIP := net.ParseIP(ip)
 			if err := allocator.Allocate(parsedIP); err != nil {
-				el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIPs"), service.Spec.ClusterIPs, fmt.Sprintf("failed to allocated ip:%v with error:%v", ip, err))}
+				el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIPs"), service.Spec.ClusterIPs, fmt.Sprintf("failed to allocate ip:%v with error:%v", ip, err))}
 				return allocated, errors.NewInvalid(api.Kind("Service"), service.Name, el)
 			}
 			allocated[family] = ip
@@ -678,6 +686,16 @@ func (rs *REST) allocServiceClusterIPs(service *api.Service) (map[api.IPFamily]s
 	// headless don't get ClusterIPs
 	if len(service.Spec.ClusterIPs) > 0 && service.Spec.ClusterIPs[0] == api.ClusterIPNone {
 		return nil, nil
+	}
+
+	// validate all clusterIPs are at least parseable, so invalid IP values
+	// don't reach the allocators.  If they are invalid, validation will catch
+	// them.
+	for _, clusterIP := range service.Spec.ClusterIPs {
+		ip := net.ParseIP(clusterIP)
+		if ip == nil {
+			return nil, nil
+		}
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
@@ -884,9 +902,12 @@ func (rs *REST) tryDefaultValidateServiceClusterIPFields(service *api.Service) e
 			break
 		}
 
-		// we have previously validated for ip correctness and if family exist it will match ip family
-		// so the following is safe to do
-		isIPv6 := netutil.IsIPv6String(ip)
+		parsedIP := net.ParseIP(ip)
+		if parsedIP == nil {
+			break // Not an IP string - let validation catch it
+		}
+
+		isIPv6 := netutil.IsIPv6(parsedIP)
 
 		// family is not there.
 		if i > len(service.Spec.IPFamilies)-1 {
@@ -1247,4 +1268,78 @@ func (nearlyNullStrategy) Export(ctx context.Context, obj runtime.Object, exact 
 		}
 	}
 	return nil
+}
+
+// normalizeClusterIPs adjust clusterIPs based on ClusterIP
+func normalizeClusterIPs(newSvc, oldSvc *api.Service) {
+	// In all cases here, we don't need to over-think the inputs.  Validation
+	// will be called on the new object soon enough.  All this needs to do is
+	// try to divine what user meant with these linked fields. The below
+	// is verbosely written for clarity.
+
+	// **** IMPORTANT *****
+	// as a governing rule. User must (either)
+	// -- Use singular only (old client)
+	// -- singular and plural fields (new clients)
+
+	if oldSvc == nil {
+		// This was a create operation.
+		// User specified singular and not plural (e.g. an old client), so init
+		// plural for them.
+		if len(newSvc.Spec.ClusterIP) > 0 && len(newSvc.Spec.ClusterIPs) == 0 {
+			newSvc.Spec.ClusterIPs = []string{newSvc.Spec.ClusterIP}
+			return
+		}
+
+		// we don't init singular based on plural because
+		// new client must use both fields
+
+		// Either both were not specified (will be allocated) or both were
+		// specified (will be validated).
+		return
+	}
+
+	// This was an update operation
+
+	// ClusterIPs were cleared by an old client which was trying to patch
+	// some field and didn't provide ClusterIPs
+	if len(oldSvc.Spec.ClusterIPs) > 0 && len(newSvc.Spec.ClusterIPs) == 0 {
+		// if ClusterIP is the same, then it is an old client trying to
+		// patch service and didn't provide ClusterIPs
+		if oldSvc.Spec.ClusterIP == newSvc.Spec.ClusterIP {
+			newSvc.Spec.ClusterIPs = oldSvc.Spec.ClusterIPs
+		}
+	}
+
+	// clusterIP is not the same
+	if oldSvc.Spec.ClusterIP != newSvc.Spec.ClusterIP {
+		// this is a client trying to clear it
+		if len(oldSvc.Spec.ClusterIP) > 0 && len(newSvc.Spec.ClusterIP) == 0 {
+			// if clusterIPs are the same, then clear on their behalf
+			if sameStringSlice(oldSvc.Spec.ClusterIPs, newSvc.Spec.ClusterIPs) {
+				newSvc.Spec.ClusterIPs = nil
+			}
+
+			// if they provided nil, then we are fine (handled by patching case above)
+			// if they changed it then validation will catch it
+		} else {
+			// ClusterIP has changed but not cleared *and* ClusterIPs are the same
+			// then we set ClusterIPs based on ClusterIP
+			if sameStringSlice(oldSvc.Spec.ClusterIPs, newSvc.Spec.ClusterIPs) {
+				newSvc.Spec.ClusterIPs = []string{newSvc.Spec.ClusterIP}
+			}
+		}
+	}
+}
+
+func sameStringSlice(a []string, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

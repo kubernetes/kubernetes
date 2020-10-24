@@ -298,92 +298,197 @@ func releaseServiceNodePorts(t *testing.T, ctx context.Context, svcName string, 
 
 func TestServiceRegistryCreate(t *testing.T) {
 	testCases := []struct {
-		svc             *api.Service
 		name            string
-		families        []api.IPFamily
 		enableDualStack bool
-	}{
-		{
-			name:            "Service IPFamily default cluster dualstack:off",
-			enableDualStack: false,
-			families:        []api.IPFamily{api.IPv4Protocol},
-
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
+		clusterFamilies []api.IPFamily
+		svc             *api.Service
+	}{{
+		name:            "IPFamily:default dualstack:off cluster:v4",
+		enableDualStack: false,
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol},
+		svc: &api.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: api.ServiceSpec{
+				Selector:        map[string]string{"bar": "baz"},
+				SessionAffinity: api.ServiceAffinityNone,
+				Type:            api.ServiceTypeClusterIP,
+				Ports: []api.ServicePort{{
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: intstr.FromInt(6502),
+				}},
 			},
 		},
-		{
-			name:            "Service IPFamily:v4 dualstack off",
-			enableDualStack: false,
-			families:        []api.IPFamily{api.IPv4Protocol},
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
+	}, {
+		name:            "IPFamily:default dualstack:off cluster:v6",
+		enableDualStack: false,
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol},
+		svc: &api.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: api.ServiceSpec{
+				Selector:        map[string]string{"bar": "baz"},
+				SessionAffinity: api.ServiceAffinityNone,
+				Type:            api.ServiceTypeClusterIP,
+				Ports: []api.ServicePort{{
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: intstr.FromInt(6502),
+				}},
 			},
 		},
-		{
-			name:            "Service IPFamily:v4 dualstack on",
-			enableDualStack: true,
-			families:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv4Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
+	}, {
+		name:            "IPFamily:v4 dualstack:off cluster:v4",
+		enableDualStack: false,
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol},
+		svc: &api.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: api.ServiceSpec{
+				Selector:        map[string]string{"bar": "baz"},
+				SessionAffinity: api.ServiceAffinityNone,
+				Type:            api.ServiceTypeClusterIP,
+				IPFamilies:      []api.IPFamily{api.IPv4Protocol},
+				Ports: []api.ServicePort{{
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: intstr.FromInt(6502),
+				}},
 			},
 		},
-		{
-			name:            "Service IPFamily:v6 dualstack on",
-			enableDualStack: true,
-			families:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-
-			svc: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Spec: api.ServiceSpec{
-					Selector:        map[string]string{"bar": "baz"},
-					SessionAffinity: api.ServiceAffinityNone,
-					Type:            api.ServiceTypeClusterIP,
-					IPFamilies:      []api.IPFamily{api.IPv6Protocol},
-					Ports: []api.ServicePort{{
-						Port:       6502,
-						Protocol:   api.ProtocolTCP,
-						TargetPort: intstr.FromInt(6502),
-					}},
-				},
+	}, {
+		name:            "IPFamily:v6 dualstack:off cluster:v6",
+		enableDualStack: false,
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol},
+		svc: &api.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: api.ServiceSpec{
+				Selector:        map[string]string{"bar": "baz"},
+				SessionAffinity: api.ServiceAffinityNone,
+				Type:            api.ServiceTypeClusterIP,
+				IPFamilies:      []api.IPFamily{api.IPv6Protocol},
+				Ports: []api.ServicePort{{
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: intstr.FromInt(6502),
+				}},
 			},
 		},
-	}
+	}, {
+		name:            "IPFamily:v4 dualstack:off cluster:v6",
+		enableDualStack: false,
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol},
+		svc: &api.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: api.ServiceSpec{
+				Selector:        map[string]string{"bar": "baz"},
+				SessionAffinity: api.ServiceAffinityNone,
+				Type:            api.ServiceTypeClusterIP,
+				IPFamilies:      []api.IPFamily{api.IPv4Protocol},
+				Ports: []api.ServicePort{{
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: intstr.FromInt(6502),
+				}},
+			},
+		},
+	}, {
+		name:            "IPFamily:v6 dualstack:off cluster:v4",
+		enableDualStack: false,
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol},
+		svc: &api.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: api.ServiceSpec{
+				Selector:        map[string]string{"bar": "baz"},
+				SessionAffinity: api.ServiceAffinityNone,
+				Type:            api.ServiceTypeClusterIP,
+				IPFamilies:      []api.IPFamily{api.IPv6Protocol},
+				Ports: []api.ServicePort{{
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: intstr.FromInt(6502),
+				}},
+			},
+		},
+	}, {
+		name:            "IPFamily:v4 dualstack:on cluster:v4v6",
+		enableDualStack: true,
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		svc: &api.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: api.ServiceSpec{
+				Selector:        map[string]string{"bar": "baz"},
+				SessionAffinity: api.ServiceAffinityNone,
+				Type:            api.ServiceTypeClusterIP,
+				IPFamilies:      []api.IPFamily{api.IPv4Protocol},
+				Ports: []api.ServicePort{{
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: intstr.FromInt(6502),
+				}},
+			},
+		},
+	}, {
+		name:            "IPFamily:v6 dualstack:on cluster:v4v6",
+		enableDualStack: true,
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		svc: &api.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: api.ServiceSpec{
+				Selector:        map[string]string{"bar": "baz"},
+				SessionAffinity: api.ServiceAffinityNone,
+				Type:            api.ServiceTypeClusterIP,
+				IPFamilies:      []api.IPFamily{api.IPv6Protocol},
+				Ports: []api.ServicePort{{
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: intstr.FromInt(6502),
+				}},
+			},
+		},
+	}, {
+		name:            "IPFamily:v4 dualstack:on cluster:v6v4",
+		enableDualStack: true,
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+		svc: &api.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: api.ServiceSpec{
+				Selector:        map[string]string{"bar": "baz"},
+				SessionAffinity: api.ServiceAffinityNone,
+				Type:            api.ServiceTypeClusterIP,
+				IPFamilies:      []api.IPFamily{api.IPv4Protocol},
+				Ports: []api.ServicePort{{
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: intstr.FromInt(6502),
+				}},
+			},
+		},
+	}, {
+		name:            "IPFamily:v6 dualstack:on cluster:v6v4",
+		enableDualStack: true,
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+		svc: &api.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: api.ServiceSpec{
+				Selector:        map[string]string{"bar": "baz"},
+				SessionAffinity: api.ServiceAffinityNone,
+				Type:            api.ServiceTypeClusterIP,
+				IPFamilies:      []api.IPFamily{api.IPv6Protocol},
+				Ports: []api.ServicePort{{
+					Port:       6502,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: intstr.FromInt(6502),
+				}},
+			},
+		},
+	}}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, registry, server := NewTestREST(t, nil, tc.families)
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+
+			// NOTE: This does not include the strategy, which limits the
+			// utility of these tests. We should rethink how we want to test
+			// this "nested" REST.
+			storage, registry, server := NewTestREST(t, nil, tc.clusterFamilies)
 			defer server.Terminate(t)
 
 			ctx := genericapirequest.NewDefaultContext()
@@ -406,12 +511,18 @@ func TestServiceRegistryCreate(t *testing.T) {
 				t.Errorf("Expected timestamp to be set, got: %v", createdService.CreationTimestamp)
 			}
 
-			for i, family := range createdService.Spec.IPFamilies {
+			var expectedFamilies []api.IPFamily
+			if tc.enableDualStack {
+				expectedFamilies = tc.svc.Spec.IPFamilies
+			} else {
+				expectedFamilies = append(expectedFamilies, tc.clusterFamilies[0])
+			}
+			for i, family := range expectedFamilies {
 				allocator := storage.serviceIPAllocatorsByFamily[family]
 				c := allocator.CIDR()
 				cidr := &c
 				if !cidr.Contains(net.ParseIP(createdService.Spec.ClusterIPs[i])) {
-					t.Errorf("Unexpected ClusterIP: %s", createdService.Spec.ClusterIPs[i])
+					t.Errorf("Unexpected ClusterIPs[%d] %s: not in %s", i, createdService.Spec.ClusterIPs[i], cidr)
 				}
 			}
 			srv, err := registry.GetService(ctx, tc.svc.Name, &metav1.GetOptions{})
@@ -796,59 +907,6 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 			nodePort := serviceNodePorts[i]
 			// Release the node port at the end of the test case.
 			storage.serviceNodePorts.Release(nodePort)
-		}
-	}
-}
-
-func TestServiceStorageValidatesCreate(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
-	defer server.Terminate(t)
-	failureCases := map[string]api.Service{
-		"empty ID": {
-			ObjectMeta: metav1.ObjectMeta{Name: ""},
-			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"bar": "baz"},
-				SessionAffinity: api.ServiceAffinityNone,
-				Type:            api.ServiceTypeClusterIP,
-				Ports: []api.ServicePort{{
-					Port:       6502,
-					Protocol:   api.ProtocolTCP,
-					TargetPort: intstr.FromInt(6502),
-				}},
-			},
-		},
-		"empty port": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"bar": "baz"},
-				SessionAffinity: api.ServiceAffinityNone,
-				Type:            api.ServiceTypeClusterIP,
-				Ports: []api.ServicePort{{
-					Protocol: api.ProtocolTCP,
-				}},
-			},
-		},
-		"missing targetPort": {
-			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"bar": "baz"},
-				SessionAffinity: api.ServiceAffinityNone,
-				Type:            api.ServiceTypeClusterIP,
-				Ports: []api.ServicePort{{
-					Port:     6502,
-					Protocol: api.ProtocolTCP,
-				}},
-			},
-		},
-	}
-	ctx := genericapirequest.NewDefaultContext()
-	for _, failureCase := range failureCases {
-		c, err := storage.Create(ctx, &failureCase, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-		if c != nil {
-			t.Errorf("Expected nil object")
-		}
-		if !errors.IsInvalid(err) {
-			t.Errorf("Expected to get an invalid resource error, got %v", err)
 		}
 	}
 }
@@ -1823,65 +1881,6 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 	}
 	if !makeIPNet(t).Contains(net.ParseIP(createdService2.Spec.ClusterIPs[0])) {
 		t.Errorf("Unexpected ClusterIP: %s", createdService2.Spec.ClusterIPs[0])
-	}
-}
-
-func TestServiceRegistryIPUpdate(t *testing.T) {
-	storage, _, server := NewTestREST(t, nil, singleStackIPv4)
-	defer server.Terminate(t)
-
-	svc := &api.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			SessionAffinity: api.ServiceAffinityNone,
-			Type:            api.ServiceTypeClusterIP,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-		},
-	}
-	ctx := genericapirequest.NewDefaultContext()
-	createdSvc, _ := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-	createdService := createdSvc.(*api.Service)
-	if createdService.Spec.Ports[0].Port != 6502 {
-		t.Errorf("Expected port 6502, but got %v", createdService.Spec.Ports[0].Port)
-	}
-	if !makeIPNet(t).Contains(net.ParseIP(createdService.Spec.ClusterIPs[0])) {
-		t.Errorf("Unexpected ClusterIP: %s", createdService.Spec.ClusterIPs[0])
-	}
-
-	update := createdService.DeepCopy()
-	update.Spec.Ports[0].Port = 6503
-
-	updatedSvc, _, errUpdate := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-	if errUpdate != nil {
-		t.Fatalf("unexpected error during update %v", errUpdate)
-	}
-	updatedService := updatedSvc.(*api.Service)
-	if updatedService.Spec.Ports[0].Port != 6503 {
-		t.Errorf("Expected port 6503, but got %v", updatedService.Spec.Ports[0].Port)
-	}
-
-	testIPs := []string{"1.2.3.93", "1.2.3.94", "1.2.3.95", "1.2.3.96"}
-	testIP := ""
-	for _, ip := range testIPs {
-		if !storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].(*ipallocator.Range).Has(net.ParseIP(ip)) {
-			testIP = ip
-			break
-		}
-	}
-
-	update = createdService.DeepCopy()
-	update.Spec.Ports[0].Port = 6503
-	update.Spec.ClusterIP = testIP
-	update.Spec.ClusterIPs[0] = testIP
-
-	_, _, err := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-	if err == nil || !errors.IsInvalid(err) {
-		t.Errorf("Unexpected error type: %v", err)
 	}
 }
 
@@ -5061,5 +5060,281 @@ func isValidClusterIPFields(t *testing.T, storage *REST, pre *api.Service, post 
 		if isIPv6 && post.Spec.IPFamilies[i] != api.IPv6Protocol {
 			t.Fatalf("ips does not match assigned families %+v %+v", post.Spec.ClusterIPs, post.Spec.IPFamilies)
 		}
+	}
+}
+
+func TestNormalizeClusterIPs(t *testing.T) {
+	testCases := []struct {
+		name               string
+		oldService         *api.Service
+		newService         *api.Service
+		expectedClusterIP  string
+		expectedClusterIPs []string
+	}{{
+		name:       "new - only clusterip used",
+		oldService: nil,
+		newService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: nil,
+			},
+		},
+		expectedClusterIP:  "10.0.0.10",
+		expectedClusterIPs: []string{"10.0.0.10"},
+	}, {
+		name:       "new - only clusterips used",
+		oldService: nil,
+		newService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "",
+				ClusterIPs: []string{"10.0.0.10"},
+			},
+		},
+		expectedClusterIP:  "", // this is a validation issue, and validation will catch it
+		expectedClusterIPs: []string{"10.0.0.10"},
+	}, {
+		name:       "new - both used",
+		oldService: nil,
+		newService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"10.0.0.10"},
+			},
+		},
+		expectedClusterIP:  "10.0.0.10",
+		expectedClusterIPs: []string{"10.0.0.10"},
+	}, {
+		name: "update - no change",
+		oldService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"10.0.0.10"},
+			},
+		},
+		newService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"10.0.0.10"},
+			},
+		},
+		expectedClusterIP:  "10.0.0.10",
+		expectedClusterIPs: []string{"10.0.0.10"},
+	}, {
+		name: "update - malformed change",
+		oldService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"10.0.0.10"},
+			},
+		},
+		newService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.11",
+				ClusterIPs: []string{"10.0.0.11"},
+			},
+		},
+		expectedClusterIP:  "10.0.0.11",
+		expectedClusterIPs: []string{"10.0.0.11"},
+	}, {
+		name: "update - malformed change on secondary ip",
+		oldService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"10.0.0.10", "2000::1"},
+			},
+		},
+		newService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.11",
+				ClusterIPs: []string{"10.0.0.11", "3000::1"},
+			},
+		},
+		expectedClusterIP:  "10.0.0.11",
+		expectedClusterIPs: []string{"10.0.0.11", "3000::1"},
+	}, {
+		name: "update - upgrade",
+		oldService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"10.0.0.10"},
+			},
+		},
+		newService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"10.0.0.10", "2000::1"},
+			},
+		},
+		expectedClusterIP:  "10.0.0.10",
+		expectedClusterIPs: []string{"10.0.0.10", "2000::1"},
+	}, {
+		name: "update - downgrade",
+		oldService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"10.0.0.10", "2000::1"},
+			},
+		},
+		newService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"10.0.0.10"},
+			},
+		},
+		expectedClusterIP:  "10.0.0.10",
+		expectedClusterIPs: []string{"10.0.0.10"},
+	}, {
+		name: "update - user cleared cluster IP",
+		oldService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"10.0.0.10"},
+			},
+		},
+		newService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "",
+				ClusterIPs: []string{"10.0.0.10"},
+			},
+		},
+		expectedClusterIP:  "",
+		expectedClusterIPs: nil,
+	}, {
+		name: "update - user cleared clusterIPs", // *MUST* REMAIN FOR OLD CLIENTS
+		oldService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"10.0.0.10"},
+			},
+		},
+		newService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: nil,
+			},
+		},
+		expectedClusterIP:  "10.0.0.10",
+		expectedClusterIPs: []string{"10.0.0.10"},
+	}, {
+		name: "update - user cleared both",
+		oldService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"10.0.0.10"},
+			},
+		},
+		newService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "",
+				ClusterIPs: nil,
+			},
+		},
+		expectedClusterIP:  "",
+		expectedClusterIPs: nil,
+	}, {
+		name: "update - user cleared ClusterIP but changed clusterIPs",
+		oldService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"10.0.0.10"},
+			},
+		},
+		newService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "",
+				ClusterIPs: []string{"10.0.0.11"},
+			},
+		},
+		expectedClusterIP:  "", /* validation catches this */
+		expectedClusterIPs: []string{"10.0.0.11"},
+	}, {
+		name: "update - user cleared ClusterIPs but changed ClusterIP",
+		oldService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"10.0.0.10", "2000::1"},
+			},
+		},
+		newService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.11",
+				ClusterIPs: nil,
+			},
+		},
+		expectedClusterIP:  "10.0.0.11",
+		expectedClusterIPs: nil,
+	}, {
+		name: "update - user changed from None to ClusterIP",
+		oldService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "None",
+				ClusterIPs: []string{"None"},
+			},
+		},
+		newService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"None"},
+			},
+		},
+		expectedClusterIP:  "10.0.0.10",
+		expectedClusterIPs: []string{"10.0.0.10"},
+	}, {
+		name: "update - user changed from ClusterIP to None",
+		oldService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"10.0.0.10"},
+			},
+		},
+		newService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "None",
+				ClusterIPs: []string{"10.0.0.10"},
+			},
+		},
+		expectedClusterIP:  "None",
+		expectedClusterIPs: []string{"None"},
+	}, {
+		name: "update - user changed from ClusterIP to None and changed ClusterIPs in a dual stack (new client making a mistake)",
+		oldService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "10.0.0.10",
+				ClusterIPs: []string{"10.0.0.10", "2000::1"},
+			},
+		},
+		newService: &api.Service{
+			Spec: api.ServiceSpec{
+				ClusterIP:  "None",
+				ClusterIPs: []string{"10.0.0.11", "2000::1"},
+			},
+		},
+		expectedClusterIP:  "None",
+		expectedClusterIPs: []string{"10.0.0.11", "2000::1"},
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			normalizeClusterIPs(tc.newService, tc.oldService)
+
+			if tc.newService == nil {
+				t.Fatalf("unexpected new service to be nil")
+			}
+
+			if tc.newService.Spec.ClusterIP != tc.expectedClusterIP {
+				t.Fatalf("expected clusterIP [%v] got [%v]", tc.expectedClusterIP, tc.newService.Spec.ClusterIP)
+			}
+
+			if len(tc.newService.Spec.ClusterIPs) != len(tc.expectedClusterIPs) {
+				t.Fatalf("expected  clusterIPs %v got %v", tc.expectedClusterIPs, tc.newService.Spec.ClusterIPs)
+			}
+
+			for idx, clusterIP := range tc.newService.Spec.ClusterIPs {
+				if clusterIP != tc.expectedClusterIPs[idx] {
+					t.Fatalf("expected clusterIP [%v] at index[%v] got [%v]", tc.expectedClusterIPs[idx], idx, tc.newService.Spec.ClusterIPs[idx])
+
+				}
+			}
+		})
 	}
 }
