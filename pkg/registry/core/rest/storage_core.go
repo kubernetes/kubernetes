@@ -190,6 +190,15 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
 
+	controllerStorage, err := controllerstore.NewStorage(restOptionsGetter)
+	if err != nil {
+		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+	}
+
+	// Hang on for a wild ride.  Service is a WEIRD case. This should be
+	// factored out into the Service registry, but it has some deep and old
+	// entanglements.  We're leaving that for later.
+
 	var serviceClusterIPRegistry rangeallocation.RangeRegistry
 	serviceClusterIPRange := c.ServiceIPRange
 	if serviceClusterIPRange.IP == nil {
@@ -252,16 +261,15 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	}
 	restStorage.ServiceNodePortAllocator = serviceNodePortRegistry
 
-	controllerStorage, err := controllerstore.NewStorage(restOptionsGetter)
-	if err != nil {
-		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-	}
-
+	// Here we allocate what seems like the service REST handler.  Fooled you!
+	// This is wrapped by a more customized REST handler which implements the
+	// logic for things like IP allocation.
 	serviceRESTStorage, serviceStatusStorage, err := servicestore.NewGenericREST(restOptionsGetter, serviceClusterIPRange, secondaryServiceClusterIPAllocator != nil)
 	if err != nil {
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
 
+	// This allocates the wrapper REST handler.
 	serviceRest, serviceRestProxy := servicestore.NewREST(serviceRESTStorage,
 		endpointsStorage,
 		podStorage.Pod,

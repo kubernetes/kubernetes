@@ -170,6 +170,14 @@ func (s *serviceStorage) StorageVersion() runtime.GroupVersioner {
 	panic("not implemented")
 }
 
+func (s *serviceStorage) ShortNames() []string {
+	panic("not implemented")
+}
+
+func (s *serviceStorage) Categories() []string {
+	panic("not implemented")
+}
+
 func NewTestREST(t *testing.T, endpoints *api.EndpointsList, ipFamilies []api.IPFamily) (*REST, *serviceStorage, *etcd3testing.EtcdTestServer) {
 	return NewTestRESTWithPods(t, endpoints, nil, ipFamilies)
 }

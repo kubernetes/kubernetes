@@ -35,9 +35,11 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/klog/v2"
 
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -81,6 +83,8 @@ type ServiceStorage interface {
 	rest.Watcher
 	rest.Exporter
 	rest.StorageVersionProvider
+	rest.CategoriesProvider
+	rest.ShortNamesProvider
 }
 
 type EndpointsStorage interface {
@@ -102,7 +106,15 @@ func NewREST(
 	proxyTransport http.RoundTripper,
 ) (*REST, *registry.ProxyREST) {
 
-	strategy, _ := registry.StrategyForServiceCIDRs(serviceIPs.CIDR(), secondaryServiceIPs != nil)
+	// This REST is the "outer" rest.  The "inner" instance uses a real
+	// strategy.  This outer one serves to capture Create() and Update(), do
+	// some allocations, then pass control to the inner.
+	// TODO: flatten outer and inner.  Move all of the Create() logic to
+	// strategy.PrepareForCreate().  Ditto for Update.
+	strategy := nearlyNullStrategy{
+		ObjectTyper:   legacyscheme.Scheme,
+		NameGenerator: names.SimpleNameGenerator,
+	}
 
 	byIPFamily := make(map[api.IPFamily]ipallocator.Interface)
 
@@ -157,12 +169,12 @@ func (rs *REST) StorageVersion() runtime.GroupVersioner {
 
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (rs *REST) ShortNames() []string {
-	return []string{"svc"}
+	return rs.services.ShortNames()
 }
 
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
 func (rs *REST) Categories() []string {
-	return []string{"all"}
+	return rs.services.Categories()
 }
 
 func (rs *REST) NamespaceScoped() bool {
@@ -204,7 +216,7 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation
 		return nil, err
 	}
 
-	// TODO: this should probably move to strategy.PrepareForCreate()
+	// TODO: this should probably move to inner strategy.PrepareForCreate()
 	defer func() {
 		released, err := rs.releaseClusterIPs(toReleaseClusterIPs)
 		if err != nil {
@@ -243,10 +255,12 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation
 			return nil, errors.NewInternalError(err)
 		}
 	}
+
 	if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
 		return nil, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
 
+	// Call the wrapped "simple" REST to do the real work.
 	out, err := rs.services.Create(ctx, service, createValidation, options)
 	if err != nil {
 		err = rest.CheckGeneratedNameError(rs.strategy, err, service)
@@ -1175,4 +1189,62 @@ func collectServiceNodePorts(service *api.Service) []int {
 		}
 	}
 	return servicePorts
+}
+
+// nearlyNullStrategy does almost nothing, but makes the REST logic happy.
+type nearlyNullStrategy struct {
+	runtime.ObjectTyper
+	names.NameGenerator
+}
+
+// NamespaceScoped is true for services.
+func (nearlyNullStrategy) NamespaceScoped() bool {
+	return true
+}
+
+func (nearlyNullStrategy) PrepareForCreate(_ context.Context, _ runtime.Object) {
+}
+
+func (nearlyNullStrategy) PrepareForUpdate(_ context.Context, _, _ runtime.Object) {
+}
+
+func (nearlyNullStrategy) Validate(_ context.Context, _ runtime.Object) field.ErrorList {
+	return field.ErrorList{}
+}
+
+func (nearlyNullStrategy) Canonicalize(_ runtime.Object) {
+}
+
+func (nearlyNullStrategy) AllowCreateOnUpdate() bool {
+	return true
+}
+
+func (nearlyNullStrategy) ValidateUpdate(_ context.Context, _, _ runtime.Object) field.ErrorList {
+	return field.ErrorList{}
+}
+
+func (nearlyNullStrategy) AllowUnconditionalUpdate() bool {
+	return true
+}
+
+func (nearlyNullStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) error {
+	t, ok := obj.(*api.Service)
+	if !ok {
+		// unexpected programmer error
+		return fmt.Errorf("unexpected object: %v", obj)
+	}
+	// TODO: service does not yet have a prepare create strategy (see above)
+	t.Status = api.ServiceStatus{}
+	if exact {
+		return nil
+	}
+	if t.Spec.ClusterIP != api.ClusterIPNone {
+		t.Spec.ClusterIP = ""
+	}
+	if t.Spec.Type == api.ServiceTypeNodePort {
+		for i := range t.Spec.Ports {
+			t.Spec.Ports[i].NodePort = 0
+		}
+	}
+	return nil
 }
