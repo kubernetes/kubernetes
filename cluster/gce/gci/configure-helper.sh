@@ -2155,12 +2155,14 @@ function start-cluster-autoscaler {
     # Remove salt comments and replace variables with values
     local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
 
-    local params=("${AUTOSCALER_MIG_CONFIG}" "${CLOUD_CONFIG_OPT}" "${AUTOSCALER_EXPANDER_CONFIG:---expander=price}")
+    local params
+    read -r -a params <<< "${AUTOSCALER_MIG_CONFIG}"
+    params+=("${CLOUD_CONFIG_OPT}" "${AUTOSCALER_EXPANDER_CONFIG:---expander=price}")
     params+=("--kubeconfig=/etc/srv/kubernetes/cluster-autoscaler/kubeconfig")
 
     # split the params into separate arguments passed to binary
     local params_split
-    params_split=$(eval 'for param in "${params[@]}"; do echo -n "$param",; done')
+    params_split=$(eval 'for param in "${params[@]}"; do echo -n \""$param"\",; done')
     params_split=${params_split%?}
 
     sed -i -e "s@{{params}}@${params_split}@g" "${src_file}"
