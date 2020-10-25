@@ -1136,6 +1136,62 @@ func TestMasqueradeRule(t *testing.T) {
 	}
 }
 
+func TestDefaultIptablesRule(t *testing.T) {
+	for _, testcase := range []bool{false, true} {
+		ipt := iptablestest.NewFake().SetHasRandomFully(testcase)
+		ipvs := ipvstest.NewFake()
+		ipset := ipsettest.NewFake(testIPSetVersion)
+		fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+		makeServiceMap(fp)
+		makeEndpointsMap(fp)
+		fp.syncProxyRules()
+
+		serviceRules := ipt.GetRules(string(kubeServicesChain))
+		if len(serviceRules) != 1 || !hasJump(serviceRules, "KUBE-NODE-PORT", "") {
+			t.Errorf("Expect exactly one -j KUBE-NODE-PORT in %s chain", kubeServicesChain)
+		}
+
+		firewallRules := ipt.GetRules(string(KubeFireWallChain))
+		if len(firewallRules) != 1 || !hasJump(firewallRules, "KUBE-MARK-DROP", "") {
+			t.Errorf("Expect exactly one -j KUBE-MARK-DROP in %s chain", KubeFireWallChain)
+		}
+
+		postRoutingRules := ipt.GetRules(string(kubePostroutingChain))
+		if !hasJump(postRoutingRules, "MASQUERADE", "") {
+			t.Errorf("Failed to find -j MASQUERADE in %s chain", kubePostroutingChain)
+		}
+		if hasMasqRandomFully(postRoutingRules) != testcase {
+			probs := map[bool]string{false: "found", true: "did not find"}
+			t.Errorf("%s --random-fully in -j MASQUERADE rule in %s chain for HasRandomFully()=%v", probs[testcase], kubePostroutingChain, testcase)
+		}
+
+		markMasqRules := ipt.GetRules(string(KubeMarkMasqChain))
+		if len(markMasqRules) != 1 || !hasJump(markMasqRules, "MARK", "") {
+			t.Errorf("Expect exactly one -j MARK in %s chain", KubeMarkMasqChain)
+		}
+
+		nodePortRules := ipt.GetRules(string(KubeNodePortChain))
+		if len(nodePortRules) != 0 {
+			t.Errorf("Expect no rule in %s chain", KubeNodePortChain)
+		}
+
+		markDropRules := ipt.GetRules(string(KubeMarkDropChain))
+		if len(markDropRules) != 0 {
+			t.Errorf("Expect no rule in %s chain", KubeMarkDropChain)
+		}
+
+		forwardRules := ipt.GetRules(string(KubeForwardChain))
+		if !hasJump(forwardRules, "ACCEPT", "") {
+			t.Errorf("Failed to find -j ACCEPT in %s chain", KubeForwardChain)
+		}
+
+		loadBalancerRules := ipt.GetRules(string(KubeLoadBalancerChain))
+		if len(loadBalancerRules) != 1 || !hasJump(loadBalancerRules, "KUBE-MARK-MASQ", "") {
+			t.Errorf("Expect exactly one -j KUBE-MARK-MASQ in %s chain", KubeLoadBalancerChain)
+		}
+	}
+}
+
 func TestExternalIPsNoEndpoint(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
