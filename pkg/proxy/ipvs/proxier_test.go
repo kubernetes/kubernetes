@@ -1115,6 +1115,82 @@ func TestClusterIP(t *testing.T) {
 	}
 }
 
+func TestClusterIPIptablesRule(t *testing.T) {
+	svc1 := makeTestService("ns1", "svc1", func(svc *v1.Service) {
+		svc.Spec.ClusterIP = "10.20.30.41"
+		svc.Spec.Ports = []v1.ServicePort{{
+			Name:     "p80",
+			Port:     int32(80),
+			Protocol: v1.ProtocolTCP,
+		}}
+	})
+	ep1 := makeTestEndpoints("ns1", "svc1", func(ept *v1.Endpoints) {
+		ept.Subsets = []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{
+				IP: "10.180.0.1",
+			}},
+			Ports: []v1.EndpointPort{{
+				Name:     "p80",
+				Port:     int32(80),
+				Protocol: v1.ProtocolTCP,
+			}},
+		}}
+	})
+	ipt := iptablestest.NewFake().SetHasRandomFully(false)
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+	makeServiceMap(fp, svc1)
+	makeEndpointsMap(fp, ep1)
+	fp.syncProxyRules()
+
+	serviceRules := ipt.GetRules(string(kubeServicesChain))
+	if !hasJump(serviceRules, "KUBE-NODE-PORT", "") {
+		t.Errorf("Failed to find -j KUBE-NODE-PORT in %s chain", kubeServicesChain)
+	}
+	if !hasJump(serviceRules, "KUBE-MARK-MASQ", "KUBE-CLUSTER-IP") {
+		t.Errorf("Failed to find -j KUBE-MARK-MASQ in %s chain", kubeServicesChain)
+	}
+	if !hasJump(serviceRules, "ACCEPT", "KUBE-CLUSTER-IP") {
+		t.Errorf("Failed to find ACCEPT rule in %s chain", kubeServicesChain)
+	}
+
+	firewallRules := ipt.GetRules(string(KubeFireWallChain))
+	if len(firewallRules) != 1 || !hasJump(firewallRules, "KUBE-MARK-DROP", "") {
+		t.Errorf("Expect exactly one -j KUBE-MARK-DROP in %s chain", KubeFireWallChain)
+	}
+
+	postRoutingRules := ipt.GetRules(string(kubePostroutingChain))
+	if !hasJump(postRoutingRules, "MASQUERADE", "") {
+		t.Errorf("Failed to find -j MASQUERADE in %s chain", kubePostroutingChain)
+	}
+
+	markMasqRules := ipt.GetRules(string(KubeMarkMasqChain))
+	if len(markMasqRules) != 1 || !hasJump(markMasqRules, "MARK", "") {
+		t.Errorf("Expect exactly one -j MARK in %s chain", KubeMarkMasqChain)
+	}
+
+	nodePortRules := ipt.GetRules(string(KubeNodePortChain))
+	if len(nodePortRules) != 0 {
+		t.Errorf("Expect no rule in %s chain", KubeNodePortChain)
+	}
+
+	markDropRules := ipt.GetRules(string(KubeMarkDropChain))
+	if len(markDropRules) != 0 {
+		t.Errorf("Expect no rule in %s chain", KubeMarkDropChain)
+	}
+
+	forwardRules := ipt.GetRules(string(KubeForwardChain))
+	if !hasJump(forwardRules, "ACCEPT", "") {
+		t.Errorf("Failed to find -j ACCEPT in %s chain", KubeForwardChain)
+	}
+
+	loadBalancerRules := ipt.GetRules(string(KubeLoadBalancerChain))
+	if len(loadBalancerRules) != 1 || !hasJump(loadBalancerRules, "KUBE-MARK-MASQ", "") {
+		t.Errorf("Expect exactly one -j KUBE-MARK-MASQ in %s chain", KubeLoadBalancerChain)
+	}
+}
+
 func TestMasqueradeRule(t *testing.T) {
 	for _, testcase := range []bool{false, true} {
 		ipt := iptablestest.NewFake().SetHasRandomFully(testcase)
