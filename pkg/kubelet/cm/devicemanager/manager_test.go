@@ -477,7 +477,7 @@ func TestCheckpoint(t *testing.T) {
 		healthyDevices:    make(map[string]sets.String),
 		unhealthyDevices:  make(map[string]sets.String),
 		allocatedDevices:  make(map[string]sets.String),
-		podDevices:        make(podDevices),
+		podDevices:        newPodDevices(),
 		checkpointManager: ckm,
 	}
 
@@ -516,12 +516,12 @@ func TestCheckpoint(t *testing.T) {
 	err = testManager.writeCheckpoint()
 
 	as.Nil(err)
-	testManager.podDevices = make(podDevices)
+	testManager.podDevices = newPodDevices()
 	err = testManager.readCheckpoint()
 	as.Nil(err)
 
-	as.Equal(len(expectedPodDevices), len(testManager.podDevices))
-	for podUID, containerDevices := range expectedPodDevices {
+	as.Equal(expectedPodDevices.size(), testManager.podDevices.size())
+	for podUID, containerDevices := range expectedPodDevices.devs {
 		for conName, resources := range containerDevices {
 			for resource := range resources {
 				expDevices := expectedPodDevices.containerDevices(podUID, conName, resource)
@@ -615,7 +615,7 @@ func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestReso
 		unhealthyDevices:      make(map[string]sets.String),
 		allocatedDevices:      make(map[string]sets.String),
 		endpoints:             make(map[string]endpointInfo),
-		podDevices:            make(podDevices),
+		podDevices:            newPodDevices(),
 		devicesToReuse:        make(PodReusableDevices),
 		topologyAffinityStore: topologymanager.NewFakeManager(),
 		activePods:            activePods,
@@ -882,10 +882,10 @@ func TestUpdatePluginResources(t *testing.T) {
 		callback:          monitorCallback,
 		allocatedDevices:  make(map[string]sets.String),
 		healthyDevices:    make(map[string]sets.String),
-		podDevices:        make(podDevices),
+		podDevices:        newPodDevices(),
 		checkpointManager: ckm,
 	}
-	testManager.podDevices[string(pod.UID)] = make(containerDevices)
+	testManager.podDevices.devs[string(pod.UID)] = make(containerDevices)
 
 	// require one of resource1 and one of resource2
 	testManager.allocatedDevices[resourceName1] = sets.NewString()
@@ -983,7 +983,7 @@ func TestResetExtendedResource(t *testing.T) {
 		healthyDevices:    make(map[string]sets.String),
 		unhealthyDevices:  make(map[string]sets.String),
 		allocatedDevices:  make(map[string]sets.String),
-		podDevices:        make(podDevices),
+		podDevices:        newPodDevices(),
 		checkpointManager: ckm,
 	}
 
