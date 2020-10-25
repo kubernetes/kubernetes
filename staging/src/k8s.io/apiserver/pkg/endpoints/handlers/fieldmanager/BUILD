@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "buildmanagerinfo.go",
         "capmanagers.go",
+        "context.go",
         "fieldmanager.go",
         "lastappliedmanager.go",
         "lastappliedupdater.go",

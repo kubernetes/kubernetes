@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
@@ -176,6 +177,8 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 		trace.Step("About to store object in database")
 		wasCreated := false
 		requestFunc := func() (runtime.Object, error) {
+			ctx = fieldmanager.ToContext(ctx, scope.ParentFieldManager)
+			options.FieldManager = managerOrUserAgent(options.FieldManager, req.UserAgent())
 			obj, created, err := r.Update(
 				ctx,
 				name,

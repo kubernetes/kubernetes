@@ -463,6 +463,8 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			patchType:   patchType,
 			patchBytes:  patch,
 
+			options: &metav1.PatchOptions{},
+
 			trace: utiltrace.New("Patch", utiltrace.Field{"name", name}),
 		}
 

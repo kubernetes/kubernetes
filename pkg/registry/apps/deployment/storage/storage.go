@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -279,10 +280,11 @@ func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOpt
 
 // Update alters scale subset of Deployment object.
 func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	parentFieldManager := fieldmanager.FromContext(ctx)
 	obj, _, err := r.store.Update(
 		ctx,
 		name,
-		&scaleUpdatedObjectInfo{name, objInfo},
+		&scaleUpdatedObjectInfo{name, objInfo, parentFieldManager, options.FieldManager},
 		toScaleCreateValidation(createValidation),
 		toScaleUpdateValidation(updateValidation),
 		false,
@@ -350,8 +352,10 @@ func scaleFromDeployment(deployment *apps.Deployment) (*autoscaling.Scale, error
 
 // scaleUpdatedObjectInfo transforms existing deployment -> existing scale -> new scale -> new deployment
 type scaleUpdatedObjectInfo struct {
-	name       string
-	reqObjInfo rest.UpdatedObjectInfo
+	name               string
+	reqObjInfo         rest.UpdatedObjectInfo
+	parentFieldManager *fieldmanager.FieldManager
+	manager            string
 }
 
 func (i *scaleUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
@@ -401,8 +405,15 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 		)
 	}
 
-	// move replicas/resourceVersion fields to object and return
+	live := deployment.DeepCopy()
+
+	// move replicas/resourceVersion fields to object
 	deployment.Spec.Replicas = scale.Spec.Replicas
 	deployment.ResourceVersion = scale.ResourceVersion
+
+	if i.parentFieldManager != nil {
+		// update managed fields using the fieldmanager of the main resource
+		return i.parentFieldManager.Update(live, deployment, i.manager)
+	}
 	return deployment, nil
 }

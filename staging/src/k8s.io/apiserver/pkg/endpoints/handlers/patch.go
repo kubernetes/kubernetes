@@ -587,6 +587,8 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 	requestFunc := func() (runtime.Object, error) {
 		// Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
 		options := patchToUpdateOptions(p.options)
+		options.FieldManager = managerOrUserAgent(options.FieldManager, p.userAgent)
+		ctx = fieldmanager.ToContext(ctx, scope.ParentFieldManager)
 		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation, p.forceAllowCreate, options)
 		wasCreated = created
 		return updateObject, updateErr
