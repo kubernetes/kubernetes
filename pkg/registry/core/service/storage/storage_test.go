@@ -246,8 +246,8 @@ func makeServiceList() (undefaulted, defaulted *api.ServiceList) {
 	undefaultedSvc = &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "ipv4", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
 		Spec: api.ServiceSpec{
-			Type:       api.ServiceTypeClusterIP,
-			ClusterIPs: []string{"10.0.0.4"},
+			Type:      api.ServiceTypeClusterIP,
+			ClusterIP: "10.0.0.4",
 		},
 	}
 	defaultedSvc = undefaultedSvc.DeepCopy()
@@ -261,8 +261,8 @@ func makeServiceList() (undefaulted, defaulted *api.ServiceList) {
 	undefaultedSvc = &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "ipv6", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
 		Spec: api.ServiceSpec{
-			Type:       api.ServiceTypeClusterIP,
-			ClusterIPs: []string{"2000::1"},
+			Type:      api.ServiceTypeClusterIP,
+			ClusterIP: "2000::1",
 		},
 	}
 	defaultedSvc = undefaultedSvc.DeepCopy()
@@ -277,6 +277,7 @@ func makeServiceList() (undefaulted, defaulted *api.ServiceList) {
 		ObjectMeta: metav1.ObjectMeta{Name: "ipv4_ipv6", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Type:       api.ServiceTypeClusterIP,
+			ClusterIP:  "10.0.0.4",
 			ClusterIPs: []string{"10.0.0.4", "2000::1"},
 		},
 	}
@@ -292,6 +293,7 @@ func makeServiceList() (undefaulted, defaulted *api.ServiceList) {
 		ObjectMeta: metav1.ObjectMeta{Name: "ipv6_ipv4", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Type:       api.ServiceTypeClusterIP,
+			ClusterIP:  "2000::1",
 			ClusterIPs: []string{"2000::1", "10.0.0.4"},
 		},
 	}

@@ -173,6 +173,13 @@ func (r *GenericREST) defaultAServiceOnRead(service *api.Service) error {
 		return nil // already defaulted
 	}
 
+	// set clusterIPs based on ClusterIP
+	if len(service.Spec.ClusterIPs) == 0 {
+		if len(service.Spec.ClusterIP) > 0 {
+			service.Spec.ClusterIPs = []string{service.Spec.ClusterIP}
+		}
+	}
+
 	requireDualStack := api.IPFamilyPolicyRequireDualStack
 	singleStack := api.IPFamilyPolicySingleStack
 	preferDualStack := api.IPFamilyPolicyPreferDualStack
