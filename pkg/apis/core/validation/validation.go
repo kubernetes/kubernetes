@@ -4178,10 +4178,10 @@ func ValidateService(service *core.Service, allowAppProtocol bool) field.ErrorLi
 
 		// must have nil families and nil policy
 		if len(service.Spec.IPFamilies) > 0 {
-			allErrs = append(allErrs, field.Forbidden(specPath.Child("IPFamilies"), "may not be set for ExternalName services"))
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("ipFamilies"), "may not be set for ExternalName services"))
 		}
 		if service.Spec.IPFamilyPolicy != nil {
-			allErrs = append(allErrs, field.Forbidden(specPath.Child("IPFamilies"), "may not be set for ExternalName services"))
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("ipFamilyPolicy"), "may not be set for ExternalName services"))
 		}
 
 		// The value (a CNAME) may have a trailing dot to denote it as fully qualified

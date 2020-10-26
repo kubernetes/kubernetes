@@ -13072,20 +13072,20 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.IPFamilyPolicy = nil
 				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
 
-				oldSvc.Spec.IPFamilyPolicy = &singleStack
+				newSvc.Spec.IPFamilyPolicy = &singleStack
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
 			},
 			numErrs: 0,
 		},
 		{
-			name: "same ServiceIPFamily, change IPFamilyPolicy singleStack => preferDualStack",
+			name: "same ServiceIPFamily, change IPFamilyPolicy singleStack => requireDualStack",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				oldSvc.Spec.IPFamilyPolicy = &singleStack
 				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
 
-				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
+				newSvc.Spec.IPFamilyPolicy = &requireDualStack
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
 			},
@@ -13361,7 +13361,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			numErrs: 0, // families and ips are trimmed in strategy
 		},
 		{
-			name: "invalid, downgrade keeping the preferDualStack:true",
+			name: "invalid, downgrade without changing to singleStack",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
