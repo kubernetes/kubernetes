@@ -710,7 +710,14 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			}
 		})
 
-		ginkgo.It("verify PriorityClass endpoints can be operated with different HTTP methods", func() {
+		/*
+			Release: v1.20
+			Testname: Scheduler, Verify PriorityClass endpoints
+			Description: Verify that PriorityClass endpoints can be listed. When any mutable field is
+			either patched or updated it MUST succeed. When any immutable field is either patched or
+			updated it MUST fail.
+		*/
+		framework.ConformanceIt("verify PriorityClass endpoints can be operated with different HTTP methods", func() {
 			// 1. Patch/Update on immutable fields will fail.
 			pcCopy := pcs[0].DeepCopy()
 			pcCopy.Value = pcCopy.Value * 10
