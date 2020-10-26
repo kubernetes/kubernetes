@@ -68,6 +68,7 @@ spec:
     livenessProbe:
       failureThreshold: 8
       httpGet:
+		expect: {}
         host: 127.0.0.1
         path: /healthz
         port: 6443
@@ -156,6 +157,7 @@ spec:
         livenessProbe:
           failureThreshold: 8
           httpGet:
+			expect: {}
             host: 127.0.0.1
             path: /healthz
             port: 6443
@@ -228,6 +230,7 @@ spec:
     livenessProbe:
       failureThreshold: 8
       httpGet:
+		expect: {}
         host: 127.0.0.1
         path: /healthz
         port: 10257
@@ -305,6 +308,7 @@ spec:
         livenessProbe:
           failureThreshold: 8
           httpGet:
+			expect: {}
             host: 127.0.0.1
             path: /healthz
             port: 10257
@@ -377,6 +381,7 @@ spec:
     livenessProbe:
       failureThreshold: 8
       httpGet:
+		expect: {}
         host: 127.0.0.1
         path: /healthz
         port: 10259
@@ -429,7 +434,8 @@ spec:
         livenessProbe:
           failureThreshold: 8
           httpGet:
-            host: 127.0.0.1
+            expect: {}
+			host: 127.0.0.1
             path: /healthz
             port: 10259
             scheme: HTTPS

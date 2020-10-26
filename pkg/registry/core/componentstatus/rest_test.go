@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -43,7 +44,7 @@ type fakeHttpProber struct {
 	err    error
 }
 
-func (f *fakeHttpProber) Probe(*url.URL, http.Header, time.Duration) (probe.Result, string, error) {
+func (f *fakeHttpProber) Probe(*url.URL, http.Header, time.Duration, v1.HTTPGetExpect) (probe.Result, string, error) {
 	return f.result, f.body, f.err
 }
 

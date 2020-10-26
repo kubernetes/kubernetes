@@ -139,7 +139,7 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface, exp
 
 	if len(expect.HTTPResponseBody) > 0 && body != expect.HTTPResponseBody {
 		klog.V(4).Infof("Probe failed for %s with request headers %v", url.String(), headers)
-		return probe.Failure, fmt.Sprintf("HTTP probe failed with no matching headers and statuscode: %d", res.StatusCode), nil
+		return probe.Failure, fmt.Sprintf("HTTP probe failed with no matching response body and statuscode: %d", res.StatusCode), nil
 	}
 
 	if len(expect.HTTPStatusCodes) > 0 {
@@ -151,7 +151,7 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface, exp
 		}
 
 		if !hasExpectedStatusCode {
-			klog.V(4).Infof("Probe failed for %s with status code %d, request headers %v, response body: %v", res.StatusCode, url.String(), headers, body)
+			klog.V(4).Infof("Probe failed for %s with status code %d, request headers %v, response body: %v", url.String(), res.StatusCode, headers, body)
 			return probe.Failure, fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode), nil
 		}
 

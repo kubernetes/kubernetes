@@ -1738,6 +1738,19 @@ message HTTPGetAction {
   // Custom headers to set in the request. HTTP allows repeated headers.
   // +optional
   repeated HTTPHeader httpHeaders = 5;
+
+  // Criteria to expect from the HTTP Get result.
+  // +optional
+  optional HTTPGetExpect expect = 6;
+}
+
+// HTTPGetExpect describes criteria to expect from the HTTP Get result.
+message HTTPGetExpect {
+  repeated HTTPHeader httpHeaders = 1;
+
+  repeated int32 httpStatusCodes = 2;
+
+  optional string httpResponseBody = 3;
 }
 
 // HTTPHeader describes a custom header to be used in HTTP probes

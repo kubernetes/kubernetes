@@ -800,10 +800,19 @@ var map_HTTPGetAction = map[string]string{
 	"host":        "Host name to connect to, defaults to the pod IP. You probably want to set \"Host\" in httpHeaders instead.",
 	"scheme":      "Scheme to use for connecting to the host. Defaults to HTTP.",
 	"httpHeaders": "Custom headers to set in the request. HTTP allows repeated headers.",
+	"expect":      "Criteria to expect from the HTTP Get result.",
 }
 
 func (HTTPGetAction) SwaggerDoc() map[string]string {
 	return map_HTTPGetAction
+}
+
+var map_HTTPGetExpect = map[string]string{
+	"": "HTTPGetExpect describes criteria to expect from the HTTP Get result.",
+}
+
+func (HTTPGetExpect) SwaggerDoc() map[string]string {
+	return map_HTTPGetExpect
 }
 
 var map_HTTPHeader = map[string]string{
