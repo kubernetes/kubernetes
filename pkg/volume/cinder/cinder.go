@@ -448,7 +448,7 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin.GetPluginName()))
 	}
 	klog.V(3).Infof("Cinder volume %s mounted to %s", b.pdName, dir)
 
