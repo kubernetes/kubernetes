@@ -167,7 +167,7 @@ func (c *Client) Send(ctx context.Context, request *http.Request) (*http.Respons
 
 	// only use the result if the regional request actually goes through and returns 2xx status code, for two reasons:
 	// 1. the retry on regional ARM host approach is a hack.
-	// 2. the concatted regional uri could be wrong as the rule is not officially declared by ARM.
+	// 2. the concatenated regional uri could be wrong as the rule is not officially declared by ARM.
 	if regionalResponse == nil || regionalResponse.StatusCode > 299 {
 		regionalErrStr := ""
 		if regionalError != nil {

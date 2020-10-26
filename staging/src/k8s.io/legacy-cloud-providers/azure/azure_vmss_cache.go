@@ -152,7 +152,7 @@ func (ss *scaleSet) gcVMSSVMCache() error {
 	return nil
 }
 
-// newVMSSVirtualMachinesCache instanciates a new VMs cache for VMs belonging to the provided VMSS.
+// newVMSSVirtualMachinesCache instantiates a new VMs cache for VMs belonging to the provided VMSS.
 func (ss *scaleSet) newVMSSVirtualMachinesCache(resourceGroupName, vmssName, cacheKey string) (*azcache.TimedCache, error) {
 	vmssVirtualMachinesCacheTTL := time.Duration(ss.Config.VmssVirtualMachinesCacheTTLInSeconds) * time.Second
 

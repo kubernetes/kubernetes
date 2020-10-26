@@ -59,7 +59,7 @@ const (
 	backendPoolIDTemplate       = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/backendAddressPools/%s"
 	loadBalancerProbeIDTemplate = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/probes/%s"
 
-	// InternalLoadBalancerNameSuffix is load balancer posfix
+	// InternalLoadBalancerNameSuffix is load balancer suffix
 	InternalLoadBalancerNameSuffix = "-internal"
 
 	// nodeLabelRole specifies the role of a node
@@ -609,9 +609,9 @@ func (as *availabilitySet) GetPrivateIPsByNodeName(name string) ([]string, error
 	return ips, nil
 }
 
-// getAgentPoolAvailabiliySets lists the virtual machines for the resource group and then builds
+// getAgentPoolAvailabilitySets lists the virtual machines for the resource group and then builds
 // a list of availability sets that match the nodes available to k8s.
-func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentPoolAvailabilitySets *[]string, err error) {
+func (as *availabilitySet) getAgentPoolAvailabilitySets(nodes []*v1.Node) (agentPoolAvailabilitySets *[]string, err error) {
 	vms, err := as.ListVirtualMachines(as.ResourceGroup)
 	if err != nil {
 		klog.Errorf("as.getNodeAvailabilitySet - ListVirtualMachines failed, err=%v", err)
@@ -634,7 +634,7 @@ func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentP
 		asID, ok := vmNameToAvailabilitySetID[nodeName]
 		if !ok {
 			klog.Errorf("as.getNodeAvailabilitySet - Node(%s) has no availability sets", nodeName)
-			return nil, fmt.Errorf("Node (%s) - has no availability sets", nodeName)
+			return nil, fmt.Errorf("node (%s) - has no availability sets", nodeName)
 		}
 		if availabilitySetIDs.Has(asID) {
 			// already added in the list
@@ -645,7 +645,7 @@ func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentP
 			klog.Errorf("as.getNodeAvailabilitySet - Node (%s)- getLastSegment(%s), err=%v", nodeName, asID, err)
 			return nil, err
 		}
-		// AvailabilitySet ID is currently upper cased in a indeterministic way
+		// AvailabilitySet ID is currently upper cased in a non-deterministic way
 		// We want to keep it lower case, before the ID get fixed
 		asName = strings.ToLower(asName)
 
@@ -657,7 +657,7 @@ func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentP
 
 // GetVMSetNames selects all possible availability sets or scale sets
 // (depending vmType configured) for service load balancer, if the service has
-// no loadbalancer mode annotaion returns the primary VMSet. If service annotation
+// no loadbalancer mode annotation returns the primary VMSet. If service annotation
 // for loadbalancer exists then return the eligible VMSet.
 func (as *availabilitySet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) (availabilitySetNames *[]string, err error) {
 	hasMode, isAuto, serviceAvailabilitySetNames := getServiceLoadBalancerMode(service)
@@ -666,14 +666,14 @@ func (as *availabilitySet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) 
 		availabilitySetNames = &[]string{as.Config.PrimaryAvailabilitySetName}
 		return availabilitySetNames, nil
 	}
-	availabilitySetNames, err = as.getAgentPoolAvailabiliySets(nodes)
+	availabilitySetNames, err = as.getAgentPoolAvailabilitySets(nodes)
 	if err != nil {
-		klog.Errorf("as.GetVMSetNames - getAgentPoolAvailabiliySets failed err=(%v)", err)
+		klog.Errorf("as.GetVMSetNames - getAgentPoolAvailabilitySets failed err=(%v)", err)
 		return nil, err
 	}
 	if len(*availabilitySetNames) == 0 {
 		klog.Errorf("as.GetVMSetNames - No availability sets found for nodes in the cluster, node count(%d)", len(nodes))
-		return nil, fmt.Errorf("No availability sets found for nodes, node count(%d)", len(nodes))
+		return nil, fmt.Errorf("no availability sets found for nodes, node count(%d)", len(nodes))
 	}
 	// sort the list to have deterministic selection
 	sort.Strings(*availabilitySetNames)
