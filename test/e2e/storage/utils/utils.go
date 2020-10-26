@@ -67,41 +67,41 @@ const (
 )
 
 // PodExec runs f.ExecCommandInContainerWithFullOutput to execute a shell cmd in target pod
-func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, error) {
-	stdout, _, err := f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
-	return stdout, err
+func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, string, error) {
+	stdout, stderr, err := f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
+	return stdout, stderr, err
 }
 
 // VerifyExecInPodSucceed verifies shell cmd in target pod succeed
 func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, shExec string) {
-	_, err := PodExec(f, pod, shExec)
+	stdout, stderr, err := PodExec(f, pod, shExec)
 	if err != nil {
 		if exiterr, ok := err.(uexec.CodeExitError); ok {
 			exitCode := exiterr.ExitStatus()
 			framework.ExpectNoError(err,
-				"%q should succeed, but failed with exit code %d and error message %q",
-				shExec, exitCode, exiterr)
+				"%q should succeed, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",
+				shExec, exitCode, exiterr, stdout, stderr)
 		} else {
 			framework.ExpectNoError(err,
-				"%q should succeed, but failed with error message %q",
-				shExec, err)
+				"%q should succeed, but failed with error message %q\nstdout: %s\nstderr: %s",
+				shExec, err, stdout, stderr)
 		}
 	}
 }
 
 // VerifyExecInPodFail verifies shell cmd in target pod fail with certain exit code
 func VerifyExecInPodFail(f *framework.Framework, pod *v1.Pod, shExec string, exitCode int) {
-	_, err := PodExec(f, pod, shExec)
+	stdout, stderr, err := PodExec(f, pod, shExec)
 	if err != nil {
 		if exiterr, ok := err.(clientexec.ExitError); ok {
 			actualExitCode := exiterr.ExitStatus()
 			framework.ExpectEqual(actualExitCode, exitCode,
-				"%q should fail with exit code %d, but failed with exit code %d and error message %q",
-				shExec, exitCode, actualExitCode, exiterr)
+				"%q should fail with exit code %d, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",
+				shExec, exitCode, actualExitCode, exiterr, stdout, stderr)
 		} else {
 			framework.ExpectNoError(err,
-				"%q should fail with exit code %d, but failed with error message %q",
-				shExec, exitCode, err)
+				"%q should fail with exit code %d, but failed with error message %q\nstdout: %s\nstderr: %s",
+				shExec, exitCode, err, stdout, stderr)
 		}
 	}
 	framework.ExpectError(err, "%q should fail with exit code %d, but exit without error", shExec, exitCode)
