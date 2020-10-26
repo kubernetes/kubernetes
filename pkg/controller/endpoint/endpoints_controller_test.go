@@ -1256,8 +1256,8 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone,
-					IPFamily:  &ipv4,
+					ClusterIP:  v1.ClusterIPNone,
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			},
 
@@ -1289,7 +1289,7 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 				},
 			},
 
-			expectedEndpointFamily: ipv4,
+			expectedEndpointFamily: ipv6,
 		},
 		{
 			name: "v6 service, in a dual stack cluster",
@@ -1320,33 +1320,32 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name: "v6 headless service, in a dual stack cluster",
+			name: "v6 headless service, in a dual stack cluster (connected to a new api-server)",
 
 			enableDualStack: true,
 			ipFamilies:      ipv4ipv6,
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone,
-					IPFamily:  &ipv6,
+					ClusterIP:  v1.ClusterIPNone,
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol}, // <- set by a api-server defaulting logic
 				},
 			},
 
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name: "v6 legacy headless service, in a dual stack cluster",
+			name: "v6 legacy headless service, in a dual stack cluster  (connected to a old api-server)",
 
 			enableDualStack: false,
 			ipFamilies:      ipv4ipv6,
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone,
+					ClusterIP: v1.ClusterIPNone, // <- families are not set by api-server
 				},
 			},
 
-			// This is not the behavior we *want*, but it's the behavior we currently expect.
 			expectedEndpointFamily: ipv4,
 		},
 
