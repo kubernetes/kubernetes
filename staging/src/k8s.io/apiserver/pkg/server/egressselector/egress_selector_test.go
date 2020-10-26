@@ -90,7 +90,7 @@ func TestEgressSelector(t *testing.T) {
 					nil,
 				},
 				{
-					Master,
+					ControlPlane,
 					validateDirectDialer,
 					nil,
 					nil,

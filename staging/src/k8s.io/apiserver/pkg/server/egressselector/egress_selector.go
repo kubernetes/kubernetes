@@ -51,8 +51,8 @@ type EgressSelector struct {
 type EgressType int
 
 const (
-	// Master is the EgressType for traffic intended to go to the control plane.
-	Master EgressType = iota
+	// ControlPlane is the EgressType for traffic intended to go to the control plane.
+	ControlPlane EgressType = iota
 	// Etcd is the EgressType for traffic intended to go to Kubernetes persistence store.
 	Etcd
 	// Cluster is the EgressType for traffic intended to go to the system being managed by Kubernetes.
@@ -73,8 +73,8 @@ type Lookup func(networkContext NetworkContext) (utilnet.DialFunc, error)
 // String returns the canonical string representation of the egress type
 func (s EgressType) String() string {
 	switch s {
-	case Master:
-		return "master"
+	case ControlPlane:
+		return "controlplane"
 	case Etcd:
 		return "etcd"
 	case Cluster:
@@ -91,8 +91,12 @@ func (s EgressType) AsNetworkContext() NetworkContext {
 
 func lookupServiceName(name string) (EgressType, error) {
 	switch strings.ToLower(name) {
+	// 'master' is deprecated, interpret "master" as controlplane internally until removed in v1.22.
 	case "master":
-		return Master, nil
+		klog.Warning("EgressSelection name 'master' is deprecated, use 'controlplane' instead")
+		return ControlPlane, nil
+	case "controlplane":
+		return ControlPlane, nil
 	case "etcd":
 		return Etcd, nil
 	case "cluster":
@@ -364,5 +368,6 @@ func (cs *EgressSelector) Lookup(networkContext NetworkContext) (utilnet.DialFun
 		// The round trip wrapper will over-ride the dialContext method appropriately
 		return nil, nil
 	}
+
 	return cs.egressToDialer[networkContext.EgressSelectionName], nil
 }
