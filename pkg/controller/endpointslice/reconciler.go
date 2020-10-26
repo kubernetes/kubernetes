@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -56,11 +57,61 @@ type endpointMeta struct {
 // slices for the given service. It creates, updates, or deletes endpoint slices
 // to ensure the desired set of pods are represented by endpoint slices.
 func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, existingSlices []*discovery.EndpointSlice, triggerTime time.Time) error {
-	addressType := discovery.AddressTypeIPv4
+	slicesToDelete := []*discovery.EndpointSlice{}                                    // slices that are no longer  matching any address the service has
+	errs := []error{}                                                                 // all errors generated in the process of reconciling
+	slicesByAddressType := make(map[discovery.AddressType][]*discovery.EndpointSlice) // slices by address type
 
-	if endpointutil.IsIPv6Service(service) {
-		addressType = discovery.AddressTypeIPv6
+	// addresses that this service supports [o(1) find]
+	serviceSupportedAddressesTypes := getAddressTypesForService(service)
+
+	// loop through slices identifying their address type.
+	// slices that no longer match address type supported by services
+	// go to delete, other slices goes to the reconciler machinery
+	// for further adjustment
+	for _, existingSlice := range existingSlices {
+		// service no longer supports that address type, add it to deleted slices
+		if _, ok := serviceSupportedAddressesTypes[existingSlice.AddressType]; !ok {
+			slicesToDelete = append(slicesToDelete, existingSlice)
+			continue
+		}
+
+		// add list if it is not on our map
+		if _, ok := slicesByAddressType[existingSlice.AddressType]; !ok {
+			slicesByAddressType[existingSlice.AddressType] = make([]*discovery.EndpointSlice, 0, 1)
+		}
+
+		slicesByAddressType[existingSlice.AddressType] = append(slicesByAddressType[existingSlice.AddressType], existingSlice)
 	}
+
+	// reconcile for existing.
+	for addressType := range serviceSupportedAddressesTypes {
+		existingSlices := slicesByAddressType[addressType]
+		err := r.reconcileByAddressType(service, pods, existingSlices, triggerTime, addressType)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	// delete those which are of addressType that is no longer supported
+	// by the service
+	for _, sliceToDelete := range slicesToDelete {
+		err := r.client.DiscoveryV1beta1().EndpointSlices(service.Namespace).Delete(context.TODO(), sliceToDelete.Name, metav1.DeleteOptions{})
+		if err != nil {
+			errs = append(errs, fmt.Errorf("Error deleting %s EndpointSlice for Service %s/%s: %v", sliceToDelete.Name, service.Namespace, service.Name, err))
+		} else {
+			r.endpointSliceTracker.Delete(sliceToDelete)
+			metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
+		}
+	}
+
+	return utilerrors.NewAggregate(errs)
+}
+
+// reconcileByAddressType takes a set of pods currently matching a service selector and
+// compares them with the endpoints already present in any existing endpoint
+// slices (by address type) for the given service. It creates, updates, or deletes endpoint slices
+// to ensure the desired set of pods are represented by endpoint slices.
+func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*corev1.Pod, existingSlices []*discovery.EndpointSlice, triggerTime time.Time, addressType discovery.AddressType) error {
 
 	slicesToCreate := []*discovery.EndpointSlice{}
 	slicesToUpdate := []*discovery.EndpointSlice{}
@@ -70,7 +121,7 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 	existingSlicesByPortMap := map[endpointutil.PortMapKey][]*discovery.EndpointSlice{}
 	numExistingEndpoints := 0
 	for _, existingSlice := range existingSlices {
-		if existingSlice.AddressType == addressType && ownedBy(existingSlice, service) {
+		if ownedBy(existingSlice, service) {
 			epHash := endpointutil.NewPortMapKey(existingSlice.Ports)
 			existingSlicesByPortMap[epHash] = append(existingSlicesByPortMap[epHash], existingSlice)
 			numExistingEndpoints += len(existingSlice.Endpoints)
@@ -106,7 +157,7 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 		if err != nil {
 			return err
 		}
-		endpoint := podToEndpoint(pod, node, service)
+		endpoint := podToEndpoint(pod, node, service, addressType)
 		if len(endpoint.Addresses) > 0 {
 			desiredEndpointsByPortMap[epHash].Insert(&endpoint)
 			numDesiredEndpoints++

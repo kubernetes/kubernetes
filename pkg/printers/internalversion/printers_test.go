@@ -1074,9 +1074,9 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 			service: api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "service1"},
 				Spec: api.ServiceSpec{
-					ClusterIP: "1.2.3.4",
-					Type:      "LoadBalancer",
-					Ports:     []api.ServicePort{{Port: 80, Protocol: "TCP"}},
+					ClusterIPs: []string{"1.2.3.4"},
+					Type:       "LoadBalancer",
+					Ports:      []api.ServicePort{{Port: 80, Protocol: "TCP"}},
 				},
 				Status: api.ServiceStatus{
 					LoadBalancer: api.LoadBalancerStatus{
@@ -1092,9 +1092,9 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 			service: api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "service2"},
 				Spec: api.ServiceSpec{
-					ClusterIP: "1.3.4.5",
-					Type:      "LoadBalancer",
-					Ports:     []api.ServicePort{{Port: 80, Protocol: "TCP"}, {Port: 8090, Protocol: "UDP"}, {Port: 8000, Protocol: "TCP"}, {Port: 7777, Protocol: "SCTP"}},
+					ClusterIPs: []string{"1.3.4.5"},
+					Type:       "LoadBalancer",
+					Ports:      []api.ServicePort{{Port: 80, Protocol: "TCP"}, {Port: 8090, Protocol: "UDP"}, {Port: 8000, Protocol: "TCP"}, {Port: 7777, Protocol: "SCTP"}},
 				},
 			},
 			options: printers.GenerateOptions{},
@@ -1106,9 +1106,9 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 			service: api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "service3"},
 				Spec: api.ServiceSpec{
-					ClusterIP: "1.4.5.6",
-					Type:      "LoadBalancer",
-					Ports:     []api.ServicePort{{Port: 80, Protocol: "TCP"}, {Port: 8090, Protocol: "UDP"}, {Port: 8000, Protocol: "TCP"}},
+					ClusterIPs: []string{"1.4.5.6"},
+					Type:       "LoadBalancer",
+					Ports:      []api.ServicePort{{Port: 80, Protocol: "TCP"}, {Port: 8090, Protocol: "UDP"}, {Port: 8000, Protocol: "TCP"}},
 				},
 				Status: api.ServiceStatus{
 					LoadBalancer: api.LoadBalancerStatus{
@@ -1124,9 +1124,9 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 			service: api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "service4"},
 				Spec: api.ServiceSpec{
-					ClusterIP: "1.5.6.7",
-					Type:      "LoadBalancer",
-					Ports:     []api.ServicePort{{Port: 80, Protocol: "TCP"}, {Port: 8090, Protocol: "UDP"}, {Port: 8000, Protocol: "TCP"}},
+					ClusterIPs: []string{"1.5.6.7"},
+					Type:       "LoadBalancer",
+					Ports:      []api.ServicePort{{Port: 80, Protocol: "TCP"}, {Port: 8090, Protocol: "UDP"}, {Port: 8000, Protocol: "TCP"}},
 				},
 				Status: api.ServiceStatus{
 					LoadBalancer: api.LoadBalancerStatus{
@@ -1142,10 +1142,10 @@ func TestPrintServiceLoadBalancer(t *testing.T) {
 			service: api.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "service4"},
 				Spec: api.ServiceSpec{
-					ClusterIP: "1.5.6.7",
-					Type:      "LoadBalancer",
-					Ports:     []api.ServicePort{{Port: 80, Protocol: "TCP"}, {Port: 8090, Protocol: "UDP"}, {Port: 8000, Protocol: "TCP"}},
-					Selector:  map[string]string{"foo": "bar"},
+					ClusterIPs: []string{"1.5.6.7"},
+					Type:       "LoadBalancer",
+					Ports:      []api.ServicePort{{Port: 80, Protocol: "TCP"}, {Port: 8090, Protocol: "UDP"}, {Port: 8000, Protocol: "TCP"}},
+					Selector:   map[string]string{"foo": "bar"},
 				},
 				Status: api.ServiceStatus{
 					LoadBalancer: api.LoadBalancerStatus{
@@ -3083,8 +3083,8 @@ func TestPrintService(t *testing.T) {
 							Port:     2233,
 						},
 					},
-					ClusterIP: "10.9.8.7",
-					Selector:  map[string]string{"foo": "bar"}, // Does NOT get printed.
+					ClusterIPs: []string{"10.9.8.7"},
+					Selector:   map[string]string{"foo": "bar"}, // Does NOT get printed.
 				},
 			},
 			options: printers.GenerateOptions{},
@@ -3103,8 +3103,8 @@ func TestPrintService(t *testing.T) {
 							Port:     2233,
 						},
 					},
-					ClusterIP: "10.9.8.7",
-					Selector:  map[string]string{"foo": "bar"},
+					ClusterIPs: []string{"10.9.8.7"},
+					Selector:   map[string]string{"foo": "bar"},
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
@@ -3124,7 +3124,7 @@ func TestPrintService(t *testing.T) {
 							NodePort: 9999,
 						},
 					},
-					ClusterIP: "10.9.8.7",
+					ClusterIPs: []string{"10.9.8.7"},
 				},
 			},
 			options: printers.GenerateOptions{},
@@ -3143,7 +3143,7 @@ func TestPrintService(t *testing.T) {
 							Port:     8888,
 						},
 					},
-					ClusterIP: "10.9.8.7",
+					ClusterIPs: []string{"10.9.8.7"},
 				},
 			},
 			options: printers.GenerateOptions{},
@@ -3162,7 +3162,7 @@ func TestPrintService(t *testing.T) {
 							Port:     8888,
 						},
 					},
-					ClusterIP:   "10.9.8.7",
+					ClusterIPs:  []string{"10.9.8.7"},
 					ExternalIPs: singleExternalIP,
 				},
 			},
@@ -3182,7 +3182,7 @@ func TestPrintService(t *testing.T) {
 							Port:     8888,
 						},
 					},
-					ClusterIP:   "10.9.8.7",
+					ClusterIPs:  []string{"10.9.8.7"},
 					ExternalIPs: singleExternalIP,
 				},
 				Status: api.ServiceStatus{
@@ -3212,7 +3212,7 @@ func TestPrintService(t *testing.T) {
 							Port:     8888,
 						},
 					},
-					ClusterIP:   "10.9.8.7",
+					ClusterIPs:  []string{"10.9.8.7"},
 					ExternalIPs: mulExternalIP,
 				},
 				Status: api.ServiceStatus{
@@ -3276,7 +3276,7 @@ func TestPrintServiceList(t *testing.T) {
 							Port:     2233,
 						},
 					},
-					ClusterIP: "10.9.8.7",
+					ClusterIPs: []string{"10.9.8.7"},
 				},
 			},
 			{
@@ -3289,7 +3289,7 @@ func TestPrintServiceList(t *testing.T) {
 							Port:     5566,
 						},
 					},
-					ClusterIP: "1.2.3.4",
+					ClusterIPs: []string{"1.2.3.4"},
 				},
 			},
 		},

@@ -27,7 +27,6 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
-	utilnet "k8s.io/utils/net"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -137,32 +136,36 @@ func SetDefaults_Service(obj *v1.Service) {
 		obj.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
 	}
 
-	// if dualstack feature gate is on then we need to default
-	// Spec.IPFamily correctly. This is to cover the case
-	// when an existing cluster have been converted to dualstack
-	// i.e. it already contain services with Spec.IPFamily==nil
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) &&
-		obj.Spec.Type != v1.ServiceTypeExternalName &&
-		obj.Spec.ClusterIP != "" && /*has an ip already set*/
-		obj.Spec.ClusterIP != "None" && /* not converting from ExternalName to other */
-		obj.Spec.IPFamily == nil /* family was not previously set */ {
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		// Default obj.Spec.IPFamilyPolicy if we *know* we can, otherwise it will
+		// be handled later in allocation.
+		if obj.Spec.Type != v1.ServiceTypeExternalName {
+			if obj.Spec.IPFamilyPolicy == nil {
+				if len(obj.Spec.ClusterIPs) == 2 || len(obj.Spec.IPFamilies) == 2 {
+					requireDualStack := v1.IPFamilyPolicyRequireDualStack
+					obj.Spec.IPFamilyPolicy = &requireDualStack
+				}
+			}
 
-		// there is a change that the ClusterIP (set by user) is unparsable.
-		// in this case, the family will be set mistakenly to ipv4 (because
-		// the util function does not parse errors *sigh*). The error
-		// will be caught in validation which asserts the validity of the
-		// IP and the service object will not be persisted with the wrong IP
-		// family
+			// If the user demanded dual-stack, but only specified one family, we add
+			// the other.
+			if obj.Spec.IPFamilyPolicy != nil && *(obj.Spec.IPFamilyPolicy) == v1.IPFamilyPolicyRequireDualStack && len(obj.Spec.IPFamilies) == 1 {
+				if obj.Spec.IPFamilies[0] == v1.IPv4Protocol {
+					obj.Spec.IPFamilies = append(obj.Spec.IPFamilies, v1.IPv6Protocol)
+				} else {
+					obj.Spec.IPFamilies = append(obj.Spec.IPFamilies, v1.IPv4Protocol)
+				}
 
-		ipv6 := v1.IPv6Protocol
-		ipv4 := v1.IPv4Protocol
-		if utilnet.IsIPv6String(obj.Spec.ClusterIP) {
-			obj.Spec.IPFamily = &ipv6
-		} else {
-			obj.Spec.IPFamily = &ipv4
+				// Any other dual-stack defaulting depends on cluster configuration.
+				// Further IPFamilies, IPFamilyPolicy defaulting is in ClusterIP alloc/reserve logic
+				// NOTE: strategy handles cases where ClusterIPs is used (but not ClusterIP).
+			}
 		}
-	}
 
+		// any other defaulting depends on cluster configuration.
+		// further IPFamilies, IPFamilyPolicy defaulting is in ClusterIP alloc/reserve logic
+		// note: conversion logic handles cases where ClusterIPs is used (but not ClusterIP).
+	}
 }
 func SetDefaults_Pod(obj *v1.Pod) {
 	// If limits are specified, but requests are not, default requests to limits
