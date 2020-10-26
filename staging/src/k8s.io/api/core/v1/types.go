@@ -2059,6 +2059,16 @@ type HTTPGetAction struct {
 	// Custom headers to set in the request. HTTP allows repeated headers.
 	// +optional
 	HTTPHeaders []HTTPHeader `json:"httpHeaders,omitempty" protobuf:"bytes,5,rep,name=httpHeaders"`
+	// Criteria to expect from the HTTP Get result.
+	// +optional
+	Expect HTTPGetExpect `json:"expect,omitempty" protobuf:"bytes,6,opt,name=expect"`
+}
+
+// HTTPGetExpect describes criteria to expect from the HTTP Get result.
+type HTTPGetExpect struct {
+	HTTPHeaders      []HTTPHeader `json:"httpHeaders,omitempty" protobuf:"bytes,1,opt,name=httpHeaders"`
+	HTTPStatusCodes  []int32      `json:"httpStatusCodes,omitempty" protobuf:"bytes,2,opt,name=httpStatusCodes"`
+	HTTPResponseBody string       `json:"httpResponseBody,omitempty" protobuf:"bytes,3,opt,name=httpResponseBody"`
 }
 
 // URIScheme identifies the scheme used for connection to a host for Get actions

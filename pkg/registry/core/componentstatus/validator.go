@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/probe"
 	httpprober "k8s.io/kubernetes/pkg/probe/http"
@@ -72,7 +73,7 @@ func (server *Server) DoServerCheck() (probe.Result, string, error) {
 	}
 	url := utilnet.FormatURL(scheme, server.Addr, server.Port, server.Path)
 
-	result, data, err := server.Prober.Probe(url, nil, probeTimeOut)
+	result, data, err := server.Prober.Probe(url, nil, probeTimeOut, v1.HTTPGetExpect{})
 
 	if err != nil {
 		return probe.Unknown, "", err

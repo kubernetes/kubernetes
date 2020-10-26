@@ -2590,6 +2590,20 @@ func validateHTTPGetAction(http *core.HTTPGetAction, fldPath *field.Path) field.
 			allErrors = append(allErrors, field.Invalid(fldPath.Child("httpHeaders"), header.Name, msg))
 		}
 	}
+	if len(http.Expect.HTTPHeaders) > 0 {
+		for _, header := range http.Expect.HTTPHeaders {
+			for _, msg := range validation.IsHTTPHeaderName(header.Name) {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("expect").Child("httpHeaders"), header.Name, msg))
+			}
+		}
+	}
+	if len(http.Expect.HTTPStatusCodes) > 0 {
+		for _, statusCode := range http.Expect.HTTPStatusCodes {
+			if statusCode < 100 || statusCode > 599 {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("expect").Child("httpStatusCodes"), statusCode, "must be greater than or equal to 100 or less than or equal to 599"))
+			}
+		}
+	}
 	return allErrors
 }
 

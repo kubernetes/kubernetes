@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/probe"
@@ -60,7 +61,7 @@ func NewWithTLSConfig(config *tls.Config, followNonLocalRedirects bool) Prober {
 
 // Prober is an interface that defines the Probe function for doing HTTP readiness/liveness checks.
 type Prober interface {
-	Probe(url *url.URL, headers http.Header, timeout time.Duration) (probe.Result, string, error)
+	Probe(url *url.URL, headers http.Header, timeout time.Duration, expect v1.HTTPGetExpect) (probe.Result, string, error)
 }
 
 type httpProber struct {
@@ -69,13 +70,13 @@ type httpProber struct {
 }
 
 // Probe returns a ProbeRunner capable of running an HTTP check.
-func (pr httpProber) Probe(url *url.URL, headers http.Header, timeout time.Duration) (probe.Result, string, error) {
+func (pr httpProber) Probe(url *url.URL, headers http.Header, timeout time.Duration, expect v1.HTTPGetExpect) (probe.Result, string, error) {
 	client := &http.Client{
 		Timeout:       timeout,
 		Transport:     pr.transport,
 		CheckRedirect: redirectChecker(pr.followNonLocalRedirects),
 	}
-	return DoHTTPProbe(url, headers, client)
+	return DoHTTPProbe(url, headers, client, expect)
 }
 
 // GetHTTPInterface is an interface for making HTTP requests, that returns a response and error.
@@ -87,7 +88,7 @@ type GetHTTPInterface interface {
 // If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
 // If the HTTP response code is unsuccessful or HTTP communication fails, it returns Failure.
 // This is exported because some other packages may want to do direct HTTP probes.
-func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (probe.Result, string, error) {
+func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface, expect v1.HTTPGetExpect) (probe.Result, string, error) {
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		// Convert errors into failures to catch timeouts.
@@ -120,6 +121,44 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (pr
 		}
 	}
 	body := string(b)
+
+	if len(expect.HTTPHeaders) > 0 {
+		expectedHeaderCount := 0
+		for _, header := range expect.HTTPHeaders {
+			responseHeaderValue := res.Header.Get(header.Name)
+			if responseHeaderValue == header.Value {
+				expectedHeaderCount++
+			}
+		}
+
+		if len(expect.HTTPHeaders) != expectedHeaderCount {
+			klog.V(4).Infof("Probe failed for %s with request headers %v", url.String(), headers)
+			return probe.Failure, fmt.Sprintf("HTTP probe failed with no matching headers and statuscode: %d", res.StatusCode), nil
+		}
+	}
+
+	if len(expect.HTTPResponseBody) > 0 && body != expect.HTTPResponseBody {
+		klog.V(4).Infof("Probe failed for %s with request headers %v", url.String(), headers)
+		return probe.Failure, fmt.Sprintf("HTTP probe failed with no matching headers and statuscode: %d", res.StatusCode), nil
+	}
+
+	if len(expect.HTTPStatusCodes) > 0 {
+		hasExpectedStatusCode := false
+		for _, statusCode := range expect.HTTPStatusCodes {
+			if res.StatusCode == int(statusCode) {
+				hasExpectedStatusCode = true
+			}
+		}
+
+		if !hasExpectedStatusCode {
+			klog.V(4).Infof("Probe failed for %s with status code %d, request headers %v, response body: %v", res.StatusCode, url.String(), headers, body)
+			return probe.Failure, fmt.Sprintf("HTTP probe failed with statuscode: %d", res.StatusCode), nil
+		}
+
+		klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
+		return probe.Success, body, nil
+	}
+
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
 		if res.StatusCode >= http.StatusMultipleChoices { // Redirect
 			klog.V(4).Infof("Probe terminated redirects for %s, Response: %v", url.String(), *res)

@@ -1973,6 +1973,16 @@ type HTTPGetAction struct {
 	// Optional: Custom headers to set in the request. HTTP allows repeated headers.
 	// +optional
 	HTTPHeaders []HTTPHeader
+	// Criteria to expect from the HTTP Get result.
+	// +optional
+	Expect HTTPGetExpect
+}
+
+// HTTPGetExpect describes criteria to expect from the HTTP Get result.
+type HTTPGetExpect struct {
+	HTTPHeaders      []HTTPHeader
+	HTTPStatusCodes  []int32
+	HTTPResponseBody string
 }
 
 // URIScheme identifies the scheme used for connection to a host for Get actions
