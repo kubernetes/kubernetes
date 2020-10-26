@@ -413,6 +413,48 @@ func TestValidateEgressSelectorConfiguration(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:        "invalid egress selection name",
+			expectError: true,
+			contents: &apiserver.EgressSelectorConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				EgressSelections: []apiserver.EgressSelection{
+					{
+						Name: "invalid",
+						Connection: apiserver.Connection{
+							ProxyProtocol: apiserver.ProtocolDirect,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "both master and controlplane egress selection configured",
+			expectError: true,
+			contents: &apiserver.EgressSelectorConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				EgressSelections: []apiserver.EgressSelection{
+					{
+						Name: "controlplane",
+						Connection: apiserver.Connection{
+							ProxyProtocol: apiserver.ProtocolDirect,
+						},
+					},
+					{
+						Name: "master",
+						Connection: apiserver.Connection{
+							ProxyProtocol: apiserver.ProtocolDirect,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range testcases {

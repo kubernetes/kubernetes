@@ -12,6 +12,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/apiserver:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/install:go_default_library",
