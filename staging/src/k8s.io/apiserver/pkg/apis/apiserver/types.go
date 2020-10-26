@@ -62,8 +62,8 @@ type EgressSelectorConfiguration struct {
 // EgressSelection provides the configuration for a single egress selection client.
 type EgressSelection struct {
 	// Name is the name of the egress selection.
-	// Currently supported values are "ControlPlane", "Master", "Etcd" and "Cluster"
-	// The "Master" egress selector is deprecated in favor of "ControlPlane"
+	// Currently supported values are "controlplane", "master", "etcd" and "cluster"
+	// The "master" egress selector is deprecated in favor of "controlplane"
 	Name string
 
 	// Connection is the exact information used to configure the egress selection
