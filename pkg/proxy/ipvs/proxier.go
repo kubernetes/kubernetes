@@ -699,7 +699,7 @@ func (handle *LinuxKernelHandler) GetKernelVersion() (string, error) {
 // This is determined by checking if all the required kernel modules can be loaded. It may
 // return an error if it fails to get the kernel modules information without error, in which
 // case it will also return false.
-func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, error) {
+func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler string) (bool, error) {
 	mods, err := handle.GetModules()
 	if err != nil {
 		return false, fmt.Errorf("error getting installed ipvs required kernel modules: %v", err)
@@ -717,6 +717,12 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, err
 	}
 	mods = utilipvs.GetRequiredIPVSModules(kernelVersion)
 	wantModules := sets.NewString()
+	// We check for the existence of the scheduler mod and will trigger a missingMods error if not found
+	if scheduler == "" {
+		scheduler = DefaultScheduler
+	}
+	schedulerMod := "ip_vs_" + scheduler
+	mods = append(mods, schedulerMod)
 	wantModules.Insert(mods...)
 
 	modules := wantModules.Difference(loadModules).UnsortedList()

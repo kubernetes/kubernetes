@@ -256,6 +256,7 @@ func TestCleanupLeftovers(t *testing.T) {
 func TestCanUseIPVSProxier(t *testing.T) {
 	testCases := []struct {
 		mods          []string
+		scheduler     string
 		kernelVersion string
 		kernelErr     error
 		ipsetVersion  string
@@ -265,6 +266,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		// case 0, kernel error
 		{
 			mods:          []string{"foo", "bar", "baz"},
+			scheduler:     "",
 			kernelVersion: "4.19",
 			kernelErr:     fmt.Errorf("oops"),
 			ipsetVersion:  "0.0",
@@ -273,6 +275,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		// case 1, ipset error
 		{
 			mods:          []string{"foo", "bar", "baz"},
+			scheduler:     "",
 			kernelVersion: "4.19",
 			ipsetVersion:  MinIPSetCheckVersion,
 			ipsetErr:      fmt.Errorf("oops"),
@@ -281,6 +284,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		// case 2, missing required kernel modules and ipset version too low
 		{
 			mods:          []string{"foo", "bar", "baz"},
+			scheduler:     "rr",
 			kernelVersion: "4.19",
 			ipsetVersion:  "1.1",
 			ok:            false,
@@ -288,6 +292,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		// case 3, missing required ip_vs_* kernel modules
 		{
 			mods:          []string{"ip_vs", "a", "bc", "def"},
+			scheduler:     "sed",
 			kernelVersion: "4.19",
 			ipsetVersion:  MinIPSetCheckVersion,
 			ok:            false,
@@ -295,6 +300,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		// case 4, ipset version too low
 		{
 			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack"},
+			scheduler:     "rr",
 			kernelVersion: "4.19",
 			ipsetVersion:  "4.3.0",
 			ok:            false,
@@ -302,6 +308,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		// case 5, ok for linux kernel 4.19
 		{
 			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack"},
+			scheduler:     "rr",
 			kernelVersion: "4.19",
 			ipsetVersion:  MinIPSetCheckVersion,
 			ok:            true,
@@ -309,6 +316,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		// case 6, ok for linux kernel 4.18
 		{
 			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
+			scheduler:     "rr",
 			kernelVersion: "4.18",
 			ipsetVersion:  MinIPSetCheckVersion,
 			ok:            true,
@@ -316,16 +324,41 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		// case 7. ok when module list has extra modules
 		{
 			mods:          []string{"foo", "ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "bar"},
+			scheduler:     "rr",
 			kernelVersion: "4.19",
 			ipsetVersion:  "6.19",
 			ok:            true,
+		},
+		// case 8, not ok for sed based IPVS scheduling
+		{
+			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack"},
+			scheduler:     "sed",
+			kernelVersion: "4.19",
+			ipsetVersion:  MinIPSetCheckVersion,
+			ok:            false,
+		},
+		// case 9, ok for dh based IPVS scheduling
+		{
+			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "ip_vs_dh"},
+			scheduler:     "dh",
+			kernelVersion: "4.19",
+			ipsetVersion:  MinIPSetCheckVersion,
+			ok:            true,
+		},
+		// case 10, non-existent scheduler, error due to modules not existing
+		{
+			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "ip_vs_dh"},
+			scheduler:     "foobar",
+			kernelVersion: "4.19",
+			ipsetVersion:  MinIPSetCheckVersion,
+			ok:            false,
 		},
 	}
 
 	for i := range testCases {
 		handle := &fakeKernelHandler{modules: testCases[i].mods, kernelVersion: testCases[i].kernelVersion}
 		versioner := &fakeIPSetVersioner{version: testCases[i].ipsetVersion, err: testCases[i].ipsetErr}
-		ok, err := CanUseIPVSProxier(handle, versioner)
+		ok, err := CanUseIPVSProxier(handle, versioner, testCases[i].scheduler)
 		if ok != testCases[i].ok {
 			t.Errorf("Case [%d], expect %v, got %v: err: %v", i, testCases[i].ok, ok, err)
 		}
