@@ -148,6 +148,12 @@ const (
 	//
 	// Allows for updating watchcache resource version with progress notify events.
 	EfficientWatchResumption featuregate.Feature = "EfficientWatchResumption"
+
+	// owner: @roycaihw
+	// alpha: v1.20
+	//
+	// Assigns each kube-apiserver an ID in a cluster.
+	APIServerIdentity featuregate.Feature = "APIServerIdentity"
 )
 
 func init() {
@@ -173,4 +179,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SelectorIndex:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	WarningHeaders:           {Default: true, PreRelease: featuregate.Beta},
 	EfficientWatchResumption: {Default: false, PreRelease: featuregate.Alpha},
+	APIServerIdentity:        {Default: false, PreRelease: featuregate.Alpha},
 }
