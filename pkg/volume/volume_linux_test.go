@@ -314,7 +314,7 @@ func TestSetVolumeOwnership(t *testing.T) {
 			}
 
 			mounter := &localFakeMounter{path: tmpDir}
-			err = SetVolumeOwnership(mounter, &expectedGid, test.fsGroupChangePolicy)
+			err = SetVolumeOwnership(mounter, &expectedGid, test.fsGroupChangePolicy, nil)
 			if err != nil {
 				t.Errorf("for %s error changing ownership with: %v", test.description, err)
 			}

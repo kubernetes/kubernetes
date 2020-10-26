@@ -40,7 +40,7 @@ const (
 // SetVolumeOwnership modifies the given volume to be owned by
 // fsGroup, and sets SetGid so that newly created files are owned by
 // fsGroup. If fsGroup is nil nothing is done.
-func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) error {
+func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(*error)) error {
 	if fsGroup == nil {
 		return nil
 	}
@@ -55,7 +55,11 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1
 	// This code exists for legacy purposes, so as old behaviour is entirely preserved when feature gate is disabled
 	// TODO: remove this when ConfigurableFSGroupPolicy turns GA.
 	if !fsGroupPolicyEnabled {
-		return legacyOwnershipChange(mounter, fsGroup)
+		err := legacyOwnershipChange(mounter, fsGroup)
+		if completeFunc != nil {
+			completeFunc(&err)
+		}
+		return err
 	}
 
 	if skipPermissionChange(mounter, fsGroup, fsGroupChangePolicy) {
@@ -63,13 +67,16 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1
 		return nil
 	}
 
-	return walkDeep(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
+	err := walkDeep(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		return changeFilePermission(path, fsGroup, mounter.GetAttributes().ReadOnly, info)
 	})
-
+	if completeFunc != nil {
+		completeFunc(&err)
+	}
+	return err
 }
 
 func legacyOwnershipChange(mounter Mounter, fsGroup *int64) error {

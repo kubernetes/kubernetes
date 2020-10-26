@@ -161,7 +161,7 @@ func (v *sioVolume) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 
 	if !v.readOnly && mounterArgs.FsGroup != nil {
 		klog.V(4).Info(log("applying  value FSGroup ownership"))
-		volume.SetVolumeOwnership(v, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+		volume.SetVolumeOwnership(v, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(v.plugin.GetPluginName()))
 	}
 
 	klog.V(4).Info(log("successfully setup PV %s: volume %s mapped as %s mounted at %s", v.volSpecName, v.volName, devicePath, dir))
