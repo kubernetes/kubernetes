@@ -807,6 +807,11 @@ var (
 			existingPodsNum: 10000,
 			allNodesNum:     1000,
 		},
+		{
+			name:            "5000nodes",
+			existingPodsNum: 50000,
+			allNodesNum:     5000,
+		},
 	}
 )
 
