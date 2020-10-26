@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	apierrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
@@ -232,9 +233,9 @@ func containsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.Persisten
 	return false
 }
 
-// NodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
+// nodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
 // labels.Selector.
-func NodeSelectorRequirementsAsSelector(nsm []v1.NodeSelectorRequirement) (labels.Selector, error) {
+func nodeSelectorRequirementsAsSelector(nsm []v1.NodeSelectorRequirement) (labels.Selector, error) {
 	if len(nsm) == 0 {
 		return labels.Nothing(), nil
 	}
@@ -266,9 +267,9 @@ func NodeSelectorRequirementsAsSelector(nsm []v1.NodeSelectorRequirement) (label
 	return selector, nil
 }
 
-// NodeSelectorRequirementsAsFieldSelector converts the []NodeSelectorRequirement core type into a struct that implements
+// nodeSelectorRequirementsAsFieldSelector converts the []NodeSelectorRequirement core type into a struct that implements
 // fields.Selector.
-func NodeSelectorRequirementsAsFieldSelector(nsm []v1.NodeSelectorRequirement) (fields.Selector, error) {
+func nodeSelectorRequirementsAsFieldSelector(nsm []v1.NodeSelectorRequirement) (fields.Selector, error) {
 	if len(nsm) == 0 {
 		return fields.Nothing(), nil
 	}
@@ -315,34 +316,45 @@ func NodeSelectorRequirementKeysExistInNodeSelectorTerms(reqs []v1.NodeSelectorR
 // MatchNodeSelectorTerms checks whether the node labels and fields match node selector terms in ORed;
 // nil or empty term matches no objects.
 func MatchNodeSelectorTerms(
-	nodeSelectorTerms []v1.NodeSelectorTerm,
-	nodeLabels labels.Set,
-	nodeFields fields.Set,
-) bool {
-	for _, req := range nodeSelectorTerms {
+	node *v1.Node,
+	nodeSelector *v1.NodeSelector,
+) (bool, error) {
+	if node == nil {
+		return false, nil
+	}
+	var errors []error
+	for _, req := range nodeSelector.NodeSelectorTerms {
 		// nil or empty term selects no objects
 		if len(req.MatchExpressions) == 0 && len(req.MatchFields) == 0 {
 			continue
 		}
 
 		if len(req.MatchExpressions) != 0 {
-			labelSelector, err := NodeSelectorRequirementsAsSelector(req.MatchExpressions)
-			if err != nil || !labelSelector.Matches(nodeLabels) {
+			labelSelector, err := nodeSelectorRequirementsAsSelector(req.MatchExpressions)
+			if err != nil {
+				errors = append(errors, err)
+				continue
+			}
+			if labelSelector == nil || !labelSelector.Matches(labels.Set(node.Labels)) {
 				continue
 			}
 		}
 
-		if len(req.MatchFields) != 0 {
-			fieldSelector, err := NodeSelectorRequirementsAsFieldSelector(req.MatchFields)
-			if err != nil || !fieldSelector.Matches(nodeFields) {
+		if len(req.MatchFields) != 0 && len(node.Name) > 0 {
+			fieldSelector, err := nodeSelectorRequirementsAsFieldSelector(req.MatchFields)
+			if err != nil {
+				errors = append(errors, err)
+				continue
+			}
+			if fieldSelector == nil || !fieldSelector.Matches(fields.Set{"metadata.name": node.Name}) {
 				continue
 			}
 		}
 
-		return true
+		return true, nil
 	}
 
-	return false
+	return false, apierrors.NewAggregate(errors)
 }
 
 // TopologySelectorRequirementsAsSelector converts the []TopologySelectorLabelRequirement api type into a struct
