@@ -1644,7 +1644,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 				},
 				Status: corev1.PersistentVolumeClaimStatus{},
 			},
-			expectedElements: []string{"\nDataSource:\n  Kind:      PersistentVolumeClaim\n  Name:      srcpvc"},
+			expectedElements: []string{"\nDataSource:\n  Kind:   PersistentVolumeClaim\n  Name:   srcpvc"},
 		},
 		{
 			name: "snapshot-datasource",
