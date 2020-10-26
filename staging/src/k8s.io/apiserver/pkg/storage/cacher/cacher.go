@@ -263,7 +263,7 @@ type Cacher struct {
 
 	// Defines a time budget that can be spend on waiting for not-ready watchers
 	// while dispatching event before shutting them down.
-	dispatchTimeoutBudget *timeBudget
+	dispatchTimeoutBudget timeBudget
 
 	// Handling graceful termination.
 	stopLock sync.RWMutex

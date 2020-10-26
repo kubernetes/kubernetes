@@ -998,6 +998,14 @@ func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
 	wg.Wait()
 }
 
+type fakeTimeBudget struct{}
+
+func (f *fakeTimeBudget) takeAvailable() time.Duration {
+	return 2 * time.Second
+}
+
+func (f *fakeTimeBudget) returnUnused(_ time.Duration) {}
+
 func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
@@ -1010,7 +1018,19 @@ func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 	cacher.ready.wait()
 
 	// Ensure there is some budget for slowing down processing.
-	cacher.dispatchTimeoutBudget.returnUnused(50 * time.Millisecond)
+	// When using the official `timeBudgetImpl` we were observing flakiness
+	// due under the following conditions:
+	// 1) the watch w1 is blocked, so we were consuming the whole budget once
+	//    its buffer was filled in (10 items)
+	// 2) the budget is refreshed once per second, so it basically wasn't
+	//    happening in the test at all
+	// 3) if the test was cpu-starved and we weren't able to consume events
+	//    from w2 ResultCh it could have happened that its buffer was also
+	//    filling in and given we no longer had timeBudget (consumed in (1))
+	//    trying to put next item was simply breaking the watch
+	// Using fakeTimeBudget gives us always a budget to wait and have a test
+	// pick up something from ResultCh in the meantime.
+	cacher.dispatchTimeoutBudget = &fakeTimeBudget{}
 
 	makePod := func(i int) *examplev1.Pod {
 		return &examplev1.Pod{
@@ -1055,8 +1075,6 @@ func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 				shouldContinue = false
 				break
 			}
-			// Ensure there is some budget for fast watcher after slower one is blocked.
-			cacher.dispatchTimeoutBudget.returnUnused(50 * time.Millisecond)
 			if event.Type == watch.Added {
 				eventsCount++
 				if eventsCount == totalPods {
