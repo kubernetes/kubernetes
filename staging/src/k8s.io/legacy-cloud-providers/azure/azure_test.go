@@ -947,7 +947,7 @@ func findLBRuleForPort(lbRules []network.LoadBalancingRule, port int32) (network
 			return lbRule, nil
 		}
 	}
-	return network.LoadBalancingRule{}, fmt.Errorf("Expected LB rule with port %d but none found", port)
+	return network.LoadBalancingRule{}, fmt.Errorf("expected LB rule with port %d but none found", port)
 }
 
 func TestServiceDefaultsToNoSessionPersistence(t *testing.T) {
@@ -1883,7 +1883,7 @@ func TestSecurityRulePriorityFailsIfExhausted(t *testing.T) {
 
 	_, err := getNextAvailablePriority(rules)
 	if err == nil {
-		t.Error("Expectected an error. There are no priority levels left.")
+		t.Error("Expect an error. There are no priority levels left.")
 	}
 }
 
@@ -3092,7 +3092,7 @@ func TestGetResourceGroupFromDiskURI(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			// case insentive check
+			// case insensitive check
 			diskURL:        "/subscriptions/4be8920b-2978-43d7-axyz-04d8549c1d05/resourcegroups/azure-k8s1102/providers/Microsoft.Compute/disks/andy-mghyb1102-dynamic-pvc-f7f014c9-49f4-11e8-ab5c-000d3af7b38e",
 			expectedResult: "azure-k8s1102",
 			expectError:    false,
@@ -3285,7 +3285,7 @@ func TestGetActiveZones(t *testing.T) {
 
 	az.nodeInformerSynced = nil
 	zones, err := az.GetActiveZones()
-	expectedErr := fmt.Errorf("Azure cloud provider doesn't have informers set")
+	expectedErr := fmt.Errorf("azure cloud provider doesn't have informers set")
 	assert.Equal(t, expectedErr, err)
 	assert.Nil(t, zones)
 
