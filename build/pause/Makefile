@@ -88,9 +88,12 @@ push-manifest:
 	# For Windows images, we also need to include the "os.version" in the manifest list, so the Windows node can pull the proper image it needs.
 	# At the moment, docker manifest annotate doesn't allow us to set the os.version, so we'll have to it ourselves. The manifest list can be found locally as JSONs.
 	# See: https://github.com/moby/moby/issues/41417
+	# If the ${REGISTRY} is on dockerhub, the prefix "docker.io/" is optional. However, we need the full
+	# registry name for setting the os.version for Windows images below.
+	# If the registry name does not contain any slashes, we prepend "docker.io/"
 	# TODO(claudiub): Clean this up once the above issue has been fixed.
 	set -x; \
-	registry_prefix=$(shell (echo ${REGISTRY} | grep -Eq "[a-z]*") && echo "docker.io/" || echo ""); \
+	registry_prefix=$(shell (echo ${REGISTRY} | grep -Eq ".*\/.*") && echo "" || echo "docker.io/"); \
 	manifest_image_folder=`echo "$${registry_prefix}${IMAGE}" | sed "s|/|_|g" | sed "s/:/-/"`; \
 	for arch in $(ALL_ARCH.windows);  do \
 		for osversion in ${ALL_OSVERSIONS.windows}; do \
