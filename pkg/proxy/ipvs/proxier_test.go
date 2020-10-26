@@ -1750,6 +1750,136 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	checkIptables(t, ipt, epIpt)
 }
 
+func TestOnlyLocalNodePortsIptablesRule(t *testing.T) {
+	nodeIP := net.ParseIP("100.101.102.103")
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP}, nil, false)
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+
+	makeServiceMap(fp,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(svcNodePort),
+			}}
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		}),
+	)
+
+	epIP := "10.180.0.1"
+	epIP1 := "10.180.1.1"
+	thisHostname := testHostname
+	otherHostname := "other-hostname"
+
+	makeEndpointsMap(fp,
+		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
+			ept.Subsets = []v1.EndpointSubset{
+				{ // **local** endpoint address, should be added as RS
+					Addresses: []v1.EndpointAddress{{
+						IP:       epIP,
+						NodeName: &thisHostname,
+					}},
+					Ports: []v1.EndpointPort{{
+						Name:     svcPortName.Port,
+						Port:     int32(svcPort),
+						Protocol: v1.ProtocolTCP,
+					}}},
+				{ // **remote** endpoint address, should not be added as RS
+					Addresses: []v1.EndpointAddress{{
+						IP:       epIP1,
+						NodeName: &otherHostname,
+					}},
+					Ports: []v1.EndpointPort{{
+						Name:     svcPortName.Port,
+						Port:     int32(svcPort),
+						Protocol: v1.ProtocolTCP,
+					}},
+				}}
+		}),
+	)
+
+	itf := net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0}
+	addrs := []net.Addr{proxyutiltest.AddrStruct{Val: "100.101.102.103/24"}}
+	itf1 := net.Interface{Index: 1, MTU: 0, Name: "eth1", HardwareAddr: nil, Flags: 0}
+	addrs1 := []net.Addr{proxyutiltest.AddrStruct{Val: "2001:db8::0/64"}}
+	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
+	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
+	fp.nodePortAddresses = []string{"100.101.102.0/24", "2001:db8::0/64"}
+
+	fp.syncProxyRules()
+
+	serviceRules := ipt.GetRules(string(kubeServicesChain))
+	if !hasJump(serviceRules, "KUBE-NODE-PORT", "") {
+		t.Errorf("Failed to find -j KUBE-NODE-PORT in %s chain", kubeServicesChain)
+	}
+	if !hasJump(serviceRules, "KUBE-MARK-MASQ", "KUBE-CLUSTER-IP") {
+		t.Errorf("Failed to find -j KUBE-MARK-MASQ in %s chain", kubeServicesChain)
+	}
+	if !hasJump(serviceRules, "ACCEPT", "KUBE-CLUSTER-IP") {
+		t.Errorf("Failed to find ACCEPT KUBE-CLUSTER-IP rule in %s chain", kubeServicesChain)
+	}
+
+	firewallRules := ipt.GetRules(string(KubeFireWallChain))
+	if len(firewallRules) != 1 || !hasJump(firewallRules, "KUBE-MARK-DROP", "") {
+		t.Errorf("Expect exactly one -j KUBE-MARK-DROP in %s chain", firewallRules)
+	}
+
+	postRoutingRules := ipt.GetRules(string(kubePostroutingChain))
+	if !hasJump(postRoutingRules, "MASQUERADE", "") {
+		t.Errorf("Failed to find -j MASQUERADE in %s chain", kubePostroutingChain)
+	}
+	if !hasJump(postRoutingRules, "MASQUERADE", "KUBE-LOOP-BACK") {
+		t.Errorf("Failed to find KUBE-LOOP-BACK -j MASQUERADE in %s chain", kubePostroutingChain)
+	}
+	if !hasJump(postRoutingRules, "RETURN", "") {
+		t.Errorf("Failed to find -j RETURN in %s chain", kubePostroutingChain)
+	}
+	if !hasJump(postRoutingRules, "MARK", "") {
+		t.Errorf("Failed to find -j MARK in %s chain", kubePostroutingChain)
+	}
+
+	markMasqRules := ipt.GetRules(string(KubeMarkMasqChain))
+	if len(markMasqRules) != 1 || !hasJump(markMasqRules, "MARK", "") {
+		t.Errorf("Expect exactly one -j MARK in %s chain", KubeMarkMasqChain)
+	}
+
+	nodePortRules := ipt.GetRules(string(KubeNodePortChain))
+	if !hasJump(nodePortRules, "RETURN", "KUBE-NODE-PORT-LOCAL-TCP") {
+		t.Errorf("Failed to find -j RETURN in %s chain", KubeNodePortChain)
+	}
+	if !hasJump(nodePortRules, "KUBE-MARK-MASQ", "KUBE-NODE-PORT-TCP") {
+		t.Errorf("Failed to find -j KUBE-MARK-MASQ in %s chain", KubeNodePortChain)
+	}
+
+	markDropRules := ipt.GetRules(string(KubeMarkDropChain))
+	if len(markDropRules) != 0 {
+		t.Errorf("Expect no rule in %s chain", KubeMarkDropChain)
+	}
+
+	forwardRules := ipt.GetRules(string(KubeForwardChain))
+	if !hasJump(forwardRules, "ACCEPT", "") {
+		t.Errorf("Failed to find -j ACCEPT in %s chain", KubeForwardChain)
+	}
+
+	loadBalancerRules := ipt.GetRules(string(KubeLoadBalancerChain))
+	if len(loadBalancerRules) != 1 || !hasJump(loadBalancerRules, "KUBE-MARK-MASQ", "") {
+		t.Errorf("Expect exactly one -j KUBE-MARK-MASQ in %s chain", loadBalancerRules)
+	}
+}
+
 func TestLoadBalanceSourceRanges(t *testing.T) {
 	ipt, fp := buildFakeProxier()
 
