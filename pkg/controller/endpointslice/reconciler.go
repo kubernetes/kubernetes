@@ -62,15 +62,15 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 	slicesByAddressType := make(map[discovery.AddressType][]*discovery.EndpointSlice) // slices by address type
 
 	// addresses that this service supports [o(1) find]
-	serviceSupportedAddresses := getAddressTypesForService(service)
+	serviceSupportedAddressesTypes := getAddressTypesForService(service)
 
 	// loop through slices identifying their address type.
-	// slices that no longer match address supported by services
+	// slices that no longer match address type supported by services
 	// go to delete, other slices goes to the reconciler machinery
 	// for further adjustment
 	for _, existingSlice := range existingSlices {
-		// service no longer support that address type, add it to deleted slices
-		if _, ok := serviceSupportedAddresses[existingSlice.AddressType]; !ok {
+		// service no longer supports that address type, add it to deleted slices
+		if _, ok := serviceSupportedAddressesTypes[existingSlice.AddressType]; !ok {
 			slicesToDelete = append(slicesToDelete, existingSlice)
 			continue
 		}
@@ -84,9 +84,9 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 	}
 
 	// reconcile for existing.
-	for addr := range serviceSupportedAddresses {
-		existingSlices := slicesByAddressType[addr]
-		err := r.reconcileByAddressType(service, pods, existingSlices, triggerTime, addr)
+	for addressType := range serviceSupportedAddressesTypes {
+		existingSlices := slicesByAddressType[addressType]
+		err := r.reconcileByAddressType(service, pods, existingSlices, triggerTime, addressType)
 		if err != nil {
 			errs = append(errs, err)
 		}
