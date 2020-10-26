@@ -286,8 +286,8 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 				})
 
 				command = "cat /mnt/test/data"
-				actualData, err := utils.PodExec(f, restoredPod, command)
-				framework.ExpectNoError(err)
+				actualData, stderr, err := utils.PodExec(f, restoredPod, command)
+				framework.ExpectNoError(err, "command %q: stdout: %s\nstderr: %s", command, actualData, stderr)
 				framework.ExpectEqual(actualData, originalMntTestData)
 			})
 		})
