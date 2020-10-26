@@ -35,7 +35,6 @@ import (
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -165,18 +164,20 @@ func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) 
 // CheckNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
 // This ensures that we don't mount a volume that doesn't belong to this node
 func CheckNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {
-	return checkVolumeNodeAffinity(pv, nodeLabels)
+	return checkVolumeNodeAffinity(pv, &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: nodeLabels}})
 }
 
-func checkVolumeNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {
+func checkVolumeNodeAffinity(pv *v1.PersistentVolume, node *v1.Node) error {
 	if pv.Spec.NodeAffinity == nil {
 		return nil
 	}
 
 	if pv.Spec.NodeAffinity.Required != nil {
-		terms := pv.Spec.NodeAffinity.Required.NodeSelectorTerms
+		terms := pv.Spec.NodeAffinity.Required
 		klog.V(10).Infof("Match for Required node selector terms %+v", terms)
-		if !v1helper.MatchNodeSelectorTerms(terms, labels.Set(nodeLabels), nil) {
+		if matches, err := v1helper.MatchNodeSelectorTerms(node, terms); err != nil {
+			return err
+		} else if !matches {
 			return fmt.Errorf("no matching NodeSelectorTerms")
 		}
 	}
