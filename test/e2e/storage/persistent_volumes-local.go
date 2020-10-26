@@ -1074,10 +1074,10 @@ func testReadFileContent(f *framework.Framework, testFileDir string, testFile st
 // Execute a read or write command in a pod.
 // Fail on error
 func podRWCmdExec(f *framework.Framework, pod *v1.Pod, cmd string) string {
-	out, err := utils.PodExec(f, pod, cmd)
-	framework.Logf("podRWCmdExec out: %q err: %v", out, err)
+	stdout, stderr, err := utils.PodExec(f, pod, cmd)
+	framework.Logf("podRWCmdExec cmd: %q, out: %q, stderr: %q, err: %v", cmd, stdout, stderr, err)
 	framework.ExpectNoError(err)
-	return out
+	return stdout
 }
 
 // Initialize test volume on node
