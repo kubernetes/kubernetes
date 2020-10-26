@@ -1,0 +1,39 @@
+# Copyright 2020 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+ARG BASEIMAGE
+ARG REGISTRY
+
+# We're using a Linux image to unpack the archive, then we're copying it over to Windows.
+FROM --platform=linux/amd64 alpine:3.6 as prep
+
+ADD https://openresty.org/download/openresty-1.13.6.2-win64.zip /openresty-win64.zip
+RUN mkdir /openresty &&\
+    unzip /openresty-win64.zip -d /openresty
+
+FROM $REGISTRY/windows-image-builder-helper:1.1-windows-amd64-1809 as helper
+FROM $BASEIMAGE
+
+COPY --from=prep /openresty/openresty-1.13.6.2-win64 /openresty
+COPY --from=helper /Windows/System32/vcruntime140.dll /Windows/System32/
+COPY --from=helper ["/Program Files/OpenSSL", "/Program Files/OpenSSL"]
+
+ENV PATH="C:\openresty\;C:\bin\;C:\curl\;C:\Windows\system32;C:\Windows;C:\Program Files\PowerShell;"
+
+ADD run.sh /openresty/run.sh
+ADD nginx.conf /openresty/conf/nginx.conf
+ADD template.lua /openresty/lua/template.lua
+
+EXPOSE 80 443 8080 8443
+ENTRYPOINT ["/bin/sh", "/openresty/run.sh"]

@@ -1,4 +1,4 @@
-# Copyright 2018 The Kubernetes Authors.
+# Copyright 2020 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,13 @@
 # see e2e test named "Should be able to support the 1.17 Sample API Server using the current Aggregator"
 
 ARG BASEIMAGE
-FROM $BASEIMAGE
-ADD sample-apiserver /sample-apiserver
+ARG REGISTRY
+ARG OS_VERSION
 
-ENTRYPOINT ["/sample-apiserver"]
+FROM --platform=linux/amd64 $REGISTRY/windows-servercore-cache:1.0-linux-amd64-$OS_VERSION as servercore-helper
+FROM $BASEIMAGE
+
+COPY --from=servercore-helper /Windows/System32/netapi32.dll /Windows/System32/netapi32.dll
+ADD sample-apiserver /sample-apiserver.exe
+
+ENTRYPOINT ["/sample-apiserver.exe"]
