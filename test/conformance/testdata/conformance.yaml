@@ -2014,6 +2014,14 @@
     number of Replicas.
   release: v1.19
   file: test/e2e/scheduling/preemption.go
+- testname: Scheduler, Verify PriorityClass endpoints
+  codename: '[sig-scheduling] SchedulerPreemption [Serial] PriorityClass endpoints
+    verify PriorityClass endpoints can be operated with different HTTP methods [Conformance]'
+  description: Verify that PriorityClass endpoints can be listed. When any mutable
+    field is either patched or updated it MUST succeed. When any immutable field is
+    either patched or updated it MUST fail.
+  release: v1.20
+  file: test/e2e/scheduling/preemption.go
 - testname: Scheduler, Basic Preemption
   codename: '[sig-scheduling] SchedulerPreemption [Serial] validates basic preemption
     works [Conformance]'
