@@ -322,7 +322,6 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 
 	clusterIP := utilproxy.GetClusterIPByFamily(sct.ipFamily, service)
 	if clusterIP == "" {
-		utilproxy.LogAndEmitIncorrectIPVersionEvent(sct.recorder, "clusterIPs", strings.Join(service.Spec.ClusterIPs, ","), service.Namespace, service.Name, service.UID)
 		return nil
 	}
 
