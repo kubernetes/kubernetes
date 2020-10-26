@@ -1,5 +1,6 @@
 cluster/images/etcd/migrate
 pkg/controller/replicaset
+pkg/kubelet/dockershim
 pkg/volume/testing
 test/e2e/autoscaling
 test/integration/examples
