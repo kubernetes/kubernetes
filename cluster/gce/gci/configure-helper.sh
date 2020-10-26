@@ -1657,6 +1657,9 @@ function prepare-kube-proxy-manifest-variables {
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
     params+=" ${KUBEPROXY_TEST_ARGS}"
   fi
+  if [[ -n "${DETECT_LOCAL_MODE:-}" ]]; then
+    params+=" --detect-local-mode=${DETECT_LOCAL_MODE}"
+  fi
   local container_env=""
   local kube_cache_mutation_detector_env_name=""
   local kube_cache_mutation_detector_env_value=""
