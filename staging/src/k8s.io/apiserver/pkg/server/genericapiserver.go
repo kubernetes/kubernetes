@@ -196,6 +196,9 @@ type GenericAPIServer struct {
 	// The limit on the request body size that would be accepted and decoded in a write request.
 	// 0 means no limit.
 	maxRequestBodyBytes int64
+
+	// APIServerID is the ID of this API server
+	APIServerID string
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works

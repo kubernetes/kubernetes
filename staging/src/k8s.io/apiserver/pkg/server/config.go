@@ -224,6 +224,9 @@ type Config struct {
 	// EquivalentResourceRegistry provides information about resources equivalent to a given resource,
 	// and the kind associated with a given resource. As resources are installed, they are registered here.
 	EquivalentResourceRegistry runtime.EquivalentResourceRegistry
+
+	// APIServerID is the ID of this API server
+	APIServerID string
 }
 
 type RecommendedConfig struct {
@@ -287,6 +290,10 @@ type AuthorizationInfo struct {
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
 	defaultHealthChecks := []healthz.HealthChecker{healthz.PingHealthz, healthz.LogHealthz}
+	var id string
+	if feature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		id = "kube-apiserver-" + uuid.New().String()
+	}
 	return &Config{
 		Serializer:                  codecs,
 		BuildHandlerChainFunc:       DefaultBuildHandlerChain,
@@ -325,6 +332,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
 		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+		APIServerID:     id,
 	}
 }
 
@@ -574,6 +582,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 		maxRequestBodyBytes: c.MaxRequestBodyBytes,
 		livezClock:          clock.RealClock{},
+		APIServerID:         c.APIServerID,
 	}
 
 	for {
