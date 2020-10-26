@@ -5610,7 +5610,7 @@ func TestValidateHandler(t *testing.T) {
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP"}},
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "Host", Value: "foo.example.com"}}}},
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "X-Forwarded-For", Value: "1.2.3.4"}, {Name: "X-Forwarded-For", Value: "5.6.7.8"}}}},
-		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt(1), Host: "", Scheme: "HTTP", Expect: core.HTTPGetExpect{ HTTPHeaders: []core.HTTPHeader{{Name: "X-Forwarded-For", Value: "1.2.3.4" }}}}},
+		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt(1), Host: "", Scheme: "HTTP", Expect: core.HTTPGetExpect{HTTPHeaders: []core.HTTPHeader{{Name: "X-Forwarded-For", Value: "1.2.3.4"}}}}},
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt(1), Host: "", Scheme: "HTTP", Expect: core.HTTPGetExpect{HTTPStatusCodes: []int32{200, 201}}}},
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt(1), Host: "", Scheme: "HTTP", Expect: core.HTTPGetExpect{HTTPResponseBody: "FOO"}}},
 	}
@@ -5630,7 +5630,7 @@ func TestValidateHandler(t *testing.T) {
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromString("port"), Host: "", Scheme: "HTTP", HTTPHeaders: []core.HTTPHeader{{Name: "X_Forwarded_For", Value: "foo.example.com"}}}},
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt(1), Host: "", Scheme: "HTTP", Expect: core.HTTPGetExpect{HTTPStatusCodes: []int32{99}}}},
 		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt(1), Host: "", Scheme: "HTTP", Expect: core.HTTPGetExpect{HTTPStatusCodes: []int32{600}}}},
-		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt(1), Host: "", Scheme: "HTTP", Expect: core.HTTPGetExpect{ HTTPHeaders: []core.HTTPHeader{{Name: "X_Forwarded_For", Value: "1.2.3.4" }}}}},
+		{HTTPGet: &core.HTTPGetAction{Path: "/", Port: intstr.FromInt(1), Host: "", Scheme: "HTTP", Expect: core.HTTPGetExpect{HTTPHeaders: []core.HTTPHeader{{Name: "X_Forwarded_For", Value: "1.2.3.4"}}}}},
 	}
 	for _, h := range errorCases {
 		if errs := validateHandler(&h, field.NewPath("field")); len(errs) == 0 {
