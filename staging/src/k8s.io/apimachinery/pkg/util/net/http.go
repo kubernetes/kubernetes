@@ -165,7 +165,7 @@ func configureHttp2Transport(t1 *http.Transport) error {
 		return err
 	}
 
-	// There are several confirmed flaws with Go's http2 implementation.
+	// There are several corner cases with Go's http2 implementation.
 	// So we need to explicitly enable the "http2: connection health check" introduced in golang/net/pull/55
 	// to recover from such "fatal" situations.
 	// Upstream golang issues:
@@ -174,17 +174,17 @@ func configureHttp2Transport(t1 *http.Transport) error {
 	//   # golang/go/issues/41721
 	// Associated Kubernetes issues:
 	//   # kubernetes/kubernetes/issues/87615
-	if idleConnTimeout := t1.IdleConnTimeout / 2; idleConnTimeout > 0 {
+	if readIdleTimeout := t1.IdleConnTimeout / 2; readIdleTimeout > 0 {
 		// h2Transport configured here does not dial any new connection,
 		// we can set the interval of healthCheck to half of h1Transport's IdleConnTimeout.
 		// By default, ReadIdleTimeout is not configured.
-		h2t.ReadIdleTimeout = idleConnTimeout
+		h2t.ReadIdleTimeout = readIdleTimeout
 	} else {
 		// The default IdleConnTimeout for h1Transport is 90s
 		h2t.ReadIdleTimeout = defaultTransport.IdleConnTimeout / 2
 	}
 	// The default PingTimeout is 15s.
-	// Our configuration should not below default value.
+	// Our configuration should not be below the default value.
 	if pingTimeout := h2t.ReadIdleTimeout / 2; pingTimeout > 15*time.Second {
 		h2t.PingTimeout = pingTimeout
 	}
