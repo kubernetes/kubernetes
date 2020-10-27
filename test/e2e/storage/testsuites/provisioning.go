@@ -195,7 +195,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		l.testCase.TestDynamicProvisioning()
 	})
 
-	ginkgo.It("should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]", func() {
+	ginkgo.It("should provision storage with snapshot data source", func() {
 		if !dInfo.Capabilities[CapSnapshotDataSource] {
 			e2eskipper.Skipf("Driver %q does not support populate data from snapshot - skipping", dInfo.Name)
 		}

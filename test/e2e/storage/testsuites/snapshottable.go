@@ -82,7 +82,6 @@ func InitSnapshottableTestSuite() TestSuite {
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
-			FeatureTag: "[Feature:VolumeSnapshotDataSource]",
 		},
 	}
 }
