@@ -131,20 +131,27 @@ func WithExponentialBackoff(ctx context.Context, initialBackoff time.Duration, w
 		Steps:    5,
 	}
 
-	var err error
-	wait.ExponentialBackoff(backoff, func() (bool, error) {
-		err = webhookFn()
-		if ctx.Err() != nil {
-			// we timed out or were cancelled, we should not retry
-			return true, err
-		}
-		if shouldRetry(err) {
+	// having a webhook error allows us to track the last actual webhook error for requests that
+	// are later cancelled or time out.
+	var webhookErr error
+	err := wait.ExponentialBackoffWithContext(ctx, backoff, func() (bool, error) {
+		webhookErr = webhookFn()
+		if shouldRetry(webhookErr) {
 			return false, nil
 		}
-		if err != nil {
-			return false, err
+		if webhookErr != nil {
+			return false, webhookErr
 		}
 		return true, nil
 	})
-	return err
+
+	switch {
+	// we check for webhookErr first, if webhookErr is set it's the most important error to return.
+	case webhookErr != nil:
+		return webhookErr
+	case err != nil:
+		return fmt.Errorf("webhook call failed: %s", err.Error())
+	default:
+		return nil
+	}
 }
