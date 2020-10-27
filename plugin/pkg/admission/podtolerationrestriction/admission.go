@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 
 	"k8s.io/klog/v2"
 
@@ -54,9 +55,11 @@ func Register(plugins *admission.Plugins) {
 }
 
 // The annotation keys for default and whitelist of tolerations
+// and an option to append cluster tolerations to the default tolerations and whitelist
 const (
-	NSDefaultTolerations string = "scheduler.alpha.kubernetes.io/defaultTolerations"
-	NSWLTolerations      string = "scheduler.alpha.kubernetes.io/tolerationsWhitelist"
+	NSDefaultTolerations       string = "scheduler.alpha.kubernetes.io/defaultTolerations"
+	NSWLTolerations            string = "scheduler.alpha.kubernetes.io/tolerationsWhitelist"
+	NSAppendClusterTolerations string = "scheduler.alpha.kubernetes.io/appendClusterTolerations"
 )
 
 var _ admission.MutationInterface = &Plugin{}
@@ -90,10 +93,16 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 			return err
 		}
 
+		appendClusterTolerations, err := p.getNamespaceAppendClusterTolerations(a.GetNamespace())
+		if err != nil {
+			return err
+		}
+
 		// If the namespace has not specified its default tolerations,
+		// or we should not append the default ones,
 		// fall back to cluster's default tolerations.
-		if ts == nil {
-			ts = p.pluginConfig.Default
+		if ts == nil || appendClusterTolerations {
+			ts = append(ts, p.pluginConfig.Default...)
 		}
 
 		extraTolerations = ts
@@ -132,10 +141,16 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 			return err
 		}
 
+		appendClusterTolerations, err := p.getNamespaceAppendClusterTolerations(a.GetNamespace())
+		if err != nil {
+			return err
+		}
+
 		// If the namespace has not specified its tolerations whitelist,
+		// or AppendClusterTolerations is enabled,
 		// fall back to cluster's whitelist of tolerations.
-		if whitelist == nil {
-			whitelist = p.pluginConfig.Whitelist
+		if whitelist == nil || appendClusterTolerations {
+			whitelist = append(whitelist, p.pluginConfig.Whitelist...)
 			whitelistScope = "cluster"
 		}
 
@@ -178,7 +193,7 @@ func NewPodTolerationsPlugin(pluginConfig *pluginapi.Configuration) *Plugin {
 	}
 }
 
-// SetExternalKubeClientSet sets th client
+// SetExternalKubeClientSet sets the client
 func (p *Plugin) SetExternalKubeClientSet(client kubernetes.Interface) {
 	p.client = client
 }
@@ -237,6 +252,14 @@ func (p *Plugin) getNamespaceTolerationsWhitelist(nsName string) ([]api.Tolerati
 	return extractNSTolerations(ns, NSWLTolerations)
 }
 
+func (p *Plugin) getNamespaceAppendClusterTolerations(nsName string) (bool, error) {
+	ns, err := p.getNamespace(nsName)
+	if err != nil {
+		return false, err
+	}
+	return extractNSBooleanOption(ns, NSAppendClusterTolerations, false)
+}
+
 // extractNSTolerations extracts default or whitelist of tolerations from
 // following namespace annotations keys: "scheduler.alpha.kubernetes.io/defaultTolerations"
 // and "scheduler.alpha.kubernetes.io/tolerationsWhitelist". If these keys are
@@ -273,4 +296,24 @@ func extractNSTolerations(ns *corev1.Namespace, key string) ([]api.Toleration, e
 	}
 
 	return ts, nil
+}
+
+// extractNSBooleanOption extracts a boolean value for a given annotation.
+// If the annotation does not exist, it will fall-back to the default value provided.
+func extractNSBooleanOption(ns *corev1.Namespace, key string, defaultvalue bool) (bool, error) {
+	// if a namespace does not have any annotations
+	if len(ns.Annotations) == 0 {
+		return defaultvalue, nil
+	}
+
+	// if NSWLTolerations or NSDefaultTolerations does not exist
+	if _, ok := ns.Annotations[key]; !ok {
+		return defaultvalue, nil
+	}
+
+	// if value is set to empty
+	if len(ns.Annotations[key]) == 0 {
+		return defaultvalue, nil
+	}
+	return strconv.ParseBool(ns.Annotations[key])
 }
