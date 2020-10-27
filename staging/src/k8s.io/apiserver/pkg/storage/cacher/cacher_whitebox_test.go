@@ -1081,7 +1081,7 @@ func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 					shouldContinue = false
 				}
 			}
-		case <-time.After(2 * time.Second):
+		case <-time.After(wait.ForeverTestTimeout):
 			shouldContinue = false
 			w2.Stop()
 		}
