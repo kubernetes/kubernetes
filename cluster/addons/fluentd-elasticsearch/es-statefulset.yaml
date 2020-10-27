@@ -18,11 +18,11 @@ metadata:
 rules:
   - apiGroups:
       - ""
-  - resources:
+    resources:
       - "services"
       - "namespaces"
       - "endpoints"
-  - verbs:
+    verbs:
       - "get"
 ---
 kind: ClusterRoleBinding
