@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -305,7 +305,7 @@ func (b *azureFileMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 
 	mountComplete := false
 	err = wait.PollImmediate(1*time.Second, 2*time.Minute, func() (bool, error) {
-		err := b.mounter.MountSensitive(source, dir, "cifs", mountOptions, sensitiveMountOptions)
+		err := b.mounter.MountSensitiveWithoutSystemd(source, dir, "cifs", mountOptions, sensitiveMountOptions)
 		mountComplete = true
 		return true, err
 	})

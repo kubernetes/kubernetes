@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 func fakeContainerMgrMountInt() mount.Interface {
@@ -59,7 +59,7 @@ func fakeContainerMgrMountInt() mount.Interface {
 
 func TestCgroupMountValidationSuccess(t *testing.T) {
 	f, err := validateSystemRequirements(fakeContainerMgrMountInt())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	if cgroups.IsCgroup2UnifiedMode() {
 		assert.True(t, f.cpuHardcapping, "cpu hardcapping is expected to be enabled")
 	} else {
@@ -116,7 +116,7 @@ func TestCgroupMountValidationMultipleSubsystem(t *testing.T) {
 			},
 		})
 	_, err := validateSystemRequirements(mountInt)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestGetCpuWeight(t *testing.T) {

@@ -1131,10 +1131,11 @@ func printService(obj *api.Service, options printers.GenerateOptions) ([]metav1.
 		Object: runtime.RawExtension{Object: obj},
 	}
 	svcType := obj.Spec.Type
-	internalIP := obj.Spec.ClusterIP
-	if len(internalIP) == 0 {
-		internalIP = "<none>"
+	internalIP := "<none>"
+	if len(obj.Spec.ClusterIPs) > 0 {
+		internalIP = obj.Spec.ClusterIPs[0]
 	}
+
 	externalIP := getServiceExternalIP(obj, options.Wide)
 	svcPorts := makePortString(obj.Spec.Ports)
 	if len(svcPorts) == 0 {
@@ -2039,6 +2040,25 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 				target := "<auto>"
 				if spec.Resource.Target.AverageUtilization != nil {
 					target = fmt.Sprintf("%d%%", *spec.Resource.Target.AverageUtilization)
+				}
+				list = append(list, fmt.Sprintf("%s/%s", current, target))
+			}
+		case autoscaling.ContainerResourceMetricSourceType:
+			if spec.ContainerResource.Target.AverageValue != nil {
+				current := "<unknown>"
+				if len(statuses) > i && statuses[i].ContainerResource != nil {
+					current = statuses[i].ContainerResource.Current.AverageValue.String()
+				}
+				list = append(list, fmt.Sprintf("%s/%s", current, spec.ContainerResource.Target.AverageValue.String()))
+			} else {
+				current := "<unknown>"
+				if len(statuses) > i && statuses[i].ContainerResource != nil && statuses[i].ContainerResource.Current.AverageUtilization != nil {
+					current = fmt.Sprintf("%d%%", *statuses[i].ContainerResource.Current.AverageUtilization)
+				}
+
+				target := "<auto>"
+				if spec.ContainerResource.Target.AverageUtilization != nil {
+					target = fmt.Sprintf("%d%%", *spec.ContainerResource.Target.AverageUtilization)
 				}
 				list = append(list, fmt.Sprintf("%s/%s", current, target))
 			}

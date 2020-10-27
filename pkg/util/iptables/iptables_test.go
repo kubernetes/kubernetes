@@ -35,7 +35,11 @@ import (
 	fakeexec "k8s.io/utils/exec/testing"
 )
 
-const TestLockfilePath = "xtables.lock"
+func getLockPaths() (string, string) {
+	lock14x := fmt.Sprintf("@xtables-%d", time.Now().Nanosecond())
+	lock16x := fmt.Sprintf("xtables-%d.lock", time.Now().Nanosecond())
+	return lock14x, lock16x
+}
 
 func testIPTablesVersionCmds(t *testing.T, protocol Protocol) {
 	version := " v1.4.22"
@@ -934,8 +938,8 @@ func TestRestoreAll(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := newInternal(&fexec, ProtocolIPv4, TestLockfilePath)
-	defer os.Remove(TestLockfilePath)
+	lockPath14x, lockPath16x := getLockPaths()
+	runner := newInternal(&fexec, ProtocolIPv4, lockPath14x, lockPath16x)
 
 	err := runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)
 	if err != nil {
@@ -975,8 +979,8 @@ func TestRestoreAllWait(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := newInternal(&fexec, ProtocolIPv4, TestLockfilePath)
-	defer os.Remove(TestLockfilePath)
+	lockPath14x, lockPath16x := getLockPaths()
+	runner := newInternal(&fexec, ProtocolIPv4, lockPath14x, lockPath16x)
 
 	err := runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)
 	if err != nil {
@@ -1020,8 +1024,8 @@ func TestRestoreAllWaitOldIptablesRestore(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := newInternal(&fexec, ProtocolIPv4, TestLockfilePath)
-	defer os.Remove(TestLockfilePath)
+	lockPath14x, lockPath16x := getLockPaths()
+	runner := newInternal(&fexec, ProtocolIPv4, lockPath14x, lockPath16x)
 
 	err := runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)
 	if err != nil {
@@ -1065,24 +1069,23 @@ func TestRestoreAllGrabNewLock(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-
-	runner := newInternal(&fexec, ProtocolIPv4, TestLockfilePath)
-	defer os.Remove(TestLockfilePath)
+	lockPath14x, lockPath16x := getLockPaths()
+	runner := newInternal(&fexec, ProtocolIPv4, lockPath14x, lockPath16x)
 
 	// Grab the /run lock and ensure the RestoreAll fails
-	runLock, err := os.OpenFile(TestLockfilePath, os.O_CREATE, 0600)
+	runLock, err := os.OpenFile(lockPath16x, os.O_CREATE, 0600)
 	if err != nil {
-		t.Fatalf("expected to open %s, got %v", TestLockfilePath, err)
+		t.Fatalf("expected to open %s, got %v", lockPath16x, err)
 	}
 	defer runLock.Close()
 
 	if err := grabIptablesFileLock(runLock); err != nil {
-		t.Errorf("expected to lock %s, got %v", TestLockfilePath, err)
+		t.Errorf("expected to lock %s, got %v", lockPath16x, err)
 	}
 
 	err = runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)
 	if err == nil {
-		t.Errorf("expected failure, got success instead")
+		t.Fatal("expected failure, got success instead")
 	}
 	if !strings.Contains(err.Error(), "failed to acquire new iptables lock: timed out waiting for the condition") {
 		t.Errorf("expected timeout error, got %v", err)
@@ -1107,22 +1110,21 @@ func TestRestoreAllGrabOldLock(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-
-	runner := newInternal(&fexec, ProtocolIPv4, TestLockfilePath)
-	defer os.Remove(TestLockfilePath)
+	lockPath14x, lockPath16x := getLockPaths()
+	runner := newInternal(&fexec, ProtocolIPv4, lockPath14x, lockPath16x)
 
 	var runLock *net.UnixListener
 	// Grab the abstract @xtables socket, will retry if the socket exists
 	err := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
-		runLock, err = net.ListenUnix("unix", &net.UnixAddr{Name: "@xtables", Net: "unix"})
+		runLock, err = net.ListenUnix("unix", &net.UnixAddr{Name: lockPath14x, Net: "unix"})
 		if err != nil {
-			t.Logf("Failed to lock @xtables: %v, will retry.", err)
+			t.Logf("Failed to lock %s: %v, will retry.", lockPath14x, err)
 			return false, nil
 		}
 		return true, nil
 	})
 	if err != nil {
-		t.Fatal("Timed out locking @xtables")
+		t.Fatalf("Timed out locking %s", lockPath14x)
 	}
 	if runLock == nil {
 		t.Fatal("Unexpected nil runLock")
@@ -1132,7 +1134,7 @@ func TestRestoreAllGrabOldLock(t *testing.T) {
 
 	err = runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)
 	if err == nil {
-		t.Errorf("expected failure, got success instead")
+		t.Fatal("expected failure, got success instead")
 	}
 	if !strings.Contains(err.Error(), "failed to acquire old iptables lock: timed out waiting for the condition") {
 		t.Errorf("expected timeout error, got %v", err)
@@ -1160,8 +1162,8 @@ func TestRestoreAllWaitBackportedIptablesRestore(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := newInternal(&fexec, ProtocolIPv4, TestLockfilePath)
-	defer os.Remove(TestLockfilePath)
+	lockPath14x, lockPath16x := getLockPaths()
+	runner := newInternal(&fexec, ProtocolIPv4, lockPath14x, lockPath16x)
 
 	err := runner.RestoreAll([]byte{}, NoFlushTables, RestoreCounters)
 	if err != nil {

@@ -7,8 +7,10 @@ approvers:
 - derekwaynecarr
 - vishh
 - yujuhong
-- dashpole
 - sjenning
+
+emeritus_approvers:
+- dashpole
 
 reviewers:
 - sig-node-reviewers # see https://github.com/kubernetes/kubernetes/blob/master/OWNERS_ALIASES#LC220:~:text=sig%2Dnode%2Dreviewers

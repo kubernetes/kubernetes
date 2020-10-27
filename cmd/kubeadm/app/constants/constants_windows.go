@@ -23,5 +23,5 @@ const (
 	DefaultDockerCRISocket = "npipe:////./pipe/docker_engine"
 
 	// PauseVersion indicates the default pause image version for kubeadm
-	PauseVersion = "1.3.0"
+	PauseVersion = "1.4.0"
 )

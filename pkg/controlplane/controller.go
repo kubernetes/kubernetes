@@ -52,7 +52,7 @@ type Controller struct {
 	ServiceClient   corev1client.ServicesGetter
 	NamespaceClient corev1client.NamespacesGetter
 	EventClient     corev1client.EventsGetter
-	healthClient    rest.Interface
+	readyzClient    rest.Interface
 
 	ServiceClusterIPRegistry          rangeallocation.RangeRegistry
 	ServiceClusterIPRange             net.IPNet
@@ -85,7 +85,7 @@ type Controller struct {
 }
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master
-func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient corev1client.ServicesGetter, nsClient corev1client.NamespacesGetter, eventClient corev1client.EventsGetter, healthClient rest.Interface) *Controller {
+func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient corev1client.ServicesGetter, nsClient corev1client.NamespacesGetter, eventClient corev1client.EventsGetter, readyzClient rest.Interface) *Controller {
 	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
 	if err != nil {
 		klog.Fatalf("failed to get listener address: %v", err)
@@ -97,7 +97,7 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		ServiceClient:   serviceClient,
 		NamespaceClient: nsClient,
 		EventClient:     eventClient,
-		healthClient:    healthClient,
+		readyzClient:    readyzClient,
 
 		EndpointReconciler: c.ExtraConfig.EndpointReconcilerConfig.Reconciler,
 		EndpointInterval:   c.ExtraConfig.EndpointReconcilerConfig.Interval,
@@ -211,7 +211,7 @@ func (c *Controller) RunKubernetesService(ch chan struct{}) {
 	// wait until process is ready
 	wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
 		var code int
-		c.healthClient.Get().AbsPath("/healthz").Do(context.TODO()).StatusCode(&code)
+		c.readyzClient.Get().AbsPath("/readyz").Do(context.TODO()).StatusCode(&code)
 		return code == http.StatusOK, nil
 	}, ch)
 
@@ -292,6 +292,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 		}
 		return nil
 	}
+	singleStack := corev1.IPFamilyPolicySingleStack
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
@@ -303,6 +304,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 			// maintained by this code, not by the pod selector
 			Selector:        nil,
 			ClusterIP:       serviceIP.String(),
+			IPFamilyPolicy:  &singleStack,
 			SessionAffinity: corev1.ServiceAffinityNone,
 			Type:            serviceType,
 		},

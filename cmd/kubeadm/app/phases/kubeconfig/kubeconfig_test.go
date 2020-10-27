@@ -261,11 +261,10 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 			kubeConfig:         configWithAnotherClusterCa,
 			expectedError:      true,
 		},
-		{ // if KubeConfig is not equal to the existingKubeConfig - refers to the another cluster (a cluster with another address) -, raise error
+		{ // if KubeConfig is not equal to the existingKubeConfig - tollerate custom server addresses
 			name:               "KubeConfig referst to the cluster with another address",
 			existingKubeConfig: config,
 			kubeConfig:         configWithAnotherClusterAddress,
-			expectedError:      true,
 		},
 	}
 
@@ -505,10 +504,9 @@ func TestValidateKubeConfig(t *testing.T) {
 			kubeConfig:         config,
 			expectedError:      true,
 		},
-		"kubeconfig exist and has invalid server url": {
+		"kubeconfig exist and has a different server url": {
 			existingKubeConfig: configWithAnotherServerURL,
 			kubeConfig:         config,
-			expectedError:      true,
 		},
 		"kubeconfig exist and is valid": {
 			existingKubeConfig: config,
@@ -608,15 +606,14 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 			initConfig:    initConfig,
 			expectedError: true,
 		},
-		"some files have invalid Server Url": {
+		"some files have a different Server URL": {
 			filesToWrite: map[string]*clientcmdapi.Config{
 				kubeadmconstants.AdminKubeConfigFileName:             config,
 				kubeadmconstants.KubeletKubeConfigFileName:           config,
 				kubeadmconstants.ControllerManagerKubeConfigFileName: config,
 				kubeadmconstants.SchedulerKubeConfigFileName:         configWithAnotherServerURL,
 			},
-			initConfig:    initConfig,
-			expectedError: true,
+			initConfig: initConfig,
 		},
 		"all files are valid": {
 			filesToWrite: map[string]*clientcmdapi.Config{

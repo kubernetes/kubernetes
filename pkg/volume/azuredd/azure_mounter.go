@@ -24,7 +24,7 @@ import (
 	"runtime"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
@@ -131,7 +131,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 		return err
 	}
 
-	mountErr := mounter.Mount(globalPDPath, dir, *volumeSource.FSType, options)
+	mountErr := mounter.MountSensitiveWithoutSystemd(globalPDPath, dir, *volumeSource.FSType, options, nil)
 	// Everything in the following control flow is meant as an
 	// attempt cleanup a failed setupAt (bind mount)
 	if mountErr != nil {
@@ -164,7 +164,7 @@ func (m *azureDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 	}
 
 	if volumeSource.ReadOnly == nil || !*volumeSource.ReadOnly {
-		volume.SetVolumeOwnership(m, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+		volume.SetVolumeOwnership(m, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(m.plugin.GetPluginName()))
 	}
 
 	klog.V(2).Infof("azureDisk - successfully mounted disk %s on %s", diskName, dir)

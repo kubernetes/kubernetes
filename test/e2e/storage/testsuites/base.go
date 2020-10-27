@@ -172,7 +172,7 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	if !dInfo.SupportedFsType.Has(pattern.FsType) {
 		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.FsType)
 	}
-	if pattern.FsType == "xfs" && framework.NodeOSDistroIs("gci", "cos", "windows") {
+	if pattern.FsType == "xfs" && framework.NodeOSDistroIs("windows") {
 		e2eskipper.Skipf("Distro doesn't support xfs -- skipping")
 	}
 	if pattern.FsType == "ntfs" && !framework.NodeOSDistroIs("windows") {

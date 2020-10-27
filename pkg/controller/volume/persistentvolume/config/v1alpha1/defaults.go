@@ -39,6 +39,11 @@ func RecommendedDefaultPersistentVolumeBinderControllerConfiguration(obj *kubect
 		obj.PVClaimBinderSyncPeriod = metav1.Duration{Duration: 15 * time.Second}
 	}
 
+	if obj.VolumeHostAllowLocalLoopback == nil {
+		trueValue := true
+		obj.VolumeHostAllowLocalLoopback = &trueValue
+	}
+
 	// Use the default VolumeConfiguration options.
 	RecommendedDefaultVolumeConfiguration(&obj.VolumeConfiguration)
 }

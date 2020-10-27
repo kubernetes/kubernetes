@@ -19,7 +19,7 @@ limitations under the License.
 package stats
 
 import (
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
 // listContainerNetworkStats returns the network stats of all the running containers.

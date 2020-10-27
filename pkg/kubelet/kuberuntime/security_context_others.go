@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
@@ -35,16 +36,16 @@ func verifyRunAsNonRoot(pod *v1.Pod, container *v1.Container, uid *int64, userna
 
 	if effectiveSc.RunAsUser != nil {
 		if *effectiveSc.RunAsUser == 0 {
-			return fmt.Errorf("container's runAsUser breaks non-root policy")
+			return fmt.Errorf("container's runAsUser breaks non-root policy (pod: %q, container: %s)", format.Pod(pod), container.Name)
 		}
 		return nil
 	}
 
 	switch {
 	case uid != nil && *uid == 0:
-		return fmt.Errorf("container has runAsNonRoot and image will run as root")
+		return fmt.Errorf("container has runAsNonRoot and image will run as root (pod: %q, container: %s)", format.Pod(pod), container.Name)
 	case uid == nil && len(username) > 0:
-		return fmt.Errorf("container has runAsNonRoot and image has non-numeric user (%s), cannot verify user is non-root", username)
+		return fmt.Errorf("container has runAsNonRoot and image has non-numeric user (%s), cannot verify user is non-root (pod: %q, container: %s)", username, format.Pod(pod), container.Name)
 	default:
 		return nil
 	}

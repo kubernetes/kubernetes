@@ -23,8 +23,7 @@ import (
 	"regexp"
 	"testing"
 
-	v1 "k8s.io/api/core/v1"
-	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -49,7 +48,6 @@ func TestSyncHandler(t *testing.T) {
 	tests := []struct {
 		name                string
 		csiMigrationEnabled bool
-		storageClass        *storagev1.StorageClass
 		pvcKey              string
 		pv                  *v1.PersistentVolume
 		pvc                 *v1.PersistentVolumeClaim
@@ -59,27 +57,14 @@ func TestSyncHandler(t *testing.T) {
 	}{
 		{
 			name:     "when pvc has no PV binding",
-			pvc:      getFakePersistentVolumeClaim("no-pv-pvc", "", "", ""),
+			pvc:      getFakePersistentVolumeClaim("no-pv-pvc", "", ""),
 			pvcKey:   "default/no-pv-pvc",
 			hasError: true,
 		},
 		{
-			name:   "when pvc has no storageclass",
-			pv:     getFakePersistentVolume("vol-1", csitranslationplugins.AWSEBSInTreePluginName, "no-sc-pvc-vol-1"),
-			pvc:    getFakePersistentVolumeClaim("no-sc-pvc", "vol-1", "", "no-sc-pvc-vol-1"),
-			pvcKey: "default/no-sc-pvc",
-		},
-		{
-			name:   "when pvc storageclass is missing",
-			pv:     getFakePersistentVolume("vol-2", csitranslationplugins.AWSEBSInTreePluginName, "missing-sc-pvc-vol-2"),
-			pvc:    getFakePersistentVolumeClaim("missing-sc-pvc", "vol-2", "resizable", "missing-sc-pvc-vol-2"),
-			pvcKey: "default/missing-sc-pvc",
-		},
-		{
 			name:               "when pvc and pv has everything for in-tree plugin",
 			pv:                 getFakePersistentVolume("vol-3", csitranslationplugins.AWSEBSInTreePluginName, "good-pvc-vol-3"),
-			pvc:                getFakePersistentVolumeClaim("good-pvc", "vol-3", "resizable2", "good-pvc-vol-3"),
-			storageClass:       getFakeStorageClass("resizable2", csitranslationplugins.AWSEBSInTreePluginName),
+			pvc:                getFakePersistentVolumeClaim("good-pvc", "vol-3", "good-pvc-vol-3"),
 			pvcKey:             "default/good-pvc",
 			expansionCalled:    true,
 			expectedAnnotation: map[string]string{volumetypes.VolumeResizerKey: csitranslationplugins.AWSEBSInTreePluginName},
@@ -88,16 +73,14 @@ func TestSyncHandler(t *testing.T) {
 			name:                "when csi migration is enabled for a in-tree plugin",
 			csiMigrationEnabled: true,
 			pv:                  getFakePersistentVolume("vol-4", csitranslationplugins.AWSEBSInTreePluginName, "csi-pvc-vol-4"),
-			pvc:                 getFakePersistentVolumeClaim("csi-pvc", "vol-4", "resizable3", "csi-pvc-vol-4"),
-			storageClass:        getFakeStorageClass("resizable3", csitranslationplugins.AWSEBSInTreePluginName),
+			pvc:                 getFakePersistentVolumeClaim("csi-pvc", "vol-4", "csi-pvc-vol-4"),
 			pvcKey:              "default/csi-pvc",
 			expectedAnnotation:  map[string]string{volumetypes.VolumeResizerKey: csitranslationplugins.AWSEBSDriverName},
 		},
 		{
 			name:            "for csi plugin without migration path",
 			pv:              getFakePersistentVolume("vol-5", "com.csi.ceph", "ceph-csi-pvc-vol-5"),
-			pvc:             getFakePersistentVolumeClaim("ceph-csi-pvc", "vol-5", "resizable4", "ceph-csi-pvc-vol-5"),
-			storageClass:    getFakeStorageClass("resizable4", "com.csi.ceph"),
+			pvc:             getFakePersistentVolumeClaim("ceph-csi-pvc", "vol-5", "ceph-csi-pvc-vol-5"),
 			pvcKey:          "default/ceph-csi-pvc",
 			expansionCalled: false,
 			hasError:        false,
@@ -110,7 +93,6 @@ func TestSyncHandler(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 		pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 		pvInformer := informerFactory.Core().V1().PersistentVolumes()
-		storageClassInformer := informerFactory.Storage().V1().StorageClasses()
 
 		pvc := test.pvc
 		if tc.pv != nil {
@@ -122,11 +104,8 @@ func TestSyncHandler(t *testing.T) {
 		}
 		allPlugins := []volume.VolumePlugin{}
 		allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
-		if tc.storageClass != nil {
-			informerFactory.Storage().V1().StorageClasses().Informer().GetIndexer().Add(tc.storageClass)
-		}
 		translator := csitrans.New()
-		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, storageClassInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator))
+		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator), nil)
 		if err != nil {
 			t.Fatalf("error creating expand controller : %v", err)
 		}
@@ -226,7 +205,7 @@ func getFakePersistentVolume(volumeName, pluginName string, pvcUID types.UID) *v
 	return pv
 }
 
-func getFakePersistentVolumeClaim(pvcName, volumeName, scName string, uid types.UID) *v1.PersistentVolumeClaim {
+func getFakePersistentVolumeClaim(pvcName, volumeName string, uid types.UID) *v1.PersistentVolumeClaim {
 	pvc := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: pvcName, Namespace: "default", UID: uid},
 		Spec:       v1.PersistentVolumeClaimSpec{},
@@ -235,15 +214,5 @@ func getFakePersistentVolumeClaim(pvcName, volumeName, scName string, uid types.
 		pvc.Spec.VolumeName = volumeName
 	}
 
-	if scName != "" {
-		pvc.Spec.StorageClassName = &scName
-	}
 	return pvc
-}
-
-func getFakeStorageClass(scName, pluginName string) *storagev1.StorageClass {
-	return &storagev1.StorageClass{
-		ObjectMeta:  metav1.ObjectMeta{Name: scName},
-		Provisioner: pluginName,
-	}
 }

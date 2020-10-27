@@ -88,11 +88,11 @@ function set-linux-node-image() {
 function set-windows-node-image() {
   WINDOWS_NODE_IMAGE_PROJECT="windows-cloud"
   if [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win2019" ]]; then
-    WINDOWS_NODE_IMAGE="windows-server-2019-dc-core-for-containers-v20200310"
+    WINDOWS_NODE_IMAGE="windows-server-2019-dc-core-for-containers-v20200908"
   elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win1909" ]]; then
-    WINDOWS_NODE_IMAGE="windows-server-1909-dc-core-for-containers-v20200310"
+    WINDOWS_NODE_IMAGE="windows-server-1909-dc-core-for-containers-v20200908"
   elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win1809" ]]; then
-    WINDOWS_NODE_IMAGE="windows-server-1809-dc-core-for-containers-v20200310"
+    WINDOWS_NODE_IMAGE="windows-server-1809-dc-core-for-containers-v20200908"
   else
     echo "Unknown WINDOWS_NODE_OS_DISTRIBUTION ${WINDOWS_NODE_OS_DISTRIBUTION}" >&2
     exit 1
@@ -239,10 +239,10 @@ function copy-to-staging() {
     fi
   fi
 
-  echo "${hash}" > "${tar}.sha1"
-  gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha1" "${staging_path}"
-  gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha1" >/dev/null 2>&1 || true
-  echo "+++ ${basename_tar} uploaded (sha1 = ${hash})"
+  echo "${hash}" > "${tar}.sha512"
+  gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha512" "${staging_path}"
+  gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha512" >/dev/null 2>&1 || true
+  echo "+++ ${basename_tar} uploaded (sha512 = ${hash})"
 }
 
 
@@ -314,13 +314,13 @@ function upload-tars() {
     DOCKER_REGISTRY_MIRROR_URL="https://mirror.gcr.io"
   fi
 
-  SERVER_BINARY_TAR_HASH=$(sha1sum-file "${SERVER_BINARY_TAR}")
+  SERVER_BINARY_TAR_HASH=$(sha512sum-file "${SERVER_BINARY_TAR}")
 
   if [[ -n "${NODE_BINARY_TAR:-}" ]]; then
-    NODE_BINARY_TAR_HASH=$(sha1sum-file "${NODE_BINARY_TAR}")
+    NODE_BINARY_TAR_HASH=$(sha512sum-file "${NODE_BINARY_TAR}")
   fi
   if [[ -n "${KUBE_MANIFESTS_TAR:-}" ]]; then
-    KUBE_MANIFESTS_TAR_HASH=$(sha1sum-file "${KUBE_MANIFESTS_TAR}")
+    KUBE_MANIFESTS_TAR_HASH=$(sha512sum-file "${KUBE_MANIFESTS_TAR}")
   fi
 
   local server_binary_tar_urls=()
@@ -506,11 +506,11 @@ function load-or-gen-kube-bearertoken() {
 #   SERVER_BINARY_TAR_URL
 #   SERVER_BINARY_TAR_HASH
 function tars_from_version() {
-  local sha1sum=""
-  if which sha1sum >/dev/null 2>&1; then
-    sha1sum="sha1sum"
+  local sha512sum=""
+  if which sha512sum >/dev/null 2>&1; then
+    sha512sum="sha512sum"
   else
-    sha1sum="shasum -a1"
+    sha512sum="shasum -a512"
   fi
 
   if [[ -z "${KUBE_VERSION-}" ]]; then
@@ -520,18 +520,18 @@ function tars_from_version() {
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release/release/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
     # TODO: Clean this up.
     KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
-    KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} --silent --show-error | ${sha1sum} | awk '{print $1}')
+    KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} --silent --show-error | ${sha512sum} | awk '{print $1}')
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     SERVER_BINARY_TAR_URL="https://storage.googleapis.com/kubernetes-release-dev/ci/${KUBE_VERSION}/kubernetes-server-linux-amd64.tar.gz"
     # TODO: Clean this up.
     KUBE_MANIFESTS_TAR_URL="${SERVER_BINARY_TAR_URL/server-linux-amd64/manifests}"
-    KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} --silent --show-error | ${sha1sum} | awk '{print $1}')
+    KUBE_MANIFESTS_TAR_HASH=$(curl ${KUBE_MANIFESTS_TAR_URL} --silent --show-error | ${sha512sum} | awk '{print $1}')
   else
     echo "Version doesn't match regexp" >&2
     exit 1
   fi
-  if ! SERVER_BINARY_TAR_HASH=$(curl -Ss --fail "${SERVER_BINARY_TAR_URL}.sha1"); then
-    echo "Failure trying to curl release .sha1"
+  if ! SERVER_BINARY_TAR_HASH=$(curl -Ss --fail "${SERVER_BINARY_TAR_URL}.sha512"); then
+    echo "Failure trying to curl release .sha512"
   fi
 
   if ! curl -Ss --head "${SERVER_BINARY_TAR_URL}" >&/dev/null; then
@@ -1144,7 +1144,7 @@ NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS: $(yaml-quote "${NODE_PROBLEM_DETECTOR_CUSTOM
 CNI_STORAGE_URL_BASE: $(yaml-quote "${CNI_STORAGE_URL_BASE:-}")
 CNI_TAR_PREFIX: $(yaml-quote "${CNI_TAR_PREFIX:-}")
 CNI_VERSION: $(yaml-quote "${CNI_VERSION:-}")
-CNI_SHA1: $(yaml-quote "${CNI_SHA1:-}")
+CNI_HASH: $(yaml-quote "${CNI_HASH:-}")
 ENABLE_NODE_LOGGING: $(yaml-quote "${ENABLE_NODE_LOGGING:-false}")
 LOGGING_DESTINATION: $(yaml-quote "${LOGGING_DESTINATION:-}")
 ELASTICSEARCH_LOGGING_REPLICAS: $(yaml-quote "${ELASTICSEARCH_LOGGING_REPLICAS:-}")
@@ -1159,6 +1159,7 @@ ENABLE_DNS_HORIZONTAL_AUTOSCALER: $(yaml-quote "${ENABLE_DNS_HORIZONTAL_AUTOSCAL
 KUBE_PROXY_DAEMONSET: $(yaml-quote "${KUBE_PROXY_DAEMONSET:-false}")
 KUBE_PROXY_TOKEN: $(yaml-quote "${KUBE_PROXY_TOKEN:-}")
 KUBE_PROXY_MODE: $(yaml-quote "${KUBE_PROXY_MODE:-iptables}")
+DETECT_LOCAL_MODE: $(yaml-quote "${DETECT_LOCAL_MODE:-}")
 NODE_PROBLEM_DETECTOR_TOKEN: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TOKEN:-}")
 ADMISSION_CONTROL: $(yaml-quote "${ADMISSION_CONTROL:-}")
 ENABLE_POD_SECURITY_POLICY: $(yaml-quote "${ENABLE_POD_SECURITY_POLICY:-}")
@@ -1215,6 +1216,7 @@ CONTAINER_RUNTIME_TEST_HANDLER: $(yaml-quote "${CONTAINER_RUNTIME_TEST_HANDLER:-
 UBUNTU_INSTALL_CONTAINERD_VERSION: $(yaml-quote "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}")
 UBUNTU_INSTALL_RUNC_VERSION: $(yaml-quote "${UBUNTU_INSTALL_RUNC_VERSION:-}")
 NODE_LOCAL_SSDS_EXT: $(yaml-quote "${NODE_LOCAL_SSDS_EXT:-}")
+NODE_LOCAL_SSDS_EPHEMERAL: "$(yaml-quote ${NODE_LOCAL_SSDS_EPHEMERAL:-})"
 LOAD_IMAGE_COMMAND: $(yaml-quote "${LOAD_IMAGE_COMMAND:-}")
 ZONE: $(yaml-quote "${ZONE}")
 REGION: $(yaml-quote "${REGION}")
@@ -1505,9 +1507,19 @@ EOF
 MAX_PODS_PER_NODE: $(yaml-quote "${MAX_PODS_PER_NODE}")
 EOF
   fi
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
-      cat >>"$file" <<EOF
-ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE: $(yaml-quote "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE}")
+  if [[ "${PREPARE_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+      cat >>$file <<EOF
+PREPARE_KONNECTIVITY_SERVICE: $(yaml-quote "${PREPARE_KONNECTIVITY_SERVICE}")
+EOF
+  fi
+  if [[ "${EGRESS_VIA_KONNECTIVITY:-false}" == "true" ]]; then
+      cat >>$file <<EOF
+EGRESS_VIA_KONNECTIVITY: $(yaml-quote "${EGRESS_VIA_KONNECTIVITY}")
+EOF
+  fi
+  if [[ "${RUN_KONNECTIVITY_PODS:-false}" == "true" ]]; then
+      cat >>$file <<EOF
+RUN_KONNECTIVITY_PODS: $(yaml-quote "${RUN_KONNECTIVITY_PODS}")
 EOF
   fi
   if [[ -n "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-}" ]]; then
@@ -1529,6 +1541,7 @@ NODE_BINARY_TAR_URL: $(yaml-quote "${NODE_BINARY_TAR_URL}")
 NODE_BINARY_TAR_HASH: $(yaml-quote "${NODE_BINARY_TAR_HASH}")
 CSI_PROXY_STORAGE_PATH: $(yaml-quote "${CSI_PROXY_STORAGE_PATH}")
 CSI_PROXY_VERSION: $(yaml-quote "${CSI_PROXY_VERSION}")
+ENABLE_CSI_PROXY: $(yaml-quote "${ENABLE_CSI_PROXY}")
 K8S_DIR: $(yaml-quote "${WINDOWS_K8S_DIR}")
 NODE_DIR: $(yaml-quote "${WINDOWS_NODE_DIR}")
 LOGS_DIR: $(yaml-quote "${WINDOWS_LOGS_DIR}")
@@ -1550,11 +1563,11 @@ WINDOWS_INFRA_CONTAINER: $(yaml-quote "${WINDOWS_INFRA_CONTAINER}")
 EOF
 }
 
-function sha1sum-file() {
-  if which sha1sum >/dev/null 2>&1; then
-    sha1sum "$1" | awk '{ print $1 }'
+function sha512sum-file() {
+  if which sha512sum >/dev/null 2>&1; then
+    sha512sum "$1" | awk '{ print $1 }'
   else
-    shasum -a1 "$1" | awk '{ print $1 }'
+    shasum -a512 "$1" | awk '{ print $1 }'
   fi
 }
 
@@ -1592,7 +1605,8 @@ function create-certs {
   local -r primary_cn="${1}"
 
   # Determine extra certificate names for master
-  local octets=($(echo "${SERVICE_CLUSTER_IP_RANGE}" | sed -e 's|/.*||' -e 's/\./ /g'))
+  local octets
+  read -r -a octets <<< "$(echo "${SERVICE_CLUSTER_IP_RANGE}" | sed -e 's|/.*||' -e 's/\./ /g')"
   ((octets[3]+=1))
   local -r service_ip=$(echo "${octets[*]}" | sed 's/ /./g')
   local sans=""
@@ -1611,24 +1625,24 @@ function create-certs {
 
   # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
   # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
-  CA_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/ca.key" | base64 | tr -d '\r\n')
-  CA_CERT_BASE64=$(cat "${CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
-  MASTER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" | base64 | tr -d '\r\n')
-  MASTER_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/${MASTER_NAME}.key" | base64 | tr -d '\r\n')
-  KUBELET_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubelet.crt" | base64 | tr -d '\r\n')
-  KUBELET_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubelet.key" | base64 | tr -d '\r\n')
-  KUBECFG_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubecfg.crt" | base64 | tr -d '\r\n')
-  KUBECFG_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubecfg.key" | base64 | tr -d '\r\n')
-  KUBEAPISERVER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kube-apiserver.crt" | base64 | tr -d '\r\n')
-  KUBEAPISERVER_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kube-apiserver.key" | base64 | tr -d '\r\n')
+  CA_KEY_BASE64=$(base64 "${CERT_DIR}/pki/private/ca.key" | tr -d '\r\n')
+  CA_CERT_BASE64=$(base64 "${CERT_DIR}/pki/ca.crt" | tr -d '\r\n')
+  MASTER_CERT_BASE64=$(base64 "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" | tr -d '\r\n')
+  MASTER_KEY_BASE64=$(base64 "${CERT_DIR}/pki/private/${MASTER_NAME}.key" | tr -d '\r\n')
+  KUBELET_CERT_BASE64=$(base64 "${CERT_DIR}/pki/issued/kubelet.crt" | tr -d '\r\n')
+  KUBELET_KEY_BASE64=$(base64 "${CERT_DIR}/pki/private/kubelet.key" | tr -d '\r\n')
+  KUBECFG_CERT_BASE64=$(base64 "${CERT_DIR}/pki/issued/kubecfg.crt" | tr -d '\r\n')
+  KUBECFG_KEY_BASE64=$(base64 "${CERT_DIR}/pki/private/kubecfg.key" | tr -d '\r\n')
+  KUBEAPISERVER_CERT_BASE64=$(base64 "${CERT_DIR}/pki/issued/kube-apiserver.crt" | tr -d '\r\n')
+  KUBEAPISERVER_KEY_BASE64=$(base64 "${CERT_DIR}/pki/private/kube-apiserver.key" | tr -d '\r\n')
 
   # Setting up an addition directory (beyond pki) as it is the simplest way to
   # ensure we get a different CA pair to sign the proxy-client certs and which
   # we can send CA public key to the user-apiserver to validate communication.
-  AGGREGATOR_CA_KEY_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/private/ca.key" | base64 | tr -d '\r\n')
-  REQUESTHEADER_CA_CERT_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
-  PROXY_CLIENT_CERT_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/issued/proxy-client.crt" | base64 | tr -d '\r\n')
-  PROXY_CLIENT_KEY_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/private/proxy-client.key" | base64 | tr -d '\r\n')
+  AGGREGATOR_CA_KEY_BASE64=$(base64 "${AGGREGATOR_CERT_DIR}/pki/private/ca.key" | tr -d '\r\n')
+  REQUESTHEADER_CA_CERT_BASE64=$(base64 "${AGGREGATOR_CERT_DIR}/pki/ca.crt" | tr -d '\r\n')
+  PROXY_CLIENT_CERT_BASE64=$(base64 "${AGGREGATOR_CERT_DIR}/pki/issued/proxy-client.crt" | tr -d '\r\n')
+  PROXY_CLIENT_KEY_BASE64=$(base64 "${AGGREGATOR_CERT_DIR}/pki/private/proxy-client.key" | tr -d '\r\n')
 }
 
 # Set up easy-rsa directory structure.
@@ -1909,9 +1923,9 @@ function create-static-ip() {
       echo -e "${color_red}Failed to create static ip $1 ${color_norm}" >&2
       exit 2
     fi
-    attempt=$(($attempt+1))
-    echo -e "${color_yellow}Attempt $attempt failed to create static ip $1. Retrying.${color_norm}" >&2
-    sleep $(($attempt * 5))
+    attempt=$((attempt + 1))
+    echo -e "${color_yellow:-}Attempt $attempt failed to create static ip $1. Retrying.${color_norm:-}" >&2
+    sleep $((attempt * 5))
   done
 }
 
@@ -1933,9 +1947,9 @@ function create-firewall-rule() {
         echo -e "${color_red}Failed to create firewall rule $1 ${color_norm}" >&2
         exit 2
       fi
-      echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create firewall rule $1. Retrying.${color_norm}" >&2
-      attempt=$(($attempt+1))
-      sleep $(($attempt * 5))
+      echo -e "${color_yellow}Attempt $((attempt + 1)) failed to create firewall rule $1. Retrying.${color_norm}" >&2
+      attempt=$((attempt + 1))
+      sleep $((attempt * 5))
     else
         break
     fi
@@ -2045,41 +2059,38 @@ function create-node-template() {
 
   local gcloud="gcloud"
 
-  local accelerator_args=""
+  local accelerator_args=()
   # VMs with Accelerators cannot be live migrated.
   # More details here - https://cloud.google.com/compute/docs/gpus/add-gpus#create-new-gpu-instance
-  if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
-    accelerator_args="--maintenance-policy TERMINATE --restart-on-failure --accelerator ${NODE_ACCELERATORS}"
+  if [[ -n "${NODE_ACCELERATORS}" ]]; then
+    accelerator_args+=(--maintenance-policy TERMINATE --restart-on-failure --accelerator "${NODE_ACCELERATORS}")
     gcloud="gcloud beta"
   fi
 
-  local preemptible_minions=""
+  local preemptible_minions=()
   if [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
-    preemptible_minions="--preemptible --maintenance-policy TERMINATE"
+    preemptible_minions+=(--preemptible --maintenance-policy TERMINATE)
   fi
 
-  local local_ssds=""
+  local local_ssds=()
   local_ssd_ext_count=0
-  if [[ ! -z ${NODE_LOCAL_SSDS_EXT:-} ]]; then
+  if [[ -n "${NODE_LOCAL_SSDS_EXT:-}" ]]; then
     IFS=";" read -r -a ssdgroups <<< "${NODE_LOCAL_SSDS_EXT:-}"
     for ssdgroup in "${ssdgroups[@]}"
     do
       IFS="," read -r -a ssdopts <<< "${ssdgroup}"
-      validate-node-local-ssds-ext "${ssdopts}"
-      for i in $(seq ${ssdopts[0]}); do
-        local_ssds="$local_ssds--local-ssd=interface=${ssdopts[1]} "
+      validate-node-local-ssds-ext "${ssdopts[@]}"
+      for ((i=1; i<=ssdopts[0]; i++)); do
+        local_ssds+=("--local-ssd=interface=${ssdopts[1]}")
       done
     done
   fi
 
-  if [[ ! -z ${NODE_LOCAL_SSDS+x} ]]; then
+  if [[ -n ${NODE_LOCAL_SSDS+x} ]]; then
     # The NODE_LOCAL_SSDS check below fixes issue #49171
-    # Some versions of seq will count down from 1 if "seq 0" is specified
-    if [[ ${NODE_LOCAL_SSDS} -ge 1 ]]; then
-      for i in $(seq ${NODE_LOCAL_SSDS}); do
-        local_ssds="$local_ssds--local-ssd=interface=SCSI "
-      done
-    fi
+    for ((i=1; i<=NODE_LOCAL_SSDS; i++)); do
+      local_ssds+=('--local-ssd=interface=SCSI')
+    done
   fi
 
   local address=""
@@ -2087,7 +2098,8 @@ function create-node-template() {
     address="no-address"
   fi
 
-  local network=$(make-gcloud-network-argument \
+  local network
+  network=$(make-gcloud-network-argument \
     "${NETWORK_PROJECT}" \
     "${REGION}" \
     "${NETWORK}" \
@@ -2096,11 +2108,11 @@ function create-node-template() {
     "${ENABLE_IP_ALIASES:-}" \
     "${IP_ALIAS_SIZE:-}")
 
-  local node_image_flags=""
+  local node_image_flags=()
   if [[ "${os}" == 'linux' ]]; then
-      node_image_flags="--image-project ${NODE_IMAGE_PROJECT} --image ${NODE_IMAGE}"
+      node_image_flags+=(--image-project "${NODE_IMAGE_PROJECT}" --image "${NODE_IMAGE}")
   elif [[ "${os}" == 'windows' ]]; then
-      node_image_flags="--image-project ${WINDOWS_NODE_IMAGE_PROJECT} --image ${WINDOWS_NODE_IMAGE}"
+      node_image_flags+=(--image-project "${WINDOWS_NODE_IMAGE_PROJECT}" --image "${WINDOWS_NODE_IMAGE}")
   else
       echo "Unknown OS ${os}" >&2
       exit 1
@@ -2117,24 +2129,24 @@ function create-node-template() {
       --machine-type "${machine_type}" \
       --boot-disk-type "${NODE_DISK_TYPE}" \
       --boot-disk-size "${NODE_DISK_SIZE}" \
-      ${node_image_flags} \
+      "${node_image_flags[@]}" \
       --service-account "${NODE_SERVICE_ACCOUNT}" \
       --tags "${NODE_TAG}" \
-      ${accelerator_args} \
-      ${local_ssds} \
+      "${accelerator_args[@]}" \
+      "${local_ssds[@]}" \
       --region "${REGION}" \
       ${network} \
-      ${preemptible_minions} \
+      "${preemptible_minions[@]}" \
       $2 \
-      --metadata-from-file $3 \
+      --metadata-from-file "$3" \
       ${metadata_flag} >&2; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to create instance template ${template_name} ${color_norm}" >&2
           exit 2
         fi
         echo -e "${color_yellow}Attempt ${attempt} failed to create instance template ${template_name}. Retrying.${color_norm}" >&2
-        attempt=$(($attempt+1))
-        sleep $(($attempt * 5))
+        attempt=$((attempt + 1))
+        sleep $((attempt * 5))
 
         # In case the previous attempt failed with something like a
         # Backend Error and left the entry laying around, delete it
@@ -2421,7 +2433,7 @@ function delete-all-firewall-rules() {
 
 # Ignores firewall rule arguments that do not exist in NETWORK_PROJECT.
 function delete-firewall-rules() {
-  for fw in $@; do
+  for fw in "$@"; do
     if [[ -n $(gcloud compute firewall-rules --project "${NETWORK_PROJECT}" describe "${fw}" --format='value(name)' 2>/dev/null || true) ]]; then
       gcloud compute firewall-rules delete --project "${NETWORK_PROJECT}" --quiet "${fw}" &
     fi
@@ -2514,10 +2526,10 @@ function create-etcd-certs {
     generate-etcd-cert "${KUBE_TEMP}/cfssl" "${host}" "peer" "peer"
 
   pushd "${KUBE_TEMP}/cfssl"
-  ETCD_CA_KEY_BASE64=$(cat "ca-key.pem" | base64 | tr -d '\r\n')
-  ETCD_CA_CERT_BASE64=$(cat "ca.pem" | gzip | base64 | tr -d '\r\n')
-  ETCD_PEER_KEY_BASE64=$(cat "peer-key.pem" | base64 | tr -d '\r\n')
-  ETCD_PEER_CERT_BASE64=$(cat "peer.pem" | gzip | base64 | tr -d '\r\n')
+  ETCD_CA_KEY_BASE64=$(base64 "ca-key.pem" | tr -d '\r\n')
+  ETCD_CA_CERT_BASE64=$(gzip -c "ca.pem" | base64 | tr -d '\r\n')
+  ETCD_PEER_KEY_BASE64=$(base64 "peer-key.pem" | tr -d '\r\n')
+  ETCD_PEER_CERT_BASE64=$(gzip -c "peer.pem" | base64 | tr -d '\r\n')
   popd
 }
 
@@ -2553,12 +2565,12 @@ function create-etcd-apiserver-certs {
     generate-etcd-cert "${KUBE_TEMP}/cfssl" "${hostClient}" "client" "etcd-apiserver-client"
 
   pushd "${KUBE_TEMP}/cfssl"
-  ETCD_APISERVER_CA_KEY_BASE64=$(cat "ca-key.pem" | base64 | tr -d '\r\n')
-  ETCD_APISERVER_CA_CERT_BASE64=$(cat "ca.pem" | gzip | base64 | tr -d '\r\n')
-  ETCD_APISERVER_SERVER_KEY_BASE64=$(cat "etcd-apiserver-server-key.pem" | base64 | tr -d '\r\n')
-  ETCD_APISERVER_SERVER_CERT_BASE64=$(cat "etcd-apiserver-server.pem" | gzip | base64 | tr -d '\r\n')
-  ETCD_APISERVER_CLIENT_KEY_BASE64=$(cat "etcd-apiserver-client-key.pem" | base64 | tr -d '\r\n')
-  ETCD_APISERVER_CLIENT_CERT_BASE64=$(cat "etcd-apiserver-client.pem" | gzip | base64 | tr -d '\r\n')
+  ETCD_APISERVER_CA_KEY_BASE64=$(base64 "ca-key.pem" | tr -d '\r\n')
+  ETCD_APISERVER_CA_CERT_BASE64=$(gzip -c "ca.pem" | base64 | tr -d '\r\n')
+  ETCD_APISERVER_SERVER_KEY_BASE64=$(base64 "etcd-apiserver-server-key.pem" | tr -d '\r\n')
+  ETCD_APISERVER_SERVER_CERT_BASE64=$(gzip -c "etcd-apiserver-server.pem" | base64 | tr -d '\r\n')
+  ETCD_APISERVER_CLIENT_KEY_BASE64=$(base64 "etcd-apiserver-client-key.pem" | tr -d '\r\n')
+  ETCD_APISERVER_CLIENT_CERT_BASE64=$(gzip -c "etcd-apiserver-client.pem" | base64 | tr -d '\r\n')
   popd
 }
 
@@ -2572,7 +2584,7 @@ function create-master() {
     --allow tcp:443 &
 
   echo "Configuring firewall for apiserver konnectivity server"
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${PREPARE_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     gcloud compute firewall-rules create "${MASTER_NAME}-konnectivity-server" \
       --project "${NETWORK_PROJECT}" \
       --network "${NETWORK}" \
@@ -2997,8 +3009,8 @@ function set_num_migs() {
     echo "MAX_INSTANCES_PER_MIG cannot be negative. Assuming default 1000"
     defaulted_max_instances_per_mig=1000
   fi
-  export NUM_MIGS=$(((${NUM_NODES} + ${defaulted_max_instances_per_mig} - 1) / ${defaulted_max_instances_per_mig}))
-  export NUM_WINDOWS_MIGS=$(((${NUM_WINDOWS_NODES} + ${defaulted_max_instances_per_mig} - 1) / ${defaulted_max_instances_per_mig}))
+  export NUM_MIGS=$(((NUM_NODES + defaulted_max_instances_per_mig - 1) / defaulted_max_instances_per_mig))
+  export NUM_WINDOWS_MIGS=$(((NUM_WINDOWS_NODES + defaulted_max_instances_per_mig - 1) / defaulted_max_instances_per_mig))
 }
 
 # Assumes:
@@ -3039,22 +3051,22 @@ function create-linux-nodes() {
           --zone "${ZONE}" \
           --project "${PROJECT}" \
           --timeout "${MIG_WAIT_UNTIL_STABLE_TIMEOUT}" || true
-      nodes=$(( nodes - $num_additional ))
+      nodes=$(( nodes - num_additional ))
     fi
   fi
 
   local instances_left=${nodes}
 
-  for ((i=1; i<=${NUM_MIGS}; i++)); do
+  for ((i=1; i<=NUM_MIGS; i++)); do
     local group_name="${NODE_INSTANCE_PREFIX}-group-$i"
-    if [[ $i == ${NUM_MIGS} ]]; then
+    if [[ $i -eq ${NUM_MIGS} ]]; then
       # TODO: We don't add a suffix for the last group to keep backward compatibility when there's only one MIG.
       # We should change it at some point, but note #18545 when changing this.
       group_name="${NODE_INSTANCE_PREFIX}-group"
     fi
     # Spread the remaining number of nodes evenly
-    this_mig_size=$((${instances_left} / (${NUM_MIGS}-${i}+1)))
-    instances_left=$((instances_left-${this_mig_size}))
+    this_mig_size=$((instances_left / (NUM_MIGS - i + 1)))
+    instances_left=$((instances_left - this_mig_size))
 
     # Run instance-groups creation in parallel.
     {
@@ -3087,16 +3099,16 @@ function create-windows-nodes() {
   local -r nodes="${NUM_WINDOWS_NODES}"
   local instances_left=${nodes}
 
-  for ((i=1; i<=${NUM_WINDOWS_MIGS}; i++)); do
+  for ((i=1; i <= NUM_WINDOWS_MIGS; i++)); do
     local group_name="${WINDOWS_NODE_INSTANCE_PREFIX}-group-$i"
-    if [[ $i == ${NUM_WINDOWS_MIGS} ]]; then
+    if [[ $i -eq ${NUM_WINDOWS_MIGS} ]]; then
       # TODO: We don't add a suffix for the last group to keep backward compatibility when there's only one MIG.
       # We should change it at some point, but note #18545 when changing this.
       group_name="${WINDOWS_NODE_INSTANCE_PREFIX}-group"
     fi
     # Spread the remaining number of nodes evenly
-    this_mig_size=$((${instances_left} / (${NUM_WINDOWS_MIGS}-${i}+1)))
-    instances_left=$((instances_left-${this_mig_size}))
+    this_mig_size=$((instances_left / (NUM_WINDOWS_MIGS - i + 1)))
+    instances_left=$((instances_left - this_mig_size))
 
     gcloud compute instance-groups managed \
         create "${group_name}" \
@@ -3195,18 +3207,18 @@ function create-cluster-autoscaler-mig-config() {
   local left_min=${AUTOSCALER_MIN_NODES}
   local left_max=${AUTOSCALER_MAX_NODES}
 
-  for ((i=1; i<=${NUM_MIGS}; i++)); do
+  for ((i=1; i <= NUM_MIGS; i++)); do
     local group_name="${NODE_INSTANCE_PREFIX}-group-$i"
-    if [[ $i == ${NUM_MIGS} ]]; then
+    if [[ $i -eq ${NUM_MIGS} ]]; then
       # TODO: We don't add a suffix for the last group to keep backward compatibility when there's only one MIG.
       # We should change it at some point, but note #18545 when changing this.
       group_name="${NODE_INSTANCE_PREFIX}-group"
     fi
 
-    this_mig_min=$((${left_min}/(${NUM_MIGS}-${i}+1)))
-    this_mig_max=$((${left_max}/(${NUM_MIGS}-${i}+1)))
-    left_min=$((left_min-$this_mig_min))
-    left_max=$((left_max-$this_mig_max))
+    this_mig_min=$((left_min/(NUM_MIGS-i+1)))
+    this_mig_max=$((left_max/(NUM_MIGS-i+1)))
+    left_min=$((left_min-this_mig_min))
+    left_max=$((left_max-this_mig_max))
 
     local mig_url="https://www.googleapis.com/compute/v1/projects/${PROJECT}/zones/${ZONE}/instanceGroups/${group_name}"
     AUTOSCALER_MIG_CONFIG="${AUTOSCALER_MIG_CONFIG} --nodes=${this_mig_min}:${this_mig_max}:${mig_url}"
@@ -3502,10 +3514,10 @@ function kube-down() {
   if [[ "${KUBE_DELETE_NODES:-}" != "false" ]]; then
     # Find out what minions are running.
     local -a minions
-    minions=( $(gcloud compute instances list \
-                  --project "${PROJECT}" \
-                  --filter="(name ~ '${NODE_INSTANCE_PREFIX}-.+' OR name ~ '${WINDOWS_NODE_INSTANCE_PREFIX}-.+') AND zone:(${ZONE})" \
-                  --format='value(name)') )
+    kube::util::read-array minions < <(gcloud compute instances list \
+      --project "${PROJECT}" \
+      --filter="(name ~ '${NODE_INSTANCE_PREFIX}-.+' OR name ~ '${WINDOWS_NODE_INSTANCE_PREFIX}-.+') AND zone:(${ZONE})" \
+      --format='value(name)')
     # If any minions are running, delete them in batches.
     while (( "${#minions[@]}" > 0 )); do
       echo Deleting nodes "${minions[*]::${batch}}"
@@ -3529,9 +3541,9 @@ function kube-down() {
     # Note that this is currently a noop, as synchronously deleting the node MIG
     # first allows the master to cleanup routes itself.
     local TRUNCATED_PREFIX="${INSTANCE_PREFIX:0:26}"
-    routes=( $(gcloud compute routes list --project "${NETWORK_PROJECT}" \
+    kube::util::read-array routes < <(gcloud compute routes list --project "${NETWORK_PROJECT}" \
       --filter="name ~ '${TRUNCATED_PREFIX}-.{8}-.{4}-.{4}-.{4}-.{12}'" \
-      --format='value(name)') )
+      --format='value(name)')
     while (( "${#routes[@]}" > 0 )); do
       echo Deleting routes "${routes[*]::${batch}}"
       gcloud compute routes delete \
@@ -3693,12 +3705,12 @@ function check-resources() {
   echo "Looking for already existing resources"
   KUBE_RESOURCE_FOUND=""
 
-  if [[ -n "${INSTANCE_GROUPS[@]:-}" ]]; then
-    KUBE_RESOURCE_FOUND="Managed instance groups ${INSTANCE_GROUPS[@]}"
+  if [[ -n "${INSTANCE_GROUPS[*]:-}" ]]; then
+    KUBE_RESOURCE_FOUND="Managed instance groups ${INSTANCE_GROUPS[*]}"
     return 1
   fi
-  if [[ -n "${WINDOWS_INSTANCE_GROUPS[@]:-}" ]]; then
-    KUBE_RESOURCE_FOUND="Managed instance groups ${WINDOWS_INSTANCE_GROUPS[@]}"
+  if [[ -n "${WINDOWS_INSTANCE_GROUPS[*]:-}" ]]; then
+    KUBE_RESOURCE_FOUND="Managed instance groups ${WINDOWS_INSTANCE_GROUPS[*]}"
     return 1
   fi
 
@@ -3723,10 +3735,10 @@ function check-resources() {
 
   # Find out what minions are running.
   local -a minions
-  minions=( $(gcloud compute instances list \
-                --project "${PROJECT}" \
-                --filter="(name ~ '${NODE_INSTANCE_PREFIX}-.+' OR name ~ '${WINDOWS_NODE_INSTANCE_PREFIX}-.+') AND zone:(${ZONE})" \
-                --format='value(name)') )
+  kube::util::read-array minions < <(gcloud compute instances list \
+    --project "${PROJECT}" \
+    --filter="(name ~ '${NODE_INSTANCE_PREFIX}-.+' OR name ~ '${WINDOWS_NODE_INSTANCE_PREFIX}-.+') AND zone:(${ZONE})" \
+    --format='value(name)')
   if (( "${#minions[@]}" > 0 )); then
     KUBE_RESOURCE_FOUND="${#minions[@]} matching ${NODE_INSTANCE_PREFIX}-.+ or ${WINDOWS_NODE_INSTANCE_PREFIX}-.+"
     return 1
@@ -3743,8 +3755,8 @@ function check-resources() {
   fi
 
   local -a routes
-  routes=( $(gcloud compute routes list --project "${NETWORK_PROJECT}" \
-    --filter="name ~ '${INSTANCE_PREFIX}-minion-.{4}'" --format='value(name)') )
+  kube::util::read-array routes < <(gcloud compute routes list --project "${NETWORK_PROJECT}" \
+    --filter="name ~ '${INSTANCE_PREFIX}-minion-.{4}'" --format='value(name)')
   if (( "${#routes[@]}" > 0 )); then
     KUBE_RESOURCE_FOUND="${#routes[@]} routes matching ${INSTANCE_PREFIX}-minion-.{4}"
     return 1
@@ -3800,7 +3812,7 @@ function test-setup() {
   # As there is no simple way to wait longer for this operation we need to manually
   # wait some additional time (20 minutes altogether).
   while ! gcloud compute firewall-rules describe --project "${NETWORK_PROJECT}" "${NODE_TAG}-http-alt" 2> /dev/null; do
-    if [[ $(($start + 1200)) -lt `date +%s` ]]; then
+    if [[ $((start + 1200)) -lt $(date +%s) ]]; then
       echo -e "${color_red}Failed to create firewall ${NODE_TAG}-http-alt in ${NETWORK_PROJECT}" >&2
       exit 1
     fi
@@ -3819,7 +3831,7 @@ function test-setup() {
   # As there is no simple way to wait longer for this operation we need to manually
   # wait some additional time (20 minutes altogether).
   while ! gcloud compute firewall-rules describe --project "${NETWORK_PROJECT}" "${NODE_TAG}-nodeports" 2> /dev/null; do
-    if [[ $(($start + 1200)) -lt `date +%s` ]]; then
+    if [[ $((start + 1200)) -lt $(date +%s) ]]; then
       echo -e "${color_red}Failed to create firewall ${NODE_TAG}-nodeports in ${PROJECT}" >&2
       exit 1
     fi
@@ -3851,7 +3863,7 @@ function ssh-to-node() {
   local node="$1"
   local cmd="$2"
   # Loop until we can successfully ssh into the box
-  for try in {1..5}; do
+  for (( i=0; i<5; i++)); do
     if gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --ssh-flag="-o ConnectTimeout=30" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "echo test > /dev/null"; then
       break
     fi

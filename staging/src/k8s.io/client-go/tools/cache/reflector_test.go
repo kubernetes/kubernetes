@@ -910,3 +910,59 @@ func TestReflectorSetExpectedType(t *testing.T) {
 		})
 	}
 }
+
+type storeWithRV struct {
+	Store
+
+	// resourceVersions tracks values passed by UpdateResourceVersion
+	resourceVersions []string
+}
+
+func (s *storeWithRV) UpdateResourceVersion(resourceVersion string) {
+	s.resourceVersions = append(s.resourceVersions, resourceVersion)
+}
+
+func newStoreWithRV() *storeWithRV {
+	return &storeWithRV{
+		Store: NewStore(MetaNamespaceKeyFunc),
+	}
+}
+
+func TestReflectorResourceVersionUpdate(t *testing.T) {
+	s := newStoreWithRV()
+
+	stopCh := make(chan struct{})
+	fw := watch.NewFake()
+
+	lw := &testLW{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return fw, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}, nil
+		},
+	}
+	r := NewReflector(lw, &v1.Pod{}, s, 0)
+
+	makePod := func(rv string) *v1.Pod {
+		return &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: rv}}
+	}
+
+	go func() {
+		fw.Action(watch.Added, makePod("10"))
+		fw.Action(watch.Modified, makePod("20"))
+		fw.Action(watch.Bookmark, makePod("30"))
+		fw.Action(watch.Deleted, makePod("40"))
+		close(stopCh)
+	}()
+
+	// Initial list should use RV=0
+	if err := r.ListAndWatch(stopCh); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedRVs := []string{"10", "20", "30", "40"}
+	if !reflect.DeepEqual(s.resourceVersions, expectedRVs) {
+		t.Errorf("Expected series of resource version updates of %#v but got: %#v", expectedRVs, s.resourceVersions)
+	}
+}

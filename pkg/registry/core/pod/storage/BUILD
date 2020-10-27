@@ -14,6 +14,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/api/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/registry/registrytest:go_default_library",

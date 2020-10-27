@@ -29,8 +29,8 @@ import (
 // Event is a report of an event somewhere in the cluster. It generally denotes some state change in the system.
 type Event struct {
 	metav1.TypeMeta `json:",inline"`
-	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,opt,name=metadata"`
 
 	// eventTime is the time when this Event was first observed. It is required.
 	EventTime metav1.MicroTime `json:"eventTime" protobuf:"bytes,2,opt,name=eventTime"`

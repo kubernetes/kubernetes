@@ -5270,6 +5270,11 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.ClusterIPs != nil {
+		in, out := &in.ClusterIPs, &out.ClusterIPs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.ExternalIPs != nil {
 		in, out := &in.ExternalIPs, &out.ExternalIPs
 		*out = make([]string, len(*in))
@@ -5285,15 +5290,20 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 		*out = new(SessionAffinityConfig)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.IPFamily != nil {
-		in, out := &in.IPFamily, &out.IPFamily
-		*out = new(IPFamily)
-		**out = **in
+	if in.IPFamilies != nil {
+		in, out := &in.IPFamilies, &out.IPFamilies
+		*out = make([]IPFamily, len(*in))
+		copy(*out, *in)
 	}
 	if in.TopologyKeys != nil {
 		in, out := &in.TopologyKeys, &out.TopologyKeys
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.IPFamilyPolicy != nil {
+		in, out := &in.IPFamilyPolicy, &out.IPFamilyPolicy
+		*out = new(IPFamilyPolicyType)
+		**out = **in
 	}
 	return
 }

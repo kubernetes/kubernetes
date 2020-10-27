@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 // Construct an instance of a plugin, by name.

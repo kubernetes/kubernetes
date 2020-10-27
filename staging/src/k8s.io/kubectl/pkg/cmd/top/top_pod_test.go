@@ -34,7 +34,6 @@ import (
 	"k8s.io/client-go/rest/fake"
 	core "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	metricsv1alpha1api "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -80,15 +79,16 @@ const (
 func TestTopPod(t *testing.T) {
 	testNS := "testns"
 	testCases := []struct {
-		name            string
-		namespace       string
-		options         *TopPodOptions
-		args            []string
-		expectedQuery   string
-		expectedPods    []string
-		namespaces      []string
-		containers      bool
-		listsNamespaces bool
+		name               string
+		namespace          string
+		options            *TopPodOptions
+		args               []string
+		expectedQuery      string
+		expectedPods       []string
+		expectedContainers []string
+		namespaces         []string
+		containers         bool
+		listsNamespaces    bool
 	}{
 		{
 			name:            "all namespaces",
@@ -112,23 +112,55 @@ func TestTopPod(t *testing.T) {
 			namespaces:    []string{testNS, testNS},
 		},
 		{
-			name:       "pod with container metrics",
-			options:    &TopPodOptions{PrintContainers: true},
-			args:       []string{"pod1"},
+			name:    "pod with container metrics",
+			options: &TopPodOptions{PrintContainers: true},
+			args:    []string{"pod1"},
+			expectedContainers: []string{
+				"container1-1",
+				"container1-2",
+			},
 			namespaces: []string{testNS},
 			containers: true,
 		},
 		{
-			name:         "pod with label sort by cpu",
+			name:         "pod sort by cpu",
 			options:      &TopPodOptions{SortBy: "cpu"},
 			expectedPods: []string{"pod2", "pod3", "pod1"},
 			namespaces:   []string{testNS, testNS, testNS},
 		},
 		{
-			name:         "pod with label sort by memory",
+			name:         "pod sort by memory",
 			options:      &TopPodOptions{SortBy: "memory"},
 			expectedPods: []string{"pod2", "pod3", "pod1"},
 			namespaces:   []string{testNS, testNS, testNS},
+		},
+		{
+			name:    "container sort by cpu",
+			options: &TopPodOptions{PrintContainers: true, SortBy: "cpu"},
+			expectedContainers: []string{
+				"container2-3",
+				"container2-2",
+				"container2-1",
+				"container3-1",
+				"container1-2",
+				"container1-1",
+			},
+			namespaces: []string{testNS, testNS, testNS},
+			containers: true,
+		},
+		{
+			name:    "container sort by memory",
+			options: &TopPodOptions{PrintContainers: true, SortBy: "memory"},
+			expectedContainers: []string{
+				"container2-3",
+				"container2-2",
+				"container2-1",
+				"container3-1",
+				"container1-2",
+				"container1-1",
+			},
+			namespaces: []string{testNS, testNS, testNS},
+			containers: true,
 		},
 	}
 	cmdtesting.InitTestErrorHandler(t)
@@ -234,21 +266,32 @@ func TestTopPod(t *testing.T) {
 					t.Errorf("unexpected metrics for %s: \n%s", name, result)
 				}
 			}
-			if cmdutil.GetFlagString(cmd, "sort-by") == "cpu" || cmdutil.GetFlagString(cmd, "sort-by") == "memory" {
-				resultLines := strings.Split(result, "\n")
-				resultPods := make([]string, len(resultLines)-2) // don't process first (header) and last (empty) line
-
-				for i, line := range resultLines[1 : len(resultLines)-1] { // don't process first (header) and last (empty) line
-					lineFirstColumn := strings.Split(line, " ")[0]
-					resultPods[i] = lineFirstColumn
-				}
-
+			if testCase.expectedPods != nil {
+				resultPods := getResultColumnValues(result, 0)
 				if !reflect.DeepEqual(testCase.expectedPods, resultPods) {
-					t.Errorf("kinds not matching:\n\texpectedKinds: %v\n\tgotKinds: %v\n", testCase.expectedPods, resultPods)
+					t.Errorf("pods not matching:\n\texpectedPods: %v\n\tresultPods: %v\n", testCase.expectedPods, resultPods)
+				}
+			}
+			if testCase.expectedContainers != nil {
+				resultContainers := getResultColumnValues(result, 1)
+				if !reflect.DeepEqual(testCase.expectedContainers, resultContainers) {
+					t.Errorf("containers not matching:\n\texpectedContainers: %v\n\tresultContainers: %v\n", testCase.expectedContainers, resultContainers)
 				}
 			}
 		})
 	}
+}
+
+func getResultColumnValues(result string, columnIndex int) []string {
+	resultLines := strings.Split(result, "\n")
+	values := make([]string, len(resultLines)-2) // don't process first (header) and last (empty) line
+
+	for i, line := range resultLines[1 : len(resultLines)-1] { // don't process first (header) and last (empty) line
+		value := strings.Fields(line)[columnIndex]
+		values[i] = value
+	}
+
+	return values
 }
 
 func TestTopPodNoResourcesFound(t *testing.T) {

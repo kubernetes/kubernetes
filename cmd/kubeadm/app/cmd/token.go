@@ -54,8 +54,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
-// NewCmdToken returns cobra.Command for token management
-func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
+// newCmdToken returns cobra.Command for token management
+func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	var kubeConfigFile string
 	var dryRun bool
 	tokenCmd := &cobra.Command{
@@ -149,7 +149,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	bto.AddDescriptionFlag(createCmd.Flags())
 
 	tokenCmd.AddCommand(createCmd)
-	tokenCmd.AddCommand(NewCmdTokenGenerate(out))
+	tokenCmd.AddCommand(newCmdTokenGenerate(out))
 
 	outputFlags := output.NewOutputFlags(&tokenTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(output.TextOutput)
 
@@ -208,8 +208,8 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	return tokenCmd
 }
 
-// NewCmdTokenGenerate returns cobra.Command to generate new token
-func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
+// newCmdTokenGenerate returns cobra.Command to generate new token
+func newCmdTokenGenerate(out io.Writer) *cobra.Command {
 	return &cobra.Command{
 		Use:   "generate",
 		Short: "Generate and print a bootstrap token, but do not create it on the server",

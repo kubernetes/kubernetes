@@ -21,7 +21,7 @@ import (
 	"sync"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -114,7 +114,7 @@ func (th *TopologyHint) IsEqual(topologyHint TopologyHint) bool {
 // or `a` NUMANodeAffinity attribute is narrower than `b` NUMANodeAffinity attribute.
 func (th *TopologyHint) LessThan(other TopologyHint) bool {
 	if th.Preferred != other.Preferred {
-		return th.Preferred == true
+		return th.Preferred
 	}
 	return th.NUMANodeAffinity.IsNarrowerThan(other.NUMANodeAffinity)
 }

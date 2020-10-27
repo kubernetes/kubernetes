@@ -303,56 +303,44 @@ func StopServeHostnameService(clientset clientset.Interface, ns, name string) er
 }
 
 // verifyServeHostnameServiceUp wgets the given serviceIP:servicePort from the
-// given host and from within a pod. The host is expected to be an SSH-able node
-// in the cluster. Each pod in the service is expected to echo its name. These
-// names are compared with the given expectedPods list after a sort | uniq.
-func verifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expectedPods []string, serviceIP string, servicePort int) error {
-	execPod := e2epod.CreateExecPodOrFail(c, ns, "execpod-", nil)
+// the host exec pod of host network type and from the exec pod of container network type.
+// Each pod in the service is expected to echo its name. These names are compared with the
+// given expectedPods list after a sort | uniq.
+func verifyServeHostnameServiceUp(c clientset.Interface, ns string, expectedPods []string, serviceIP string, servicePort int) error {
+	// to verify from host network
+	hostExecPod := launchHostExecPod(c, ns, "verify-service-up-host-exec-pod")
+
+	// to verify from container's network
+	execPod := e2epod.CreateExecPodOrFail(c, ns, "verify-service-up-exec-pod-", nil)
 	defer func() {
+		e2epod.DeletePodOrFail(c, ns, hostExecPod.Name)
 		e2epod.DeletePodOrFail(c, ns, execPod.Name)
 	}()
 
-	// Loop a bunch of times - the proxy is randomized, so we want a good
-	// chance of hitting each backend at least once.
-	buildCommand := func(wget string) string {
+	// verify service from pod
+	cmdFunc := func(podName string) string {
+		wgetCmd := "wget -q -T 1 -O -"
 		serviceIPPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
-		return fmt.Sprintf("for i in $(seq 1 %d); do %s http://%s 2>&1 || true; echo; done",
-			50*len(expectedPods), wget, serviceIPPort)
-	}
-	commands := []func() string{
-		// verify service from node
-		func() string {
-			cmd := "set -e; " + buildCommand("wget -q --timeout=0.2 --tries=1 -O -")
-			framework.Logf("Executing cmd %q on host %v", cmd, host)
-			result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
-			if err != nil || result.Code != 0 {
-				e2essh.LogResult(result)
-				framework.Logf("error while SSH-ing to node: %v", err)
-			}
-			return result.Stdout
-		},
-		// verify service from pod
-		func() string {
-			cmd := buildCommand("wget -q -T 1 -O -")
-			framework.Logf("Executing cmd %q in pod %v/%v", cmd, ns, execPod.Name)
-			// TODO: Use exec-over-http via the netexec pod instead of kubectl exec.
-			output, err := framework.RunHostCmd(ns, execPod.Name, cmd)
-			if err != nil {
-				framework.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, execPod.Name, err, output)
-			}
-			return output
-		},
+		cmd := fmt.Sprintf("for i in $(seq 1 %d); do %s http://%s 2>&1 || true; echo; done",
+			50*len(expectedPods), wgetCmd, serviceIPPort)
+		framework.Logf("Executing cmd %q in pod %v/%v", cmd, ns, podName)
+		// TODO: Use exec-over-http via the netexec pod instead of kubectl exec.
+		output, err := framework.RunHostCmd(ns, podName, cmd)
+		if err != nil {
+			framework.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, podName, err, output)
+		}
+		return output
 	}
 
 	expectedEndpoints := sets.NewString(expectedPods...)
 	ginkgo.By(fmt.Sprintf("verifying service has %d reachable backends", len(expectedPods)))
-	for _, cmdFunc := range commands {
+	for _, podName := range []string{hostExecPod.Name, execPod.Name} {
 		passed := false
 		gotEndpoints := sets.NewString()
 
 		// Retry cmdFunc for a while
 		for start := time.Now(); time.Since(start) < e2eservice.KubeProxyLagTimeout; time.Sleep(5 * time.Second) {
-			for _, endpoint := range strings.Split(cmdFunc(), "\n") {
+			for _, endpoint := range strings.Split(cmdFunc(podName), "\n") {
 				trimmedEp := strings.TrimSpace(endpoint)
 				if trimmedEp != "" {
 					gotEndpoints.Insert(trimmedEp)
@@ -384,25 +372,32 @@ func verifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 }
 
 // verifyServeHostnameServiceDown verifies that the given service isn't served.
-func verifyServeHostnameServiceDown(c clientset.Interface, host string, serviceIP string, servicePort int) error {
+func verifyServeHostnameServiceDown(c clientset.Interface, ns string, serviceIP string, servicePort int) error {
+	// verify from host network
+	hostExecPod := launchHostExecPod(c, ns, "verify-service-down-host-exec-pod")
+
+	defer func() {
+		e2epod.DeletePodOrFail(c, ns, hostExecPod.Name)
+	}()
+
 	ipPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
 	// The current versions of curl included in CentOS and RHEL distros
 	// misinterpret square brackets around IPv6 as globbing, so use the -g
 	// argument to disable globbing to handle the IPv6 case.
 	command := fmt.Sprintf(
-		"curl -g -s --connect-timeout 2 http://%s && exit 99", ipPort)
+		"curl -g -s --connect-timeout 2 http://%s && echo service-down-failed", ipPort)
 
-	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(command, host, framework.TestContext.Provider)
+	for start := time.Now(); time.Since(start) < e2eservice.KubeProxyLagTimeout; time.Sleep(5 * time.Second) {
+		output, err := framework.RunHostCmd(ns, hostExecPod.Name, command)
 		if err != nil {
-			e2essh.LogResult(result)
-			framework.Logf("error while SSH-ing to node: %v", err)
+			framework.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", command, ns, hostExecPod.Name, err, output)
 		}
-		if result.Code != 99 {
+		if !strings.Contains(output, "service-down-failed") {
 			return nil
 		}
 		framework.Logf("service still alive - still waiting")
 	}
+
 	return fmt.Errorf("waiting for service to be down timed out")
 }
 
@@ -986,7 +981,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("Creating a webserver pod to be part of the TCP service which echoes back source ip")
 		serverPodName := "echo-sourceip"
-		pod := newAgnhostPod(serverPodName, "netexec", "--http-port", strconv.Itoa(servicePort))
+		pod := e2epod.NewAgnhostPod(ns, serverPodName, nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort))
 		pod.Labels = jig.Labels
 		_, err = cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
@@ -1044,7 +1039,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("creating a client/server pod")
 		serverPodName := "hairpin"
-		podTemplate := newAgnhostPod(serverPodName, "netexec", "--http-port", strconv.Itoa(servicePort))
+		podTemplate := e2epod.NewAgnhostPod(ns, serverPodName, nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort))
 		podTemplate.Labels = jig.Labels
 		pod, err := cs.CoreV1().Pods(ns).Create(context.TODO(), podTemplate, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
@@ -1060,12 +1055,6 @@ var _ = SIGDescribe("Services", func() {
 	})
 
 	ginkgo.It("should be able to up and down services", func() {
-		// TODO: use the ServiceTestJig here
-		// this test uses e2essh.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
-		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-		// this test does not work if the Node does not support SSH Key
-		e2eskipper.SkipUnlessSSHKeyPresent()
-
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, defaultServeHostnameServicePort
 
@@ -1080,27 +1069,20 @@ var _ = SIGDescribe("Services", func() {
 		podNames2, svc2IP, err := StartServeHostnameService(cs, getServeHostnameService(svc2), ns, numPods)
 		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc2, ns)
 
-		hosts, err := e2essh.NodeSSHHosts(cs)
-		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
-		if len(hosts) == 0 {
-			framework.Failf("No ssh-able nodes")
-		}
-		host := hosts[0]
-
 		ginkgo.By("verifying service " + svc1 + " is up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames1, svc1IP, servicePort))
 
 		ginkgo.By("verifying service " + svc2 + " is up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames2, svc2IP, servicePort))
 
 		// Stop service 1 and make sure it is gone.
 		ginkgo.By("stopping service " + svc1)
 		framework.ExpectNoError(StopServeHostnameService(f.ClientSet, ns, svc1))
 
 		ginkgo.By("verifying service " + svc1 + " is not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, host, svc1IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, ns, svc1IP, servicePort))
 		ginkgo.By("verifying service " + svc2 + " is still up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames2, svc2IP, servicePort))
 
 		// Start another service and verify both are up.
 		ginkgo.By("creating service " + svc3 + " in namespace " + ns)
@@ -1112,10 +1094,10 @@ var _ = SIGDescribe("Services", func() {
 		}
 
 		ginkgo.By("verifying service " + svc2 + " is still up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames2, svc2IP, servicePort))
 
 		ginkgo.By("verifying service " + svc3 + " is up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames3, svc3IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames3, svc3IP, servicePort))
 	})
 
 	ginkgo.It("should work after restarting kube-proxy [Disruptive]", func() {
@@ -1152,15 +1134,15 @@ var _ = SIGDescribe("Services", func() {
 		}
 		host := hosts[0]
 
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames1, svc1IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames2, svc2IP, servicePort))
 
 		ginkgo.By(fmt.Sprintf("Restarting kube-proxy on %v", host))
 		if err := restartKubeProxy(host); err != nil {
 			framework.Failf("error restarting kube-proxy: %v", err)
 		}
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames1, svc1IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames2, svc2IP, servicePort))
 	})
 
 	ginkgo.It("should work after restarting apiserver [Disruptive]", func() {
@@ -1180,14 +1162,7 @@ var _ = SIGDescribe("Services", func() {
 		podNames1, svc1IP, err := StartServeHostnameService(cs, getServeHostnameService(svc1), ns, numPods)
 		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc1, ns)
 
-		hosts, err := e2essh.NodeSSHHosts(cs)
-		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
-		if len(hosts) == 0 {
-			framework.Failf("No ssh-able nodes")
-		}
-		host := hosts[0]
-
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames1, svc1IP, servicePort))
 
 		// Restart apiserver
 		ginkgo.By("Restarting apiserver")
@@ -1198,7 +1173,7 @@ var _ = SIGDescribe("Services", func() {
 		if err := waitForApiserverUp(cs); err != nil {
 			framework.Failf("error while waiting for apiserver up: %v", err)
 		}
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames1, svc1IP, servicePort))
 
 		// Create a new service and check if it's not reusing IP.
 		defer func() {
@@ -1210,8 +1185,8 @@ var _ = SIGDescribe("Services", func() {
 		if svc1IP == svc2IP {
 			framework.Failf("VIPs conflict: %v", svc1IP)
 		}
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames1, svc1IP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podNames2, svc2IP, servicePort))
 	})
 
 	/*
@@ -2590,11 +2565,6 @@ var _ = SIGDescribe("Services", func() {
 	})
 
 	ginkgo.It("should implement service.kubernetes.io/service-proxy-name", func() {
-		// this test uses e2essh.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
-		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-		// this test does not work if the Node does not support SSH Key
-		e2eskipper.SkipUnlessSSHKeyPresent()
-
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, defaultServeHostnameServicePort
 		serviceProxyNameLabels := map[string]string{"service.kubernetes.io/service-proxy-name": "foo-bar"}
@@ -2617,18 +2587,11 @@ var _ = SIGDescribe("Services", func() {
 
 		jig := e2eservice.NewTestJig(cs, ns, svcToggled.ObjectMeta.Name)
 
-		hosts, err := e2essh.NodeSSHHosts(cs)
-		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
-		if len(hosts) == 0 {
-			framework.Failf("No ssh-able nodes")
-		}
-		host := hosts[0]
-
 		ginkgo.By("verifying service is up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podToggledNames, svcToggledIP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podToggledNames, svcToggledIP, servicePort))
 
 		ginkgo.By("verifying service-disabled is not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, host, svcDisabledIP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, ns, svcDisabledIP, servicePort))
 
 		ginkgo.By("adding service-proxy-name label")
 		_, err = jig.UpdateService(func(svc *v1.Service) {
@@ -2637,7 +2600,7 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("verifying service is not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, host, svcToggledIP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, ns, svcToggledIP, servicePort))
 
 		ginkgo.By("removing service-proxy-name annotation")
 		_, err = jig.UpdateService(func(svc *v1.Service) {
@@ -2646,18 +2609,13 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("verifying service is up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podToggledNames, svcToggledIP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podToggledNames, svcToggledIP, servicePort))
 
 		ginkgo.By("verifying service-disabled is still not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, host, svcDisabledIP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, ns, svcDisabledIP, servicePort))
 	})
 
 	ginkgo.It("should implement service.kubernetes.io/headless", func() {
-		// this test uses e2essh.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
-		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-		// this test does not work if the Node does not support SSH Key
-		e2eskipper.SkipUnlessSSHKeyPresent()
-
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, defaultServeHostnameServicePort
 		serviceHeadlessLabels := map[string]string{v1.IsHeadlessService: ""}
@@ -2681,18 +2639,11 @@ var _ = SIGDescribe("Services", func() {
 
 		jig := e2eservice.NewTestJig(cs, ns, svcHeadlessToggled.ObjectMeta.Name)
 
-		hosts, err := e2essh.NodeSSHHosts(cs)
-		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
-		if len(hosts) == 0 {
-			framework.Failf("No ssh-able nodes")
-		}
-		host := hosts[0]
-
 		ginkgo.By("verifying service is up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podHeadlessToggledNames, svcHeadlessToggledIP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podHeadlessToggledNames, svcHeadlessToggledIP, servicePort))
 
 		ginkgo.By("verifying service-headless is not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, host, svcHeadlessIP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, ns, svcHeadlessIP, servicePort))
 
 		ginkgo.By("adding service.kubernetes.io/headless label")
 		_, err = jig.UpdateService(func(svc *v1.Service) {
@@ -2701,7 +2652,7 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("verifying service is not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, host, svcHeadlessToggledIP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, ns, svcHeadlessToggledIP, servicePort))
 
 		ginkgo.By("removing service.kubernetes.io/headless annotation")
 		_, err = jig.UpdateService(func(svc *v1.Service) {
@@ -2710,10 +2661,10 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("verifying service is up")
-		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, host, podHeadlessToggledNames, svcHeadlessToggledIP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceUp(cs, ns, podHeadlessToggledNames, svcHeadlessToggledIP, servicePort))
 
 		ginkgo.By("verifying service-headless is still not up")
-		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, host, svcHeadlessIP, servicePort))
+		framework.ExpectNoError(verifyServeHostnameServiceDown(cs, ns, svcHeadlessIP, servicePort))
 	})
 
 	ginkgo.It("should be rejected when no endpoints exist", func() {
@@ -3243,7 +3194,8 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		}
 	})
 
-	ginkgo.It("should handle updates to ExternalTrafficPolicy field", func() {
+	// TODO(#56138): Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
+	ginkgo.It("should handle updates to ExternalTrafficPolicy field [DisabledForLargeClusters]", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-update"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
@@ -3456,7 +3408,19 @@ func execAffinityTestForSessionAffinityTimeout(f *framework.Framework, cs client
 			if hosts.Len() > 1 {
 				return
 			}
-			time.Sleep(time.Duration(svcSessionAffinityTimeout) * time.Second)
+			// In some case, ipvs didn't deleted the persistent connection after timeout expired,
+			// use 'ipvsadm -lnc' command can found the expire time become '13171233:02' after '00:00'
+			//
+			// pro expire state       source             virtual            destination
+			// TCP 00:00  NONE        10.105.253.160:0   10.105.253.160:80  10.244.1.25:9376
+			//
+			// pro expire state       source             virtual            destination
+			// TCP 13171233:02 NONE        10.105.253.160:0   10.105.253.160:80  10.244.1.25:9376
+			//
+			// And 2 seconds later, the connection will be ensure deleted,
+			// so we sleep 'svcSessionAffinityTimeout+5' seconds to avoid this issue.
+			// TODO: figure out why the expired connection didn't be deleted and fix this issue in ipvs side.
+			time.Sleep(time.Duration(svcSessionAffinityTimeout+5) * time.Second)
 		}
 	}
 	framework.Fail("Session is sticky after reaching the timeout")
@@ -3587,11 +3551,7 @@ func createPausePodDeployment(cs clientset.Interface, name, ns string, replicas 
 	labels := map[string]string{"deployment": "agnhost-pause"}
 	pauseDeployment := e2edeployment.NewDeployment(name, int32(replicas), labels, "", "", appsv1.RollingUpdateDeploymentStrategyType)
 
-	pauseDeployment.Spec.Template.Spec.Containers[0] = v1.Container{
-		Name:  "agnhost-pause",
-		Image: imageutils.GetE2EImage(imageutils.Agnhost),
-		Args:  []string{"pause"},
-	}
+	pauseDeployment.Spec.Template.Spec.Containers[0] = e2epod.NewAgnhostContainer("agnhost-pause", nil, nil, "pause")
 	pauseDeployment.Spec.Template.Spec.Affinity = &v1.Affinity{
 		PodAntiAffinity: &v1.PodAntiAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
@@ -3612,25 +3572,12 @@ func createPausePodDeployment(cs clientset.Interface, name, ns string, replicas 
 // createPodOrFail creates a pod with the specified containerPorts.
 func createPodOrFail(c clientset.Interface, ns, name string, labels map[string]string, containerPorts []v1.ContainerPort) {
 	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", name, ns))
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   name,
-			Labels: labels,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "pause",
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"pause"},
-					Ports: containerPorts,
-					// Add a dummy environment variable to work around a docker issue.
-					// https://github.com/docker/docker/issues/14203
-					Env: []v1.EnvVar{{Name: "FOO", Value: " "}},
-				},
-			},
-		},
-	}
+	pod := e2epod.NewAgnhostPod(ns, name, nil, nil, containerPorts)
+	pod.ObjectMeta.Labels = labels
+	// Add a dummy environment variable to work around a docker issue.
+	// https://github.com/docker/docker/issues/14203
+	pod.Spec.Containers[0].Env = []v1.EnvVar{{Name: "FOO", Value: " "}}
+
 	_, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create pod %s in namespace %s", name, ns)
 }
@@ -3638,6 +3585,7 @@ func createPodOrFail(c clientset.Interface, ns, name string, labels map[string]s
 // launchHostExecPod launches a hostexec pod in the given namespace and waits
 // until it's Running
 func launchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
+	framework.Logf("Creating new host exec pod")
 	hostExecPod := e2epod.NewExecPodSpec(ns, name, true)
 	pod, err := client.CoreV1().Pods(ns).Create(context.TODO(), hostExecPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
@@ -3667,22 +3615,8 @@ func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, n
 
 // proxyMode returns a proxyMode of a kube-proxy.
 func proxyMode(f *framework.Framework) (string, error) {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-proxy-mode-detector",
-			Namespace: f.Namespace.Name,
-		},
-		Spec: v1.PodSpec{
-			HostNetwork: true,
-			Containers: []v1.Container{
-				{
-					Name:  "detector",
-					Image: agnHostImage,
-					Args:  []string{"pause"},
-				},
-			},
-		},
-	}
+	pod := e2epod.NewAgnhostPod(f.Namespace.Name, "kube-proxy-mode-detector", nil, nil, nil)
+	pod.Spec.HostNetwork = true
 	f.PodClient().CreateSync(pod)
 	defer f.PodClient().DeleteSync(pod.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 
@@ -3834,7 +3768,7 @@ func sshRestartMaster() error {
 		command = "sudo /etc/init.d/kube-apiserver restart"
 	}
 	framework.Logf("Restarting master via ssh, running: %v", command)
-	result, err := e2essh.SSH(command, net.JoinHostPort(framework.GetMasterHost(), e2essh.SSHPort), framework.TestContext.Provider)
+	result, err := e2essh.SSH(command, net.JoinHostPort(framework.APIAddress(), e2essh.SSHPort), framework.TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		e2essh.LogResult(result)
 		return fmt.Errorf("couldn't restart apiserver: %v", err)
@@ -3965,32 +3899,8 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 
 		ginkgo.By("creating a pod with hostport on the selected node")
 		podName := "hostport"
-
-		podSpec := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      podName,
-				Namespace: f.Namespace.Name,
-				Labels:    map[string]string{"app": "hostport-pod"},
-			},
-			Spec: v1.PodSpec{
-				NodeName: node.Name,
-				Containers: []v1.Container{
-					{
-						Name:  "hostport",
-						Image: imageutils.GetE2EImage(imageutils.Agnhost),
-						Args:  []string{"pause"},
-						Ports: []v1.ContainerPort{
-							{
-								Protocol:      v1.ProtocolSCTP,
-								ContainerPort: 5060,
-								HostPort:      5060,
-							},
-						},
-						ImagePullPolicy: "IfNotPresent",
-					},
-				},
-			},
-		}
+		ports := []v1.ContainerPort{{Protocol: v1.ProtocolSCTP, ContainerPort: 5060, HostPort: 5060}}
+		podSpec := e2epod.NewAgnhostPod(f.Namespace.Name, podName, nil, nil, ports)
 
 		ginkgo.By(fmt.Sprintf("Launching the pod on node %v", node.Name))
 		f.PodClient().CreateSync(podSpec)
@@ -3998,24 +3908,28 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 			err := cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", podName, f.Namespace.Name)
 		}()
-
-		ginkgo.By("dumping iptables rules on the node")
-		cmd = "sudo iptables-save"
-		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
-		result, err := hostExec.IssueCommandWithResult(cmd, node)
-		if err != nil {
-			framework.Failf("Interrogation of iptables rules failed on node %v", node.Name)
+		// wait until host port manager syncs rules
+		cmd = "iptables-save"
+		if framework.TestContext.ClusterIsIPv6() {
+			cmd = "ip6tables-save"
 		}
-
-		ginkgo.By("checking that iptables contains the necessary iptables rules")
-		found := false
-		for _, line := range strings.Split(result, "\n") {
-			if strings.Contains(line, "-p sctp") && strings.Contains(line, "--dport 5060") {
-				found = true
-				break
+		err = wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
+			framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
+			result, err := hostExec.IssueCommandWithResult(cmd, node)
+			if err != nil {
+				framework.Logf("Interrogation of iptables rules failed on node %v", node.Name)
+				return false, nil
 			}
-		}
-		if !found {
+
+			for _, line := range strings.Split(result, "\n") {
+				if strings.Contains(line, "-p sctp") && strings.Contains(line, "--dport 5060") {
+					return true, nil
+				}
+			}
+			framework.Logf("retrying ... not hostport sctp iptables rules found on node %v", node.Name)
+			return false, nil
+		})
+		if err != nil {
 			framework.Failf("iptables rules are not set for a pod with sctp hostport")
 		}
 		ginkgo.By("validating sctp module is still not loaded")
@@ -4054,28 +3968,31 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 
 		err = e2enetwork.WaitForService(f.ClientSet, ns, serviceName, true, 5*time.Second, e2eservice.TestTimeout)
 		framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceName, err))
-
-		ginkgo.By("dumping iptables rules on a node")
 		hostExec := utils.NewHostExec(f)
 		defer hostExec.Cleanup()
 		node, err := e2enode.GetRandomReadySchedulableNode(cs)
 		framework.ExpectNoError(err)
-		cmd := "sudo iptables-save"
-		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
-		result, err := hostExec.IssueCommandWithResult(cmd, node)
-		if err != nil {
-			framework.Failf("Interrogation of iptables rules failed on node %v", node.Name)
+		cmd := "iptables-save"
+		if framework.TestContext.ClusterIsIPv6() {
+			cmd = "ip6tables-save"
 		}
-
-		ginkgo.By("checking that iptables contains the necessary iptables rules")
-		kubeService := false
-		for _, line := range strings.Split(result, "\n") {
-			if strings.Contains(line, "-A KUBE-SERVICES") && strings.Contains(line, "-p sctp") {
-				kubeService = true
-				break
+		err = wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
+			framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
+			result, err := hostExec.IssueCommandWithResult(cmd, node)
+			if err != nil {
+				framework.Logf("Interrogation of iptables rules failed on node %v", node.Name)
+				return false, nil
 			}
-		}
-		if !kubeService {
+
+			for _, line := range strings.Split(result, "\n") {
+				if strings.Contains(line, "-A KUBE-SERVICES") && strings.Contains(line, "-p sctp") {
+					return true, nil
+				}
+			}
+			framework.Logf("retrying ... no iptables rules found for service with sctp ports on node %v", node.Name)
+			return false, nil
+		})
+		if err != nil {
 			framework.Failf("iptables rules are not set for a clusterip service with sctp ports")
 		}
 		ginkgo.By("validating sctp module is still not loaded")

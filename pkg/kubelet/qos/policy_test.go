@@ -187,8 +187,8 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 		{
 			pod:             &equalRequestLimitCPUMemory,
 			memoryCapacity:  123456789,
-			lowOOMScoreAdj:  -998,
-			highOOMScoreAdj: -998,
+			lowOOMScoreAdj:  -997,
+			highOOMScoreAdj: -997,
 		},
 		{
 			pod:             &cpuUnlimitedMemoryLimitedWithRequests,
@@ -199,14 +199,14 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 		{
 			pod:             &requestNoLimit,
 			memoryCapacity:  standardMemoryAmount,
-			lowOOMScoreAdj:  2,
-			highOOMScoreAdj: 2,
+			lowOOMScoreAdj:  3,
+			highOOMScoreAdj: 3,
 		},
 		{
 			pod:             &critical,
 			memoryCapacity:  4000000000,
-			lowOOMScoreAdj:  -998,
-			highOOMScoreAdj: -998,
+			lowOOMScoreAdj:  -997,
+			highOOMScoreAdj: -997,
 		},
 	}
 	for _, test := range oomTests {

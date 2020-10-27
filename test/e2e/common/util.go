@@ -241,3 +241,14 @@ func getFileModeRegex(filePath string, mask *int32) string {
 
 	return fmt.Sprintf("(%s|%s)", linuxOutput, windowsOutput)
 }
+
+// createMounts creates a v1.VolumeMount list with a single element.
+func createMounts(volumeName, volumeMountPath string, readOnly bool) []v1.VolumeMount {
+	return []v1.VolumeMount{
+		{
+			Name:      volumeName,
+			MountPath: volumeMountPath,
+			ReadOnly:  readOnly,
+		},
+	}
+}

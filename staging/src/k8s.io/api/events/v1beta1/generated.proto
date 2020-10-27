@@ -31,7 +31,6 @@ option go_package = "v1beta1";
 
 // Event is a report of an event somewhere in the cluster. It generally denotes some state change in the system.
 message Event {
-  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // eventTime is the time when this Event was first observed. It is required.

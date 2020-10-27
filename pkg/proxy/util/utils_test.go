@@ -163,6 +163,39 @@ func TestIsProxyableHostname(t *testing.T) {
 	}
 }
 
+func TestIsAllowedHost(t *testing.T) {
+	testCases := []struct {
+		ip     string
+		denied []string
+		want   error
+	}{
+		{"8.8.8.8", []string{}, nil},
+		{"169.254.169.254", []string{"169.0.0.0/8"}, ErrAddressNotAllowed},
+		{"169.254.169.254", []string{"fce8::/15", "169.254.169.0/24"}, ErrAddressNotAllowed},
+		{"fce9:beef::", []string{"fce8::/15", "169.254.169.0/24"}, ErrAddressNotAllowed},
+		{"127.0.0.1", []string{"127.0.0.1/32"}, ErrAddressNotAllowed},
+		{"34.107.204.206", []string{"fce8::/15"}, nil},
+		{"fce9:beef::", []string{"127.0.0.1/32"}, nil},
+		{"34.107.204.206", []string{"127.0.0.1/32"}, nil},
+		{"127.0.0.1", []string{}, nil},
+	}
+
+	for i := range testCases {
+		var denyList []*net.IPNet
+		for _, cidrStr := range testCases[i].denied {
+			_, ipNet, err := net.ParseCIDR(cidrStr)
+			if err != nil {
+				t.Fatalf("bad IP for test case: %v: %v", cidrStr, err)
+			}
+			denyList = append(denyList, ipNet)
+		}
+		got := IsAllowedHost(net.ParseIP(testCases[i].ip), denyList)
+		if testCases[i].want != got {
+			t.Errorf("case %d: expected %v, got %v", i, testCases[i].want, got)
+		}
+	}
+}
+
 func TestShouldSkipService(t *testing.T) {
 	testCases := []struct {
 		service    *v1.Service
@@ -616,7 +649,11 @@ func TestFilterIncorrectIPVersion(t *testing.T) {
 
 	for _, testcase := range testCases {
 		t.Run(testcase.desc, func(t *testing.T) {
-			correct, incorrect := FilterIncorrectIPVersion(testcase.ipString, testcase.wantIPv6)
+			ipFamily := v1.IPv4Protocol
+			if testcase.wantIPv6 {
+				ipFamily = v1.IPv6Protocol
+			}
+			correct, incorrect := FilterIncorrectIPVersion(testcase.ipString, ipFamily)
 			if !reflect.DeepEqual(testcase.expectCorrect, correct) {
 				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, correct)
 			}
@@ -625,4 +662,163 @@ func TestFilterIncorrectIPVersion(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetClusterIPByFamily(t *testing.T) {
+	testCases := []struct {
+		name           string
+		service        v1.Service
+		requestFamily  v1.IPFamily
+		expectedResult string
+	}{
+		{
+			name:           "old style service ipv4. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "10.0.0.10",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "10.0.0.10",
+				},
+			},
+		},
+
+		{
+			name:           "old style service ipv4. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "10.0.0.10",
+				},
+			},
+		},
+
+		{
+			name:           "old style service ipv6. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "2000::1",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "2000::1",
+				},
+			},
+		},
+
+		{
+			name:           "old style service ipv6. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "2000::1",
+				},
+			},
+		},
+
+		{
+			name:           "service single stack ipv4. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "10.0.0.10",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"10.0.0.10"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service single stack ipv4. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"10.0.0.10"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service single stack ipv6. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "2000::1",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"2000::1"},
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service single stack ipv6. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"2000::1"},
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+				},
+			},
+		},
+		// dual stack
+		{
+			name:           "service dual stack ipv4,6. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "10.0.0.10",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"10.0.0.10", "2000::1"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service dual stack ipv4,6. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "2000::1",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"10.0.0.10", "2000::1"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service dual stack ipv6,4. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "2000::1",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"2000::1", "10.0.0.10"},
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service dual stack ipv6,4. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "10.0.0.10",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"2000::1", "10.0.0.10"},
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ip := GetClusterIPByFamily(testCase.requestFamily, &testCase.service)
+			if ip != testCase.expectedResult {
+				t.Fatalf("expected ip:%v got %v", testCase.expectedResult, ip)
+			}
+		})
+	}
+
 }

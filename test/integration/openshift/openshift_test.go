@@ -34,7 +34,7 @@ func TestMasterExportsSymbols(t *testing.T) {
 			EnableLogsSupport: false,
 		},
 	}
-	_ = &controlplane.Master{
+	_ = &controlplane.Instance{
 		GenericAPIServer: &genericapiserver.GenericAPIServer{},
 	}
 }

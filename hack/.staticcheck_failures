@@ -7,7 +7,6 @@ test/integration/examples
 test/integration/framework
 test/integration/garbagecollector
 test/integration/scheduler_perf
-test/integration/ttlcontroller
 vendor/k8s.io/apimachinery/pkg/api/apitesting/roundtrip
 vendor/k8s.io/apimachinery/pkg/api/meta
 vendor/k8s.io/apimachinery/pkg/apis/meta/v1/validation
@@ -50,15 +49,7 @@ vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 vendor/k8s.io/apiserver/plugin/pkg/authorizer/webhook
 vendor/k8s.io/cli-runtime/pkg/printers
 vendor/k8s.io/client-go/discovery
-vendor/k8s.io/client-go/discovery/cached/memory
-vendor/k8s.io/client-go/dynamic/fake
-vendor/k8s.io/client-go/metadata/fake
 vendor/k8s.io/client-go/rest
 vendor/k8s.io/client-go/rest/watch
-vendor/k8s.io/client-go/restmapper
-vendor/k8s.io/client-go/tools/leaderelection
 vendor/k8s.io/client-go/transport
-vendor/k8s.io/kubectl/pkg/cmd/get
 vendor/k8s.io/kubectl/pkg/cmd/scale
-vendor/k8s.io/kubectl/pkg/cmd/testing
-vendor/k8s.io/metrics/pkg/client/custom_metrics

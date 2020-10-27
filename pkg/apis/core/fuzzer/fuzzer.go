@@ -301,6 +301,11 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty
 			ct.TerminationMessagePolicy = "File"
 		},
+		func(ep *core.EphemeralContainer, c fuzz.Continue) {
+			c.FuzzNoCustom(ep)                                                                   // fuzz self without calling this function again
+			ep.EphemeralContainerCommon.TerminationMessagePath = "/" + ep.TerminationMessagePath // Must be non-empty
+			ep.EphemeralContainerCommon.TerminationMessagePolicy = "File"
+		},
 		func(p *core.Probe, c fuzz.Continue) {
 			c.FuzzNoCustom(p)
 			// These fields have default values.

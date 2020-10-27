@@ -102,7 +102,6 @@ type initOptions struct {
 	externalClusterCfg      *kubeadmapiv1beta2.ClusterConfiguration
 	uploadCerts             bool
 	skipCertificateKeyPrint bool
-	kustomizeDir            string
 	patchesDir              string
 }
 
@@ -125,14 +124,13 @@ type initData struct {
 	outputWriter            io.Writer
 	uploadCerts             bool
 	skipCertificateKeyPrint bool
-	kustomizeDir            string
 	patchesDir              string
 }
 
-// NewCmdInit returns "kubeadm init" command.
+// newCmdInit returns "kubeadm init" command.
 // NB. initOptions is exposed as parameter for allowing unit testing of
 //     the newInitOptions method, that implements all the command options validation logic
-func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
+func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	if initOptions == nil {
 		initOptions = newInitOptions()
 	}
@@ -282,7 +280,6 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
 		&initOptions.skipCertificateKeyPrint, options.SkipCertificateKeyPrint, initOptions.skipCertificateKeyPrint,
 		"Don't print the key used to encrypt the control-plane certificates.",
 	)
-	options.AddKustomizePodsFlag(flagSet, &initOptions.kustomizeDir)
 	options.AddPatchesFlag(flagSet, &initOptions.patchesDir)
 }
 
@@ -419,7 +416,6 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		outputWriter:            out,
 		uploadCerts:             options.uploadCerts,
 		skipCertificateKeyPrint: options.skipCertificateKeyPrint,
-		kustomizeDir:            options.kustomizeDir,
 		patchesDir:              options.patchesDir,
 	}, nil
 }
@@ -551,11 +547,6 @@ func (d *initData) Tokens() []string {
 		tokens = append(tokens, bt.Token.String())
 	}
 	return tokens
-}
-
-// KustomizeDir returns the folder where kustomize patches for static pod manifest are stored
-func (d *initData) KustomizeDir() string {
-	return d.kustomizeDir
 }
 
 // PatchesDir returns the folder where patches for components are stored

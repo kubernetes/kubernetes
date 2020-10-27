@@ -428,7 +428,7 @@ func TestConnectWithRedirects(t *testing.T) {
 			require.NoError(t, err, "unexpected request error")
 
 			result, err := ioutil.ReadAll(resp.Body)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			require.NoError(t, resp.Body.Close())
 			if test.expectedRedirects < len(test.redirects) {
 				// Expect the last redirect to be returned.

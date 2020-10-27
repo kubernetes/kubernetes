@@ -135,24 +135,24 @@ func makeTestEndpoints(namespace, name string, eptFunc func(*v1.Endpoints)) *v1.
 
 // This is a coarse test, but it offers some modicum of confidence as the code is evolved.
 func TestEndpointsToEndpointsMap(t *testing.T) {
-	epTracker := NewEndpointChangeTracker("test-hostname", nil, nil, nil, false, nil)
-
-	trueVal := true
-	falseVal := false
-
 	testCases := []struct {
 		desc         string
 		newEndpoints *v1.Endpoints
 		expected     map[ServicePortName][]*BaseEndpointInfo
 		isIPv6Mode   *bool
+		ipFamily     v1.IPFamily
 	}{
 		{
-			desc:         "nothing",
+			desc:     "nothing",
+			ipFamily: v1.IPv4Protocol,
+
 			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *v1.Endpoints) {}),
 			expected:     map[ServicePortName][]*BaseEndpointInfo{},
 		},
 		{
-			desc: "no changes, unnamed port",
+			desc:     "no changes, unnamed port",
+			ipFamily: v1.IPv4Protocol,
+
 			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *v1.Endpoints) {
 				ept.Subsets = []v1.EndpointSubset{
 					{
@@ -174,7 +174,9 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			},
 		},
 		{
-			desc: "no changes, named port",
+			desc:     "no changes, named port",
+			ipFamily: v1.IPv4Protocol,
+
 			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *v1.Endpoints) {
 				ept.Subsets = []v1.EndpointSubset{
 					{
@@ -196,7 +198,9 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			},
 		},
 		{
-			desc: "new port",
+			desc:     "new port",
+			ipFamily: v1.IPv4Protocol,
+
 			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *v1.Endpoints) {
 				ept.Subsets = []v1.EndpointSubset{
 					{
@@ -217,12 +221,16 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			},
 		},
 		{
-			desc:         "remove port",
+			desc:     "remove port",
+			ipFamily: v1.IPv4Protocol,
+
 			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *v1.Endpoints) {}),
 			expected:     map[ServicePortName][]*BaseEndpointInfo{},
 		},
 		{
-			desc: "new IP and port",
+			desc:     "new IP and port",
+			ipFamily: v1.IPv4Protocol,
+
 			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *v1.Endpoints) {
 				ept.Subsets = []v1.EndpointSubset{
 					{
@@ -255,7 +263,9 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			},
 		},
 		{
-			desc: "remove IP and port",
+			desc:     "remove IP and port",
+			ipFamily: v1.IPv4Protocol,
+
 			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *v1.Endpoints) {
 				ept.Subsets = []v1.EndpointSubset{
 					{
@@ -277,7 +287,9 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			},
 		},
 		{
-			desc: "rename port",
+			desc:     "rename port",
+			ipFamily: v1.IPv4Protocol,
+
 			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *v1.Endpoints) {
 				ept.Subsets = []v1.EndpointSubset{
 					{
@@ -299,7 +311,9 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			},
 		},
 		{
-			desc: "renumber port",
+			desc:     "renumber port",
+			ipFamily: v1.IPv4Protocol,
+
 			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *v1.Endpoints) {
 				ept.Subsets = []v1.EndpointSubset{
 					{
@@ -321,7 +335,9 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			},
 		},
 		{
-			desc: "should omit IPv6 address in IPv4 mode",
+			desc:     "should omit IPv6 address in IPv4 mode",
+			ipFamily: v1.IPv4Protocol,
+
 			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *v1.Endpoints) {
 				ept.Subsets = []v1.EndpointSubset{
 					{
@@ -350,10 +366,11 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 					{Endpoint: "1.1.1.1:22", IsLocal: false},
 				},
 			},
-			isIPv6Mode: &falseVal,
 		},
 		{
-			desc: "should omit IPv4 address in IPv6 mode",
+			desc:     "should omit IPv4 address in IPv6 mode",
+			ipFamily: v1.IPv6Protocol,
+
 			newEndpoints: makeTestEndpoints("ns1", "ep1", func(ept *v1.Endpoints) {
 				ept.Subsets = []v1.EndpointSubset{
 					{
@@ -382,30 +399,33 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 					{Endpoint: "[2001:db8:85a3:0:0:8a2e:370:7334]:22", IsLocal: false},
 				},
 			},
-			isIPv6Mode: &trueVal,
 		},
 	}
 
 	for _, tc := range testCases {
-		epTracker.isIPv6Mode = tc.isIPv6Mode
-		// outputs
-		newEndpoints := epTracker.endpointsToEndpointsMap(tc.newEndpoints)
+		t.Run(tc.desc, func(t *testing.T) {
 
-		if len(newEndpoints) != len(tc.expected) {
-			t.Errorf("[%s] expected %d new, got %d: %v", tc.desc, len(tc.expected), len(newEndpoints), spew.Sdump(newEndpoints))
-		}
-		for x := range tc.expected {
-			if len(newEndpoints[x]) != len(tc.expected[x]) {
-				t.Errorf("[%s] expected %d endpoints for %v, got %d", tc.desc, len(tc.expected[x]), x, len(newEndpoints[x]))
-			} else {
-				for i := range newEndpoints[x] {
-					ep := newEndpoints[x][i].(*BaseEndpointInfo)
-					if !(reflect.DeepEqual(*ep, *(tc.expected[x][i]))) {
-						t.Errorf("[%s] expected new[%v][%d] to be %v, got %v", tc.desc, x, i, tc.expected[x][i], *ep)
+			epTracker := NewEndpointChangeTracker("test-hostname", nil, tc.ipFamily, nil, false, nil)
+
+			// outputs
+			newEndpoints := epTracker.endpointsToEndpointsMap(tc.newEndpoints)
+
+			if len(newEndpoints) != len(tc.expected) {
+				t.Fatalf("[%s] expected %d new, got %d: %v", tc.desc, len(tc.expected), len(newEndpoints), spew.Sdump(newEndpoints))
+			}
+			for x := range tc.expected {
+				if len(newEndpoints[x]) != len(tc.expected[x]) {
+					t.Fatalf("[%s] expected %d endpoints for %v, got %d", tc.desc, len(tc.expected[x]), x, len(newEndpoints[x]))
+				} else {
+					for i := range newEndpoints[x] {
+						ep := newEndpoints[x][i].(*BaseEndpointInfo)
+						if !(reflect.DeepEqual(*ep, *(tc.expected[x][i]))) {
+							t.Fatalf("[%s] expected new[%v][%d] to be %v, got %v", tc.desc, x, i, tc.expected[x][i], *ep)
+						}
 					}
 				}
 			}
-		}
+		})
 	}
 }
 
@@ -1249,7 +1269,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 
 	for tci, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			fp := newFakeProxier()
+			fp := newFakeProxier(v1.IPv4Protocol)
 			fp.hostname = nodeName
 
 			// First check that after adding all previous versions of endpoints,
@@ -1413,10 +1433,18 @@ func TestLastChangeTriggerTime(t *testing.T) {
 			},
 			expected: map[types.NamespacedName][]time.Time{createName("ns", "ep1"): {t2}},
 		},
+		{
+			name: "delete",
+			scenario: func(fp *FakeProxier) {
+				e := createEndpoints("ns", "ep1", t1)
+				fp.deleteEndpoints(e)
+			},
+			expected: map[types.NamespacedName][]time.Time{},
+		},
 	}
 
 	for _, tc := range testCases {
-		fp := newFakeProxier()
+		fp := newFakeProxier(v1.IPv4Protocol)
 
 		tc.scenario(fp)
 
@@ -1446,7 +1474,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 		// test starting from an empty state
 		"add a simple slice that doesn't already exist": {
 			startingSlices:        []*discovery.EndpointSlice{},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, v1.IPv4Protocol, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			paramRemoveSlice:      false,
@@ -1469,7 +1497,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			startingSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, v1.IPv4Protocol, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			paramRemoveSlice:      false,
@@ -1481,7 +1509,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			startingSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, v1.IPv4Protocol, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    fqdnSlice,
 			paramRemoveSlice:      false,
@@ -1494,7 +1522,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, v1.IPv4Protocol, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 5, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			paramRemoveSlice:      false,
@@ -1526,7 +1554,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, v1.IPv4Protocol, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSliceWithOffset("svc1", "ns1", 3, 1, 5, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80)}),
 			paramRemoveSlice:      false,
@@ -1556,7 +1584,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, v1.IPv4Protocol, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 5, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			paramRemoveSlice:      true,
@@ -1578,7 +1606,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 5, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, v1.IPv4Protocol, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 3, 5, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			paramRemoveSlice:      true,
@@ -1590,7 +1618,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			startingSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, v1.IPv4Protocol, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 3, 1, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			paramRemoveSlice:      false,
@@ -1602,7 +1630,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 			startingSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 2, 1, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, v1.IPv4Protocol, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 2, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			paramRemoveSlice:      false,
@@ -1624,7 +1652,7 @@ func TestEndpointSliceUpdate(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 2, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 				generateEndpointSlice("svc1", "ns1", 2, 2, 2, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
-			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true, nil),
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, v1.IPv4Protocol, nil, true, nil),
 			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 3, 3, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			paramRemoveSlice:      false,
@@ -1683,20 +1711,20 @@ func TestCheckoutChanges(t *testing.T) {
 		pendingSlices         []*discovery.EndpointSlice
 	}{
 		"empty slices": {
-			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, true, nil),
+			endpointChangeTracker: NewEndpointChangeTracker("", nil, v1.IPv4Protocol, nil, true, nil),
 			expectedChanges:       []*endpointsChange{},
 			useEndpointSlices:     true,
 			appliedSlices:         []*discovery.EndpointSlice{},
 			pendingSlices:         []*discovery.EndpointSlice{},
 		},
 		"without slices, empty items": {
-			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, false, nil),
+			endpointChangeTracker: NewEndpointChangeTracker("", nil, v1.IPv4Protocol, nil, false, nil),
 			expectedChanges:       []*endpointsChange{},
 			items:                 map[types.NamespacedName]*endpointsChange{},
 			useEndpointSlices:     false,
 		},
 		"without slices, simple items": {
-			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, false, nil),
+			endpointChangeTracker: NewEndpointChangeTracker("", nil, v1.IPv4Protocol, nil, false, nil),
 			expectedChanges: []*endpointsChange{{
 				previous: EndpointsMap{
 					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", ""), newTestEp("10.0.1.2:80", "")},
@@ -1720,7 +1748,7 @@ func TestCheckoutChanges(t *testing.T) {
 			useEndpointSlices: false,
 		},
 		"adding initial slice": {
-			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, true, nil),
+			endpointChangeTracker: NewEndpointChangeTracker("", nil, v1.IPv4Protocol, nil, true, nil),
 			expectedChanges: []*endpointsChange{{
 				previous: EndpointsMap{},
 				current: EndpointsMap{
@@ -1734,7 +1762,7 @@ func TestCheckoutChanges(t *testing.T) {
 			},
 		},
 		"removing port in update": {
-			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, true, nil),
+			endpointChangeTracker: NewEndpointChangeTracker("", nil, v1.IPv4Protocol, nil, true, nil),
 			expectedChanges: []*endpointsChange{{
 				previous: EndpointsMap{
 					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80", "host1"), newTestEp("10.0.1.2:80", "host1")},
@@ -1794,24 +1822,24 @@ func TestCheckoutChanges(t *testing.T) {
 func compareEndpointsMapsStr(t *testing.T, newMap EndpointsMap, expected map[ServicePortName][]*BaseEndpointInfo) {
 	t.Helper()
 	if len(newMap) != len(expected) {
-		t.Errorf("expected %d results, got %d: %v", len(expected), len(newMap), newMap)
+		t.Fatalf("expected %d results, got %d: %v", len(expected), len(newMap), newMap)
 	}
 	endpointEqual := func(a, b *BaseEndpointInfo) bool {
 		return a.Endpoint == b.Endpoint && a.IsLocal == b.IsLocal
 	}
 	for x := range expected {
 		if len(newMap[x]) != len(expected[x]) {
-			t.Errorf("expected %d endpoints for %v, got %d", len(expected[x]), x, len(newMap[x]))
 			t.Logf("Endpoints %+v", newMap[x])
+			t.Fatalf("expected %d endpoints for %v, got %d", len(expected[x]), x, len(newMap[x]))
 		} else {
 			for i := range expected[x] {
 				newEp, ok := newMap[x][i].(*BaseEndpointInfo)
 				if !ok {
-					t.Errorf("Failed to cast endpointsInfo")
+					t.Fatalf("Failed to cast endpointsInfo")
 					continue
 				}
 				if !endpointEqual(newEp, expected[x][i]) {
-					t.Errorf("expected new[%v][%d] to be %v, got %v (IsLocal expected %v, got %v)", x, i, expected[x][i], newEp, expected[x][i].IsLocal, newEp.IsLocal)
+					t.Fatalf("expected new[%v][%d] to be %v, got %v (IsLocal expected %v, got %v)", x, i, expected[x][i], newEp, expected[x][i].IsLocal, newEp.IsLocal)
 				}
 			}
 		}

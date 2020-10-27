@@ -48,8 +48,9 @@ type stressTest struct {
 	resources []*VolumeResource
 	pods      []*v1.Pod
 	// stop and wait for any async routines
-	wg      sync.WaitGroup
-	stopChs []chan struct{}
+	wg     sync.WaitGroup
+	ctx    context.Context
+	cancel context.CancelFunc
 
 	testOptions StressTestOptions
 }
@@ -112,8 +113,8 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
 		l.resources = []*VolumeResource{}
 		l.pods = []*v1.Pod{}
-		l.stopChs = []chan struct{}{}
 		l.testOptions = *dInfo.StressTestOptions
+		l.ctx, l.cancel = context.WithCancel(context.Background())
 
 		return l
 	}
@@ -122,9 +123,7 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 		var errs []error
 
 		framework.Logf("Stopping and waiting for all test routines to finish")
-		for _, stopCh := range l.stopChs {
-			close(stopCh)
-		}
+		l.cancel()
 		l.wg.Wait()
 
 		for _, pod := range l.pods {
@@ -161,7 +160,6 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 			framework.ExpectNoError(err)
 
 			l.pods = append(l.pods, pod)
-			l.stopChs = append(l.stopChs, make(chan struct{}))
 		}
 
 		// Restart pod repeatedly
@@ -173,21 +171,30 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 				defer l.wg.Done()
 				for j := 0; j < l.testOptions.NumRestarts; j++ {
 					select {
-					case <-l.stopChs[podIndex]:
+					case <-l.ctx.Done():
 						return
 					default:
 						pod := l.pods[podIndex]
-						framework.Logf("Pod %v, Iteration %v/%v", podIndex, j, l.testOptions.NumRestarts-1)
+						framework.Logf("Pod-%v [%v], Iteration %v/%v", podIndex, pod.Name, j, l.testOptions.NumRestarts-1)
 						_, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
-						framework.ExpectNoError(err)
+						if err != nil {
+							l.cancel()
+							framework.Failf("Failed to create pod-%v [%+v]. Error: %v", podIndex, pod, err)
+						}
 
 						err = e2epod.WaitForPodRunningInNamespace(cs, pod)
-						framework.ExpectNoError(err)
+						if err != nil {
+							l.cancel()
+							framework.Failf("Failed to wait for pod-%v [%+v] turn into running status. Error: %v", podIndex, pod, err)
+						}
 
 						// TODO: write data per pod and validate it everytime
 
 						err = e2epod.DeletePodWithWait(f.ClientSet, pod)
-						framework.ExpectNoError(err)
+						if err != nil {
+							l.cancel()
+							framework.Failf("Failed to delete pod-%v [%+v]. Error: %v", podIndex, pod, err)
+						}
 					}
 				}
 			}()

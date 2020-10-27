@@ -134,7 +134,7 @@ func TestCreateRole(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdCreateRole(tf, ioStreams)
-			cmd.Flags().Set("dry-run", "true")
+			cmd.Flags().Set("dry-run", "client")
 			cmd.Flags().Set("output", "yaml")
 			cmd.Flags().Set("verb", test.verbs)
 			cmd.Flags().Set("resource", test.resources)
@@ -213,7 +213,7 @@ func TestValidate(t *testing.T) {
 					},
 				},
 			},
-			expectErr: true,
+			expectErr: false,
 		},
 		"test-nonresource-verb": {
 			roleOptions: &CreateRoleOptions{
@@ -225,7 +225,7 @@ func TestValidate(t *testing.T) {
 					},
 				},
 			},
-			expectErr: true,
+			expectErr: false,
 		},
 		"test-special-verb": {
 			roleOptions: &CreateRoleOptions{
@@ -340,6 +340,8 @@ func TestValidate(t *testing.T) {
 	}
 
 	for name, test := range tests {
+		test.roleOptions.IOStreams = genericclioptions.NewTestIOStreamsDiscard()
+
 		var err error
 		test.roleOptions.Mapper, err = tf.ToRESTMapper()
 		if err != nil {

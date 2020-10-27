@@ -260,7 +260,7 @@ func endpointsControllerKey(endpointSlice *discovery.EndpointSlice) (string, err
 	return fmt.Sprintf("%s/%s", endpointSlice.Namespace, serviceName), nil
 }
 
-// skipMirror return true if the the LabelSkipMirror label has been set to
+// skipMirror return true if the LabelSkipMirror label has been set to
 // "true".
 func skipMirror(labels map[string]string) bool {
 	skipMirror, _ := labels[discovery.LabelSkipMirror]

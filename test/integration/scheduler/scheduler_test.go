@@ -130,7 +130,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"PreScorePlugin": {
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
-					{Name: "SelectorSpread"},
 					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
@@ -141,7 +140,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
 					{Name: "NodeAffinity", Weight: 1},
 					{Name: "NodePreferAvoidPods", Weight: 10000},
-					{Name: "SelectorSpread", Weight: 1},
 					{Name: "TaintToleration", Weight: 1},
 				},
 				"ReservePlugin": {{Name: "VolumeBinding"}},
@@ -223,7 +221,6 @@ kind: Policy
 				"PreScorePlugin": {
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
-					{Name: "SelectorSpread"},
 					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {
@@ -234,7 +231,6 @@ kind: Policy
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
 					{Name: "NodeAffinity", Weight: 1},
 					{Name: "NodePreferAvoidPods", Weight: 10000},
-					{Name: "SelectorSpread", Weight: 1},
 					{Name: "TaintToleration", Weight: 1},
 				},
 				"ReservePlugin": {{Name: "VolumeBinding"}},

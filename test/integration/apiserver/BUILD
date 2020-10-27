@@ -15,6 +15,7 @@ go_test(
         "max_request_body_bytes_test.go",
         "patch_test.go",
         "print_test.go",
+        "watchcache_test.go",
     ],
     rundir = ".",
     tags = [
@@ -25,6 +26,7 @@ go_test(
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/controlplane:go_default_library",
+        "//pkg/controlplane/reconcilers:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",

@@ -147,7 +147,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 			podName := fmt.Sprintf("netexec%v", i)
 
 			framework.Logf("Creating netexec pod %q on node %v in namespace %q", podName, nodeName, ns)
-			pod := newAgnhostPod(podName,
+			pod := e2epod.NewAgnhostPod(ns, podName, nil, nil, nil,
 				"netexec",
 				fmt.Sprintf("--http-port=%d", firewallTestHTTPPort),
 				fmt.Sprintf("--udp-port=%d", firewallTestUDPPort))
@@ -216,10 +216,10 @@ var _ = SIGDescribe("Firewall rule", func() {
 			framework.Failf("did not find any node addresses")
 		}
 
-		masterAddresses := framework.GetAllMasterAddresses(cs)
-		for _, masterAddress := range masterAddresses {
-			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureKubeControllerManagerPort, firewallTestTCPTimeout)
-			assertNotReachableHTTPTimeout(masterAddress, kubeschedulerconfig.DefaultInsecureSchedulerPort, firewallTestTCPTimeout)
+		controlPlaneAddresses := framework.GetControlPlaneAddresses(cs)
+		for _, instanceAddress := range controlPlaneAddresses {
+			assertNotReachableHTTPTimeout(instanceAddress, ports.InsecureKubeControllerManagerPort, firewallTestTCPTimeout)
+			assertNotReachableHTTPTimeout(instanceAddress, kubeschedulerconfig.DefaultInsecureSchedulerPort, firewallTestTCPTimeout)
 		}
 		assertNotReachableHTTPTimeout(nodeAddr, ports.KubeletPort, firewallTestTCPTimeout)
 		assertNotReachableHTTPTimeout(nodeAddr, ports.KubeletReadOnlyPort, firewallTestTCPTimeout)

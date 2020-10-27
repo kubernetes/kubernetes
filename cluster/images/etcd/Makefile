@@ -34,7 +34,7 @@ LATEST_ETCD_VERSION?=3.4.13
 # REVISION provides a version number fo this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
 # for each revision of this image at that etcd version.
-REVISION?=0
+REVISION?=1
 
 # IMAGE_TAG Uniquely identifies k8s.gcr.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
@@ -67,19 +67,19 @@ GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
 ifeq ($(ARCH),amd64)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base:v2.1.3
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base:buster-v1.2.0
 endif
 ifeq ($(ARCH),arm)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm:v2.1.3
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm:buster-v1.2.0
 endif
 ifeq ($(ARCH),arm64)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm64:v2.1.3
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm64:buster-v1.2.0
 endif
 ifeq ($(ARCH),ppc64le)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-ppc64le:v2.1.3
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-ppc64le:buster-v1.2.0
 endif
 ifeq ($(ARCH),s390x)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-s390x:v2.1.3
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-s390x:buster-v1.2.0
 endif
 
 RUNNERIMAGE?=gcr.io/distroless/static:latest

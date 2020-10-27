@@ -25,7 +25,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/cluster/ports:go_default_library",
-        "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/runtimeclass/testing:go_default_library",
         "//pkg/util/slice:go_default_library",
@@ -44,6 +43,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//staging/src/k8s.io/kubelet/pkg/apis/stats/v1alpha1:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/job:go_default_library",
         "//test/e2e/framework/kubectl:go_default_library",

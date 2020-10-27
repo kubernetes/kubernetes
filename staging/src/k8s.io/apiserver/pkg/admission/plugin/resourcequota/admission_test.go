@@ -17,10 +17,15 @@ limitations under the License.
 package resourcequota
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/admission"
+	v1 "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota/v1"
 )
 
 func TestPrettyPrint(t *testing.T) {
@@ -119,6 +124,40 @@ func TestHasUsageStats(t *testing.T) {
 	for testName, testCase := range testCases {
 		if result := hasUsageStats(&testCase.a, testCase.relevant); result != testCase.expected {
 			t.Errorf("%s expected: %v, actual: %v", testName, testCase.expected, result)
+		}
+	}
+}
+
+type fakeEvaluator struct{}
+
+func (fakeEvaluator) Evaluate(a admission.Attributes) error {
+	return errors.New("should not be called")
+}
+
+func TestExcludedOperations(t *testing.T) {
+	a := &QuotaAdmission{
+		evaluator: fakeEvaluator{},
+	}
+	testCases := []struct {
+		desc string
+		attr admission.Attributes
+	}{
+		{
+			"subresource",
+			admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "namespace", "name", schema.GroupVersionResource{}, "subresource", admission.Create, nil, false, nil),
+		},
+		{
+			"non-namespaced resource",
+			admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "namespace", schema.GroupVersionResource{}, "", admission.Create, nil, false, nil),
+		},
+		{
+			"namespace creation",
+			admission.NewAttributesRecord(nil, nil, v1.SchemeGroupVersion.WithKind("Namespace"), "namespace", "namespace", schema.GroupVersionResource{}, "", admission.Create, nil, false, nil),
+		},
+	}
+	for _, test := range testCases {
+		if err := a.Validate(context.TODO(), test.attr, nil); err != nil {
+			t.Errorf("Test case: %q. Expected no error but got: %v", test.desc, err)
 		}
 	}
 }

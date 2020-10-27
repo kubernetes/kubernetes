@@ -119,8 +119,10 @@ var (
 )
 
 const (
+	// None is to be used for unset/default images
+	None = iota
 	// Agnhost image
-	Agnhost = iota
+	Agnhost
 	// AgnhostPrivate image
 	AgnhostPrivate
 	// APIServer image
@@ -210,7 +212,7 @@ func initImageConfigs() map[int]Config {
 	configs[CheckMetadataConcealment] = Config{e2eRegistry, "metadata-concealment", "1.2"}
 	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{e2eRegistry, "cuda-vector-add", "2.0"}
-	configs[DebianIptables] = Config{buildImageRegistry, "debian-iptables", "v12.1.2"}
+	configs[DebianIptables] = Config{buildImageRegistry, "debian-iptables", "buster-v1.3.0"}
 	configs[EchoServer] = Config{e2eRegistry, "echoserver", "2.2"}
 	configs[Etcd] = Config{gcRegistry, "etcd", "3.4.13-0"}
 	configs[GlusterDynamicProvisioner] = Config{dockerGluster, "glusterdynamic-provisioner", "v1.0"}

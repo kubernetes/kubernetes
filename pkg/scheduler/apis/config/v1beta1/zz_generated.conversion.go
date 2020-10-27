@@ -854,6 +854,7 @@ func Convert_config_Plugins_To_v1beta1_Plugins(in *config.Plugins, out *v1beta1.
 
 func autoConvert_v1beta1_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(in *v1beta1.PodTopologySpreadArgs, out *config.PodTopologySpreadArgs, s conversion.Scope) error {
 	out.DefaultConstraints = *(*[]corev1.TopologySpreadConstraint)(unsafe.Pointer(&in.DefaultConstraints))
+	out.DefaultingType = config.PodTopologySpreadConstraintsDefaulting(in.DefaultingType)
 	return nil
 }
 
@@ -864,6 +865,7 @@ func Convert_v1beta1_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(in *v
 
 func autoConvert_config_PodTopologySpreadArgs_To_v1beta1_PodTopologySpreadArgs(in *config.PodTopologySpreadArgs, out *v1beta1.PodTopologySpreadArgs, s conversion.Scope) error {
 	out.DefaultConstraints = *(*[]corev1.TopologySpreadConstraint)(unsafe.Pointer(&in.DefaultConstraints))
+	out.DefaultingType = v1beta1.PodTopologySpreadConstraintsDefaulting(in.DefaultingType)
 	return nil
 }
 

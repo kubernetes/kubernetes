@@ -94,24 +94,24 @@ func TestInstallPathHandler(t *testing.T) {
 
 }
 
-func testMultipleChecks(path string, t *testing.T) {
+func testMultipleChecks(path, name string, t *testing.T) {
 	tests := []struct {
 		path             string
 		expectedResponse string
 		expectedStatus   int
 		addBadCheck      bool
 	}{
-		{"?verbose", "[+]ping ok\nhealthz check passed\n", http.StatusOK, false},
+		{"?verbose", fmt.Sprintf("[+]ping ok\n%s check passed\n", name), http.StatusOK, false},
 		{"?exclude=dontexist", "ok", http.StatusOK, false},
 		{"?exclude=bad", "ok", http.StatusOK, true},
-		{"?verbose=true&exclude=bad", "[+]ping ok\n[+]bad excluded: ok\nhealthz check passed\n", http.StatusOK, true},
-		{"?verbose=true&exclude=dontexist", "[+]ping ok\nwarn: some health checks cannot be excluded: no matches for \"dontexist\"\nhealthz check passed\n", http.StatusOK, false},
+		{"?verbose=true&exclude=bad", fmt.Sprintf("[+]ping ok\n[+]bad excluded: ok\n%s check passed\n", name), http.StatusOK, true},
+		{"?verbose=true&exclude=dontexist", fmt.Sprintf("[+]ping ok\nwarn: some health checks cannot be excluded: no matches for \"dontexist\"\n%s check passed\n", name), http.StatusOK, false},
 		{"/ping", "ok", http.StatusOK, false},
 		{"", "ok", http.StatusOK, false},
-		{"?verbose", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
+		{"?verbose", fmt.Sprintf("[+]ping ok\n[-]bad failed: reason withheld\n%s check failed\n", name), http.StatusInternalServerError, true},
 		{"/ping", "ok", http.StatusOK, true},
 		{"/bad", "internal server error: this will fail\n", http.StatusInternalServerError, true},
-		{"", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
+		{"", fmt.Sprintf("[+]ping ok\n[-]bad failed: reason withheld\n%s check failed\n", name), http.StatusInternalServerError, true},
 	}
 
 	for i, test := range tests {
@@ -148,11 +148,11 @@ func testMultipleChecks(path string, t *testing.T) {
 }
 
 func TestMultipleChecks(t *testing.T) {
-	testMultipleChecks("", t)
+	testMultipleChecks("", "healthz", t)
 }
 
 func TestMultiplePathChecks(t *testing.T) {
-	testMultipleChecks("/ready", t)
+	testMultipleChecks("/ready", "ready", t)
 }
 
 func TestCheckerNames(t *testing.T) {
