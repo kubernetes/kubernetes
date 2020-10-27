@@ -4142,6 +4142,9 @@ type ServiceSpec struct {
 	// +optional
 	SessionAffinityConfig *SessionAffinityConfig `json:"sessionAffinityConfig,omitempty" protobuf:"bytes,14,opt,name=sessionAffinityConfig"`
 
+	// IPFamily is tombstoned to show why 15 is a reserved protobuf tag.
+	// IPFamily *IPFamily `json:"ipFamily,omitempty" protobuf:"bytes,15,opt,name=ipFamily,Configcasttype=IPFamily"`
+
 	// IPFamilies identifies all the IPFamilies assigned for this Service. If a value
 	// was not provided for IPFamilies it will be defaulted based on the cluster
 	// configuration and the value of service.spec.ipFamilyPolicy. A maximum of two
