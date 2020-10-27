@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -444,7 +445,7 @@ func (ts *azureTokenSourceDeviceCode) Token() (*azureToken, error) {
 		}
 	}
 	client := &autorest.Client{}
-	deviceCode, err := adal.InitiateDeviceAuth(client, *oauthConfig, ts.clientID, ts.apiserverID)
+	deviceCode, err := adal.InitiateDeviceAuthWithContext(context.Background(), client, *oauthConfig, ts.clientID, ts.apiserverID)
 	if err != nil {
 		return nil, fmt.Errorf("initialing the device code authentication: %v", err)
 	}
@@ -454,7 +455,7 @@ func (ts *azureTokenSourceDeviceCode) Token() (*azureToken, error) {
 		return nil, fmt.Errorf("prompting the device code message: %v", err)
 	}
 
-	token, err := adal.WaitForUserCompletion(client, deviceCode)
+	token, err := adal.WaitForUserCompletionWithContext(context.Background(), client, deviceCode)
 	if err != nil {
 		return nil, fmt.Errorf("waiting for device code authentication to complete: %v", err)
 	}
