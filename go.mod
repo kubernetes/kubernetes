@@ -430,9 +430,10 @@ replace (
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f
 	golang.org/x/mobile => golang.org/x/mobile v0.0.0-20190719004257-d2bd2a29d028
 	golang.org/x/mod => golang.org/x/mod v0.3.0
+	golang.org/x/net => golang.org/x/net v0.0.0-20201026091529-146b70c837a4
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f
 	golang.org/x/text => golang.org/x/text v0.3.3
 	golang.org/x/time => golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20200616133436-c1934b75d054

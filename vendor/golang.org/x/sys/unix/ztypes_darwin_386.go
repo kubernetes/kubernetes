@@ -145,6 +145,10 @@ type Dirent struct {
 	_       [3]byte
 }
 
+const (
+	PathMax = 0x400
+)
+
 type RawSockaddrInet4 struct {
 	Len    uint8
 	Family uint8
