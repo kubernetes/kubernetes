@@ -120,7 +120,7 @@ func validateTokenRequest(options *ServerRunOptions) []error {
 
 	enableSucceeded := options.ServiceAccountIssuer != nil
 
-	if !enableAttempted && utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
+	if !enableAttempted {
 		errs = append(errs, errors.New("--service-account-signing-key-file and --service-account-issuer are required flags"))
 	}
 
