@@ -419,6 +419,17 @@ func TestNewBuilder(t *testing.T) {
 				t.Fatalf("unexpected list properties, got: %s, expected: %s", gotListProperties.List(), want.List())
 			}
 
+			if e, a := (spec.StringOrArray{"string"}), got.listSchema.Properties["apiVersion"].Type; !reflect.DeepEqual(e, a) {
+				t.Errorf("expected %#v, got %#v", e, a)
+			}
+			if e, a := (spec.StringOrArray{"string"}), got.listSchema.Properties["kind"].Type; !reflect.DeepEqual(e, a) {
+				t.Errorf("expected %#v, got %#v", e, a)
+			}
+			listRef := got.listSchema.Properties["metadata"].Ref
+			if e, a := "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta", (&listRef).String(); e != a {
+				t.Errorf("expected %q, got %q", e, a)
+			}
+
 			gotListSchema := got.listSchema.Properties["items"].Items.Schema
 			if !reflect.DeepEqual(&wantedItemsSchema, gotListSchema) {
 				t.Errorf("unexpected list schema: %s (want/got)", schemaDiff(&wantedItemsSchema, gotListSchema))

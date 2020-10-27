@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -29,14 +28,14 @@ import (
 
 func TestV1beta1ToConfigKubeSchedulerConfigurationConversion(t *testing.T) {
 	cases := []struct {
-		name     string
-		config   v1beta1.KubeSchedulerConfiguration
-		expected config.KubeSchedulerConfiguration
+		name   string
+		config v1beta1.KubeSchedulerConfiguration
+		want   config.KubeSchedulerConfiguration
 	}{
 		{
-			name:     "default conversion v1beta1 to config",
-			config:   v1beta1.KubeSchedulerConfiguration{},
-			expected: config.KubeSchedulerConfiguration{AlgorithmSource: config.SchedulerAlgorithmSource{Provider: pointer.StringPtr(v1beta1.SchedulerDefaultProviderName)}},
+			name:   "default conversion v1beta1 to config",
+			config: v1beta1.KubeSchedulerConfiguration{},
+			want:   config.KubeSchedulerConfiguration{AlgorithmSource: config.SchedulerAlgorithmSource{Provider: pointer.StringPtr(v1beta1.SchedulerDefaultProviderName)}},
 		},
 	}
 
@@ -44,13 +43,14 @@ func TestV1beta1ToConfigKubeSchedulerConfigurationConversion(t *testing.T) {
 	if err := AddToScheme(scheme); err != nil {
 		t.Fatal(err)
 	}
+
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var out config.KubeSchedulerConfiguration
-			if err := scheme.Convert(&tc.config, &out, nil); err != nil {
+			var got config.KubeSchedulerConfiguration
+			if err := scheme.Convert(&tc.config, &got, nil); err != nil {
 				t.Errorf("failed to convert: %+v", err)
 			}
-			if diff := cmp.Diff(tc.expected, out); diff != "" {
+			if diff := cmp.Diff(tc.want, got); diff != "" {
 				t.Errorf("unexpected conversion (-want, +got):\n%s", diff)
 			}
 		})

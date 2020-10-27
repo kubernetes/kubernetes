@@ -474,6 +474,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 				cStatus.Message += tMessage
 			}
 		}
+		cStatus.PodSandboxID = c.PodSandboxId
 		statuses[i] = cStatus
 	}
 
@@ -629,10 +630,10 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 	}
 	if gracePeriodOverride != nil {
 		gracePeriod = *gracePeriodOverride
-		klog.V(3).Infof("Killing container %q, but using %d second grace period override", containerID, gracePeriod)
+		klog.V(3).Infof("Killing container %q, but using a %d second grace period override", containerID, gracePeriod)
 	}
 
-	klog.V(2).Infof("Killing container %q with %d second grace period", containerID.String(), gracePeriod)
+	klog.V(2).Infof("Killing container %q with a %d second grace period", containerID.String(), gracePeriod)
 
 	err := m.runtimeService.StopContainer(containerID.ID, gracePeriod)
 	if err != nil {
@@ -658,6 +659,7 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, ru
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
 			if err := m.killContainer(pod, container.ID, container.Name, "", gracePeriodOverride); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
+				klog.Errorf("killContainer %q(id=%q) for pod %q failed: %v", container.Name, container.ID, format.Pod(pod), err)
 			}
 			containerResults <- killContainerResult
 		}(container)
@@ -855,19 +857,19 @@ func (m *kubeGenericRuntimeManager) removeContainer(containerID string) error {
 
 // removeContainerLog removes the container log.
 func (m *kubeGenericRuntimeManager) removeContainerLog(containerID string) error {
-	// Remove the container log.
+	// Use log manager to remove rotated logs.
+	err := m.logManager.Clean(containerID)
+	if err != nil {
+		return err
+	}
+
 	status, err := m.runtimeService.ContainerStatus(containerID)
 	if err != nil {
 		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
 	}
-	labeledInfo := getContainerInfoFromLabels(status.Labels)
-	path := status.GetLogPath()
-	if err := m.osInterface.Remove(path); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove container %q log %q: %v", containerID, path, err)
-	}
-
 	// Remove the legacy container log symlink.
 	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
+	labeledInfo := getContainerInfoFromLabels(status.Labels)
 	legacySymlink := legacyLogSymlink(containerID, labeledInfo.ContainerName, labeledInfo.PodName,
 		labeledInfo.PodNamespace)
 	if err := m.osInterface.Remove(legacySymlink); err != nil && !os.IsNotExist(err) {

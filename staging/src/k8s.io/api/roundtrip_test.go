@@ -24,6 +24,7 @@ import (
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	admissionregv1 "k8s.io/api/admissionregistration/v1"
 	admissionregv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
@@ -42,6 +43,7 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	eventsv1 "k8s.io/api/events/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
@@ -56,7 +58,6 @@ import (
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
-	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
@@ -74,6 +75,7 @@ var groups = []runtime.SchemeBuilder{
 	admissionv1.SchemeBuilder,
 	admissionregv1beta1.SchemeBuilder,
 	admissionregv1.SchemeBuilder,
+	apiserverinternalv1alpha1.SchemeBuilder,
 	appsv1beta1.SchemeBuilder,
 	appsv1beta2.SchemeBuilder,
 	appsv1.SchemeBuilder,
@@ -92,6 +94,7 @@ var groups = []runtime.SchemeBuilder{
 	coordinationv1.SchemeBuilder,
 	coordinationv1beta1.SchemeBuilder,
 	corev1.SchemeBuilder,
+	eventsv1.SchemeBuilder,
 	eventsv1beta1.SchemeBuilder,
 	extensionsv1beta1.SchemeBuilder,
 	imagepolicyv1alpha1.SchemeBuilder,
@@ -106,7 +109,6 @@ var groups = []runtime.SchemeBuilder{
 	schedulingv1alpha1.SchemeBuilder,
 	schedulingv1beta1.SchemeBuilder,
 	schedulingv1.SchemeBuilder,
-	settingsv1alpha1.SchemeBuilder,
 	storagev1alpha1.SchemeBuilder,
 	storagev1beta1.SchemeBuilder,
 	storagev1.SchemeBuilder,

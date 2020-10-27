@@ -17,7 +17,7 @@ limitations under the License.
 package events
 
 import (
-	"k8s.io/api/events/v1beta1"
+	eventsv1 "k8s.io/api/events/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 )
@@ -65,9 +65,9 @@ type EventBroadcaster interface {
 // It is assumed that EventSink will return the same sorts of errors as
 // client-go's REST client.
 type EventSink interface {
-	Create(event *v1beta1.Event) (*v1beta1.Event, error)
-	Update(event *v1beta1.Event) (*v1beta1.Event, error)
-	Patch(oldEvent *v1beta1.Event, data []byte) (*v1beta1.Event, error)
+	Create(event *eventsv1.Event) (*eventsv1.Event, error)
+	Update(event *eventsv1.Event) (*eventsv1.Event, error)
+	Patch(oldEvent *eventsv1.Event, data []byte) (*eventsv1.Event, error)
 }
 
 // EventBroadcasterAdapter is a auxiliary interface to simplify migration to

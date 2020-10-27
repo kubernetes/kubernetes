@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
+	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 )
 
 // QueueSetFactory is used to create QueueSet objects.  Creation, like
@@ -30,7 +31,7 @@ import (
 // before committing to a concurrency allotment for the second.
 type QueueSetFactory interface {
 	// BeginConstruction does the first phase of creating a QueueSet
-	BeginConstruction(QueuingConfig) (QueueSetCompleter, error)
+	BeginConstruction(QueuingConfig, metrics.TimedObserverPair) (QueueSetCompleter, error)
 }
 
 // QueueSetCompleter finishes the two-step process of creating or
@@ -79,7 +80,11 @@ type QueueSet interface {
 	// was idle at the moment of the return.  Otherwise idle==false
 	// and the client must call the Finish method of the Request
 	// exactly once.
-	StartRequest(ctx context.Context, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}) (req Request, idle bool)
+	StartRequest(ctx context.Context, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn QueueNoteFn) (req Request, idle bool)
+
+	// UpdateObservations makes sure any time-based statistics have
+	// caught up with the current clock reading
+	UpdateObservations()
 
 	// Dump saves and returns the instant internal state of the queue-set.
 	// Note that dumping process will stop the queue-set from proceeding
@@ -87,6 +92,9 @@ type QueueSet interface {
 	// For debugging only.
 	Dump(includeRequestDetails bool) debug.QueueSetDump
 }
+
+// QueueNoteFn is called when a request enters and leaves a queue
+type QueueNoteFn func(inQueue bool)
 
 // Request represents the remainder of the handling of one request
 type Request interface {

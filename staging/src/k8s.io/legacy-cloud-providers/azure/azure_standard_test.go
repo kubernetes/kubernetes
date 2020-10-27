@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/publicipclient/mockpublicipclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/vmclient/mockvmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
@@ -447,7 +448,7 @@ func TestGetFrontendIPConfigName(t *testing.T) {
 		svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = c.subnetName
 		svc.Annotations[ServiceAnnotationLoadBalancerInternal] = strconv.FormatBool(c.isInternal)
 
-		ipconfigName := az.getFrontendIPConfigName(svc)
+		ipconfigName := az.getDefaultFrontendIPConfigName(svc)
 		assert.Equal(t, c.expected, ipconfigName, c.description)
 	}
 }
@@ -908,7 +909,7 @@ func TestGetStandardInstanceIDByNodeName(t *testing.T) {
 			ID:   to.StringPtr(invalidResouceID),
 		}, nil).AnyTimes()
 
-		instanceID, err := cloud.vmSet.GetInstanceIDByNodeName(test.nodeName)
+		instanceID, err := cloud.VMSet.GetInstanceIDByNodeName(test.nodeName)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
 		assert.Equal(t, test.expectedID, instanceID, test.name)
 	}
@@ -979,7 +980,7 @@ func TestGetStandardVMPowerStatusByNodeName(t *testing.T) {
 		mockVMClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
 		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, test.nodeName, gomock.Any()).Return(test.vm, test.getErr).AnyTimes()
 
-		powerState, err := cloud.vmSet.GetPowerStatusByNodeName(test.nodeName)
+		powerState, err := cloud.VMSet.GetPowerStatusByNodeName(test.nodeName)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
 		assert.Equal(t, test.expectedStatus, powerState, test.name)
 	}
@@ -1064,7 +1065,7 @@ func TestGetStandardVMZoneByNodeName(t *testing.T) {
 		mockVMClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
 		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, test.nodeName, gomock.Any()).Return(test.vm, test.getErr).AnyTimes()
 
-		zone, err := cloud.vmSet.GetZoneByNodeName(test.nodeName)
+		zone, err := cloud.VMSet.GetZoneByNodeName(test.nodeName)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
 		assert.Equal(t, test.expectedZone, zone, test.name)
 	}
@@ -1166,7 +1167,7 @@ func TestGetStandardVMSetNames(t *testing.T) {
 		mockVMClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
 		mockVMClient.EXPECT().List(gomock.Any(), cloud.ResourceGroup).Return(test.vm, nil).AnyTimes()
 
-		vmSetNames, err := cloud.vmSet.GetVMSetNames(test.service, test.nodes)
+		vmSetNames, err := cloud.VMSet.GetVMSetNames(test.service, test.nodes)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
 		assert.Equal(t, test.expectedVMSetNames, vmSetNames, test.name)
 	}
@@ -1339,7 +1340,7 @@ func TestStandardEnsureHostInPool(t *testing.T) {
 		mockInterfaceClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, test.nicName, gomock.Any()).Return(testNIC, nil).AnyTimes()
 		mockInterfaceClient.EXPECT().CreateOrUpdate(gomock.Any(), cloud.ResourceGroup, gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
-		_, _, _, vm, err := cloud.vmSet.EnsureHostInPool(test.service, test.nodeName, test.backendPoolID, test.vmSetName, false)
+		_, _, _, vm, err := cloud.VMSet.EnsureHostInPool(test.service, test.nodeName, test.backendPoolID, test.vmSetName, false)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
 		assert.Nil(t, vm, test.name)
 	}
@@ -1501,11 +1502,244 @@ func TestStandardEnsureHostsInPool(t *testing.T) {
 		mockInterfaceClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, test.nicName, gomock.Any()).Return(testNIC, nil).AnyTimes()
 		mockInterfaceClient.EXPECT().CreateOrUpdate(gomock.Any(), cloud.ResourceGroup, gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
-		err := cloud.vmSet.EnsureHostsInPool(test.service, test.nodes, test.backendPoolID, test.vmSetName, false)
+		err := cloud.VMSet.EnsureHostsInPool(test.service, test.nodes, test.backendPoolID, test.vmSetName, false)
 		if test.expectedErr {
 			assert.Equal(t, test.expectedErrMsg, err.Error(), test.name)
 		} else {
 			assert.Nil(t, err, test.name)
 		}
+	}
+}
+
+func TestServiceOwnsFrontendIP(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cloud := GetTestCloud(ctrl)
+
+	testCases := []struct {
+		desc         string
+		existingPIPs []network.PublicIPAddress
+		fip          network.FrontendIPConfiguration
+		service      *v1.Service
+		isOwned      bool
+		isPrimary    bool
+		expectedErr  error
+	}{
+		{
+			desc: "serviceOwnsFrontendIP should detect the primary service",
+			fip: network.FrontendIPConfiguration{
+				Name: to.StringPtr("auid"),
+			},
+			service: &v1.Service{
+				ObjectMeta: meta.ObjectMeta{
+					UID: types.UID("uid"),
+				},
+			},
+			isOwned:   true,
+			isPrimary: true,
+		},
+		{
+			desc: "serviceOwnsFrontendIP should return false if the secondary external service doesn't set it's loadBalancer IP",
+			fip: network.FrontendIPConfiguration{
+				Name: to.StringPtr("auid"),
+			},
+			service: &v1.Service{
+				ObjectMeta: meta.ObjectMeta{
+					UID: types.UID("secondary"),
+				},
+			},
+		},
+		{
+			desc: "serviceOwnsFrontendIP should report a not found error if there is no public IP " +
+				"found according to the external service's loadBalancer IP but do not return the error",
+			existingPIPs: []network.PublicIPAddress{
+				{
+					ID: to.StringPtr("pip"),
+					PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+						IPAddress: to.StringPtr("4.3.2.1"),
+					},
+				},
+			},
+			fip: network.FrontendIPConfiguration{
+				Name: to.StringPtr("auid"),
+				FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+					PublicIPAddress: &network.PublicIPAddress{
+						ID: to.StringPtr("pip"),
+					},
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: meta.ObjectMeta{
+					UID: types.UID("secondary"),
+				},
+				Spec: v1.ServiceSpec{
+					LoadBalancerIP: "1.2.3.4",
+				},
+			},
+		},
+		{
+			desc: "serviceOwnsFrontendIP should return false if there is a mismatch between the PIP's ID and " +
+				"the counterpart on the frontend IP config",
+			existingPIPs: []network.PublicIPAddress{
+				{
+					ID: to.StringPtr("pip"),
+					PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+						IPAddress: to.StringPtr("4.3.2.1"),
+					},
+				},
+			},
+			fip: network.FrontendIPConfiguration{
+				Name: to.StringPtr("auid"),
+				FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+					PublicIPAddress: &network.PublicIPAddress{
+						ID: to.StringPtr("pip1"),
+					},
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: meta.ObjectMeta{
+					UID: types.UID("secondary"),
+				},
+				Spec: v1.ServiceSpec{
+					LoadBalancerIP: "4.3.2.1",
+				},
+			},
+		},
+		{
+			desc: "serviceOwnsFrontendIP should detect the secondary external service",
+			existingPIPs: []network.PublicIPAddress{
+				{
+					ID: to.StringPtr("pip"),
+					PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+						IPAddress: to.StringPtr("4.3.2.1"),
+					},
+				},
+			},
+			fip: network.FrontendIPConfiguration{
+				Name: to.StringPtr("auid"),
+				FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+					PublicIPAddress: &network.PublicIPAddress{
+						ID: to.StringPtr("pip"),
+					},
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: meta.ObjectMeta{
+					UID: types.UID("secondary"),
+				},
+				Spec: v1.ServiceSpec{
+					LoadBalancerIP: "4.3.2.1",
+				},
+			},
+			isOwned: true,
+		},
+		{
+			desc: "serviceOwnsFrontendIP should detect the secondary internal service",
+			fip: network.FrontendIPConfiguration{
+				Name: to.StringPtr("auid"),
+				FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+					PrivateIPAddress: to.StringPtr("4.3.2.1"),
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: meta.ObjectMeta{
+					UID:         types.UID("secondary"),
+					Annotations: map[string]string{ServiceAnnotationLoadBalancerInternal: "true"},
+				},
+				Spec: v1.ServiceSpec{
+					LoadBalancerIP: "4.3.2.1",
+				},
+			},
+			isOwned: true,
+		},
+	}
+
+	for _, test := range testCases {
+		mockPIPClient := mockpublicipclient.NewMockInterface(ctrl)
+		cloud.PublicIPAddressesClient = mockPIPClient
+		mockPIPClient.EXPECT().List(gomock.Any(), gomock.Any()).Return(test.existingPIPs, nil).MaxTimes(1)
+
+		isOwned, isPrimary, err := cloud.serviceOwnsFrontendIP(test.fip, test.service)
+		assert.Equal(t, test.expectedErr, err, test.desc)
+		assert.Equal(t, test.isOwned, isOwned, test.desc)
+		assert.Equal(t, test.isPrimary, isPrimary, test.desc)
+	}
+}
+
+func TestStandardEnsureBackendPoolDeleted(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cloud := GetTestCloud(ctrl)
+	service := getTestService("test", v1.ProtocolTCP, nil, false, 80)
+	backendPoolID := "backendPoolID"
+	vmSetName := "AS"
+
+	tests := []struct {
+		desc                string
+		backendAddressPools *[]network.BackendAddressPool
+		loadBalancerSKU     string
+		existingVM          compute.VirtualMachine
+		existingNIC         network.Interface
+	}{
+		{
+			desc: "",
+			backendAddressPools: &[]network.BackendAddressPool{
+				{
+					ID: to.StringPtr(backendPoolID),
+					BackendAddressPoolPropertiesFormat: &network.BackendAddressPoolPropertiesFormat{
+						BackendIPConfigurations: &[]network.InterfaceIPConfiguration{
+							{
+								ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/k8s-agentpool1-00000000-nic-1/ipConfigurations/ipconfig1"),
+							},
+						},
+					},
+				},
+			},
+			existingVM: compute.VirtualMachine{
+				VirtualMachineProperties: &compute.VirtualMachineProperties{
+					AvailabilitySet: &compute.SubResource{
+						ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/availabilitySets/as"),
+					},
+					NetworkProfile: &compute.NetworkProfile{
+						NetworkInterfaces: &[]compute.NetworkInterfaceReference{
+							{
+								ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/k8s-agentpool1-00000000-nic-1"),
+							},
+						},
+					},
+				},
+			},
+			existingNIC: network.Interface{
+				InterfacePropertiesFormat: &network.InterfacePropertiesFormat{
+					ProvisioningState: to.StringPtr("Succeeded"),
+					IPConfigurations: &[]network.InterfaceIPConfiguration{
+						{
+							InterfaceIPConfigurationPropertiesFormat: &network.InterfaceIPConfigurationPropertiesFormat{
+								Primary: to.BoolPtr(true),
+								LoadBalancerBackendAddressPools: &[]network.BackendAddressPool{
+									{
+										ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/k8s-agentpool1-00000000-nic-1/ipConfigurations/ipconfig1"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		cloud.LoadBalancerSku = test.loadBalancerSKU
+		mockVMClient := mockvmclient.NewMockInterface(ctrl)
+		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "k8s-agentpool1-00000000-1", gomock.Any()).Return(test.existingVM, nil)
+		cloud.VirtualMachinesClient = mockVMClient
+		mockNICClient := mockinterfaceclient.NewMockInterface(ctrl)
+		mockNICClient.EXPECT().Get(gomock.Any(), "rg", "k8s-agentpool1-00000000-nic-1", gomock.Any()).Return(test.existingNIC, nil)
+		mockNICClient.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		cloud.InterfacesClient = mockNICClient
+
+		err := cloud.VMSet.EnsureBackendPoolDeleted(&service, backendPoolID, vmSetName, test.backendAddressPools)
+		assert.NoError(t, err, test.desc)
 	}
 }

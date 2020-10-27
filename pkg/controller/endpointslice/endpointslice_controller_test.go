@@ -29,7 +29,10 @@ import (
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
@@ -97,7 +100,26 @@ func TestSyncServiceNoSelector(t *testing.T) {
 	})
 
 	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
+	assert.Len(t, client.Actions(), 0)
+}
+
+// Ensure SyncService for service with pending deletion results in no action
+func TestSyncServicePendingDeletion(t *testing.T) {
+	ns := metav1.NamespaceDefault
+	serviceName := "testing-1"
+	deletionTimestamp := metav1.Now()
+	client, esController := newController([]string{"node-1"}, time.Duration(0))
+	esController.serviceStore.Add(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: ns, DeletionTimestamp: &deletionTimestamp},
+		Spec: v1.ServiceSpec{
+			Selector: map[string]string{"foo": "bar"},
+			Ports:    []v1.ServicePort{{TargetPort: intstr.FromInt(80)}},
+		},
+	})
+
+	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+	assert.NoError(t, err)
 	assert.Len(t, client.Actions(), 0)
 }
 
@@ -106,7 +128,7 @@ func TestSyncServiceWithSelector(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	serviceName := "testing-1"
 	client, esController := newController([]string{"node-1"}, time.Duration(0))
-	standardSyncService(t, esController, ns, serviceName, "true")
+	standardSyncService(t, esController, ns, serviceName)
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
 
 	sliceList, err := client.DiscoveryV1beta1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{})
@@ -172,7 +194,7 @@ func TestSyncServicePodSelection(t *testing.T) {
 	pod2.Labels["foo"] = "boo"
 	esController.podStore.Add(pod2)
 
-	standardSyncService(t, esController, ns, "testing-1", "true")
+	standardSyncService(t, esController, ns, "testing-1")
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
 
 	// an endpoint slice should be created, it should only reference pod1 (not pod2)
@@ -191,12 +213,17 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 	client, esController := newController([]string{"node-1"}, time.Duration(0))
 	ns := metav1.NamespaceDefault
 	serviceName := "testing-1"
+	service := createService(t, esController, ns, serviceName)
+
+	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
+	ownerRef := metav1.NewControllerRef(service, gvk)
 
 	// 5 slices, 3 with matching labels for our service
 	endpointSlices := []*discovery.EndpointSlice{{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "matching-1",
-			Namespace: ns,
+			Name:            "matching-1",
+			Namespace:       ns,
+			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Labels: map[string]string{
 				discovery.LabelServiceName: serviceName,
 				discovery.LabelManagedBy:   controllerName,
@@ -205,8 +232,9 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 		AddressType: discovery.AddressTypeIPv4,
 	}, {
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "matching-2",
-			Namespace: ns,
+			Name:            "matching-2",
+			Namespace:       ns,
+			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Labels: map[string]string{
 				discovery.LabelServiceName: serviceName,
 				discovery.LabelManagedBy:   controllerName,
@@ -258,9 +286,9 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 		}
 	}
 
-	// +1 for extra action involved in Service creation before syncService call.
-	numActionsBefore := len(client.Actions()) + 1
-	standardSyncService(t, esController, ns, serviceName, "false")
+	numActionsBefore := len(client.Actions())
+	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+	assert.Nil(t, err, "Expected no error syncing service")
 
 	if len(client.Actions()) != numActionsBefore+2 {
 		t.Errorf("Expected 2 more actions, got %d", len(client.Actions())-numActionsBefore)
@@ -274,12 +302,44 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 	cmc.Check(t)
 }
 
+func TestOnEndpointSliceUpdate(t *testing.T) {
+	_, esController := newController([]string{"node-1"}, time.Duration(0))
+	ns := metav1.NamespaceDefault
+	serviceName := "testing-1"
+	epSlice1 := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "matching-1",
+			Namespace: ns,
+			Labels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   controllerName,
+			},
+		},
+		AddressType: discovery.AddressTypeIPv4,
+	}
+
+	epSlice2 := epSlice1.DeepCopy()
+	epSlice2.Labels[discovery.LabelManagedBy] = "something else"
+
+	assert.Equal(t, 0, esController.queue.Len())
+	esController.onEndpointSliceUpdate(epSlice1, epSlice2)
+	err := wait.PollImmediate(100*time.Millisecond, 3*time.Second, func() (bool, error) {
+		if esController.queue.Len() > 0 {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error waiting for add to queue")
+	}
+	assert.Equal(t, 1, esController.queue.Len())
+}
+
 // Ensure SyncService handles a variety of protocols and IPs appropriately.
 func TestSyncServiceFull(t *testing.T) {
 	client, esController := newController([]string{"node-1"}, time.Duration(0))
 	namespace := metav1.NamespaceDefault
 	serviceName := "all-the-protocols"
-	ipv6Family := v1.IPv6Protocol
 
 	pod1 := newPod(1, namespace, true, 0)
 	pod1.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}}
@@ -303,8 +363,8 @@ func TestSyncServiceFull(t *testing.T) {
 				{Name: "udp-example", TargetPort: intstr.FromInt(161), Protocol: v1.ProtocolUDP},
 				{Name: "sctp-example", TargetPort: intstr.FromInt(3456), Protocol: v1.ProtocolSCTP},
 			},
-			Selector: map[string]string{"foo": "bar"},
-			IPFamily: &ipv6Family,
+			Selector:   map[string]string{"foo": "bar"},
+			IPFamilies: []v1.IPFamily{v1.IPv6Protocol},
 		},
 	}
 	esController.serviceStore.Add(service)
@@ -313,7 +373,7 @@ func TestSyncServiceFull(t *testing.T) {
 
 	// run through full sync service loop
 	err = esController.syncService(fmt.Sprintf("%s/%s", namespace, serviceName))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// last action should be to create endpoint slice
 	expectActions(t, client.Actions(), 1, "create", "endpointslices")
@@ -430,8 +490,9 @@ func TestPodAddsBatching(t *testing.T) {
 			esController.serviceStore.Add(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 				Spec: v1.ServiceSpec{
-					Selector: map[string]string{"foo": "bar"},
-					Ports:    []v1.ServicePort{{Port: 80}},
+					Selector:   map[string]string{"foo": "bar"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+					Ports:      []v1.ServicePort{{Port: 80}},
 				},
 			})
 
@@ -563,8 +624,9 @@ func TestPodUpdatesBatching(t *testing.T) {
 			esController.serviceStore.Add(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 				Spec: v1.ServiceSpec{
-					Selector: map[string]string{"foo": "bar"},
-					Ports:    []v1.ServicePort{{Port: 80}},
+					Selector:   map[string]string{"foo": "bar"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+					Ports:      []v1.ServicePort{{Port: 80}},
 				},
 			})
 
@@ -697,8 +759,9 @@ func TestPodDeleteBatching(t *testing.T) {
 			esController.serviceStore.Add(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 				Spec: v1.ServiceSpec{
-					Selector: map[string]string{"foo": "bar"},
-					Ports:    []v1.ServicePort{{Port: 80}},
+					Selector:   map[string]string{"foo": "bar"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+					Ports:      []v1.ServicePort{{Port: 80}},
 				},
 			})
 
@@ -731,25 +794,27 @@ func addPods(t *testing.T, esController *endpointSliceController, namespace stri
 	}
 }
 
-func standardSyncService(t *testing.T, esController *endpointSliceController, namespace, serviceName, managedBySetup string) {
+func standardSyncService(t *testing.T, esController *endpointSliceController, namespace, serviceName string) {
 	t.Helper()
-	createService(t, esController, namespace, serviceName, managedBySetup)
+	createService(t, esController, namespace, serviceName)
 
 	err := esController.syncService(fmt.Sprintf("%s/%s", namespace, serviceName))
 	assert.Nil(t, err, "Expected no error syncing service")
 }
 
-func createService(t *testing.T, esController *endpointSliceController, namespace, serviceName, managedBySetup string) *v1.Service {
+func createService(t *testing.T, esController *endpointSliceController, namespace, serviceName string) *v1.Service {
 	t.Helper()
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              serviceName,
 			Namespace:         namespace,
 			CreationTimestamp: metav1.NewTime(time.Now()),
+			UID:               types.UID(namespace + "-" + serviceName),
 		},
 		Spec: v1.ServiceSpec{
-			Ports:    []v1.ServicePort{{TargetPort: intstr.FromInt(80)}},
-			Selector: map[string]string{"foo": "bar"},
+			Ports:      []v1.ServicePort{{TargetPort: intstr.FromInt(80)}},
+			Selector:   map[string]string{"foo": "bar"},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	}
 	esController.serviceStore.Add(service)

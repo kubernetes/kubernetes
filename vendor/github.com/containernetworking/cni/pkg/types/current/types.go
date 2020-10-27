@@ -207,23 +207,6 @@ func (r *Result) PrintTo(writer io.Writer) error {
 	return err
 }
 
-// String returns a formatted string in the form of "[Interfaces: $1,][ IP: $2,] DNS: $3" where
-// $1 represents the receiver's Interfaces, $2 represents the receiver's IP addresses and $3 the
-// receiver's DNS. If $1 or $2 are nil, they won't be present in the returned string.
-func (r *Result) String() string {
-	var str string
-	if len(r.Interfaces) > 0 {
-		str += fmt.Sprintf("Interfaces:%+v, ", r.Interfaces)
-	}
-	if len(r.IPs) > 0 {
-		str += fmt.Sprintf("IP:%+v, ", r.IPs)
-	}
-	if len(r.Routes) > 0 {
-		str += fmt.Sprintf("Routes:%+v, ", r.Routes)
-	}
-	return fmt.Sprintf("%sDNS:%+v", str, r.DNS)
-}
-
 // Convert this old version result to the current CNI version result
 func (r *Result) Convert() (*Result, error) {
 	return r, nil

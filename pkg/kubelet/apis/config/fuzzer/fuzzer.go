@@ -24,11 +24,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubelet/config/v1beta1"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/master/ports"
 )
 
 // Funcs returns the fuzzer functions for the kubeletconfig apis.
@@ -59,6 +59,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ImageMinimumGCAge = metav1.Duration{Duration: 2 * time.Minute}
 			obj.ImageGCHighThresholdPercent = 85
 			obj.ImageGCLowThresholdPercent = 80
+			obj.KernelMemcgNotification = false
 			obj.MaxOpenFiles = 1000000
 			obj.MaxPods = 110
 			obj.PodPidsLimit = -1
@@ -99,6 +100,10 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ConfigMapAndSecretChangeDetectionStrategy = "Watch"
 			obj.AllowedUnsafeSysctls = []string{}
 			obj.VolumePluginDir = kubeletconfigv1beta1.DefaultVolumePluginDir
+			if obj.Logging.Format == "" {
+				obj.Logging.Format = "text"
+			}
+			obj.EnableSystemLogHandler = true
 		},
 	}
 }

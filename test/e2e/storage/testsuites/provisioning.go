@@ -30,7 +30,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -52,7 +51,6 @@ type StorageClassTest struct {
 	Name                 string
 	CloudProviders       []string
 	Provisioner          string
-	StorageClassName     string
 	Parameters           map[string]string
 	DelayBinding         bool
 	ClaimSize            string
@@ -103,8 +101,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		sourcePVC *v1.PersistentVolumeClaim
 		sc        *storagev1.StorageClass
 
-		intreeOps   opCounts
-		migratedOps opCounts
+		migrationCheck *migrationOpCheck
 	}
 	var (
 		dInfo   = driver.GetDriverInfo()
@@ -139,7 +136,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
+		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
 		l.cs = l.config.Framework.ClientSet
 		testVolumeSizeRange := p.GetTestSuiteInfo().SupportedSizeRange
 		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
@@ -177,7 +174,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		l.driverCleanup = nil
 		framework.ExpectNoError(err, "while cleaning up driver")
 
-		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
+		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
 	ginkgo.It("should provision storage with mount options", func() {
@@ -202,6 +199,9 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		if !dInfo.Capabilities[CapSnapshotDataSource] {
 			e2eskipper.Skipf("Driver %q does not support populate data from snapshot - skipping", dInfo.Name)
 		}
+		if !dInfo.SupportedFsType.Has(pattern.FsType) {
+			e2eskipper.Skipf("Driver %q does not support %q fs type - skipping", dInfo.Name, pattern.FsType)
+		}
 
 		sDriver, ok := driver.(SnapshottableTestDriver)
 		if !ok {
@@ -212,10 +212,9 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		defer cleanup()
 
 		dc := l.config.Framework.DynamicClient
-		vsc := sDriver.GetSnapshotClass(l.config)
 		testConfig := convertTestConfig(l.config)
 		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
-		dataSource, cleanupFunc := prepareSnapshotDataSourceForProvisioning(f, testConfig, l.cs, dc, l.pvc, l.sc, vsc, pattern.VolMode, expectedContent)
+		dataSource, cleanupFunc := prepareSnapshotDataSourceForProvisioning(f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, expectedContent)
 		defer cleanupFunc()
 
 		l.pvc.Spec.DataSource = dataSource
@@ -713,6 +712,68 @@ func StopPod(c clientset.Interface, pod *v1.Pod) {
 	e2epod.DeletePodWithWait(c, pod)
 }
 
+// StopPodAndDependents first tries to log the output of the pod's container,
+// then deletes the pod and waits for that to succeed. Also waits for all owned
+// resources to be deleted.
+func StopPodAndDependents(c clientset.Interface, pod *v1.Pod) {
+	if pod == nil {
+		return
+	}
+	body, err := c.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &v1.PodLogOptions{}).Do(context.TODO()).Raw()
+	if err != nil {
+		framework.Logf("Error getting logs for pod %s: %v", pod.Name, err)
+	} else {
+		framework.Logf("Pod %s has the following logs: %s", pod.Name, body)
+	}
+
+	// We must wait explicitly for removal of the generic ephemeral volume PVs.
+	// For that we must find them first...
+	pvs, err := c.CoreV1().PersistentVolumes().List(context.TODO(), metav1.ListOptions{})
+	framework.ExpectNoError(err, "list PVs")
+	var podPVs []v1.PersistentVolume
+	for _, pv := range pvs.Items {
+		if pv.Spec.ClaimRef == nil ||
+			pv.Spec.ClaimRef.Namespace != pod.Namespace {
+			continue
+		}
+		pvc, err := c.CoreV1().PersistentVolumeClaims(pod.Namespace).Get(context.TODO(), pv.Spec.ClaimRef.Name, metav1.GetOptions{})
+		if err != nil && apierrors.IsNotFound(err) {
+			// Must have been some unrelated PV, otherwise the PVC should exist.
+			continue
+		}
+		framework.ExpectNoError(err, "get PVC")
+		if pv.Spec.ClaimRef.UID == pvc.UID && metav1.IsControlledBy(pvc, pod) {
+			podPVs = append(podPVs, pv)
+		}
+	}
+
+	framework.Logf("Deleting pod %q in namespace %q", pod.Name, pod.Namespace)
+	deletionPolicy := metav1.DeletePropagationForeground
+	err = c.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name,
+		metav1.DeleteOptions{
+			// If the pod is the owner of some resources (like ephemeral inline volumes),
+			// then we want to be sure that those are also gone before we return.
+			// Blocking pod deletion via metav1.DeletePropagationForeground achieves that.
+			PropagationPolicy: &deletionPolicy,
+		})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return // assume pod was already deleted
+		}
+		framework.Logf("pod Delete API error: %v", err)
+	}
+	framework.Logf("Wait up to %v for pod %q to be fully deleted", e2epod.PodDeleteTimeout, pod.Name)
+	e2epod.WaitForPodNotFoundInNamespace(c, pod.Name, pod.Namespace, e2epod.PodDeleteTimeout)
+	if len(podPVs) > 0 {
+		for _, pv := range podPVs {
+			// As with CSI inline volumes, we use the pod delete timeout here because conceptually
+			// the volume deletion needs to be that fast (whatever "that" is).
+			framework.Logf("Wait up to %v for pod PV %s to be fully deleted", e2epod.PodDeleteTimeout, pv.Name)
+			e2epv.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, e2epod.PodDeleteTimeout)
+		}
+	}
+}
+
 func verifyPVCsPending(client clientset.Interface, pvcs []*v1.PersistentVolumeClaim) {
 	for _, claim := range pvcs {
 		// Get new copy of the claim
@@ -725,11 +786,13 @@ func verifyPVCsPending(client clientset.Interface, pvcs []*v1.PersistentVolumeCl
 func prepareSnapshotDataSourceForProvisioning(
 	f *framework.Framework,
 	config e2evolume.TestConfig,
+	perTestConfig *PerTestConfig,
+	pattern testpatterns.TestPattern,
 	client clientset.Interface,
 	dynamicClient dynamic.Interface,
 	initClaim *v1.PersistentVolumeClaim,
 	class *storagev1.StorageClass,
-	snapshotClass *unstructured.Unstructured,
+	sDriver SnapshottableTestDriver,
 	mode v1.PersistentVolumeMode,
 	injectContent string,
 ) (*v1.TypedLocalObjectReference, func()) {
@@ -755,44 +818,30 @@ func prepareSnapshotDataSourceForProvisioning(
 	}
 	e2evolume.InjectContent(f, config, nil, "", tests)
 
-	ginkgo.By("[Initialize dataSource]creating a SnapshotClass")
-	snapshotClass, err = dynamicClient.Resource(SnapshotClassGVR).Create(context.TODO(), snapshotClass, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+	snapshotResource := CreateSnapshotResource(sDriver, perTestConfig, pattern, updatedClaim.GetName(), updatedClaim.GetNamespace())
 
-	ginkgo.By("[Initialize dataSource]creating a snapshot")
-	snapshot := getSnapshot(updatedClaim.Name, updatedClaim.Namespace, snapshotClass.GetName())
-	snapshot, err = dynamicClient.Resource(SnapshotGVR).Namespace(updatedClaim.Namespace).Create(context.TODO(), snapshot, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
-
-	WaitForSnapshotReady(dynamicClient, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
-	framework.ExpectNoError(err)
-
-	ginkgo.By("[Initialize dataSource]checking the snapshot")
-	// Get new copy of the snapshot
-	snapshot, err = dynamicClient.Resource(SnapshotGVR).Namespace(snapshot.GetNamespace()).Get(context.TODO(), snapshot.GetName(), metav1.GetOptions{})
-	framework.ExpectNoError(err)
 	group := "snapshot.storage.k8s.io"
 	dataSourceRef := &v1.TypedLocalObjectReference{
 		APIGroup: &group,
 		Kind:     "VolumeSnapshot",
-		Name:     snapshot.GetName(),
+		Name:     snapshotResource.Vs.GetName(),
 	}
 
 	cleanupFunc := func() {
-		framework.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
-		err = dynamicClient.Resource(SnapshotGVR).Namespace(updatedClaim.Namespace).Delete(context.TODO(), snapshot.GetName(), metav1.DeleteOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			framework.Failf("Error deleting snapshot %q. Error: %v", snapshot.GetName(), err)
-		}
-
 		framework.Logf("deleting initClaim %q/%q", updatedClaim.Namespace, updatedClaim.Name)
 		err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Delete(context.TODO(), updatedClaim.Name, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			framework.Failf("Error deleting initClaim %q. Error: %v", updatedClaim.Name, err)
 		}
 
-		framework.Logf("deleting SnapshotClass %s", snapshotClass.GetName())
-		framework.ExpectNoError(dynamicClient.Resource(SnapshotClassGVR).Delete(context.TODO(), snapshotClass.GetName(), metav1.DeleteOptions{}))
+		err = snapshotResource.CleanupResource()
+		framework.ExpectNoError(err)
+
+		ginkgo.By("deleting StorageClass " + class.Name)
+		err = client.StorageV1().StorageClasses().Delete(context.TODO(), class.GetName(), metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			framework.Failf("Error deleting storage class %q. Error: %v", class.GetName(), err)
+		}
 	}
 
 	return dataSourceRef, cleanupFunc

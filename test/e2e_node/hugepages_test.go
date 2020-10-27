@@ -327,7 +327,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 					ginkgo.By("checking if the expected hugetlb settings were applied")
 					f.PodClient().Create(verifyPod)
 					err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
-					gomega.Expect(err).To(gomega.BeNil())
+					framework.ExpectNoError(err)
 				}
 			})
 		}

@@ -16,6 +16,7 @@ package libcontainer
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -32,10 +33,9 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 	"golang.org/x/sys/unix"
 
-	"bytes"
-
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	fs2 "github.com/opencontainers/runc/libcontainer/cgroups/fs2"
 	"k8s.io/klog/v2"
 )
 
@@ -71,9 +71,21 @@ func NewHandler(cgroupManager cgroups.Manager, rootFs string, pid int, includedM
 
 // Get cgroup and networking stats of the specified container
 func (h *Handler) GetStats() (*info.ContainerStats, error) {
-	cgroupStats, err := h.cgroupManager.GetStats()
-	if err != nil {
-		return nil, err
+	var cgroupStats *cgroups.Stats
+	readCgroupStats := true
+	if cgroups.IsCgroup2UnifiedMode() {
+		// On cgroup v2 there are no stats at the root cgroup
+		// so check whether it is the root cgroup
+		if h.cgroupManager.Path("") == fs2.UnifiedMountpoint {
+			readCgroupStats = false
+		}
+	}
+	var err error
+	if readCgroupStats {
+		cgroupStats, err = h.cgroupManager.GetStats()
+		if err != nil {
+			return nil, err
+		}
 	}
 	libcontainerStats := &libcontainer.Stats{
 		CgroupStats: cgroupStats,
@@ -106,56 +118,58 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	}
 
 	// If we know the pid then get network stats from /proc/<pid>/net/dev
-	if h.pid == 0 {
-		return stats, nil
-	}
-	if h.includedMetrics.Has(container.NetworkUsageMetrics) {
-		netStats, err := networkStatsFromProc(h.rootFs, h.pid)
-		if err != nil {
-			klog.V(4).Infof("Unable to get network stats from pid %d: %v", h.pid, err)
-		} else {
-			stats.Network.Interfaces = append(stats.Network.Interfaces, netStats...)
+	if h.pid > 0 {
+		if h.includedMetrics.Has(container.NetworkUsageMetrics) {
+			netStats, err := networkStatsFromProc(h.rootFs, h.pid)
+			if err != nil {
+				klog.V(4).Infof("Unable to get network stats from pid %d: %v", h.pid, err)
+			} else {
+				stats.Network.Interfaces = append(stats.Network.Interfaces, netStats...)
+			}
 		}
-	}
-	if h.includedMetrics.Has(container.NetworkTcpUsageMetrics) {
-		t, err := tcpStatsFromProc(h.rootFs, h.pid, "net/tcp")
-		if err != nil {
-			klog.V(4).Infof("Unable to get tcp stats from pid %d: %v", h.pid, err)
-		} else {
-			stats.Network.Tcp = t
-		}
+		if h.includedMetrics.Has(container.NetworkTcpUsageMetrics) {
+			t, err := tcpStatsFromProc(h.rootFs, h.pid, "net/tcp")
+			if err != nil {
+				klog.V(4).Infof("Unable to get tcp stats from pid %d: %v", h.pid, err)
+			} else {
+				stats.Network.Tcp = t
+			}
 
-		t6, err := tcpStatsFromProc(h.rootFs, h.pid, "net/tcp6")
-		if err != nil {
-			klog.V(4).Infof("Unable to get tcp6 stats from pid %d: %v", h.pid, err)
-		} else {
-			stats.Network.Tcp6 = t6
-		}
+			t6, err := tcpStatsFromProc(h.rootFs, h.pid, "net/tcp6")
+			if err != nil {
+				klog.V(4).Infof("Unable to get tcp6 stats from pid %d: %v", h.pid, err)
+			} else {
+				stats.Network.Tcp6 = t6
+			}
 
-	}
-	if h.includedMetrics.Has(container.NetworkAdvancedTcpUsageMetrics) {
-		ta, err := advancedTCPStatsFromProc(h.rootFs, h.pid, "net/netstat", "net/snmp")
-		if err != nil {
-			klog.V(4).Infof("Unable to get advanced tcp stats from pid %d: %v", h.pid, err)
-		} else {
-			stats.Network.TcpAdvanced = ta
 		}
-	}
-	if h.includedMetrics.Has(container.NetworkUdpUsageMetrics) {
-		u, err := udpStatsFromProc(h.rootFs, h.pid, "net/udp")
-		if err != nil {
-			klog.V(4).Infof("Unable to get udp stats from pid %d: %v", h.pid, err)
-		} else {
-			stats.Network.Udp = u
+		if h.includedMetrics.Has(container.NetworkAdvancedTcpUsageMetrics) {
+			ta, err := advancedTCPStatsFromProc(h.rootFs, h.pid, "net/netstat", "net/snmp")
+			if err != nil {
+				klog.V(4).Infof("Unable to get advanced tcp stats from pid %d: %v", h.pid, err)
+			} else {
+				stats.Network.TcpAdvanced = ta
+			}
 		}
+		if h.includedMetrics.Has(container.NetworkUdpUsageMetrics) {
+			u, err := udpStatsFromProc(h.rootFs, h.pid, "net/udp")
+			if err != nil {
+				klog.V(4).Infof("Unable to get udp stats from pid %d: %v", h.pid, err)
+			} else {
+				stats.Network.Udp = u
+			}
 
-		u6, err := udpStatsFromProc(h.rootFs, h.pid, "net/udp6")
-		if err != nil {
-			klog.V(4).Infof("Unable to get udp6 stats from pid %d: %v", h.pid, err)
-		} else {
-			stats.Network.Udp6 = u6
+			u6, err := udpStatsFromProc(h.rootFs, h.pid, "net/udp6")
+			if err != nil {
+				klog.V(4).Infof("Unable to get udp6 stats from pid %d: %v", h.pid, err)
+			} else {
+				stats.Network.Udp6 = u6
+			}
 		}
 	}
+	// some process metrics are per container ( number of processes, number of
+	// file descriptors etc.) and not required a proper container's
+	// root PID (systemd services don't have the root PID atm)
 	if h.includedMetrics.Has(container.ProcessMetrics) {
 		paths := h.cgroupManager.GetPaths()
 		path, ok := paths["cpu"]
@@ -286,13 +300,15 @@ func processStatsFromProcs(rootFs string, cgroupPath string, rootPid int) (info.
 			}
 		}
 	}
-	ulimits := processRootProcUlimits(rootFs, rootPid)
 
 	processStats := info.ProcessStats{
 		ProcessCount: uint64(len(pids)),
 		FdCount:      fdCount,
 		SocketCount:  socketCount,
-		Ulimits:      ulimits,
+	}
+
+	if rootPid > 0 {
+		processStats.Ulimits = processRootProcUlimits(rootFs, rootPid)
 	}
 
 	return processStats, nil
@@ -838,8 +854,13 @@ func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
 		ret.Memory.HierarchicalData.Pgmajfault = v
 	}
 
+	inactiveFileKeyName := "total_inactive_file"
+	if cgroups.IsCgroup2UnifiedMode() {
+		inactiveFileKeyName = "inactive_file"
+	}
+
 	workingSet := ret.Memory.Usage
-	if v, ok := s.MemoryStats.Stats["total_inactive_file"]; ok {
+	if v, ok := s.MemoryStats.Stats[inactiveFileKeyName]; ok {
 		if workingSet < v {
 			workingSet = 0
 		} else {

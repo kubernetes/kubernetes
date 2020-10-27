@@ -55,6 +55,7 @@ go_library(
         "//test/e2e/framework/resource:go_default_library",
         "//test/e2e/framework/service:go_default_library",
         "//test/e2e/framework/skipper:go_default_library",
+        "//test/e2e/framework/testfiles:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",

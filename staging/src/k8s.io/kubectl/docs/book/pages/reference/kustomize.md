@@ -187,7 +187,7 @@ as well as `namePrefix`'s and `nameSuffix`'s.
 | :------------ | :------ | :---------------------------------- |
 | **behavior**  | string  | Merge behavior when the Secret generator is defined in a base.  May be one of `create`, `replace`, `merge`. |
 | **env**       | string  | Single file to generate Secret data entries from.  Should be a path to a local *env* file, e.g. `path/to/file.env`, where each line of the file is a `key=value` pair.  *Each line* will appear as an entry in the Secret data field. |
-| **files**     | []string  | List of files to generate Secret data entries from. Each item should be a path to a local file, e.g. `path/to/file.config`, and the filename will appear as an entry in the ConfigMap data field with its contents as a value.  |
+| **files**     | []string  | List of files to generate Secret data entries from. Each item should be a path to a local file, e.g. `path/to/file.config`, and the filename will appear as an entry in the Secret data field with its contents as a value.  |
 | **literals**  | []string  | List of literal Secret data entries. Each item should be a key and literal value, e.g. `somekey=somevalue`, and the key/value will appear as an entry in the Secret data field.|
 | **name**      | string  | Name for the Secret.  Modified by the `namePrefix` and `nameSuffix` fields. |
 | **namespace** | string  | Namespace for the Secret.  Overridden by kustomize-wide `namespace` field.|
@@ -300,7 +300,7 @@ Definitions:
 | Name          | Type    | Desc                                |
 | :------------ | :------ | :---------------------------------- |
 | **name** | string  | Match all `image` fields with this value for the *name*|
-| **nameName** | string  | Replace the `image` field *name* with this value. |
+| **newName** | string  | Replace the `image` field *name* with this value. |
 | **newTag** | string  | Replace the `image` field *tag* with this tag value. |
 | **digest** | string  | Replace the `image` field *tag* with this digest value.  Includes the `sha256:` portion of the digest. |
 

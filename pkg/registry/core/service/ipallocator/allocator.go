@@ -82,14 +82,28 @@ type Range struct {
 
 // NewAllocatorCIDRRange creates a Range over a net.IPNet, calling allocatorFactory to construct the backing store.
 func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.AllocatorFactory) (*Range, error) {
-	max := RangeSize(cidr)
-	base := bigForIP(cidr.IP)
+	max := utilnet.RangeSize(cidr)
+	base := utilnet.BigForIP(cidr.IP)
 	rangeSpec := cidr.String()
+
+	if utilnet.IsIPv6CIDR(cidr) {
+		// Limit the max size, since the allocator keeps a bitmap of that size.
+		if max > 65536 {
+			max = 65536
+		}
+	} else {
+		// Don't use the IPv4 network's broadcast address.
+		max--
+	}
+
+	// Don't use the network's ".0" address.
+	base.Add(base, big.NewInt(1))
+	max--
 
 	r := Range{
 		net:  cidr,
-		base: base.Add(base, big.NewInt(1)), // don't use the network base
-		max:  maximum(0, int(max-2)),        // don't use the network broadcast,
+		base: base,
+		max:  maximum(0, int(max)),
 	}
 	var err error
 	r.alloc, err = allocatorFactory(r.max, rangeSpec)
@@ -171,7 +185,7 @@ func (r *Range) AllocateNext() (net.IP, error) {
 	if !ok {
 		return nil, ErrFull
 	}
-	return addIPOffset(r.base, offset), nil
+	return utilnet.AddIPOffset(r.base, offset), nil
 }
 
 // Release releases the IP back to the pool. Releasing an
@@ -247,40 +261,8 @@ func (r *Range) contains(ip net.IP) (bool, int) {
 	return true, offset
 }
 
-// bigForIP creates a big.Int based on the provided net.IP
-func bigForIP(ip net.IP) *big.Int {
-	b := ip.To4()
-	if b == nil {
-		b = ip.To16()
-	}
-	return big.NewInt(0).SetBytes(b)
-}
-
-// addIPOffset adds the provided integer offset to a base big.Int representing a
-// net.IP
-func addIPOffset(base *big.Int, offset int) net.IP {
-	return net.IP(big.NewInt(0).Add(base, big.NewInt(int64(offset))).Bytes())
-}
-
 // calculateIPOffset calculates the integer offset of ip from base such that
 // base + offset = ip. It requires ip >= base.
 func calculateIPOffset(base *big.Int, ip net.IP) int {
-	return int(big.NewInt(0).Sub(bigForIP(ip), base).Int64())
-}
-
-// RangeSize returns the size of a range in valid addresses.
-func RangeSize(subnet *net.IPNet) int64 {
-	ones, bits := subnet.Mask.Size()
-	if bits == 32 && (bits-ones) >= 31 || bits == 128 && (bits-ones) >= 127 {
-		return 0
-	}
-	// For IPv6, the max size will be limited to 65536
-	// This is due to the allocator keeping track of all the
-	// allocated IP's in a bitmap. This will keep the size of
-	// the bitmap to 64k.
-	if bits == 128 && (bits-ones) >= 16 {
-		return int64(1) << uint(16)
-	} else {
-		return int64(1) << uint(bits-ones)
-	}
+	return int(big.NewInt(0).Sub(utilnet.BigForIP(ip), base).Int64())
 }

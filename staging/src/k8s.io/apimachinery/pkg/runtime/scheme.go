@@ -309,11 +309,6 @@ func (s *Scheme) New(kind schema.GroupVersionKind) (Object, error) {
 	return nil, NewNotRegisteredErrForKind(s.schemeName, kind)
 }
 
-// Log sets a logger on the scheme. For test purposes only
-func (s *Scheme) Log(l conversion.DebugLogger) {
-	s.converter.Debug = l
-}
-
 // AddIgnoredConversionType identifies a pair of types that should be skipped by
 // conversion (because the data inside them is explicitly dropped during
 // conversion).

@@ -91,15 +91,10 @@ func TestVMSSVMCache(t *testing.T) {
 	ss.cloud.VirtualMachineScaleSetsClient = mockVMSSClient
 	ss.cloud.VirtualMachineScaleSetVMsClient = mockVMSSVMClient
 
-	expectedScaleSet := compute.VirtualMachineScaleSet{
-		Name: &vmssName,
-		VirtualMachineScaleSetProperties: &compute.VirtualMachineScaleSetProperties{
-			VirtualMachineProfile: &compute.VirtualMachineScaleSetVMProfile{},
-		},
-	}
+	expectedScaleSet := buildTestVMSS(vmssName, "vmssee6c2")
 	mockVMSSClient.EXPECT().List(gomock.Any(), gomock.Any()).Return([]compute.VirtualMachineScaleSet{expectedScaleSet}, nil).AnyTimes()
 
-	expectedVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, vmssName, "", 0, vmList, "")
+	expectedVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, vmssName, "", 0, vmList, "", false)
 	mockVMSSVMClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(expectedVMs, nil).AnyTimes()
 
 	// validate getting VMSS VM via cache.
@@ -107,7 +102,7 @@ func TestVMSSVMCache(t *testing.T) {
 		vm := expectedVMs[i]
 		vmName := to.String(vm.OsProfile.ComputerName)
 		ssName, instanceID, realVM, err := ss.getVmssVM(vmName, azcache.CacheReadTypeDefault)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, "vmss", ssName)
 		assert.Equal(t, to.String(vm.InstanceID), instanceID)
 		assert.Equal(t, &vm, realVM)
@@ -120,7 +115,9 @@ func TestVMSSVMCache(t *testing.T) {
 	assert.NoError(t, err)
 
 	// the VM should be removed from cache after deleteCacheForNode().
-	cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey, azcache.CacheReadTypeDefault)
+	cacheKey, cache, err := ss.getVMSSVMCache("rg", vmssName)
+	assert.NoError(t, err)
+	cached, err := cache.Get(cacheKey, azcache.CacheReadTypeDefault)
 	assert.NoError(t, err)
 	cachedVirtualMachines := cached.(*sync.Map)
 	_, ok := cachedVirtualMachines.Load(vmName)
@@ -154,7 +151,7 @@ func TestVMSSVMCacheWithDeletingNodes(t *testing.T) {
 	}
 	mockVMSSClient.EXPECT().List(gomock.Any(), gomock.Any()).Return([]compute.VirtualMachineScaleSet{expectedScaleSet}, nil).AnyTimes()
 
-	expectedVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, vmssName, "", 0, vmList, string(compute.ProvisioningStateDeleting))
+	expectedVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, vmssName, "", 0, vmList, string(compute.ProvisioningStateDeleting), false)
 	mockVMSSVMClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(expectedVMs, nil).AnyTimes()
 
 	for i := range expectedVMs {

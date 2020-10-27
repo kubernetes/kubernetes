@@ -28,10 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
@@ -92,7 +89,6 @@ func TestAddRemovePods(t *testing.T) {
 	}
 
 	m := newTestManager()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StartupProbe, true)()
 	defer cleanup(t, m)
 	if err := expectProbes(m, nil); err != nil {
 		t.Error(err)
@@ -139,7 +135,6 @@ func TestAddRemovePods(t *testing.T) {
 
 func TestCleanupPods(t *testing.T) {
 	m := newTestManager()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StartupProbe, true)()
 	defer cleanup(t, m)
 	podToCleanup := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -202,7 +197,6 @@ func TestCleanupPods(t *testing.T) {
 
 func TestCleanupRepeated(t *testing.T) {
 	m := newTestManager()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StartupProbe, true)()
 	defer cleanup(t, m)
 	podTemplate := v1.Pod{
 		Spec: v1.PodSpec{
@@ -256,6 +250,20 @@ func TestUpdatePodStatus(t *testing.T) {
 			Running: &v1.ContainerStateRunning{},
 		},
 	}
+	notStartedNoReadiness := v1.ContainerStatus{
+		Name:        "not_started_container_no_readiness",
+		ContainerID: "test://not_started_container_no_readiness_id",
+		State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{},
+		},
+	}
+	startedNoReadiness := v1.ContainerStatus{
+		Name:        "started_container_no_readiness",
+		ContainerID: "test://started_container_no_readiness_id",
+		State: v1.ContainerState{
+			Running: &v1.ContainerStateRunning{},
+		},
+	}
 	terminated := v1.ContainerStatus{
 		Name:        "terminated_container",
 		ContainerID: "test://terminated_container_id",
@@ -266,7 +274,7 @@ func TestUpdatePodStatus(t *testing.T) {
 	podStatus := v1.PodStatus{
 		Phase: v1.PodRunning,
 		ContainerStatuses: []v1.ContainerStatus{
-			unprobed, probedReady, probedPending, probedUnready, terminated,
+			unprobed, probedReady, probedPending, probedUnready, notStartedNoReadiness, startedNoReadiness, terminated,
 		},
 	}
 
@@ -275,24 +283,29 @@ func TestUpdatePodStatus(t *testing.T) {
 
 	// Setup probe "workers" and cached results.
 	m.workers = map[probeKey]*worker{
-		{testPodUID, unprobed.Name, liveness}:       {},
-		{testPodUID, probedReady.Name, readiness}:   {},
-		{testPodUID, probedPending.Name, readiness}: {},
-		{testPodUID, probedUnready.Name, readiness}: {},
-		{testPodUID, terminated.Name, readiness}:    {},
+		{testPodUID, unprobed.Name, liveness}:             {},
+		{testPodUID, probedReady.Name, readiness}:         {},
+		{testPodUID, probedPending.Name, readiness}:       {},
+		{testPodUID, probedUnready.Name, readiness}:       {},
+		{testPodUID, notStartedNoReadiness.Name, startup}: {},
+		{testPodUID, startedNoReadiness.Name, startup}:    {},
+		{testPodUID, terminated.Name, readiness}:          {},
 	}
 	m.readinessManager.Set(kubecontainer.ParseContainerID(probedReady.ContainerID), results.Success, &v1.Pod{})
 	m.readinessManager.Set(kubecontainer.ParseContainerID(probedUnready.ContainerID), results.Failure, &v1.Pod{})
+	m.startupManager.Set(kubecontainer.ParseContainerID(startedNoReadiness.ContainerID), results.Success, &v1.Pod{})
 	m.readinessManager.Set(kubecontainer.ParseContainerID(terminated.ContainerID), results.Success, &v1.Pod{})
 
 	m.UpdatePodStatus(testPodUID, &podStatus)
 
 	expectedReadiness := map[probeKey]bool{
-		{testPodUID, unprobed.Name, readiness}:      true,
-		{testPodUID, probedReady.Name, readiness}:   true,
-		{testPodUID, probedPending.Name, readiness}: false,
-		{testPodUID, probedUnready.Name, readiness}: false,
-		{testPodUID, terminated.Name, readiness}:    false,
+		{testPodUID, unprobed.Name, readiness}:              true,
+		{testPodUID, probedReady.Name, readiness}:           true,
+		{testPodUID, probedPending.Name, readiness}:         false,
+		{testPodUID, probedUnready.Name, readiness}:         false,
+		{testPodUID, notStartedNoReadiness.Name, readiness}: false,
+		{testPodUID, startedNoReadiness.Name, readiness}:    true,
+		{testPodUID, terminated.Name, readiness}:            false,
 	}
 	for _, c := range podStatus.ContainerStatuses {
 		expected, ok := expectedReadiness[probeKey{testPodUID, c.Name, readiness}]

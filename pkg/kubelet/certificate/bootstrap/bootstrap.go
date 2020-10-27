@@ -105,7 +105,7 @@ func LoadClientConfig(kubeconfigPath, bootstrapPath, certDir string) (certConfig
 // The kubeconfig at bootstrapPath is used to request a client certificate from the API server.
 // On success, a kubeconfig file referencing the generated key and obtained certificate is written to kubeconfigPath.
 // The certificate and key file are stored in certDir.
-func LoadClientCert(kubeconfigPath, bootstrapPath, certDir string, nodeName types.NodeName) error {
+func LoadClientCert(ctx context.Context, kubeconfigPath, bootstrapPath, certDir string, nodeName types.NodeName) error {
 	// Short-circuit if the kubeconfig file exists and is valid.
 	ok, err := isClientConfigStillValid(kubeconfigPath)
 	if err != nil {
@@ -156,11 +156,11 @@ func LoadClientCert(kubeconfigPath, bootstrapPath, certDir string, nodeName type
 		}
 	}
 
-	if err := waitForServer(*bootstrapClientConfig, 1*time.Minute); err != nil {
+	if err := waitForServer(ctx, *bootstrapClientConfig, 1*time.Minute); err != nil {
 		klog.Warningf("Error waiting for apiserver to come up: %v", err)
 	}
 
-	certData, err := requestNodeCertificate(bootstrapClient, keyData, nodeName)
+	certData, err := requestNodeCertificate(ctx, bootstrapClient, keyData, nodeName)
 	if err != nil {
 		return err
 	}
@@ -278,7 +278,7 @@ func verifyKeyData(data []byte) bool {
 	return err == nil
 }
 
-func waitForServer(cfg restclient.Config, deadline time.Duration) error {
+func waitForServer(ctx context.Context, cfg restclient.Config, deadline time.Duration) error {
 	cfg.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 	cfg.Timeout = 1 * time.Second
 	cli, err := restclient.UnversionedRESTClientFor(&cfg)
@@ -286,12 +286,12 @@ func waitForServer(cfg restclient.Config, deadline time.Duration) error {
 		return fmt.Errorf("couldn't create client: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.TODO(), deadline)
+	ctx, cancel := context.WithTimeout(ctx, deadline)
 	defer cancel()
 
 	var connected bool
 	wait.JitterUntil(func() {
-		if _, err := cli.Get().AbsPath("/healthz").Do(context.TODO()).Raw(); err != nil {
+		if _, err := cli.Get().AbsPath("/healthz").Do(ctx).Raw(); err != nil {
 			klog.Infof("Failed to connect to apiserver: %v", err)
 			return
 		}
@@ -312,7 +312,7 @@ func waitForServer(cfg restclient.Config, deadline time.Duration) error {
 // certificate (pem-encoded). If there is any errors, or the watch timeouts, it
 // will return an error. This is intended for use on nodes (kubelet and
 // kubeadm).
-func requestNodeCertificate(client clientset.Interface, privateKeyData []byte, nodeName types.NodeName) (certData []byte, err error) {
+func requestNodeCertificate(ctx context.Context, client clientset.Interface, privateKeyData []byte, nodeName types.NodeName) (certData []byte, err error) {
 	subject := &pkix.Name{
 		Organization: []string{"system:nodes"},
 		CommonName:   "system:node:" + string(nodeName),
@@ -349,7 +349,7 @@ func requestNodeCertificate(client clientset.Interface, privateKeyData []byte, n
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3600*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 3600*time.Second)
 	defer cancel()
 
 	klog.V(2).Infof("Waiting for client certificate to be issued")

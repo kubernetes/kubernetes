@@ -471,3 +471,47 @@ func TestEnableHiddenStableCollector(t *testing.T) {
 		})
 	}
 }
+
+func TestRegistryReset(t *testing.T) {
+	currentVersion := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "17",
+		GitVersion: "v1.17.1-alpha-1.12345",
+	}
+	registry := newKubeRegistry(currentVersion)
+	resettableMetric := NewCounterVec(&CounterOpts{
+		Name: "reset_metric",
+		Help: "this metric can be reset",
+	}, []string{"label"})
+	// gauges cannot be reset
+	nonResettableMetric := NewGauge(&GaugeOpts{
+		Name: "not_reset_metric",
+		Help: "this metric cannot be reset",
+	})
+
+	registry.MustRegister(resettableMetric)
+	registry.MustRegister(nonResettableMetric)
+	resettableMetric.WithLabelValues("one").Inc()
+	resettableMetric.WithLabelValues("two").Inc()
+	resettableMetric.WithLabelValues("two").Inc()
+	nonResettableMetric.Inc()
+
+	nonResettableOutput := `
+        # HELP not_reset_metric [ALPHA] this metric cannot be reset
+        # TYPE not_reset_metric gauge
+        not_reset_metric 1
+`
+	resettableOutput := `
+        # HELP reset_metric [ALPHA] this metric can be reset
+        # TYPE reset_metric counter
+        reset_metric{label="one"} 1
+        reset_metric{label="two"} 2
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(nonResettableOutput+resettableOutput), "reset_metric", "not_reset_metric"); err != nil {
+		t.Fatal(err)
+	}
+	registry.Reset()
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(nonResettableOutput), "reset_metric", "not_reset_metric"); err != nil {
+		t.Fatal(err)
+	}
+}

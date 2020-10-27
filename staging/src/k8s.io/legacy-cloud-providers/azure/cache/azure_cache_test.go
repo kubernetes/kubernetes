@@ -195,8 +195,10 @@ func TestCacheNoConcurrentGet(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := 0; i < 5; i++ {
 		wg.Add(1)
-		go cache.Get(key, CacheReadTypeDefault)
-		wg.Done()
+		go func() {
+			defer wg.Done()
+			_, _ = cache.Get(key, CacheReadTypeDefault)
+		}()
 	}
 	v, err := cache.Get(key, CacheReadTypeDefault)
 	wg.Wait()

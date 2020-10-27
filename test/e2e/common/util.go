@@ -57,11 +57,12 @@ var (
 // CurrentSuite represents current test suite.
 var CurrentSuite Suite
 
-// CommonImageWhiteList is the list of images used in common test. These images should be prepulled
-// before a tests starts, so that the tests won't fail due image pulling flakes. Currently, this is
-// only used by node e2e test.
+// PrePulledImages are a list of images used in e2e/common tests. These images should be prepulled
+// before tests starts, so that the tests won't fail due image pulling flakes.
+// Currently, this is only used by node e2e test.
+// See also updateImageAllowList() in ../../e2e_node/image_list.go
 // TODO(random-liu): Change the image puller pod to use similar mechanism.
-var CommonImageWhiteList = sets.NewString(
+var PrePulledImages = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Agnhost),
 	imageutils.GetE2EImage(imageutils.BusyBox),
 	imageutils.GetE2EImage(imageutils.IpcUtils),
@@ -239,4 +240,15 @@ func getFileModeRegex(filePath string, mask *int32) string {
 	windowsOutput := fmt.Sprintf("mode of Windows file \"%v\": %s", filePath, os.FileMode(windowsMask))
 
 	return fmt.Sprintf("(%s|%s)", linuxOutput, windowsOutput)
+}
+
+// createMounts creates a v1.VolumeMount list with a single element.
+func createMounts(volumeName, volumeMountPath string, readOnly bool) []v1.VolumeMount {
+	return []v1.VolumeMount{
+		{
+			Name:      volumeName,
+			MountPath: volumeMountPath,
+			ReadOnly:  readOnly,
+		},
+	}
 }

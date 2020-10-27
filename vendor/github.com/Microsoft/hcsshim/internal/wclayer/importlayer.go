@@ -93,6 +93,19 @@ func (r *legacyLayerWriterWrapper) Close() (err error) {
 			return err
 		}
 	}
+
+	// The reapplyDirectoryTimes must be called AFTER we are done with Tombstone
+	// deletion and hard link creation. This is because Tombstone deletion and hard link
+	// creation updates the directory last write timestamps so that will change the
+	// timestamps added by the `Add` call. Some container applications depend on the
+	// correctness of these timestamps and so we should change the timestamps back to
+	// the original value (i.e the value provided in the Add call) after this
+	// processing is done.
+	err = reapplyDirectoryTimes(r.destRoot, r.changedDi)
+	if err != nil {
+		return err
+	}
+
 	// Prepare the utility VM for use if one is present in the layer.
 	if r.HasUtilityVM {
 		err := safefile.EnsureNotReparsePointRelative("UtilityVM", r.destRoot)

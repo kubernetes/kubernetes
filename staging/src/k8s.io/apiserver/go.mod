@@ -2,7 +2,7 @@
 
 module k8s.io/apiserver
 
-go 1.13
+go 1.15
 
 require (
 	github.com/coreos/go-oidc v2.1.0+incompatible
@@ -12,7 +12,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible
-	github.com/evanphx/json-patch v0.0.0-20190815234213-e83c0a1c26c8
+	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/go-openapi/jsonreference v0.19.3 // indirect
 	github.com/go-openapi/spec v0.19.3
 	github.com/gogo/protobuf v1.3.1
@@ -30,14 +30,14 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5 // indirect
-	go.etcd.io/etcd v0.5.0-alpha.5.0.20200520232829-54ba9589114f
+	go.etcd.io/bbolt v1.3.5 // indirect
+	go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489
 	go.uber.org/zap v1.10.0
-	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
-	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e
+	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
+	golang.org/x/net v0.0.0-20200707034311-ab3426394381
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	golang.org/x/sys v0.0.0-20200420163511-1957bb5e6d1f
-	google.golang.org/genproto v0.0.0-20200115191322-ca5a22157cba // indirect
-	google.golang.org/grpc v1.26.0
+	golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4
+	google.golang.org/grpc v1.27.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/yaml.v2 v2.2.8
@@ -45,17 +45,15 @@ require (
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
 	k8s.io/component-base v0.0.0
-	k8s.io/klog/v2 v2.1.0
-	k8s.io/kube-openapi v0.0.0-20200427153329-656914f816f9
-	k8s.io/utils v0.0.0-20200414100711-2df71ebbae66
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.9
-	sigs.k8s.io/structured-merge-diff/v3 v3.0.0
+	k8s.io/klog/v2 v2.2.0
+	k8s.io/kube-openapi v0.0.0-20200923155610-8b5066479488
+	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.12
+	sigs.k8s.io/structured-merge-diff/v4 v4.0.2-0.20201001033253-b3cf1e8ff931
 	sigs.k8s.io/yaml v1.2.0
 )
 
 replace (
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a // pinned to release-branch.go1.13
-	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7 // pinned to release-branch.go1.13
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

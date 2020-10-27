@@ -17,9 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	gojson "encoding/json"
-
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -64,7 +62,24 @@ type NodeResourcesFitArgs struct {
 	// should ignore.
 	// +listType=atomic
 	IgnoredResources []string `json:"ignoredResources,omitempty"`
+	// IgnoredResourceGroups defines the list of resource groups that NodeResources fit filter should ignore.
+	// e.g. if group is ["example.com"], it will ignore all resource names that begin
+	// with "example.com", such as "example.com/aaa" and "example.com/bbb".
+	// A resource group name can't contain '/'.
+	// +listType=atomic
+	IgnoredResourceGroups []string `json:"ignoredResourceGroups,omitempty"`
 }
+
+// PodTopologySpreadConstraintsDefaulting defines how to set default constraints
+// for the PodTopologySpread plugin.
+type PodTopologySpreadConstraintsDefaulting string
+
+const (
+	// SystemDefaulting instructs to use the kubernetes defined default.
+	SystemDefaulting PodTopologySpreadConstraintsDefaulting = "System"
+	// ListDefaulting instructs to use the config provided default.
+	ListDefaulting PodTopologySpreadConstraintsDefaulting = "List"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -73,14 +88,26 @@ type PodTopologySpreadArgs struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// DefaultConstraints defines topology spread constraints to be applied to
-	// pods that don't define any in `pod.spec.topologySpreadConstraints`.
-	// `topologySpreadConstraint.labelSelectors` must be empty, as they are
-	// deduced the pods' membership to Services, Replication Controllers, Replica
-	// Sets or Stateful Sets.
-	// Empty by default.
+	// Pods that don't define any in `pod.spec.topologySpreadConstraints`.
+	// `.defaultConstraints[*].labelSelectors` must be empty, as they are
+	// deduced from the Pod's membership to Services, ReplicationControllers,
+	// ReplicaSets or StatefulSets.
+	// When not empty, .defaultingType must be "List".
 	// +optional
 	// +listType=atomic
-	DefaultConstraints []v1.TopologySpreadConstraint `json:"defaultConstraints"`
+	DefaultConstraints []corev1.TopologySpreadConstraint `json:"defaultConstraints,omitempty"`
+
+	// DefaultingType determines how .defaultConstraints are deduced. Can be one
+	// of "System" or "List".
+	//
+	// - "System": Use kubernetes defined constraints that spread Pods among
+	//   Nodes and Zones.
+	// - "List": Use constraints defined in .defaultConstraints.
+	//
+	// Defaults to "List" if feature gate DefaultPodTopologySpread is disabled
+	// and to "System" if enabled.
+	// +optional
+	DefaultingType PodTopologySpreadConstraintsDefaulting `json:"defaultingType,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -123,39 +150,20 @@ type NodeResourcesMostAllocatedArgs struct {
 	Resources []ResourceSpec `json:"resources,omitempty"`
 }
 
-// TODO add JSON tags and remove custom unmarshalling in v1beta1.
-// UtilizationShapePoint and ResourceSpec fields are not annotated with JSON tags in v1alpha2
-// to maintain backward compatibility with the args shipped with v1.18.
-// See https://github.com/kubernetes/kubernetes/pull/88585#discussion_r405021905
-
 // UtilizationShapePoint represents single point of priority function shape.
 type UtilizationShapePoint struct {
 	// Utilization (x axis). Valid values are 0 to 100. Fully utilized node maps to 100.
-	Utilization int32
+	Utilization int32 `json:"utilization"`
 	// Score assigned to given utilization (y axis). Valid values are 0 to 10.
-	Score int32
-}
-
-// UnmarshalJSON provides case insensitive unmarshalling for the type.
-// TODO remove when copying to v1beta1.
-func (t *UtilizationShapePoint) UnmarshalJSON(data []byte) error {
-	type internal *UtilizationShapePoint
-	return gojson.Unmarshal(data, internal(t))
+	Score int32 `json:"score"`
 }
 
 // ResourceSpec represents single resource and weight for bin packing of priority RequestedToCapacityRatioArguments.
 type ResourceSpec struct {
 	// Name of the resource to be managed by RequestedToCapacityRatio function.
-	Name string
+	Name string `json:"name"`
 	// Weight of the resource.
-	Weight int64
-}
-
-// UnmarshalJSON provides case insensitive unmarshalling for the type.
-// TODO remove when copying to v1beta1.
-func (t *ResourceSpec) UnmarshalJSON(data []byte) error {
-	type internal *ResourceSpec
-	return gojson.Unmarshal(data, internal(t))
+	Weight int64 `json:"weight,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -41,6 +41,9 @@ go_library(
         "//vendor/github.com/prometheus/common/expfmt:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/github.com/prometheus/procfs:go_default_library",
         ],
@@ -53,7 +56,13 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/github.com/prometheus/procfs:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/github.com/prometheus/procfs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
             "//vendor/github.com/prometheus/procfs:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [

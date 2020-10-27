@@ -33,7 +33,7 @@ type Policy struct {
 	// Holds the information to configure the priority functions
 	Priorities []PriorityPolicy `json:"priorities"`
 	// Holds the information to communicate with the extender(s)
-	Extenders []Extender `json:"extenders"`
+	Extenders []LegacyExtender `json:"extenders"`
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
 	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 1-100.
@@ -185,9 +185,9 @@ type ExtenderTLSConfig struct {
 	CAData []byte `json:"caData,omitempty"`
 }
 
-// Extender holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
+// LegacyExtender holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
 // it is assumed that the extender chose not to provide that extension.
-type Extender struct {
+type LegacyExtender struct {
 	// URLPrefix at which the extender is available
 	URLPrefix string `json:"urlPrefix"`
 	// Verb for the filter call, empty if not supported. This verb is appended to the URLPrefix when issuing the filter call to extender.
@@ -233,10 +233,10 @@ type Extender struct {
 // to preserve compatibility with incorrectly specified scheduler config fields:
 // * BindVerb, which originally did not specify a json tag, and required upper-case serialization in 1.7
 // * TLSConfig, which uses a struct not intended for serialization, and does not include any json tags
-type caseInsensitiveExtender *Extender
+type caseInsensitiveExtender *LegacyExtender
 
 // UnmarshalJSON implements the json.Unmarshaller interface.
 // This preserves compatibility with incorrect case-insensitive configuration fields.
-func (t *Extender) UnmarshalJSON(b []byte) error {
+func (t *LegacyExtender) UnmarshalJSON(b []byte) error {
 	return gojson.Unmarshal(b, caseInsensitiveExtender(t))
 }

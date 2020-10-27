@@ -94,6 +94,10 @@ func newBaseEndpointInfo(IP string, port int, isLocal bool, topology map[string]
 
 type makeEndpointFunc func(info *BaseEndpointInfo) Endpoint
 
+// This handler is invoked by the apply function on every change. This function should not modify the
+// EndpointsMap's but just use the changes for any Proxier specific cleanup.
+type processEndpointsMapChangeFunc func(oldEndpointsMap, newEndpointsMap EndpointsMap)
+
 // EndpointChangeTracker carries state about uncommitted changes to an arbitrary number of
 // Endpoints, keyed by their namespace and name.
 type EndpointChangeTracker struct {
@@ -104,29 +108,31 @@ type EndpointChangeTracker struct {
 	// items maps a service to is endpointsChange.
 	items map[types.NamespacedName]*endpointsChange
 	// makeEndpointInfo allows proxier to inject customized information when processing endpoint.
-	makeEndpointInfo makeEndpointFunc
+	makeEndpointInfo          makeEndpointFunc
+	processEndpointsMapChange processEndpointsMapChangeFunc
 	// endpointSliceCache holds a simplified version of endpoint slices.
 	endpointSliceCache *EndpointSliceCache
-	// isIPv6Mode indicates if change tracker is under IPv6/IPv4 mode. Nil means not applicable.
-	isIPv6Mode *bool
-	recorder   record.EventRecorder
+	// ipfamily identify the ip family on which the tracker is operating on
+	ipFamily v1.IPFamily
+	recorder record.EventRecorder
 	// Map from the Endpoints namespaced-name to the times of the triggers that caused the endpoints
 	// object to change. Used to calculate the network-programming-latency.
 	lastChangeTriggerTimes map[types.NamespacedName][]time.Time
 }
 
 // NewEndpointChangeTracker initializes an EndpointsChangeMap
-func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, isIPv6Mode *bool, recorder record.EventRecorder, endpointSlicesEnabled bool) *EndpointChangeTracker {
+func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, ipFamily v1.IPFamily, recorder record.EventRecorder, endpointSlicesEnabled bool, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointChangeTracker {
 	ect := &EndpointChangeTracker{
-		hostname:               hostname,
-		items:                  make(map[types.NamespacedName]*endpointsChange),
-		makeEndpointInfo:       makeEndpointInfo,
-		isIPv6Mode:             isIPv6Mode,
-		recorder:               recorder,
-		lastChangeTriggerTimes: make(map[types.NamespacedName][]time.Time),
+		hostname:                  hostname,
+		items:                     make(map[types.NamespacedName]*endpointsChange),
+		makeEndpointInfo:          makeEndpointInfo,
+		ipFamily:                  ipFamily,
+		recorder:                  recorder,
+		lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
+		processEndpointsMapChange: processEndpointsMapChange,
 	}
 	if endpointSlicesEnabled {
-		ect.endpointSliceCache = NewEndpointSliceCache(hostname, isIPv6Mode, recorder, makeEndpointInfo)
+		ect.endpointSliceCache = NewEndpointSliceCache(hostname, ipFamily, recorder, makeEndpointInfo)
 	}
 	return ect
 }
@@ -161,7 +167,10 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 		ect.items[namespacedName] = change
 	}
 
-	if t := getLastChangeTriggerTime(endpoints.Annotations); !t.IsZero() {
+	// In case of Endpoints deletion, the LastChangeTriggerTime annotation is
+	// by-definition coming from the time of last update, which is not what
+	// we want to measure. So we simply ignore it in this cases.
+	if t := getLastChangeTriggerTime(endpoints.Annotations); !t.IsZero() && current != nil {
 		ect.lastChangeTriggerTimes[namespacedName] = append(ect.lastChangeTriggerTimes[namespacedName], t)
 	}
 
@@ -216,7 +225,12 @@ func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.E
 
 	if changeNeeded {
 		metrics.EndpointChangesPending.Inc()
-		if t := getLastChangeTriggerTime(endpointSlice.Annotations); !t.IsZero() {
+		// In case of Endpoints deletion, the LastChangeTriggerTime annotation is
+		// by-definition coming from the time of last update, which is not what
+		// we want to measure. So we simply ignore it in this cases.
+		// TODO(wojtek-t, robscott): Address the problem for EndpointSlice deletion
+		// when other EndpointSlice for that service still exist.
+		if t := getLastChangeTriggerTime(endpointSlice.Annotations); !t.IsZero() && !removeSlice {
 			ect.lastChangeTriggerTimes[namespacedName] =
 				append(ect.lastChangeTriggerTimes[namespacedName], t)
 		}
@@ -360,14 +374,16 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 					klog.Warningf("ignoring invalid endpoint port %s with empty host", port.Name)
 					continue
 				}
+
 				// Filter out the incorrect IP version case.
 				// Any endpoint port that contains incorrect IP version will be ignored.
-				if ect.isIPv6Mode != nil && utilnet.IsIPv6String(addr.IP) != *ect.isIPv6Mode {
+				if (ect.ipFamily == v1.IPv6Protocol) != utilnet.IsIPv6String(addr.IP) {
 					// Emit event on the corresponding service which had a different
 					// IP version than the endpoint.
 					utilproxy.LogAndEmitIncorrectIPVersionEvent(ect.recorder, "endpoints", addr.IP, endpoints.Namespace, endpoints.Name, "")
 					continue
 				}
+
 				isLocal := addr.NodeName != nil && *addr.NodeName == ect.hostname
 				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal, nil)
 				if ect.makeEndpointInfo != nil {
@@ -388,6 +404,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 // The changes map is cleared after applying them.
 // In addition it returns (via argument) and resets the lastChangeTriggerTimes for all endpoints
 // that were changed and will result in syncing the proxy rules.
+// apply triggers processEndpointsMapChange on every change.
 func (em EndpointsMap) apply(ect *EndpointChangeTracker, staleEndpoints *[]ServiceEndpoint,
 	staleServiceNames *[]ServicePortName, lastChangeTriggerTimes *map[types.NamespacedName][]time.Time) {
 	if ect == nil {
@@ -396,6 +413,9 @@ func (em EndpointsMap) apply(ect *EndpointChangeTracker, staleEndpoints *[]Servi
 
 	changes := ect.checkoutChanges()
 	for _, change := range changes {
+		if ect.processEndpointsMapChange != nil {
+			ect.processEndpointsMapChange(change.previous, change.current)
+		}
 		em.unmerge(change.previous)
 		em.merge(change.current)
 		detectStaleConnections(change.previous, change.current, staleEndpoints, staleServiceNames)

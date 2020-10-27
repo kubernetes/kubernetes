@@ -28,7 +28,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
-	v1 "k8s.io/api/core/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -65,8 +64,6 @@ type Controller struct {
 	nodeInformerSynced cache.InformerSynced
 
 	cidrAllocator ipam.CIDRAllocator
-
-	forcefullyDeletePod func(*v1.Pod) error
 }
 
 // NewNodeIpamController returns a new node IP Address Management controller to
@@ -89,7 +86,7 @@ func NewNodeIpamController(
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartStructuredLogging(0)
 
 	klog.Infof("Sending events to api server.")
 	eventBroadcaster.StartRecordingToSink(

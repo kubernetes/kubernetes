@@ -15,6 +15,11 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/network/kubenet",
     deps = select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//pkg/kubelet/apis/config:go_default_library",
+            "//pkg/kubelet/container:go_default_library",
+            "//pkg/kubelet/dockershim/network:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/features:go_default_library",
             "//pkg/kubelet/apis/config:go_default_library",
@@ -22,7 +27,6 @@ go_library(
             "//pkg/kubelet/dockershim/network:go_default_library",
             "//pkg/kubelet/dockershim/network/hostport:go_default_library",
             "//pkg/util/bandwidth:go_default_library",
-            "//pkg/util/ebtables:go_default_library",
             "//pkg/util/iptables:go_default_library",
             "//pkg/util/sysctl:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
@@ -37,6 +41,7 @@ go_library(
             "//vendor/k8s.io/klog/v2:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
             "//vendor/k8s.io/utils/net:go_default_library",
+            "//vendor/k8s.io/utils/net/ebtables:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
             "//pkg/kubelet/apis/config:go_default_library",
@@ -53,7 +58,17 @@ go_library(
             "//pkg/kubelet/container:go_default_library",
             "//pkg/kubelet/dockershim/network:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//pkg/kubelet/apis/config:go_default_library",
+            "//pkg/kubelet/container:go_default_library",
+            "//pkg/kubelet/dockershim/network:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
+            "//pkg/kubelet/apis/config:go_default_library",
+            "//pkg/kubelet/container:go_default_library",
+            "//pkg/kubelet/dockershim/network:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
             "//pkg/kubelet/apis/config:go_default_library",
             "//pkg/kubelet/container:go_default_library",
             "//pkg/kubelet/dockershim/network:go_default_library",
@@ -65,7 +80,6 @@ go_library(
             "//pkg/kubelet/dockershim/network:go_default_library",
             "//pkg/kubelet/dockershim/network/hostport:go_default_library",
             "//pkg/util/bandwidth:go_default_library",
-            "//pkg/util/ebtables:go_default_library",
             "//pkg/util/iptables:go_default_library",
             "//pkg/util/sysctl:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
@@ -80,6 +94,7 @@ go_library(
             "//vendor/k8s.io/klog/v2:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
             "//vendor/k8s.io/utils/net:go_default_library",
+            "//vendor/k8s.io/utils/net/ebtables:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "//pkg/kubelet/apis/config:go_default_library",
@@ -125,7 +140,6 @@ go_test(
             "//pkg/kubelet/container:go_default_library",
             "//pkg/kubelet/dockershim/network:go_default_library",
             "//pkg/kubelet/dockershim/network/cni/testing:go_default_library",
-            "//pkg/kubelet/dockershim/network/hostport/testing:go_default_library",
             "//pkg/kubelet/dockershim/network/testing:go_default_library",
             "//pkg/util/bandwidth:go_default_library",
             "//pkg/util/iptables/testing:go_default_library",
@@ -143,7 +157,6 @@ go_test(
             "//pkg/kubelet/container:go_default_library",
             "//pkg/kubelet/dockershim/network:go_default_library",
             "//pkg/kubelet/dockershim/network/cni/testing:go_default_library",
-            "//pkg/kubelet/dockershim/network/hostport/testing:go_default_library",
             "//pkg/kubelet/dockershim/network/testing:go_default_library",
             "//pkg/util/bandwidth:go_default_library",
             "//pkg/util/iptables/testing:go_default_library",

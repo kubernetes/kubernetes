@@ -64,7 +64,6 @@ func (any *stringAny) ToInt64() int64 {
 
 	flag := 1
 	startPos := 0
-	endPos := 0
 	if any.val[0] == '+' || any.val[0] == '-' {
 		startPos = 1
 	}
@@ -73,6 +72,7 @@ func (any *stringAny) ToInt64() int64 {
 		flag = -1
 	}
 
+	endPos := startPos
 	for i := startPos; i < len(any.val); i++ {
 		if any.val[i] >= '0' && any.val[i] <= '9' {
 			endPos = i + 1
@@ -98,7 +98,6 @@ func (any *stringAny) ToUint64() uint64 {
 	}
 
 	startPos := 0
-	endPos := 0
 
 	if any.val[0] == '-' {
 		return 0
@@ -107,6 +106,7 @@ func (any *stringAny) ToUint64() uint64 {
 		startPos = 1
 	}
 
+	endPos := startPos
 	for i := startPos; i < len(any.val); i++ {
 		if any.val[i] >= '0' && any.val[i] <= '9' {
 			endPos = i + 1

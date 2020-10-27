@@ -50,6 +50,7 @@ var (
 	procHcsResumeComputeSystem             = modvmcompute.NewProc("HcsResumeComputeSystem")
 	procHcsGetComputeSystemProperties      = modvmcompute.NewProc("HcsGetComputeSystemProperties")
 	procHcsModifyComputeSystem             = modvmcompute.NewProc("HcsModifyComputeSystem")
+	procHcsModifyServiceSettings           = modvmcompute.NewProc("HcsModifyServiceSettings")
 	procHcsRegisterComputeSystemCallback   = modvmcompute.NewProc("HcsRegisterComputeSystemCallback")
 	procHcsUnregisterComputeSystemCallback = modvmcompute.NewProc("HcsUnregisterComputeSystemCallback")
 	procHcsCreateProcess                   = modvmcompute.NewProc("HcsCreateProcess")
@@ -305,6 +306,29 @@ func _hcsModifyComputeSystem(computeSystem HcsSystem, configuration *uint16, res
 		return
 	}
 	r0, _, _ := syscall.Syscall(procHcsModifyComputeSystem.Addr(), 3, uintptr(computeSystem), uintptr(unsafe.Pointer(configuration)), uintptr(unsafe.Pointer(result)))
+	if int32(r0) < 0 {
+		if r0&0x1fff0000 == 0x00070000 {
+			r0 &= 0xffff
+		}
+		hr = syscall.Errno(r0)
+	}
+	return
+}
+
+func hcsModifyServiceSettings(settings string, result **uint16) (hr error) {
+	var _p0 *uint16
+	_p0, hr = syscall.UTF16PtrFromString(settings)
+	if hr != nil {
+		return
+	}
+	return _hcsModifyServiceSettings(_p0, result)
+}
+
+func _hcsModifyServiceSettings(settings *uint16, result **uint16) (hr error) {
+	if hr = procHcsModifyServiceSettings.Find(); hr != nil {
+		return
+	}
+	r0, _, _ := syscall.Syscall(procHcsModifyServiceSettings.Addr(), 2, uintptr(unsafe.Pointer(settings)), uintptr(unsafe.Pointer(result)), 0)
 	if int32(r0) < 0 {
 		if r0&0x1fff0000 == 0x00070000 {
 			r0 &= 0xffff

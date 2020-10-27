@@ -28,7 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -96,7 +96,7 @@ func (fake *fakePDManager) AttachDisk(b *cinderVolumeMounter, globalPDPath strin
 		}
 	}
 	if notmnt {
-		err = b.mounter.Mount(fakeDeviceName, globalPath, "", []string{"bind"})
+		err = b.mounter.MountSensitiveWithoutSystemd(fakeDeviceName, globalPath, "", []string{"bind"}, nil)
 		if err != nil {
 			return err
 		}

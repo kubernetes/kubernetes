@@ -152,11 +152,12 @@ are not thread safe. To work with data in multiple goroutines you must start
 a transaction for each one or use locking to ensure only one goroutine accesses
 a transaction at a time. Creating transaction from the `DB` is thread safe.
 
-Read-only transactions and read-write transactions should not depend on one
-another and generally shouldn't be opened simultaneously in the same goroutine.
-This can cause a deadlock as the read-write transaction needs to periodically
-re-map the data file but it cannot do so while a read-only transaction is open.
-
+Transactions should not depend on one another and generally shouldn't be opened
+simultaneously in the same goroutine. This can cause a deadlock as the read-write
+transaction needs to periodically re-map the data file but it cannot do so while
+any read-only transaction is open. Even a nested read-only transaction can cause
+a deadlock, as the child transaction can block the parent transaction from releasing
+its resources.
 
 #### Read-write transactions
 
@@ -275,7 +276,7 @@ should be writable.
 ### Using buckets
 
 Buckets are collections of key/value pairs within the database. All keys in a
-bucket must be unique. You can create a bucket using the `DB.CreateBucket()`
+bucket must be unique. You can create a bucket using the `Tx.CreateBucket()`
 function:
 
 ```go
@@ -923,6 +924,7 @@ Below is a list of public, open source projects that use Bolt:
 * [GoWebApp](https://github.com/josephspurrier/gowebapp) - A basic MVC web application in Go using BoltDB.
 * [GoShort](https://github.com/pankajkhairnar/goShort) - GoShort is a URL shortener written in Golang and BoltDB for persistent key/value storage and for routing it's using high performent HTTPRouter.
 * [gopherpit](https://github.com/gopherpit/gopherpit) - A web service to manage Go remote import paths with custom domains
+* [gokv](https://github.com/philippgille/gokv) - Simple key-value store abstraction and implementations for Go (Redis, Consul, etcd, bbolt, BadgerDB, LevelDB, Memcached, DynamoDB, S3, PostgreSQL, MongoDB, CockroachDB and many more)
 * [Gitchain](https://github.com/gitchain/gitchain) - Decentralized, peer-to-peer Git repositories aka "Git meets Bitcoin".
 * [InfluxDB](https://influxdata.com) - Scalable datastore for metrics, events, and real-time analytics.
 * [ipLocator](https://github.com/AndreasBriese/ipLocator) - A fast ip-geo-location-server using bolt with bloom filters.
@@ -935,6 +937,7 @@ Below is a list of public, open source projects that use Bolt:
 * [mbuckets](https://github.com/abhigupta912/mbuckets) - A Bolt wrapper that allows easy operations on multi level (nested) buckets.
 * [MetricBase](https://github.com/msiebuhr/MetricBase) - Single-binary version of Graphite.
 * [MuLiFS](https://github.com/dankomiocevic/mulifs) - Music Library Filesystem creates a filesystem to organise your music files.
+* [NATS](https://github.com/nats-io/nats-streaming-server) - NATS Streaming uses bbolt for message and metadata storage.
 * [Operation Go: A Routine Mission](http://gocode.io) - An online programming game for Golang using Bolt for user accounts and a leaderboard.
 * [photosite/session](https://godoc.org/bitbucket.org/kardianos/photosite/session) - Sessions for a photo viewing site.
 * [Prometheus Annotation Server](https://github.com/oliver006/prom_annotation_server) - Annotation server for PromDash & Prometheus service monitoring system.

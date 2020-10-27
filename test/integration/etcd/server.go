@@ -50,7 +50,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 
 	// install all APIs
-	_ "k8s.io/kubernetes/pkg/master"
+	_ "k8s.io/kubernetes/pkg/controlplane"
 )
 
 // StartRealMasterOrDie starts an API master that is appropriate for use in tests that require one of every resource

@@ -30,9 +30,10 @@ import (
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -62,7 +63,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 					Predicates: []st.FitPredicate{st.ErrorPredicateExtender},
 				},
 			},
-			nodes:      []string{"machine1", "machine2"},
+			nodes:      []string{"node1", "node2"},
 			expectsErr: true,
 			name:       "test 1",
 		},
@@ -80,7 +81,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 					Predicates: []st.FitPredicate{st.FalsePredicateExtender},
 				},
 			},
-			nodes:      []string{"machine1", "machine2"},
+			nodes:      []string{"node1", "node2"},
 			expectsErr: true,
 			name:       "test 2",
 		},
@@ -95,12 +96,12 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 					Predicates: []st.FitPredicate{st.TruePredicateExtender},
 				},
 				{
-					Predicates: []st.FitPredicate{st.Machine1PredicateExtender},
+					Predicates: []st.FitPredicate{st.Node1PredicateExtender},
 				},
 			},
-			nodes: []string{"machine1", "machine2"},
+			nodes: []string{"node1", "node2"},
 			expectedResult: ScheduleResult{
-				SuggestedHost:  "machine1",
+				SuggestedHost:  "node1",
 				EvaluatedNodes: 2,
 				FeasibleNodes:  1,
 			},
@@ -114,13 +115,13 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
-					Predicates: []st.FitPredicate{st.Machine2PredicateExtender},
+					Predicates: []st.FitPredicate{st.Node2PredicateExtender},
 				},
 				{
-					Predicates: []st.FitPredicate{st.Machine1PredicateExtender},
+					Predicates: []st.FitPredicate{st.Node1PredicateExtender},
 				},
 			},
-			nodes:      []string{"machine1", "machine2"},
+			nodes:      []string{"node1", "node2"},
 			expectsErr: true,
 			name:       "test 4",
 		},
@@ -137,9 +138,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 					Weight:       1,
 				},
 			},
-			nodes: []string{"machine1"},
+			nodes: []string{"node1"},
 			expectedResult: ScheduleResult{
-				SuggestedHost:  "machine1",
+				SuggestedHost:  "node1",
 				EvaluatedNodes: 1,
 				FeasibleNodes:  1,
 			},
@@ -154,18 +155,18 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			extenders: []st.FakeExtender{
 				{
 					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
-					Prioritizers: []st.PriorityConfig{{Function: st.Machine1PrioritizerExtender, Weight: 10}},
+					Prioritizers: []st.PriorityConfig{{Function: st.Node1PrioritizerExtender, Weight: 10}},
 					Weight:       1,
 				},
 				{
 					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
-					Prioritizers: []st.PriorityConfig{{Function: st.Machine2PrioritizerExtender, Weight: 10}},
+					Prioritizers: []st.PriorityConfig{{Function: st.Node2PrioritizerExtender, Weight: 10}},
 					Weight:       5,
 				},
 			},
-			nodes: []string{"machine1", "machine2"},
+			nodes: []string{"node1", "node2"},
 			expectedResult: ScheduleResult{
-				SuggestedHost:  "machine2",
+				SuggestedHost:  "node2",
 				EvaluatedNodes: 2,
 				FeasibleNodes:  2,
 			},
@@ -174,23 +175,23 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		{
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
-				st.RegisterScorePlugin("Machine2Prioritizer", st.NewMachine2PrioritizerPlugin(), 20),
+				st.RegisterScorePlugin("Node2Prioritizer", st.NewNode2PrioritizerPlugin(), 20),
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			extenders: []st.FakeExtender{
 				{
 					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
-					Prioritizers: []st.PriorityConfig{{Function: st.Machine1PrioritizerExtender, Weight: 10}},
+					Prioritizers: []st.PriorityConfig{{Function: st.Node1PrioritizerExtender, Weight: 10}},
 					Weight:       1,
 				},
 			},
-			nodes: []string{"machine1", "machine2"},
+			nodes: []string{"node1", "node2"},
 			expectedResult: ScheduleResult{
-				SuggestedHost:  "machine2",
+				SuggestedHost:  "node2",
 				EvaluatedNodes: 2,
 				FeasibleNodes:  2,
-			}, // machine2 has higher score
+			}, // node2 has higher score
 			name: "test 7",
 		},
 		{
@@ -203,7 +204,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			// errorPrioritizerExtender.
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
-				st.RegisterScorePlugin("Machine2Prioritizer", st.NewMachine2PrioritizerPlugin(), 1),
+				st.RegisterScorePlugin("Node2Prioritizer", st.NewNode2PrioritizerPlugin(), 1),
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -214,13 +215,13 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 					UnInterested: true,
 				},
 			},
-			nodes:      []string{"machine1", "machine2"},
+			nodes:      []string{"node1", "node2"},
 			expectsErr: false,
 			expectedResult: ScheduleResult{
-				SuggestedHost:  "machine2",
+				SuggestedHost:  "node2",
 				EvaluatedNodes: 2,
 				FeasibleNodes:  2,
-			}, // machine2 has higher score
+			}, // node2 has higher score
 			name: "test 8",
 		},
 		{
@@ -240,13 +241,13 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 					Ignorable:  true,
 				},
 				{
-					Predicates: []st.FitPredicate{st.Machine1PredicateExtender},
+					Predicates: []st.FitPredicate{st.Node1PredicateExtender},
 				},
 			},
-			nodes:      []string{"machine1", "machine2"},
+			nodes:      []string{"node1", "node2"},
 			expectsErr: false,
 			expectedResult: ScheduleResult{
-				SuggestedHost:  "machine1",
+				SuggestedHost:  "node1",
 				EvaluatedNodes: 2,
 				FeasibleNodes:  1,
 			},
@@ -259,7 +260,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			extenders := []framework.Extender{}
+			var extenders []framework.Extender
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
@@ -267,9 +268,13 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			for _, name := range test.nodes {
 				cache.AddNode(createNode(name))
 			}
-			queue := internalqueue.NewSchedulingQueue(nil)
 
-			fwk, err := st.NewFramework(test.registerPlugins, framework.WithClientSet(client))
+			fwk, err := st.NewFramework(
+				test.registerPlugins,
+				runtime.WithClientSet(client),
+				runtime.WithInformerFactory(informerFactory),
+				runtime.WithPodNominator(internalqueue.NewPodNominator()),
+			)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -279,11 +284,8 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 
 			scheduler := NewGenericScheduler(
 				cache,
-				queue,
 				emptySnapshot,
 				extenders,
-				informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
-				false,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 			podIgnored := &v1.Pod{}
 			result, err := scheduler.Schedule(context.Background(), prof, framework.NewCycleState(), podIgnored)

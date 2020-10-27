@@ -91,7 +91,8 @@ func NewDesiredStateOfWorldPopulator(
 	kubeContainerRuntime kubecontainer.Runtime,
 	keepTerminatedPodVolumes bool,
 	csiMigratedPluginManager csimigration.PluginManager,
-	intreeToCSITranslator csimigration.InTreeToCSITranslator) DesiredStateOfWorldPopulator {
+	intreeToCSITranslator csimigration.InTreeToCSITranslator,
+	volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
 		kubeClient:                kubeClient,
 		loopSleepDuration:         loopSleepDuration,
@@ -108,6 +109,7 @@ func NewDesiredStateOfWorldPopulator(
 		hasAddedPodsLock:         sync.RWMutex{},
 		csiMigratedPluginManager: csiMigratedPluginManager,
 		intreeToCSITranslator:    intreeToCSITranslator,
+		volumePluginMgr:          volumePluginMgr,
 	}
 }
 
@@ -127,6 +129,7 @@ type desiredStateOfWorldPopulator struct {
 	hasAddedPodsLock          sync.RWMutex
 	csiMigratedPluginManager  csimigration.PluginManager
 	intreeToCSITranslator     csimigration.InTreeToCSITranslator
+	volumePluginMgr           *volume.VolumePluginMgr
 }
 
 type processedPods struct {
@@ -222,6 +225,20 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 	for _, volumeToMount := range dswp.desiredStateOfWorld.GetVolumesToMount() {
 		pod, podExists := dswp.podManager.GetPodByUID(volumeToMount.Pod.UID)
 		if podExists {
+
+			// check if the attachability has changed for this volume
+			if volumeToMount.PluginIsAttachable {
+				attachableVolumePlugin, err := dswp.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
+				// only this means the plugin is truly non-attachable
+				if err == nil && attachableVolumePlugin == nil {
+					// It is not possible right now for a CSI plugin to be both attachable and non-deviceMountable
+					// So the uniqueVolumeName should remain the same after the attachability change
+					dswp.desiredStateOfWorld.MarkVolumeAttachability(volumeToMount.VolumeName, false)
+					klog.Infof("Volume %v changes from attachable to non-attachable.", volumeToMount.VolumeName)
+					continue
+				}
+			}
+
 			// Skip running pods
 			if !dswp.isPodTerminated(pod) {
 				continue
@@ -316,7 +333,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 		}
 
 		pvc, volumeSpec, volumeGidValue, err :=
-			dswp.createVolumeSpec(podVolume, pod.Name, pod.Namespace, mounts, devices)
+			dswp.createVolumeSpec(podVolume, pod, mounts, devices)
 		if err != nil {
 			klog.Errorf(
 				"Error processing volume %q for pod %q: %v",
@@ -491,29 +508,50 @@ func (dswp *desiredStateOfWorldPopulator) deleteProcessedPod(
 // specified volume. It dereference any PVC to get PV objects, if needed.
 // Returns an error if unable to obtain the volume at this time.
 func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
-	podVolume v1.Volume, podName string, podNamespace string, mounts, devices sets.String) (*v1.PersistentVolumeClaim, *volume.Spec, string, error) {
-	if pvcSource :=
-		podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
+	podVolume v1.Volume, pod *v1.Pod, mounts, devices sets.String) (*v1.PersistentVolumeClaim, *volume.Spec, string, error) {
+	pvcSource := podVolume.VolumeSource.PersistentVolumeClaim
+	ephemeral := false
+	if pvcSource == nil &&
+		podVolume.VolumeSource.Ephemeral != nil &&
+		utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+		// Generic ephemeral inline volumes are handled the
+		// same way as a PVC reference. The only additional
+		// constraint (checked below) is that the PVC must be
+		// owned by the pod.
+		pvcSource = &v1.PersistentVolumeClaimVolumeSource{
+			ClaimName: pod.Name + "-" + podVolume.Name,
+			ReadOnly:  podVolume.VolumeSource.Ephemeral.ReadOnly,
+		}
+		ephemeral = true
+	}
+	if pvcSource != nil {
 		klog.V(5).Infof(
 			"Found PVC, ClaimName: %q/%q",
-			podNamespace,
+			pod.Namespace,
 			pvcSource.ClaimName)
 
 		// If podVolume is a PVC, fetch the real PV behind the claim
 		pvc, err := dswp.getPVCExtractPV(
-			podNamespace, pvcSource.ClaimName)
+			pod.Namespace, pvcSource.ClaimName)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf(
 				"error processing PVC %s/%s: %v",
-				podNamespace,
+				pod.Namespace,
 				pvcSource.ClaimName,
 				err)
+		}
+		if ephemeral && !metav1.IsControlledBy(pvc, pod) {
+			return nil, nil, "", fmt.Errorf(
+				"error processing PVC %s/%s: not the ephemeral PVC for the pod",
+				pod.Namespace,
+				pvcSource.ClaimName,
+			)
 		}
 		pvName, pvcUID := pvc.Spec.VolumeName, pvc.UID
 
 		klog.V(5).Infof(
 			"Found bound PV for PVC (ClaimName %q/%q pvcUID %v): pvName=%q",
-			podNamespace,
+			pod.Namespace,
 			pvcSource.ClaimName,
 			pvcUID,
 			pvName)
@@ -524,7 +562,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 		if err != nil {
 			return nil, nil, "", fmt.Errorf(
 				"error processing PVC %s/%s: %v",
-				podNamespace,
+				pod.Namespace,
 				pvcSource.ClaimName,
 				err)
 		}
@@ -533,7 +571,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			"Extracted volumeSpec (%v) from bound PV (pvName %q) and PVC (ClaimName %q/%q pvcUID %v)",
 			volumeSpec.Name(),
 			pvName,
-			podNamespace,
+			pod.Namespace,
 			pvcSource.ClaimName,
 			pvcUID)
 

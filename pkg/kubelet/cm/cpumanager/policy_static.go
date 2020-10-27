@@ -338,15 +338,16 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v
 		}
 		klog.Infof("[cpumanager] Regenerating TopologyHints for CPUs already allocated to (pod %v, container %v)", string(pod.UID), container.Name)
 		return map[string][]topologymanager.TopologyHint{
-			string(v1.ResourceCPU): p.generateCPUTopologyHints(allocated, requested),
+			string(v1.ResourceCPU): p.generateCPUTopologyHints(allocated, cpuset.CPUSet{}, requested),
 		}
 	}
 
 	// Get a list of available CPUs.
 	available := p.assignableCPUs(s)
+	reusable := p.cpusToReuse[string(pod.UID)]
 
 	// Generate hints.
-	cpuHints := p.generateCPUTopologyHints(available, requested)
+	cpuHints := p.generateCPUTopologyHints(available, reusable, requested)
 	klog.Infof("[cpumanager] TopologyHints generated for pod '%v', container '%v': %v", pod.Name, container.Name, cpuHints)
 
 	return map[string][]topologymanager.TopologyHint{
@@ -360,41 +361,44 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v
 // It follows the convention of marking all hints that have the same number of
 // bits set as the narrowest matching NUMANodeAffinity with 'Preferred: true', and
 // marking all others with 'Preferred: false'.
-func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, request int) []topologymanager.TopologyHint {
+func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reusableCPUs cpuset.CPUSet, request int) []topologymanager.TopologyHint {
 	// Initialize minAffinitySize to include all NUMA Nodes.
 	minAffinitySize := p.topology.CPUDetails.NUMANodes().Size()
-	// Initialize minSocketsOnMinAffinity to include all Sockets.
-	minSocketsOnMinAffinity := p.topology.CPUDetails.Sockets().Size()
 
-	// Iterate through all combinations of socket bitmask and build hints from them.
+	// Iterate through all combinations of numa nodes bitmask and build hints from them.
 	hints := []topologymanager.TopologyHint{}
 	bitmask.IterateBitMasks(p.topology.CPUDetails.NUMANodes().ToSlice(), func(mask bitmask.BitMask) {
-		// First, update minAffinitySize and minSocketsOnMinAffinity for the
-		// current request size.
+		// First, update minAffinitySize for the current request size.
 		cpusInMask := p.topology.CPUDetails.CPUsInNUMANodes(mask.GetBits()...).Size()
-		socketsInMask := p.topology.CPUDetails.SocketsInNUMANodes(mask.GetBits()...).Size()
 		if cpusInMask >= request && mask.Count() < minAffinitySize {
 			minAffinitySize = mask.Count()
-			if socketsInMask < minSocketsOnMinAffinity {
-				minSocketsOnMinAffinity = socketsInMask
-			}
 		}
 
 		// Then check to see if we have enough CPUs available on the current
-		// socket bitmask to satisfy the CPU request.
+		// numa node bitmask to satisfy the CPU request.
 		numMatching := 0
+		for _, c := range reusableCPUs.ToSlice() {
+			// Disregard this mask if its NUMANode isn't part of it.
+			if !mask.IsSet(p.topology.CPUDetails[c].NUMANodeID) {
+				return
+			}
+			numMatching++
+		}
+
+		// Finally, check to see if enough available CPUs remain on the current
+		// NUMA node combination to satisfy the CPU request.
 		for _, c := range availableCPUs.ToSlice() {
 			if mask.IsSet(p.topology.CPUDetails[c].NUMANodeID) {
 				numMatching++
 			}
 		}
 
-		// If we don't, then move onto the next combination.
+		// If they don't, then move onto the next combination.
 		if numMatching < request {
 			return
 		}
 
-		// Otherwise, create a new hint from the socket bitmask and add it to the
+		// Otherwise, create a new hint from the numa node bitmask and add it to the
 		// list of hints.  We set all hint preferences to 'false' on the first
 		// pass through.
 		hints = append(hints, topologymanager.TopologyHint{
@@ -406,14 +410,10 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, req
 	// Loop back through all hints and update the 'Preferred' field based on
 	// counting the number of bits sets in the affinity mask and comparing it
 	// to the minAffinitySize. Only those with an equal number of bits set (and
-	// with a minimal set of sockets) will be considered preferred.
+	// with a minimal set of numa nodes) will be considered preferred.
 	for i := range hints {
 		if hints[i].NUMANodeAffinity.Count() == minAffinitySize {
-			nodes := hints[i].NUMANodeAffinity.GetBits()
-			numSockets := p.topology.CPUDetails.SocketsInNUMANodes(nodes...).Size()
-			if numSockets == minSocketsOnMinAffinity {
-				hints[i].Preferred = true
-			}
+			hints[i].Preferred = true
 		}
 	}
 

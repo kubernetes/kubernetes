@@ -24,9 +24,16 @@ import (
 	"k8s.io/klog/v2"
 )
 
+type PerfEvents struct {
+	// Core perf events to be measured.
+	Core Events `json:"core,omitempty"`
+
+	// Uncore perf events to be measured.
+	Uncore Events `json:"uncore,omitempty"`
+}
+
 type Events struct {
-	// List of perf events' names to be measured. Any value found in
-	// output of perf list can be used.
+	// List of perf events' names to be measured.
 	Events [][]Event `json:"events"`
 
 	// List of custom perf events' to be measured. It is impossible to
@@ -40,7 +47,7 @@ type Event string
 type CustomEvent struct {
 	// Type of the event. See perf_event_attr documentation
 	// at man perf_event_open.
-	Type uint32 `json:"type"`
+	Type uint32 `json:"type,omitempty"`
 
 	// Symbolically formed event like:
 	// pmu/config=PerfEvent.Config[0],config1=PerfEvent.Config[1],config2=PerfEvent.Config[2]
@@ -73,11 +80,11 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func parseConfig(file *os.File) (events Events, err error) {
+func parseConfig(file *os.File) (events PerfEvents, err error) {
 	decoder := json.NewDecoder(file)
 	err = decoder.Decode(&events)
 	if err != nil {
-		err = fmt.Errorf("unable to load perf events cofiguration from %q: %q", file.Name(), err)
+		err = fmt.Errorf("unable to load perf events configuration from %q: %q", file.Name(), err)
 		return
 	}
 	return

@@ -82,7 +82,7 @@ func NewController(podInformer coreinformers.PodInformer,
 	endpointUpdatesBatchPeriod time.Duration,
 ) *Controller {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartLogging(klog.Infof)
+	broadcaster.StartStructuredLogging(0)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-slice-controller"})
 
@@ -237,7 +237,7 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting endpoint slice controller")
 	defer klog.Infof("Shutting down endpoint slice controller")
 
-	if !cache.WaitForNamedCacheSync("endpoint_slice", stopCh, c.podsSynced, c.servicesSynced) {
+	if !cache.WaitForNamedCacheSync("endpoint_slice", stopCh, c.podsSynced, c.servicesSynced, c.endpointSlicesSynced, c.nodesSynced) {
 		return
 	}
 
@@ -307,6 +307,7 @@ func (c *Controller) syncService(key string) error {
 		if apierrors.IsNotFound(err) {
 			c.triggerTimeTracker.DeleteService(namespace, name)
 			c.reconciler.deleteService(namespace, name)
+			c.endpointSliceTracker.DeleteService(namespace, name)
 			// The service has been deleted, return nil so that it won't be retried.
 			return nil
 		}
@@ -404,7 +405,7 @@ func (c *Controller) onEndpointSliceAdd(obj interface{}) {
 // endpointSliceTracker or the managed-by value of the EndpointSlice has changed
 // from or to this controller.
 func (c *Controller) onEndpointSliceUpdate(prevObj, obj interface{}) {
-	prevEndpointSlice := obj.(*discovery.EndpointSlice)
+	prevEndpointSlice := prevObj.(*discovery.EndpointSlice)
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	if endpointSlice == nil || prevEndpointSlice == nil {
 		utilruntime.HandleError(fmt.Errorf("Invalid EndpointSlice provided to onEndpointSliceUpdate()"))
@@ -456,7 +457,7 @@ func (c *Controller) addPod(obj interface{}) {
 }
 
 func (c *Controller) updatePod(old, cur interface{}) {
-	services := endpointutil.GetServicesToUpdateOnPodChange(c.serviceLister, c.serviceSelectorCache, old, cur, podEndpointChanged)
+	services := endpointutil.GetServicesToUpdateOnPodChange(c.serviceLister, c.serviceSelectorCache, old, cur)
 	for key := range services {
 		c.queue.AddAfter(key, c.endpointUpdatesBatchPeriod)
 	}

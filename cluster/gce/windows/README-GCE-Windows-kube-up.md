@@ -1,6 +1,7 @@
 # Starting a Windows Kubernetes cluster on GCE using kube-up
 
-## IMPORTANT PLEASE NOTE!
+## IMPORTANT PLEASE NOTE
+
 Any time the file structure in the `windows` directory changes, `windows/BUILD`
 and `k8s.io/release/lib/releaselib.sh` must be manually updated with the
 changes. We HIGHLY recommend not changing the file structure, because consumers
@@ -15,7 +16,7 @@ Prerequisites: a Google Cloud Platform project.
 Clone this repository under your `$GOPATH/src` directory on a Linux machine.
 Then, optionally clean/prepare your environment using these commands:
 
-```
+```bash
 # Remove files that interfere with get-kube / kube-up:
 rm -rf ./kubernetes/; rm -f kubernetes.tar.gz; rm -f ~/.kube/config
 
@@ -44,19 +45,15 @@ release`. However, that builds binaries for all supported platforms, and can be
 slow. You can speed up the process by following the instructions below to only
 build the necessary binaries.
 
-```
-# Apply https://github.com/yujuhong/kubernetes/commit/27e608a050a997be5ab736a7cdeb29aa68f3b7ee to your tree:
-curl \
-  https://github.com/yujuhong/kubernetes/commit/27e608a050a997be5ab736a7cdeb29aa68f3b7ee.patch | \
-  git apply
-
+```bash
 # Build binaries for both Linux and Windows:
-make quick-release
+KUBE_BUILD_PLATFORMS="linux/amd64 windows/amd64" make quick-release
 ```
 
 ### 2. Create a Kubernetes cluster
 
-You can create a regular Kubernetes cluster or an end-to-end test cluster.<br />
+You can create a regular Kubernetes cluster or an end-to-end test cluster.
+
 Only end-to-end test clusters support running the Kubernetes e2e tests (as both [e2e cluster creation](https://github.com/kubernetes/kubernetes/blob/b632eaddbaad9dc1430d214d506b72750bbb9f69/hack/e2e-internal/e2e-up.sh#L24) and [e2e test scripts](https://github.com/kubernetes/kubernetes/blob/b632eaddbaad9dc1430d214d506b72750bbb9f69/hack/ginkgo-e2e.sh#L42) are setup based on `cluster/gce/config-test.sh`), also enables some debugging features such as SSH access on the Windows nodes.
 
 Please make sure you set the environment variables properly following the
@@ -69,7 +66,7 @@ Linux worker node is required and two are recommended because many default
 cluster-addons (e.g., `kube-dns`) need to run on Linux nodes. The master control
 plane only runs on Linux.
 
-```
+```bash
 export NUM_NODES=2  # number of Linux nodes
 export NUM_WINDOWS_NODES=2
 export KUBE_GCE_ENABLE_IP_ALIASES=true
@@ -81,7 +78,7 @@ Now bring up a cluster using one of the following two methods:
 
 #### 2a. Create a regular Kubernetes cluster
 
-```
+```bash
 # Invoke kube-up.sh with these environment variables:
 #   PROJECT: text name of your GCP project.
 #   WINDOWS_NODE_OS_DISTRIBUTION: the Windows version you want your nodes to
@@ -94,21 +91,24 @@ PROJECT=${CLOUDSDK_CORE_PROJECT} WINDOWS_NODE_OS_DISTRIBUTION=win2019 \
 
 To teardown the cluster run:
 
-```
+```bash
 PROJECT=${CLOUDSDK_CORE_PROJECT} ./cluster/kube-down.sh
 ```
 
 #### 2b. Create a Kubernetes end-to-end (E2E) test cluster
+
 If you have built your own release binaries following step 1, run the following
 command:
-```
+
+```bash
 PROJECT=${CLOUDSDK_CORE_PROJECT} WINDOWS_NODE_OS_DISTRIBUTION=win2019 \
   ./hack/e2e-internal/e2e-up.sh
 ```
 
 If any e2e cluster exists already, this command will prompt you to tear down and
 create a new one. To teardown existing e2e cluster only, run the command:
-```
+
+```bash
 PROJECT=${CLOUDSDK_CORE_PROJECT} ./hack/e2e-internal/e2e-down.sh
 ```
 
@@ -121,7 +121,7 @@ and `NUM_WINDOWS_NODES` Windows worker nodes.
 Invoke this script to run a smoke test that verifies that the cluster has been
 brought up correctly:
 
-```
+```bash
 cluster/gce/windows/smoke-test.sh
 ```
 
@@ -135,16 +135,16 @@ If you brought up an end-to-end test cluster using the steps above then you can
 use the steps below to run K8s e2e tests. These steps are based on
 [kubernetes-sigs/windows-testing](https://github.com/kubernetes-sigs/windows-testing).
 
-*   Build the necessary test binaries. This must be done after every change to
+* Build the necessary test binaries. This must be done after every change to
     test code.
 
-    ```
+    ```bash
     make WHAT=test/e2e/e2e.test
     ```
 
-*   Set necessary environment variables and fetch the `run-e2e.sh` script:
+* Set necessary environment variables and fetch the `run-e2e.sh` script:
 
-    ```
+    ```bash
     export KUBECONFIG=~/.kube/config
     export WORKSPACE=$(pwd)
     export ARTIFACTS=${WORKSPACE}/e2e-artifacts
@@ -158,23 +158,23 @@ use the steps below to run K8s e2e tests. These steps are based on
     NOTE: `run-e2e.sh` begins with a 5 minute sleep to wait for container images
     to be pre-pulled. You'll probably want to edit the script and remove this.
 
-*   The canonical arguments for running all Windows e2e tests against a cluster
+* The canonical arguments for running all Windows e2e tests against a cluster
     on GCE can be seen by searching for `--test-cmd-args` in the [test
     configuration](https://github.com/kubernetes/test-infra/blob/master/config/jobs/kubernetes/sig-windows/windows-gce.yaml#L78)
     for the `ci-kubernetes-e2e-windows-gce` continuous test job. These arguments
     should be passed to the `run-e2e` script; escape the ginkgo arguments by
     adding quotes around them. For example:
 
-    ```
+    ```bash
     ./run-e2e.sh --node-os-distro=windows \
       --ginkgo.focus="\[Conformance\]|\[NodeConformance\]|\[sig-windows\]" \
       --ginkgo.skip="\[LinuxOnly\]|\[Serial\]|\[Feature:.+\]" --minStartupPods=8
     ```
 
-*   Run a single test by setting the ginkgo focus to match your test name; for
+* Run a single test by setting the ginkgo focus to match your test name; for
     example, the "DNS should provide DNS for the cluster" test can be run using:
 
-    ```
+    ```bash
     ./run-e2e.sh --node-os-distro=windows \
       --ginkgo.focus="provide\sDNS\sfor\sthe\scluster"
     ```
@@ -184,3 +184,9 @@ use the steps below to run K8s e2e tests. These steps are based on
 
 After the test run completes, log files can be found under the `${ARTIFACTS}`
 directory.
+
+## E2E Testing
+
+Once you've created a pull request you can comment,
+`/test pull-kubernetes-e2e-windows-gce` to run the integration tests that cover
+the changes in this directory.

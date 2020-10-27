@@ -54,6 +54,8 @@ const (
 	buildBackOffDuration = time.Minute
 	syncLoopFrequency    = 10 * time.Second
 	maxBackOffTolerance  = time.Duration(1.3 * float64(kubelet.MaxContainerBackOff))
+	podRetryPeriod       = 1 * time.Second
+	podRetryTimeout      = 1 * time.Minute
 )
 
 // testHostIP tests that a pod gets a host IP
@@ -181,7 +183,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pods, assigned hostip
 		Description: Create a Pod. Pod status MUST return successfully and contains a valid IP address.
 	*/
@@ -203,7 +205,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pods, lifecycle
 		Description: A Pod is created with a unique label. Pod MUST be accessible when queried using the label selector upon creation. Add a watch, check if the Pod is running. Pod then deleted, The pod deletion timestamp is observed. The watch MUST return the pod deleted event. Query with the original selector for the Pod MUST return empty list.
 	*/
@@ -334,12 +336,9 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pods, update
 		Description: Create a Pod with a unique label. Query for the Pod with the label as selector MUST be successful. Update the pod to change the value of the Label. Query for the Pod with the new value for the label MUST be successful.
-		Behaviors:
-		- pod/spec/label/create
-		- pod/spec/label/patch
 	*/
 	framework.ConformanceIt("should be updated [NodeConformance]", func() {
 		ginkgo.By("creating the pod")
@@ -391,7 +390,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pods, ActiveDeadlineSeconds
 		Description: Create a Pod with a unique label. Query for the Pod with the label as selector MUST be successful. The Pod is updated with ActiveDeadlineSeconds set on the Pod spec. Pod MUST terminate of the specified time elapses.
 	*/
@@ -437,7 +436,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Pods, service environment variables
 		Description: Create a server Pod listening on port 9376. A Service called fooservice is created for the server Pod listening on port 8765 targeting port 8080. If a new Pod is created in the cluster then the Pod MUST have the fooservice environment variables available from this new Pod. The new create Pod MUST have environment variables such as FOOSERVICE_SERVICE_HOST, FOOSERVICE_SERVICE_PORT, FOOSERVICE_PORT, FOOSERVICE_PORT_8765_TCP_PORT, FOOSERVICE_PORT_8765_TCP_PROTO, FOOSERVICE_PORT_8765_TCP and FOOSERVICE_PORT_8765_TCP_ADDR that are populated with proper values.
 	*/
@@ -528,7 +527,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	/*
-		Release : v1.13
+		Release: v1.13
 		Testname: Pods, remote command execution over websocket
 		Description: A Pod is created. Websocket is created to retrieve exec command output from this pod.
 		Message retrieved form Websocket MUST match with expected exec command output.
@@ -610,7 +609,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	})
 
 	/*
-		Release : v1.13
+		Release: v1.13
 		Testname: Pods, logs from websockets
 		Description: A Pod is created. Websocket is created to retrieve log of a container from this pod.
 		Message retrieved form Websocket MUST match with container's output.
@@ -829,4 +828,71 @@ var _ = framework.KubeDescribe("Pods", func() {
 		validatePodReadiness(false)
 
 	})
+
+	/*
+		Release: v1.19
+		Testname: Pods, delete a collection
+		Description: A set of pods is created with a label selector which MUST be found when listed.
+		The set of pods is deleted and MUST NOT show up when listed by its label selector.
+	*/
+	framework.ConformanceIt("should delete a collection of pods", func() {
+		podTestNames := []string{"test-pod-1", "test-pod-2", "test-pod-3"}
+
+		zero := int64(0)
+
+		ginkgo.By("Create set of pods")
+		// create a set of pods in test namespace
+		for _, podTestName := range podTestNames {
+			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podTestName,
+					Labels: map[string]string{
+						"type": "Testing"},
+				},
+				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: &zero,
+					Containers: []v1.Container{{
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Name:  "token-test",
+					}},
+					RestartPolicy: v1.RestartPolicyNever,
+				}}, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "failed to create pod")
+			framework.Logf("created %v", podTestName)
+		}
+
+		// wait as required for all 3 pods to be found
+		ginkgo.By("waiting for all 3 pods to be located")
+		err := wait.PollImmediate(podRetryPeriod, podRetryTimeout, checkPodListQuantity(f, "type=Testing", 3))
+		framework.ExpectNoError(err, "3 pods not found")
+
+		// delete Collection of pods with a label in the current namespace
+		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &zero}, metav1.ListOptions{
+			LabelSelector: "type=Testing"})
+		framework.ExpectNoError(err, "failed to delete collection of pods")
+
+		// wait for all pods to be deleted
+		ginkgo.By("waiting for all pods to be deleted")
+		err = wait.PollImmediate(podRetryPeriod, podRetryTimeout, checkPodListQuantity(f, "type=Testing", 0))
+		framework.ExpectNoError(err, "found a pod(s)")
+	})
 })
+
+func checkPodListQuantity(f *framework.Framework, label string, quantity int) func() (bool, error) {
+	return func() (bool, error) {
+		var err error
+
+		list, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: label})
+
+		if err != nil {
+			return false, err
+		}
+
+		if len(list.Items) != quantity {
+			framework.Logf("Pod quantity %d is different from expected quantity %d", len(list.Items), quantity)
+			return false, err
+		}
+		return true, nil
+	}
+}

@@ -62,7 +62,7 @@ EVICTION_PRESSURE_TRANSITION_PERIOD=${EVICTION_PRESSURE_TRANSITION_PERIOD:-"1m"}
 # This script uses docker0 (or whatever container bridge docker is currently using)
 # and we don't know the IP of the DNS pod to pass in as --cluster-dns.
 # To set this up by hand, set this flag and change DNS_SERVER_IP.
-# Note also that you need API_HOST (defined above) for correct DNS.
+# Note also that you need API_HOST (defined below) for correct DNS.
 KUBE_PROXY_MODE=${KUBE_PROXY_MODE:-""}
 ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-true}
 ENABLE_NODELOCAL_DNS=${KUBE_ENABLE_NODELOCAL_DNS:-false}
@@ -828,9 +828,11 @@ function start_kubelet {
 function start_kubeproxy {
     PROXY_LOG=${LOG_DIR}/kube-proxy.log
 
-    # wait for kubelet collect node information
-    echo "wait kubelet ready"
-    wait_node_ready
+    if [[ "${START_MODE}" != "nokubelet" ]]; then
+      # wait for kubelet collect node information
+      echo "wait kubelet ready"
+      wait_node_ready
+    fi
 
     cat <<EOF > /tmp/kube-proxy.yaml
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
@@ -884,22 +886,29 @@ EOF
 function start_kubedns {
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
         cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns/kube-dns.yaml.in" kube-dns.yaml
-        ${SED} -i -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" kube-dns.yaml
-        ${SED} -i -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" kube-dns.yaml
-        ${SED} -i -e "s/{{ pillar\['dns_memory_limit'\] }}/${DNS_MEMORY_LIMIT}/g" kube-dns.yaml
+        ${SED} -i -e "s/dns_domain/${DNS_DOMAIN}/g" kube-dns.yaml
+        ${SED} -i -e "s/dns_server/${DNS_SERVER_IP}/g" kube-dns.yaml
+        ${SED} -i -e "s/dns_memory_limit/${DNS_MEMORY_LIMIT}/g" kube-dns.yaml
         # TODO update to dns role once we have one.
         # use kubectl to create kubedns addon
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kube-dns.yaml
-        echo "Kube-dns addon successfully deployed."
+        if ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kube-dns.yaml ; then
+       		echo "Kube-dns addon successfully deployed."
+        else
+		echo "Something is wrong with your DNS input"
+		cat kube-dns.yaml
+		exit 1
+        fi
         rm kube-dns.yaml
     fi
 }
 
 function start_nodelocaldns {
   cp "${KUBE_ROOT}/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml" nodelocaldns.yaml
+  # eventually all the __PILLAR__ stuff will be gone, but theyre still in nodelocaldns for backward compat.
   ${SED} -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" nodelocaldns.yaml
   ${SED} -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" nodelocaldns.yaml
   ${SED} -i -e "s/__PILLAR__LOCAL__DNS__/${LOCAL_DNS_IP}/g" nodelocaldns.yaml
+
   # use kubectl to create nodelocaldns addon
   ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f nodelocaldns.yaml
   echo "NodeLocalDNS addon successfully deployed."
@@ -910,11 +919,7 @@ function start_kubedashboard {
     if [[ "${ENABLE_CLUSTER_DASHBOARD}" = true ]]; then
         echo "Creating kubernetes-dashboard"
         # use kubectl to create the dashboard
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-secret.yaml"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-configmap.yaml"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-rbac.yaml"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-deployment.yaml"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard-service.yaml"
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/dashboard/dashboard.yaml"
         echo "kubernetes-dashboard deployment and service successfully deployed."
     fi
 }

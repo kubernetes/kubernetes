@@ -85,7 +85,9 @@ func WithLogging(handler http.Handler, pred StacktracePred) http.Handler {
 		rl := newLogged(req, w).StacktraceWhen(pred)
 		req = req.WithContext(context.WithValue(ctx, respLoggerContextKey, rl))
 
-		defer rl.Log()
+		if klog.V(3).Enabled() {
+			defer func() { klog.InfoS("HTTP", rl.LogArgs()...) }()
+		}
 		handler.ServeHTTP(rl, req)
 	})
 }
@@ -153,24 +155,34 @@ func (rl *respLogger) Addf(format string, data ...interface{}) {
 	rl.addedInfo += "\n" + fmt.Sprintf(format, data...)
 }
 
-// Log is intended to be called once at the end of your request handler, via defer
-func (rl *respLogger) Log() {
+func (rl *respLogger) LogArgs() []interface{} {
 	latency := time.Since(rl.startTime)
-	if klog.V(3).Enabled() {
-		if !rl.hijacked {
-			klog.InfoDepth(1, fmt.Sprintf("verb=%q URI=%q latency=%v resp=%v UserAgent=%q srcIP=%q: %v%v",
-				rl.req.Method, rl.req.RequestURI,
-				latency, rl.status,
-				rl.req.UserAgent(), rl.req.RemoteAddr,
-				rl.statusStack, rl.addedInfo,
-			))
-		} else {
-			klog.InfoDepth(1, fmt.Sprintf("verb=%q URI=%q latency=%v UserAgent=%q srcIP=%q: hijacked",
-				rl.req.Method, rl.req.RequestURI,
-				latency, rl.req.UserAgent(), rl.req.RemoteAddr,
-			))
+	if rl.hijacked {
+		return []interface{}{
+			"verb", rl.req.Method,
+			"URI", rl.req.RequestURI,
+			"latency", latency,
+			"userAgent", rl.req.UserAgent(),
+			"srcIP", rl.req.RemoteAddr,
+			"hijacked", true,
 		}
 	}
+	args := []interface{}{
+		"verb", rl.req.Method,
+		"URI", rl.req.RequestURI,
+		"latency", latency,
+		"userAgent", rl.req.UserAgent(),
+		"srcIP", rl.req.RemoteAddr,
+		"resp", rl.status,
+	}
+	if len(rl.statusStack) > 0 {
+		args = append(args, "statusStack", rl.statusStack)
+	}
+
+	if len(rl.addedInfo) > 0 {
+		args = append(args, "addedInfo", rl.addedInfo)
+	}
+	return args
 }
 
 // Header implements http.ResponseWriter.

@@ -56,6 +56,11 @@ func (c *Fake) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions
 	return map[string]cadvisorapiv2.ContainerInfo{}, nil
 }
 
+// GetRequestedContainersInfo is a fake implementation if Interface.GetRequestedContainersInfo
+func (c *Fake) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
+	return map[string]*cadvisorapi.ContainerInfo{}, nil
+}
+
 // SubcontainerInfo is a fake implementation of Interface.SubcontainerInfo.
 func (c *Fake) SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return map[string]*cadvisorapi.ContainerInfo{}, nil

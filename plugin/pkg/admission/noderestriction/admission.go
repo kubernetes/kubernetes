@@ -224,6 +224,9 @@ func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
 	if len(pod.OwnerReferences) > 1 {
 		return admission.NewForbidden(a, fmt.Errorf("node %q can only create pods with a single owner reference set to itself", nodeName))
 	}
+	if len(pod.OwnerReferences) == 0 {
+		return admission.NewForbidden(a, fmt.Errorf("node %q can only create pods with an owner reference set to itself", nodeName))
+	}
 	if len(pod.OwnerReferences) == 1 {
 		owner := pod.OwnerReferences[0]
 		if owner.APIVersion != v1.SchemeGroupVersion.String() ||
@@ -390,6 +393,11 @@ func (p *Plugin) admitPVCStatus(nodeName string, a admission.Attributes) error {
 
 func (p *Plugin) admitNode(nodeName string, a admission.Attributes) error {
 	requestedName := a.GetName()
+
+	if requestedName != nodeName {
+		return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to modify node %q", nodeName, requestedName))
+	}
+
 	if a.GetOperation() == admission.Create {
 		node, ok := a.GetObject().(*api.Node)
 		if !ok {
@@ -408,9 +416,6 @@ func (p *Plugin) admitNode(nodeName string, a admission.Attributes) error {
 		if forbiddenLabels := p.getForbiddenLabels(modifiedLabels); len(forbiddenLabels) > 0 {
 			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to set the following labels: %s", nodeName, strings.Join(forbiddenLabels.List(), ", ")))
 		}
-	}
-	if requestedName != nodeName {
-		return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to modify node %q", nodeName, requestedName))
 	}
 
 	if a.GetOperation() == admission.Update {

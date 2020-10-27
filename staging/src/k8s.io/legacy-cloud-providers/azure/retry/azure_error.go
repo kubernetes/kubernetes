@@ -89,6 +89,15 @@ func (err *Error) IsThrottled() bool {
 	return err.HTTPStatusCode == http.StatusTooManyRequests || err.RetryAfter.After(now())
 }
 
+// IsNotFound returns true the if the requested object wasn't found
+func (err *Error) IsNotFound() bool {
+	if err == nil {
+		return false
+	}
+
+	return err.HTTPStatusCode == http.StatusNotFound
+}
+
 // NewError creates a new Error.
 func NewError(retriable bool, err error) *Error {
 	return &Error{
@@ -285,4 +294,21 @@ func IsErrorRetriable(err error) bool {
 	}
 
 	return strings.Contains(err.Error(), "Retriable: true")
+}
+
+// HasStatusForbiddenOrIgnoredError return true if the given error code is part of the error message
+// This should only be used when trying to delete resources
+func HasStatusForbiddenOrIgnoredError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if strings.Contains(err.Error(), fmt.Sprintf("HTTPStatusCode: %d", http.StatusNotFound)) {
+		return true
+	}
+
+	if strings.Contains(err.Error(), fmt.Sprintf("HTTPStatusCode: %d", http.StatusForbidden)) {
+		return true
+	}
+	return false
 }

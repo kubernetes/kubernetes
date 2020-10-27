@@ -103,6 +103,15 @@ func (t *TimedCache) getInternal(key string) (*AzureCacheEntry, error) {
 	t.Lock.Lock()
 	defer t.Lock.Unlock()
 
+	// Another goroutine might have written the same key.
+	entry, exists, err = t.Store.GetByKey(key)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return entry.(*AzureCacheEntry), nil
+	}
+
 	// Still not found, add new entry with nil data.
 	// Note the data will be filled later by getter.
 	newEntry := &AzureCacheEntry{

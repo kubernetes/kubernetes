@@ -37,6 +37,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -146,7 +147,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 		t.Fatalf("Failed to build cert with error: %+v", err)
 	}
 
-	recorder := &timeoutRecorder{invocations: []invocation{}}
+	recorder := &timeoutRecorder{invocations: []invocation{}, markers: sets.NewString()}
 	webhookServer := httptest.NewUnstartedServer(newTimeoutWebhookHandler(recorder))
 	webhookServer.TLS = &tls.Config{
 
@@ -182,7 +183,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 
 	for i, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			upCh := recorder.Reset()
+			recorder.Reset()
 			ns := fmt.Sprintf("reinvoke-%d", i)
 			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
 			if err != nil {
@@ -260,13 +261,16 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 			// wait until new webhook is called the first time
 			if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
 				_, err = client.CoreV1().Pods("default").Patch(context.TODO(), timeoutMarkerFixture.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
-				select {
-				case <-upCh:
-					return true, nil
-				default:
-					t.Logf("Waiting for webhook to become effective, getting marker object: %v", err)
+				received := recorder.MarkerReceived()
+				if len(tt.mutatingWebhooks) > 0 && !received.Has("mutating") {
+					t.Logf("Waiting for mutating webhooks to become effective, getting marker object: %v", err)
 					return false, nil
 				}
+				if len(tt.validatingWebhooks) > 0 && !received.Has("validating") {
+					t.Logf("Waiting for validating webhooks to become effective, getting marker object: %v", err)
+					return false, nil
+				}
+				return true, nil
 			}); err != nil {
 				t.Fatal(err)
 			}
@@ -340,28 +344,24 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 
 type timeoutRecorder struct {
 	mu          sync.Mutex
-	upCh        chan struct{}
-	upOnce      sync.Once
+	markers     sets.String
 	invocations []invocation
 }
 
-// Reset zeros out all counts and returns a channel that is closed when the first admission of the
-// marker object is received.
-func (i *timeoutRecorder) Reset() chan struct{} {
+// Reset zeros out all counts
+func (i *timeoutRecorder) Reset() {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.invocations = []invocation{}
-	i.upCh = make(chan struct{})
-	i.upOnce = sync.Once{}
-	return i.upCh
+	i.markers = sets.NewString()
 }
 
-func (i *timeoutRecorder) MarkerReceived() {
+// MarkerReceived records the specified markers were received and returns the set of received markers
+func (i *timeoutRecorder) MarkerReceived(markers ...string) sets.String {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	i.upOnce.Do(func() {
-		close(i.upCh)
-	})
+	i.markers.Insert(markers...)
+	return i.markers.Union(nil)
 }
 
 func (i *timeoutRecorder) RecordInvocation(call invocation) {
@@ -423,7 +423,12 @@ func newTimeoutWebhookHandler(recorder *timeoutRecorder) http.Handler {
 		// When resetting between tests, a marker object is patched until this webhook
 		// observes it, at which point it is considered ready.
 		if pod.Namespace == timeoutMarkerFixture.Namespace && pod.Name == timeoutMarkerFixture.Name {
-			recorder.MarkerReceived()
+			if strings.HasPrefix(r.URL.Path, "/mutating/") {
+				recorder.MarkerReceived("mutating")
+			}
+			if strings.HasPrefix(r.URL.Path, "/validating/") {
+				recorder.MarkerReceived("validating")
+			}
 			allow(w)
 			return
 		}

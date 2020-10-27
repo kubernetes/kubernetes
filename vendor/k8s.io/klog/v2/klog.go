@@ -687,7 +687,7 @@ func (buf *buffer) someDigits(i, d int) int {
 	return copy(buf.tmp[i:], buf.tmp[j:])
 }
 
-func (l *loggingT) println(s severity, logr logr.InfoLogger, args ...interface{}) {
+func (l *loggingT) println(s severity, logr logr.Logger, args ...interface{}) {
 	buf, file, line := l.header(s, 0)
 	// if logr is set, we clear the generated header as we rely on the backing
 	// logr implementation to print headers
@@ -699,11 +699,11 @@ func (l *loggingT) println(s severity, logr logr.InfoLogger, args ...interface{}
 	l.output(s, logr, buf, file, line, false)
 }
 
-func (l *loggingT) print(s severity, logr logr.InfoLogger, args ...interface{}) {
+func (l *loggingT) print(s severity, logr logr.Logger, args ...interface{}) {
 	l.printDepth(s, logr, 1, args...)
 }
 
-func (l *loggingT) printDepth(s severity, logr logr.InfoLogger, depth int, args ...interface{}) {
+func (l *loggingT) printDepth(s severity, logr logr.Logger, depth int, args ...interface{}) {
 	buf, file, line := l.header(s, depth)
 	// if logr is set, we clear the generated header as we rely on the backing
 	// logr implementation to print headers
@@ -718,7 +718,7 @@ func (l *loggingT) printDepth(s severity, logr logr.InfoLogger, depth int, args 
 	l.output(s, logr, buf, file, line, false)
 }
 
-func (l *loggingT) printf(s severity, logr logr.InfoLogger, format string, args ...interface{}) {
+func (l *loggingT) printf(s severity, logr logr.Logger, format string, args ...interface{}) {
 	buf, file, line := l.header(s, 0)
 	// if logr is set, we clear the generated header as we rely on the backing
 	// logr implementation to print headers
@@ -736,7 +736,7 @@ func (l *loggingT) printf(s severity, logr logr.InfoLogger, format string, args 
 // printWithFileLine behaves like print but uses the provided file and line number.  If
 // alsoLogToStderr is true, the log message always appears on standard error; it
 // will also appear in the log file unless --logtostderr is set.
-func (l *loggingT) printWithFileLine(s severity, logr logr.InfoLogger, file string, line int, alsoToStderr bool, args ...interface{}) {
+func (l *loggingT) printWithFileLine(s severity, logr logr.Logger, file string, line int, alsoToStderr bool, args ...interface{}) {
 	buf := l.formatHeader(s, file, line)
 	// if logr is set, we clear the generated header as we rely on the backing
 	// logr implementation to print headers
@@ -761,7 +761,7 @@ func (l *loggingT) errorS(err error, loggr logr.Logger, msg string, keysAndValue
 }
 
 // if loggr is specified, will call loggr.Info, otherwise output with logging module.
-func (l *loggingT) infoS(loggr logr.InfoLogger, msg string, keysAndValues ...interface{}) {
+func (l *loggingT) infoS(loggr logr.Logger, msg string, keysAndValues ...interface{}) {
 	if loggr != nil {
 		loggr.Info(msg, keysAndValues)
 		return
@@ -878,7 +878,7 @@ func LogToStderr(stderr bool) {
 }
 
 // output writes the data to the log files and releases the buffer.
-func (l *loggingT) output(s severity, log logr.InfoLogger, buf *buffer, file string, line int, alsoToStderr bool) {
+func (l *loggingT) output(s severity, log logr.Logger, buf *buffer, file string, line int, alsoToStderr bool) {
 	l.mu.Lock()
 	if l.traceLocation.isSet() {
 		if l.traceLocation.match(file, line) {
@@ -1231,7 +1231,7 @@ func (l *loggingT) setV(pc uintptr) Level {
 // See the documentation of V for more information.
 type Verbose struct {
 	enabled bool
-	logr    logr.InfoLogger
+	logr    logr.Logger
 }
 
 func newVerbose(level Level, b bool) Verbose {
@@ -1320,7 +1320,15 @@ func (v Verbose) Infof(format string, args ...interface{}) {
 // See the documentation of V for usage.
 func (v Verbose) InfoS(msg string, keysAndValues ...interface{}) {
 	if v.enabled {
-		logging.infoS(v.logr, msg, keysAndValues)
+		logging.infoS(v.logr, msg, keysAndValues...)
+	}
+}
+
+// Error is equivalent to the global Error function, guarded by the value of v.
+// See the documentation of V for usage.
+func (v Verbose) Error(err error, msg string, args ...interface{}) {
+	if v.enabled {
+		logging.errorS(err, v.logr, msg, args...)
 	}
 }
 

@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -151,14 +152,15 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 	})
 
 	// Test that a Pod and PVC attached to a GCEPD successfully unmounts and detaches when the encompassing Namespace is deleted.
-	ginkgo.It("should test that deleting the Namespace of a PVC and Pod causes the successful detach of Persistent Disk [Flaky]", func() {
+	ginkgo.It("should test that deleting the Namespace of a PVC and Pod causes the successful detach of Persistent Disk", func() {
 
 		ginkgo.By("Deleting the Namespace")
 		err := c.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 
-		err = framework.WaitForNamespacesDeleted(c, []string{ns}, framework.DefaultNamespaceDeletionTimeout)
-		framework.ExpectNoError(err)
+		// issue deletes for the client pod and claim, accelerating namespace controller actions
+		e2epod.DeletePodOrFail(c, clientPod.Namespace, clientPod.Name)
+		framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Unable to delete PVC ", pvc.Name)
 
 		ginkgo.By("Verifying Persistent Disk detaches")
 		framework.ExpectNoError(waitForPDDetach(diskName, node), "PD ", diskName, " did not detach")

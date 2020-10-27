@@ -20,7 +20,14 @@ package azure
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"sync"
+)
+
+const (
+	tagsDelimiter        = ","
+	tagKeyValueDelimiter = "="
 )
 
 // lockMap used to lock on entries
@@ -73,4 +80,38 @@ func (lm *lockMap) unlockEntry(entry string) {
 
 func getContextWithCancel() (context.Context, context.CancelFunc) {
 	return context.WithCancel(context.Background())
+}
+
+// ConvertTagsToMap convert the tags from string to map
+// the valid tags fomat is "key1=value1,key2=value2", which could be converted to
+// {"key1": "value1", "key2": "value2"}
+func ConvertTagsToMap(tags string) (map[string]string, error) {
+	m := make(map[string]string)
+	if tags == "" {
+		return m, nil
+	}
+	s := strings.Split(tags, tagsDelimiter)
+	for _, tag := range s {
+		kv := strings.Split(tag, tagKeyValueDelimiter)
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("Tags '%s' are invalid, the format should like: 'key1=value1,key2=value2'", tags)
+		}
+		key := strings.TrimSpace(kv[0])
+		if key == "" {
+			return nil, fmt.Errorf("Tags '%s' are invalid, the format should like: 'key1=value1,key2=value2'", tags)
+		}
+		value := strings.TrimSpace(kv[1])
+		m[key] = value
+	}
+
+	return m, nil
+}
+
+func convertMaptoMapPointer(origin map[string]string) map[string]*string {
+	newly := make(map[string]*string)
+	for k, v := range origin {
+		value := v
+		newly[k] = &value
+	}
+	return newly
 }

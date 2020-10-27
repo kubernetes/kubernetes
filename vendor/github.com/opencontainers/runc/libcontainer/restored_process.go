@@ -5,31 +5,29 @@ package libcontainer
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/opencontainers/runc/libcontainer/system"
 )
 
-func newRestoredProcess(pid int, fds []string) (*restoredProcess, error) {
+func newRestoredProcess(cmd *exec.Cmd, fds []string) (*restoredProcess, error) {
 	var (
 		err error
 	)
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return nil, err
-	}
+	pid := cmd.Process.Pid
 	stat, err := system.Stat(pid)
 	if err != nil {
 		return nil, err
 	}
 	return &restoredProcess{
-		proc:             proc,
+		cmd:              cmd,
 		processStartTime: stat.StartTime,
 		fds:              fds,
 	}, nil
 }
 
 type restoredProcess struct {
-	proc             *os.Process
+	cmd              *exec.Cmd
 	processStartTime uint64
 	fds              []string
 }
@@ -39,11 +37,11 @@ func (p *restoredProcess) start() error {
 }
 
 func (p *restoredProcess) pid() int {
-	return p.proc.Pid
+	return p.cmd.Process.Pid
 }
 
 func (p *restoredProcess) terminate() error {
-	err := p.proc.Kill()
+	err := p.cmd.Process.Kill()
 	if _, werr := p.wait(); err == nil {
 		err = werr
 	}
@@ -53,10 +51,13 @@ func (p *restoredProcess) terminate() error {
 func (p *restoredProcess) wait() (*os.ProcessState, error) {
 	// TODO: how do we wait on the actual process?
 	// maybe use --exec-cmd in criu
-	st, err := p.proc.Wait()
+	err := p.cmd.Wait()
 	if err != nil {
-		return nil, err
+		if _, ok := err.(*exec.ExitError); !ok {
+			return nil, err
+		}
 	}
+	st := p.cmd.ProcessState
 	return st, nil
 }
 
@@ -65,7 +66,7 @@ func (p *restoredProcess) startTime() (uint64, error) {
 }
 
 func (p *restoredProcess) signal(s os.Signal) error {
-	return p.proc.Signal(s)
+	return p.cmd.Process.Signal(s)
 }
 
 func (p *restoredProcess) externalDescriptors() []string {

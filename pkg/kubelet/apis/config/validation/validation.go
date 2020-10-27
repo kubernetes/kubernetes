@@ -20,14 +20,20 @@ import (
 	"fmt"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+)
+
+var (
+	defaultCFSQuota = metav1.Duration{Duration: 100 * time.Millisecond}
 )
 
 // ValidateKubeletConfiguration validates `kc` and returns an error if it is invalid
@@ -58,6 +64,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	}
 	if kc.HealthzPort != 0 && utilvalidation.IsValidPortNum(int(kc.HealthzPort)) != nil {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: HealthzPort (--healthz-port) %v must be between 1 and 65535, inclusive", kc.HealthzPort))
+	}
+	if !localFeatureGate.Enabled(features.CPUCFSQuotaPeriod) && kc.CPUCFSQuotaPeriod != defaultCFSQuota {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: CPUCFSQuotaPeriod %v requires feature gate CustomCPUCFSQuotaPeriod", kc.CPUCFSQuotaPeriod))
 	}
 	if localFeatureGate.Enabled(features.CPUCFSQuotaPeriod) && utilvalidation.IsInRange(int(kc.CPUCFSQuotaPeriod.Duration), int(1*time.Microsecond), int(time.Second)) != nil {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: CPUCFSQuotaPeriod (--cpu-cfs-quota-period) %v must be between 1usec and 1sec, inclusive", kc.CPUCFSQuotaPeriod))
@@ -158,5 +167,12 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 		allErrors = append(allErrors, err)
 	}
 	allErrors = append(allErrors, metrics.ValidateShowHiddenMetricsVersion(kc.ShowHiddenMetricsForVersion)...)
+
+	logOption := logs.NewOptions()
+	if kc.Logging.Format != "" {
+		logOption.LogFormat = kc.Logging.Format
+	}
+	allErrors = append(allErrors, logOption.Validate()...)
+
 	return utilerrors.NewAggregate(allErrors)
 }

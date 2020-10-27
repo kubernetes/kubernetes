@@ -39,12 +39,12 @@ import (
 var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
 
-	ginkgo.It("should reject a Pod requesting a non-existent RuntimeClass", func() {
+	ginkgo.It("should reject a Pod requesting a non-existent RuntimeClass [NodeFeature:RuntimeHandler]", func() {
 		rcName := f.Namespace.Name + "-nonexistent"
 		expectPodRejection(f, e2enode.NewRuntimeClassPod(rcName))
 	})
 
-	ginkgo.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler", func() {
+	ginkgo.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler [NodeFeature:RuntimeHandler]", func() {
 		handler := f.Namespace.Name + "-handler"
 		rcName := createRuntimeClass(f, "unconfigured-handler", handler)
 		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
@@ -61,7 +61,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 		expectPodSuccess(f, pod)
 	})
 
-	ginkgo.It("should reject a Pod requesting a deleted RuntimeClass", func() {
+	ginkgo.It("should reject a Pod requesting a deleted RuntimeClass [NodeFeature:RuntimeHandler]", func() {
 		rcName := createRuntimeClass(f, "delete-me", "runc")
 		rcClient := f.ClientSet.NodeV1beta1().RuntimeClasses()
 
@@ -97,16 +97,9 @@ func createRuntimeClass(f *framework.Framework, name, handler string) string {
 }
 
 func expectPodRejection(f *framework.Framework, pod *v1.Pod) {
-	// The Node E2E doesn't run the RuntimeClass admission controller, so we expect the rejection to
-	// happen by the Kubelet.
-	if framework.TestContext.NodeE2E {
-		pod = f.PodClient().Create(pod)
-		expectSandboxFailureEvent(f, pod, fmt.Sprintf("\"%s\" not found", *pod.Spec.RuntimeClassName))
-	} else {
-		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-		framework.ExpectError(err, "should be forbidden")
-		framework.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
-	}
+	_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+	framework.ExpectError(err, "should be forbidden")
+	framework.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
 }
 
 // expectPodSuccess waits for the given pod to terminate successfully.

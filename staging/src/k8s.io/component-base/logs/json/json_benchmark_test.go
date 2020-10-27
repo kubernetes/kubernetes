@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"testing"
 	"time"
-
-	"go.uber.org/zap"
 )
 
 var record = struct {
@@ -61,7 +59,7 @@ var record = struct {
 func BenchmarkInfoLoggerInfo(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			jLogger := NewJSONLogger(zap.NewExample(), nil)
+			jLogger := NewJSONLogger(nil)
 			jLogger.Info("test",
 				"str", "foo",
 				"int64-1", int64(1),
@@ -98,7 +96,7 @@ func BenchmarkInfoLoggerInfoStandardJSON(b *testing.B) {
 func BenchmarkZapLoggerError(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			jLogger := NewJSONLogger(zap.NewExample(), nil)
+			jLogger := NewJSONLogger(nil)
 			jLogger.Error(fmt.Errorf("test for error:%s", "default"),
 				"test",
 				"str", "foo",
@@ -135,7 +133,7 @@ func BenchmarkZapLoggerErrorStandardJSON(b *testing.B) {
 func BenchmarkZapLoggerV(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			jLogger := NewJSONLogger(zap.NewExample(), nil)
+			jLogger := NewJSONLogger(nil)
 			jLogger.V(1).Info("test",
 				"str", "foo",
 				"int64-1", int64(1),

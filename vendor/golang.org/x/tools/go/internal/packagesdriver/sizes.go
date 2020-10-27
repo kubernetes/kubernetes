@@ -11,17 +11,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"go/types"
-	"log"
-	"os"
 	"os/exec"
 	"strings"
-	"time"
+
+	"golang.org/x/tools/internal/gocommand"
 )
 
 var debug = false
 
-// GetSizes returns the sizes used by the underlying driver with the given parameters.
-func GetSizes(ctx context.Context, buildFlags, env []string, dir string, usesExportData bool) (types.Sizes, error) {
+func GetSizes(ctx context.Context, buildFlags, env []string, gocmdRunner *gocommand.Runner, dir string) (types.Sizes, error) {
 	// TODO(matloob): Clean this up. This code is mostly a copy of packages.findExternalDriver.
 	const toolPrefix = "GOPACKAGESDRIVER="
 	tool := ""
@@ -41,7 +39,7 @@ func GetSizes(ctx context.Context, buildFlags, env []string, dir string, usesExp
 	}
 
 	if tool == "off" {
-		return GetSizesGolist(ctx, buildFlags, env, dir, usesExportData)
+		return GetSizesGolist(ctx, buildFlags, env, gocmdRunner, dir)
 	}
 
 	req, err := json.Marshal(struct {
@@ -77,97 +75,43 @@ func GetSizes(ctx context.Context, buildFlags, env []string, dir string, usesExp
 	return response.Sizes, nil
 }
 
-func GetSizesGolist(ctx context.Context, buildFlags, env []string, dir string, usesExportData bool) (types.Sizes, error) {
-	args := []string{"list", "-f", "{{context.GOARCH}} {{context.Compiler}}"}
-	args = append(args, buildFlags...)
-	args = append(args, "--", "unsafe")
-	stdout, err := InvokeGo(ctx, env, dir, usesExportData, args...)
+func GetSizesGolist(ctx context.Context, buildFlags, env []string, gocmdRunner *gocommand.Runner, dir string) (types.Sizes, error) {
+	inv := gocommand.Invocation{
+		Verb:       "list",
+		Args:       []string{"-f", "{{context.GOARCH}} {{context.Compiler}}", "--", "unsafe"},
+		Env:        env,
+		BuildFlags: buildFlags,
+		WorkingDir: dir,
+	}
+	stdout, stderr, friendlyErr, rawErr := gocmdRunner.RunRaw(ctx, inv)
 	var goarch, compiler string
-	if err != nil {
-		if strings.Contains(err.Error(), "cannot find main module") {
+	if rawErr != nil {
+		if strings.Contains(rawErr.Error(), "cannot find main module") {
 			// User's running outside of a module. All bets are off. Get GOARCH and guess compiler is gc.
 			// TODO(matloob): Is this a problem in practice?
-			envout, enverr := InvokeGo(ctx, env, dir, usesExportData, "env", "GOARCH")
+			inv := gocommand.Invocation{
+				Verb:       "env",
+				Args:       []string{"GOARCH"},
+				Env:        env,
+				WorkingDir: dir,
+			}
+			envout, enverr := gocmdRunner.Run(ctx, inv)
 			if enverr != nil {
-				return nil, err
+				return nil, enverr
 			}
 			goarch = strings.TrimSpace(envout.String())
 			compiler = "gc"
 		} else {
-			return nil, err
+			return nil, friendlyErr
 		}
 	} else {
 		fields := strings.Fields(stdout.String())
 		if len(fields) < 2 {
-			return nil, fmt.Errorf("could not determine GOARCH and Go compiler")
+			return nil, fmt.Errorf("could not parse GOARCH and Go compiler in format \"<GOARCH> <compiler>\":\nstdout: <<%s>>\nstderr: <<%s>>",
+				stdout.String(), stderr.String())
 		}
 		goarch = fields[0]
 		compiler = fields[1]
 	}
 	return types.SizesFor(compiler, goarch), nil
-}
-
-// InvokeGo returns the stdout of a go command invocation.
-func InvokeGo(ctx context.Context, env []string, dir string, usesExportData bool, args ...string) (*bytes.Buffer, error) {
-	if debug {
-		defer func(start time.Time) { log.Printf("%s for %v", time.Since(start), cmdDebugStr(env, args...)) }(time.Now())
-	}
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
-	cmd := exec.CommandContext(ctx, "go", args...)
-	// On darwin the cwd gets resolved to the real path, which breaks anything that
-	// expects the working directory to keep the original path, including the
-	// go command when dealing with modules.
-	// The Go stdlib has a special feature where if the cwd and the PWD are the
-	// same node then it trusts the PWD, so by setting it in the env for the child
-	// process we fix up all the paths returned by the go command.
-	cmd.Env = append(append([]string{}, env...), "PWD="+dir)
-	cmd.Dir = dir
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	if err := cmd.Run(); err != nil {
-		exitErr, ok := err.(*exec.ExitError)
-		if !ok {
-			// Catastrophic error:
-			// - executable not found
-			// - context cancellation
-			return nil, fmt.Errorf("couldn't exec 'go %v': %s %T", args, err, err)
-		}
-
-		// Export mode entails a build.
-		// If that build fails, errors appear on stderr
-		// (despite the -e flag) and the Export field is blank.
-		// Do not fail in that case.
-		if !usesExportData {
-			return nil, fmt.Errorf("go %v: %s: %s", args, exitErr, stderr)
-		}
-	}
-
-	// As of writing, go list -export prints some non-fatal compilation
-	// errors to stderr, even with -e set. We would prefer that it put
-	// them in the Package.Error JSON (see https://golang.org/issue/26319).
-	// In the meantime, there's nowhere good to put them, but they can
-	// be useful for debugging. Print them if $GOPACKAGESPRINTGOLISTERRORS
-	// is set.
-	if len(stderr.Bytes()) != 0 && os.Getenv("GOPACKAGESPRINTGOLISTERRORS") != "" {
-		fmt.Fprintf(os.Stderr, "%s stderr: <<%s>>\n", cmdDebugStr(env, args...), stderr)
-	}
-
-	// debugging
-	if false {
-		fmt.Fprintf(os.Stderr, "%s stdout: <<%s>>\n", cmdDebugStr(env, args...), stdout)
-	}
-
-	return stdout, nil
-}
-
-func cmdDebugStr(envlist []string, args ...string) string {
-	env := make(map[string]string)
-	for _, kv := range envlist {
-		split := strings.Split(kv, "=")
-		k, v := split[0], split[1]
-		env[k] = v
-	}
-
-	return fmt.Sprintf("GOROOT=%v GOPATH=%v GO111MODULE=%v PWD=%v go %v", env["GOROOT"], env["GOPATH"], env["GO111MODULE"], env["PWD"], args)
 }

@@ -10,6 +10,9 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/volume/util/fs",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/volume/util/fsquota:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
@@ -26,10 +29,16 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
             "//pkg/volume/util/fsquota:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
+            "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/volume/util/fsquota:go_default_library",

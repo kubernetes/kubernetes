@@ -21,16 +21,18 @@ import (
 	"fmt"
 	"os"
 
+	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/stats"
 )
 
 type manager struct {
-	events   Events
+	events   PerfEvents
 	numCores int
+	topology []info.Node
 	stats.NoopDestroy
 }
 
-func NewManager(configFile string, numCores int) (stats.Manager, error) {
+func NewManager(configFile string, numCores int, topology []info.Node) (stats.Manager, error) {
 	if configFile == "" {
 		return &stats.NoopManager{}, nil
 	}
@@ -49,11 +51,11 @@ func NewManager(configFile string, numCores int) (stats.Manager, error) {
 		return nil, fmt.Errorf("event grouping is not supported you must modify config file at %s", configFile)
 	}
 
-	return &manager{events: config, numCores: numCores}, nil
+	return &manager{events: config, numCores: numCores, topology: topology}, nil
 }
 
-func areGroupedEventsUsed(events Events) bool {
-	for _, group := range events.Events {
+func areGroupedEventsUsed(events PerfEvents) bool {
+	for _, group := range events.Core.Events {
 		if len(group) > 1 {
 			return true
 		}
@@ -62,7 +64,7 @@ func areGroupedEventsUsed(events Events) bool {
 }
 
 func (m *manager) GetCollector(cgroupPath string) (stats.Collector, error) {
-	collector := newCollector(cgroupPath, m.events, m.numCores)
+	collector := newCollector(cgroupPath, m.events, m.numCores, m.topology)
 	err := collector.setup()
 	if err != nil {
 		collector.Destroy()

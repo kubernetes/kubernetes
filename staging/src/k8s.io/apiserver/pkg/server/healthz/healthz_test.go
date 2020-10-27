@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -93,24 +94,24 @@ func TestInstallPathHandler(t *testing.T) {
 
 }
 
-func testMultipleChecks(path string, t *testing.T) {
+func testMultipleChecks(path, name string, t *testing.T) {
 	tests := []struct {
 		path             string
 		expectedResponse string
 		expectedStatus   int
 		addBadCheck      bool
 	}{
-		{"?verbose", "[+]ping ok\nhealthz check passed\n", http.StatusOK, false},
+		{"?verbose", fmt.Sprintf("[+]ping ok\n%s check passed\n", name), http.StatusOK, false},
 		{"?exclude=dontexist", "ok", http.StatusOK, false},
 		{"?exclude=bad", "ok", http.StatusOK, true},
-		{"?verbose=true&exclude=bad", "[+]ping ok\n[+]bad excluded: ok\nhealthz check passed\n", http.StatusOK, true},
-		{"?verbose=true&exclude=dontexist", "[+]ping ok\nwarn: some health checks cannot be excluded: no matches for \"dontexist\"\nhealthz check passed\n", http.StatusOK, false},
+		{"?verbose=true&exclude=bad", fmt.Sprintf("[+]ping ok\n[+]bad excluded: ok\n%s check passed\n", name), http.StatusOK, true},
+		{"?verbose=true&exclude=dontexist", fmt.Sprintf("[+]ping ok\nwarn: some health checks cannot be excluded: no matches for \"dontexist\"\n%s check passed\n", name), http.StatusOK, false},
 		{"/ping", "ok", http.StatusOK, false},
 		{"", "ok", http.StatusOK, false},
-		{"?verbose", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
+		{"?verbose", fmt.Sprintf("[+]ping ok\n[-]bad failed: reason withheld\n%s check failed\n", name), http.StatusInternalServerError, true},
 		{"/ping", "ok", http.StatusOK, true},
 		{"/bad", "internal server error: this will fail\n", http.StatusInternalServerError, true},
-		{"", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
+		{"", fmt.Sprintf("[+]ping ok\n[-]bad failed: reason withheld\n%s check failed\n", name), http.StatusInternalServerError, true},
 	}
 
 	for i, test := range tests {
@@ -147,11 +148,11 @@ func testMultipleChecks(path string, t *testing.T) {
 }
 
 func TestMultipleChecks(t *testing.T) {
-	testMultipleChecks("", t)
+	testMultipleChecks("", "healthz", t)
 }
 
 func TestMultiplePathChecks(t *testing.T) {
-	testMultipleChecks("/ready", t)
+	testMultipleChecks("/ready", "ready", t)
 }
 
 func TestCheckerNames(t *testing.T) {
@@ -206,9 +207,6 @@ func TestFormatQuoted(t *testing.T) {
 }
 
 func TestGetExcludedChecks(t *testing.T) {
-	type args struct {
-		r *http.Request
-	}
 	tests := []struct {
 		name string
 		r    *http.Request
@@ -272,4 +270,44 @@ func createGetRequestWithUrl(rawUrlString string) *http.Request {
 		Proto:  "HTTP/1.1",
 		URL:    url,
 	}
+}
+
+func TestInformerSyncHealthChecker(t *testing.T) {
+	t.Run("test that check returns nil when all informers are started", func(t *testing.T) {
+		healthChecker := NewInformerSyncHealthz(cacheSyncWaiterStub{
+			startedByInformerType: map[reflect.Type]bool{
+				reflect.TypeOf(corev1.Pod{}): true,
+			},
+		})
+
+		err := healthChecker.Check(nil)
+		if err != nil {
+			t.Errorf("Got %v, expected no error", err)
+		}
+	})
+
+	t.Run("test that check returns err when there is not started informer", func(t *testing.T) {
+		healthChecker := NewInformerSyncHealthz(cacheSyncWaiterStub{
+			startedByInformerType: map[reflect.Type]bool{
+				reflect.TypeOf(corev1.Pod{}):     true,
+				reflect.TypeOf(corev1.Service{}): false,
+				reflect.TypeOf(corev1.Node{}):    true,
+			},
+		})
+
+		err := healthChecker.Check(nil)
+		if err == nil {
+			t.Errorf("expected error, got: %v", err)
+		}
+	})
+}
+
+type cacheSyncWaiterStub struct {
+	startedByInformerType map[reflect.Type]bool
+}
+
+// WaitForCacheSync is a stub implementation of the corresponding func
+// that simply returns the value passed during stub initialization.
+func (s cacheSyncWaiterStub) WaitForCacheSync(_ <-chan struct{}) map[reflect.Type]bool {
+	return s.startedByInformerType
 }

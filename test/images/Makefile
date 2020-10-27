@@ -16,7 +16,7 @@ REGISTRY ?= gcr.io/kubernetes-e2e-test-images
 GOARM ?= 7
 DOCKER_CERT_BASE_PATH ?=
 QEMUVERSION=v2.9.1
-GOLANG_VERSION=1.13.9
+GOLANG_VERSION=1.15.2
 export
 
 ifndef WHAT
@@ -33,10 +33,11 @@ endif
 all: all-container
 
 all-container:
-	./image-util.sh build $(WHAT)
+	./image-util.sh build $(WHAT) "docker"
 
-all-push: all-container
-	./image-util.sh push $(WHAT)
+all-push:
+	bash -x ./image-util.sh build $(WHAT) "registry"
+	bash -x ./image-util.sh push $(WHAT)
 
 all-build-and-push:
 	./image-util.sh build_and_push ${WHAT}

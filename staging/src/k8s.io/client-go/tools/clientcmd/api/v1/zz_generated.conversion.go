@@ -358,6 +358,7 @@ func autoConvert_v1_ExecConfig_To_api_ExecConfig(in *ExecConfig, out *api.ExecCo
 	out.Args = *(*[]string)(unsafe.Pointer(&in.Args))
 	out.Env = *(*[]api.ExecEnvVar)(unsafe.Pointer(&in.Env))
 	out.APIVersion = in.APIVersion
+	out.InstallHint = in.InstallHint
 	return nil
 }
 
@@ -371,6 +372,7 @@ func autoConvert_api_ExecConfig_To_v1_ExecConfig(in *api.ExecConfig, out *ExecCo
 	out.Args = *(*[]string)(unsafe.Pointer(&in.Args))
 	out.Env = *(*[]ExecEnvVar)(unsafe.Pointer(&in.Env))
 	out.APIVersion = in.APIVersion
+	out.InstallHint = in.InstallHint
 	return nil
 }
 

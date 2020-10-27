@@ -125,9 +125,9 @@ type Statfs_t struct {
 	Owner       uint32
 	Fsid        Fsid
 	Charspare   [80]int8
-	Fstypename  [16]int8
-	Mntfromname [1024]int8
-	Mntonname   [1024]int8
+	Fstypename  [16]byte
+	Mntfromname [1024]byte
+	Mntonname   [1024]byte
 }
 
 type statfs_freebsd11_t struct {
@@ -150,9 +150,9 @@ type statfs_freebsd11_t struct {
 	Owner       uint32
 	Fsid        Fsid
 	Charspare   [80]int8
-	Fstypename  [16]int8
-	Mntfromname [88]int8
-	Mntonname   [88]int8
+	Fstypename  [16]byte
+	Mntfromname [88]byte
+	Mntonname   [88]byte
 }
 
 type Flock_t struct {
@@ -405,7 +405,7 @@ type PtraceIoDesc struct {
 	Op   int32
 	Offs *byte
 	Addr *byte
-	Len  uint
+	Len  uint32
 }
 
 type Kevent_t struct {
@@ -680,4 +680,14 @@ type Utsname struct {
 	Release  [256]byte
 	Version  [256]byte
 	Machine  [256]byte
+}
+
+const SizeofClockinfo = 0x14
+
+type Clockinfo struct {
+	Hz     int32
+	Tick   int32
+	Spare  int32
+	Stathz int32
+	Profhz int32
 }

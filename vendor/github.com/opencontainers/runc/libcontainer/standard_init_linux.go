@@ -7,14 +7,13 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"syscall" //only for Exec
 
 	"github.com/opencontainers/runc/libcontainer/apparmor"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/keys"
 	"github.com/opencontainers/runc/libcontainer/seccomp"
 	"github.com/opencontainers/runc/libcontainer/system"
-	"github.com/opencontainers/selinux/go-selinux/label"
+	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/pkg/errors"
 
 	"golang.org/x/sys/unix"
@@ -48,10 +47,10 @@ func (l *linuxStandardInit) Init() error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	if !l.config.Config.NoNewKeyring {
-		if err := label.SetKeyLabel(l.config.ProcessLabel); err != nil {
+		if err := selinux.SetKeyLabel(l.config.ProcessLabel); err != nil {
 			return err
 		}
-		defer label.SetKeyLabel("")
+		defer selinux.SetKeyLabel("")
 		ringname, keepperms, newperms := l.getSessionRingParams()
 
 		// Do not inherit the parent's session keyring.
@@ -84,7 +83,8 @@ func (l *linuxStandardInit) Init() error {
 		return err
 	}
 
-	label.Init()
+	// initialises the labeling system
+	selinux.GetEnabled()
 	if err := prepareRootfs(l.pipe, l.config); err != nil {
 		return err
 	}
@@ -146,10 +146,10 @@ func (l *linuxStandardInit) Init() error {
 	if err := syncParentReady(l.pipe); err != nil {
 		return errors.Wrap(err, "sync ready")
 	}
-	if err := label.SetProcessLabel(l.config.ProcessLabel); err != nil {
+	if err := selinux.SetExecLabel(l.config.ProcessLabel); err != nil {
 		return errors.Wrap(err, "set process label")
 	}
-	defer label.SetProcessLabel("")
+	defer selinux.SetExecLabel("")
 	// Without NoNewPrivileges seccomp is a privileged operation, so we need to
 	// do this before dropping capabilities; otherwise do it as late as possible
 	// just before execve so as few syscalls take place after it as possible.
@@ -207,7 +207,15 @@ func (l *linuxStandardInit) Init() error {
 			return newSystemErrorWithCause(err, "init seccomp")
 		}
 	}
-	if err := syscall.Exec(name, l.config.Args[0:], os.Environ()); err != nil {
+
+	s := l.config.SpecState
+	s.Pid = unix.Getpid()
+	s.Status = configs.Created
+	if err := l.config.Config.Hooks[configs.StartContainer].RunHooks(s); err != nil {
+		return err
+	}
+
+	if err := unix.Exec(name, l.config.Args[0:], os.Environ()); err != nil {
 		return newSystemErrorWithCause(err, "exec user process")
 	}
 	return nil

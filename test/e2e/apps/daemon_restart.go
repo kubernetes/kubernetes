@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -263,7 +263,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		// Requires master ssh access.
 		e2eskipper.SkipUnlessProviderIs("gce", "aws")
 		restarter := NewRestartConfig(
-			framework.GetMasterHost(), "kube-controller", ports.InsecureKubeControllerManagerPort, restartPollInterval, restartTimeout)
+			framework.APIAddress(), "kube-controller", ports.InsecureKubeControllerManagerPort, restartPollInterval, restartTimeout)
 		restarter.restart()
 
 		// The intent is to ensure the replication controller manager has observed and reported status of
@@ -294,7 +294,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		// Requires master ssh access.
 		e2eskipper.SkipUnlessProviderIs("gce", "aws")
 		restarter := NewRestartConfig(
-			framework.GetMasterHost(), "kube-scheduler", kubeschedulerconfig.DefaultInsecureSchedulerPort, restartPollInterval, restartTimeout)
+			framework.APIAddress(), "kube-scheduler", kubeschedulerconfig.DefaultInsecureSchedulerPort, restartPollInterval, restartTimeout)
 
 		// Create pods while the scheduler is down and make sure the scheduler picks them up by
 		// scaling the rc to the same size.

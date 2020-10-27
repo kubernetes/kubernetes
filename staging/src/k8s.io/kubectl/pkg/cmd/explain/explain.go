@@ -86,7 +86,7 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 		},
 	}
 	cmd.Flags().BoolVar(&o.Recursive, "recursive", o.Recursive, "Print the fields of fields (Currently only 1 level deep)")
-	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "Get different explanations for particular API version")
+	cmd.Flags().StringVar(&o.APIVersion, "api-version", o.APIVersion, "Get different explanations for particular API version (API group/version)")
 	return cmd
 }
 

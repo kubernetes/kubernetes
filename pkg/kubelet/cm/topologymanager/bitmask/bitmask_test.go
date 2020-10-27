@@ -381,6 +381,53 @@ func TestIsSet(t *testing.T) {
 	}
 }
 
+func TestAnySet(t *testing.T) {
+	tcases := []struct {
+		name        string
+		mask        []int
+		checkBits   []int
+		expectedSet bool
+	}{
+		{
+			name:        "Check if any bits from 11 in mask 00 is set",
+			mask:        nil,
+			checkBits:   []int{0, 1},
+			expectedSet: false,
+		},
+		{
+			name:        "Check if any bits from 11 in mask 01 is set",
+			mask:        []int{0},
+			checkBits:   []int{0, 1},
+			expectedSet: true,
+		},
+		{
+			name:        "Check if any bits from 11 in mask 11 is set",
+			mask:        []int{0, 1},
+			checkBits:   []int{0, 1},
+			expectedSet: true,
+		},
+		{
+			name:        "Check if any bit outside range 0-63 is set",
+			mask:        []int{0, 1},
+			checkBits:   []int{64, 65},
+			expectedSet: false,
+		},
+		{
+			name:        "Check if any bits from 1001 in mask 0110 is set",
+			mask:        []int{1, 2},
+			checkBits:   []int{0, 3},
+			expectedSet: false,
+		},
+	}
+	for _, tc := range tcases {
+		mask, _ := NewBitMask(tc.mask...)
+		set := mask.AnySet(tc.checkBits)
+		if set != tc.expectedSet {
+			t.Errorf("Expected value to be %v, got %v", tc.expectedSet, set)
+		}
+	}
+}
+
 func TestIsEqual(t *testing.T) {
 	tcases := []struct {
 		name          string

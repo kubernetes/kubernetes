@@ -134,6 +134,27 @@ func (p Proc) CmdLine() ([]string, error) {
 	return strings.Split(string(bytes.TrimRight(data, string("\x00"))), string(byte(0))), nil
 }
 
+// Wchan returns the wchan (wait channel) of a process.
+func (p Proc) Wchan() (string, error) {
+	f, err := os.Open(p.path("wchan"))
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	data, err := ioutil.ReadAll(f)
+	if err != nil {
+		return "", err
+	}
+
+	wchan := string(data)
+	if wchan == "" || wchan == "0" {
+		return "", nil
+	}
+
+	return wchan, nil
+}
+
 // Comm returns the command name of a process.
 func (p Proc) Comm() (string, error) {
 	data, err := util.ReadFileNoStat(p.path("comm"))

@@ -18,7 +18,9 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	cpconfigv1alpha1 "k8s.io/cloud-provider/app/apis/config/v1alpha1"
+	serviceconfigv1alpha1 "k8s.io/cloud-provider/service/config/v1alpha1"
+	cmconfigv1alpha1 "k8s.io/controller-manager/config/v1alpha1"
 )
 
 // PersistentVolumeRecyclerConfiguration contains elements describing persistent volume plugins.
@@ -85,10 +87,10 @@ type KubeControllerManagerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Generic holds configuration for a generic controller-manager
-	Generic GenericControllerManagerConfiguration
+	Generic cmconfigv1alpha1.GenericControllerManagerConfiguration
 	// KubeCloudSharedConfiguration holds configuration for shared related features
 	// both in cloud controller manager and kube-controller manager.
-	KubeCloudShared KubeCloudSharedConfiguration
+	KubeCloudShared cpconfigv1alpha1.KubeCloudSharedConfiguration
 
 	// AttachDetachControllerConfiguration holds configuration for
 	// AttachDetachController related features.
@@ -114,6 +116,9 @@ type KubeControllerManagerConfiguration struct {
 	// EndpointSliceControllerConfiguration holds configuration for
 	// EndpointSliceController related features.
 	EndpointSliceController EndpointSliceControllerConfiguration
+	// EndpointSliceMirroringControllerConfiguration holds configuration for
+	// EndpointSliceMirroringController related features.
+	EndpointSliceMirroringController EndpointSliceMirroringControllerConfiguration
 	// GarbageCollectorControllerConfiguration holds configuration for
 	// GarbageCollectorController related features.
 	GarbageCollectorController GarbageCollectorControllerConfiguration
@@ -149,71 +154,10 @@ type KubeControllerManagerConfiguration struct {
 	SAController SAControllerConfiguration
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
-	ServiceController ServiceControllerConfiguration
+	ServiceController serviceconfigv1alpha1.ServiceControllerConfiguration
 	// TTLAfterFinishedControllerConfiguration holds configuration for
 	// TTLAfterFinishedController related features.
 	TTLAfterFinishedController TTLAfterFinishedControllerConfiguration
-}
-
-// GenericControllerManagerConfiguration holds configuration for a generic controller-manager.
-type GenericControllerManagerConfiguration struct {
-	// port is the port that the controller-manager's http service runs on.
-	Port int32
-	// address is the IP address to serve on (set to 0.0.0.0 for all interfaces).
-	Address string
-	// minResyncPeriod is the resync period in reflectors; will be random between
-	// minResyncPeriod and 2*minResyncPeriod.
-	MinResyncPeriod metav1.Duration
-	// ClientConnection specifies the kubeconfig file and client connection
-	// settings for the proxy server to use when communicating with the apiserver.
-	ClientConnection componentbaseconfigv1alpha1.ClientConnectionConfiguration
-	// How long to wait between starting controller managers
-	ControllerStartInterval metav1.Duration
-	// leaderElection defines the configuration of leader election client.
-	LeaderElection componentbaseconfigv1alpha1.LeaderElectionConfiguration
-	// Controllers is the list of controllers to enable or disable
-	// '*' means "all enabled by default controllers"
-	// 'foo' means "enable 'foo'"
-	// '-foo' means "disable 'foo'"
-	// first item for a particular name wins
-	Controllers []string
-	// DebuggingConfiguration holds configuration for Debugging related features.
-	Debugging componentbaseconfigv1alpha1.DebuggingConfiguration
-}
-
-// KubeCloudSharedConfiguration contains elements shared by both kube-controller manager
-// and cloud-controller manager, but not genericconfig.
-type KubeCloudSharedConfiguration struct {
-	// CloudProviderConfiguration holds configuration for CloudProvider related features.
-	CloudProvider CloudProviderConfiguration
-	// externalCloudVolumePlugin specifies the plugin to use when cloudProvider is "external".
-	// It is currently used by the in repo cloud providers to handle node and volume control in the KCM.
-	ExternalCloudVolumePlugin string
-	// useServiceAccountCredentials indicates whether controllers should be run with
-	// individual service account credentials.
-	UseServiceAccountCredentials bool
-	// run with untagged cloud instances
-	AllowUntaggedCloud bool
-	// routeReconciliationPeriod is the period for reconciling routes created for Nodes by cloud provider..
-	RouteReconciliationPeriod metav1.Duration
-	// nodeMonitorPeriod is the period for syncing NodeStatus in NodeController.
-	NodeMonitorPeriod metav1.Duration
-	// clusterName is the instance prefix for the cluster.
-	ClusterName string
-	// clusterCIDR is CIDR Range for Pods in cluster.
-	ClusterCIDR string
-	// AllocateNodeCIDRs enables CIDRs for Pods to be allocated and, if
-	// ConfigureCloudRoutes is true, to be set on the cloud provider.
-	AllocateNodeCIDRs bool
-	// CIDRAllocatorType determines what kind of pod CIDR allocator will be used.
-	CIDRAllocatorType string
-	// configureCloudRoutes enables CIDRs allocated with allocateNodeCIDRs
-	// to be configured on the cloud provider.
-	ConfigureCloudRoutes *bool
-	// nodeSyncPeriod is the period for syncing nodes from cloudprovider. Longer
-	// periods will result in fewer calls to cloud provider, but may delay addition
-	// of new nodes to cluster.
-	NodeSyncPeriod metav1.Duration
 }
 
 // AttachDetachControllerConfiguration contains elements describing AttachDetachController.
@@ -227,14 +171,6 @@ type AttachDetachControllerConfiguration struct {
 	ReconcilerSyncLoopPeriod metav1.Duration
 }
 
-// CloudProviderConfiguration contains basically elements about cloud provider.
-type CloudProviderConfiguration struct {
-	// Name is the provider for cloud services.
-	Name string
-	// cloudConfigFile is the path to the cloud provider configuration file.
-	CloudConfigFile string
-}
-
 // CSRSigningControllerConfiguration contains elements describing CSRSigningController.
 type CSRSigningControllerConfiguration struct {
 	// clusterSigningCertFile is the filename containing a PEM-encoded
@@ -243,9 +179,29 @@ type CSRSigningControllerConfiguration struct {
 	// clusterSigningCertFile is the filename containing a PEM-encoded
 	// RSA or ECDSA private key used to issue cluster-scoped certificates
 	ClusterSigningKeyFile string
+
+	// kubeletServingSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/kubelet-serving signer
+	KubeletServingSignerConfiguration CSRSigningConfiguration
+	// kubeletClientSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/kube-apiserver-client-kubelet
+	KubeletClientSignerConfiguration CSRSigningConfiguration
+	// kubeAPIServerClientSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/kube-apiserver-client
+	KubeAPIServerClientSignerConfiguration CSRSigningConfiguration
+	// legacyUnknownSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/legacy-unknown
+	LegacyUnknownSignerConfiguration CSRSigningConfiguration
+
 	// clusterSigningDuration is the length of duration signed certificates
 	// will be given.
 	ClusterSigningDuration metav1.Duration
+}
+
+// CSRSigningConfiguration holds information about a particular CSR signer
+type CSRSigningConfiguration struct {
+	// certFile is the filename containing a PEM-encoded
+	// X509 CA certificate used to issue certificates
+	CertFile string
+	// keyFile is the filename containing a PEM-encoded
+	// RSA or ECDSA private key used to issue certificates
+	KeyFile string
 }
 
 // DaemonSetControllerConfiguration contains elements describing DaemonSetController.
@@ -317,6 +273,27 @@ type EndpointSliceControllerConfiguration struct {
 	// Processing of pod changes will be delayed by this duration to join them with potential
 	// upcoming updates and reduce the overall number of endpoints updates.
 	EndpointUpdatesBatchPeriod metav1.Duration
+}
+
+// EndpointSliceMirroringControllerConfiguration contains elements describing
+// EndpointSliceMirroringController.
+type EndpointSliceMirroringControllerConfiguration struct {
+	// mirroringConcurrentServiceEndpointSyncs is the number of service endpoint
+	// syncing operations that will be done concurrently. Larger number = faster
+	// endpoint slice updating, but more CPU (and network) load.
+	MirroringConcurrentServiceEndpointSyncs int32
+
+	// mirroringMaxEndpointsPerSubset is the maximum number of endpoints that
+	// will be mirrored to an EndpointSlice for an EndpointSubset.
+	MirroringMaxEndpointsPerSubset int32
+
+	// mirroringEndpointUpdatesBatchPeriod can be used to batch EndpointSlice
+	// updates. All updates triggered by EndpointSlice changes will be delayed
+	// by up to 'mirroringEndpointUpdatesBatchPeriod'. If other addresses in the
+	// same Endpoints resource change in that period, they will be batched to a
+	// single EndpointSlice update. Default 0 value means that each Endpoints
+	// update triggers an EndpointSlice update.
+	MirroringEndpointUpdatesBatchPeriod metav1.Duration
 }
 
 // GarbageCollectorControllerConfiguration contains elements describing GarbageCollectorController.
@@ -427,6 +404,12 @@ type PersistentVolumeBinderControllerConfiguration struct {
 	PVClaimBinderSyncPeriod metav1.Duration
 	// volumeConfiguration holds configuration for volume related features.
 	VolumeConfiguration VolumeConfiguration
+	// VolumeHostCIDRDenylist is a list of CIDRs that should not be reachable by the
+	// controller from plugins.
+	VolumeHostCIDRDenylist []string
+	// VolumeHostAllowLocalLoopback indicates if local loopback hosts (127.0.0.1, etc)
+	// should be allowed from plugins.
+	VolumeHostAllowLocalLoopback *bool
 }
 
 // PodGCControllerConfiguration contains elements describing PodGCController.
@@ -475,14 +458,6 @@ type SAControllerConfiguration struct {
 	// rootCAFile is the root certificate authority will be included in service
 	// account's token secret. This must be a valid PEM-encoded CA bundle.
 	RootCAFile string
-}
-
-// ServiceControllerConfiguration contains elements describing ServiceController.
-type ServiceControllerConfiguration struct {
-	// concurrentServiceSyncs is the number of services that are
-	// allowed to sync concurrently. Larger number = more responsive service
-	// management, but more CPU (and network) load.
-	ConcurrentServiceSyncs int32
 }
 
 // TTLAfterFinishedControllerConfiguration contains elements describing TTLAfterFinishedController.

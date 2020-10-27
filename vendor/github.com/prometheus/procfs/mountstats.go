@@ -186,6 +186,8 @@ type NFSOperationStats struct {
 	CumulativeTotalResponseMilliseconds uint64
 	// Duration from when a request was enqueued to when it was completely handled.
 	CumulativeTotalRequestMilliseconds uint64
+	// The count of operations that complete with tk_status < 0.  These statuses usually indicate error conditions.
+	Errors uint64
 }
 
 // A NFSTransportStats contains statistics for the NFS mount RPC requests and
@@ -494,8 +496,8 @@ func parseNFSEventsStats(ss []string) (*NFSEventsStats, error) {
 // line is reached.
 func parseNFSOperationStats(s *bufio.Scanner) ([]NFSOperationStats, error) {
 	const (
-		// Number of expected fields in each per-operation statistics set
-		numFields = 9
+		// Minimum number of expected fields in each per-operation statistics set
+		minFields = 9
 	)
 
 	var ops []NFSOperationStats
@@ -508,12 +510,12 @@ func parseNFSOperationStats(s *bufio.Scanner) ([]NFSOperationStats, error) {
 			break
 		}
 
-		if len(ss) != numFields {
+		if len(ss) < minFields {
 			return nil, fmt.Errorf("invalid NFS per-operations stats: %v", ss)
 		}
 
 		// Skip string operation name for integers
-		ns := make([]uint64, 0, numFields-1)
+		ns := make([]uint64, 0, minFields-1)
 		for _, st := range ss[1:] {
 			n, err := strconv.ParseUint(st, 10, 64)
 			if err != nil {
@@ -523,7 +525,7 @@ func parseNFSOperationStats(s *bufio.Scanner) ([]NFSOperationStats, error) {
 			ns = append(ns, n)
 		}
 
-		ops = append(ops, NFSOperationStats{
+		opStats := NFSOperationStats{
 			Operation:                           strings.TrimSuffix(ss[0], ":"),
 			Requests:                            ns[0],
 			Transmissions:                       ns[1],
@@ -533,7 +535,13 @@ func parseNFSOperationStats(s *bufio.Scanner) ([]NFSOperationStats, error) {
 			CumulativeQueueMilliseconds:         ns[5],
 			CumulativeTotalResponseMilliseconds: ns[6],
 			CumulativeTotalRequestMilliseconds:  ns[7],
-		})
+		}
+
+		if len(ns) > 8 {
+			opStats.Errors = ns[8]
+		}
+
+		ops = append(ops, opStats)
 	}
 
 	return ops, s.Err()

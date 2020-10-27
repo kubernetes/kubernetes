@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 )
 
 func TestDefaultBinder(t *testing.T) {
@@ -66,7 +66,7 @@ func TestDefaultBinder(t *testing.T) {
 				return true, gotBinding, nil
 			})
 
-			fh, err := framework.NewFramework(nil, nil, nil, framework.WithClientSet(client))
+			fh, err := frameworkruntime.NewFramework(nil, nil, nil, frameworkruntime.WithClientSet(client))
 			if err != nil {
 				t.Fatal(err)
 			}

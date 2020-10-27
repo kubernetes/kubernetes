@@ -105,18 +105,6 @@ const (
 	// document.
 	StorageVersionHash featuregate.Feature = "StorageVersionHash"
 
-	// owner: @ksubrmnn
-	// alpha: v1.14
-	//
-	// Allows kube-proxy to run in Overlay mode for Windows
-	WinOverlay featuregate.Feature = "WinOverlay"
-
-	// owner: @ksubrmnn
-	// alpha: v1.14
-	//
-	// Allows kube-proxy to create DSR loadbalancers for Windows
-	WinDSR featuregate.Feature = "WinDSR"
-
 	// owner: @wojtek-t
 	// alpha: v1.15
 	// beta: v1.16
@@ -134,12 +122,15 @@ const (
 
 	// owner: @wojtek-t
 	// alpha: v1.16
+	// beta: v1.20
 	//
 	// Deprecates and removes SelfLink from ObjectMeta and ListMeta.
 	RemoveSelfLink featuregate.Feature = "RemoveSelfLink"
 
-	// owner: @shaloulcy
+	// owner: @shaloulcy, @wojtek-t
 	// alpha: v1.18
+	// beta: v1.19
+	// GA: v1.20
 	//
 	// Allows label and field based indexes in apiserver watch cache to accelerate list operations.
 	SelectorIndex featuregate.Feature = "SelectorIndex"
@@ -149,6 +140,12 @@ const (
 	//
 	// Allows sending warning headers in API responses.
 	WarningHeaders featuregate.Feature = "WarningHeaders"
+
+	// owner: @wojtek-t
+	// alpha: v1.20
+	//
+	// Allows for updating watchcache resource version with progress notify events.
+	EfficientWatchResumption featuregate.Feature = "EfficientWatchResumption"
 )
 
 func init() {
@@ -159,20 +156,19 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	StreamingProxyRedirects: {Default: true, PreRelease: featuregate.Deprecated},
-	ValidateProxyRedirects:  {Default: true, PreRelease: featuregate.Beta},
-	AdvancedAuditing:        {Default: true, PreRelease: featuregate.GA},
-	APIResponseCompression:  {Default: true, PreRelease: featuregate.Beta},
-	APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
-	DryRun:                  {Default: true, PreRelease: featuregate.GA},
-	RemainingItemCount:      {Default: true, PreRelease: featuregate.Beta},
-	ServerSideApply:         {Default: true, PreRelease: featuregate.Beta},
-	StorageVersionHash:      {Default: true, PreRelease: featuregate.Beta},
-	WinOverlay:              {Default: false, PreRelease: featuregate.Alpha},
-	WinDSR:                  {Default: false, PreRelease: featuregate.Alpha},
-	WatchBookmark:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	APIPriorityAndFairness:  {Default: false, PreRelease: featuregate.Alpha},
-	RemoveSelfLink:          {Default: false, PreRelease: featuregate.Alpha},
-	SelectorIndex:           {Default: false, PreRelease: featuregate.Alpha},
-	WarningHeaders:          {Default: true, PreRelease: featuregate.Beta},
+	StreamingProxyRedirects:  {Default: true, PreRelease: featuregate.Deprecated},
+	ValidateProxyRedirects:   {Default: true, PreRelease: featuregate.Beta},
+	AdvancedAuditing:         {Default: true, PreRelease: featuregate.GA},
+	APIResponseCompression:   {Default: true, PreRelease: featuregate.Beta},
+	APIListChunking:          {Default: true, PreRelease: featuregate.Beta},
+	DryRun:                   {Default: true, PreRelease: featuregate.GA},
+	RemainingItemCount:       {Default: true, PreRelease: featuregate.Beta},
+	ServerSideApply:          {Default: true, PreRelease: featuregate.Beta},
+	StorageVersionHash:       {Default: true, PreRelease: featuregate.Beta},
+	WatchBookmark:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	APIPriorityAndFairness:   {Default: false, PreRelease: featuregate.Alpha},
+	RemoveSelfLink:           {Default: true, PreRelease: featuregate.Beta},
+	SelectorIndex:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	WarningHeaders:           {Default: true, PreRelease: featuregate.Beta},
+	EfficientWatchResumption: {Default: false, PreRelease: featuregate.Alpha},
 }

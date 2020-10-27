@@ -4,6 +4,10 @@ go_library(
     name = "go_default_library",
     srcs = [
         "chain_provider.go",
+        "context_background_go1.5.go",
+        "context_background_go1.7.go",
+        "context_go1.5.go",
+        "context_go1.9.go",
         "credentials.go",
         "env_provider.go",
         "shared_credentials_provider.go",
@@ -14,8 +18,10 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws/awserr:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/internal/context:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/internal/ini:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/internal/shareddefaults:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/internal/sync/singleflight:go_default_library",
     ],
 )
 

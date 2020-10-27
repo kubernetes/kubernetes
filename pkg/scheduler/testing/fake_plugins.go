@@ -20,10 +20,12 @@ import (
 	"context"
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 )
 
 // ErrReasonFake is a fake error message denotes the filter function errored.
@@ -43,7 +45,7 @@ func (pl *FalseFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, 
 }
 
 // NewFalseFilterPlugin initializes a FalseFilterPlugin and returns it.
-func NewFalseFilterPlugin(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func NewFalseFilterPlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &FalseFilterPlugin{}, nil
 }
 
@@ -61,7 +63,7 @@ func (pl *TrueFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, p
 }
 
 // NewTrueFilterPlugin initializes a TrueFilterPlugin and returns it.
-func NewTrueFilterPlugin(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func NewTrueFilterPlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &TrueFilterPlugin{}, nil
 }
 
@@ -89,8 +91,8 @@ func (pl *FakeFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, p
 }
 
 // NewFakeFilterPlugin initializes a fakeFilterPlugin and returns it.
-func NewFakeFilterPlugin(failedNodeReturnCodeMap map[string]framework.Code) framework.PluginFactory {
-	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func NewFakeFilterPlugin(failedNodeReturnCodeMap map[string]framework.Code) frameworkruntime.PluginFactory {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &FakeFilterPlugin{
 			FailedNodeReturnCodeMap: failedNodeReturnCodeMap,
 		}, nil
@@ -119,6 +121,113 @@ func (pl *MatchFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, 
 }
 
 // NewMatchFilterPlugin initializes a MatchFilterPlugin and returns it.
-func NewMatchFilterPlugin(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func NewMatchFilterPlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &MatchFilterPlugin{}, nil
+}
+
+// FakePreFilterPlugin is a test filter plugin.
+type FakePreFilterPlugin struct {
+	Status *framework.Status
+}
+
+// Name returns name of the plugin.
+func (pl *FakePreFilterPlugin) Name() string {
+	return "FakePreFilter"
+}
+
+// PreFilter invoked at the PreFilter extension point.
+func (pl *FakePreFilterPlugin) PreFilter(_ context.Context, _ *framework.CycleState, pod *v1.Pod) *framework.Status {
+	return pl.Status
+}
+
+// PreFilterExtensions no extensions implemented by this plugin.
+func (pl *FakePreFilterPlugin) PreFilterExtensions() framework.PreFilterExtensions {
+	return nil
+}
+
+// NewFakePreFilterPlugin initializes a fakePreFilterPlugin and returns it.
+func NewFakePreFilterPlugin(status *framework.Status) frameworkruntime.PluginFactory {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+		return &FakePreFilterPlugin{
+			Status: status,
+		}, nil
+	}
+}
+
+// FakeReservePlugin is a test reserve plugin.
+type FakeReservePlugin struct {
+	Status *framework.Status
+}
+
+// Name returns name of the plugin.
+func (pl *FakeReservePlugin) Name() string {
+	return "FakeReserve"
+}
+
+// Reserve invoked at the Reserve extension point.
+func (pl *FakeReservePlugin) Reserve(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) *framework.Status {
+	return pl.Status
+}
+
+// Unreserve invoked at the Unreserve extension point.
+func (pl *FakeReservePlugin) Unreserve(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) {
+}
+
+// NewFakeReservePlugin initializes a fakeReservePlugin and returns it.
+func NewFakeReservePlugin(status *framework.Status) frameworkruntime.PluginFactory {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+		return &FakeReservePlugin{
+			Status: status,
+		}, nil
+	}
+}
+
+// FakePreBindPlugin is a test prebind plugin.
+type FakePreBindPlugin struct {
+	Status *framework.Status
+}
+
+// Name returns name of the plugin.
+func (pl *FakePreBindPlugin) Name() string {
+	return "FakePreBind"
+}
+
+// PreBind invoked at the PreBind extension point.
+func (pl *FakePreBindPlugin) PreBind(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) *framework.Status {
+	return pl.Status
+}
+
+// NewFakePreBindPlugin initializes a fakePreBindPlugin and returns it.
+func NewFakePreBindPlugin(status *framework.Status) frameworkruntime.PluginFactory {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+		return &FakePreBindPlugin{
+			Status: status,
+		}, nil
+	}
+}
+
+// FakePermitPlugin is a test permit plugin.
+type FakePermitPlugin struct {
+	Status  *framework.Status
+	Timeout time.Duration
+}
+
+// Name returns name of the plugin.
+func (pl *FakePermitPlugin) Name() string {
+	return "FakePermit"
+}
+
+// Permit invoked at the Permit extension point.
+func (pl *FakePermitPlugin) Permit(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) (*framework.Status, time.Duration) {
+	return pl.Status, pl.Timeout
+}
+
+// NewFakePermitPlugin initializes a fakePermitPlugin and returns it.
+func NewFakePermitPlugin(status *framework.Status, timeout time.Duration) frameworkruntime.PluginFactory {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+		return &FakePermitPlugin{
+			Status:  status,
+			Timeout: timeout,
+		}, nil
+	}
 }

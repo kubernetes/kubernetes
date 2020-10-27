@@ -21,6 +21,11 @@ import (
 	"syscall"
 )
 
+const (
+	// PrivateDirMode grants owner to make/remove files inside the directory.
+	PrivateDirMode = 0777
+)
+
 // OpenDir opens a directory in windows with write access for syncing.
 func OpenDir(path string) (*os.File, error) {
 	fd, err := openDir(path)

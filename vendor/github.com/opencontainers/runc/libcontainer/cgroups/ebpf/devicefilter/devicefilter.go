@@ -22,7 +22,7 @@ const (
 )
 
 // DeviceFilter returns eBPF device filter program and its license string
-func DeviceFilter(devices []*configs.Device) (asm.Instructions, string, error) {
+func DeviceFilter(devices []*configs.DeviceRule) (asm.Instructions, string, error) {
 	p := &program{}
 	p.init()
 	for i := len(devices) - 1; i >= 0; i-- {
@@ -49,7 +49,8 @@ func (p *program) init() {
 	*/
 	// R2 <- type (lower 16 bit of u32 access_type at R1[0])
 	p.insts = append(p.insts,
-		asm.LoadMem(asm.R2, asm.R1, 0, asm.Half))
+		asm.LoadMem(asm.R2, asm.R1, 0, asm.Word),
+		asm.And.Imm32(asm.R2, 0xFFFF))
 
 	// R3 <- access (upper 16 bit of u32 access_type at R1[0])
 	p.insts = append(p.insts,
@@ -67,7 +68,7 @@ func (p *program) init() {
 }
 
 // appendDevice needs to be called from the last element of OCI linux.resources.devices to the head element.
-func (p *program) appendDevice(dev *configs.Device) error {
+func (p *program) appendDevice(dev *configs.DeviceRule) error {
 	if p.blockID < 0 {
 		return errors.New("the program is finalized")
 	}

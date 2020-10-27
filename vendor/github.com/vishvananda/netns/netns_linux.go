@@ -7,26 +7,11 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
-)
 
-// SYS_SETNS syscall allows changing the namespace of the current process.
-var SYS_SETNS = map[string]uintptr{
-	"386":     346,
-	"amd64":   308,
-	"arm64":   268,
-	"arm":     375,
-	"mips":    4344,
-	"mipsle":  4344,
-	"mips64le":  4344,
-	"ppc64":   350,
-	"ppc64le": 350,
-	"riscv64": 268,
-	"s390x":   339,
-}[runtime.GOARCH]
+	"golang.org/x/sys/unix"
+)
 
 // Deprecated: use syscall pkg instead (go >= 1.5 needed).
 const (
@@ -41,11 +26,7 @@ const (
 // Setns sets namespace using syscall. Note that this should be a method
 // in syscall but it has not been added.
 func Setns(ns NsHandle, nstype int) (err error) {
-	_, _, e1 := syscall.Syscall(SYS_SETNS, uintptr(ns), uintptr(nstype), 0)
-	if e1 != 0 {
-		err = e1
-	}
-	return
+	return unix.Setns(int(ns), nstype)
 }
 
 // Set sets the current network namespace to the namespace represented
@@ -57,7 +38,7 @@ func Set(ns NsHandle) (err error) {
 // New creates a new network namespace, sets it as current and returns
 // a handle to it.
 func New() (ns NsHandle, err error) {
-	if err := syscall.Unshare(CLONE_NEWNET); err != nil {
+	if err := unix.Unshare(CLONE_NEWNET); err != nil {
 		return -1, err
 	}
 	return Get()
@@ -65,13 +46,13 @@ func New() (ns NsHandle, err error) {
 
 // Get gets a handle to the current threads network namespace.
 func Get() (NsHandle, error) {
-	return GetFromThread(os.Getpid(), syscall.Gettid())
+	return GetFromThread(os.Getpid(), unix.Gettid())
 }
 
 // GetFromPath gets a handle to a network namespace
 // identified by the path
 func GetFromPath(path string) (NsHandle, error) {
-	fd, err := syscall.Open(path, syscall.O_RDONLY, 0)
+	fd, err := unix.Open(path, unix.O_RDONLY, 0)
 	if err != nil {
 		return -1, err
 	}

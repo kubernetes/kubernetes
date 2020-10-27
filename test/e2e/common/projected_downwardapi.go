@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -44,7 +44,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, DownwardAPI, pod name
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the pod name from the mounted DownwardAPIVolumeFiles.
 	*/
@@ -58,7 +58,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, DownwardAPI, volume mode 0400
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. The default mode for the volume mount is set to 0400. Pod MUST be able to read the pod name from the mounted DownwardAPIVolumeFiles and the volume mode must be -r--------.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
@@ -74,7 +74,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, DownwardAPI, volume mode 0400
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. The default mode for the volume mount is set to 0400. Pod MUST be able to read the pod name from the mounted DownwardAPIVolumeFiles and the volume mode must be -r--------.
 	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
@@ -121,7 +121,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, DownwardAPI, update labels
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests and label items. Pod MUST be able to read the labels from the mounted DownwardAPIVolumeFiles. Labels are then updated. Pod MUST be able to read the updated values for the Labels.
 	*/
@@ -153,7 +153,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, DownwardAPI, update annotation
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests and annotation items. Pod MUST be able to read the annotations from the mounted DownwardAPIVolumeFiles. Annotations are then updated. Pod MUST be able to read the updated values for the Annotations.
 	*/
@@ -187,7 +187,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, DownwardAPI, CPU limits
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the cpu limits from the mounted DownwardAPIVolumeFiles.
 	*/
@@ -201,7 +201,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, DownwardAPI, memory limits
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the memory limits from the mounted DownwardAPIVolumeFiles.
 	*/
@@ -215,7 +215,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, DownwardAPI, CPU request
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the cpu request from the mounted DownwardAPIVolumeFiles.
 	*/
@@ -229,7 +229,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, DownwardAPI, memory request
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests. Pod MUST be able to read the memory request from the mounted DownwardAPIVolumeFiles.
 	*/
@@ -243,7 +243,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, DownwardAPI, CPU limit, node allocatable
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests.  The CPU and memory resources for requests and limits are NOT specified for the container. Pod MUST be able to read the default cpu limits from the mounted DownwardAPIVolumeFiles.
 	*/
@@ -255,7 +255,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 	})
 
 	/*
-	   Release : v1.9
+	   Release: v1.9
 	   Testname: Projected Volume, DownwardAPI, memory limit, node allocatable
 	   Description: A Pod is created with a projected volume source for downwardAPI with pod name, cpu and memory limits and cpu and memory requests.  The CPU and memory resources for requests and limits are NOT specified for the container. Pod MUST be able to read the default memory limits from the mounted DownwardAPIVolumeFiles.
 	*/

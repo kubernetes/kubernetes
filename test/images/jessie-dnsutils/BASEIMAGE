@@ -3,3 +3,6 @@ linux/arm=arm32v7/debian:jessie
 linux/arm64=arm64v8/debian:jessie
 linux/ppc64le=ppc64le/debian:jessie
 linux/s390x=s390x/debian:jessie
+windows/amd64/1809=REGISTRY/busybox:1.29-windows-amd64-1809
+windows/amd64/1903=REGISTRY/busybox:1.29-windows-amd64-1903
+windows/amd64/1909=REGISTRY/busybox:1.29-windows-amd64-1909

@@ -59,8 +59,12 @@ func (EtcdUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 }
 
 func kubectlCreate(ns, file string) {
-	input := string(e2etestfiles.ReadOrDie(filepath.Join(manifestPath, file)))
-	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
+	data, err := e2etestfiles.Read(filepath.Join(manifestPath, file))
+	if err != nil {
+		framework.Fail(err.Error())
+	}
+	input := string(data)
+	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-")
 }
 
 // Setup creates etcd statefulset and then verifies that the etcd is writable.

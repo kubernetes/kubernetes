@@ -85,6 +85,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/format:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/metrics:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1:go_default_library",

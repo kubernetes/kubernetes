@@ -108,7 +108,7 @@ type validator struct {
 
 var _ = Validator(&validator{})
 
-func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, privateObj interface{}) (*ServiceAccountInfo, error) {
+func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, privateObj interface{}) (*apiserverserviceaccount.ServiceAccountInfo, error) {
 	private, ok := privateObj.(*privateClaims)
 	if !ok {
 		klog.Errorf("jwt validator expected private claim of type *privateClaims but got: %T", privateObj)
@@ -198,7 +198,7 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 		}
 	}
 
-	return &ServiceAccountInfo{
+	return &apiserverserviceaccount.ServiceAccountInfo{
 		Namespace: private.Kubernetes.Namespace,
 		Name:      private.Kubernetes.Svcacct.Name,
 		UID:       private.Kubernetes.Svcacct.UID,

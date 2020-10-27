@@ -32,6 +32,7 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
+// DefaultMemorySwap always returns 0 for no memory swap in a sandbox
 func DefaultMemorySwap() int64 {
 	return 0
 }
@@ -41,6 +42,12 @@ func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) 
 		klog.Warningf("seccomp annotations are not supported on windows")
 	}
 	return nil, nil
+}
+
+func (ds *dockerService) getSandBoxSecurityOpts(separator rune) []string {
+	// Currently, Windows container does not support privileged mode, so no no-new-privileges flag can be returned directly like Linux
+	// If the future Windows container has new support for privileged mode, we can adjust it here
+	return nil
 }
 
 // applyExperimentalCreateConfig applys experimental configures from sandbox annotations.

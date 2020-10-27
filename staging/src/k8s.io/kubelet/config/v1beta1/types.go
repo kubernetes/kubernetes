@@ -19,6 +19,7 @@ package v1beta1
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -481,7 +482,6 @@ type KubeletConfiguration struct {
 	// +optional
 	PodCIDR string `json:"podCIDR,omitempty"`
 	// PodPidsLimit is the maximum number of pids in any pod.
-	// Requires the SupportPodPidsLimit feature gate to be enabled.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// lowering it may prevent container processes from forking after the change.
 	// Default: -1
@@ -786,6 +786,23 @@ type KubeletConfiguration struct {
 	// Default: ""
 	// +optional
 	ProviderID string `json:"providerID,omitempty"`
+	// kernelMemcgNotification, if set, the kubelet will integrate with the kernel memcg notification
+	// to determine if memory eviction thresholds are crossed rather than polling.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may impact the way Kubelet interacts with the kernel.
+	// Default: false
+	// +optional
+	KernelMemcgNotification bool `json:"kernelMemcgNotification,omitempty"`
+	// Logging specifies the options of logging.
+	// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
+	// Defaults:
+	//   Format: text
+	// + optional
+	Logging componentbaseconfigv1alpha1.LoggingConfiguration `json:"logging,omitempty"`
+	// enableSystemLogHandler enables system logs via web interface host:port/logs/
+	// Default: true
+	// +optional
+	EnableSystemLogHandler *bool `json:"enableSystemLogHandler,omitempty"`
 }
 
 type KubeletAuthorizationMode string

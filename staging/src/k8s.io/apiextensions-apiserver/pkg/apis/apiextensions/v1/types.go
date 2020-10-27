@@ -174,6 +174,17 @@ type CustomResourceDefinitionVersion struct {
 	// storage indicates this version should be used when persisting custom resources to storage.
 	// There must be exactly one version with storage=true.
 	Storage bool `json:"storage" protobuf:"varint,3,opt,name=storage"`
+	// deprecated indicates this version of the custom resource API is deprecated.
+	// When set to true, API requests to this version receive a warning header in the server response.
+	// Defaults to false.
+	// +optional
+	Deprecated bool `json:"deprecated,omitempty" protobuf:"varint,7,opt,name=deprecated"`
+	// deprecationWarning overrides the default warning returned to API clients.
+	// May only be set when `deprecated` is true.
+	// The default warning indicates this version is deprecated and recommends use
+	// of the newest served version of equal or greater stability, if one exists.
+	// +optional
+	DeprecationWarning *string `json:"deprecationWarning,omitempty" protobuf:"bytes,8,opt,name=deprecationWarning"`
 	// schema describes the schema used for validation, pruning, and defaulting of this version of the custom resource.
 	// +optional
 	Schema *CustomResourceValidation `json:"schema,omitempty" protobuf:"bytes,4,opt,name=schema"`

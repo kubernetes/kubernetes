@@ -35,8 +35,7 @@ var _ InstanceGroups = &Cloud{}
 func ResizeInstanceGroup(asg ASG, instanceGroupName string, size int) error {
 	request := &autoscaling.UpdateAutoScalingGroupInput{
 		AutoScalingGroupName: aws.String(instanceGroupName),
-		MinSize:              aws.Int64(int64(size)),
-		MaxSize:              aws.Int64(int64(size)),
+		DesiredCapacity:      aws.Int64(int64(size)),
 	}
 	if _, err := asg.UpdateAutoScalingGroup(request); err != nil {
 		return fmt.Errorf("error resizing AWS autoscaling group: %q", err)

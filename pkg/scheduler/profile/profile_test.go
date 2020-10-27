@@ -23,15 +23,16 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/events/v1beta1"
+	eventsv1 "k8s.io/api/events/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 )
 
-var fakeRegistry = framework.Registry{
+var fakeRegistry = frameworkruntime.Registry{
 	"QueueSort": newFakePlugin,
 	"Bind1":     newFakePlugin,
 	"Bind2":     newFakePlugin,
@@ -100,7 +101,7 @@ func TestNewProfile(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := fake.NewSimpleClientset()
-			b := events.NewBroadcaster(&events.EventSinkImpl{Interface: c.EventsV1beta1().Events("")})
+			b := events.NewBroadcaster(&events.EventSinkImpl{Interface: c.EventsV1()})
 			p, err := NewProfile(tc.cfg, fakeFrameworkFactory, NewRecorderFactory(b))
 			if err := checkErr(err, tc.wantErr); err != nil {
 				t.Fatal(err)
@@ -112,7 +113,7 @@ func TestNewProfile(t *testing.T) {
 			called := make(chan struct{})
 			var ctrl string
 			stopFn := b.StartEventWatcher(func(obj runtime.Object) {
-				e, _ := obj.(*v1beta1.Event)
+				e, _ := obj.(*eventsv1.Event)
 				ctrl = e.ReportingController
 				close(called)
 			})
@@ -347,12 +348,12 @@ func (p *fakePlugin) Bind(context.Context, *framework.CycleState, *v1.Pod, strin
 	return nil
 }
 
-func newFakePlugin(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func newFakePlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &fakePlugin{}, nil
 }
 
-func fakeFrameworkFactory(cfg config.KubeSchedulerProfile, opts ...framework.Option) (framework.Framework, error) {
-	return framework.NewFramework(fakeRegistry, cfg.Plugins, cfg.PluginConfig, opts...)
+func fakeFrameworkFactory(cfg config.KubeSchedulerProfile, opts ...frameworkruntime.Option) (framework.Framework, error) {
+	return frameworkruntime.NewFramework(fakeRegistry, cfg.Plugins, cfg.PluginConfig, opts...)
 }
 
 func nilRecorderFactory(_ string) events.EventRecorder {

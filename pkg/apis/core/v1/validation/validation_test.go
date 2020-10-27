@@ -129,6 +129,62 @@ func TestValidateResourceRequirements(t *testing.T) {
 	}
 }
 
+func TestValidateContainerResourceName(t *testing.T) {
+	successCase := []struct {
+		Name         string
+		ResourceName string
+	}{
+		{
+			Name:         "CPU resource",
+			ResourceName: "cpu",
+		},
+		{
+			Name:         "Memory resource",
+			ResourceName: "memory",
+		},
+		{
+			Name:         "Hugepages resource",
+			ResourceName: "hugepages-2Mi",
+		},
+		{
+			Name:         "Namespaced resource",
+			ResourceName: "kubernetes.io/resource-foo",
+		},
+		{
+			Name:         "Extended Resource",
+			ResourceName: "my.org/resource-bar",
+		},
+	}
+	for _, tc := range successCase {
+		if errs := ValidateContainerResourceName(tc.ResourceName, field.NewPath(tc.ResourceName)); len(errs) != 0 {
+			t.Errorf("%q unexpected error: %v", tc.Name, errs)
+		}
+	}
+
+	errorCase := []struct {
+		Name         string
+		ResourceName string
+	}{
+		{
+			Name:         "Invalid standard resource",
+			ResourceName: "cpu-core",
+		},
+		{
+			Name:         "Invalid namespaced resource",
+			ResourceName: "kubernetes.io/",
+		},
+		{
+			Name:         "Invalid extended resource",
+			ResourceName: "my.org-foo-resource",
+		},
+	}
+	for _, tc := range errorCase {
+		if errs := ValidateContainerResourceName(tc.ResourceName, field.NewPath(tc.ResourceName)); len(errs) == 0 {
+			t.Errorf("%q expected error", tc.Name)
+		}
+	}
+}
+
 func TestValidatePodLogOptions(t *testing.T) {
 
 	var (

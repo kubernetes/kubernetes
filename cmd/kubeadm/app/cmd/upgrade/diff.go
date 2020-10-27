@@ -54,8 +54,8 @@ var (
 	defaultSchedulerManifestPath         = constants.GetStaticPodFilepath(constants.KubeScheduler, constants.GetStaticPodDirectory())
 )
 
-// NewCmdDiff returns the cobra command for `kubeadm upgrade diff`
-func NewCmdDiff(out io.Writer) *cobra.Command {
+// newCmdDiff returns the cobra command for `kubeadm upgrade diff`
+func newCmdDiff(out io.Writer) *cobra.Command {
 	flags := &diffFlags{
 		kubeConfigPath: constants.GetAdminKubeConfigPath(),
 		out:            out,
@@ -91,7 +91,7 @@ func runDiff(flags *diffFlags, args []string) error {
 		if err != nil {
 			return errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 		}
-		cfg, err = configutil.FetchInitConfigurationFromCluster(client, flags.out, "upgrade/diff", false)
+		cfg, err = configutil.FetchInitConfigurationFromCluster(client, flags.out, "upgrade/diff", false, false)
 	}
 	if err != nil {
 		return err

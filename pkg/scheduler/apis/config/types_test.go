@@ -64,7 +64,6 @@ func TestPluginsAppend(t *testing.T) {
 				PreBind:    &PluginSet{},
 				Bind:       &PluginSet{},
 				PostBind:   &PluginSet{},
-				Unreserve:  &PluginSet{},
 			},
 		},
 		{
@@ -126,7 +125,6 @@ func TestPluginsApply(t *testing.T) {
 				PreBind:    &PluginSet{Enabled: []Plugin{}},
 				Bind:       &PluginSet{Enabled: []Plugin{}},
 				PostBind:   &PluginSet{Enabled: []Plugin{}},
-				Unreserve:  &PluginSet{Enabled: []Plugin{}},
 			},
 		},
 		{
@@ -168,7 +166,6 @@ func TestPluginsApply(t *testing.T) {
 				PreBind:    &PluginSet{Enabled: []Plugin{}},
 				Bind:       &PluginSet{Enabled: []Plugin{}},
 				PostBind:   &PluginSet{Enabled: []Plugin{}},
-				Unreserve:  &PluginSet{Enabled: []Plugin{}},
 			},
 		},
 		{
@@ -211,7 +208,6 @@ func TestPluginsApply(t *testing.T) {
 				PreBind:    &PluginSet{Enabled: []Plugin{}},
 				Bind:       &PluginSet{Enabled: []Plugin{}},
 				PostBind:   &PluginSet{Enabled: []Plugin{}},
-				Unreserve:  &PluginSet{Enabled: []Plugin{}},
 			},
 		},
 		{
@@ -252,7 +248,6 @@ func TestPluginsApply(t *testing.T) {
 				PreBind:    &PluginSet{Enabled: []Plugin{}},
 				Bind:       &PluginSet{Enabled: []Plugin{}},
 				PostBind:   &PluginSet{Enabled: []Plugin{}},
-				Unreserve:  &PluginSet{Enabled: []Plugin{}},
 			},
 		},
 		{
@@ -275,14 +270,13 @@ func TestPluginsApply(t *testing.T) {
 						{Name: "DefaultPlugin2"},
 					},
 				},
-				PreScore:  nil,
-				Score:     nil,
-				Reserve:   nil,
-				Permit:    nil,
-				PreBind:   nil,
-				Bind:      nil,
-				PostBind:  nil,
-				Unreserve: nil,
+				PreScore: nil,
+				Score:    nil,
+				Reserve:  nil,
+				Permit:   nil,
+				PreBind:  nil,
+				Bind:     nil,
+				PostBind: nil,
 			},
 		},
 	}

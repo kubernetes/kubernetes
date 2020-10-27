@@ -64,10 +64,11 @@ func New(authorizer autorest.Authorizer, baseURI, userAgent, apiVersion, clientR
 
 	backoff := clientBackoff
 	if backoff == nil {
+		backoff = &retry.Backoff{}
+	}
+	if backoff.Steps == 0 {
 		// 1 steps means no retry.
-		backoff = &retry.Backoff{
-			Steps: 1,
-		}
+		backoff.Steps = 1
 	}
 
 	return &Client{
@@ -109,6 +110,11 @@ func (c *Client) sendRequest(ctx context.Context, request *http.Request) (*http.
 		request,
 		retry.DoExponentialBackoffRetry(&sendBackoff),
 	)
+
+	if response == nil && err == nil {
+		return response, retry.NewError(false, fmt.Errorf("Empty response and no HTTP code"))
+	}
+
 	return response, retry.GetError(response, err)
 }
 

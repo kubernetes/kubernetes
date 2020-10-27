@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"os"
 	"reflect"
 	"testing"
 
@@ -963,6 +964,7 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("can't create temp dir: %v", err)
 		}
+		defer os.RemoveAll(tmpDir)
 		host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
 			tmpDir,
 			client,
@@ -1025,6 +1027,7 @@ func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []t
 		if err != nil {
 			t.Fatalf("can't create temp dir: %v", err)
 		}
+		defer os.RemoveAll(tmpDir)
 		host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
 			tmpDir,
 			client,

@@ -114,11 +114,11 @@ func ConfListFromBytes(bytes []byte) (*NetworkConfigList, error) {
 	for i, conf := range plugins {
 		newBytes, err := json.Marshal(conf)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to marshal plugin config %d: %v", i, err)
+			return nil, fmt.Errorf("failed to marshal plugin config %d: %v", i, err)
 		}
 		netConf, err := ConfFromBytes(newBytes)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to parse plugin config %d: %v", i, err)
+			return nil, fmt.Errorf("failed to parse plugin config %d: %v", i, err)
 		}
 		list.Plugins = append(list.Plugins, netConf)
 	}

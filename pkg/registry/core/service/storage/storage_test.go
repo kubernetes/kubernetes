@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"net"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +30,10 @@ import (
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func newStorage(t *testing.T) (*GenericREST, *StatusREST, *etcd3testing.EtcdTestServer) {
@@ -47,6 +52,8 @@ func newStorage(t *testing.T) (*GenericREST, *StatusREST, *etcd3testing.EtcdTest
 }
 
 func validService() *api.Service {
+	singleStack := api.IPFamilyPolicySingleStack
+
 	return &api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
@@ -54,7 +61,10 @@ func validService() *api.Service {
 		},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
-			ClusterIP:       "None",
+			ClusterIP:       api.ClusterIPNone,
+			ClusterIPs:      []string{api.ClusterIPNone},
+			IPFamilyPolicy:  &singleStack,
+			IPFamilies:      []api.IPFamily{api.IPv4Protocol},
 			SessionAffinity: "None",
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
@@ -84,7 +94,7 @@ func TestCreate(t *testing.T) {
 		&api.Service{
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz"},
-				ClusterIP:       "invalid",
+				ClusterIPs:      []string{"invalid"},
 				SessionAffinity: "None",
 				Type:            api.ServiceTypeClusterIP,
 				Ports: []api.ServicePort{{
@@ -110,7 +120,8 @@ func TestUpdate(t *testing.T) {
 			object := obj.(*api.Service)
 			object.Spec = api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz2"},
-				ClusterIP:       "None",
+				ClusterIP:       api.ClusterIPNone,
+				ClusterIPs:      []string{api.ClusterIPNone},
 				SessionAffinity: api.ServiceAffinityNone,
 				Type:            api.ServiceTypeClusterIP,
 				Ports: []api.ServicePort{{
@@ -186,4 +197,279 @@ func TestCategories(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	expected := []string{"all"}
 	registrytest.AssertCategories(t, storage, expected)
+}
+
+func makeServiceList() (undefaulted, defaulted *api.ServiceList) {
+	undefaulted = &api.ServiceList{Items: []api.Service{}}
+	defaulted = &api.ServiceList{Items: []api.Service{}}
+
+	singleStack := api.IPFamilyPolicySingleStack
+	requireDualStack := api.IPFamilyPolicyRequireDualStack
+
+	var undefaultedSvc *api.Service
+	var defaultedSvc *api.Service
+
+	// (for headless) tests must set fields  manually according to how the cluster configured
+	// headless w selector (subject to how the cluster is configured)
+	undefaultedSvc = &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "headless_with_selector", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
+		Spec: api.ServiceSpec{
+			Type:       api.ServiceTypeClusterIP,
+			ClusterIPs: []string{api.ClusterIPNone},
+			Selector:   map[string]string{"foo": "bar"},
+		},
+	}
+	defaultedSvc = undefaultedSvc.DeepCopy()
+	defaultedSvc.Spec.IPFamilyPolicy = nil // forcing tests to set them
+	defaultedSvc.Spec.IPFamilies = nil     // forcing tests to them
+
+	undefaulted.Items = append(undefaulted.Items, *(undefaultedSvc))
+	defaulted.Items = append(defaulted.Items, *(defaultedSvc))
+
+	// headless w/o selector (always set to require and families according to cluster)
+	undefaultedSvc = &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "headless_no_selector", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
+		Spec: api.ServiceSpec{
+			Type:       api.ServiceTypeClusterIP,
+			ClusterIPs: []string{api.ClusterIPNone},
+			Selector:   nil,
+		},
+	}
+	defaultedSvc = undefaultedSvc.DeepCopy()
+	defaultedSvc.Spec.IPFamilyPolicy = nil // forcing tests to set them
+	defaultedSvc.Spec.IPFamilies = nil     // forcing tests to them
+
+	undefaulted.Items = append(undefaulted.Items, *(undefaultedSvc))
+	defaulted.Items = append(defaulted.Items, *(defaultedSvc))
+
+	// single stack IPv4
+	undefaultedSvc = &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "ipv4", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
+		Spec: api.ServiceSpec{
+			Type:      api.ServiceTypeClusterIP,
+			ClusterIP: "10.0.0.4",
+		},
+	}
+	defaultedSvc = undefaultedSvc.DeepCopy()
+	defaultedSvc.Spec.IPFamilyPolicy = &singleStack
+	defaultedSvc.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol}
+
+	undefaulted.Items = append(undefaulted.Items, *(undefaultedSvc))
+	defaulted.Items = append(defaulted.Items, *(defaultedSvc))
+
+	// single stack IPv6
+	undefaultedSvc = &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "ipv6", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
+		Spec: api.ServiceSpec{
+			Type:      api.ServiceTypeClusterIP,
+			ClusterIP: "2000::1",
+		},
+	}
+	defaultedSvc = undefaultedSvc.DeepCopy()
+	defaultedSvc.Spec.IPFamilyPolicy = &singleStack
+	defaultedSvc.Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol}
+
+	undefaulted.Items = append(undefaulted.Items, *(undefaultedSvc))
+	defaulted.Items = append(defaulted.Items, *(defaultedSvc))
+
+	// dualstack IPv4 IPv6
+	undefaultedSvc = &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "ipv4_ipv6", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
+		Spec: api.ServiceSpec{
+			Type:       api.ServiceTypeClusterIP,
+			ClusterIP:  "10.0.0.4",
+			ClusterIPs: []string{"10.0.0.4", "2000::1"},
+		},
+	}
+	defaultedSvc = undefaultedSvc.DeepCopy()
+	defaultedSvc.Spec.IPFamilyPolicy = &requireDualStack
+	defaultedSvc.Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol}
+
+	undefaulted.Items = append(undefaulted.Items, *(undefaultedSvc))
+	defaulted.Items = append(defaulted.Items, *(defaultedSvc))
+
+	// dualstack IPv6 IPv4
+	undefaultedSvc = &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "ipv6_ipv4", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
+		Spec: api.ServiceSpec{
+			Type:       api.ServiceTypeClusterIP,
+			ClusterIP:  "2000::1",
+			ClusterIPs: []string{"2000::1", "10.0.0.4"},
+		},
+	}
+	defaultedSvc = undefaultedSvc.DeepCopy()
+	defaultedSvc.Spec.IPFamilyPolicy = &requireDualStack
+	defaultedSvc.Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol}
+
+	undefaulted.Items = append(undefaulted.Items, *(undefaultedSvc))
+	defaulted.Items = append(defaulted.Items, *(defaultedSvc))
+
+	// external name
+	undefaultedSvc = &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "external_name", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
+		Spec: api.ServiceSpec{
+			Type: api.ServiceTypeExternalName,
+		},
+	}
+
+	defaultedSvc = undefaultedSvc.DeepCopy()
+	defaultedSvc.Spec.IPFamilyPolicy = nil
+	defaultedSvc.Spec.IPFamilies = nil
+
+	undefaulted.Items = append(undefaulted.Items, *(undefaultedSvc))
+	defaulted.Items = append(defaulted.Items, *(defaultedSvc))
+
+	return undefaulted, defaulted
+}
+
+func TestServiceDefaulting(t *testing.T) {
+	makeStorage := func(t *testing.T, primaryCIDR string, isDualStack bool) (*GenericREST, *StatusREST, *etcd3testing.EtcdTestServer) {
+		etcdStorage, server := registrytest.NewEtcdStorage(t, "")
+		restOptions := generic.RESTOptions{
+			StorageConfig:           etcdStorage,
+			Decorator:               generic.UndecoratedStorage,
+			DeleteCollectionWorkers: 1,
+			ResourcePrefix:          "services",
+		}
+
+		_, cidr, err := net.ParseCIDR(primaryCIDR)
+		if err != nil {
+			t.Fatalf("failed to parse CIDR %s", primaryCIDR)
+		}
+
+		serviceStorage, statusStorage, err := NewGenericREST(restOptions, *(cidr), isDualStack)
+		if err != nil {
+			t.Fatalf("unexpected error from REST storage: %v", err)
+		}
+		return serviceStorage, statusStorage, server
+	}
+
+	testCases := []struct {
+		name        string
+		primaryCIDR string
+		PrimaryIPv6 bool
+		isDualStack bool
+	}{
+		{
+			name:        "IPv4 single stack cluster",
+			primaryCIDR: "10.0.0.0/16",
+			PrimaryIPv6: false,
+			isDualStack: false,
+		},
+		{
+			name:        "IPv6 single stack cluster",
+			primaryCIDR: "2000::/108",
+			PrimaryIPv6: true,
+			isDualStack: false,
+		},
+
+		{
+			name:        "IPv4, IPv6 dual stack cluster",
+			primaryCIDR: "10.0.0.0/16",
+			PrimaryIPv6: false,
+			isDualStack: true,
+		},
+		{
+			name:        "IPv6, IPv4 dual stack cluster",
+			primaryCIDR: "2000::/108",
+			PrimaryIPv6: true,
+			isDualStack: true,
+		},
+	}
+
+	singleStack := api.IPFamilyPolicySingleStack
+	preferDualStack := api.IPFamilyPolicyPreferDualStack
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			// this func only works with dual stack feature gate on.
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+
+			storage, _, server := makeStorage(t, testCase.primaryCIDR, testCase.isDualStack)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+
+			undefaultedServiceList, defaultedServiceList := makeServiceList()
+			// set the two special ones (0: w/ selector, 1: w/o selector)
+			// review default*OnRead(...)
+			// Single stack cluster:
+			// headless w/selector => singlestack
+			// headless w/o selector => preferDualStack
+			// dual stack cluster:
+			// headless w/selector => preferDualStack
+			// headless w/o selector => preferDualStack
+
+			// assume single stack
+			defaultedServiceList.Items[0].Spec.IPFamilyPolicy = &singleStack
+
+			// primary family
+			if testCase.PrimaryIPv6 {
+				// no selector, gets both families
+				defaultedServiceList.Items[1].Spec.IPFamilyPolicy = &preferDualStack
+				defaultedServiceList.Items[1].Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol}
+
+				//assume single stack for w/selector
+				defaultedServiceList.Items[0].Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol}
+				// make dualstacked. if needed
+				if testCase.isDualStack {
+					defaultedServiceList.Items[0].Spec.IPFamilyPolicy = &preferDualStack
+					defaultedServiceList.Items[0].Spec.IPFamilies = append(defaultedServiceList.Items[0].Spec.IPFamilies, api.IPv4Protocol)
+				}
+			} else {
+				// no selector gets both families
+				defaultedServiceList.Items[1].Spec.IPFamilyPolicy = &preferDualStack
+				defaultedServiceList.Items[1].Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol}
+
+				// assume single stack for w/selector
+				defaultedServiceList.Items[0].Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol}
+				// make dualstacked. if needed
+				if testCase.isDualStack {
+					defaultedServiceList.Items[0].Spec.IPFamilyPolicy = &preferDualStack
+					defaultedServiceList.Items[0].Spec.IPFamilies = append(defaultedServiceList.Items[0].Spec.IPFamilies, api.IPv6Protocol)
+				}
+			}
+
+			// data is now ready for testing over various cluster configuration
+			compareSvc := func(out api.Service, expected api.Service) {
+				if expected.Spec.IPFamilyPolicy == nil && out.Spec.IPFamilyPolicy != nil {
+					t.Fatalf("service %+v expected IPFamilyPolicy to be nil", out)
+				}
+				if expected.Spec.IPFamilyPolicy != nil && out.Spec.IPFamilyPolicy == nil {
+					t.Fatalf("service %+v expected IPFamilyPolicy not to be nil", out)
+				}
+
+				if expected.Spec.IPFamilyPolicy != nil {
+					if *out.Spec.IPFamilyPolicy != *expected.Spec.IPFamilyPolicy {
+						t.Fatalf("service %+v expected IPFamilyPolicy %v got %v", out, *expected.Spec.IPFamilyPolicy, *out.Spec.IPFamilyPolicy)
+					}
+				}
+
+				if len(out.Spec.IPFamilies) != len(expected.Spec.IPFamilies) {
+					t.Fatalf("service %+v expected len(IPFamilies) == %v", out, len(expected.Spec.IPFamilies))
+				}
+				for i, ipfamily := range out.Spec.IPFamilies {
+					if expected.Spec.IPFamilies[i] != ipfamily {
+						t.Fatalf("service %+v expected ip families %+v", out, expected.Spec.IPFamilies)
+					}
+				}
+			}
+
+			copyUndefaultedList := undefaultedServiceList.DeepCopy()
+			// run for each service
+			for i, svc := range copyUndefaultedList.Items {
+				storage.defaultServiceOnRead(&svc)
+				compareSvc(svc, defaultedServiceList.Items[i])
+			}
+
+			copyUndefaultedList = undefaultedServiceList.DeepCopy()
+			// run as a servicr list
+			storage.defaultServiceOnRead(copyUndefaultedList)
+			for i, svc := range copyUndefaultedList.Items {
+				compareSvc(svc, defaultedServiceList.Items[i])
+			}
+
+			// if there are more tests needed then the last call need to work
+			// with copy of undefaulted list since
+		})
+	}
 }

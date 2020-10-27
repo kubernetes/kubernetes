@@ -36,6 +36,7 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
@@ -49,8 +50,8 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	utiltesting "k8s.io/client-go/util/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/utils/pointer"
 
 	// Do some initialization to decode the query parameters correctly.
@@ -101,6 +102,10 @@ func (fk *fakeKubelet) LatestLoopEntryTime() time.Time {
 
 func (fk *fakeKubelet) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 	return fk.podByNameFunc(namespace, name)
+}
+
+func (fk *fakeKubelet) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
+	return map[string]*cadvisorapi.ContainerInfo{}, nil
 }
 
 func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
@@ -301,6 +306,11 @@ func newServerTest() *serverTestFramework {
 }
 
 func newServerTestWithDebug(enableDebugging, redirectContainerStreaming bool, streamingServer streaming.Server) *serverTestFramework {
+	return newServerTestWithDebuggingHandlers(enableDebugging, enableDebugging, redirectContainerStreaming, streamingServer)
+}
+
+func newServerTestWithDebuggingHandlers(enableDebugging, enableSystemLogHandler, redirectContainerStreaming bool,
+	streamingServer streaming.Server) *serverTestFramework {
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
 		hostnameFunc: func() string {
@@ -340,6 +350,7 @@ func newServerTestWithDebug(enableDebugging, redirectContainerStreaming bool, st
 		enableDebugging,
 		false,
 		redirectContainerStreaming,
+		enableSystemLogHandler,
 		fw.criHandler)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
@@ -1496,7 +1507,6 @@ func TestMetricBuckets(t *testing.T) {
 		"metrics":                         {url: "/metrics", bucket: "metrics"},
 		"metrics cadvisor sub":            {url: "/metrics/cadvisor", bucket: "metrics/cadvisor"},
 		"metrics probes sub":              {url: "/metrics/probes", bucket: "metrics/probes"},
-		"metrics resource v1alpha1":       {url: "/metrics/resource/v1alpha1", bucket: "metrics/resource"},
 		"metrics resource sub":            {url: "/metrics/resource", bucket: "metrics/resource"},
 		"pods":                            {url: "/pods/", bucket: "pods"},
 		"portForward":                     {url: "/portForward/podNamespace/podID", bucket: "portForward"},
@@ -1544,7 +1554,9 @@ func TestMetricMethodBuckets(t *testing.T) {
 }
 
 func TestDebuggingDisabledHandlers(t *testing.T) {
-	fw := newServerTestWithDebug(false, false, nil)
+	// for backward compatibility even if enablesystemLogHandler is set but not enableDebuggingHandler then /logs
+	//shouldn't be served.
+	fw := newServerTestWithDebuggingHandlers(false, true, false, nil)
 	defer fw.testHTTPServer.Close()
 
 	paths := []string{
@@ -1554,19 +1566,7 @@ func TestDebuggingDisabledHandlers(t *testing.T) {
 	}
 
 	for _, p := range paths {
-		resp, err := http.Get(fw.testHTTPServer.URL + p)
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
-		body, err := ioutil.ReadAll(resp.Body)
-		require.NoError(t, err)
-		assert.Equal(t, "Debug endpoints are disabled.\n", string(body))
-
-		resp, err = http.Post(fw.testHTTPServer.URL+p, "", nil)
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
-		body, err = ioutil.ReadAll(resp.Body)
-		require.NoError(t, err)
-		assert.Equal(t, "Debug endpoints are disabled.\n", string(body))
+		verifyEndpointResponse(t, fw, p, "Debug endpoints are disabled.\n")
 	}
 
 	// test some other paths, make sure they're working
@@ -1599,6 +1599,14 @@ func TestDebuggingDisabledHandlers(t *testing.T) {
 
 }
 
+func TestDisablingSystemLogHandler(t *testing.T) {
+	fw := newServerTestWithDebuggingHandlers(true, false, false, nil)
+	defer fw.testHTTPServer.Close()
+
+	// verify logs endpoint is disabled
+	verifyEndpointResponse(t, fw, "/logs/kubelet.log", "logs endpoint is disabled.\n")
+}
+
 func TestFailedParseParamsSummaryHandler(t *testing.T) {
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
@@ -1610,7 +1618,22 @@ func TestFailedParseParamsSummaryHandler(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 	assert.Contains(t, string(v), "parse form failed")
+}
 
+func verifyEndpointResponse(t *testing.T, fw *serverTestFramework, path string, expectedResponse string) {
+	resp, err := http.Get(fw.testHTTPServer.URL + path)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+	body, err := ioutil.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, expectedResponse, string(body))
+
+	resp, err = http.Post(fw.testHTTPServer.URL+path, "", nil)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+	body, err = ioutil.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, expectedResponse, string(body))
 }
 
 func TestTrimURLPath(t *testing.T) {

@@ -48,7 +48,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
@@ -104,7 +103,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, discovery document
 		Description: The admissionregistration.k8s.io API group MUST exists in the /apis discovery document.
 		The admissionregistration.k8s.io/v1 API group/version MUST exists in the /apis discovery document.
@@ -183,7 +182,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, deny create
 		Description: Register an admission webhook configuration that admits pod and configmap. Attempts to create
 		non-compliant pods and configmaps, or update/patch compliant pods and configmaps to be non-compliant MUST
@@ -198,7 +197,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, deny attach
 		Description: Register an admission webhook configuration that denies connecting to a pod's attach sub-resource.
 		Attempts to attach MUST be denied.
@@ -210,7 +209,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, deny custom resource create and delete
 		Description: Register an admission webhook configuration that denies creation, update and deletion of
 		custom resources. Attempts to create, update and delete custom resources MUST be denied.
@@ -228,7 +227,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, fail closed
 		Description: Register a webhook with a fail closed policy and without CA bundle so that it cannot be called.
 		Attempt operations that require the admission webhook; all MUST be denied.
@@ -240,7 +239,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, ordered mutation
 		Description: Register a mutating webhook configuration with two webhooks that admit configmaps, one that
 		adds a data key if the configmap already has a specific key, and another that adds a key if the key added by
@@ -253,7 +252,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, mutation with defaulting
 		Description: Register a mutating webhook that adds an InitContainer to pods. Attempt to create a pod;
 		the InitContainer MUST be added the TerminationMessagePolicy MUST be defaulted.
@@ -265,7 +264,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, admission control not allowed on webhook configuration objects
 		Description: Register webhooks that mutate and deny deletion of webhook configuration objects. Attempt to create
 		and delete a webhook configuration object; both operations MUST be allowed and the webhook configuration object
@@ -280,7 +279,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, mutate custom resource
 		Description: Register a webhook that mutates a custom resource. Attempt to create custom resource object;
 		the custom resource MUST be mutated.
@@ -297,7 +296,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, deny custom resource definition
 		Description: Register a webhook that denies custom resource definition create. Attempt to create a
 		custom resource definition; the create request MUST be denied.
@@ -310,7 +309,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, mutate custom resource with different stored version
 		Description: Register a webhook that mutates custom resources on create and update. Register a custom resource
 		definition using v1 as stored version. Create a custom resource. Patch the custom resource definition to use v2 as
@@ -329,7 +328,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, mutate custom resource with pruning
 		Description: Register mutating webhooks that adds fields to custom objects. Register a custom resource definition
 		with a schema that includes only one of the data keys added by the webhooks. Attempt to a custom resource;
@@ -367,7 +366,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, honor timeout
 		Description: Using a webhook that waits 5 seconds before admitting objects, configure the webhook with combinations
 		of timeouts and failure policy values. Attempt to create a config map with each combination. Requests MUST
@@ -401,7 +400,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, update validating webhook
 		Description: Register a validating admission webhook configuration. Update the webhook to not apply to the create
 		operation and attempt to create an object; the webhook MUST NOT deny the create. Patch the webhook to apply to the
@@ -496,7 +495,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, update mutating webhook
 		Description: Register a mutating admission webhook configuration. Update the webhook to not apply to the create
 		operation and attempt to create an object; the webhook MUST NOT mutate the object. Patch the webhook to apply to the
@@ -569,7 +568,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, list validating webhooks
 		Description: Create 10 validating webhook configurations, all with a label. Attempt to list the webhook
 		configurations matching the label; all the created webhook configurations MUST be present. Attempt to create an
@@ -643,7 +642,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	})
 
 	/*
-		Release : v1.16
+		Release: v1.16
 		Testname: Admission webhook, list mutating webhooks
 		Description: Create 10 mutating webhook configurations, all with a label. Attempt to list the webhook
 		configurations matching the label; all the created webhook configurations MUST be present. Attempt to create an
@@ -1064,7 +1063,7 @@ func testMutatingPodWebhook(f *framework.Framework) {
 	client := f.ClientSet
 	pod := toBeMutatedPod(f)
 	mutatedPod, err := client.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 	if len(mutatedPod.Spec.InitContainers) != 1 {
 		framework.Failf("expect pod to have 1 init container, got %#v", mutatedPod.Spec.InitContainers)
 	}
@@ -2211,9 +2210,9 @@ func testSlowWebhookTimeoutNoError(f *framework.Framework) {
 	client := f.ClientSet
 	name := "e2e-test-slow-webhook-configmap"
 	_, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name}}, metav1.CreateOptions{})
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 	err = client.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 }
 
 // createAdmissionWebhookMultiVersionTestCRDWithV1Storage creates a new CRD specifically

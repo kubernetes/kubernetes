@@ -453,7 +453,7 @@ func waitForJobReplaced(c clientset.Interface, ns, previousJobName string) error
 		// Ignore Jobs pending deletion, since deletion of Jobs is now asynchronous.
 		aliveJobs := filterNotDeletedJobs(jobs)
 		if len(aliveJobs) > 1 {
-			return false, fmt.Errorf("More than one job is running %+v", jobs.Items)
+			return false, fmt.Errorf("more than one job is running %+v", jobs.Items)
 		} else if len(aliveJobs) == 0 {
 			framework.Logf("Warning: Found 0 jobs in namespace %v", ns)
 			return false, nil

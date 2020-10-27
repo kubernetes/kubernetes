@@ -240,6 +240,8 @@ func TestCreateOrUpdateLB(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	referencedResourceNotProvisionedRawErrorString := `Code="ReferencedResourceNotProvisioned" Message="Cannot proceed with operation because resource /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/publicIPAddresses/pip used by resource /subscriptions/sub/resourceGroups/rg/providers/Microsoft.Network/loadBalancers/lb is not in Succeeded state. Resource is in Failed state and the last operation that updated/is updating the resource is PutPublicIpAddressOperation."`
+
 	tests := []struct {
 		clientErr   *retry.Error
 		expectedErr error
@@ -252,6 +254,10 @@ func TestCreateOrUpdateLB(t *testing.T) {
 			clientErr:   &retry.Error{RawError: fmt.Errorf(operationCanceledErrorMessage)},
 			expectedErr: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: canceledandsupersededduetoanotheroperation"),
 		},
+		{
+			clientErr:   &retry.Error{RawError: fmt.Errorf(referencedResourceNotProvisionedRawErrorString)},
+			expectedErr: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 0, RawError: %s", referencedResourceNotProvisionedRawErrorString),
+		},
 	}
 
 	for _, test := range tests {
@@ -261,6 +267,15 @@ func TestCreateOrUpdateLB(t *testing.T) {
 		mockLBClient := az.LoadBalancerClient.(*mockloadbalancerclient.MockInterface)
 		mockLBClient.EXPECT().CreateOrUpdate(gomock.Any(), az.ResourceGroup, gomock.Any(), gomock.Any(), gomock.Any()).Return(test.clientErr)
 		mockLBClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "lb", gomock.Any()).Return(network.LoadBalancer{}, nil)
+
+		mockPIPClient := az.PublicIPAddressesClient.(*mockpublicipclient.MockInterface)
+		mockPIPClient.EXPECT().CreateOrUpdate(gomock.Any(), az.ResourceGroup, "pip", gomock.Any()).Return(nil).AnyTimes()
+		mockPIPClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "pip", gomock.Any()).Return(network.PublicIPAddress{
+			Name: to.StringPtr("pip"),
+			PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+				ProvisioningState: to.StringPtr("Succeeded"),
+			},
+		}, nil).AnyTimes()
 
 		err := az.CreateOrUpdateLB(&v1.Service{}, network.LoadBalancer{
 			Name: to.StringPtr("lb"),

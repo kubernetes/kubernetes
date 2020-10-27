@@ -156,6 +156,28 @@ func (pw *prefixWriter) Flush() {
 	}
 }
 
+// nestedPrefixWriter implements PrefixWriter by increasing the level
+// before passing text on to some other writer.
+type nestedPrefixWriter struct {
+	PrefixWriter
+	indent int
+}
+
+var _ PrefixWriter = &prefixWriter{}
+
+// NewPrefixWriter creates a new PrefixWriter.
+func NewNestedPrefixWriter(out PrefixWriter, indent int) PrefixWriter {
+	return &nestedPrefixWriter{PrefixWriter: out, indent: indent}
+}
+
+func (npw *nestedPrefixWriter) Write(level int, format string, a ...interface{}) {
+	npw.PrefixWriter.Write(level+npw.indent, format, a...)
+}
+
+func (npw *nestedPrefixWriter) WriteLine(a ...interface{}) {
+	npw.PrefixWriter.Write(npw.indent, "%s", fmt.Sprintln(a...))
+}
+
 func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescriber, error) {
 	c, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
@@ -822,6 +844,8 @@ func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
 			printGlusterfsVolumeSource(volume.VolumeSource.Glusterfs, w)
 		case volume.VolumeSource.PersistentVolumeClaim != nil:
 			printPersistentVolumeClaimVolumeSource(volume.VolumeSource.PersistentVolumeClaim, w)
+		case volume.VolumeSource.Ephemeral != nil:
+			printEphemeralVolumeSource(volume.VolumeSource.Ephemeral, w)
 		case volume.VolumeSource.RBD != nil:
 			printRBDVolumeSource(volume.VolumeSource.RBD, w)
 		case volume.VolumeSource.Quobyte != nil:
@@ -1035,6 +1059,18 @@ func printPersistentVolumeClaimVolumeSource(claim *corev1.PersistentVolumeClaimV
 		"    ClaimName:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		claim.ClaimName, claim.ReadOnly)
+}
+
+func printEphemeralVolumeSource(ephemeral *corev1.EphemeralVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tEphemeralVolume (an inline specification for a volume that gets created and deleted with the pod)\n")
+	if ephemeral.VolumeClaimTemplate != nil {
+		printPersistentVolumeClaim(NewNestedPrefixWriter(w, LEVEL_2),
+			&corev1.PersistentVolumeClaim{
+				ObjectMeta: ephemeral.VolumeClaimTemplate.ObjectMeta,
+				Spec:       ephemeral.VolumeClaimTemplate.Spec,
+			}, false /* not a full PVC */)
+	}
+	w.Write(LEVEL_2, "ReadOnly:\t%v\n", ephemeral.ReadOnly)
 }
 
 func printRBDVolumeSource(rbd *corev1.RBDVolumeSource, w PrefixWriter) {
@@ -1535,39 +1571,7 @@ func getPvcs(volumes []corev1.Volume) []corev1.Volume {
 func describePersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, events *corev1.EventList, mountPods []corev1.Pod) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", pvc.Name)
-		w.Write(LEVEL_0, "Namespace:\t%s\n", pvc.Namespace)
-		w.Write(LEVEL_0, "StorageClass:\t%s\n", storageutil.GetPersistentVolumeClaimClass(pvc))
-		if pvc.ObjectMeta.DeletionTimestamp != nil {
-			w.Write(LEVEL_0, "Status:\tTerminating (lasts %s)\n", translateTimestampSince(*pvc.ObjectMeta.DeletionTimestamp))
-		} else {
-			w.Write(LEVEL_0, "Status:\t%v\n", pvc.Status.Phase)
-		}
-		w.Write(LEVEL_0, "Volume:\t%s\n", pvc.Spec.VolumeName)
-		printLabelsMultiline(w, "Labels", pvc.Labels)
-		printAnnotationsMultiline(w, "Annotations", pvc.Annotations)
-		w.Write(LEVEL_0, "Finalizers:\t%v\n", pvc.ObjectMeta.Finalizers)
-		storage := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
-		capacity := ""
-		accessModes := ""
-		if pvc.Spec.VolumeName != "" {
-			accessModes = storageutil.GetAccessModesAsString(pvc.Status.AccessModes)
-			storage = pvc.Status.Capacity[corev1.ResourceStorage]
-			capacity = storage.String()
-		}
-		w.Write(LEVEL_0, "Capacity:\t%s\n", capacity)
-		w.Write(LEVEL_0, "Access Modes:\t%s\n", accessModes)
-		if pvc.Spec.VolumeMode != nil {
-			w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pvc.Spec.VolumeMode)
-		}
-		if pvc.Spec.DataSource != nil {
-			w.Write(LEVEL_0, "DataSource:\n")
-			if pvc.Spec.DataSource.APIGroup != nil {
-				w.Write(LEVEL_1, "APIGroup:\t%v\n", *pvc.Spec.DataSource.APIGroup)
-			}
-			w.Write(LEVEL_1, "Kind:\t%v\n", pvc.Spec.DataSource.Kind)
-			w.Write(LEVEL_1, "Name:\t%v\n", pvc.Spec.DataSource.Name)
-		}
+		printPersistentVolumeClaim(w, pvc, true)
 		printPodsMultiline(w, "Mounted By", mountPods)
 
 		if len(pvc.Status.Conditions) > 0 {
@@ -1590,6 +1594,50 @@ func describePersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, events *co
 
 		return nil
 	})
+}
+
+// printPersistentVolumeClaim is used for both PVCs and PersistentVolumeClaimTemplate. For the latter,
+// we need to skip some fields which have no meaning.
+func printPersistentVolumeClaim(w PrefixWriter, pvc *corev1.PersistentVolumeClaim, isFullPVC bool) {
+	if isFullPVC {
+		w.Write(LEVEL_0, "Name:\t%s\n", pvc.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", pvc.Namespace)
+	}
+	w.Write(LEVEL_0, "StorageClass:\t%s\n", storageutil.GetPersistentVolumeClaimClass(pvc))
+	if isFullPVC {
+		if pvc.ObjectMeta.DeletionTimestamp != nil {
+			w.Write(LEVEL_0, "Status:\tTerminating (lasts %s)\n", translateTimestampSince(*pvc.ObjectMeta.DeletionTimestamp))
+		} else {
+			w.Write(LEVEL_0, "Status:\t%v\n", pvc.Status.Phase)
+		}
+	}
+	w.Write(LEVEL_0, "Volume:\t%s\n", pvc.Spec.VolumeName)
+	printLabelsMultiline(w, "Labels", pvc.Labels)
+	printAnnotationsMultiline(w, "Annotations", pvc.Annotations)
+	if isFullPVC {
+		w.Write(LEVEL_0, "Finalizers:\t%v\n", pvc.ObjectMeta.Finalizers)
+	}
+	storage := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
+	capacity := ""
+	accessModes := ""
+	if pvc.Spec.VolumeName != "" {
+		accessModes = storageutil.GetAccessModesAsString(pvc.Status.AccessModes)
+		storage = pvc.Status.Capacity[corev1.ResourceStorage]
+		capacity = storage.String()
+	}
+	w.Write(LEVEL_0, "Capacity:\t%s\n", capacity)
+	w.Write(LEVEL_0, "Access Modes:\t%s\n", accessModes)
+	if pvc.Spec.VolumeMode != nil {
+		w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pvc.Spec.VolumeMode)
+	}
+	if pvc.Spec.DataSource != nil {
+		w.Write(LEVEL_0, "DataSource:\n")
+		if pvc.Spec.DataSource.APIGroup != nil {
+			w.Write(LEVEL_1, "APIGroup:\t%v\n", *pvc.Spec.DataSource.APIGroup)
+		}
+		w.Write(LEVEL_1, "Kind:\t%v\n", pvc.Spec.DataSource.Kind)
+		w.Write(LEVEL_1, "Name:\t%v\n", pvc.Spec.DataSource.Name)
+	}
 }
 
 func describeContainers(label string, containers []corev1.Container, containerStatuses []corev1.ContainerStatus,
@@ -2417,7 +2465,7 @@ func (i *IngressDescriber) describeBackendV1(ns string, backend *networkingv1.In
 			}
 		}
 		ep := formatEndpoints(endpoints, sets.NewString(spName))
-		return fmt.Sprintf("%s\t %s)", sb, ep)
+		return fmt.Sprintf("%s (%s)", sb, ep)
 	}
 	if backend.Resource != nil {
 		ic := backend.Resource
@@ -2470,7 +2518,7 @@ func (i *IngressDescriber) describeIngressV1(ing *networkingv1.Ingress, events *
 			}
 		}
 		if count == 0 {
-			w.Write(LEVEL_1, "\t%s %s\n", "*", "*", i.describeBackendV1(ns, def))
+			w.Write(LEVEL_1, "%s\t%s\t%s\n", "*", "*", i.describeBackendV1(ns, def))
 		}
 		printAnnotationsMultiline(w, "Annotations", ing.Annotations)
 
@@ -2673,10 +2721,27 @@ func describeService(service *corev1.Service, endpoints *corev1.Endpoints, event
 		printAnnotationsMultiline(w, "Annotations", service.Annotations)
 		w.Write(LEVEL_0, "Selector:\t%s\n", labels.FormatLabels(service.Spec.Selector))
 		w.Write(LEVEL_0, "Type:\t%s\n", service.Spec.Type)
-		w.Write(LEVEL_0, "IP:\t%s\n", service.Spec.ClusterIP)
 
-		if service.Spec.IPFamily != nil {
-			w.Write(LEVEL_0, "IPFamily:\t%s\n", *(service.Spec.IPFamily))
+		if service.Spec.IPFamilyPolicy != nil {
+			w.Write(LEVEL_0, "IP Family Policy:\t%s\n", *(service.Spec.IPFamilyPolicy))
+		}
+
+		if len(service.Spec.IPFamilies) > 0 {
+			ipfamiliesStrings := make([]string, 0, len(service.Spec.IPFamilies))
+			for _, family := range service.Spec.IPFamilies {
+				ipfamiliesStrings = append(ipfamiliesStrings, string(family))
+			}
+
+			w.Write(LEVEL_0, "IP Families:\t%s\n", strings.Join(ipfamiliesStrings, ","))
+		} else {
+			w.Write(LEVEL_0, "IP Families:\t%s\n", "<none>")
+		}
+
+		w.Write(LEVEL_0, "IP:\t%s\n", service.Spec.ClusterIP)
+		if len(service.Spec.ClusterIPs) > 0 {
+			w.Write(LEVEL_0, "IPs:\t%s\n", strings.Join(service.Spec.ClusterIPs, ","))
+		} else {
+			w.Write(LEVEL_0, "IPs:\t%s\n", "<none>")
 		}
 
 		if len(service.Spec.ExternalIPs) > 0 {
@@ -3605,8 +3670,28 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 					}
 					w.Write(LEVEL_1, "(as a percentage of request):\t%s / %s\n", current, target)
 				}
+			case autoscalingv2beta2.ContainerResourceMetricSourceType:
+				w.Write(LEVEL_1, "resource %s of container \"%s\" on pods", string(metric.ContainerResource.Name), metric.ContainerResource.Container)
+				if metric.ContainerResource.Target.AverageValue != nil {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].ContainerResource != nil {
+						current = hpa.Status.CurrentMetrics[i].ContainerResource.Current.AverageValue.String()
+					}
+					w.Write(LEVEL_0, ":\t%s / %s\n", current, metric.ContainerResource.Target.AverageValue.String())
+				} else {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].ContainerResource != nil && hpa.Status.CurrentMetrics[i].ContainerResource.Current.AverageUtilization != nil {
+						current = fmt.Sprintf("%d%% (%s)", *hpa.Status.CurrentMetrics[i].ContainerResource.Current.AverageUtilization, hpa.Status.CurrentMetrics[i].ContainerResource.Current.AverageValue.String())
+					}
+
+					target := "<auto>"
+					if metric.ContainerResource.Target.AverageUtilization != nil {
+						target = fmt.Sprintf("%d%%", *metric.ContainerResource.Target.AverageUtilization)
+					}
+					w.Write(LEVEL_1, "(as a percentage of request):\t%s / %s\n", current, target)
+				}
 			default:
-				w.Write(LEVEL_1, "<unknown metric type %q>", string(metric.Type))
+				w.Write(LEVEL_1, "<unknown metric type %q>\n", string(metric.Type))
 			}
 		}
 		minReplicas := "<unset>"
@@ -3825,11 +3910,15 @@ func DescribeEvents(el *corev1.EventList, w PrefixWriter) {
 				interval = translateMicroTimestampSince(e.EventTime)
 			}
 		}
+		source := e.Source.Component
+		if source == "" {
+			source = e.ReportingController
+		}
 		w.Write(LEVEL_1, "%v\t%v\t%s\t%v\t%v\n",
 			e.Type,
 			e.Reason,
 			interval,
-			formatEventSource(e.Source),
+			source,
 			strings.TrimSpace(e.Message),
 		)
 	}
@@ -4109,7 +4198,7 @@ func printNetworkPolicySpecEgressTo(npers []networkingv1.NetworkPolicyEgressRule
 			}
 		}
 		if len(nper.To) == 0 {
-			w.Write(LEVEL_0, "%s%s\n", initialIndent, "To: <any> (traffic not restricted by source)")
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "To: <any> (traffic not restricted by destination)")
 		} else {
 			for _, to := range nper.To {
 				w.Write(LEVEL_0, "%s%s\n", initialIndent, "To:")
@@ -4789,7 +4878,7 @@ func printTolerationsMultilineWithIndent(w PrefixWriter, initialIndent, title, i
 		// - operator: "Exists"
 		// is a special case which tolerates everything
 		if toleration.Operator == corev1.TolerationOpExists && len(toleration.Value) == 0 {
-			if len(toleration.Key) != 0 {
+			if len(toleration.Key) != 0 || len(toleration.Effect) != 0 {
 				w.Write(LEVEL_0, " op=Exists")
 			} else {
 				w.Write(LEVEL_0, "op=Exists")
@@ -4951,15 +5040,6 @@ func translateTimestampSince(timestamp metav1.Time) string {
 	}
 
 	return duration.HumanDuration(time.Since(timestamp.Time))
-}
-
-// formatEventSource formats EventSource as a comma separated string excluding Host when empty
-func formatEventSource(es corev1.EventSource) string {
-	EventSourceString := []string{es.Component}
-	if len(es.Host) > 0 {
-		EventSourceString = append(EventSourceString, es.Host)
-	}
-	return strings.Join(EventSourceString, ", ")
 }
 
 // Pass ports=nil for all ports.

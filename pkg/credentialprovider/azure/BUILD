@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "azure_acr_helper.go",
         "azure_credentials.go",
+        "doc.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/credentialprovider/azure",
     deps = [
@@ -34,6 +35,7 @@ go_test(
         "//vendor/github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
 

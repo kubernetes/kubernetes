@@ -54,7 +54,7 @@ type csiClient interface {
 		fsType string,
 		mountOptions []string,
 	) error
-	NodeExpandVolume(ctx context.Context, volumeid, volumePath string, newSize resource.Quantity) (resource.Quantity, error)
+	NodeExpandVolume(ctx context.Context, rsOpts csiResizeOptions) (resource.Quantity, error)
 	NodeUnpublishVolume(
 		ctx context.Context,
 		volID string,
@@ -93,6 +93,20 @@ type csiDriverClient struct {
 	driverName          csiDriverName
 	addr                csiAddr
 	nodeV1ClientCreator nodeV1ClientCreator
+}
+
+type csiResizeOptions struct {
+	volumeID string
+	// volumePath is path where volume is available. It could be:
+	//   - path where node is staged if NodeExpandVolume is called after NodeStageVolume
+	//   - path where volume is published if NodeExpandVolume is called after NodePublishVolume
+	// DEPRECATION NOTICE: in future NodeExpandVolume will be always called after NodePublish
+	volumePath        string
+	stagingTargetPath string
+	fsType            string
+	accessMode        api.PersistentVolumeAccessMode
+	newSize           resource.Quantity
+	mountOptions      []string
 }
 
 var _ csiClient = &csiDriverClient{}
@@ -245,36 +259,61 @@ func (c *csiDriverClient) NodePublishVolume(
 	return err
 }
 
-func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, volumeID, volumePath string, newSize resource.Quantity) (resource.Quantity, error) {
+func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOptions) (resource.Quantity, error) {
 	if c.nodeV1ClientCreator == nil {
-		return newSize, fmt.Errorf("version of CSI driver does not support volume expansion")
+		return opts.newSize, fmt.Errorf("version of CSI driver does not support volume expansion")
 	}
 
-	if volumeID == "" {
-		return newSize, errors.New("missing volume id")
+	if opts.volumeID == "" {
+		return opts.newSize, errors.New("missing volume id")
 	}
-	if volumePath == "" {
-		return newSize, errors.New("missing volume path")
+	if opts.volumePath == "" {
+		return opts.newSize, errors.New("missing volume path")
 	}
 
-	if newSize.Value() < 0 {
-		return newSize, errors.New("size can not be less than 0")
+	if opts.newSize.Value() < 0 {
+		return opts.newSize, errors.New("size can not be less than 0")
 	}
 
 	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
 	if err != nil {
-		return newSize, err
+		return opts.newSize, err
 	}
 	defer closer.Close()
 
 	req := &csipbv1.NodeExpandVolumeRequest{
-		VolumeId:      volumeID,
-		VolumePath:    volumePath,
-		CapacityRange: &csipbv1.CapacityRange{RequiredBytes: newSize.Value()},
+		VolumeId:      opts.volumeID,
+		VolumePath:    opts.volumePath,
+		CapacityRange: &csipbv1.CapacityRange{RequiredBytes: opts.newSize.Value()},
+		VolumeCapability: &csipbv1.VolumeCapability{
+			AccessMode: &csipbv1.VolumeCapability_AccessMode{
+				Mode: asCSIAccessModeV1(opts.accessMode),
+			},
+		},
 	}
+
+	// not all CSI drivers support NodeStageUnstage and hence the StagingTargetPath
+	// should only be set when available
+	if opts.stagingTargetPath != "" {
+		req.StagingTargetPath = opts.stagingTargetPath
+	}
+
+	if opts.fsType == fsTypeBlockName {
+		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Block{
+			Block: &csipbv1.VolumeCapability_BlockVolume{},
+		}
+	} else {
+		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Mount{
+			Mount: &csipbv1.VolumeCapability_MountVolume{
+				FsType:     opts.fsType,
+				MountFlags: opts.mountOptions,
+			},
+		}
+	}
+
 	resp, err := nodeClient.NodeExpandVolume(ctx, req)
 	if err != nil {
-		return newSize, err
+		return opts.newSize, err
 	}
 	updatedQuantity := resource.NewQuantity(resp.CapacityBytes, resource.BinarySI)
 	return *updatedQuantity, nil

@@ -87,6 +87,7 @@ coordination.k8s.io/v1 \
 discovery.k8s.io/v1alpha1 \
 discovery.k8s.io/v1beta1 \
 extensions/v1beta1 \
+events.k8s.io/v1 \
 events.k8s.io/v1beta1 \
 imagepolicy.k8s.io/v1alpha1 \
 networking.k8s.io/v1 \
@@ -100,11 +101,11 @@ rbac.authorization.k8s.io/v1alpha1 \
 scheduling.k8s.io/v1alpha1 \
 scheduling.k8s.io/v1beta1 \
 scheduling.k8s.io/v1 \
-settings.k8s.io/v1alpha1 \
 storage.k8s.io/v1beta1 \
 storage.k8s.io/v1 \
 storage.k8s.io/v1alpha1 \
 flowcontrol.apiserver.k8s.io/v1alpha1 \
+internal.apiserver.k8s.io/v1alpha1 \
 }"
 
 # not all group versions are exposed by the server.  This list contains those

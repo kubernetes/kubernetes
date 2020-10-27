@@ -32,6 +32,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	storagev1informer "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -42,6 +43,7 @@ import (
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	csitrans "k8s.io/csi-translation-lib"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
@@ -57,12 +59,12 @@ import (
 	ttlcontroller "k8s.io/kubernetes/pkg/controller/ttl"
 	"k8s.io/kubernetes/pkg/controller/ttlafterfinished"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
+	"k8s.io/kubernetes/pkg/controller/volume/ephemeral"
 	"k8s.io/kubernetes/pkg/controller/volume/expand"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/controller/volume/pvcprotection"
 	"k8s.io/kubernetes/pkg/controller/volume/pvprotection"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	netutils "k8s.io/utils/net"
@@ -108,14 +110,14 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 		return nil, false, err
 	}
 
-	// failure: more than one cidr and dual stack is not enabled
-	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and dualstack feature is not enabled", len(clusterCIDRs))
+	// failure: more than one cidr and dual stack is not enabled and/or endpoint slice is not enabled
+	if len(clusterCIDRs) > 1 && (!utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) || !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice)) {
+		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and dualstack or EndpointSlice feature is not enabled", len(clusterCIDRs))
 	}
 
 	// failure: more than one cidr but they are not configured as dual stack
 	if len(clusterCIDRs) > 1 && !dualStack {
-		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and they are not configured as dual stack (at least one from each IPFamily", len(clusterCIDRs))
+		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and they are not configured as dual stack (at least one from each IPFamily)", len(clusterCIDRs))
 	}
 
 	// failure: more than cidrs is not allowed even with dual stack
@@ -156,13 +158,13 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 	}
 
 	var nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6 int
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+	if dualStack {
 		// only --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 supported with dual stack clusters.
 		// --node-cidr-mask-size flag is incompatible with dual stack clusters.
 		nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6, err = setNodeCIDRMaskSizesDualStack(ctx.ComponentConfig.NodeIPAMController)
 	} else {
 		// only --node-cidr-mask-size supported with single stack clusters.
-		// --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 flags are incompatible with dual stack clusters.
+		// --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 flags are incompatible with single stack clusters.
 		nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6, err = setNodeCIDRMaskSizes(ctx.ComponentConfig.NodeIPAMController)
 	}
 
@@ -284,6 +286,12 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler,
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to probe volume plugins when starting persistentvolume controller: %v", err)
 	}
+	filteredDialOptions, err := options.ParseVolumeHostFilters(
+		ctx.ComponentConfig.PersistentVolumeBinderController.VolumeHostCIDRDenylist,
+		ctx.ComponentConfig.PersistentVolumeBinderController.VolumeHostAllowLocalLoopback)
+	if err != nil {
+		return nil, true, err
+	}
 	params := persistentvolumecontroller.ControllerParameters{
 		KubeClient:                ctx.ClientBuilder.ClientOrDie("persistent-volume-binder"),
 		SyncPeriod:                ctx.ComponentConfig.PersistentVolumeBinderController.PVClaimBinderSyncPeriod.Duration,
@@ -296,6 +304,7 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler,
 		PodInformer:               ctx.InformerFactory.Core().V1().Pods(),
 		NodeInformer:              ctx.InformerFactory.Core().V1().Nodes(),
 		EnableDynamicProvisioning: ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration.EnableDynamicProvisioning,
+		FilteredDialOptions:       filteredDialOptions,
 	}
 	volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)
 	if volumeControllerErr != nil {
@@ -323,6 +332,13 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 		return nil, true, fmt.Errorf("failed to probe volume plugins when starting attach/detach controller: %v", err)
 	}
 
+	filteredDialOptions, err := options.ParseVolumeHostFilters(
+		ctx.ComponentConfig.PersistentVolumeBinderController.VolumeHostCIDRDenylist,
+		ctx.ComponentConfig.PersistentVolumeBinderController.VolumeHostAllowLocalLoopback)
+	if err != nil {
+		return nil, true, err
+	}
+
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
 			ctx.ClientBuilder.ClientOrDie("attachdetach-controller"),
@@ -339,6 +355,7 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 			ctx.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
 			ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
 			attachdetach.DefaultTimerConfig,
+			filteredDialOptions,
 		)
 	if attachDetachControllerErr != nil {
 		return nil, true, fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
@@ -354,20 +371,43 @@ func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, err
 			return nil, true, fmt.Errorf("failed to probe volume plugins when starting volume expand controller: %v", err)
 		}
 		csiTranslator := csitrans.New()
+		filteredDialOptions, err := options.ParseVolumeHostFilters(
+			ctx.ComponentConfig.PersistentVolumeBinderController.VolumeHostCIDRDenylist,
+			ctx.ComponentConfig.PersistentVolumeBinderController.VolumeHostAllowLocalLoopback)
+		if err != nil {
+			return nil, true, err
+		}
 		expandController, expandControllerErr := expand.NewExpandController(
 			ctx.ClientBuilder.ClientOrDie("expand-controller"),
 			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 			ctx.InformerFactory.Core().V1().PersistentVolumes(),
-			ctx.InformerFactory.Storage().V1().StorageClasses(),
 			ctx.Cloud,
 			plugins,
 			csiTranslator,
-			csimigration.NewPluginManager(csiTranslator))
+			csimigration.NewPluginManager(csiTranslator),
+			filteredDialOptions,
+		)
 
 		if expandControllerErr != nil {
 			return nil, true, fmt.Errorf("failed to start volume expand controller: %v", expandControllerErr)
 		}
 		go expandController.Run(ctx.Stop)
+		return nil, true, nil
+	}
+	return nil, false, nil
+}
+
+func startEphemeralVolumeController(ctx ControllerContext) (http.Handler, bool, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+		ephemeralController, err := ephemeral.NewController(
+			ctx.ClientBuilder.ClientOrDie("ephemeral-volume-controller"),
+			ctx.InformerFactory.Core().V1().Pods(),
+			ctx.InformerFactory.Core().V1().PersistentVolumeClaims())
+		if err != nil {
+			return nil, true, fmt.Errorf("failed to start ephemeral volume controller: %v", err)
+		}
+		// TODO (before beta at the latest): make this configurable similar to the EndpointController
+		go ephemeralController.Run(1 /* int(ctx.ComponentConfig.EphemeralController.ConcurrentEphemeralVolumeSyncs) */, ctx.Stop)
 		return nil, true, nil
 	}
 	return nil, false, nil
@@ -410,7 +450,7 @@ func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, er
 	listerFuncForResource := generic.ListerFuncForResourceFunc(ctx.InformerFactory.ForResource)
 	quotaConfiguration := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
 
-	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
+	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
 		ResourceQuotaInformer:     ctx.InformerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.ComponentConfig.ResourceQuotaController.ResourceQuotaSyncPeriod.Duration),
@@ -427,7 +467,7 @@ func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, er
 		}
 	}
 
-	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions)
+	resourceQuotaController, err := resourcequotacontroller.NewController(resourceQuotaControllerOptions)
 	if err != nil {
 		return nil, false, err
 	}
@@ -538,6 +578,7 @@ func startPVCProtectionController(ctx ControllerContext) (http.Handler, bool, er
 		ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("pvc-protection-controller"),
+		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
 		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
 	)
 	if err != nil {

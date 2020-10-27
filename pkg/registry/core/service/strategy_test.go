@@ -83,7 +83,7 @@ func TestExportService(t *testing.T) {
 					Namespace: "bar",
 				},
 				Spec: api.ServiceSpec{
-					ClusterIP: "10.0.0.1",
+					ClusterIPs: []string{"10.0.0.1"},
 				},
 				Status: api.ServiceStatus{
 					LoadBalancer: api.LoadBalancerStatus{
@@ -99,10 +99,38 @@ func TestExportService(t *testing.T) {
 					Namespace: "bar",
 				},
 				Spec: api.ServiceSpec{
-					ClusterIP: "",
+					ClusterIPs: nil,
 				},
 			},
 		},
+		{
+			objIn: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Spec: api.ServiceSpec{
+					ClusterIPs: []string{"10.0.0.1", "2001::1"},
+				},
+				Status: api.ServiceStatus{
+					LoadBalancer: api.LoadBalancerStatus{
+						Ingress: []api.LoadBalancerIngress{
+							{IP: "1.2.3.4"},
+						},
+					},
+				},
+			},
+			objOut: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+				Spec: api.ServiceSpec{
+					ClusterIPs: nil,
+				},
+			},
+		},
+
 		{
 			objIn:     &api.Pod{},
 			expectErr: true,
@@ -146,7 +174,6 @@ func TestCheckGeneratedNameError(t *testing.T) {
 }
 
 func makeValidService() api.Service {
-	defaultServiceIPFamily := api.IPv4Protocol
 	return api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "valid",
@@ -160,137 +187,16 @@ func makeValidService() api.Service {
 			SessionAffinity: "None",
 			Type:            api.ServiceTypeClusterIP,
 			Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675, TargetPort: intstr.FromInt(8675)}},
-			IPFamily:        &defaultServiceIPFamily,
 		},
 	}
 }
 
 // TODO: This should be done on types that are not part of our API
-func TestBeforeCreate(t *testing.T) {
-	withIP := func(family *api.IPFamily, ip string) *api.Service {
-		svc := makeValidService()
-		svc.Spec.IPFamily = family
-		svc.Spec.ClusterIP = ip
-		return &svc
-	}
-
-	ipv4 := api.IPv4Protocol
-	ipv6 := api.IPv6Protocol
-	testCases := []struct {
-		name               string
-		cidr               string
-		configureDualStack bool
-		enableDualStack    bool
-		in                 *api.Service
-		expect             *api.Service
-		expectErr          bool
-	}{
-		{
-			name:   "does not set ipfamily when dual stack gate is disabled",
-			cidr:   "10.0.0.0/16",
-			in:     withIP(nil, ""),
-			expect: withIP(nil, ""),
-		},
-
-		{
-			name:   "clears ipfamily when dual stack gate is disabled",
-			cidr:   "10.0.0.0/16",
-			in:     withIP(&ipv4, ""),
-			expect: withIP(nil, ""),
-		},
-
-		{
-			name:            "allows ipfamily to configured ipv4 value",
-			cidr:            "10.0.0.0/16",
-			enableDualStack: true,
-			in:              withIP(nil, ""),
-			expect:          withIP(&ipv4, ""),
-		},
-		{
-			name:               "allows ipfamily to configured ipv4 value when dual stack is in use",
-			cidr:               "10.0.0.0/16",
-			enableDualStack:    true,
-			configureDualStack: true,
-			in:                 withIP(nil, ""),
-			expect:             withIP(&ipv4, ""),
-		},
-		{
-			name:            "allows ipfamily to configured ipv6 value",
-			cidr:            "fd00::/64",
-			enableDualStack: true,
-			in:              withIP(nil, ""),
-			expect:          withIP(&ipv6, ""),
-		},
-		{
-			name:               "allows ipfamily to configured ipv6 value when dual stack is in use",
-			cidr:               "fd00::/64",
-			enableDualStack:    true,
-			configureDualStack: true,
-			in:                 withIP(nil, ""),
-			expect:             withIP(&ipv6, ""),
-		},
-
-		{
-			name:            "rejects ipv6 ipfamily when single-stack ipv4",
-			enableDualStack: true,
-			cidr:            "10.0.0.0/16",
-			in:              withIP(&ipv6, ""),
-			expectErr:       true,
-		},
-		{
-			name:            "rejects ipv4 ipfamily when single-stack ipv6",
-			enableDualStack: true,
-			cidr:            "fd00::/64",
-			in:              withIP(&ipv4, ""),
-			expectErr:       true,
-		},
-		{
-			name:            "rejects implicit ipv4 ipfamily when single-stack ipv6",
-			enableDualStack: true,
-			cidr:            "fd00::/64",
-			in:              withIP(nil, "10.0.1.0"),
-			expectErr:       true,
-		},
-		{
-			name:            "rejects implicit ipv6 ipfamily when single-stack ipv4",
-			enableDualStack: true,
-			cidr:            "10.0.0.0/16",
-			in:              withIP(nil, "fd00::1"),
-			expectErr:       true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
-			testStrategy, _ := newStrategy(tc.cidr, tc.configureDualStack)
-			ctx := genericapirequest.NewDefaultContext()
-			err := rest.BeforeCreate(testStrategy, ctx, runtime.Object(tc.in))
-			if tc.expectErr != (err != nil) {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if err != nil {
-				return
-			}
-			if tc.expect != nil && tc.in != nil {
-				tc.expect.ObjectMeta = tc.in.ObjectMeta
-			}
-			if !reflect.DeepEqual(tc.expect, tc.in) {
-				t.Fatalf("unexpected change: %s", diff.ObjectReflectDiff(tc.expect, tc.in))
-			}
-		})
-	}
-}
-
 func TestBeforeUpdate(t *testing.T) {
 	testCases := []struct {
-		name            string
-		enableDualStack bool
-		defaultIPv6     bool
-		allowSecondary  bool
-		tweakSvc        func(oldSvc, newSvc *api.Service) // given basic valid services, each test case can customize them
-		expectErr       bool
-		expectObj       func(t *testing.T, svc *api.Service)
+		name      string
+		tweakSvc  func(oldSvc, newSvc *api.Service) // given basic valid services, each test case can customize them
+		expectErr bool
 	}{
 		{
 			name: "no change",
@@ -323,23 +229,10 @@ func TestBeforeUpdate(t *testing.T) {
 		{
 			name: "change ClusterIP",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Spec.ClusterIP = "1.2.3.4"
-				newSvc.Spec.ClusterIP = "4.3.2.1"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+				newSvc.Spec.ClusterIPs = []string{"4.3.2.1"}
 			},
 			expectErr: true,
-		},
-		{
-			name:            "clear IP family is allowed (defaulted back by before update)",
-			enableDualStack: true,
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Spec.IPFamily = nil
-			},
-			expectErr: false,
-			expectObj: func(t *testing.T, svc *api.Service) {
-				if svc.Spec.IPFamily == nil {
-					t.Errorf("ipfamily was not defaulted")
-				}
-			},
 		},
 		{
 			name: "change selector",
@@ -351,32 +244,22 @@ func TestBeforeUpdate(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
-			var cidr string
-			if tc.defaultIPv6 {
-				cidr = "ffd0::/64"
-			} else {
-				cidr = "172.30.0.0/16"
-			}
-			strategy, _ := newStrategy(cidr, tc.allowSecondary)
-			oldSvc := makeValidService()
-			newSvc := makeValidService()
-			tc.tweakSvc(&oldSvc, &newSvc)
-			ctx := genericapirequest.NewDefaultContext()
-			err := rest.BeforeUpdate(strategy, ctx, runtime.Object(&newSvc), runtime.Object(&oldSvc))
-			if tc.expectObj != nil {
-				tc.expectObj(t, &newSvc)
-			}
-			if tc.expectErr && err == nil {
-				t.Fatalf("unexpected non-error: %v", err)
-			}
-			if !tc.expectErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-		})
+		strategy, _ := newStrategy("172.30.0.0/16", false)
+
+		oldSvc := makeValidService()
+		newSvc := makeValidService()
+		tc.tweakSvc(&oldSvc, &newSvc)
+		ctx := genericapirequest.NewDefaultContext()
+		err := rest.BeforeUpdate(strategy, ctx, runtime.Object(&oldSvc), runtime.Object(&newSvc))
+		if tc.expectErr && err == nil {
+			t.Errorf("unexpected non-error for %q", tc.name)
+		}
+		if !tc.expectErr && err != nil {
+			t.Errorf("unexpected error for %q: %v", tc.name, err)
+		}
 	}
 }
+
 func TestServiceStatusStrategy(t *testing.T) {
 	_, testStatusStrategy := newStrategy("10.0.0.0/16", false)
 	ctx := genericapirequest.NewDefaultContext()
@@ -408,16 +291,20 @@ func TestServiceStatusStrategy(t *testing.T) {
 	}
 }
 
-func makeServiceWithIPFamily(ipFamily *api.IPFamily) *api.Service {
+func makeServiceWithIPFamilies(ipfamilies []api.IPFamily, ipFamilyPolicy *api.IPFamilyPolicyType) *api.Service {
 	return &api.Service{
 		Spec: api.ServiceSpec{
-			IPFamily: ipFamily,
+			IPFamilies:     ipfamilies,
+			IPFamilyPolicy: ipFamilyPolicy,
 		},
 	}
 }
+
 func TestDropDisabledField(t *testing.T) {
-	ipv4Service := api.IPv4Protocol
-	ipv6Service := api.IPv6Protocol
+	requireDualStack := api.IPFamilyPolicyRequireDualStack
+	preferDualStack := api.IPFamilyPolicyPreferDualStack
+	singleStack := api.IPFamilyPolicySingleStack
+
 	testCases := []struct {
 		name            string
 		enableDualStack bool
@@ -428,44 +315,60 @@ func TestDropDisabledField(t *testing.T) {
 		{
 			name:            "not dual stack, field not used",
 			enableDualStack: false,
-			svc:             makeServiceWithIPFamily(nil),
+			svc:             makeServiceWithIPFamilies(nil, nil),
 			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamily(nil),
-		},
-		{
-			name:            "not dual stack, field used in new, not in old",
-			enableDualStack: false,
-			svc:             makeServiceWithIPFamily(&ipv4Service),
-			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamily(nil),
+			compareSvc:      makeServiceWithIPFamilies(nil, nil),
 		},
 		{
 			name:            "not dual stack, field used in old and new",
 			enableDualStack: false,
-			svc:             makeServiceWithIPFamily(&ipv4Service),
-			oldSvc:          makeServiceWithIPFamily(&ipv4Service),
-			compareSvc:      makeServiceWithIPFamily(&ipv4Service),
+			svc:             makeServiceWithIPFamilies([]api.IPFamily{api.IPv4Protocol}, nil),
+			oldSvc:          makeServiceWithIPFamilies([]api.IPFamily{api.IPv4Protocol}, nil),
+			compareSvc:      makeServiceWithIPFamilies([]api.IPFamily{api.IPv4Protocol}, nil),
 		},
 		{
 			name:            "dualstack, field used",
 			enableDualStack: true,
-			svc:             makeServiceWithIPFamily(&ipv6Service),
+			svc:             makeServiceWithIPFamilies([]api.IPFamily{api.IPv6Protocol}, nil),
 			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamily(&ipv6Service),
+			compareSvc:      makeServiceWithIPFamilies([]api.IPFamily{api.IPv6Protocol}, nil),
+		},
+		/* preferDualStack field */
+		{
+			name:            "not dual stack, fields is not use",
+			enableDualStack: false,
+			svc:             makeServiceWithIPFamilies(nil, nil),
+			oldSvc:          nil,
+			compareSvc:      makeServiceWithIPFamilies(nil, nil),
 		},
 		{
-			name:            "dualstack, field used, changed",
-			enableDualStack: true,
-			svc:             makeServiceWithIPFamily(&ipv6Service),
-			oldSvc:          makeServiceWithIPFamily(&ipv4Service),
-			compareSvc:      makeServiceWithIPFamily(&ipv6Service),
+			name:            "not dual stack, fields used in new, not in old",
+			enableDualStack: false,
+			svc:             makeServiceWithIPFamilies(nil, &preferDualStack),
+			oldSvc:          nil,
+			compareSvc:      makeServiceWithIPFamilies(nil, nil),
 		},
 		{
-			name:            "dualstack, field used, not changed",
+			name:            "not dual stack, fields used in new, not in old",
+			enableDualStack: false,
+			svc:             makeServiceWithIPFamilies(nil, &requireDualStack),
+			oldSvc:          nil,
+			compareSvc:      makeServiceWithIPFamilies(nil, nil),
+		},
+
+		{
+			name:            "not dual stack, fields not used in old (single stack)",
+			enableDualStack: false,
+			svc:             makeServiceWithIPFamilies(nil, nil),
+			oldSvc:          makeServiceWithIPFamilies(nil, &singleStack),
+			compareSvc:      makeServiceWithIPFamilies(nil, nil),
+		},
+		{
+			name:            "dualstack, field used",
 			enableDualStack: true,
-			svc:             makeServiceWithIPFamily(&ipv6Service),
-			oldSvc:          makeServiceWithIPFamily(&ipv6Service),
-			compareSvc:      makeServiceWithIPFamily(&ipv6Service),
+			svc:             makeServiceWithIPFamilies(nil, &singleStack),
+			oldSvc:          nil,
+			compareSvc:      makeServiceWithIPFamilies(nil, &singleStack),
 		},
 
 		/* add more tests for other dropped fields as needed */
@@ -474,7 +377,10 @@ func TestDropDisabledField(t *testing.T) {
 		func() {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
 			old := tc.oldSvc.DeepCopy()
-			dropServiceDisabledFields(tc.svc, tc.oldSvc)
+
+			// to test against user using IPFamily not set on cluster
+			svcStrategy := svcStrategy{ipFamilies: []api.IPFamily{api.IPv4Protocol}}
+			svcStrategy.dropServiceDisabledFields(tc.svc, tc.oldSvc)
 
 			// old node  should never be changed
 			if !reflect.DeepEqual(tc.oldSvc, old) {
@@ -487,4 +393,613 @@ func TestDropDisabledField(t *testing.T) {
 		}()
 	}
 
+}
+
+func TestNormalizeClusterIPs(t *testing.T) {
+	testCases := []struct {
+		name               string
+		oldService         *api.Service
+		newService         *api.Service
+		expectedClusterIP  string
+		expectedClusterIPs []string
+	}{
+
+		{
+			name:       "new - only clusterip used",
+			oldService: nil,
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: nil,
+				},
+			},
+			expectedClusterIP:  "10.0.0.10",
+			expectedClusterIPs: []string{"10.0.0.10"},
+		},
+
+		{
+			name:       "new - only clusterips used",
+			oldService: nil,
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "",
+					ClusterIPs: []string{"10.0.0.10"},
+				},
+			},
+			expectedClusterIP:  "", // this is a validation issue, and validation will catch it
+			expectedClusterIPs: []string{"10.0.0.10"},
+		},
+
+		{
+			name:       "new - both used",
+			oldService: nil,
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"10.0.0.10"},
+				},
+			},
+			expectedClusterIP:  "10.0.0.10",
+			expectedClusterIPs: []string{"10.0.0.10"},
+		},
+
+		{
+			name: "update - no change",
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"10.0.0.10"},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"10.0.0.10"},
+				},
+			},
+			expectedClusterIP:  "10.0.0.10",
+			expectedClusterIPs: []string{"10.0.0.10"},
+		},
+
+		{
+			name: "update - malformed change",
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"10.0.0.10"},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.11",
+					ClusterIPs: []string{"10.0.0.11"},
+				},
+			},
+			expectedClusterIP:  "10.0.0.11",
+			expectedClusterIPs: []string{"10.0.0.11"},
+		},
+
+		{
+			name: "update - malformed change on secondary ip",
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"10.0.0.10", "2000::1"},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.11",
+					ClusterIPs: []string{"10.0.0.11", "3000::1"},
+				},
+			},
+			expectedClusterIP:  "10.0.0.11",
+			expectedClusterIPs: []string{"10.0.0.11", "3000::1"},
+		},
+
+		{
+			name: "update - upgrade",
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"10.0.0.10"},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"10.0.0.10", "2000::1"},
+				},
+			},
+			expectedClusterIP:  "10.0.0.10",
+			expectedClusterIPs: []string{"10.0.0.10", "2000::1"},
+		},
+		{
+			name: "update - downgrade",
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"10.0.0.10", "2000::1"},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"10.0.0.10"},
+				},
+			},
+			expectedClusterIP:  "10.0.0.10",
+			expectedClusterIPs: []string{"10.0.0.10"},
+		},
+
+		{
+			name: "update - user cleared cluster IP",
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"10.0.0.10"},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "",
+					ClusterIPs: []string{"10.0.0.10"},
+				},
+			},
+			expectedClusterIP:  "",
+			expectedClusterIPs: nil,
+		},
+
+		{
+			name: "update - user cleared clusterIPs", // *MUST* REMAIN FOR OLD CLIENTS
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"10.0.0.10"},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: nil,
+				},
+			},
+			expectedClusterIP:  "10.0.0.10",
+			expectedClusterIPs: []string{"10.0.0.10"},
+		},
+
+		{
+			name: "update - user cleared both",
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"10.0.0.10"},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "",
+					ClusterIPs: nil,
+				},
+			},
+			expectedClusterIP:  "",
+			expectedClusterIPs: nil,
+		},
+
+		{
+			name: "update - user cleared ClusterIP but changed clusterIPs",
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"10.0.0.10"},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "",
+					ClusterIPs: []string{"10.0.0.11"},
+				},
+			},
+			expectedClusterIP:  "", /* validation catches this */
+			expectedClusterIPs: []string{"10.0.0.11"},
+		},
+
+		{
+			name: "update - user cleared ClusterIPs but changed ClusterIP",
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"10.0.0.10", "2000::1"},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.11",
+					ClusterIPs: nil,
+				},
+			},
+			expectedClusterIP:  "10.0.0.11",
+			expectedClusterIPs: nil,
+		},
+
+		{
+			name: "update - user changed from None to ClusterIP",
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "None",
+					ClusterIPs: []string{"None"},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"None"},
+				},
+			},
+			expectedClusterIP:  "10.0.0.10",
+			expectedClusterIPs: []string{"10.0.0.10"},
+		},
+
+		{
+			name: "update - user changed from ClusterIP to None",
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"10.0.0.10"},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "None",
+					ClusterIPs: []string{"10.0.0.10"},
+				},
+			},
+			expectedClusterIP:  "None",
+			expectedClusterIPs: []string{"None"},
+		},
+
+		{
+			name: "update - user changed from ClusterIP to None and changed ClusterIPs in a dual stack (new client making a mistake)",
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "10.0.0.10",
+					ClusterIPs: []string{"10.0.0.10", "2000::1"},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					ClusterIP:  "None",
+					ClusterIPs: []string{"10.0.0.11", "2000::1"},
+				},
+			},
+			expectedClusterIP:  "None",
+			expectedClusterIPs: []string{"10.0.0.11", "2000::1"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			normalizeClusterIPs(tc.oldService, tc.newService)
+
+			if tc.newService == nil {
+				t.Fatalf("unexpected new service to be nil")
+			}
+
+			if tc.newService.Spec.ClusterIP != tc.expectedClusterIP {
+				t.Fatalf("expected clusterIP [%v] got [%v]", tc.expectedClusterIP, tc.newService.Spec.ClusterIP)
+			}
+
+			if len(tc.newService.Spec.ClusterIPs) != len(tc.expectedClusterIPs) {
+				t.Fatalf("expected  clusterIPs %v got %v", tc.expectedClusterIPs, tc.newService.Spec.ClusterIPs)
+			}
+
+			for idx, clusterIP := range tc.newService.Spec.ClusterIPs {
+				if clusterIP != tc.expectedClusterIPs[idx] {
+					t.Fatalf("expected clusterIP [%v] at index[%v] got [%v]", tc.expectedClusterIPs[idx], idx, tc.newService.Spec.ClusterIPs[idx])
+
+				}
+			}
+		})
+	}
+
+}
+
+func TestClearClusterIPRelatedFields(t *testing.T) {
+	//
+	// NOTE the data fed to this test assums that ClusterIPs normalization is
+	// already done check PrepareFor*(..) strategy
+	//
+	singleStack := api.IPFamilyPolicySingleStack
+	requireDualStack := api.IPFamilyPolicyRequireDualStack
+	testCases := []struct {
+		name        string
+		oldService  *api.Service
+		newService  *api.Service
+		shouldClear bool
+	}{
+		{
+			name:        "should clear, single stack converting to external name",
+			shouldClear: true,
+
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeClusterIP,
+					IPFamilyPolicy: &singleStack,
+					ClusterIP:      "10.0.0.4",
+					ClusterIPs:     []string{"10.0.0.4"},
+					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeExternalName,
+					IPFamilyPolicy: &singleStack,
+					ClusterIP:      "",
+					ClusterIPs:     nil,
+					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
+				},
+			},
+		},
+
+		{
+			name:        "should clear, dual stack converting to external name(normalization removed all ips)",
+			shouldClear: true,
+
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeClusterIP,
+					IPFamilyPolicy: &requireDualStack,
+					ClusterIP:      "2000::1",
+					ClusterIPs:     []string{"2000::1", "10.0.0.4"},
+					IPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeExternalName,
+					IPFamilyPolicy: &singleStack,
+					ClusterIP:      "",
+					ClusterIPs:     nil,
+					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
+				},
+			},
+		},
+
+		{
+			name:        "should NOT clear, single stack converting to external name ClusterIPs was not cleared",
+			shouldClear: false,
+
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeClusterIP,
+					IPFamilyPolicy: &singleStack,
+					ClusterIP:      "2000::1",
+					ClusterIPs:     []string{"2000::1"},
+					IPFamilies:     []api.IPFamily{api.IPv6Protocol},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeExternalName,
+					IPFamilyPolicy: &singleStack,
+					ClusterIP:      "2000::1",
+					ClusterIPs:     []string{"2000::1"},
+					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
+				},
+			},
+		},
+
+		{
+			name:        "should NOT clear, dualstack cleared primary and changed ClusterIPs",
+			shouldClear: true,
+
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeClusterIP,
+					IPFamilyPolicy: &requireDualStack,
+					ClusterIP:      "2000::1",
+					ClusterIPs:     []string{"2000::1", "10.0.0.4"},
+					IPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeExternalName,
+					IPFamilyPolicy: &singleStack,
+					ClusterIP:      "",
+					ClusterIPs:     []string{"2000::1", "10.0.0.5"},
+					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
+				},
+			},
+		},
+		{
+			name:        "should clear, dualstack user removed ClusterIPs",
+			shouldClear: true,
+
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeClusterIP,
+					IPFamilyPolicy: &requireDualStack,
+					ClusterIP:      "2000::1",
+					ClusterIPs:     []string{"2000::1", "10.0.0.4"},
+					IPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				},
+			},
+
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeExternalName,
+					IPFamilyPolicy: &singleStack,
+					ClusterIP:      "",
+					ClusterIPs:     nil,
+					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
+				},
+			},
+		},
+		{
+			name:        "should NOT clear, dualstack service changing selector",
+			shouldClear: false,
+
+			oldService: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeClusterIP,
+					Selector:       map[string]string{"foo": "bar"},
+					IPFamilyPolicy: &requireDualStack,
+					ClusterIP:      "2000::1",
+					ClusterIPs:     []string{"2000::1", "10.0.0.4"},
+					IPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				},
+			},
+			newService: &api.Service{
+				Spec: api.ServiceSpec{
+					Type:           api.ServiceTypeClusterIP,
+					Selector:       map[string]string{"foo": "baz"},
+					IPFamilyPolicy: &singleStack,
+					ClusterIP:      "2000::1",
+					ClusterIPs:     []string{"2000::1", "10.0.0.4"},
+					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			clearClusterIPRelatedFields(testCase.newService, testCase.oldService)
+
+			if testCase.shouldClear && len(testCase.newService.Spec.ClusterIPs) != 0 {
+				t.Fatalf("expected clusterIPs to be cleared")
+			}
+
+			if testCase.shouldClear && len(testCase.newService.Spec.IPFamilies) != 0 {
+				t.Fatalf("expected ipfamilies to be cleared")
+			}
+
+			if testCase.shouldClear && testCase.newService.Spec.IPFamilyPolicy != nil {
+				t.Fatalf("expected ipfamilypolicy to be cleared")
+			}
+
+			if !testCase.shouldClear && len(testCase.newService.Spec.ClusterIPs) == 0 {
+				t.Fatalf("expected clusterIPs NOT to be cleared")
+			}
+
+			if !testCase.shouldClear && len(testCase.newService.Spec.IPFamilies) == 0 {
+				t.Fatalf("expected ipfamilies NOT to be cleared")
+			}
+
+			if !testCase.shouldClear && testCase.newService.Spec.IPFamilyPolicy == nil {
+				t.Fatalf("expected ipfamilypolicy NOT to be cleared")
+			}
+
+		})
+	}
+}
+
+func TestTrimFieldsForDualStackDowngrade(t *testing.T) {
+	singleStack := api.IPFamilyPolicySingleStack
+	preferDualStack := api.IPFamilyPolicyPreferDualStack
+	requireDualStack := api.IPFamilyPolicyRequireDualStack
+	testCases := []struct {
+		name          string
+		oldPolicy     *api.IPFamilyPolicyType
+		oldClusterIPs []string
+		oldFamilies   []api.IPFamily
+
+		newPolicy          *api.IPFamilyPolicyType
+		expectedClusterIPs []string
+		expectedIPFamilies []api.IPFamily
+	}{
+
+		{
+			name:               "no change single to single",
+			oldPolicy:          &singleStack,
+			oldClusterIPs:      []string{"10.10.10.10"},
+			oldFamilies:        []api.IPFamily{api.IPv4Protocol},
+			newPolicy:          &singleStack,
+			expectedClusterIPs: []string{"10.10.10.10"},
+			expectedIPFamilies: []api.IPFamily{api.IPv4Protocol},
+		},
+
+		{
+			name:               "dualstack to dualstack (preferred)",
+			oldPolicy:          &preferDualStack,
+			oldClusterIPs:      []string{"10.10.10.10", "2000::1"},
+			oldFamilies:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+			newPolicy:          &preferDualStack,
+			expectedClusterIPs: []string{"10.10.10.10", "2000::1"},
+			expectedIPFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		},
+
+		{
+			name:               "dualstack to dualstack (required)",
+			oldPolicy:          &requireDualStack,
+			oldClusterIPs:      []string{"10.10.10.10", "2000::1"},
+			oldFamilies:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+			newPolicy:          &preferDualStack,
+			expectedClusterIPs: []string{"10.10.10.10", "2000::1"},
+			expectedIPFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		},
+
+		{
+			name:               "dualstack (preferred) to single",
+			oldPolicy:          &preferDualStack,
+			oldClusterIPs:      []string{"10.10.10.10", "2000::1"},
+			oldFamilies:        []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+			newPolicy:          &singleStack,
+			expectedClusterIPs: []string{"10.10.10.10"},
+			expectedIPFamilies: []api.IPFamily{api.IPv4Protocol},
+		},
+
+		{
+			name:               "dualstack (require) to single",
+			oldPolicy:          &requireDualStack,
+			oldClusterIPs:      []string{"2000::1", "10.10.10.10"},
+			oldFamilies:        []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+			newPolicy:          &singleStack,
+			expectedClusterIPs: []string{"2000::1"},
+			expectedIPFamilies: []api.IPFamily{api.IPv6Protocol},
+		},
+	}
+	// only when gate is on
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			oldService := &api.Service{
+				Spec: api.ServiceSpec{
+					IPFamilyPolicy: tc.oldPolicy,
+					ClusterIPs:     tc.oldClusterIPs,
+					IPFamilies:     tc.oldFamilies,
+				},
+			}
+
+			newService := oldService.DeepCopy()
+			newService.Spec.IPFamilyPolicy = tc.newPolicy
+
+			trimFieldsForDualStackDowngrade(newService, oldService)
+
+			if len(newService.Spec.ClusterIPs) != len(tc.expectedClusterIPs) {
+				t.Fatalf("unexpected clusterIPs. expected %v and got %v", tc.expectedClusterIPs, newService.Spec.ClusterIPs)
+			}
+
+			// compare clusterIPS
+			for i, expectedIP := range tc.expectedClusterIPs {
+				if expectedIP != newService.Spec.ClusterIPs[i] {
+					t.Fatalf("unexpected clusterIPs. expected %v and got %v", tc.expectedClusterIPs, newService.Spec.ClusterIPs)
+				}
+			}
+
+			// families
+			if len(newService.Spec.IPFamilies) != len(tc.expectedIPFamilies) {
+				t.Fatalf("unexpected ipfamilies. expected %v and got %v", tc.expectedIPFamilies, newService.Spec.IPFamilies)
+			}
+
+			// compare clusterIPS
+			for i, expectedIPFamily := range tc.expectedIPFamilies {
+				if expectedIPFamily != newService.Spec.IPFamilies[i] {
+					t.Fatalf("unexpected ipfamilies. expected %v and got %v", tc.expectedIPFamilies, newService.Spec.IPFamilies)
+				}
+			}
+
+		})
+	}
 }

@@ -80,7 +80,7 @@ func Seek(fd int, offset int64, whence int) (newoffset int64, err error) {
 
 // 64-bit file system and 32-bit uid calls
 // (16-bit uid calls are not always supported in newer kernels)
-//sys	Dup2(oldfd int, newfd int) (err error)
+//sys	dup2(oldfd int, newfd int) (err error)
 //sysnb	EpollCreate(size int) (fd int, err error)
 //sys	EpollWait(epfd int, events []EpollEvent, msec int) (n int, err error)
 //sys	Fchown(fd int, uid int, gid int) (err error) = SYS_FCHOWN32
@@ -98,8 +98,8 @@ func Seek(fd int, offset int64, whence int) (newoffset int64, err error) {
 //sys	Renameat(olddirfd int, oldpath string, newdirfd int, newpath string) (err error)
 //sys	sendfile(outfd int, infd int, offset *int64, count int) (written int, err error) = SYS_SENDFILE64
 //sys	Select(nfd int, r *FdSet, w *FdSet, e *FdSet, timeout *Timeval) (n int, err error) = SYS__NEWSELECT
-//sys	Setfsgid(gid int) (err error) = SYS_SETFSGID32
-//sys	Setfsuid(uid int) (err error) = SYS_SETFSUID32
+//sys	setfsgid(gid int) (prev int, err error) = SYS_SETFSGID32
+//sys	setfsuid(uid int) (prev int, err error) = SYS_SETFSUID32
 //sysnb	Setregid(rgid int, egid int) (err error) = SYS_SETREGID32
 //sysnb	Setresgid(rgid int, egid int, sgid int) (err error) = SYS_SETRESGID32
 //sysnb	Setresuid(ruid int, euid int, suid int) (err error) = SYS_SETRESUID32
@@ -250,6 +250,10 @@ func (iov *Iovec) SetLen(length int) {
 
 func (msghdr *Msghdr) SetControllen(length int) {
 	msghdr.Controllen = uint32(length)
+}
+
+func (msghdr *Msghdr) SetIovlen(length int) {
+	msghdr.Iovlen = uint32(length)
 }
 
 func (cmsg *Cmsghdr) SetLen(length int) {

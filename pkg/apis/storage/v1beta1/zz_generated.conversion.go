@@ -230,7 +230,17 @@ func Convert_storage_CSIDriver_To_v1beta1_CSIDriver(in *storage.CSIDriver, out *
 
 func autoConvert_v1beta1_CSIDriverList_To_storage_CSIDriverList(in *v1beta1.CSIDriverList, out *storage.CSIDriverList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]storage.CSIDriver)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]storage.CSIDriver, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_CSIDriver_To_storage_CSIDriver(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -241,7 +251,17 @@ func Convert_v1beta1_CSIDriverList_To_storage_CSIDriverList(in *v1beta1.CSIDrive
 
 func autoConvert_storage_CSIDriverList_To_v1beta1_CSIDriverList(in *storage.CSIDriverList, out *v1beta1.CSIDriverList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1beta1.CSIDriver)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1beta1.CSIDriver, len(*in))
+		for i := range *in {
+			if err := Convert_storage_CSIDriver_To_v1beta1_CSIDriver(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -254,6 +274,8 @@ func autoConvert_v1beta1_CSIDriverSpec_To_storage_CSIDriverSpec(in *v1beta1.CSID
 	out.AttachRequired = (*bool)(unsafe.Pointer(in.AttachRequired))
 	out.PodInfoOnMount = (*bool)(unsafe.Pointer(in.PodInfoOnMount))
 	out.VolumeLifecycleModes = *(*[]storage.VolumeLifecycleMode)(unsafe.Pointer(&in.VolumeLifecycleModes))
+	out.StorageCapacity = (*bool)(unsafe.Pointer(in.StorageCapacity))
+	out.FSGroupPolicy = (*storage.FSGroupPolicy)(unsafe.Pointer(in.FSGroupPolicy))
 	return nil
 }
 
@@ -264,8 +286,10 @@ func Convert_v1beta1_CSIDriverSpec_To_storage_CSIDriverSpec(in *v1beta1.CSIDrive
 
 func autoConvert_storage_CSIDriverSpec_To_v1beta1_CSIDriverSpec(in *storage.CSIDriverSpec, out *v1beta1.CSIDriverSpec, s conversion.Scope) error {
 	out.AttachRequired = (*bool)(unsafe.Pointer(in.AttachRequired))
+	out.FSGroupPolicy = (*v1beta1.FSGroupPolicy)(unsafe.Pointer(in.FSGroupPolicy))
 	out.PodInfoOnMount = (*bool)(unsafe.Pointer(in.PodInfoOnMount))
 	out.VolumeLifecycleModes = *(*[]v1beta1.VolumeLifecycleMode)(unsafe.Pointer(&in.VolumeLifecycleModes))
+	out.StorageCapacity = (*bool)(unsafe.Pointer(in.StorageCapacity))
 	return nil
 }
 

@@ -352,3 +352,17 @@ func TestIsErrorRetriable(t *testing.T) {
 	result = IsErrorRetriable(fmt.Errorf("Retriable: true"))
 	assert.Equal(t, true, result)
 }
+
+func TestHasErrorCode(t *testing.T) {
+	// false case
+	result := HasStatusForbiddenOrIgnoredError(fmt.Errorf("HTTPStatusCode: 408"))
+	assert.False(t, result)
+
+	// true case 404
+	result = HasStatusForbiddenOrIgnoredError(fmt.Errorf("HTTPStatusCode: %d", http.StatusNotFound))
+	assert.True(t, result)
+
+	// true case 403
+	result = HasStatusForbiddenOrIgnoredError(fmt.Errorf("HTTPStatusCode: %d", http.StatusForbidden))
+	assert.True(t, result)
+}

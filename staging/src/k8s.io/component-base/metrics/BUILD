@@ -45,6 +45,7 @@ go_test(
         "desc_test.go",
         "gauge_test.go",
         "histogram_test.go",
+        "http_test.go",
         "opts_test.go",
         "registry_test.go",
         "summary_test.go",

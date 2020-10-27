@@ -87,7 +87,7 @@ var _ = SIGDescribe("ReplicaSet", func() {
 	f := framework.NewDefaultFramework("replicaset")
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: Replica Set, run basic image
 		Description: Create a ReplicaSet with a Pod and a single Container. Make sure that the Pod is running. Pod SHOULD send a valid response when queried.
 	*/
@@ -107,7 +107,7 @@ var _ = SIGDescribe("ReplicaSet", func() {
 	})
 
 	/*
-		Release : v1.13
+		Release: v1.13
 		Testname: Replica Set, adopt matching pods and release non matching pods
 		Description: A Pod is created, then a Replica Set (RS) whose label selector will match the Pod. The RS MUST either adopt the Pod or delete and replace it with a new Pod. When the labels on one of the Pods owned by the RS change to no longer match the RS's label selector, the RS MUST release the Pod and update the Pod's owner references
 	*/
@@ -148,9 +148,9 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 		if err != nil {
 			updatePod, getErr := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 			if getErr == nil {
-				err = fmt.Errorf("Pod %q never run (phase: %s, conditions: %+v): %v", updatePod.Name, updatePod.Status.Phase, updatePod.Status.Conditions, err)
+				err = fmt.Errorf("pod %q never run (phase: %s, conditions: %+v): %v", updatePod.Name, updatePod.Status.Phase, updatePod.Status.Conditions, err)
 			} else {
-				err = fmt.Errorf("Pod %q never run: %v", pod.Name, err)
+				err = fmt.Errorf("pod %q never run: %v", pod.Name, err)
 			}
 		}
 		framework.ExpectNoError(err)

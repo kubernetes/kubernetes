@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 )
@@ -59,10 +59,12 @@ type Cloud struct {
 	Exists bool
 	Err    error
 
+	EnableInstancesV2       bool
 	ExistsByProviderID      bool
 	ErrByProviderID         error
 	NodeShutdown            bool
 	ErrShutdownByProviderID error
+	MetadataErr             error
 
 	Calls         []string
 	Addresses     []v1.NodeAddress
@@ -80,6 +82,7 @@ type Cloud struct {
 	RouteMap      map[string]*Route
 	Lock          sync.Mutex
 	Provider      string
+	ProviderID    map[types.NodeName]string
 	addCallLock   sync.Mutex
 	cloudprovider.Zone
 	VolumeLabelMap map[string]map[string]string
@@ -150,6 +153,16 @@ func (f *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 // Actually it just returns f itself.
 func (f *Cloud) Instances() (cloudprovider.Instances, bool) {
 	return f, true
+}
+
+// InstancesV2 returns a fake implementation of InstancesV2.
+//
+// Actually it just returns f itself.
+func (f *Cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
+	if f.EnableInstancesV2 {
+		return f, true
+	}
+	return nil, false
 }
 
 // Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
@@ -292,16 +305,38 @@ func (f *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID str
 	return f.NodeShutdown, f.ErrShutdownByProviderID
 }
 
-// InstanceMetadataByProviderID returns metadata of the specified instance.
-func (f *Cloud) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
+// InstanceExists returns true if the instance corresponding to a node still exists and is running.
+// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+func (f *Cloud) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {
+	f.addCall("instance-exists")
+	return f.ExistsByProviderID, f.ErrByProviderID
+}
+
+// InstanceShutdown returns true if the instances is in safe state to detach volumes
+func (f *Cloud) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, error) {
+	f.addCall("instance-shutdown")
+	return f.NodeShutdown, f.ErrShutdownByProviderID
+}
+
+// InstanceMetadata returns metadata of the specified instance.
+func (f *Cloud) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
 	f.addCall("instance-metadata-by-provider-id")
 	f.addressesMux.Lock()
 	defer f.addressesMux.Unlock()
+
+	providerID := ""
+	id, ok := f.ProviderID[types.NodeName(node.Name)]
+	if ok {
+		providerID = id
+	}
+
 	return &cloudprovider.InstanceMetadata{
 		ProviderID:    providerID,
-		Type:          f.InstanceTypes[types.NodeName(providerID)],
+		InstanceType:  f.InstanceTypes[types.NodeName(node.Spec.ProviderID)],
 		NodeAddresses: f.Addresses,
-	}, f.Err
+		Zone:          f.Zone.FailureDomain,
+		Region:        f.Zone.Region,
+	}, f.MetadataErr
 }
 
 // List is a test-spy implementation of Instances.List.

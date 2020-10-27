@@ -30,7 +30,7 @@ endif
 
 
 # It's necessary to set this because some environments don't link sh -> bash.
-SHELL := /bin/bash
+SHELL := /usr/bin/env bash
 
 # This rule collects all the generated file sets into a single rule.  Other
 # rules should depend on this to ensure generated files are rebuilt.

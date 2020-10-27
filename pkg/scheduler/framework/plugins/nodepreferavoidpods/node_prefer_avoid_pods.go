@@ -24,13 +24,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // NodePreferAvoidPods is a plugin that priorities nodes according to the node annotation
 // "scheduler.alpha.kubernetes.io/preferAvoidPods".
 type NodePreferAvoidPods struct {
-	handle framework.FrameworkHandle
+	handle framework.Handle
 }
 
 var _ framework.ScorePlugin = &NodePreferAvoidPods{}
@@ -47,7 +47,7 @@ func (pl *NodePreferAvoidPods) Name() string {
 func (pl *NodePreferAvoidPods) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
 	if err != nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
+		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
 	node := nodeInfo.Node()
@@ -87,6 +87,6 @@ func (pl *NodePreferAvoidPods) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, h framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, h framework.Handle) (framework.Plugin, error) {
 	return &NodePreferAvoidPods{handle: h}, nil
 }

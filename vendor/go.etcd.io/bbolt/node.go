@@ -41,19 +41,19 @@ func (n *node) size() int {
 	sz, elsz := pageHeaderSize, n.pageElementSize()
 	for i := 0; i < len(n.inodes); i++ {
 		item := &n.inodes[i]
-		sz += elsz + len(item.key) + len(item.value)
+		sz += elsz + uintptr(len(item.key)) + uintptr(len(item.value))
 	}
-	return sz
+	return int(sz)
 }
 
 // sizeLessThan returns true if the node is less than a given size.
 // This is an optimization to avoid calculating a large node when we only need
 // to know if it fits inside a certain page size.
-func (n *node) sizeLessThan(v int) bool {
+func (n *node) sizeLessThan(v uintptr) bool {
 	sz, elsz := pageHeaderSize, n.pageElementSize()
 	for i := 0; i < len(n.inodes); i++ {
 		item := &n.inodes[i]
-		sz += elsz + len(item.key) + len(item.value)
+		sz += elsz + uintptr(len(item.key)) + uintptr(len(item.value))
 		if sz >= v {
 			return false
 		}
@@ -62,7 +62,7 @@ func (n *node) sizeLessThan(v int) bool {
 }
 
 // pageElementSize returns the size of each page element based on the type of node.
-func (n *node) pageElementSize() int {
+func (n *node) pageElementSize() uintptr {
 	if n.isLeaf {
 		return leafPageElementSize
 	}
@@ -207,9 +207,16 @@ func (n *node) write(p *page) {
 	}
 
 	// Loop over each item and write it to the page.
-	b := (*[maxAllocSize]byte)(unsafe.Pointer(&p.ptr))[n.pageElementSize()*len(n.inodes):]
+	// off tracks the offset into p of the start of the next data.
+	off := unsafe.Sizeof(*p) + n.pageElementSize()*uintptr(len(n.inodes))
 	for i, item := range n.inodes {
 		_assert(len(item.key) > 0, "write: zero-length inode key")
+
+		// Create a slice to write into of needed size and advance
+		// byte pointer for next iteration.
+		sz := len(item.key) + len(item.value)
+		b := unsafeByteSlice(unsafe.Pointer(p), off, 0, sz)
+		off += uintptr(sz)
 
 		// Write the page element.
 		if n.isLeaf {
@@ -226,20 +233,9 @@ func (n *node) write(p *page) {
 			_assert(elem.pgid != p.id, "write: circular dependency occurred")
 		}
 
-		// If the length of key+value is larger than the max allocation size
-		// then we need to reallocate the byte array pointer.
-		//
-		// See: https://github.com/boltdb/bolt/pull/335
-		klen, vlen := len(item.key), len(item.value)
-		if len(b) < klen+vlen {
-			b = (*[maxAllocSize]byte)(unsafe.Pointer(&b[0]))[:]
-		}
-
 		// Write data for the element to the end of the page.
-		copy(b[0:], item.key)
-		b = b[klen:]
-		copy(b[0:], item.value)
-		b = b[vlen:]
+		l := copy(b, item.key)
+		copy(b[l:], item.value)
 	}
 
 	// DEBUG ONLY: n.dump()
@@ -247,7 +243,7 @@ func (n *node) write(p *page) {
 
 // split breaks up a node into multiple smaller nodes, if appropriate.
 // This should only be called from the spill() function.
-func (n *node) split(pageSize int) []*node {
+func (n *node) split(pageSize uintptr) []*node {
 	var nodes []*node
 
 	node := n
@@ -270,7 +266,7 @@ func (n *node) split(pageSize int) []*node {
 
 // splitTwo breaks up a node into two smaller nodes, if appropriate.
 // This should only be called from the split() function.
-func (n *node) splitTwo(pageSize int) (*node, *node) {
+func (n *node) splitTwo(pageSize uintptr) (*node, *node) {
 	// Ignore the split if the page doesn't have at least enough nodes for
 	// two pages or if the nodes can fit in a single page.
 	if len(n.inodes) <= (minKeysPerPage*2) || n.sizeLessThan(pageSize) {
@@ -312,18 +308,18 @@ func (n *node) splitTwo(pageSize int) (*node, *node) {
 // splitIndex finds the position where a page will fill a given threshold.
 // It returns the index as well as the size of the first page.
 // This is only be called from split().
-func (n *node) splitIndex(threshold int) (index, sz int) {
+func (n *node) splitIndex(threshold int) (index, sz uintptr) {
 	sz = pageHeaderSize
 
 	// Loop until we only have the minimum number of keys required for the second page.
 	for i := 0; i < len(n.inodes)-minKeysPerPage; i++ {
-		index = i
+		index = uintptr(i)
 		inode := n.inodes[i]
-		elsize := n.pageElementSize() + len(inode.key) + len(inode.value)
+		elsize := n.pageElementSize() + uintptr(len(inode.key)) + uintptr(len(inode.value))
 
 		// If we have at least the minimum number of keys and adding another
 		// node would put us over the threshold then exit and return.
-		if i >= minKeysPerPage && sz+elsize > threshold {
+		if index >= minKeysPerPage && sz+elsize > uintptr(threshold) {
 			break
 		}
 
@@ -356,7 +352,7 @@ func (n *node) spill() error {
 	n.children = nil
 
 	// Split nodes into appropriate sizes. The first node will always be n.
-	var nodes = n.split(tx.db.pageSize)
+	var nodes = n.split(uintptr(tx.db.pageSize))
 	for _, node := range nodes {
 		// Add node's page to the freelist if it's not new.
 		if node.pgid > 0 {
@@ -587,9 +583,11 @@ func (n *node) dump() {
 
 type nodes []*node
 
-func (s nodes) Len() int           { return len(s) }
-func (s nodes) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s nodes) Less(i, j int) bool { return bytes.Compare(s[i].inodes[0].key, s[j].inodes[0].key) == -1 }
+func (s nodes) Len() int      { return len(s) }
+func (s nodes) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s nodes) Less(i, j int) bool {
+	return bytes.Compare(s[i].inodes[0].key, s[j].inodes[0].key) == -1
+}
 
 // inode represents an internal node inside of a node.
 // It can be used to point to elements in a page or point

@@ -6,7 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/scheduler/framework/v1alpha1:go_default_library",
+        "//pkg/scheduler/framework:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -19,7 +19,7 @@ go_test(
     srcs = ["default_binder_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/scheduler/framework/v1alpha1:go_default_library",
+        "//pkg/scheduler/framework/runtime:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

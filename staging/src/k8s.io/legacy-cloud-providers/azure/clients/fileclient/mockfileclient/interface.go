@@ -19,10 +19,10 @@ limitations under the License.
 package mockfileclient
 
 import (
-	reflect "reflect"
-
 	storage "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	gomock "github.com/golang/mock/gomock"
+	fileclient "k8s.io/legacy-cloud-providers/azure/clients/fileclient"
+	reflect "reflect"
 )
 
 // MockInterface is a mock of Interface interface
@@ -49,17 +49,17 @@ func (m *MockInterface) EXPECT() *MockInterfaceMockRecorder {
 }
 
 // CreateFileShare mocks base method
-func (m *MockInterface) CreateFileShare(resourceGroupName, accountName, name string, protocol storage.EnabledProtocols, sizeGiB int) error {
+func (m *MockInterface) CreateFileShare(resourceGroupName, accountName string, shareOptions *fileclient.ShareOptions) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateFileShare", resourceGroupName, accountName, name, protocol, sizeGiB)
+	ret := m.ctrl.Call(m, "CreateFileShare", resourceGroupName, accountName, shareOptions)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreateFileShare indicates an expected call of CreateFileShare
-func (mr *MockInterfaceMockRecorder) CreateFileShare(resourceGroupName, accountName, name, protocol, sizeGiB interface{}) *gomock.Call {
+func (mr *MockInterfaceMockRecorder) CreateFileShare(resourceGroupName, accountName, shareOptions interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateFileShare", reflect.TypeOf((*MockInterface)(nil).CreateFileShare), resourceGroupName, accountName, name, protocol, sizeGiB)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateFileShare", reflect.TypeOf((*MockInterface)(nil).CreateFileShare), resourceGroupName, accountName, shareOptions)
 }
 
 // DeleteFileShare mocks base method

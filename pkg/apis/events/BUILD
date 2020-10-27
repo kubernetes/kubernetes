@@ -27,6 +27,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/apis/events/install:all-srcs",
+        "//pkg/apis/events/v1:all-srcs",
         "//pkg/apis/events/v1beta1:all-srcs",
     ],
     tags = ["automanaged"],

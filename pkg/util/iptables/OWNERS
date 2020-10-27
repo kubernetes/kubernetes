@@ -3,12 +3,12 @@
 reviewers:
   - dcbw
   - thockin
-  - eparis
   - danwinship
 approvers:
   - dcbw
   - thockin
-  - eparis
   - danwinship
+emeritus_approvers:
+  - eparis
 labels:
 - sig/network

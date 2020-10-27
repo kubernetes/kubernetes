@@ -19,6 +19,7 @@ package pod
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,6 +39,7 @@ var (
 type Config struct {
 	NS                  string
 	PVCs                []*v1.PersistentVolumeClaim
+	PVCsReadOnly        bool
 	InlineVolumeSources []*v1.VolumeSource
 	IsPrivileged        bool
 	Command             string
@@ -46,6 +48,7 @@ type Config struct {
 	SeLinuxLabel        *v1.SELinuxOptions
 	FsGroup             *int64
 	NodeSelection       NodeSelection
+	ImageID             int
 }
 
 // CreateUnschedulablePod with given claims based on node selector
@@ -178,10 +181,14 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 		podConfig.Command = "trap exit TERM; while true; do sleep 1; done"
 	}
 	podName := "pod-" + string(uuid.NewUUID())
-	if podConfig.FsGroup == nil {
+	if podConfig.FsGroup == nil && runtime.GOOS != "windows" {
 		podConfig.FsGroup = func(i int64) *int64 {
 			return &i
 		}(1000)
+	}
+	image := imageutils.BusyBox
+	if podConfig.ImageID != imageutils.None {
+		image = podConfig.ImageID
 	}
 	podSpec := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -201,7 +208,7 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 			Containers: []v1.Container{
 				{
 					Name:    "write-pod",
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Image:   imageutils.GetE2EImage(image),
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", podConfig.Command},
 					SecurityContext: &v1.SecurityContext{
@@ -224,7 +231,7 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 			volumeMounts = append(volumeMounts, v1.VolumeMount{Name: volumename, MountPath: "/mnt/" + volumename})
 		}
 
-		volumes[volumeIndex] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: false}}}
+		volumes[volumeIndex] = v1.Volume{Name: volumename, VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: pvclaim.Name, ReadOnly: podConfig.PVCsReadOnly}}}
 		volumeIndex++
 	}
 	for _, src := range podConfig.InlineVolumeSources {
@@ -238,7 +245,9 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 	podSpec.Spec.Containers[0].VolumeMounts = volumeMounts
 	podSpec.Spec.Containers[0].VolumeDevices = volumeDevices
 	podSpec.Spec.Volumes = volumes
-	podSpec.Spec.SecurityContext.SELinuxOptions = podConfig.SeLinuxLabel
+	if runtime.GOOS != "windows" {
+		podSpec.Spec.SecurityContext.SELinuxOptions = podConfig.SeLinuxLabel
+	}
 
 	SetNodeSelection(&podSpec.Spec, podConfig.NodeSelection)
 	return podSpec, nil

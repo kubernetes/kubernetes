@@ -80,6 +80,9 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 
 	// Create YAML just under 3MB limit, nested
 	t.Run("create YAML doc under limit, nested", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		yamlBody := []byte(fmt.Sprintf(`
 	apiVersion: %s
 	kind: %s
@@ -100,6 +103,9 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 
 	// Create YAML just under 3MB limit, not nested
 	t.Run("create YAML doc under limit, not nested", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		yamlBody := []byte(fmt.Sprintf(`
 		apiVersion: %s
 		kind: %s
@@ -141,6 +147,9 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 
 	// Create JSON just under 3MB limit, nested
 	t.Run("create JSON doc under limit, nested", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		jsonBody := []byte(fmt.Sprintf(`{
 		"apiVersion": %q,
 		"kind": %q,
@@ -162,6 +171,9 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 
 	// Create JSON just under 3MB limit, not nested
 	t.Run("create JSON doc under limit, not nested", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		jsonBody := []byte(fmt.Sprintf(`{
 			"apiVersion": %q,
 			"kind": %q,
@@ -191,6 +203,9 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 	}
 
 	t.Run("JSONPatchType nested patch under limit", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		patchBody := []byte(`[{"op":"add","path":"/foo","value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}]`)
 		err = rest.Patch(types.JSONPatchType).AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "test").
 			Body(patchBody).Do(context.TODO()).Error()
@@ -199,6 +214,9 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 		}
 	})
 	t.Run("MergePatchType nested patch under limit", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		patchBody := []byte(`{"value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}`)
 		err = rest.Patch(types.MergePatchType).AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "test").
 			Body(patchBody).Do(context.TODO()).Error()
@@ -207,6 +225,9 @@ values: `+strings.Repeat("[", 3*1024*1024), apiVersion, kind))
 		}
 	})
 	t.Run("ApplyPatchType nested patch under limit", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping expensive test")
+		}
 		patchBody := []byte(`{"value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}`)
 		err = rest.Patch(types.ApplyPatchType).Param("fieldManager", "test").AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural, "test").
 			Body(patchBody).Do(context.TODO()).Error()

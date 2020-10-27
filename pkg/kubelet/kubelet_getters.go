@@ -24,9 +24,11 @@ import (
 	"path/filepath"
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
+	cadvisorv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 	utilpath "k8s.io/utils/path"
+	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,6 +37,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/kubernetes/pkg/volume/csi"
 )
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -259,23 +262,23 @@ func (kl *Kubelet) GetPodCgroupRoot() string {
 	return kl.containerManager.GetPodCgroupRoot()
 }
 
-// GetHostIP returns host IP or nil in case of error.
-func (kl *Kubelet) GetHostIP() (net.IP, error) {
+// GetHostIPs returns host IPs or nil in case of error.
+func (kl *Kubelet) GetHostIPs() ([]net.IP, error) {
 	node, err := kl.GetNode()
 	if err != nil {
 		return nil, fmt.Errorf("cannot get node: %v", err)
 	}
-	return utilnode.GetNodeHostIP(node)
+	return utilnode.GetNodeHostIPs(node)
 }
 
-// getHostIPAnyway attempts to return the host IP from kubelet's nodeInfo, or
+// getHostIPsAnyWay attempts to return the host IPs from kubelet's nodeInfo, or
 // the initialNode.
-func (kl *Kubelet) getHostIPAnyWay() (net.IP, error) {
+func (kl *Kubelet) getHostIPsAnyWay() ([]net.IP, error) {
 	node, err := kl.getNodeAnyWay()
 	if err != nil {
 		return nil, err
 	}
-	return utilnode.GetNodeHostIP(node)
+	return utilnode.GetNodeHostIPs(node)
 }
 
 // GetExtraSupplementalGroupsForPod returns a list of the extra
@@ -310,8 +313,22 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 		if err != nil {
 			return volumes, fmt.Errorf("could not read directory %s: %v", volumePluginPath, err)
 		}
-		for _, volumeDir := range volumeDirs {
-			volumes = append(volumes, filepath.Join(volumePluginPath, volumeDir))
+		unescapePluginName := utilstrings.UnescapeQualifiedName(volumePluginName)
+
+		if unescapePluginName != csi.CSIPluginName {
+			for _, volumeDir := range volumeDirs {
+				volumes = append(volumes, filepath.Join(volumePluginPath, volumeDir))
+			}
+		} else {
+			// For CSI volumes, the mounted volume path has an extra sub path "/mount", so also add it
+			// to the list if the mounted path exists.
+			for _, volumeDir := range volumeDirs {
+				path := filepath.Join(volumePluginPath, volumeDir)
+				csimountpath := csi.GetCSIMounterPath(path)
+				if pathExists, _ := mount.PathExists(csimountpath); pathExists {
+					volumes = append(volumes, csimountpath)
+				}
+			}
 		}
 	}
 	return volumes, nil
@@ -323,10 +340,15 @@ func (kl *Kubelet) getMountedVolumePathListFromDisk(podUID types.UID) ([]string,
 	if err != nil {
 		return mountedVolumes, err
 	}
+	// Only use IsLikelyNotMountPoint to check might not cover all cases. For CSI volumes that
+	// either: 1) don't mount or 2) bind mount in the rootfs, the mount check will not work as expected.
+	// We plan to remove this mountpoint check as a condition before deleting pods since it is
+	// not reliable and the condition might be different for different types of volumes. But it requires
+	// a reliable way to clean up unused volume dir to avoid problems during pod deletion. See discussion in issue #74650
 	for _, volumePath := range volumePaths {
 		isNotMount, err := kl.mounter.IsLikelyNotMountPoint(volumePath)
 		if err != nil {
-			return mountedVolumes, err
+			return mountedVolumes, fmt.Errorf("fail to check mount point %q: %v", volumePath, err)
 		}
 		if !isNotMount {
 			mountedVolumes = append(mountedVolumes, volumePath)
@@ -348,6 +370,11 @@ func (kl *Kubelet) podVolumeSubpathsDirExists(podUID types.UID) (bool, error) {
 	return true, nil
 }
 
+// GetRequestedContainersInfo returns container info.
+func (kl *Kubelet) GetRequestedContainersInfo(containerName string, options cadvisorv2.RequestOptions) (map[string]*cadvisorapiv1.ContainerInfo, error) {
+	return kl.cadvisor.GetRequestedContainersInfo(containerName, options)
+}
+
 // GetVersionInfo returns information about the version of cAdvisor in use.
 func (kl *Kubelet) GetVersionInfo() (*cadvisorapiv1.VersionInfo, error) {
 	return kl.cadvisor.VersionInfo()
@@ -355,5 +382,13 @@ func (kl *Kubelet) GetVersionInfo() (*cadvisorapiv1.VersionInfo, error) {
 
 // GetCachedMachineInfo assumes that the machine info can't change without a reboot
 func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorapiv1.MachineInfo, error) {
+	kl.machineInfoLock.RLock()
+	defer kl.machineInfoLock.RUnlock()
 	return kl.machineInfo, nil
+}
+
+func (kl *Kubelet) setCachedMachineInfo(info *cadvisorapiv1.MachineInfo) {
+	kl.machineInfoLock.Lock()
+	defer kl.machineInfoLock.Unlock()
+	kl.machineInfo = info
 }

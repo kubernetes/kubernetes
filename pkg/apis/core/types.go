@@ -154,9 +154,36 @@ type VolumeSource struct {
 	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
 	// +optional
 	StorageOS *StorageOSVolumeSource
-	// CSI (Container Storage Interface) represents storage that is handled by an external CSI driver (Alpha feature).
+	// CSI (Container Storage Interface) represents ephemeral storage that is handled by certain external CSI drivers (Beta feature).
 	// +optional
 	CSI *CSIVolumeSource
+	// Ephemeral represents a volume that is handled by a cluster storage driver (Alpha feature).
+	// The volume's lifecycle is tied to the pod that defines it - it will be created before the pod starts,
+	// and deleted when the pod is removed.
+	//
+	// Use this if:
+	// a) the volume is only needed while the pod runs,
+	// b) features of normal volumes like restoring from snapshot or capacity
+	//    tracking are needed,
+	// c) the storage driver is specified through a storage class, and
+	// d) the storage driver supports dynamic volume provisioning through
+	//    a PersistentVolumeClaim (see EphemeralVolumeSource for more
+	//    information on the connection between this volume type
+	//    and PersistentVolumeClaim).
+	//
+	// Use PersistentVolumeClaim or one of the vendor-specific
+	// APIs for volumes that persist for longer than the lifecycle
+	// of an individual pod.
+	//
+	// Use CSI for light-weight local ephemeral volumes if the CSI driver is meant to
+	// be used that way - see the documentation of the driver for
+	// more information.
+	//
+	// A pod can use both types of ephemeral volumes and
+	// persistent volumes at the same time.
+	//
+	// +optional
+	Ephemeral *EphemeralVolumeSource
 }
 
 // PersistentVolumeSource is similar to VolumeSource but meant for the administrator who creates PVs.
@@ -1670,6 +1697,53 @@ type CSIVolumeSource struct {
 	NodePublishSecretRef *LocalObjectReference
 }
 
+// EphemeralVolumeSource represents an ephemeral volume that is handled by a normal storage driver.
+type EphemeralVolumeSource struct {
+	// VolumeClaimTemplate will be used to create a stand-alone PVC to provision the volume.
+	// The pod in which this EphemeralVolumeSource is embedded will be the
+	// owner of the PVC, i.e. the PVC will be deleted together with the
+	// pod.  The name of the PVC will be `<pod name>-<volume name>` where
+	// `<volume name>` is the name from the `PodSpec.Volumes` array
+	// entry. Pod validation will reject the pod if the concatenated name
+	// is not valid for a PVC (for example, too long).
+	//
+	// An existing PVC with that name that is not owned by the pod
+	// will *not* be used for the pod to avoid using an unrelated
+	// volume by mistake. Starting the pod is then blocked until
+	// the unrelated PVC is removed. If such a pre-created PVC is
+	// meant to be used by the pod, the PVC has to updated with an
+	// owner reference to the pod once the pod exists. Normally
+	// this should not be necessary, but it may be useful when
+	// manually reconstructing a broken cluster.
+	//
+	// This field is read-only and no changes will be made by Kubernetes
+	// to the PVC after it has been created.
+	//
+	// Required, must not be nil.
+	VolumeClaimTemplate *PersistentVolumeClaimTemplate
+
+	// ReadOnly specifies a read-only configuration for the volume.
+	// Defaults to false (read/write).
+	// +optional
+	ReadOnly bool
+}
+
+// PersistentVolumeClaimTemplate is used to produce
+// PersistentVolumeClaim objects as part of an EphemeralVolumeSource.
+type PersistentVolumeClaimTemplate struct {
+	// ObjectMeta may contain labels and annotations that will be copied into the PVC
+	// when creating it. No other fields are allowed and will be rejected during
+	// validation.
+	// +optional
+	metav1.ObjectMeta
+
+	// Spec for the PersistentVolumeClaim. The entire content is
+	// copied unchanged into the PVC that gets created from this
+	// template. The same fields as in a PersistentVolumeClaim
+	// are also valid here.
+	Spec PersistentVolumeClaimSpec
+}
+
 // ContainerPort represents a network port in a single container
 type ContainerPort struct {
 	// Optional: If specified, this must be an IANA_SVC_NAME  Each named port
@@ -2731,7 +2805,7 @@ type PodSpec struct {
 	// PreemptionPolicy is the Policy for preempting pods with lower priority.
 	// One of Never, PreemptLowerPriority.
 	// Defaults to PreemptLowerPriority if unset.
-	// This field is alpha-level and is only honored by servers that enable the NonPreemptingPriority feature.
+	// This field is beta-level, gated by the NonPreemptingPriority feature-gate.
 	// +optional
 	PreemptionPolicy *PreemptionPolicy
 	// Specifies the DNS parameters of a pod.
@@ -2897,7 +2971,35 @@ type PodSecurityContext struct {
 	// sysctls (by the container runtime) might fail to launch.
 	// +optional
 	Sysctls []Sysctl
+	// The seccomp options to use by the containers in this pod.
+	// +optional
+	SeccompProfile *SeccompProfile
 }
+
+// SeccompProfile defines a pod/container's seccomp profile settings.
+// Only one profile source may be set.
+// +union
+type SeccompProfile struct {
+	// +unionDiscriminator
+	Type SeccompProfileType
+	// Load a profile defined in static file on the node.
+	// The profile must be preconfigured on the node to work.
+	// LocalhostProfile cannot be an absolute nor a descending path.
+	// +optional
+	LocalhostProfile *string
+}
+
+// SeccompProfileType defines the supported seccomp profile types.
+type SeccompProfileType string
+
+const (
+	// SeccompProfileTypeUnconfined is when no seccomp profile is applied (A.K.A. unconfined).
+	SeccompProfileTypeUnconfined SeccompProfileType = "Unconfined"
+	// SeccompProfileTypeRuntimeDefault represents the default container runtime seccomp profile.
+	SeccompProfileTypeRuntimeDefault SeccompProfileType = "RuntimeDefault"
+	// SeccompProfileTypeLocalhost represents custom made profiles stored on the node's disk.
+	SeccompProfileTypeLocalhost SeccompProfileType = "Localhost"
+)
 
 // PodQOSClass defines the supported qos classes of Pods.
 type PodQOSClass string
@@ -3408,8 +3510,13 @@ type LoadBalancerIngress struct {
 	Hostname string
 }
 
+const (
+	// MaxServiceTopologyKeys is the largest number of topology keys allowed on a service
+	MaxServiceTopologyKeys = 16
+)
+
 // IPFamily represents the IP Family (IPv4 or IPv6). This type is used
-// to express the family of an IP expressed by a type (i.e. service.Spec.IPFamily)
+// to express the family of an IP expressed by a type (e.g. service.spec.ipFamilies).
 type IPFamily string
 
 const (
@@ -3417,8 +3524,29 @@ const (
 	IPv4Protocol IPFamily = "IPv4"
 	// IPv6Protocol indicates that this IP is IPv6 protocol
 	IPv6Protocol IPFamily = "IPv6"
-	// MaxServiceTopologyKeys is the largest number of topology keys allowed on a service
-	MaxServiceTopologyKeys = 16
+)
+
+// IPFamilyPolicyType represents the dual-stack-ness requested or required by a Service
+type IPFamilyPolicyType string
+
+const (
+	// IPFamilyPolicySingleStack indicates that this service is required to have a single IPFamily.
+	// The IPFamily assigned is based on the default IPFamily used by the cluster
+	// or as identified by service.spec.ipFamilies field
+	IPFamilyPolicySingleStack IPFamilyPolicyType = "SingleStack"
+	// IPFamilyPolicyPreferDualStack indicates that this service prefers dual-stack when
+	// the cluster is configured for dual-stack. If the cluster is not configured
+	// for dual-stack the service will be assigned a single IPFamily. If the IPFamily is not
+	// set in service.spec.ipFamilies then the service will be assigned the default IPFamily
+	// configured on the cluster
+	IPFamilyPolicyPreferDualStack IPFamilyPolicyType = "PreferDualStack"
+	// IPFamilyPolicyRequireDualStack indicates that this service requires dual-stack. Using
+	// IPFamilyPolicyRequireDualStack on a single stack cluster will result in validation errors. The
+	// IPFamilies (and their order) assigned  to this service is based on service.spec.ipFamilies. If
+	// service.spec.ipFamilies was not provided then it will be assigned according to how they are
+	// configured on the cluster. If service.spec.ipFamilies has only one entry then the alternative
+	// IPFamily will be added by apiserver
+	IPFamilyPolicyRequireDualStack IPFamilyPolicyType = "RequireDualStack"
 )
 
 // ServiceSpec describes the attributes that a user creates on a service
@@ -3462,6 +3590,36 @@ type ServiceSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 	// +optional
 	ClusterIP string
+
+	// ClusterIPs identifies all the ClusterIPs assigned to this
+	// service. ClusterIPs are assigned or reserved based on the values of
+	// service.spec.ipFamilies. A maximum of two entries (dual-stack IPs) are
+	// allowed in ClusterIPs. The IPFamily of each ClusterIP must match
+	// values provided in service.spec.ipFamilies. Clients using ClusterIPs must
+	// keep it in sync with ClusterIP (if provided) by having ClusterIP matching
+	// first element of ClusterIPs.
+	// +optional
+	ClusterIPs []string
+
+	// IPFamilies identifies all the IPFamilies assigned for this Service. If a value
+	// was not provided for IPFamilies it will be defaulted based on the cluster
+	// configuration and the value of service.spec.ipFamilyPolicy. A maximum of two
+	// values (dual-stack IPFamilies) are allowed in IPFamilies. IPFamilies field is
+	// conditionally mutable: it allows for adding or removing a secondary IPFamily,
+	// but it does not allow changing the primary IPFamily of the service.
+	// +optional
+	IPFamilies []IPFamily
+
+	// IPFamilyPolicy represents the dual-stack-ness requested or required by this
+	// Service. If there is no value provided, then this Service will be considered
+	// SingleStack (single IPFamily). Services can be SingleStack (single IPFamily),
+	// PreferDualStack (two dual-stack IPFamilies on dual-stack clusters or single
+	// IPFamily on single-stack clusters), or RequireDualStack (two dual-stack IPFamilies
+	// on dual-stack configured clusters, otherwise fail). The IPFamilies and ClusterIPs assigned
+	// to this service can be controlled by service.spec.ipFamilies and service.spec.clusterIPs
+	// respectively.
+	// +optional
+	IPFamilyPolicy *IPFamilyPolicyType
 
 	// ExternalName is the external reference that kubedns or equivalent will
 	// return as a CNAME record for this service. No proxying will be involved.
@@ -3513,24 +3671,16 @@ type ServiceSpec struct {
 	// +optional
 	HealthCheckNodePort int32
 
-	// publishNotReadyAddresses, when set to true, indicates that DNS implementations
-	// must publish the notReadyAddresses of subsets for the Endpoints associated with
-	// the Service. The default value is false.
-	// The primary use case for setting this field is to use a StatefulSet's Headless Service
-	// to propagate SRV records for its Pods without respect to their readiness for purpose
-	// of peer discovery.
+	// publishNotReadyAddresses indicates that any agent which deals with endpoints for this
+	// Service should disregard any indications of ready/not-ready.
+	// The primary use case for setting this field is for a StatefulSet's Headless Service to
+	// propagate SRV DNS records for its Pods for the purpose of peer discovery.
+	// The Kubernetes controllers that generate Endpoints and EndpointSlice resources for
+	// Services interpret this to mean that all endpoints are considered "ready" even if the
+	// Pods themselves are not. Agents which consume only Kubernetes generated endpoints
+	// through the Endpoints or EndpointSlice resources can safely assume this behavior.
 	// +optional
 	PublishNotReadyAddresses bool
-
-	// ipFamily specifies whether this Service has a preference for a particular IP family (e.g. IPv4 vs.
-	// IPv6).  If a specific IP family is requested, the clusterIP field will be allocated from that family, if it is
-	// available in the cluster.  If no IP family is requested, the cluster's primary IP family will be used.
-	// Other IP fields (loadBalancerIP, loadBalancerSourceRanges, externalIPs) and controllers which
-	// allocate external load-balancers should use the same IP family.  Endpoints for this Service will be of
-	// this family.  This field is immutable after creation. Assigning a ServiceIPFamily not available in the
-	// cluster (e.g. IPv6 in IPv4 only cluster) is an error condition and will fail during clusterIP assignment.
-	// +optional
-	IPFamily *IPFamily
 
 	// topologyKeys is a preference-order list of topology keys which
 	// implementations of services should use to preferentially sort endpoints
@@ -4456,10 +4606,10 @@ const (
 // TODO: Decide whether to store these separately or with the object they apply to.
 type Event struct {
 	metav1.TypeMeta
-	// +optional
+
 	metav1.ObjectMeta
 
-	// Required. The object that this event is about. Mapped to events.Event.regarding
+	// The object that this event is about. Mapped to events.Event.regarding
 	// +optional
 	InvolvedObject ObjectReference
 
@@ -4997,6 +5147,7 @@ type ComponentCondition struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
+// Deprecated: This API is deprecated in v1.19+
 type ComponentStatus struct {
 	metav1.TypeMeta
 	// +optional
@@ -5009,6 +5160,7 @@ type ComponentStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ComponentStatusList represents the list of component statuses
+// Deprecated: This API is deprecated in v1.19+
 type ComponentStatusList struct {
 	metav1.TypeMeta
 	// +optional
@@ -5075,6 +5227,11 @@ type SecurityContext struct {
 	// readonly paths and masked paths.
 	// +optional
 	ProcMount *ProcMountType
+	// The seccomp options to use by this container. If seccomp options are
+	// provided at both the pod & container level, the container options
+	// override the pod options.
+	// +optional
+	SeccompProfile *SeccompProfile
 }
 
 // ProcMountType defines the type of proc mount

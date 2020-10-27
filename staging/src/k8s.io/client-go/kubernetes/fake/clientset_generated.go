@@ -28,6 +28,8 @@ import (
 	fakeadmissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1/fake"
 	admissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
 	fakeadmissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1/fake"
+	internalv1alpha1 "k8s.io/client-go/kubernetes/typed/apiserverinternal/v1alpha1"
+	fakeinternalv1alpha1 "k8s.io/client-go/kubernetes/typed/apiserverinternal/v1alpha1/fake"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	fakeappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1/fake"
 	appsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
@@ -68,6 +70,8 @@ import (
 	fakediscoveryv1alpha1 "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1/fake"
 	discoveryv1beta1 "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
 	fakediscoveryv1beta1 "k8s.io/client-go/kubernetes/typed/discovery/v1beta1/fake"
+	eventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
+	fakeeventsv1 "k8s.io/client-go/kubernetes/typed/events/v1/fake"
 	eventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
 	fakeeventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1/fake"
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
@@ -96,8 +100,6 @@ import (
 	fakeschedulingv1alpha1 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1/fake"
 	schedulingv1beta1 "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1"
 	fakeschedulingv1beta1 "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1/fake"
-	settingsv1alpha1 "k8s.io/client-go/kubernetes/typed/settings/v1alpha1"
-	fakesettingsv1alpha1 "k8s.io/client-go/kubernetes/typed/settings/v1alpha1/fake"
 	storagev1 "k8s.io/client-go/kubernetes/typed/storage/v1"
 	fakestoragev1 "k8s.io/client-go/kubernetes/typed/storage/v1/fake"
 	storagev1alpha1 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1"
@@ -162,6 +164,11 @@ func (c *Clientset) AdmissionregistrationV1() admissionregistrationv1.Admissionr
 // AdmissionregistrationV1beta1 retrieves the AdmissionregistrationV1beta1Client
 func (c *Clientset) AdmissionregistrationV1beta1() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface {
 	return &fakeadmissionregistrationv1beta1.FakeAdmissionregistrationV1beta1{Fake: &c.Fake}
+}
+
+// InternalV1alpha1 retrieves the InternalV1alpha1Client
+func (c *Clientset) InternalV1alpha1() internalv1alpha1.InternalV1alpha1Interface {
+	return &fakeinternalv1alpha1.FakeInternalV1alpha1{Fake: &c.Fake}
 }
 
 // AppsV1 retrieves the AppsV1Client
@@ -264,6 +271,11 @@ func (c *Clientset) DiscoveryV1beta1() discoveryv1beta1.DiscoveryV1beta1Interfac
 	return &fakediscoveryv1beta1.FakeDiscoveryV1beta1{Fake: &c.Fake}
 }
 
+// EventsV1 retrieves the EventsV1Client
+func (c *Clientset) EventsV1() eventsv1.EventsV1Interface {
+	return &fakeeventsv1.FakeEventsV1{Fake: &c.Fake}
+}
+
 // EventsV1beta1 retrieves the EventsV1beta1Client
 func (c *Clientset) EventsV1beta1() eventsv1beta1.EventsV1beta1Interface {
 	return &fakeeventsv1beta1.FakeEventsV1beta1{Fake: &c.Fake}
@@ -332,11 +344,6 @@ func (c *Clientset) SchedulingV1beta1() schedulingv1beta1.SchedulingV1beta1Inter
 // SchedulingV1 retrieves the SchedulingV1Client
 func (c *Clientset) SchedulingV1() schedulingv1.SchedulingV1Interface {
 	return &fakeschedulingv1.FakeSchedulingV1{Fake: &c.Fake}
-}
-
-// SettingsV1alpha1 retrieves the SettingsV1alpha1Client
-func (c *Clientset) SettingsV1alpha1() settingsv1alpha1.SettingsV1alpha1Interface {
-	return &fakesettingsv1alpha1.FakeSettingsV1alpha1{Fake: &c.Fake}
 }
 
 // StorageV1beta1 retrieves the StorageV1beta1Client

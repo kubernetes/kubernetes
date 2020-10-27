@@ -24,6 +24,10 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
+// VSphereCSIMigrationEnabled is the environment variables to help
+// determine test verification flow.
+const VSphereCSIMigrationEnabled = "VSPHERE_CSI_MIGRATION_ENABLED"
+
 // environment variables related to datastore parameters
 const (
 	SPBMPolicyName             = "VSPHERE_SPBM_POLICY_NAME"
@@ -110,4 +114,16 @@ func GetAndExpectIntEnvVar(varName string) int {
 	varIntValue, err := strconv.Atoi(varValue)
 	framework.ExpectNoError(err, "Error Parsing "+varName)
 	return varIntValue
+}
+
+// GetAndExpectBoolEnvVar returns the bool value of an environment variable
+// if environment variable is not set return false
+func GetAndExpectBoolEnvVar(varName string) bool {
+	varValue := os.Getenv(varName)
+	if varValue == "" {
+		return false
+	}
+	varBoolValue, err := strconv.ParseBool(varValue)
+	framework.ExpectNoError(err, "Error Parsing "+varName)
+	return varBoolValue
 }

@@ -19,6 +19,7 @@ package apiserver
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -51,6 +52,8 @@ import (
 	"k8s.io/kube-aggregator/pkg/controllers"
 )
 
+type certKeyFunc func() ([]byte, []byte)
+
 // ServiceResolver knows how to convert a service reference into an actual location.
 type ServiceResolver interface {
 	ResolveEndpoint(namespace, name string, port int32) (*url.URL, error)
@@ -70,8 +73,10 @@ type AvailableConditionController struct {
 	endpointsLister v1listers.EndpointsLister
 	endpointsSynced cache.InformerSynced
 
-	discoveryClient *http.Client
-	serviceResolver ServiceResolver
+	// dialContext specifies the dial function for creating unencrypted TCP connections.
+	dialContext                func(ctx context.Context, network, address string) (net.Conn, error)
+	proxyCurrentCertKeyContent certKeyFunc
+	serviceResolver            ServiceResolver
 
 	// To allow injection for testing.
 	syncFn func(key string) error
@@ -81,6 +86,53 @@ type AvailableConditionController struct {
 	cache map[string]map[string][]string
 	// this lock protects operations on the above cache
 	cacheLock sync.RWMutex
+
+	// TLS config with customized dialer cannot be cached by the client-go
+	// tlsTransportCache. Use a local cache here to reduce the chance of
+	// the controller spamming idle connections with short-lived transports.
+	// NOTE: the cache works because we assume that the transports constructed
+	// by the controller only vary on the dynamic cert/key.
+	tlsCache *tlsTransportCache
+}
+
+type tlsTransportCache struct {
+	mu         sync.Mutex
+	transports map[tlsCacheKey]http.RoundTripper
+}
+
+func (c *tlsTransportCache) get(config *rest.Config) (http.RoundTripper, error) {
+	// If the available controller doesn't customzie the dialer (and we know from
+	// the code that the controller doesn't customzie other functions i.e. Proxy
+	// and GetCert (ExecProvider)), the config is cacheable by the client-go TLS
+	// transport cache. Let's skip the local cache and depend on the client-go cache.
+	if config.Dial == nil {
+		return rest.TransportFor(config)
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	// See if we already have a custom transport for this config
+	key := tlsConfigKey(config)
+	if t, ok := c.transports[key]; ok {
+		return t, nil
+	}
+	restTransport, err := rest.TransportFor(config)
+	if err != nil {
+		return nil, err
+	}
+	c.transports[key] = restTransport
+	return restTransport, nil
+}
+
+type tlsCacheKey struct {
+	certData string
+	keyData  string
+}
+
+func tlsConfigKey(c *rest.Config) tlsCacheKey {
+	return tlsCacheKey{
+		certData: string(c.TLSClientConfig.CertData),
+		keyData:  string(c.TLSClientConfig.KeyData),
+	}
 }
 
 // NewAvailableConditionController returns a new AvailableConditionController.
@@ -90,8 +142,7 @@ func NewAvailableConditionController(
 	endpointsInformer v1informers.EndpointsInformer,
 	apiServiceClient apiregistrationclient.APIServicesGetter,
 	proxyTransport *http.Transport,
-	proxyClientCert []byte,
-	proxyClientKey []byte,
+	proxyCurrentCertKeyContent certKeyFunc,
 	serviceResolver ServiceResolver,
 	egressSelector *egressselector.EgressSelector,
 ) (*AvailableConditionController, error) {
@@ -110,17 +161,8 @@ func NewAvailableConditionController(
 			// the maximum disruption time to a minimum, but it does prevent hot loops.
 			workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second),
 			"AvailableConditionController"),
-	}
-
-	// if a particular transport was specified, use that otherwise build one
-	// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status
-	// that's not so bad) and sets a very short timeout.  This is a best effort GET that provides no additional information
-	restConfig := &rest.Config{
-		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: true,
-			CertData: proxyClientCert,
-			KeyData:  proxyClientKey,
-		},
+		proxyCurrentCertKeyContent: proxyCurrentCertKeyContent,
+		tlsCache:                   &tlsTransportCache{transports: make(map[tlsCacheKey]http.RoundTripper)},
 	}
 
 	if egressSelector != nil {
@@ -130,19 +172,9 @@ func NewAvailableConditionController(
 		if err != nil {
 			return nil, err
 		}
-		restConfig.Dial = egressDialer
+		c.dialContext = egressDialer
 	} else if proxyTransport != nil && proxyTransport.DialContext != nil {
-		restConfig.Dial = proxyTransport.DialContext
-	}
-
-	transport, err := rest.TransportFor(restConfig)
-	if err != nil {
-		return nil, err
-	}
-	c.discoveryClient = &http.Client{
-		Transport: transport,
-		// the request should happen quickly.
-		Timeout: 5 * time.Second,
+		c.dialContext = proxyTransport.DialContext
 	}
 
 	// resync on this one because it is low cardinality and rechecking the actual discovery
@@ -181,6 +213,39 @@ func (c *AvailableConditionController) sync(key string) error {
 	}
 	if err != nil {
 		return err
+	}
+
+	// if a particular transport was specified, use that otherwise build one
+	// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status
+	// that's not so bad) and sets a very short timeout.  This is a best effort GET that provides no additional information
+	restConfig := &rest.Config{
+		TLSClientConfig: rest.TLSClientConfig{
+			Insecure: true,
+		},
+	}
+
+	if c.proxyCurrentCertKeyContent != nil {
+		proxyClientCert, proxyClientKey := c.proxyCurrentCertKeyContent()
+
+		restConfig.TLSClientConfig.CertData = proxyClientCert
+		restConfig.TLSClientConfig.KeyData = proxyClientKey
+	}
+	if c.dialContext != nil {
+		restConfig.Dial = c.dialContext
+	}
+	// TLS config with customized dialer cannot be cached by the client-go
+	// tlsTransportCache. Use a local cache here to reduce the chance of
+	// the controller spamming idle connections with short-lived transports.
+	// NOTE: the cache works because we assume that the transports constructed
+	// by the controller only vary on the dynamic cert/key.
+	restTransport, err := c.tlsCache.get(restConfig)
+	if err != nil {
+		return err
+	}
+	discoveryClient := &http.Client{
+		Transport: restTransport,
+		// the request should happen quickly.
+		Timeout: 5 * time.Second,
 	}
 
 	apiService := originalAPIService.DeepCopy()
@@ -303,7 +368,7 @@ func (c *AvailableConditionController) sync(key string) error {
 
 					// setting the system-masters identity ensures that we will always have access rights
 					transport.SetAuthProxyHeaders(newReq, "system:kube-aggregator", []string{"system:masters"}, nil)
-					resp, err := c.discoveryClient.Do(newReq)
+					resp, err := discoveryClient.Do(newReq)
 					if resp != nil {
 						resp.Body.Close()
 						// we should always been in the 200s or 300s

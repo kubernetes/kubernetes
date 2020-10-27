@@ -580,7 +580,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, opts storage.ListOpt
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	hasContinuation := pagingEnabled && len(pred.Continue) > 0
 	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
-	if resourceVersion == "" || hasContinuation || hasLimit {
+	if resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact {
 		// If resourceVersion is not specified, serve it from underlying
 		// storage (for backward compatibility). If a continuation is
 		// requested, serve it from the underlying storage as well.
@@ -654,7 +654,7 @@ func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions,
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	hasContinuation := pagingEnabled && len(pred.Continue) > 0
 	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
-	if resourceVersion == "" || hasContinuation || hasLimit {
+	if resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact {
 		// If resourceVersion is not specified, serve it from underlying
 		// storage (for backward compatibility). If a continuation is
 		// requested, serve it from the underlying storage as well.
@@ -793,7 +793,19 @@ func (c *Cacher) dispatchEvents() {
 			if !ok {
 				return
 			}
-			c.dispatchEvent(&event)
+			// Don't dispatch bookmarks coming from the storage layer.
+			// They can be very frequent (even to the level of subseconds)
+			// to allow efficient watch resumption on kube-apiserver restarts,
+			// and propagating them down may overload the whole system.
+			//
+			// TODO: If at some point we decide the performance and scalability
+			// footprint is acceptable, this is the place to hook them in.
+			// However, we then need to check if this was called as a result
+			// of a bookmark event or regular Add/Update/Delete operation by
+			// checking if resourceVersion here has changed.
+			if event.Type != watch.Bookmark {
+				c.dispatchEvent(&event)
+			}
 			lastProcessedResourceVersion = event.ResourceVersion
 		case <-bookmarkTimer.C():
 			bookmarkTimer.Reset(wait.Jitter(time.Second, 0.25))
@@ -1090,7 +1102,7 @@ func (lw *cacherListerWatcher) List(options metav1.ListOptions) (runtime.Object,
 		Continue: options.Continue,
 	}
 
-	if err := lw.storage.List(context.TODO(), lw.resourcePrefix, storage.ListOptions{Predicate: pred}, list); err != nil {
+	if err := lw.storage.List(context.TODO(), lw.resourcePrefix, storage.ListOptions{ResourceVersionMatch: options.ResourceVersionMatch, Predicate: pred}, list); err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -1098,7 +1110,14 @@ func (lw *cacherListerWatcher) List(options metav1.ListOptions) (runtime.Object,
 
 // Implements cache.ListerWatcher interface.
 func (lw *cacherListerWatcher) Watch(options metav1.ListOptions) (watch.Interface, error) {
-	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, storage.ListOptions{ResourceVersion: options.ResourceVersion, Predicate: storage.Everything})
+	opts := storage.ListOptions{
+		ResourceVersion: options.ResourceVersion,
+		Predicate:       storage.Everything,
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EfficientWatchResumption) {
+		opts.ProgressNotify = true
+	}
+	return lw.storage.WatchList(context.TODO(), lw.resourcePrefix, opts)
 }
 
 // errWatcher implements watch.Interface to return a single error

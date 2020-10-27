@@ -161,7 +161,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 		1. Delete PV.
 		2. Delete POD, POD deletion should succeed.
 	*/
-	ginkgo.It("should test that deleting the PV before the pod does not cause pod deletion to fail on vspehre volume detach", func() {
+	ginkgo.It("should test that deleting the PV before the pod does not cause pod deletion to fail on vsphere volume detach", func() {
 		ginkgo.By("Deleting the Persistent Volume")
 		framework.ExpectNoError(e2epv.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
 		pv = nil
@@ -176,7 +176,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 		2. Restart kubelet
 		3. Verify that written file is accessible after kubelet restart
 	*/
-	ginkgo.It("should test that a file written to the vspehre volume mount before kubelet restart can be read after restart [Disruptive]", func() {
+	ginkgo.It("should test that a file written to the vsphere volume mount before kubelet restart can be read after restart [Disruptive]", func() {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 		utils.TestKubeletRestartsAndRestoresMount(c, f, clientPod)
 	})
@@ -192,7 +192,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere [Feature:vsphere]", func() 
 		4. Start kubelet.
 		5. Verify that volume mount not to be found.
 	*/
-	ginkgo.It("should test that a vspehre volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns [Disruptive]", func() {
+	ginkgo.It("should test that a vsphere volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns [Disruptive]", func() {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 		utils.TestVolumeUnmountsFromDeletedPod(c, f, clientPod)
 	})

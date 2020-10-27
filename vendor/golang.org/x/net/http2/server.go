@@ -761,6 +761,7 @@ func (sc *serverConn) readFrames() {
 
 // frameWriteResult is the message passed from writeFrameAsync to the serve goroutine.
 type frameWriteResult struct {
+	_   incomparable
 	wr  FrameWriteRequest // what was written (or attempted)
 	err error             // result of the writeFrame call
 }
@@ -771,7 +772,7 @@ type frameWriteResult struct {
 // serverConn.
 func (sc *serverConn) writeFrameAsync(wr FrameWriteRequest) {
 	err := wr.write.writeFrame(sc)
-	sc.wroteFrameCh <- frameWriteResult{wr, err}
+	sc.wroteFrameCh <- frameWriteResult{wr: wr, err: err}
 }
 
 func (sc *serverConn) closeAllStreamsOnConnClose() {
@@ -1161,7 +1162,7 @@ func (sc *serverConn) startFrameWrite(wr FrameWriteRequest) {
 	if wr.write.staysWithinBuffer(sc.bw.Available()) {
 		sc.writingFrameAsync = false
 		err := wr.write.writeFrame(sc)
-		sc.wroteFrame(frameWriteResult{wr, err})
+		sc.wroteFrame(frameWriteResult{wr: wr, err: err})
 	} else {
 		sc.writingFrameAsync = true
 		go sc.writeFrameAsync(wr)
@@ -2057,7 +2058,7 @@ func (sc *serverConn) newWriterAndRequestNoBody(st *stream, rp requestParam) (*r
 	var trailer http.Header
 	for _, v := range rp.header["Trailer"] {
 		for _, key := range strings.Split(v, ",") {
-			key = http.CanonicalHeaderKey(strings.TrimSpace(key))
+			key = http.CanonicalHeaderKey(textproto.TrimString(key))
 			switch key {
 			case "Transfer-Encoding", "Trailer", "Content-Length":
 				// Bogus. (copy of http1 rules)
@@ -2275,6 +2276,7 @@ func (sc *serverConn) sendWindowUpdate32(st *stream, n int32) {
 // requestBody is the Handler's Request.Body type.
 // Read and Close may be called concurrently.
 type requestBody struct {
+	_             incomparable
 	stream        *stream
 	conn          *serverConn
 	closed        bool  // for use by Close only

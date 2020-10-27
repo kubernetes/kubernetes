@@ -75,6 +75,7 @@ func convertAdmissionResponseToV1(r *v1beta1.AdmissionResponse) *v1.AdmissionRes
 		Patch:            r.Patch,
 		PatchType:        pt,
 		Result:           r.Result,
+		Warnings:         r.Warnings,
 	}
 }
 
@@ -91,6 +92,7 @@ func convertAdmissionResponseToV1beta1(r *v1.AdmissionResponse) *v1beta1.Admissi
 		Patch:            r.Patch,
 		PatchType:        pt,
 		Result:           r.Result,
+		Warnings:         r.Warnings,
 	}
 }
 

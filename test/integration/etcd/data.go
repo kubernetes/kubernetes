@@ -206,6 +206,14 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/events/v1
+		gvr("events.k8s.io", "v1", "events"): {
+			Stub:             `{"metadata": {"name": "event3"}, "regarding": {"namespace": "` + namespace + `"}, "note": "some data here", "eventTime": "2017-08-09T15:04:05.000000Z", "reportingInstance": "node-xyz", "reportingController": "k8s.io/my-controller", "action": "DidNothing", "reason": "Laziness", "type": "Normal"}`,
+			ExpectedEtcdPath: "/registry/events/" + namespace + "/event3",
+			ExpectedGVK:      gvkP("", "v1", "Event"),
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/events/v1beta1
 		gvr("events.k8s.io", "v1beta1", "events"): {
 			Stub:             `{"metadata": {"name": "event2"}, "regarding": {"namespace": "` + namespace + `"}, "note": "some data here", "eventTime": "2017-08-09T15:04:05.000000Z", "reportingInstance": "node-xyz", "reportingController": "k8s.io/my-controller", "action": "DidNothing", "reason": "Laziness"}`,
@@ -310,13 +318,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("storage.k8s.io", "v1", "storageclasses"): {
 			Stub:             `{"metadata": {"name": "sc2"}, "provisioner": "aws"}`,
 			ExpectedEtcdPath: "/registry/storageclasses/sc2",
-		},
-		// --
-
-		// k8s.io/kubernetes/pkg/apis/settings/v1alpha1
-		gvr("settings.k8s.io", "v1alpha1", "podpresets"): {
-			Stub:             `{"metadata": {"name": "podpre1"}, "spec": {"env": [{"name": "FOO"}]}}`,
-			ExpectedEtcdPath: "/registry/podpresets/" + namespace + "/podpre1",
 		},
 		// --
 
@@ -498,6 +499,13 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("node.k8s.io", "v1beta1", "runtimeclasses"): {
 			Stub:             `{"metadata": {"name": "rc2"}, "handler": "h2"}`,
 			ExpectedEtcdPath: "/registry/runtimeclasses/rc2",
+		},
+		// --
+
+		// k8s.io/apiserver/pkg/apis/apiserverinternal/v1alpha1
+		gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"): {
+			Stub:             `{"metadata":{"name":"sv1.test"},"spec":{}}`,
+			ExpectedEtcdPath: "/registry/storageversions/sv1.test",
 		},
 		// --
 	}

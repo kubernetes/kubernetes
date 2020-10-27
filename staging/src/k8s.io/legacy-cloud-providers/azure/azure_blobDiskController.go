@@ -40,6 +40,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// Attention: blob disk feature is deprecated
 const (
 	vhdContainerName         = "vhds"
 	useHTTPSForBlobBasedDisk = true
@@ -84,7 +85,15 @@ func (c *BlobDiskController) initStorageAccounts() {
 // If no storage account is given, search all the storage accounts associated with the resource group and pick one that
 // fits storage type and location.
 func (c *BlobDiskController) CreateVolume(blobName, accountName, accountType, location string, requestGB int) (string, string, int, error) {
-	account, key, err := c.common.cloud.EnsureStorageAccount(accountName, accountType, string(defaultStorageAccountKind), c.common.resourceGroup, location, dedicatedDiskAccountNamePrefix, true)
+	accountOptions := &AccountOptions{
+		Name:                   accountName,
+		Type:                   accountType,
+		Kind:                   string(defaultStorageAccountKind),
+		ResourceGroup:          c.common.resourceGroup,
+		Location:               location,
+		EnableHTTPSTrafficOnly: true,
+	}
+	account, key, err := c.common.cloud.EnsureStorageAccount(accountOptions, dedicatedDiskAccountNamePrefix)
 	if err != nil {
 		return "", "", 0, fmt.Errorf("could not get storage key for storage account %s: %v", accountName, err)
 	}

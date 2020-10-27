@@ -57,7 +57,7 @@ type Client struct {
 func New(config *azclients.ClientConfig) *Client {
 	baseURI := config.ResourceManagerEndpoint
 	authorizer := config.Authorizer
-	armClient := armclient.New(authorizer, baseURI, "", APIVersion, config.Location, config.Backoff)
+	armClient := armclient.New(authorizer, baseURI, config.UserAgent, APIVersion, config.Location, config.Backoff)
 	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 
 	klog.V(2).Infof("Azure VirtualMachine client (read ops) using rate limit config: QPS=%g, bucket=%d",

@@ -29,11 +29,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/controlplane"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -52,7 +55,8 @@ type testContext struct {
 }
 
 // initTestMaster initializes a test environment and creates a master with default
-// configuration.
+// configuration. Alpha resources are enabled automatically if the corresponding feature
+// is enabled.
 func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface) *testContext {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	testCtx := testContext{
@@ -68,6 +72,14 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 	}))
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
+	resourceConfig := controlplane.DefaultAPIResourceConfigSource()
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+		resourceConfig.EnableVersions(schema.GroupVersion{
+			Group:   "storage.k8s.io",
+			Version: "v1alpha1",
+		})
+	}
+	masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 
 	if admission != nil {
 		masterConfig.GenericConfig.AdmissionControl = admission
@@ -103,16 +115,14 @@ func initTestSchedulerWithOptions(
 	// 1. Create scheduler
 	testCtx.informerFactory = informers.NewSharedInformerFactory(testCtx.clientSet, resyncPeriod)
 
-	podInformer := testCtx.informerFactory.Core().V1().Pods()
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
-		Interface: testCtx.clientSet.EventsV1beta1().Events(""),
+		Interface: testCtx.clientSet.EventsV1(),
 	})
 
 	var err error
 	testCtx.scheduler, err = scheduler.New(
 		testCtx.clientSet,
 		testCtx.informerFactory,
-		podInformer,
 		profile.NewRecorderFactory(eventBroadcaster),
 		testCtx.ctx.Done())
 

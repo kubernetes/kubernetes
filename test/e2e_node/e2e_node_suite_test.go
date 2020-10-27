@@ -56,18 +56,21 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var e2es *services.E2EServices
+var (
+	e2es *services.E2EServices
 
-// TODO(random-liu): Change the following modes to sub-command.
-var runServicesMode = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
-var runKubeletMode = flag.Bool("run-kubelet-mode", false, "If true, only start kubelet, and not run test.")
-var systemValidateMode = flag.Bool("system-validate-mode", false, "If true, only run system validation in current process, and not run test.")
-var systemSpecFile = flag.String("system-spec-file", "", "The name of the system spec file that will be used for node conformance test. If it's unspecified or empty, the default system spec (system.DefaultSysSpec) will be used.")
+	// TODO(random-liu): Change the following modes to sub-command.
+	runServicesMode    = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
+	runKubeletMode     = flag.Bool("run-kubelet-mode", false, "If true, only start kubelet, and not run test.")
+	systemValidateMode = flag.Bool("system-validate-mode", false, "If true, only run system validation in current process, and not run test.")
+	systemSpecFile     = flag.String("system-spec-file", "", "The name of the system spec file that will be used for node conformance test. If it's unspecified or empty, the default system spec (system.DefaultSysSpec) will be used.")
+)
 
 // registerNodeFlags registers flags specific to the node e2e test suite.
 func registerNodeFlags(flags *flag.FlagSet) {
 	// Mark the test as node e2e when node flags are api.Registry.
 	framework.TestContext.NodeE2E = true
+	flags.StringVar(&framework.TestContext.BearerToken, "bearer-token", "", "The bearer token to authenticate with. If not specified, it would be a random token. Currently this token is only used in node e2e tests.")
 	flags.StringVar(&framework.TestContext.NodeName, "node-name", "", "Name of the node to run tests on.")
 	// TODO(random-liu): Move kubelet start logic out of the test.
 	// TODO(random-liu): Move log fetch logic out of the test.
@@ -179,7 +182,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// This helps with debugging test flakes since it is hard to tell when a test failure is due to image pulling.
 	if framework.TestContext.PrepullImages {
 		klog.Infof("Pre-pulling images so that they are cached for the tests.")
-		updateImageWhiteList()
+		updateImageAllowList()
 		err := PrePullAllImages()
 		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 	}
@@ -205,8 +208,12 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.NodeE2E
 
-	return nil
-}, func([]byte) {
+	// ginkgo would spawn multiple processes to run tests.
+	// Since the bearer token is generated randomly at run time,
+	// we need to distribute the bearer token to other processes to make them use the same token.
+	return []byte(framework.TestContext.BearerToken)
+}, func(token []byte) {
+	framework.TestContext.BearerToken = string(token)
 	// update test context with node configuration.
 	gomega.Expect(updateTestContext()).To(gomega.Succeed(), "update test context with node config.")
 })
@@ -279,7 +286,7 @@ func waitForNodeReady() {
 // update test context with node configuration.
 func updateTestContext() error {
 	setExtraEnvs()
-	updateImageWhiteList()
+	updateImageAllowList()
 
 	client, err := getAPIServerClient()
 	if err != nil {

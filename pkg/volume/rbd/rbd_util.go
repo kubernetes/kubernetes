@@ -33,8 +33,8 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 	utilpath "k8s.io/utils/path"
 
 	v1 "k8s.io/api/core/v1"
@@ -373,7 +373,7 @@ func (util *rbdUtil) AttachDisk(b rbdMounter) (string, error) {
 
 	globalPDPath := util.MakeGlobalPDName(*b.rbd)
 	if pathExists, pathErr := mount.PathExists(globalPDPath); pathErr != nil {
-		return "", fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return "", fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		if err := os.MkdirAll(globalPDPath, 0750); err != nil {
 			return "", err
@@ -459,7 +459,7 @@ func (util *rbdUtil) AttachDisk(b rbdMounter) (string, error) {
 			devicePath, mapped = waitForPath(b.Pool, b.Image, 10 /*maxRetries*/, false /*useNbdDriver*/)
 		}
 		if !mapped {
-			return "", fmt.Errorf("Could not map image %s/%s, Timeout after 10s", b.Pool, b.Image)
+			return "", fmt.Errorf("could not map image %s/%s, Timeout after 10s", b.Pool, b.Image)
 		}
 	}
 	return devicePath, nil
@@ -515,7 +515,7 @@ func (util *rbdUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 func (util *rbdUtil) DetachBlockDisk(disk rbdDiskUnmapper, mapPath string) error {
 
 	if pathExists, pathErr := mount.PathExists(mapPath); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", mapPath)
 		return nil
@@ -594,9 +594,9 @@ func (util *rbdUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDPersistentVo
 	volSz := fmt.Sprintf("%d", sz)
 	mon := util.kernelRBDMonitorsOpt(p.Mon)
 	if p.rbdMounter.imageFormat == rbdImageFormat2 {
-		klog.V(4).Infof("rbd: create %s size %s format %s (features: %s) using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, p.rbdMounter.imageFeatures, mon, p.rbdMounter.Pool, p.rbdMounter.adminID, p.rbdMounter.adminSecret)
+		klog.V(4).Infof("rbd: create %s size %s format %s (features: %s) using mon %s, pool %s id %s key <masked>", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, p.rbdMounter.imageFeatures, mon, p.rbdMounter.Pool, p.rbdMounter.adminID)
 	} else {
-		klog.V(4).Infof("rbd: create %s size %s format %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, mon, p.rbdMounter.Pool, p.rbdMounter.adminID, p.rbdMounter.adminSecret)
+		klog.V(4).Infof("rbd: create %s size %s format %s using mon %s, pool %s id %s key <masked>", p.rbdMounter.Image, volSz, p.rbdMounter.imageFormat, mon, p.rbdMounter.Pool, p.rbdMounter.adminID)
 	}
 	args := []string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminID, "-m", mon, "--key=" + p.rbdMounter.adminSecret, "--image-format", p.rbdMounter.imageFormat}
 	if p.rbdMounter.imageFormat == rbdImageFormat2 {
@@ -632,7 +632,7 @@ func (util *rbdUtil) DeleteImage(p *rbdVolumeDeleter) error {
 	}
 	// rbd rm.
 	mon := util.kernelRBDMonitorsOpt(p.rbdMounter.Mon)
-	klog.V(4).Infof("rbd: rm %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, mon, p.rbdMounter.Pool, p.rbdMounter.adminID, p.rbdMounter.adminSecret)
+	klog.V(4).Infof("rbd: rm %s using mon %s, pool %s id %s key <masked>", p.rbdMounter.Image, mon, p.rbdMounter.Pool, p.rbdMounter.adminID)
 	output, err = p.exec.Command("rbd",
 		"rm", p.rbdMounter.Image, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminID, "-m", mon, "--key="+p.rbdMounter.adminSecret).CombinedOutput()
 	if err == nil {
@@ -668,7 +668,7 @@ func (util *rbdUtil) ExpandImage(rbdExpander *rbdVolumeExpander, oldSize resourc
 
 	// rbd resize.
 	mon := util.kernelRBDMonitorsOpt(rbdExpander.rbdMounter.Mon)
-	klog.V(4).Infof("rbd: resize %s using mon %s, pool %s id %s key %s", rbdExpander.rbdMounter.Image, mon, rbdExpander.rbdMounter.Pool, rbdExpander.rbdMounter.adminID, rbdExpander.rbdMounter.adminSecret)
+	klog.V(4).Infof("rbd: resize %s using mon %s, pool %s id %s key <masked>", rbdExpander.rbdMounter.Image, mon, rbdExpander.rbdMounter.Pool, rbdExpander.rbdMounter.adminID)
 	output, err = rbdExpander.exec.Command("rbd",
 		"resize", rbdExpander.rbdMounter.Image, "--size", newVolSz, "--pool", rbdExpander.rbdMounter.Pool, "--id", rbdExpander.rbdMounter.adminID, "-m", mon, "--key="+rbdExpander.rbdMounter.adminSecret).CombinedOutput()
 	if err == nil {
@@ -710,9 +710,9 @@ func (util *rbdUtil) rbdInfo(b *rbdMounter) (int, error) {
 	// # image does not exist (exit=2)
 	// rbd: error opening image 1234: (2) No such file or directory
 	//
-	klog.V(4).Infof("rbd: info %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, id, secret)
+	klog.V(4).Infof("rbd: info %s using mon %s, pool %s id %s key <masked>", b.Image, mon, b.Pool, id)
 	output, err = b.exec.Command("rbd",
-		"info", b.Image, "--pool", b.Pool, "-m", mon, "--id", id, "--key="+secret, "-k=/dev/null", "--format=json").CombinedOutput()
+		"info", b.Image, "--pool", b.Pool, "-m", mon, "--id", id, "--key="+secret, "-k=/dev/null", "--format=json").Output()
 
 	if err, ok := err.(*exec.Error); ok {
 		if err.Err == exec.ErrNotFound {
@@ -773,7 +773,7 @@ func (util *rbdUtil) rbdStatus(b *rbdMounter) (bool, string, error) {
 	// # image does not exist (exit=2)
 	// rbd: error opening image kubernetes-dynamic-pvc-<UUID>: (2) No such file or directory
 	//
-	klog.V(4).Infof("rbd: status %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, id, secret)
+	klog.V(4).Infof("rbd: status %s using mon %s, pool %s id %s key <masked>", b.Image, mon, b.Pool, id)
 	cmd, err = b.exec.Command("rbd",
 		"status", b.Image, "--pool", b.Pool, "-m", mon, "--id", id, "--key="+secret).CombinedOutput()
 	output = string(cmd)
@@ -803,7 +803,7 @@ func (util *rbdUtil) rbdStatus(b *rbdMounter) (bool, string, error) {
 func getRbdImageInfo(deviceMountPath string) (*rbdImageInfo, error) {
 	deviceMountedPathSeps := strings.Split(filepath.Base(deviceMountPath), "-image-")
 	if len(deviceMountedPathSeps) != 2 {
-		return nil, fmt.Errorf("Can't found devicePath for %s ", deviceMountPath)
+		return nil, fmt.Errorf("can't found devicePath for %s ", deviceMountPath)
 	}
 	return &rbdImageInfo{
 		pool: deviceMountedPathSeps[0],

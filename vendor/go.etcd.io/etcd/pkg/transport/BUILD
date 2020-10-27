@@ -20,6 +20,7 @@ go_library(
     importpath = "go.etcd.io/etcd/pkg/transport",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/go.etcd.io/etcd/pkg/fileutil:go_default_library",
         "//vendor/go.etcd.io/etcd/pkg/tlsutil:go_default_library",
         "//vendor/go.uber.org/zap:go_default_library",
     ],

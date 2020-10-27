@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -39,10 +41,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
-	testutils "k8s.io/kubernetes/test/utils"
-
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -69,9 +67,6 @@ func updateDaemonSetWithRetries(c clientset.Interface, namespace, name string, a
 	var updateErr error
 	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
 		if ds, err = daemonsets.Get(context.TODO(), name, metav1.GetOptions{}); err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		// Apply the update, then attempt to push it to the apiserver.
@@ -146,6 +141,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	/*
+	  Release: v1.10
 	  Testname: DaemonSet-Creation
 	  Description: A conformant Kubernetes distribution MUST support the creation of DaemonSets. When a DaemonSet
 	  Pod is deleted, the DaemonSet controller MUST create a replacement Pod.
@@ -173,6 +169,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	/*
+	  Release: v1.10
 	  Testname: DaemonSet-NodeSelection
 	  Description: A conformant Kubernetes distribution MUST support DaemonSet Pod node selection via label
 	  selectors.
@@ -273,6 +270,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	/*
+	  Release: v1.10
 	  Testname: DaemonSet-FailedPodCreation
 	  Description: A conformant Kubernetes distribution MUST create new DaemonSet Pods when they fail.
 	*/
@@ -352,6 +350,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	/*
+	  Release: v1.10
 	  Testname: DaemonSet-RollingUpdate
 	  Description: A conformant Kubernetes distribution MUST support DaemonSet RollingUpdates.
 	*/
@@ -408,6 +407,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	/*
+	  Release: v1.10
 	  Testname: DaemonSet-Rollback
 	  Description: A conformant Kubernetes distribution MUST support automated, minimally disruptive
 	  rollback of updates to a DaemonSet.
@@ -606,7 +606,7 @@ func setDaemonSetNodeLabels(c clientset.Interface, nodeName string, labels map[s
 	if err != nil {
 		return nil, err
 	} else if len(newLabels) != len(labels) {
-		return nil, fmt.Errorf("Could not set daemon set test labels as expected")
+		return nil, fmt.Errorf("could not set daemon set test labels as expected")
 	}
 
 	return newNode, nil
@@ -698,11 +698,11 @@ func checkRunningOnNoNodes(f *framework.Framework, ds *appsv1.DaemonSet) func() 
 func checkDaemonStatus(f *framework.Framework, dsName string) error {
 	ds, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Get(context.TODO(), dsName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("Could not get daemon set from v1")
+		return fmt.Errorf("could not get daemon set from v1")
 	}
 	desired, scheduled, ready := ds.Status.DesiredNumberScheduled, ds.Status.CurrentNumberScheduled, ds.Status.NumberReady
 	if desired != scheduled && desired != ready {
-		return fmt.Errorf("Error in daemon status. DesiredScheduled: %d, CurrentScheduled: %d, Ready: %d", desired, scheduled, ready)
+		return fmt.Errorf("error in daemon status. DesiredScheduled: %d, CurrentScheduled: %d, Ready: %d", desired, scheduled, ready)
 	}
 	return nil
 }

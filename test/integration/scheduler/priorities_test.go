@@ -25,38 +25,65 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/scheduler"
+	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // This file tests the scheduler priority functions.
 
+func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *testutils.TestContext {
+	prof := schedulerconfig.KubeSchedulerProfile{
+		SchedulerName: v1.DefaultSchedulerName,
+		Plugins: &schedulerconfig.Plugins{
+			Score: &schedulerconfig.PluginSet{
+				Enabled: []schedulerconfig.Plugin{
+					{Name: scorePluginName, Weight: 1},
+				},
+				Disabled: []schedulerconfig.Plugin{
+					{Name: "*"},
+				},
+			},
+		},
+	}
+	testCtx := testutils.InitTestSchedulerWithOptions(
+		t,
+		testutils.InitTestMaster(t, strings.ToLower(scorePluginName), nil),
+		nil,
+		0,
+		scheduler.WithProfiles(prof),
+	)
+	testutils.SyncInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.Ctx)
+	return testCtx
+}
+
 // TestNodeAffinity verifies that scheduler's node affinity priority function
-// works correctly.
+// works correctly.s
 func TestNodeAffinity(t *testing.T) {
-	testCtx := initTest(t, "node-affinity")
+	testCtx := initTestSchedulerForPriorityTest(t, nodeaffinity.Name)
 	defer testutils.CleanupTest(t, testCtx)
 	// Add a few nodes.
-	nodes, err := createNodes(testCtx.ClientSet, "testnode", nil, 5)
+	_, err := createNodes(testCtx.ClientSet, "testnode", st.MakeNode(), 4)
 	if err != nil {
 		t.Fatalf("Cannot create nodes: %v", err)
 	}
 	// Add a label to one of the nodes.
-	labeledNode := nodes[1]
 	labelKey := "kubernetes.io/node-topologyKey"
 	labelValue := "topologyvalue"
-	labels := map[string]string{
-		labelKey: labelValue,
+	labeledNode, err := createNode(testCtx.ClientSet, st.MakeNode().Name("testnode-4").Label(labelKey, labelValue).Obj())
+	if err != nil {
+		t.Fatalf("Cannot create labeled node: %v", err)
 	}
-	if err = utils.AddLabelsToNode(testCtx.ClientSet, labeledNode.Name, labels); err != nil {
-		t.Fatalf("Cannot add labels to node: %v", err)
-	}
-	if err = waitForNodeLabels(testCtx.ClientSet, labeledNode.Name, labels); err != nil {
-		t.Fatalf("Adding labels to node didn't succeed: %v", err)
-	}
+
 	// Create a pod with node affinity.
 	podName := "pod-with-node-affinity"
 	pod, err := runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
@@ -94,26 +121,14 @@ func TestNodeAffinity(t *testing.T) {
 // TestPodAffinity verifies that scheduler's pod affinity priority function
 // works correctly.
 func TestPodAffinity(t *testing.T) {
-	testCtx := initTest(t, "pod-affinity")
+	testCtx := initTestSchedulerForPriorityTest(t, interpodaffinity.Name)
 	defer testutils.CleanupTest(t, testCtx)
 	// Add a few nodes.
-	nodesInTopology, err := createNodes(testCtx.ClientSet, "in-topology", nil, 5)
-	if err != nil {
-		t.Fatalf("Cannot create nodes: %v", err)
-	}
 	topologyKey := "node-topologykey"
 	topologyValue := "topologyvalue"
-	nodeLabels := map[string]string{
-		topologyKey: topologyValue,
-	}
-	for _, node := range nodesInTopology {
-		// Add topology key to all the nodes.
-		if err = utils.AddLabelsToNode(testCtx.ClientSet, node.Name, nodeLabels); err != nil {
-			t.Fatalf("Cannot add labels to node %v: %v", node.Name, err)
-		}
-		if err = waitForNodeLabels(testCtx.ClientSet, node.Name, nodeLabels); err != nil {
-			t.Fatalf("Adding labels to node %v didn't succeed: %v", node.Name, err)
-		}
+	nodesInTopology, err := createNodes(testCtx.ClientSet, "in-topology", st.MakeNode().Label(topologyKey, topologyValue), 5)
+	if err != nil {
+		t.Fatalf("Cannot create nodes: %v", err)
 	}
 	// Add a pod with a label and wait for it to schedule.
 	labelKey := "service"
@@ -127,7 +142,7 @@ func TestPodAffinity(t *testing.T) {
 		t.Fatalf("Error running the attractor pod: %v", err)
 	}
 	// Add a few more nodes without the topology label.
-	_, err = createNodes(testCtx.ClientSet, "other-node", nil, 5)
+	_, err = createNodes(testCtx.ClientSet, "other-node", st.MakeNode(), 5)
 	if err != nil {
 		t.Fatalf("Cannot create the second set of nodes: %v", err)
 	}
@@ -184,25 +199,23 @@ func TestPodAffinity(t *testing.T) {
 // TestImageLocality verifies that the scheduler's image locality priority function
 // works correctly, i.e., the pod gets scheduled to the node where its container images are ready.
 func TestImageLocality(t *testing.T) {
-	testCtx := initTest(t, "image-locality")
+	testCtx := initTestSchedulerForPriorityTest(t, imagelocality.Name)
 	defer testutils.CleanupTest(t, testCtx)
 
-	// We use a fake large image as the test image used by the pod, which has relatively large image size.
-	image := v1.ContainerImage{
-		Names: []string{
-			"fake-large-image:v1",
-		},
-		SizeBytes: 3000 * 1024 * 1024,
-	}
-
 	// Create a node with the large image.
-	nodeWithLargeImage, err := createNodeWithImages(testCtx.ClientSet, "testnode-large-image", nil, []v1.ContainerImage{image})
+	// We use a fake large image as the test image used by the pod, which has
+	// relatively large image size.
+	imageName := "fake-large-image:v1"
+	nodeWithLargeImage, err := createNode(
+		testCtx.ClientSet,
+		st.MakeNode().Name("testnode-large-image").Images(map[string]int64{imageName: 3000 * 1024 * 1024}).Obj(),
+	)
 	if err != nil {
 		t.Fatalf("cannot create node with a large image: %v", err)
 	}
 
 	// Add a few nodes.
-	_, err = createNodes(testCtx.ClientSet, "testnode", nil, 10)
+	_, err = createNodes(testCtx.ClientSet, "testnode", st.MakeNode(), 10)
 	if err != nil {
 		t.Fatalf("cannot create nodes: %v", err)
 	}
@@ -212,7 +225,7 @@ func TestImageLocality(t *testing.T) {
 	pod, err := runPodWithContainers(testCtx.ClientSet, initPodWithContainers(testCtx.ClientSet, &podWithContainersConfig{
 		Name:       podName,
 		Namespace:  testCtx.NS.Name,
-		Containers: makeContainersWithImages(image.Names),
+		Containers: makeContainersWithImages([]string{imageName}),
 	}))
 	if err != nil {
 		t.Fatalf("error running pod with images: %v", err)
@@ -242,29 +255,23 @@ func makeContainersWithImages(images []string) []v1.Container {
 	return containers
 }
 
-// TestEvenPodsSpreadPriority verifies that EvenPodsSpread priority functions well.
-func TestEvenPodsSpreadPriority(t *testing.T) {
-	testCtx := initTest(t, "eps-priority")
+// TestPodTopologySpreadScore verifies that the PodTopologySpread Score plugin works.
+func TestPodTopologySpreadScore(t *testing.T) {
+	testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name)
+	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 	ns := testCtx.NS.Name
-	defer testutils.CleanupTest(t, testCtx)
-	// Add 4 nodes.
-	nodes, err := createNodes(cs, "node", nil, 4)
-	if err != nil {
-		t.Fatalf("Cannot create nodes: %v", err)
-	}
-	for i, node := range nodes {
-		// Apply labels "zone: zone-{0,1}" and "node: <node name>" to each node.
-		labels := map[string]string{
-			"zone": fmt.Sprintf("zone-%d", i/2),
-			"node": node.Name,
+
+	var nodes []*v1.Node
+	for i := 0; i < 4; i++ {
+		// Create nodes with labels "zone: zone-{0,1}" and "node: <node name>" to each node.
+		nodeName := fmt.Sprintf("node-%d", i)
+		zone := fmt.Sprintf("zone-%d", i/2)
+		node, err := createNode(cs, st.MakeNode().Name(nodeName).Label("node", nodeName).Label("zone", zone).Obj())
+		if err != nil {
+			t.Fatalf("Cannot create node: %v", err)
 		}
-		if err = utils.AddLabelsToNode(cs, node.Name, labels); err != nil {
-			t.Fatalf("Cannot add labels to node: %v", err)
-		}
-		if err = waitForNodeLabels(cs, node.Name, labels); err != nil {
-			t.Fatalf("Adding labels to node failed: %v", err)
-		}
+		nodes = append(nodes, node)
 	}
 
 	// Taint the 0th node
@@ -273,10 +280,10 @@ func TestEvenPodsSpreadPriority(t *testing.T) {
 		Value:  "v1",
 		Effect: v1.TaintEffectNoSchedule,
 	}
-	if err = testutils.AddTaintToNode(cs, nodes[0].Name, taint); err != nil {
+	if err := testutils.AddTaintToNode(cs, nodes[0].Name, taint); err != nil {
 		t.Fatalf("Adding taint to node failed: %v", err)
 	}
-	if err = testutils.WaitForNodeTaints(cs, nodes[0], []v1.Taint{taint}); err != nil {
+	if err := testutils.WaitForNodeTaints(cs, nodes[0], []v1.Taint{taint}); err != nil {
 		t.Fatalf("Taint not seen on node: %v", err)
 	}
 
@@ -351,6 +358,99 @@ func TestEvenPodsSpreadPriority(t *testing.T) {
 			}
 			if err != nil {
 				t.Errorf("Test Failed: %v", err)
+			}
+		})
+	}
+}
+
+// TestDefaultPodTopologySpreadScore verifies that the PodTopologySpread Score plugin
+// with the system default spreading spreads Pods belonging to a Service.
+// The setup has 300 nodes over 3 zones.
+func TestDefaultPodTopologySpreadScore(t *testing.T) {
+	testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name)
+	t.Cleanup(func() {
+		testutils.CleanupTest(t, testCtx)
+	})
+	cs := testCtx.ClientSet
+	ns := testCtx.NS.Name
+
+	zoneForNode := make(map[string]string)
+	for i := 0; i < 300; i++ {
+		nodeName := fmt.Sprintf("node-%d", i)
+		zone := fmt.Sprintf("zone-%d", i%3)
+		zoneForNode[nodeName] = zone
+		_, err := createNode(cs, st.MakeNode().Name(nodeName).Label(v1.LabelHostname, nodeName).Label(v1.LabelZoneFailureDomainStable, zone).Obj())
+		if err != nil {
+			t.Fatalf("Cannot create node: %v", err)
+		}
+	}
+
+	serviceName := "test-service"
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: ns,
+		},
+		Spec: v1.ServiceSpec{
+			Selector: map[string]string{
+				"service": serviceName,
+			},
+			Ports: []v1.ServicePort{{
+				Port:       80,
+				TargetPort: intstr.FromInt(80),
+			}},
+		},
+	}
+	_, err := cs.CoreV1().Services(ns).Create(testCtx.Ctx, svc, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Cannot create Service: %v", err)
+	}
+
+	pause := imageutils.GetPauseImageName()
+	totalPodCnt := 0
+	for _, nPods := range []int{3, 9, 15} {
+		// Append nPods each iteration.
+		t.Run(fmt.Sprintf("%d-pods", totalPodCnt+nPods), func(t *testing.T) {
+			for i := 0; i < nPods; i++ {
+				p := st.MakePod().Name(fmt.Sprintf("p-%d", totalPodCnt)).Label("service", serviceName).Container(pause).Obj()
+				_, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Cannot create Pod: %v", err)
+				}
+				totalPodCnt++
+			}
+			var pods []v1.Pod
+			// Wait for all Pods scheduled.
+			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, func() (bool, error) {
+				podList, err := cs.CoreV1().Pods(ns).List(testCtx.Ctx, metav1.ListOptions{})
+				if err != nil {
+					t.Fatalf("Cannot list pods to verify scheduling: %v", err)
+				}
+				for _, p := range podList.Items {
+					if p.Spec.NodeName == "" {
+						return false, nil
+					}
+				}
+				pods = podList.Items
+				return true, nil
+			})
+			// Verify zone spreading.
+			zoneCnts := make(map[string]int)
+			for _, p := range pods {
+				zoneCnts[zoneForNode[p.Spec.NodeName]]++
+			}
+			maxCnt := 0
+			minCnt := len(pods)
+			for _, c := range zoneCnts {
+				if c > maxCnt {
+					maxCnt = c
+				}
+				if c < minCnt {
+					minCnt = c
+				}
+			}
+			if skew := maxCnt - minCnt; skew != 0 {
+				t.Errorf("Zone skew is %d, should be 0", skew)
 			}
 		})
 	}

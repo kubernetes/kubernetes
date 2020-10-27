@@ -27,8 +27,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	v1 "k8s.io/api/core/v1"
-	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -39,10 +37,8 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/client-go/kubernetes/scheme"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
-	"k8s.io/client-go/tools/record"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/configz"
@@ -54,16 +50,14 @@ import (
 	"k8s.io/klog/v2"
 	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 )
 
 // Option configures a framework.Registry.
-type Option func(framework.Registry) error
+type Option func(runtime.Registry) error
 
 // NewSchedulerCommand creates a *cobra.Command object with default parameters and registryOptions
 func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
@@ -158,12 +152,8 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	}
 
 	// Prepare the event broadcaster.
-	if cc.Broadcaster != nil && cc.EventClient != nil {
-		cc.Broadcaster.StartRecordingToSink(ctx.Done())
-	}
-	if cc.CoreBroadcaster != nil && cc.CoreEventClient != nil {
-		cc.CoreBroadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: cc.CoreEventClient.Events("")})
-	}
+	cc.EventBroadcaster.StartRecordingToSink(ctx.Done())
+
 	// Setup healthz checks.
 	var checks []healthz.HealthChecker
 	if cc.ComponentConfig.LeaderElection.LeaderElect {
@@ -194,7 +184,6 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	}
 
 	// Start all informers.
-	go cc.PodInformer.Informer().Run(ctx.Done())
 	cc.InformerFactory.Start(ctx.Done())
 
 	// Wait for all caches to sync before scheduling.
@@ -226,9 +215,9 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 // buildHandlerChain wraps the given handler with the standard filters.
 func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz authorizer.Authorizer) http.Handler {
 	requestInfoResolver := &apirequest.RequestInfoFactory{}
-	failedHandler := genericapifilters.Unauthorized(legacyscheme.Codecs)
+	failedHandler := genericapifilters.Unauthorized(scheme.Codecs)
 
-	handler = genericapifilters.WithAuthorization(handler, authz, legacyscheme.Codecs)
+	handler = genericapifilters.WithAuthorization(handler, authz, scheme.Codecs)
 	handler = genericapifilters.WithAuthentication(handler, authn, failedHandler, nil)
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericapifilters.WithCacheControl(handler)
@@ -243,7 +232,6 @@ func installMetricHandler(pathRecorderMux *mux.PathRecorderMux) {
 	defaultMetricsHandler := legacyregistry.Handler().ServeHTTP
 	pathRecorderMux.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method == "DELETE" {
-			metrics.Reset()
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 			io.WriteString(w, "metrics reset\n")
@@ -287,20 +275,15 @@ func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, s
 }
 
 func getRecorderFactory(cc *schedulerserverconfig.CompletedConfig) profile.RecorderFactory {
-	if _, err := cc.Client.Discovery().ServerResourcesForGroupVersion(eventsv1beta1.SchemeGroupVersion.String()); err == nil {
-		cc.Broadcaster = events.NewBroadcaster(&events.EventSinkImpl{Interface: cc.EventClient.Events("")})
-		return profile.NewRecorderFactory(cc.Broadcaster)
-	}
 	return func(name string) events.EventRecorder {
-		r := cc.CoreBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: name})
-		return record.NewEventRecorderAdapter(r)
+		return cc.EventBroadcaster.NewRecorder(name)
 	}
 }
 
 // WithPlugin creates an Option based on plugin name and factory. Please don't remove this function: it is used to register out-of-tree plugins,
 // hence there are no references to it from the kubernetes scheduler code base.
-func WithPlugin(name string, factory framework.PluginFactory) Option {
-	return func(registry framework.Registry) error {
+func WithPlugin(name string, factory runtime.PluginFactory) Option {
+	return func(registry runtime.Registry) error {
 		return registry.Register(name, factory)
 	}
 }
@@ -319,7 +302,7 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 	// Get the completed config
 	cc := c.Complete()
 
-	outOfTreeRegistry := make(framework.Registry)
+	outOfTreeRegistry := make(runtime.Registry)
 	for _, option := range outOfTreeRegistryOptions {
 		if err := option(outOfTreeRegistry); err != nil {
 			return nil, nil, err
@@ -330,12 +313,10 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 	// Create the scheduler.
 	sched, err := scheduler.New(cc.Client,
 		cc.InformerFactory,
-		cc.PodInformer,
 		recorderFactory,
 		ctx.Done(),
 		scheduler.WithProfiles(cc.ComponentConfig.Profiles...),
 		scheduler.WithAlgorithmSource(cc.ComponentConfig.AlgorithmSource),
-		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
 		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),
 		scheduler.WithPodMaxBackoffSeconds(cc.ComponentConfig.PodMaxBackoffSeconds),

@@ -68,10 +68,9 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			test := "test/fixtures/doc-yaml/user-guide/liveness"
 			execYaml := readFile(test, "exec-liveness.yaml.in")
 			httpYaml := readFile(test, "http-liveness.yaml.in")
-			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
-			framework.RunKubectlOrDieInput(ns, execYaml, "create", "-f", "-", nsFlag)
-			framework.RunKubectlOrDieInput(ns, httpYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, execYaml, "create", "-f", "-")
+			framework.RunKubectlOrDieInput(ns, httpYaml, "create", "-f", "-")
 
 			// Since both containers start rapidly, we can easily run this test in parallel.
 			var wg sync.WaitGroup
@@ -117,12 +116,11 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			secretYaml := readFile(test, "secret.yaml")
 			podYaml := readFile(test, "secret-pod.yaml.in")
 
-			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			podName := "secret-test-pod"
 
 			ginkgo.By("creating secret and pod")
-			framework.RunKubectlOrDieInput(ns, secretYaml, "create", "-f", "-", nsFlag)
-			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, secretYaml, "create", "-f", "-")
+			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
 			err := e2epod.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			framework.ExpectNoError(err)
 
@@ -136,11 +134,10 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 		ginkgo.It("should create a pod that prints his name and namespace", func() {
 			test := "test/fixtures/doc-yaml/user-guide/downward-api"
 			podYaml := readFile(test, "dapi-pod.yaml.in")
-			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			podName := "dapi-test-pod"
 
 			ginkgo.By("creating the pod")
-			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
 			err := e2epod.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			framework.ExpectNoError(err)
 
@@ -155,5 +152,9 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 func readFile(test, file string) string {
 	from := filepath.Join(test, file)
-	return commonutils.SubstituteImageName(string(testfiles.ReadOrDie(from)))
+	data, err := testfiles.Read(from)
+	if err != nil {
+		framework.Fail(err.Error())
+	}
+	return commonutils.SubstituteImageName(string(data))
 }

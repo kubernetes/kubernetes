@@ -19,6 +19,7 @@ package rest
 import (
 	"time"
 
+	eventsapiv1 "k8s.io/api/events/v1"
 	eventsapiv1beta1 "k8s.io/api/events/v1beta1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -45,11 +46,30 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 			apiGroupInfo.VersionedResourcesStorageMap[eventsapiv1beta1.SchemeGroupVersion.Version] = storageMap
 		}
 	}
+	if apiResourceConfigSource.VersionEnabled(eventsapiv1.SchemeGroupVersion) {
+		if storageMap, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+			return genericapiserver.APIGroupInfo{}, false, err
+		} else {
+			apiGroupInfo.VersionedResourcesStorageMap[eventsapiv1.SchemeGroupVersion.Version] = storageMap
+		}
+	}
 
 	return apiGroupInfo, true, nil
 }
 
 func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+	storage := map[string]rest.Storage{}
+	// events
+	eventsStorage, err := eventstore.NewREST(restOptionsGetter, uint64(p.TTL.Seconds()))
+	if err != nil {
+		return storage, err
+	}
+	storage["events"] = eventsStorage
+
+	return storage, err
+}
+
+func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
 	// events
 	eventsStorage, err := eventstore.NewREST(restOptionsGetter, uint64(p.TTL.Seconds()))

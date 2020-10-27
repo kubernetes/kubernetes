@@ -86,7 +86,7 @@ func main() {
 	}
 	socketPath := pluginSocksDir + "/dp." + fmt.Sprintf("%d", time.Now().Unix())
 
-	dp1 := dm.NewDevicePluginStub(devs, socketPath, resourceName, false)
+	dp1 := dm.NewDevicePluginStub(devs, socketPath, resourceName, false, false)
 	if err := dp1.Start(); err != nil {
 		panic(err)
 

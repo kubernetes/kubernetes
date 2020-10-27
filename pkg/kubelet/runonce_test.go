@@ -23,7 +23,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,7 +65,7 @@ func TestRunOnce(t *testing.T) {
 	fakeSecretManager := secret.NewFakeManager()
 	fakeConfigMapManager := configmap.NewFakeManager()
 	podManager := kubepod.NewBasicPodManager(
-		podtest.NewFakeMirrorClient(), fakeSecretManager, fakeConfigMapManager, podtest.NewMockCheckpointManager())
+		podtest.NewFakeMirrorClient(), fakeSecretManager, fakeConfigMapManager)
 	fakeRuntime := &containertest.FakeRuntime{}
 	basePath, err := utiltesting.MkTmpdir("kubelet")
 	if err != nil {
@@ -113,7 +113,7 @@ func TestRunOnce(t *testing.T) {
 		false, /* keepTerminatedPodVolumes */
 		volumetest.NewBlockVolumePathHandler())
 
-	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
+	// TODO: Factor out "stats.Provider" from Kubelet so we don't have a cyclic dependency
 	volumeStatsAggPeriod := time.Second * 10
 	kb.resourceAnalyzer = stats.NewResourceAnalyzer(kb, volumeStatsAggPeriod)
 	nodeRef := &v1.ObjectReference{
@@ -126,7 +126,8 @@ func TestRunOnce(t *testing.T) {
 		return nil
 	}
 	fakeMirrodPodFunc := func(*v1.Pod) (*v1.Pod, bool) { return nil, false }
-	evictionManager, evictionAdmitHandler := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, fakeMirrodPodFunc, nil, nil, kb.recorder, nodeRef, kb.clock)
+	etcHostsPathFunc := func(podUID types.UID) string { return getEtcHostsPath(kb.getPodDir(podUID)) }
+	evictionManager, evictionAdmitHandler := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, fakeMirrodPodFunc, nil, nil, kb.recorder, nodeRef, kb.clock, etcHostsPathFunc)
 
 	kb.evictionManager = evictionManager
 	kb.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)

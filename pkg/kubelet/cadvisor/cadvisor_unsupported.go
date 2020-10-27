@@ -54,6 +54,10 @@ func (cu *cadvisorUnsupported) ContainerInfoV2(name string, options cadvisorapiv
 	return nil, errUnsupported
 }
 
+func (cu *cadvisorUnsupported) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
+	return nil, errUnsupported
+}
+
 func (cu *cadvisorUnsupported) SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return nil, errUnsupported
 }

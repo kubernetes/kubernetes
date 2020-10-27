@@ -33,6 +33,7 @@ type BitMask interface {
 	IsEqual(mask BitMask) bool
 	IsEmpty() bool
 	IsSet(bit int) bool
+	AnySet(bits []int) bool
 	IsNarrowerThan(mask BitMask) bool
 	String() string
 	Count() int
@@ -118,6 +119,16 @@ func (s *bitMask) IsSet(bit int) bool {
 		return false
 	}
 	return (*s & (1 << uint64(bit))) > 0
+}
+
+// AnySet checks bit in mask to see if any provided bit is set to one
+func (s *bitMask) AnySet(bits []int) bool {
+	for _, b := range bits {
+		if s.IsSet(b) {
+			return true
+		}
+	}
+	return false
 }
 
 // IsEqual checks if masks are equal

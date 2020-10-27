@@ -48,9 +48,11 @@ const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 type DevicePluginOptions struct {
 	// Indicates if PreStartContainer call is required before each container start
-	PreStartRequired     bool     `protobuf:"varint,1,opt,name=pre_start_required,json=preStartRequired,proto3" json:"pre_start_required,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
+	PreStartRequired bool `protobuf:"varint,1,opt,name=pre_start_required,json=preStartRequired,proto3" json:"pre_start_required,omitempty"`
+	// Indicates if GetPreferredAllocation is implemented and available for calling
+	GetPreferredAllocationAvailable bool     `protobuf:"varint,2,opt,name=get_preferred_allocation_available,json=getPreferredAllocationAvailable,proto3" json:"get_preferred_allocation_available,omitempty"`
+	XXX_NoUnkeyedLiteral            struct{} `json:"-"`
+	XXX_sizecache                   int32    `json:"-"`
 }
 
 func (m *DevicePluginOptions) Reset()      { *m = DevicePluginOptions{} }
@@ -88,6 +90,13 @@ var xxx_messageInfo_DevicePluginOptions proto.InternalMessageInfo
 func (m *DevicePluginOptions) GetPreStartRequired() bool {
 	if m != nil {
 		return m.PreStartRequired
+	}
+	return false
+}
+
+func (m *DevicePluginOptions) GetGetPreferredAllocationAvailable() bool {
+	if m != nil {
+		return m.GetPreferredAllocationAvailable
 	}
 	return false
 }
@@ -347,7 +356,7 @@ func (m *NUMANode) GetID() int64 {
 //    Health: "Healthy",
 //    Topology:
 //      Node:
-//ID: 1
+//        ID: 1
 //}
 type Device struct {
 	// A unique ID assigned by the device plugin used
@@ -502,6 +511,212 @@ func (m *PreStartContainerResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_PreStartContainerResponse proto.InternalMessageInfo
 
+// PreferredAllocationRequest is passed via a call to GetPreferredAllocation()
+// at pod admission time. The device plugin should take the list of
+// `available_deviceIDs` and calculate a preferred allocation of size
+// 'allocation_size' from them, making sure to include the set of devices
+// listed in 'must_include_deviceIDs'.
+type PreferredAllocationRequest struct {
+	ContainerRequests    []*ContainerPreferredAllocationRequest `protobuf:"bytes,1,rep,name=container_requests,json=containerRequests,proto3" json:"container_requests,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}                               `json:"-"`
+	XXX_sizecache        int32                                  `json:"-"`
+}
+
+func (m *PreferredAllocationRequest) Reset()      { *m = PreferredAllocationRequest{} }
+func (*PreferredAllocationRequest) ProtoMessage() {}
+func (*PreferredAllocationRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{9}
+}
+func (m *PreferredAllocationRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *PreferredAllocationRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_PreferredAllocationRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *PreferredAllocationRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PreferredAllocationRequest.Merge(m, src)
+}
+func (m *PreferredAllocationRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *PreferredAllocationRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_PreferredAllocationRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_PreferredAllocationRequest proto.InternalMessageInfo
+
+func (m *PreferredAllocationRequest) GetContainerRequests() []*ContainerPreferredAllocationRequest {
+	if m != nil {
+		return m.ContainerRequests
+	}
+	return nil
+}
+
+type ContainerPreferredAllocationRequest struct {
+	// List of available deviceIDs from which to choose a preferred allocation
+	AvailableDeviceIDs []string `protobuf:"bytes,1,rep,name=available_deviceIDs,json=availableDeviceIDs,proto3" json:"available_deviceIDs,omitempty"`
+	// List of deviceIDs that must be included in the preferred allocation
+	MustIncludeDeviceIDs []string `protobuf:"bytes,2,rep,name=must_include_deviceIDs,json=mustIncludeDeviceIDs,proto3" json:"must_include_deviceIDs,omitempty"`
+	// Number of devices to include in the preferred allocation
+	AllocationSize       int32    `protobuf:"varint,3,opt,name=allocation_size,json=allocationSize,proto3" json:"allocation_size,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ContainerPreferredAllocationRequest) Reset()      { *m = ContainerPreferredAllocationRequest{} }
+func (*ContainerPreferredAllocationRequest) ProtoMessage() {}
+func (*ContainerPreferredAllocationRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{10}
+}
+func (m *ContainerPreferredAllocationRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ContainerPreferredAllocationRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ContainerPreferredAllocationRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ContainerPreferredAllocationRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ContainerPreferredAllocationRequest.Merge(m, src)
+}
+func (m *ContainerPreferredAllocationRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *ContainerPreferredAllocationRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_ContainerPreferredAllocationRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ContainerPreferredAllocationRequest proto.InternalMessageInfo
+
+func (m *ContainerPreferredAllocationRequest) GetAvailableDeviceIDs() []string {
+	if m != nil {
+		return m.AvailableDeviceIDs
+	}
+	return nil
+}
+
+func (m *ContainerPreferredAllocationRequest) GetMustIncludeDeviceIDs() []string {
+	if m != nil {
+		return m.MustIncludeDeviceIDs
+	}
+	return nil
+}
+
+func (m *ContainerPreferredAllocationRequest) GetAllocationSize() int32 {
+	if m != nil {
+		return m.AllocationSize
+	}
+	return 0
+}
+
+// PreferredAllocationResponse returns a preferred allocation,
+// resulting from a PreferredAllocationRequest.
+type PreferredAllocationResponse struct {
+	ContainerResponses   []*ContainerPreferredAllocationResponse `protobuf:"bytes,1,rep,name=container_responses,json=containerResponses,proto3" json:"container_responses,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}                                `json:"-"`
+	XXX_sizecache        int32                                   `json:"-"`
+}
+
+func (m *PreferredAllocationResponse) Reset()      { *m = PreferredAllocationResponse{} }
+func (*PreferredAllocationResponse) ProtoMessage() {}
+func (*PreferredAllocationResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{11}
+}
+func (m *PreferredAllocationResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *PreferredAllocationResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_PreferredAllocationResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *PreferredAllocationResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PreferredAllocationResponse.Merge(m, src)
+}
+func (m *PreferredAllocationResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *PreferredAllocationResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_PreferredAllocationResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_PreferredAllocationResponse proto.InternalMessageInfo
+
+func (m *PreferredAllocationResponse) GetContainerResponses() []*ContainerPreferredAllocationResponse {
+	if m != nil {
+		return m.ContainerResponses
+	}
+	return nil
+}
+
+type ContainerPreferredAllocationResponse struct {
+	DeviceIDs            []string `protobuf:"bytes,1,rep,name=deviceIDs,proto3" json:"deviceIDs,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ContainerPreferredAllocationResponse) Reset()      { *m = ContainerPreferredAllocationResponse{} }
+func (*ContainerPreferredAllocationResponse) ProtoMessage() {}
+func (*ContainerPreferredAllocationResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{12}
+}
+func (m *ContainerPreferredAllocationResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ContainerPreferredAllocationResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ContainerPreferredAllocationResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ContainerPreferredAllocationResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ContainerPreferredAllocationResponse.Merge(m, src)
+}
+func (m *ContainerPreferredAllocationResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *ContainerPreferredAllocationResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_ContainerPreferredAllocationResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ContainerPreferredAllocationResponse proto.InternalMessageInfo
+
+func (m *ContainerPreferredAllocationResponse) GetDeviceIDs() []string {
+	if m != nil {
+		return m.DeviceIDs
+	}
+	return nil
+}
+
 // - Allocate is expected to be called during pod creation since allocation
 //   failures for any container would result in pod startup failure.
 // - Allocate allows kubelet to exposes additional artifacts in a pod's
@@ -517,7 +732,7 @@ type AllocateRequest struct {
 func (m *AllocateRequest) Reset()      { *m = AllocateRequest{} }
 func (*AllocateRequest) ProtoMessage() {}
 func (*AllocateRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{9}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{13}
 }
 func (m *AllocateRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -562,7 +777,7 @@ type ContainerAllocateRequest struct {
 func (m *ContainerAllocateRequest) Reset()      { *m = ContainerAllocateRequest{} }
 func (*ContainerAllocateRequest) ProtoMessage() {}
 func (*ContainerAllocateRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{10}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{14}
 }
 func (m *ContainerAllocateRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -615,7 +830,7 @@ type AllocateResponse struct {
 func (m *AllocateResponse) Reset()      { *m = AllocateResponse{} }
 func (*AllocateResponse) ProtoMessage() {}
 func (*AllocateResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{11}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{15}
 }
 func (m *AllocateResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -667,7 +882,7 @@ type ContainerAllocateResponse struct {
 func (m *ContainerAllocateResponse) Reset()      { *m = ContainerAllocateResponse{} }
 func (*ContainerAllocateResponse) ProtoMessage() {}
 func (*ContainerAllocateResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{12}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{16}
 }
 func (m *ContainerAllocateResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -740,7 +955,7 @@ type Mount struct {
 func (m *Mount) Reset()      { *m = Mount{} }
 func (*Mount) ProtoMessage() {}
 func (*Mount) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{13}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{17}
 }
 func (m *Mount) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -808,7 +1023,7 @@ type DeviceSpec struct {
 func (m *DeviceSpec) Reset()      { *m = DeviceSpec{} }
 func (*DeviceSpec) ProtoMessage() {}
 func (*DeviceSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{14}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{18}
 }
 func (m *DeviceSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -868,6 +1083,10 @@ func init() {
 	proto.RegisterType((*Device)(nil), "v1beta1.Device")
 	proto.RegisterType((*PreStartContainerRequest)(nil), "v1beta1.PreStartContainerRequest")
 	proto.RegisterType((*PreStartContainerResponse)(nil), "v1beta1.PreStartContainerResponse")
+	proto.RegisterType((*PreferredAllocationRequest)(nil), "v1beta1.PreferredAllocationRequest")
+	proto.RegisterType((*ContainerPreferredAllocationRequest)(nil), "v1beta1.ContainerPreferredAllocationRequest")
+	proto.RegisterType((*PreferredAllocationResponse)(nil), "v1beta1.PreferredAllocationResponse")
+	proto.RegisterType((*ContainerPreferredAllocationResponse)(nil), "v1beta1.ContainerPreferredAllocationResponse")
 	proto.RegisterType((*AllocateRequest)(nil), "v1beta1.AllocateRequest")
 	proto.RegisterType((*ContainerAllocateRequest)(nil), "v1beta1.ContainerAllocateRequest")
 	proto.RegisterType((*AllocateResponse)(nil), "v1beta1.AllocateResponse")
@@ -881,59 +1100,70 @@ func init() {
 func init() { proto.RegisterFile("api.proto", fileDescriptor_00212fb1f9d3bf1c) }
 
 var fileDescriptor_00212fb1f9d3bf1c = []byte{
-	// 822 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x55, 0xdd, 0x8e, 0xdb, 0x44,
-	0x14, 0x8e, 0x93, 0x6e, 0xe2, 0x9c, 0xa4, 0xbb, 0xd9, 0xd9, 0x52, 0x79, 0xdd, 0x62, 0x85, 0x41,
-	0xc0, 0x22, 0xb5, 0x29, 0x9b, 0x4a, 0x2d, 0xea, 0x05, 0x22, 0x34, 0x0b, 0xac, 0x44, 0xb7, 0xd1,
-	0x2c, 0x15, 0x37, 0x48, 0x91, 0xe3, 0x4c, 0x63, 0x0b, 0x67, 0xc6, 0x78, 0x26, 0x91, 0x72, 0xc7,
-	0x05, 0x0f, 0xc0, 0x43, 0xf0, 0x18, 0x3c, 0x40, 0x2f, 0xb9, 0xe4, 0x92, 0x86, 0x17, 0x41, 0x1e,
-	0x7b, 0x6c, 0xcb, 0xcd, 0x6e, 0x41, 0xea, 0x9d, 0xcf, 0xcf, 0x77, 0xe6, 0x9b, 0x73, 0xce, 0x7c,
-	0x86, 0xb6, 0x1b, 0x05, 0x83, 0x28, 0xe6, 0x92, 0xa3, 0xd6, 0xfa, 0x74, 0x46, 0xa5, 0x7b, 0x6a,
-	0xdf, 0x5f, 0x04, 0xd2, 0x5f, 0xcd, 0x06, 0x1e, 0x5f, 0x3e, 0x58, 0xf0, 0x05, 0x7f, 0xa0, 0xe2,
-	0xb3, 0xd5, 0x4b, 0x65, 0x29, 0x43, 0x7d, 0xa5, 0x38, 0xfc, 0x14, 0x8e, 0xc6, 0x74, 0x1d, 0x78,
-	0x74, 0x12, 0xae, 0x16, 0x01, 0x7b, 0x1e, 0xc9, 0x80, 0x33, 0x81, 0xee, 0x01, 0x8a, 0x62, 0x3a,
-	0x15, 0xd2, 0x8d, 0xe5, 0x34, 0xa6, 0x3f, 0xaf, 0x82, 0x98, 0xce, 0x2d, 0xa3, 0x6f, 0x9c, 0x98,
-	0xa4, 0x17, 0xc5, 0xf4, 0x32, 0x09, 0x90, 0xcc, 0x8f, 0x7f, 0x37, 0xe0, 0x80, 0xd0, 0x45, 0x20,
-	0x24, 0x8d, 0x13, 0x27, 0x15, 0x12, 0x59, 0xd0, 0x5a, 0xd3, 0x58, 0x04, 0x9c, 0x29, 0x58, 0x9b,
-	0x68, 0x13, 0xd9, 0x60, 0x52, 0x36, 0x8f, 0x78, 0xc0, 0xa4, 0x55, 0x57, 0xa1, 0xdc, 0x46, 0x1f,
-	0xc2, 0xcd, 0x98, 0x0a, 0xbe, 0x8a, 0x3d, 0x3a, 0x65, 0xee, 0x92, 0x5a, 0x0d, 0x95, 0xd0, 0xd5,
-	0xce, 0x0b, 0x77, 0x49, 0xd1, 0x23, 0x68, 0xf1, 0x94, 0xa7, 0x75, 0xa3, 0x6f, 0x9c, 0x74, 0x86,
-	0x77, 0x07, 0xd9, 0xed, 0x07, 0x3b, 0xee, 0x42, 0x74, 0x32, 0x6e, 0xc1, 0xde, 0xd9, 0x32, 0x92,
-	0x1b, 0x3c, 0x82, 0x5b, 0xdf, 0x05, 0x42, 0x8e, 0xd8, 0xfc, 0x07, 0x57, 0x7a, 0x3e, 0xa1, 0x22,
-	0xe2, 0x4c, 0x50, 0xf4, 0x29, 0xb4, 0xe6, 0xaa, 0x80, 0xb0, 0x8c, 0x7e, 0xe3, 0xa4, 0x33, 0x3c,
-	0xa8, 0x14, 0x26, 0x3a, 0x8e, 0x1f, 0x43, 0xf7, 0x7b, 0x1e, 0xf1, 0x90, 0x2f, 0x36, 0xe7, 0xec,
-	0x25, 0x47, 0x9f, 0xc0, 0x1e, 0xe3, 0xf3, 0x1c, 0x78, 0x98, 0x03, 0x2f, 0x5e, 0x3c, 0x1b, 0x5d,
-	0xf0, 0x39, 0x25, 0x69, 0x1c, 0xdb, 0x60, 0x6a, 0x17, 0xda, 0x87, 0xfa, 0xf9, 0x58, 0xb5, 0xa7,
-	0x41, 0xea, 0xc1, 0x18, 0x7b, 0xd0, 0x4c, 0xcf, 0x29, 0x45, 0xda, 0x49, 0x04, 0xdd, 0x86, 0xa6,
-	0x4f, 0xdd, 0x50, 0xfa, 0x59, 0xc7, 0x32, 0x0b, 0x9d, 0x82, 0x29, 0x33, 0x1a, 0xaa, 0x55, 0x9d,
-	0xe1, 0x7b, 0xf9, 0xc9, 0x65, 0x7e, 0x24, 0x4f, 0xc3, 0x4f, 0xc0, 0x9a, 0x64, 0x03, 0x7c, 0xca,
-	0x99, 0x74, 0x03, 0x56, 0x0c, 0xcd, 0x01, 0xc8, 0x2e, 0x78, 0x3e, 0x4e, 0xaf, 0xd2, 0x26, 0x25,
-	0x0f, 0xbe, 0x03, 0xc7, 0x3b, 0xb0, 0x69, 0xf7, 0xb0, 0x07, 0x07, 0xa3, 0x30, 0xe4, 0x9e, 0x2b,
-	0xa9, 0xae, 0x37, 0x01, 0xe4, 0xe9, 0x3c, 0xb5, 0x46, 0x54, 0x48, 0xdd, 0xa2, 0x0f, 0x72, 0xa2,
-	0x79, 0xa9, 0x0a, 0x9c, 0x1c, 0x7a, 0x15, 0x82, 0x22, 0x61, 0x7f, 0x55, 0xfa, 0x5b, 0xd9, 0x2f,
-	0xa0, 0x57, 0x40, 0xb2, 0x91, 0x5f, 0xc2, 0x51, 0x99, 0x61, 0xea, 0xd5, 0x14, 0xf1, 0x75, 0x14,
-	0xd3, 0x54, 0x82, 0xbc, 0x6a, 0x23, 0x04, 0xfe, 0xb5, 0x01, 0xc7, 0x57, 0x22, 0xd0, 0x97, 0x70,
-	0x83, 0xb2, 0xb5, 0x3e, 0xe3, 0xde, 0xdb, 0xcf, 0x18, 0x9c, 0xb1, 0xb5, 0x38, 0x63, 0x32, 0xde,
-	0x10, 0x85, 0x44, 0x1f, 0x43, 0x73, 0xc9, 0x57, 0x4c, 0x0a, 0xab, 0xae, 0x6a, 0xec, 0xe7, 0x35,
-	0x9e, 0x25, 0x6e, 0x92, 0x45, 0xd1, 0xfd, 0x62, 0x9f, 0x1b, 0x2a, 0xf1, 0xa8, 0xb2, 0xcf, 0x97,
-	0x11, 0xf5, 0xf2, 0x9d, 0x46, 0x2f, 0xa0, 0xe3, 0x32, 0xc6, 0xa5, 0xab, 0xdf, 0x56, 0x02, 0x79,
-	0xf8, 0x1f, 0xf8, 0x8d, 0x0a, 0x54, 0x4a, 0xb3, 0x5c, 0xc7, 0x7e, 0x0c, 0xed, 0xfc, 0x02, 0xa8,
-	0x07, 0x8d, 0x9f, 0xe8, 0x26, 0xdb, 0xec, 0xe4, 0x13, 0xdd, 0x82, 0xbd, 0xb5, 0x1b, 0xae, 0x68,
-	0xb6, 0xd9, 0xa9, 0xf1, 0xa4, 0xfe, 0xb9, 0x61, 0x7f, 0x01, 0xbd, 0x6a, 0xe5, 0xff, 0x83, 0xc7,
-	0x3e, 0xec, 0xa9, 0x7e, 0xa0, 0x8f, 0x60, 0xbf, 0x18, 0x72, 0xe4, 0x4a, 0x3f, 0xc3, 0xdf, 0xcc,
-	0xbd, 0x13, 0x57, 0xfa, 0xe8, 0x0e, 0xb4, 0x7d, 0x2e, 0x64, 0x9a, 0x91, 0x29, 0x53, 0xe2, 0xd0,
-	0xc1, 0x98, 0xba, 0xf3, 0x29, 0x67, 0x61, 0xfa, 0xd4, 0x4c, 0x62, 0x26, 0x8e, 0xe7, 0x2c, 0xdc,
-	0xe0, 0x18, 0xa0, 0x68, 0xe8, 0x3b, 0x39, 0xae, 0x0f, 0x9d, 0x88, 0xc6, 0xcb, 0x40, 0x08, 0x35,
-	0x8b, 0x54, 0x06, 0xcb, 0xae, 0xe1, 0xd7, 0xd0, 0x4d, 0x35, 0x37, 0x56, 0xfd, 0x41, 0x8f, 0xc0,
-	0xd4, 0x1a, 0x8c, 0xac, 0x7c, 0x68, 0x15, 0x59, 0xb6, 0x8b, 0x55, 0x49, 0xa5, 0xb0, 0x36, 0xfc,
-	0xa3, 0x0e, 0xdd, 0xb2, 0x6c, 0xa2, 0x6f, 0xe1, 0xf6, 0x37, 0x54, 0xee, 0xfa, 0x2b, 0x54, 0xc0,
-	0xf6, 0xb5, 0xba, 0x8b, 0x6b, 0x68, 0x04, 0xdd, 0xb2, 0xce, 0xbe, 0x81, 0x7f, 0x3f, 0xb7, 0x77,
-	0xc9, 0x31, 0xae, 0x7d, 0x66, 0xa0, 0x11, 0x98, 0x7a, 0xdd, 0x4a, 0xb7, 0xaa, 0xbc, 0x7c, 0xfb,
-	0x78, 0x47, 0x44, 0x17, 0x41, 0x3f, 0xc2, 0xe1, 0x1b, 0xa2, 0x85, 0x0a, 0xf5, 0xb9, 0x4a, 0x0c,
-	0x6d, 0x7c, 0x5d, 0x8a, 0xae, 0xfe, 0xd5, 0xdd, 0x57, 0xaf, 0x1d, 0xe3, 0xaf, 0xd7, 0x4e, 0xed,
-	0x97, 0xad, 0x63, 0xbc, 0xda, 0x3a, 0xc6, 0x9f, 0x5b, 0xc7, 0xf8, 0x7b, 0xeb, 0x18, 0xbf, 0xfd,
-	0xe3, 0xd4, 0x66, 0x4d, 0xf5, 0x97, 0x7d, 0xf8, 0x6f, 0x00, 0x00, 0x00, 0xff, 0xff, 0x63, 0x60,
-	0xe7, 0xf8, 0xaa, 0x07, 0x00, 0x00,
+	// 995 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x56, 0x5f, 0x6f, 0x1b, 0x45,
+	0x10, 0xcf, 0xd9, 0x75, 0x6c, 0x8f, 0xdd, 0xfc, 0xd9, 0x84, 0xc8, 0xb9, 0x04, 0x93, 0x6e, 0x0a,
+	0x0d, 0x52, 0xe3, 0x10, 0x17, 0xb5, 0x28, 0x0f, 0x08, 0x83, 0x03, 0x44, 0xd0, 0xd4, 0xba, 0x50,
+	0xf1, 0x00, 0xc2, 0x3a, 0x9f, 0x37, 0xf6, 0x89, 0xf3, 0xee, 0x71, 0xbb, 0xb6, 0xe4, 0x4a, 0x48,
+	0x3c, 0xf0, 0x01, 0xfa, 0x1d, 0xe0, 0x2b, 0xf0, 0x1d, 0xfa, 0xc8, 0x23, 0x8f, 0x34, 0x7c, 0x11,
+	0x74, 0xbb, 0xb7, 0x77, 0xa7, 0xcb, 0xc5, 0x04, 0xa9, 0x6f, 0xde, 0x99, 0xf9, 0xcd, 0x9f, 0xdf,
+	0x8c, 0x67, 0x0e, 0xaa, 0xb6, 0xef, 0xb6, 0xfc, 0x80, 0x09, 0x86, 0xca, 0xb3, 0xe3, 0x01, 0x11,
+	0xf6, 0xb1, 0x79, 0x38, 0x72, 0xc5, 0x78, 0x3a, 0x68, 0x39, 0x6c, 0x72, 0x34, 0x62, 0x23, 0x76,
+	0x24, 0xf5, 0x83, 0xe9, 0xa5, 0x7c, 0xc9, 0x87, 0xfc, 0xa5, 0x70, 0xf8, 0xa5, 0x01, 0x1b, 0x5d,
+	0x32, 0x73, 0x1d, 0xd2, 0xf3, 0xa6, 0x23, 0x97, 0x3e, 0xf3, 0x85, 0xcb, 0x28, 0x47, 0x0f, 0x01,
+	0xf9, 0x01, 0xe9, 0x73, 0x61, 0x07, 0xa2, 0x1f, 0x90, 0x9f, 0xa6, 0x6e, 0x40, 0x86, 0x0d, 0x63,
+	0xcf, 0x38, 0xa8, 0x58, 0x6b, 0x7e, 0x40, 0x2e, 0x42, 0x85, 0x15, 0xc9, 0xd1, 0x57, 0x80, 0x47,
+	0x44, 0xf4, 0xfd, 0x80, 0x5c, 0x92, 0x20, 0x20, 0xc3, 0xbe, 0xed, 0x79, 0xcc, 0xb1, 0x43, 0x57,
+	0x7d, 0x7b, 0x66, 0xbb, 0x9e, 0x3d, 0xf0, 0x48, 0xa3, 0x20, 0xd1, 0xef, 0x8c, 0x88, 0xe8, 0x69,
+	0xc3, 0x4e, 0x6c, 0xd7, 0xd1, 0x66, 0xf8, 0x77, 0x03, 0x56, 0x2d, 0x32, 0x72, 0xb9, 0x20, 0x41,
+	0x18, 0x81, 0x70, 0x81, 0x1a, 0x50, 0x9e, 0x91, 0x80, 0xbb, 0x8c, 0xca, 0x1c, 0xaa, 0x96, 0x7e,
+	0x22, 0x13, 0x2a, 0x84, 0x0e, 0x7d, 0xe6, 0x52, 0x21, 0x03, 0x54, 0xad, 0xf8, 0x8d, 0xf6, 0xe1,
+	0x6e, 0x40, 0x38, 0x9b, 0x06, 0x0e, 0xe9, 0x53, 0x7b, 0x42, 0x1a, 0x45, 0x69, 0x50, 0xd7, 0xc2,
+	0x73, 0x7b, 0x42, 0xd0, 0x63, 0x28, 0x33, 0x55, 0x74, 0xe3, 0xce, 0x9e, 0x71, 0x50, 0x6b, 0xef,
+	0xb6, 0x22, 0x2e, 0x5b, 0x39, 0xc4, 0x58, 0xda, 0x18, 0x97, 0xa1, 0x74, 0x3a, 0xf1, 0xc5, 0x1c,
+	0x77, 0x60, 0xf3, 0x6b, 0x97, 0x8b, 0x0e, 0x1d, 0x7e, 0x6b, 0x0b, 0x67, 0x6c, 0x11, 0xee, 0x33,
+	0xca, 0x09, 0x7a, 0x1f, 0xca, 0x43, 0xe9, 0x80, 0x37, 0x8c, 0xbd, 0xe2, 0x41, 0xad, 0xbd, 0x9a,
+	0x71, 0x6c, 0x69, 0x3d, 0x7e, 0x02, 0xf5, 0x6f, 0x98, 0xcf, 0x3c, 0x36, 0x9a, 0x9f, 0xd1, 0x4b,
+	0x86, 0x1e, 0x40, 0x89, 0xb2, 0x61, 0x0c, 0x5c, 0x8f, 0x81, 0xe7, 0xcf, 0x9f, 0x76, 0xce, 0xd9,
+	0x90, 0x58, 0x4a, 0x8f, 0x4d, 0xa8, 0x68, 0x11, 0x5a, 0x81, 0xc2, 0x59, 0x57, 0xd2, 0x53, 0xb4,
+	0x0a, 0x6e, 0x17, 0x3b, 0xb0, 0xac, 0xe2, 0xa4, 0x34, 0xd5, 0x50, 0x83, 0xb6, 0x60, 0x79, 0x4c,
+	0x6c, 0x4f, 0x8c, 0x23, 0xc6, 0xa2, 0x17, 0x3a, 0x86, 0x8a, 0x88, 0xd2, 0x90, 0x54, 0xd5, 0xda,
+	0x6f, 0xc5, 0x91, 0xd3, 0xf9, 0x59, 0xb1, 0x19, 0x3e, 0x81, 0x46, 0x2f, 0x9a, 0x86, 0xcf, 0x18,
+	0x15, 0xb6, 0x4b, 0x93, 0xa6, 0x35, 0x01, 0xa2, 0x02, 0xcf, 0xba, 0xaa, 0x94, 0xaa, 0x95, 0x92,
+	0xe0, 0x1d, 0xd8, 0xce, 0xc1, 0x2a, 0xf6, 0xf0, 0x1c, 0xcc, 0x9c, 0x29, 0xd1, 0xae, 0xbf, 0x03,
+	0xe4, 0x68, 0x88, 0x1c, 0x4f, 0xc2, 0x85, 0x66, 0xeb, 0x61, 0x9c, 0x73, 0xec, 0xf5, 0x66, 0x4f,
+	0xd6, 0xba, 0x93, 0x49, 0x9b, 0xe3, 0x3f, 0x0c, 0xd8, 0xbf, 0x05, 0x14, 0x1d, 0xc1, 0x46, 0x3c,
+	0xdc, 0x7d, 0x55, 0x57, 0x52, 0x28, 0x8a, 0x55, 0x5d, 0xad, 0x41, 0x1f, 0xc2, 0xd6, 0x64, 0xca,
+	0x45, 0xdf, 0xa5, 0x8e, 0x37, 0x1d, 0xa6, 0x31, 0x05, 0x89, 0xd9, 0x0c, 0xb5, 0x67, 0x4a, 0x99,
+	0xa0, 0x1e, 0xc0, 0x6a, 0xea, 0xef, 0xc4, 0xdd, 0x17, 0x6a, 0x8e, 0x4b, 0xd6, 0x4a, 0x22, 0xbe,
+	0x70, 0x5f, 0x10, 0xfc, 0x33, 0xec, 0xe4, 0x66, 0x1b, 0xcd, 0xe3, 0x0f, 0xb0, 0x91, 0xe6, 0x4c,
+	0x49, 0x35, 0x69, 0x87, 0xb7, 0x24, 0x4d, 0xa1, 0x2c, 0xe4, 0x64, 0x1b, 0xc6, 0x71, 0x17, 0xee,
+	0xdf, 0x06, 0x8b, 0x76, 0xa1, 0x9a, 0x25, 0x2b, 0x11, 0x60, 0x07, 0x56, 0x23, 0x0c, 0xd1, 0x3c,
+	0xf7, 0x16, 0x34, 0xfb, 0xde, 0xf5, 0xbc, 0x33, 0xf0, 0xbc, 0x0e, 0x9f, 0x40, 0xe3, 0x26, 0xf3,
+	0xff, 0x9c, 0xda, 0x11, 0xac, 0x25, 0x90, 0xa8, 0xa4, 0x8b, 0x45, 0xd4, 0xe2, 0x45, 0x29, 0x2e,
+	0xe0, 0xf3, 0xd7, 0x22, 0x6c, 0xdf, 0x88, 0x40, 0x9f, 0xc0, 0x1d, 0x42, 0x67, 0x0b, 0x66, 0x3e,
+	0x8b, 0x68, 0x9d, 0xd2, 0x19, 0x3f, 0xa5, 0x22, 0x98, 0x5b, 0x12, 0x89, 0xde, 0x83, 0xe5, 0x09,
+	0x9b, 0x52, 0xa1, 0xa6, 0xaf, 0xd6, 0x5e, 0x89, 0x7d, 0x3c, 0x0d, 0xc5, 0x56, 0xa4, 0x45, 0x87,
+	0xc9, 0x1e, 0x2b, 0x4a, 0xc3, 0x8d, 0xcc, 0x1e, 0xbb, 0xf0, 0x89, 0x13, 0xef, 0x32, 0xf4, 0x1c,
+	0x6a, 0x36, 0xa5, 0x4c, 0xd8, 0x7a, 0xa7, 0x86, 0x90, 0x47, 0xb7, 0xc8, 0xaf, 0x93, 0xa0, 0x54,
+	0x9a, 0x69, 0x3f, 0xe6, 0x13, 0xa8, 0xc6, 0x05, 0xa0, 0x35, 0x28, 0xfe, 0x48, 0xe6, 0xd1, 0x46,
+	0x0b, 0x7f, 0xa2, 0x4d, 0x28, 0xcd, 0x6c, 0x6f, 0x4a, 0xa2, 0x8d, 0xa6, 0x1e, 0x27, 0x85, 0x8f,
+	0x0c, 0xf3, 0x63, 0x58, 0xcb, 0x7a, 0xfe, 0x3f, 0x78, 0x3c, 0x86, 0x92, 0xe4, 0x03, 0xbd, 0x0b,
+	0x2b, 0x49, 0x93, 0x7d, 0x5b, 0x8c, 0x23, 0xfc, 0xdd, 0x58, 0xda, 0xb3, 0xc5, 0x18, 0xed, 0x40,
+	0x75, 0xcc, 0xb8, 0x50, 0x16, 0xd1, 0x45, 0x0a, 0x05, 0x5a, 0x19, 0x10, 0x7b, 0xd8, 0x67, 0xd4,
+	0x53, 0x2b, 0xb6, 0x62, 0x55, 0x42, 0xc1, 0x33, 0xea, 0xcd, 0x71, 0x00, 0x90, 0x10, 0xfa, 0x46,
+	0xc2, 0xed, 0x41, 0xcd, 0x27, 0xc1, 0xc4, 0xe5, 0x5c, 0xf6, 0x42, 0x9d, 0xbf, 0xb4, 0xa8, 0xfd,
+	0x39, 0xd4, 0xd5, 0xad, 0x0d, 0x24, 0x3f, 0xe8, 0x31, 0x54, 0xf4, 0xed, 0x45, 0x8d, 0xb8, 0x69,
+	0x99, 0x73, 0x6c, 0x26, 0xa3, 0xa2, 0x4e, 0xe0, 0x52, 0xfb, 0xb7, 0x22, 0xd4, 0xd3, 0xe7, 0x12,
+	0x7d, 0x09, 0x5b, 0x5f, 0x10, 0x91, 0xf7, 0x69, 0x91, 0x01, 0x9b, 0x0b, 0xef, 0x2d, 0x5e, 0x42,
+	0x1d, 0xa8, 0xa7, 0xef, 0xeb, 0x35, 0xfc, 0xdb, 0xf1, 0x3b, 0xef, 0x0c, 0xe3, 0xa5, 0x0f, 0x0c,
+	0x44, 0x64, 0x32, 0x39, 0x4b, 0x09, 0xed, 0xc7, 0xe0, 0x9b, 0x17, 0xbd, 0x79, 0x7f, 0xb1, 0x91,
+	0x0e, 0x84, 0x3a, 0x50, 0xd1, 0x53, 0x9d, 0x22, 0x2f, 0xb3, 0x60, 0xcc, 0xed, 0x1c, 0x4d, 0xec,
+	0xe2, 0x7b, 0x58, 0xbf, 0x76, 0x13, 0xd1, 0xbd, 0x74, 0xfc, 0xdc, 0x5b, 0x6b, 0xe2, 0x45, 0x26,
+	0xda, 0xfb, 0xa7, 0xbb, 0xaf, 0x5e, 0x37, 0x8d, 0xbf, 0x5e, 0x37, 0x97, 0x7e, 0xb9, 0x6a, 0x1a,
+	0xaf, 0xae, 0x9a, 0xc6, 0x9f, 0x57, 0x4d, 0xe3, 0xef, 0xab, 0xa6, 0xf1, 0xf2, 0x9f, 0xe6, 0xd2,
+	0x60, 0x59, 0x7e, 0x12, 0x3e, 0xfa, 0x37, 0x00, 0x00, 0xff, 0xff, 0x86, 0x3c, 0xb9, 0x8e, 0x57,
+	0x0a, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -1027,6 +1257,12 @@ type DevicePluginClient interface {
 	// Whenever a Device state change or a Device disappears, ListAndWatch
 	// returns the new list
 	ListAndWatch(ctx context.Context, in *Empty, opts ...grpc.CallOption) (DevicePlugin_ListAndWatchClient, error)
+	// GetPreferredAllocation returns a preferred set of devices to allocate
+	// from a list of available ones. The resulting preferred allocation is not
+	// guaranteed to be the allocation ultimately performed by the
+	// devicemanager. It is only designed to help the devicemanager make a more
+	// informed allocation decision when possible.
+	GetPreferredAllocation(ctx context.Context, in *PreferredAllocationRequest, opts ...grpc.CallOption) (*PreferredAllocationResponse, error)
 	// Allocate is called during container creation so that the Device
 	// Plugin can run device specific operations and instruct Kubelet
 	// of the steps to make the Device available in the container
@@ -1086,6 +1322,15 @@ func (x *devicePluginListAndWatchClient) Recv() (*ListAndWatchResponse, error) {
 	return m, nil
 }
 
+func (c *devicePluginClient) GetPreferredAllocation(ctx context.Context, in *PreferredAllocationRequest, opts ...grpc.CallOption) (*PreferredAllocationResponse, error) {
+	out := new(PreferredAllocationResponse)
+	err := c.cc.Invoke(ctx, "/v1beta1.DevicePlugin/GetPreferredAllocation", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *devicePluginClient) Allocate(ctx context.Context, in *AllocateRequest, opts ...grpc.CallOption) (*AllocateResponse, error) {
 	out := new(AllocateResponse)
 	err := c.cc.Invoke(ctx, "/v1beta1.DevicePlugin/Allocate", in, out, opts...)
@@ -1113,6 +1358,12 @@ type DevicePluginServer interface {
 	// Whenever a Device state change or a Device disappears, ListAndWatch
 	// returns the new list
 	ListAndWatch(*Empty, DevicePlugin_ListAndWatchServer) error
+	// GetPreferredAllocation returns a preferred set of devices to allocate
+	// from a list of available ones. The resulting preferred allocation is not
+	// guaranteed to be the allocation ultimately performed by the
+	// devicemanager. It is only designed to help the devicemanager make a more
+	// informed allocation decision when possible.
+	GetPreferredAllocation(context.Context, *PreferredAllocationRequest) (*PreferredAllocationResponse, error)
 	// Allocate is called during container creation so that the Device
 	// Plugin can run device specific operations and instruct Kubelet
 	// of the steps to make the Device available in the container
@@ -1132,6 +1383,9 @@ func (*UnimplementedDevicePluginServer) GetDevicePluginOptions(ctx context.Conte
 }
 func (*UnimplementedDevicePluginServer) ListAndWatch(req *Empty, srv DevicePlugin_ListAndWatchServer) error {
 	return status.Errorf(codes.Unimplemented, "method ListAndWatch not implemented")
+}
+func (*UnimplementedDevicePluginServer) GetPreferredAllocation(ctx context.Context, req *PreferredAllocationRequest) (*PreferredAllocationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPreferredAllocation not implemented")
 }
 func (*UnimplementedDevicePluginServer) Allocate(ctx context.Context, req *AllocateRequest) (*AllocateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Allocate not implemented")
@@ -1183,6 +1437,24 @@ func (x *devicePluginListAndWatchServer) Send(m *ListAndWatchResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _DevicePlugin_GetPreferredAllocation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PreferredAllocationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DevicePluginServer).GetPreferredAllocation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/v1beta1.DevicePlugin/GetPreferredAllocation",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DevicePluginServer).GetPreferredAllocation(ctx, req.(*PreferredAllocationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _DevicePlugin_Allocate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AllocateRequest)
 	if err := dec(in); err != nil {
@@ -1228,6 +1500,10 @@ var _DevicePlugin_serviceDesc = grpc.ServiceDesc{
 			Handler:    _DevicePlugin_GetDevicePluginOptions_Handler,
 		},
 		{
+			MethodName: "GetPreferredAllocation",
+			Handler:    _DevicePlugin_GetPreferredAllocation_Handler,
+		},
+		{
 			MethodName: "Allocate",
 			Handler:    _DevicePlugin_Allocate_Handler,
 		},
@@ -1266,6 +1542,16 @@ func (m *DevicePluginOptions) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.GetPreferredAllocationAvailable {
+		i--
+		if m.GetPreferredAllocationAvailable {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x10
+	}
 	if m.PreStartRequired {
 		i--
 		if m.PreStartRequired {
@@ -1561,6 +1847,158 @@ func (m *PreStartContainerResponse) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	_ = i
 	var l int
 	_ = l
+	return len(dAtA) - i, nil
+}
+
+func (m *PreferredAllocationRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PreferredAllocationRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PreferredAllocationRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.ContainerRequests) > 0 {
+		for iNdEx := len(m.ContainerRequests) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.ContainerRequests[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintApi(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *ContainerPreferredAllocationRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ContainerPreferredAllocationRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ContainerPreferredAllocationRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.AllocationSize != 0 {
+		i = encodeVarintApi(dAtA, i, uint64(m.AllocationSize))
+		i--
+		dAtA[i] = 0x18
+	}
+	if len(m.MustIncludeDeviceIDs) > 0 {
+		for iNdEx := len(m.MustIncludeDeviceIDs) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.MustIncludeDeviceIDs[iNdEx])
+			copy(dAtA[i:], m.MustIncludeDeviceIDs[iNdEx])
+			i = encodeVarintApi(dAtA, i, uint64(len(m.MustIncludeDeviceIDs[iNdEx])))
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	if len(m.AvailableDeviceIDs) > 0 {
+		for iNdEx := len(m.AvailableDeviceIDs) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.AvailableDeviceIDs[iNdEx])
+			copy(dAtA[i:], m.AvailableDeviceIDs[iNdEx])
+			i = encodeVarintApi(dAtA, i, uint64(len(m.AvailableDeviceIDs[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *PreferredAllocationResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PreferredAllocationResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PreferredAllocationResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.ContainerResponses) > 0 {
+		for iNdEx := len(m.ContainerResponses) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.ContainerResponses[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintApi(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *ContainerPreferredAllocationResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ContainerPreferredAllocationResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ContainerPreferredAllocationResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.DeviceIDs) > 0 {
+		for iNdEx := len(m.DeviceIDs) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.DeviceIDs[iNdEx])
+			copy(dAtA[i:], m.DeviceIDs[iNdEx])
+			i = encodeVarintApi(dAtA, i, uint64(len(m.DeviceIDs[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+		}
+	}
 	return len(dAtA) - i, nil
 }
 
@@ -1870,6 +2308,9 @@ func (m *DevicePluginOptions) Size() (n int) {
 	if m.PreStartRequired {
 		n += 2
 	}
+	if m.GetPreferredAllocationAvailable {
+		n += 2
+	}
 	return n
 }
 
@@ -1991,6 +2432,75 @@ func (m *PreStartContainerResponse) Size() (n int) {
 	}
 	var l int
 	_ = l
+	return n
+}
+
+func (m *PreferredAllocationRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.ContainerRequests) > 0 {
+		for _, e := range m.ContainerRequests {
+			l = e.Size()
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *ContainerPreferredAllocationRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.AvailableDeviceIDs) > 0 {
+		for _, s := range m.AvailableDeviceIDs {
+			l = len(s)
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	if len(m.MustIncludeDeviceIDs) > 0 {
+		for _, s := range m.MustIncludeDeviceIDs {
+			l = len(s)
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	if m.AllocationSize != 0 {
+		n += 1 + sovApi(uint64(m.AllocationSize))
+	}
+	return n
+}
+
+func (m *PreferredAllocationResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.ContainerResponses) > 0 {
+		for _, e := range m.ContainerResponses {
+			l = e.Size()
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *ContainerPreferredAllocationResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.DeviceIDs) > 0 {
+		for _, s := range m.DeviceIDs {
+			l = len(s)
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
 	return n
 }
 
@@ -2129,6 +2639,7 @@ func (this *DevicePluginOptions) String() string {
 	}
 	s := strings.Join([]string{`&DevicePluginOptions{`,
 		`PreStartRequired:` + fmt.Sprintf("%v", this.PreStartRequired) + `,`,
+		`GetPreferredAllocationAvailable:` + fmt.Sprintf("%v", this.GetPreferredAllocationAvailable) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2222,6 +2733,58 @@ func (this *PreStartContainerResponse) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&PreStartContainerResponse{`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PreferredAllocationRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForContainerRequests := "[]*ContainerPreferredAllocationRequest{"
+	for _, f := range this.ContainerRequests {
+		repeatedStringForContainerRequests += strings.Replace(f.String(), "ContainerPreferredAllocationRequest", "ContainerPreferredAllocationRequest", 1) + ","
+	}
+	repeatedStringForContainerRequests += "}"
+	s := strings.Join([]string{`&PreferredAllocationRequest{`,
+		`ContainerRequests:` + repeatedStringForContainerRequests + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ContainerPreferredAllocationRequest) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ContainerPreferredAllocationRequest{`,
+		`AvailableDeviceIDs:` + fmt.Sprintf("%v", this.AvailableDeviceIDs) + `,`,
+		`MustIncludeDeviceIDs:` + fmt.Sprintf("%v", this.MustIncludeDeviceIDs) + `,`,
+		`AllocationSize:` + fmt.Sprintf("%v", this.AllocationSize) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PreferredAllocationResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForContainerResponses := "[]*ContainerPreferredAllocationResponse{"
+	for _, f := range this.ContainerResponses {
+		repeatedStringForContainerResponses += strings.Replace(f.String(), "ContainerPreferredAllocationResponse", "ContainerPreferredAllocationResponse", 1) + ","
+	}
+	repeatedStringForContainerResponses += "}"
+	s := strings.Join([]string{`&PreferredAllocationResponse{`,
+		`ContainerResponses:` + repeatedStringForContainerResponses + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ContainerPreferredAllocationResponse) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ContainerPreferredAllocationResponse{`,
+		`DeviceIDs:` + fmt.Sprintf("%v", this.DeviceIDs) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2390,6 +2953,26 @@ func (m *DevicePluginOptions) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.PreStartRequired = bool(v != 0)
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field GetPreferredAllocationAvailable", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.GetPreferredAllocationAvailable = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipApi(dAtA[iNdEx:])
@@ -3165,6 +3748,401 @@ func (m *PreStartContainerResponse) Unmarshal(dAtA []byte) error {
 			return fmt.Errorf("proto: PreStartContainerResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PreferredAllocationRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PreferredAllocationRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PreferredAllocationRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContainerRequests", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ContainerRequests = append(m.ContainerRequests, &ContainerPreferredAllocationRequest{})
+			if err := m.ContainerRequests[len(m.ContainerRequests)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ContainerPreferredAllocationRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ContainerPreferredAllocationRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ContainerPreferredAllocationRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AvailableDeviceIDs", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.AvailableDeviceIDs = append(m.AvailableDeviceIDs, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MustIncludeDeviceIDs", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.MustIncludeDeviceIDs = append(m.MustIncludeDeviceIDs, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AllocationSize", wireType)
+			}
+			m.AllocationSize = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.AllocationSize |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PreferredAllocationResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PreferredAllocationResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PreferredAllocationResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContainerResponses", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ContainerResponses = append(m.ContainerResponses, &ContainerPreferredAllocationResponse{})
+			if err := m.ContainerResponses[len(m.ContainerResponses)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ContainerPreferredAllocationResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ContainerPreferredAllocationResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ContainerPreferredAllocationResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DeviceIDs", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DeviceIDs = append(m.DeviceIDs, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipApi(dAtA[iNdEx:])

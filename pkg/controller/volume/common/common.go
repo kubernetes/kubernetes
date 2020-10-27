@@ -20,7 +20,9 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -28,19 +30,36 @@ const (
 	PodPVCIndex = "pod-pvc-index"
 )
 
-// PodPVCIndexFunc returns PVC keys for given pod
-func PodPVCIndexFunc(obj interface{}) ([]string, error) {
-	pod, ok := obj.(*v1.Pod)
-	if !ok {
-		return []string{}, nil
-	}
-	keys := []string{}
-	for _, podVolume := range pod.Spec.Volumes {
-		if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
-			keys = append(keys, fmt.Sprintf("%s/%s", pod.Namespace, pvcSource.ClaimName))
+// PodPVCIndexFunc creates an index function that returns PVC keys (=
+// namespace/name) for given pod.  If enabled, this includes the PVCs
+// that might be created for generic ephemeral volumes.
+func PodPVCIndexFunc(genericEphemeralVolumeFeatureEnabled bool) func(obj interface{}) ([]string, error) {
+	return func(obj interface{}) ([]string, error) {
+		pod, ok := obj.(*v1.Pod)
+		if !ok {
+			return []string{}, nil
 		}
+		keys := []string{}
+		for _, podVolume := range pod.Spec.Volumes {
+			claimName := ""
+			if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
+				claimName = pvcSource.ClaimName
+			}
+			if ephemeralSource := podVolume.VolumeSource.Ephemeral; genericEphemeralVolumeFeatureEnabled && ephemeralSource != nil {
+				claimName = pod.Name + "-" + podVolume.Name
+			}
+			if claimName != "" {
+				keys = append(keys, fmt.Sprintf("%s/%s", pod.Namespace, claimName))
+			}
+		}
+		return keys, nil
 	}
-	return keys, nil
+}
+
+// AddPodPVCIndexerIfNotPresent adds the PodPVCIndexFunc with the current global setting for GenericEphemeralVolume.
+func AddPodPVCIndexerIfNotPresent(indexer cache.Indexer) error {
+	return AddIndexerIfNotPresent(indexer, PodPVCIndex,
+		PodPVCIndexFunc(utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume)))
 }
 
 // AddIndexerIfNotPresent adds the index function with the name into the cache indexer if not present

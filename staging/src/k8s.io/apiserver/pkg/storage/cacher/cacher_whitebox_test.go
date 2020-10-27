@@ -41,10 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 var (
@@ -637,7 +634,6 @@ func TestTimeBucketWatchersBasic(t *testing.T) {
 }
 
 func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, true)()
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -865,7 +861,6 @@ func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
 }
 
 func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, true)()
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -936,6 +931,71 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 		w.Stop()
 		wg.Wait()
 	}
+}
+
+func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	// Ensure that bookmarks are sent more frequently than every 1m.
+	cacher.bookmarkWatchers = newTimeBucketWatchers(clock.RealClock{}, 2*time.Second)
+
+	// Wait until cacher is initialized.
+	cacher.ready.wait()
+
+	makePod := func(i int) *examplev1.Pod {
+		return &examplev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("pod-%d", i),
+				Namespace:       "ns",
+				ResourceVersion: fmt.Sprintf("%d", i),
+			},
+		}
+	}
+	if err := cacher.watchCache.Add(makePod(1000)); err != nil {
+		t.Errorf("error: %v", err)
+	}
+
+	pred := storage.Everything
+	pred.AllowWatchBookmarks = true
+
+	w, err := cacher.Watch(context.TODO(), "/pods/ns", storage.ListOptions{
+		ResourceVersion: "1000",
+		Predicate:       pred,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
+
+	expectedRV := 2000
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			event, ok := <-w.ResultChan()
+			if !ok {
+				t.Fatalf("Unexpected closed channel")
+			}
+			rv, err := cacher.versioner.ObjectResourceVersion(event.Object)
+			if err != nil {
+				t.Errorf("failed to parse resource version from %#v: %v", event.Object, err)
+			}
+			if event.Type == watch.Bookmark && rv == uint64(expectedRV) {
+				return
+			}
+		}
+	}()
+
+	// Simulate progress notify event.
+	cacher.watchCache.UpdateResourceVersion(strconv.Itoa(expectedRV))
+
+	wg.Wait()
 }
 
 func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {

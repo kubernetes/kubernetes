@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -202,6 +202,10 @@ type ActualStateOfWorldMounterUpdater interface {
 
 	// GetVolumeMountState returns mount state of the volume for the Pod
 	GetVolumeMountState(volumName v1.UniqueVolumeName, podName volumetypes.UniquePodName) VolumeMountState
+
+	// MarkForInUseExpansionError marks the volume to have in-use error during expansion.
+	// volume expansion must not be retried for this volume
+	MarkForInUseExpansionError(volumeName v1.UniqueVolumeName)
 }
 
 // ActualStateOfWorldAttacherUpdater defines a set of operations updating the
@@ -981,7 +985,7 @@ func (oe *operationExecutor) CheckVolumeExistenceOperation(
 				return false, fmt.Errorf("mounter was not set for a filesystem volume")
 			}
 			if isNotMount, mountCheckErr = mounter.IsLikelyNotMountPoint(mountPath); mountCheckErr != nil {
-				return false, fmt.Errorf("Could not check whether the volume %q (spec.Name: %q) pod %q (UID: %q) is mounted with: %v",
+				return false, fmt.Errorf("could not check whether the volume %q (spec.Name: %q) pod %q (UID: %q) is mounted with: %v",
 					uniqueVolumeName,
 					volumeName,
 					podName,
@@ -1004,7 +1008,7 @@ func (oe *operationExecutor) CheckVolumeExistenceOperation(
 	var islinkExist bool
 	var checkErr error
 	if islinkExist, checkErr = blkutil.IsSymlinkExist(mountPath); checkErr != nil {
-		return false, fmt.Errorf("Could not check whether the block volume %q (spec.Name: %q) pod %q (UID: %q) is mapped to: %v",
+		return false, fmt.Errorf("could not check whether the block volume %q (spec.Name: %q) pod %q (UID: %q) is mapped to: %v",
 			uniqueVolumeName,
 			volumeName,
 			podName,

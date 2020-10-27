@@ -11,7 +11,8 @@ import (
 	"runtime/debug"
 	"strconv"
 
-	"github.com/cyphar/filepath-securejoin"
+	securejoin "github.com/cyphar/filepath-securejoin"
+	"github.com/moby/sys/mountinfo"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs2"
@@ -19,7 +20,6 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/configs/validate"
 	"github.com/opencontainers/runc/libcontainer/intelrdt"
-	"github.com/opencontainers/runc/libcontainer/mount"
 	"github.com/opencontainers/runc/libcontainer/utils"
 	"github.com/pkg/errors"
 
@@ -50,28 +50,60 @@ func InitArgs(args ...string) func(*LinuxFactory) error {
 	}
 }
 
-// SystemdCgroups is an options func to configure a LinuxFactory to return
-// containers that use systemd to create and manage cgroups.
-func SystemdCgroups(l *LinuxFactory) error {
-	systemdCgroupsManager, err := systemd.NewSystemdCgroupsManager()
-	if err != nil {
-		return err
-	}
-	l.NewCgroupsManager = systemdCgroupsManager
-	return nil
-}
-
 func getUnifiedPath(paths map[string]string) string {
-	unifiedPath := ""
+	path := ""
 	for k, v := range paths {
-		if unifiedPath == "" {
-			unifiedPath = v
-		} else if v != unifiedPath {
-			panic(errors.Errorf("expected %q path to be unified path %q, got %q", k, unifiedPath, v))
+		if path == "" {
+			path = v
+		} else if v != path {
+			panic(errors.Errorf("expected %q path to be unified path %q, got %q", k, path, v))
 		}
 	}
 	// can be empty
-	return unifiedPath
+	if path != "" {
+		if filepath.Clean(path) != path || !filepath.IsAbs(path) {
+			panic(errors.Errorf("invalid dir path %q", path))
+		}
+	}
+
+	return path
+}
+
+func systemdCgroupV2(l *LinuxFactory, rootless bool) error {
+	l.NewCgroupsManager = func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
+		return systemd.NewUnifiedManager(config, getUnifiedPath(paths), rootless)
+	}
+	return nil
+}
+
+// SystemdCgroups is an options func to configure a LinuxFactory to return
+// containers that use systemd to create and manage cgroups.
+func SystemdCgroups(l *LinuxFactory) error {
+	if !systemd.IsRunningSystemd() {
+		return fmt.Errorf("systemd not running on this host, can't use systemd as cgroups manager")
+	}
+
+	if cgroups.IsCgroup2UnifiedMode() {
+		return systemdCgroupV2(l, false)
+	}
+
+	l.NewCgroupsManager = func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
+		return systemd.NewLegacyManager(config, paths)
+	}
+
+	return nil
+}
+
+// RootlessSystemdCgroups is rootless version of SystemdCgroups.
+func RootlessSystemdCgroups(l *LinuxFactory) error {
+	if !systemd.IsRunningSystemd() {
+		return fmt.Errorf("systemd not running on this host, can't use systemd as cgroups manager")
+	}
+
+	if !cgroups.IsCgroup2UnifiedMode() {
+		return fmt.Errorf("cgroup v2 not enabled on this host, can't use systemd (rootless) as cgroups manager")
+	}
+	return systemdCgroupV2(l, true)
 }
 
 func cgroupfs2(l *LinuxFactory, rootless bool) error {
@@ -85,20 +117,21 @@ func cgroupfs2(l *LinuxFactory, rootless bool) error {
 	return nil
 }
 
+func cgroupfs(l *LinuxFactory, rootless bool) error {
+	if cgroups.IsCgroup2UnifiedMode() {
+		return cgroupfs2(l, rootless)
+	}
+	l.NewCgroupsManager = func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
+		return fs.NewManager(config, paths, rootless)
+	}
+	return nil
+}
+
 // Cgroupfs is an options func to configure a LinuxFactory to return containers
 // that use the native cgroups filesystem implementation to create and manage
 // cgroups.
 func Cgroupfs(l *LinuxFactory) error {
-	if cgroups.IsCgroup2UnifiedMode() {
-		return cgroupfs2(l, false)
-	}
-	l.NewCgroupsManager = func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
-		return &fs.Manager{
-			Cgroups: config,
-			Paths:   paths,
-		}
-	}
-	return nil
+	return cgroupfs(l, false)
 }
 
 // RootlessCgroupfs is an options func to configure a LinuxFactory to return
@@ -108,17 +141,7 @@ func Cgroupfs(l *LinuxFactory) error {
 // during rootless container (including euid=0 in userns) setup (while still allowing cgroup usage if
 // they've been set up properly).
 func RootlessCgroupfs(l *LinuxFactory) error {
-	if cgroups.IsCgroup2UnifiedMode() {
-		return cgroupfs2(l, true)
-	}
-	l.NewCgroupsManager = func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
-		return &fs.Manager{
-			Cgroups:  config,
-			Rootless: true,
-			Paths:    paths,
-		}
-	}
-	return nil
+	return cgroupfs(l, true)
 }
 
 // IntelRdtfs is an options func to configure a LinuxFactory to return
@@ -137,7 +160,7 @@ func IntelRdtFs(l *LinuxFactory) error {
 
 // TmpfsRoot is an option func to mount LinuxFactory.Root to tmpfs.
 func TmpfsRoot(l *LinuxFactory) error {
-	mounted, err := mount.Mounted(l.Root)
+	mounted, err := mountinfo.Mounted(l.Root)
 	if err != nil {
 		return err
 	}

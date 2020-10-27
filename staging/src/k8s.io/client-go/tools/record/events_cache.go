@@ -153,7 +153,8 @@ func (f *EventSourceObjectSpamFilter) Filter(event *v1.Event) bool {
 // localKey - key that makes this event in the local group
 type EventAggregatorKeyFunc func(event *v1.Event) (aggregateKey string, localKey string)
 
-// EventAggregatorByReasonFunc aggregates events by exact match on event.Source, event.InvolvedObject, event.Type and event.Reason
+// EventAggregatorByReasonFunc aggregates events by exact match on event.Source, event.InvolvedObject, event.Type,
+// event.Reason, event.ReportingController and event.ReportingInstance
 func EventAggregatorByReasonFunc(event *v1.Event) (string, string) {
 	return strings.Join([]string{
 		event.Source.Component,
@@ -165,6 +166,8 @@ func EventAggregatorByReasonFunc(event *v1.Event) (string, string) {
 		event.InvolvedObject.APIVersion,
 		event.Type,
 		event.Reason,
+		event.ReportingController,
+		event.ReportingInstance,
 	},
 		""), event.Message
 }

@@ -6,6 +6,7 @@ rules:
       - k8s.io/kubernetes/pkg/api/v1/pod
       - k8s.io/kubernetes/pkg/api/v1/resource
       - k8s.io/kubernetes/pkg/api/v1/service
+      - k8s.io/kubernetes/pkg/api/pod
       - k8s.io/kubernetes/pkg/apis/apps
       - k8s.io/kubernetes/pkg/apis/apps/validation
       - k8s.io/kubernetes/pkg/apis/autoscaling
@@ -159,7 +160,7 @@ rules:
       - k8s.io/kubernetes/pkg/kubelet/volumemanager/populator
       - k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler
       - k8s.io/kubernetes/pkg/kubemark
-      - k8s.io/kubernetes/pkg/master/ports
+      - k8s.io/kubernetes/pkg/cluster/ports
       - k8s.io/kubernetes/pkg/probe
       - k8s.io/kubernetes/pkg/probe/exec
       - k8s.io/kubernetes/pkg/probe/http
@@ -181,12 +182,14 @@ rules:
       - k8s.io/kubernetes/pkg/registry/core/service/allocator
       - k8s.io/kubernetes/pkg/registry/core/service/portallocator
       - k8s.io/kubernetes/pkg/scheduler/api
+      - k8s.io/kubernetes/pkg/scheduler/framework
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources
       - k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1
+      - k8s.io/kubernetes/pkg/scheduler/framework/runtime
       - k8s.io/kubernetes/pkg/scheduler/internal/parallelize
       - k8s.io/kubernetes/pkg/scheduler/listers
       - k8s.io/kubernetes/pkg/scheduler/metrics
@@ -204,7 +207,6 @@ rules:
       - k8s.io/kubernetes/pkg/util/config
       - k8s.io/kubernetes/pkg/util/configz
       - k8s.io/kubernetes/pkg/util/conntrack
-      - k8s.io/kubernetes/pkg/util/ebtables
       - k8s.io/kubernetes/pkg/util/env
       - k8s.io/kubernetes/pkg/util/filesystem
       - k8s.io/kubernetes/pkg/util/flag

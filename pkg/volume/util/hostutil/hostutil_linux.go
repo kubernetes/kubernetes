@@ -28,7 +28,7 @@ import (
 
 	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 	utilpath "k8s.io/utils/path"
 )
 
@@ -156,6 +156,11 @@ func (hu *HostUtil) PathExists(pathname string) (bool, error) {
 // from the interface and filepath.EvalSymlinks used directly
 func (hu *HostUtil) EvalHostSymlinks(pathname string) (string, error) {
 	return filepath.EvalSymlinks(pathname)
+}
+
+// FindMountInfo returns the mount info on the given path.
+func (hu *HostUtil) FindMountInfo(path string) (mount.MountInfo, error) {
+	return findMountInfo(path, procMountInfoPath)
 }
 
 // isShared returns true, if given path is on a mount point that has shared

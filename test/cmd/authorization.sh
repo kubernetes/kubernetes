@@ -71,8 +71,8 @@ run_impersonation_tests() {
 
     # --as-group
     kubectl create -f hack/testdata/csr.yml "${kube_flags_with_token[@]:?}" --as=user1 --as-group=group2 --as-group=group1 --as-group=,,,chameleon
-    kube::test::get_object_assert 'csr/foo' '{{len .spec.groups}}' '3'
-    kube::test::get_object_assert 'csr/foo' '{{range .spec.groups}}{{.}} {{end}}' 'group2 group1 ,,,chameleon '
+    kube::test::get_object_assert 'csr/foo' '{{len .spec.groups}}' '4'
+    kube::test::get_object_assert 'csr/foo' '{{range .spec.groups}}{{.}} {{end}}' 'group2 group1 ,,,chameleon system:authenticated '
     kubectl delete -f hack/testdata/csr.yml "${kube_flags_with_token[@]:?}"
   fi
 

@@ -42,7 +42,10 @@ import (
 )
 
 const (
-	defaultZone = ""
+	defaultZone                   = ""
+	networkInterfaceIP            = "instance/network-interfaces/%s/ip"
+	networkInterfaceAccessConfigs = "instance/network-interfaces/%s/access-configs"
+	networkInterfaceExternalIP    = "instance/network-interfaces/%s/access-configs/%s/external-ip"
 )
 
 func newInstancesMetricContext(request, zone string) *metricContext {
@@ -93,28 +96,60 @@ func (g *Cloud) NodeAddresses(ctx context.Context, nodeName types.NodeName) ([]v
 		// Use metadata server if possible
 		if g.isCurrentInstance(instanceName) {
 
-			internalIP, err := metadata.Get("instance/network-interfaces/0/ip")
+			nics, err := metadata.Get("instance/network-interfaces/")
 			if err != nil {
-				return nil, fmt.Errorf("couldn't get internal IP: %v", err)
-			}
-			externalIP, err := metadata.Get("instance/network-interfaces/0/access-configs/0/external-ip")
-			if err != nil {
-				return nil, fmt.Errorf("couldn't get external IP: %v", err)
-			}
-			addresses := []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: internalIP},
-				{Type: v1.NodeExternalIP, Address: externalIP},
+				return nil, fmt.Errorf("couldn't get network interfaces: %v", err)
 			}
 
-			if internalDNSFull, err := metadata.Get("instance/hostname"); err != nil {
+			nicsArr := strings.Split(nics, "/\n")
+			nodeAddresses := []v1.NodeAddress{}
+
+			for _, nic := range nicsArr {
+
+				if nic == "" {
+					continue
+				}
+
+				internalIP, err := metadata.Get(fmt.Sprintf(networkInterfaceIP, nic))
+				if err != nil {
+					return nil, fmt.Errorf("couldn't get internal IP: %v", err)
+				}
+				nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: internalIP})
+
+				acs, err := metadata.Get(fmt.Sprintf(networkInterfaceAccessConfigs, nic))
+				if err != nil {
+					return nil, fmt.Errorf("couldn't get access configs: %v", err)
+				}
+
+				acsArr := strings.Split(acs, "/\n")
+
+				for _, ac := range acsArr {
+
+					if ac == "" {
+						continue
+					}
+
+					externalIP, err := metadata.Get(fmt.Sprintf(networkInterfaceExternalIP, nic, ac))
+					if err != nil {
+						return nil, fmt.Errorf("couldn't get external IP: %v", err)
+					}
+
+					if externalIP != "" {
+						nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeExternalIP, Address: externalIP})
+					}
+				}
+			}
+
+			internalDNSFull, err := metadata.Get("instance/hostname")
+			if err != nil {
 				klog.Warningf("couldn't get full internal DNS name: %v", err)
 			} else {
-				addresses = append(addresses,
+				nodeAddresses = append(nodeAddresses,
 					v1.NodeAddress{Type: v1.NodeInternalDNS, Address: internalDNSFull},
 					v1.NodeAddress{Type: v1.NodeHostName, Address: internalDNSFull},
 				)
 			}
-			return addresses, nil
+			return nodeAddresses, nil
 		}
 	}
 
@@ -175,46 +210,24 @@ func (g *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID str
 	return false, cloudprovider.NotImplemented
 }
 
-// InstanceMetadataByProviderID returns metadata of the specified instance.
-func (g *Cloud) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
-	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Hour)
-	defer cancel()
-
-	if providerID == "" {
-		return nil, fmt.Errorf("couldn't compute InstanceMetadata for empty providerID")
-	}
-
-	_, zone, name, err := splitProviderID(providerID)
-	if err != nil {
-		return nil, err
-	}
-
-	instance, err := g.c.Instances().Get(timeoutCtx, meta.ZonalKey(canonicalizeInstanceName(name), zone))
-	if err != nil {
-		return nil, fmt.Errorf("error while querying for providerID %q: %v", providerID, err)
-	}
-
-	addresses, err := nodeAddressesFromInstance(instance)
-	if err != nil {
-		return nil, err
-	}
-	return &cloudprovider.InstanceMetadata{
-		ProviderID:    providerID,
-		Type:          lastComponent(instance.MachineType),
-		NodeAddresses: addresses,
-	}, nil
+// InstanceShutdown returns true if the instance is in safe state to detach volumes
+func (g *Cloud) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, error) {
+	return false, cloudprovider.NotImplemented
 }
 
 func nodeAddressesFromInstance(instance *compute.Instance) ([]v1.NodeAddress, error) {
 	if len(instance.NetworkInterfaces) < 1 {
 		return nil, fmt.Errorf("could not find network interfaces for instanceID %q", instance.Id)
 	}
-	networkInterface := instance.NetworkInterfaces[0]
+	nodeAddresses := []v1.NodeAddress{}
 
-	nodeAddresses := []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: networkInterface.NetworkIP}}
-	for _, config := range networkInterface.AccessConfigs {
-		nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeExternalIP, Address: config.NatIP})
+	for _, nic := range instance.NetworkInterfaces {
+		nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: nic.NetworkIP})
+		for _, config := range nic.AccessConfigs {
+			nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeExternalIP, Address: config.NatIP})
+		}
 	}
+
 	return nodeAddresses, nil
 }
 
@@ -243,6 +256,64 @@ func (g *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID strin
 	}
 
 	return true, nil
+}
+
+// InstanceExists returns true if the instance with the given provider id still exists and is running.
+// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+func (g *Cloud) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {
+	providerID := node.Spec.ProviderID
+	if providerID == "" {
+		var err error
+		if providerID, err = cloudprovider.GetInstanceProviderID(ctx, g, types.NodeName(node.Name)); err != nil {
+			if err == cloudprovider.InstanceNotFound {
+				return false, nil
+			}
+			return false, err
+		}
+	}
+	return g.InstanceExistsByProviderID(ctx, providerID)
+}
+
+// InstanceMetadata returns metadata of the specified instance.
+func (g *Cloud) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Hour)
+	defer cancel()
+
+	providerID := node.Spec.ProviderID
+	if providerID == "" {
+		var err error
+		if providerID, err = cloudprovider.GetInstanceProviderID(ctx, g, types.NodeName(node.Name)); err != nil {
+			return nil, err
+		}
+	}
+
+	_, zone, name, err := splitProviderID(providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	region, err := GetGCERegion(zone)
+	if err != nil {
+		return nil, err
+	}
+
+	instance, err := g.c.Instances().Get(timeoutCtx, meta.ZonalKey(canonicalizeInstanceName(name), zone))
+	if err != nil {
+		return nil, fmt.Errorf("error while querying for providerID %q: %v", providerID, err)
+	}
+
+	addresses, err := nodeAddressesFromInstance(instance)
+	if err != nil {
+		return nil, err
+	}
+
+	return &cloudprovider.InstanceMetadata{
+		ProviderID:    providerID,
+		InstanceType:  lastComponent(instance.MachineType),
+		NodeAddresses: addresses,
+		Zone:          zone,
+		Region:        region,
+	}, nil
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
@@ -490,7 +561,11 @@ func (g *Cloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
 		return nil, err
 	}
 	if len(foundInstances) != len(names) {
-		return nil, cloudprovider.InstanceNotFound
+		if len(foundInstances) == 0 {
+			// return error so the TargetPool nodecount does not drop to 0 unexpectedly.
+			return nil, cloudprovider.InstanceNotFound
+		}
+		klog.Warningf("getFoundInstanceByNames - input instances %d, found %d. Continuing LoadBalancer Update", len(names), len(foundInstances))
 	}
 	return foundInstances, nil
 }

@@ -134,6 +134,9 @@ func (o MarshalOptions) MarshalState(in protoiface.MarshalInput) (protoiface.Mar
 	return o.marshal(in.Buf, in.Message)
 }
 
+// marshal is a centralized function that all marshal operations go through.
+// For profiling purposes, avoid changing the name of this function or
+// introducing other code paths for marshal that do not go through this.
 func (o MarshalOptions) marshal(b []byte, m protoreflect.Message) (out protoiface.MarshalOutput, err error) {
 	allowPartial := o.AllowPartial
 	o.AllowPartial = true
@@ -206,7 +209,7 @@ func growcap(oldcap, wantcap int) (newcap int) {
 
 func (o MarshalOptions) marshalMessageSlow(b []byte, m protoreflect.Message) ([]byte, error) {
 	if messageset.IsMessageSet(m.Descriptor()) {
-		return marshalMessageSet(b, m, o)
+		return o.marshalMessageSet(b, m)
 	}
 	// There are many choices for what order we visit fields in. The default one here
 	// is chosen for reasonable efficiency and simplicity given the protoreflect API.

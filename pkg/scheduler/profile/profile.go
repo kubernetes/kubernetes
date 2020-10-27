@@ -26,32 +26,36 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 )
 
 // RecorderFactory builds an EventRecorder for a given scheduler name.
 type RecorderFactory func(string) events.EventRecorder
 
 // FrameworkFactory builds a Framework for a given profile configuration.
-type FrameworkFactory func(config.KubeSchedulerProfile, ...framework.Option) (framework.Framework, error)
+type FrameworkFactory func(config.KubeSchedulerProfile, ...frameworkruntime.Option) (framework.Framework, error)
 
 // Profile is a scheduling profile.
 type Profile struct {
 	framework.Framework
 	Recorder events.EventRecorder
+	Name     string
 }
 
 // NewProfile builds a Profile for the given configuration.
 func NewProfile(cfg config.KubeSchedulerProfile, frameworkFact FrameworkFactory, recorderFact RecorderFactory,
-	opts ...framework.Option) (*Profile, error) {
-	r := recorderFact(cfg.SchedulerName)
-	f, err := frameworkFact(cfg, append(opts, framework.WithEventRecorder(r))...)
+	opts ...frameworkruntime.Option) (*Profile, error) {
+	recorder := recorderFact(cfg.SchedulerName)
+	opts = append(opts, frameworkruntime.WithEventRecorder(recorder), frameworkruntime.WithProfileName(cfg.SchedulerName))
+	fwk, err := frameworkFact(cfg, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return &Profile{
-		Framework: f,
-		Recorder:  r,
+		Name:      cfg.SchedulerName,
+		Framework: fwk,
+		Recorder:  recorder,
 	}, nil
 }
 
@@ -60,7 +64,7 @@ type Map map[string]*Profile
 
 // NewMap builds the profiles given by the configuration, indexed by name.
 func NewMap(cfgs []config.KubeSchedulerProfile, frameworkFact FrameworkFactory, recorderFact RecorderFactory,
-	opts ...framework.Option) (Map, error) {
+	opts ...frameworkruntime.Option) (Map, error) {
 	m := make(Map)
 	v := cfgValidator{m: m}
 

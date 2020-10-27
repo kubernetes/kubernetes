@@ -23,9 +23,10 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/tools/cache"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 // AssumeCache is a cache on top of the informer that allows for updating
@@ -134,7 +135,11 @@ func NewAssumeCache(informer cache.SharedIndexInformer, description, indexName s
 		indexFunc:   indexFunc,
 		indexName:   indexName,
 	}
-	c.store = cache.NewIndexer(objInfoKeyFunc, cache.Indexers{indexName: c.objInfoIndexFunc})
+	indexers := cache.Indexers{}
+	if indexName != "" && indexFunc != nil {
+		indexers[indexName] = c.objInfoIndexFunc
+	}
+	c.store = cache.NewIndexer(objInfoKeyFunc, indexers)
 
 	// Unit tests don't use informers
 	if informer != nil {
@@ -353,7 +358,7 @@ type pvAssumeCache struct {
 
 func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
 	if pv, ok := obj.(*v1.PersistentVolume); ok {
-		return []string{pv.Spec.StorageClassName}, nil
+		return []string{v1helper.GetPersistentVolumeClass(pv)}, nil
 	}
 	return []string{""}, fmt.Errorf("object is not a v1.PersistentVolume: %v", obj)
 }
@@ -422,7 +427,7 @@ type pvcAssumeCache struct {
 
 // NewPVCAssumeCache creates a PVC assume cache.
 func NewPVCAssumeCache(informer cache.SharedIndexInformer) PVCAssumeCache {
-	return &pvcAssumeCache{NewAssumeCache(informer, "v1.PersistentVolumeClaim", "namespace", cache.MetaNamespaceIndexFunc)}
+	return &pvcAssumeCache{NewAssumeCache(informer, "v1.PersistentVolumeClaim", "", nil)}
 }
 
 func (c *pvcAssumeCache) GetPVC(pvcKey string) (*v1.PersistentVolumeClaim, error) {

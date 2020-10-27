@@ -159,7 +159,7 @@ func TestCompatibility_v1_PodSecurityContext(t *testing.T) {
 	}
 
 	validator := func(obj runtime.Object) field.ErrorList {
-		return validation.ValidatePodSpec(&(obj.(*api.Pod).Spec), field.NewPath("spec"))
+		return validation.ValidatePodSpec(&(obj.(*api.Pod).Spec), &(obj.(*api.Pod).ObjectMeta), field.NewPath("spec"))
 	}
 
 	for _, tc := range cases {

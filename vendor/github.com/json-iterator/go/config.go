@@ -183,11 +183,11 @@ func (cfg *frozenConfig) validateJsonRawMessage(extension EncoderExtension) {
 	encoder := &funcEncoder{func(ptr unsafe.Pointer, stream *Stream) {
 		rawMessage := *(*json.RawMessage)(ptr)
 		iter := cfg.BorrowIterator([]byte(rawMessage))
+		defer cfg.ReturnIterator(iter)
 		iter.Read()
-		if iter.Error != nil {
+		if iter.Error != nil && iter.Error != io.EOF {
 			stream.WriteRaw("null")
 		} else {
-			cfg.ReturnIterator(iter)
 			stream.WriteRaw(string(rawMessage))
 		}
 	}, func(ptr unsafe.Pointer) bool {

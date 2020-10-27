@@ -557,7 +557,8 @@ func TestIsFullyQualifiedDomainName(t *testing.T) {
 		"bbc.co.uk",
 		"10.0.0.1", // DNS labels can start with numbers and there is no requirement for letters.
 		"hyphens-are-good.k8s.io",
-		strings.Repeat("a", 246) + ".k8s.io",
+		strings.Repeat("a", 63) + ".k8s.io",
+		strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 54) + ".k8s.io",
 	}
 	for _, val := range goodValues {
 		if err := IsFullyQualifiedDomainName(field.NewPath(""), val).ToAggregate(); err != nil {
@@ -579,7 +580,8 @@ func TestIsFullyQualifiedDomainName(t *testing.T) {
 		"underscores_are_bad.k8s.io",
 		"foo@bar.example.com",
 		"http://foo.example.com",
-		strings.Repeat("a", 247) + ".k8s.io",
+		strings.Repeat("a", 64) + ".k8s.io",
+		strings.Repeat("a", 63) + "." + strings.Repeat("b", 63) + "." + strings.Repeat("c", 63) + "." + strings.Repeat("d", 55) + ".k8s.io",
 	}
 	for _, val := range badValues {
 		if err := IsFullyQualifiedDomainName(field.NewPath(""), val).ToAggregate(); err == nil {
@@ -637,12 +639,12 @@ func TestIsFullyQualifiedName(t *testing.T) {
 		{
 			name:       "name should not include scheme",
 			targetName: "http://foo.k8s.io",
-			err:        "a DNS-1123 subdomain must consist of lower case alphanumeric characters",
+			err:        "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters",
 		},
 		{
 			name:       "email should be invalid",
 			targetName: "example@foo.k8s.io",
-			err:        "a DNS-1123 subdomain must consist of lower case alphanumeric characters",
+			err:        "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters",
 		},
 		{
 			name:       "name cannot be empty",
@@ -652,7 +654,7 @@ func TestIsFullyQualifiedName(t *testing.T) {
 		{
 			name:       "name must conform to RFC 1123",
 			targetName: "A.B.C",
-			err:        "a DNS-1123 subdomain must consist of lower case alphanumeric characters",
+			err:        "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters",
 		},
 	}
 	for _, tc := range messageTests {

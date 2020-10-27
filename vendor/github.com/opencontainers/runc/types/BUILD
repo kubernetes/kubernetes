@@ -6,6 +6,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/types",
     importpath = "github.com/opencontainers/runc/types",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/opencontainers/runc/libcontainer/intelrdt:go_default_library"],
 )
 
 filegroup(

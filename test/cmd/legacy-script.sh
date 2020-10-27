@@ -29,12 +29,14 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 # source "${KUBE_ROOT}/hack/lib/test.sh"
 source "${KUBE_ROOT}/test/cmd/apply.sh"
 source "${KUBE_ROOT}/test/cmd/apps.sh"
+source "${KUBE_ROOT}/test/cmd/authentication.sh"
 source "${KUBE_ROOT}/test/cmd/authorization.sh"
 source "${KUBE_ROOT}/test/cmd/batch.sh"
 source "${KUBE_ROOT}/test/cmd/certificate.sh"
 source "${KUBE_ROOT}/test/cmd/core.sh"
 source "${KUBE_ROOT}/test/cmd/crd.sh"
 source "${KUBE_ROOT}/test/cmd/create.sh"
+source "${KUBE_ROOT}/test/cmd/debug.sh"
 source "${KUBE_ROOT}/test/cmd/delete.sh"
 source "${KUBE_ROOT}/test/cmd/diff.sh"
 source "${KUBE_ROOT}/test/cmd/discovery.sh"
@@ -341,10 +343,12 @@ runTests() {
     '-s' "http://127.0.0.1:${API_PORT}"
   )
 
-  # token defined in hack/testdata/auth-tokens.csv
-  kube_flags_with_token=(
-    '-s' "https://127.0.0.1:${SECURE_API_PORT}" '--token=admin-token' '--insecure-skip-tls-verify=true'
+  kube_flags_without_token=(
+    '-s' "https://127.0.0.1:${SECURE_API_PORT}" '--insecure-skip-tls-verify=true'
   )
+
+  # token defined in hack/testdata/auth-tokens.csv
+  kube_flags_with_token=( "${kube_flags_without_token[@]}" '--token=admin-token' )
 
   if [[ -z "${ALLOW_SKEW:-}" ]]; then
     kube_flags+=('--match-server-version')
@@ -760,6 +764,11 @@ runTests() {
     record_command run_nodes_tests
   fi
 
+  ########################
+  # Authentication
+  ########################
+
+  record_command run_exec_credentials_tests
 
   ########################
   # authorization.k8s.io #
@@ -934,6 +943,16 @@ runTests() {
   ####################
 
   record_command run_wait_tests
+
+  ####################
+  # kubectl debug    #
+  ####################
+  if kube::test::if_supports_resource "${pods}" ; then
+    record_command run_kubectl_debug_pod_tests
+  fi
+  if kube::test::if_supports_resource "${nodes}" ; then
+    record_command run_kubectl_debug_node_tests
+  fi
 
   cleanup_tests
 }

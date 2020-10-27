@@ -41,10 +41,10 @@ func SIGDescribe(text string, body func()) bool {
 }
 
 // WaitForStableCluster waits until all existing pods are scheduled and returns their amount.
-func WaitForStableCluster(c clientset.Interface, masterNodes sets.String) int {
+func WaitForStableCluster(c clientset.Interface, workerNodes sets.String) int {
 	startTime := time.Now()
 	// Wait for all pods to be scheduled.
-	allScheduledPods, allNotScheduledPods := getScheduledAndUnscheduledPods(c, masterNodes, metav1.NamespaceAll)
+	allScheduledPods, allNotScheduledPods := getScheduledAndUnscheduledPods(c, workerNodes)
 	for len(allNotScheduledPods) != 0 {
 		time.Sleep(waitTime)
 		if startTime.Add(timeout).Before(time.Now()) {
@@ -55,7 +55,7 @@ func WaitForStableCluster(c clientset.Interface, masterNodes sets.String) int {
 			framework.Failf("Timed out after %v waiting for stable cluster.", timeout)
 			break
 		}
-		allScheduledPods, allNotScheduledPods = getScheduledAndUnscheduledPods(c, masterNodes, metav1.NamespaceAll)
+		allScheduledPods, allNotScheduledPods = getScheduledAndUnscheduledPods(c, workerNodes)
 	}
 	return len(allScheduledPods)
 }
@@ -78,10 +78,11 @@ func WaitForPodsToBeDeleted(c clientset.Interface) {
 	}
 }
 
-// getScheduledAndUnscheduledPods lists scheduled and not scheduled pods in the given namespace, with succeeded and failed pods filtered out.
-func getScheduledAndUnscheduledPods(c clientset.Interface, masterNodes sets.String, ns string) (scheduledPods, notScheduledPods []v1.Pod) {
-	pods, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
-	framework.ExpectNoError(err, fmt.Sprintf("listing all pods in namespace %q while waiting for stable cluster", ns))
+// getScheduledAndUnscheduledPods lists scheduled and not scheduled pods in all namespaces, with succeeded and failed pods filtered out.
+func getScheduledAndUnscheduledPods(c clientset.Interface, workerNodes sets.String) (scheduledPods, notScheduledPods []v1.Pod) {
+	pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+	framework.ExpectNoError(err, fmt.Sprintf("listing all pods in namespace %q while waiting for stable cluster", metav1.NamespaceAll))
+
 	// API server returns also Pods that succeeded. We need to filter them out.
 	filteredPods := make([]v1.Pod, 0, len(pods.Items))
 	for _, p := range pods.Items {
@@ -90,7 +91,7 @@ func getScheduledAndUnscheduledPods(c clientset.Interface, masterNodes sets.Stri
 		}
 	}
 	pods.Items = filteredPods
-	return GetPodsScheduled(masterNodes, pods)
+	return GetPodsScheduled(workerNodes, pods)
 }
 
 // getDeletingPods returns whether there are any pods marked for deletion.

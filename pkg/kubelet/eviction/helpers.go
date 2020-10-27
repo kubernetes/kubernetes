@@ -18,6 +18,7 @@ package eviction
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,10 +26,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/api/v1/pod"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	volumeutils "k8s.io/kubernetes/pkg/volume/util"
@@ -424,7 +425,7 @@ func localEphemeralVolumeNames(pod *v1.Pod) []string {
 }
 
 // podLocalEphemeralStorageUsage aggregates pod local ephemeral storage usage and inode consumption for the specified stats to measure.
-func podLocalEphemeralStorageUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType) (v1.ResourceList, error) {
+func podLocalEphemeralStorageUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType, etcHostsPath string) (v1.ResourceList, error) {
 	disk := resource.Quantity{Format: resource.BinarySI}
 	inodes := resource.Quantity{Format: resource.DecimalSI}
 
@@ -437,6 +438,12 @@ func podLocalEphemeralStorageUsage(podStats statsapi.PodStats, pod *v1.Pod, stat
 		podLocalVolumeUsageList := podLocalVolumeUsage(volumeNames, podStats)
 		disk.Add(podLocalVolumeUsageList[v1.ResourceEphemeralStorage])
 		inodes.Add(podLocalVolumeUsageList[resourceInodes])
+	}
+	if len(etcHostsPath) > 0 {
+		if stat, err := os.Stat(etcHostsPath); err == nil {
+			disk.Add(*resource.NewQuantity(int64(stat.Size()), resource.BinarySI))
+			inodes.Add(*resource.NewQuantity(int64(1), resource.DecimalSI))
+		}
 	}
 	return v1.ResourceList{
 		v1.ResourceEphemeralStorage: disk,
@@ -521,8 +528,8 @@ func (ms *multiSorter) Less(i, j int) bool {
 
 // priority compares pods by Priority, if priority is enabled.
 func priority(p1, p2 *v1.Pod) int {
-	priority1 := pod.GetPodPriority(p1)
-	priority2 := pod.GetPodPriority(p2)
+	priority1 := corev1helpers.PodPriority(p1)
+	priority2 := corev1helpers.PodPriority(p2)
 	if priority1 == priority2 {
 		return 0
 	}

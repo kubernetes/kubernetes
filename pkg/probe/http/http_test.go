@@ -61,7 +61,13 @@ func unsetEnv(key string) func() {
 
 func TestHTTPProbeProxy(t *testing.T) {
 	res := "welcome to http probe proxy"
-	localProxy := "http://127.0.0.1:9098/"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, res)
+	}))
+	defer server.Close()
+
+	localProxy := server.URL
 
 	defer setEnv("http_proxy", localProxy)()
 	defer setEnv("HTTP_PROXY", localProxy)()
@@ -70,16 +76,6 @@ func TestHTTPProbeProxy(t *testing.T) {
 
 	followNonLocalRedirects := true
 	prober := New(followNonLocalRedirects)
-
-	go func() {
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprint(w, res)
-		})
-		err := http.ListenAndServe(":9098", nil)
-		if err != nil {
-			t.Errorf("Failed to start foo server: localhost:9098")
-		}
-	}()
 
 	// take some time to wait server boot
 	time.Sleep(2 * time.Second)

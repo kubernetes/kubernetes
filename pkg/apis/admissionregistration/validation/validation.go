@@ -496,6 +496,7 @@ func validatingHasNoSideEffects(webhooks []admissionregistration.ValidatingWebho
 	return true
 }
 
+// ValidateValidatingWebhookConfigurationUpdate validates update of validating webhook configuration
 func ValidateValidatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.ValidatingWebhookConfiguration, requestGV schema.GroupVersion) field.ErrorList {
 	return validateValidatingWebhookConfiguration(newC, validationOptions{
 		requireNoSideEffects:                    requireNoSideEffects(requestGV) && validatingHasNoSideEffects(oldC.Webhooks),
@@ -504,6 +505,7 @@ func ValidateValidatingWebhookConfigurationUpdate(newC, oldC *admissionregistrat
 	})
 }
 
+// ValidateMutatingWebhookConfigurationUpdate validates update of mutating webhook configuration
 func ValidateMutatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.MutatingWebhookConfiguration, requestGV schema.GroupVersion) field.ErrorList {
 	return validateMutatingWebhookConfiguration(newC, validationOptions{
 		requireNoSideEffects:                    requireNoSideEffects(requestGV) && mutatingHasNoSideEffects(oldC.Webhooks),

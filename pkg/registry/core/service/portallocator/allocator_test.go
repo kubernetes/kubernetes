@@ -196,14 +196,14 @@ func TestSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := NewPortAllocator(*otherPr)
+	_, err = NewPortAllocator(*otherPr)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := r.Restore(*otherPr, dst.Data); err != ErrMismatchedNetwork {
 		t.Fatal(err)
 	}
-	other, err = NewPortAllocator(*pr2)
+	other, err := NewPortAllocator(*pr2)
 	if err != nil {
 		t.Fatal(err)
 	}

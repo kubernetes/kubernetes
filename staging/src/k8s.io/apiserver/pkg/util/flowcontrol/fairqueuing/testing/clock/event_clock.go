@@ -51,10 +51,8 @@ type RealEventClock struct {
 func (RealEventClock) EventAfterDuration(f EventFunc, d time.Duration) {
 	ch := time.After(d)
 	go func() {
-		select {
-		case t := <-ch:
-			f(t)
-		}
+		t := <-ch
+		f(t)
 	}()
 }
 

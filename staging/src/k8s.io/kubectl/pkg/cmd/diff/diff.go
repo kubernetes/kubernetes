@@ -95,6 +95,7 @@ type DiffOptions struct {
 	FieldManager    string
 	ForceConflicts  bool
 
+	Selector         string
 	OpenAPISchema    openapi.Resources
 	DiscoveryClient  discovery.DiscoveryInterface
 	DynamicClient    dynamic.Interface
@@ -148,6 +149,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	}
 
 	usage := "contains the configuration to diff"
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddServerSideApplyFlags(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &options.FieldManager, apply.FieldManagerClientSideApply)
@@ -496,6 +498,7 @@ func (o *DiffOptions) Run() error {
 		Unstructured().
 		NamespaceParam(o.CmdNamespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
+		LabelSelectorParam(o.Selector).
 		Flatten().
 		Do()
 	if err := r.Err(); err != nil {

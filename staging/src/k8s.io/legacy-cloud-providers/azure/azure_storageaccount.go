@@ -28,15 +28,23 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// AccountOptions contains the fields which are used to create storage account.
+type AccountOptions struct {
+	Name, Type, Kind, ResourceGroup, Location string
+	EnableHTTPSTrafficOnly                    bool
+	Tags                                      map[string]string
+	VirtualNetworkResourceIDs                 []string
+}
+
 type accountWithLocation struct {
 	Name, StorageType, Location string
 }
 
-// getStorageAccounts gets name, type, location of all storage accounts in a resource group which matches matchingAccountType, matchingLocation
-func (az *Cloud) getStorageAccounts(matchingAccountType, matchingAccountKind, resourceGroup, matchingLocation string) ([]accountWithLocation, error) {
+// getStorageAccounts get matching storage accounts
+func (az *Cloud) getStorageAccounts(accountOptions *AccountOptions) ([]accountWithLocation, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	result, rerr := az.StorageAccountClient.ListByResourceGroup(ctx, resourceGroup)
+	result, rerr := az.StorageAccountClient.ListByResourceGroup(ctx, accountOptions.ResourceGroup)
 	if rerr != nil {
 		return nil, rerr.Error()
 	}
@@ -45,18 +53,39 @@ func (az *Cloud) getStorageAccounts(matchingAccountType, matchingAccountKind, re
 	for _, acct := range result {
 		if acct.Name != nil && acct.Location != nil && acct.Sku != nil {
 			storageType := string((*acct.Sku).Name)
-			if matchingAccountType != "" && !strings.EqualFold(matchingAccountType, storageType) {
+			if accountOptions.Type != "" && !strings.EqualFold(accountOptions.Type, storageType) {
 				continue
 			}
 
-			if matchingAccountKind != "" && !strings.EqualFold(matchingAccountKind, string(acct.Kind)) {
+			if accountOptions.Kind != "" && !strings.EqualFold(accountOptions.Kind, string(acct.Kind)) {
 				continue
 			}
 
 			location := *acct.Location
-			if matchingLocation != "" && !strings.EqualFold(matchingLocation, location) {
+			if accountOptions.Location != "" && !strings.EqualFold(accountOptions.Location, location) {
 				continue
 			}
+
+			if len(accountOptions.VirtualNetworkResourceIDs) > 0 {
+				if acct.AccountProperties == nil || acct.AccountProperties.NetworkRuleSet == nil ||
+					acct.AccountProperties.NetworkRuleSet.VirtualNetworkRules == nil {
+					continue
+				}
+
+				found := false
+				for _, subnetID := range accountOptions.VirtualNetworkResourceIDs {
+					for _, rule := range *acct.AccountProperties.NetworkRuleSet.VirtualNetworkRules {
+						if strings.EqualFold(to.String(rule.VirtualNetworkResourceID), subnetID) && rule.Action == storage.Allow {
+							found = true
+							break
+						}
+					}
+				}
+				if !found {
+					continue
+				}
+			}
+
 			accounts = append(accounts, accountWithLocation{Name: *acct.Name, StorageType: storageType, Location: location})
 		}
 	}
@@ -90,10 +119,20 @@ func (az *Cloud) GetStorageAccesskey(account, resourceGroup string) (string, err
 }
 
 // EnsureStorageAccount search storage account, create one storage account(with genAccountNamePrefix) if not found, return accountName, accountKey
-func (az *Cloud) EnsureStorageAccount(accountName, accountType, accountKind, resourceGroup, location, genAccountNamePrefix string, enableHTTPSTrafficOnly bool) (string, string, error) {
+func (az *Cloud) EnsureStorageAccount(accountOptions *AccountOptions, genAccountNamePrefix string) (string, string, error) {
+	if accountOptions == nil {
+		return "", "", fmt.Errorf("account options is nil")
+	}
+	accountName := accountOptions.Name
+	accountType := accountOptions.Type
+	accountKind := accountOptions.Kind
+	resourceGroup := accountOptions.ResourceGroup
+	location := accountOptions.Location
+	enableHTTPSTrafficOnly := accountOptions.EnableHTTPSTrafficOnly
+
 	if len(accountName) == 0 {
 		// find a storage account that matches accountType
-		accounts, err := az.getStorageAccounts(accountType, accountKind, resourceGroup, location)
+		accounts, err := az.getStorageAccounts(accountOptions)
 		if err != nil {
 			return "", "", fmt.Errorf("could not list storage accounts for account type %s: %v", accountType, err)
 		}
@@ -104,6 +143,24 @@ func (az *Cloud) EnsureStorageAccount(accountName, accountType, accountKind, res
 		}
 
 		if len(accountName) == 0 {
+			// set network rules for storage account
+			var networkRuleSet *storage.NetworkRuleSet
+			virtualNetworkRules := []storage.VirtualNetworkRule{}
+			for _, subnetID := range accountOptions.VirtualNetworkResourceIDs {
+				vnetRule := storage.VirtualNetworkRule{
+					VirtualNetworkResourceID: &subnetID,
+					Action:                   storage.Allow,
+				}
+				virtualNetworkRules = append(virtualNetworkRules, vnetRule)
+				klog.V(4).Infof("subnetID(%s) has been set", subnetID)
+			}
+			if len(virtualNetworkRules) > 0 {
+				networkRuleSet = &storage.NetworkRuleSet{
+					VirtualNetworkRules: &virtualNetworkRules,
+					DefaultAction:       storage.DefaultActionDeny,
+				}
+			}
+
 			// not found a matching account, now create a new account in current resource group
 			accountName = generateStorageAccountName(genAccountNamePrefix)
 			if location == "" {
@@ -118,14 +175,24 @@ func (az *Cloud) EnsureStorageAccount(accountName, accountType, accountKind, res
 			if accountKind != "" {
 				kind = storage.Kind(accountKind)
 			}
-			klog.V(2).Infof("azure - no matching account found, begin to create a new account %s in resource group %s, location: %s, accountType: %s, accountKind: %s",
-				accountName, resourceGroup, location, accountType, kind)
+			if len(accountOptions.Tags) == 0 {
+				accountOptions.Tags = make(map[string]string)
+			}
+			accountOptions.Tags["created-by"] = "azure"
+			tags := convertMaptoMapPointer(accountOptions.Tags)
+
+			klog.V(2).Infof("azure - no matching account found, begin to create a new account %s in resource group %s, location: %s, accountType: %s, accountKind: %s, tags: %+v",
+				accountName, resourceGroup, location, accountType, kind, accountOptions.Tags)
+
 			cp := storage.AccountCreateParameters{
-				Sku:                               &storage.Sku{Name: storage.SkuName(accountType)},
-				Kind:                              kind,
-				AccountPropertiesCreateParameters: &storage.AccountPropertiesCreateParameters{EnableHTTPSTrafficOnly: &enableHTTPSTrafficOnly},
-				Tags:                              map[string]*string{"created-by": to.StringPtr("azure")},
-				Location:                          &location}
+				Sku:  &storage.Sku{Name: storage.SkuName(accountType)},
+				Kind: kind,
+				AccountPropertiesCreateParameters: &storage.AccountPropertiesCreateParameters{
+					EnableHTTPSTrafficOnly: &enableHTTPSTrafficOnly,
+					NetworkRuleSet:         networkRuleSet,
+				},
+				Tags:     tags,
+				Location: &location}
 
 			ctx, cancel := getContextWithCancel()
 			defer cancel()

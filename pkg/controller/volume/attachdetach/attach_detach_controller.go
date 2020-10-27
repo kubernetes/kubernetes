@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/features"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -117,21 +118,23 @@ func NewAttachDetachController(
 	prober volume.DynamicPluginProber,
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
-	timerConfig TimerConfig) (AttachDetachController, error) {
+	timerConfig TimerConfig,
+	filteredDialOptions *proxyutil.FilteredDialOptions) (AttachDetachController, error) {
 
 	adc := &attachDetachController{
-		kubeClient:  kubeClient,
-		pvcLister:   pvcInformer.Lister(),
-		pvcsSynced:  pvcInformer.Informer().HasSynced,
-		pvLister:    pvInformer.Lister(),
-		pvsSynced:   pvInformer.Informer().HasSynced,
-		podLister:   podInformer.Lister(),
-		podsSynced:  podInformer.Informer().HasSynced,
-		podIndexer:  podInformer.Informer().GetIndexer(),
-		nodeLister:  nodeInformer.Lister(),
-		nodesSynced: nodeInformer.Informer().HasSynced,
-		cloud:       cloud,
-		pvcQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
+		kubeClient:          kubeClient,
+		pvcLister:           pvcInformer.Lister(),
+		pvcsSynced:          pvcInformer.Informer().HasSynced,
+		pvLister:            pvInformer.Lister(),
+		pvsSynced:           pvInformer.Informer().HasSynced,
+		podLister:           podInformer.Lister(),
+		podsSynced:          podInformer.Informer().HasSynced,
+		podIndexer:          podInformer.Informer().GetIndexer(),
+		nodeLister:          nodeInformer.Lister(),
+		nodesSynced:         nodeInformer.Informer().HasSynced,
+		cloud:               cloud,
+		pvcQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
+		filteredDialOptions: filteredDialOptions,
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
@@ -151,7 +154,7 @@ func NewAttachDetachController(
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach-controller"})
 	blkutil := volumepathhandler.NewBlockVolumePathHandler()
@@ -203,7 +206,7 @@ func NewAttachDetachController(
 
 	// This custom indexer will index pods by its PVC keys. Then we don't need
 	// to iterate all pods every time to find pods which reference given PVC.
-	if err := common.AddIndexerIfNotPresent(adc.podIndexer, common.PodPVCIndex, common.PodPVCIndexFunc); err != nil {
+	if err := common.AddPodPVCIndexerIfNotPresent(adc.podIndexer); err != nil {
 		return nil, fmt.Errorf("Could not initialize attach detach controller: %v", err)
 	}
 
@@ -313,6 +316,9 @@ type attachDetachController struct {
 
 	// intreeToCSITranslator translates from in-tree volume specs to CSI
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
+
+	// filteredDialOptions configures any dialing done by the controller.
+	filteredDialOptions *proxyutil.FilteredDialOptions
 }
 
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
@@ -425,7 +431,7 @@ func (adc *attachDetachController) populateDesiredStateOfWorld() error {
 			// The volume specs present in the ActualStateOfWorld are nil, let's replace those
 			// with the correct ones found on pods. The present in the ASW with no corresponding
 			// pod will be detached and the spec is irrelevant.
-			volumeSpec, err := util.CreateVolumeSpec(podVolume, podToAdd.Namespace, nodeName, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
+			volumeSpec, err := util.CreateVolumeSpec(podVolume, podToAdd, nodeName, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
 			if err != nil {
 				klog.Errorf(
 					"Error creating spec for volume %q, pod %q/%q: %v",
@@ -811,6 +817,10 @@ func (adc *attachDetachController) GetEventRecorder() record.EventRecorder {
 func (adc *attachDetachController) GetSubpather() subpath.Interface {
 	// Subpaths not needed in attachdetach controller
 	return nil
+}
+
+func (adc *attachDetachController) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
+	return adc.filteredDialOptions
 }
 
 func (adc *attachDetachController) GetCSIDriverLister() storagelistersv1.CSIDriverLister {

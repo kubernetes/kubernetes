@@ -222,4 +222,4 @@ kubectl plugin list
 
 {% endmethod %}
 
-The easiest way to discover and install plugins is via the kubernetes sub-project [krew.dev](https://github.com/kubernetes-sigs/krew/#installation).
+The easiest way to discover and install plugins is via the kubernetes sub-project [krew.sigs.k8s.io](https://krew.sigs.k8s.io/docs/user-guide/setup/install/).

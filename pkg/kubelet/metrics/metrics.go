@@ -29,7 +29,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // This const block defines the metric names for the kubelet metrics.
@@ -349,7 +348,7 @@ var (
 	RunningPodCount = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           "running_pod_count",
+			Name:           "running_pods",
 			Help:           "Number of pods currently running",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -358,7 +357,7 @@ var (
 	RunningContainerCount = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           "running_container_count",
+			Name:           "running_containers",
 			Help:           "Number of containers currently running",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -369,7 +368,7 @@ var (
 var registerMetrics sync.Once
 
 // Register registers all metrics.
-func Register(containerCache kubecontainer.RuntimeCache, collectors ...metrics.StableCollector) {
+func Register(collectors ...metrics.StableCollector) {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(NodeName)

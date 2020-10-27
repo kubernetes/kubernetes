@@ -7,16 +7,16 @@ go_library(
         "proc.go",
         "syscall_linux_32.go",
         "syscall_linux_64.go",
-        "sysconfig.go",
-        "sysconfig_notcgo.go",
         "unsupported.go",
         "xattrs_linux.go",
     ],
-    cgo = True,
     importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/system",
     importpath = "github.com/opencontainers/runc/libcontainer/system",
     visibility = ["//visibility:public"],
     deps = select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
         ],
@@ -29,7 +29,13 @@ go_library(
         "@io_bazel_rules_go//go/platform:freebsd": [
             "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
             "//vendor/github.com/opencontainers/runc/libcontainer/user:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
@@ -95,6 +101,9 @@ go_library(
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux_ppc64le": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux_riscv64": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux_s390x": [

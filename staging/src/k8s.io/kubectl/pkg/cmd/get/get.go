@@ -215,7 +215,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	// TODO (soltysh): currently we don't support custom columns
 	// with server side print. So in these cases force the old behavior.
 	outputOption := cmd.Flags().Lookup("output").Value.String()
-	if outputOption == "custom-columns" {
+	if strings.Contains(outputOption, "custom-columns") || outputOption == "yaml" || strings.Contains(outputOption, "json") {
 		o.ServerPrint = false
 	}
 
@@ -582,9 +582,9 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	if trackingWriter.Written == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
 		// if we wrote no output, and had no errors, and are not ignoring NotFound, be sure we output something
 		if allResourcesNamespaced {
-			fmt.Fprintln(o.ErrOut, fmt.Sprintf("No resources found in %s namespace.", o.Namespace))
+			fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
 		} else {
-			fmt.Fprintln(o.ErrOut, fmt.Sprintf("No resources found"))
+			fmt.Fprintln(o.ErrOut, "No resources found")
 		}
 	}
 	return utilerrors.NewAggregate(allErrs)

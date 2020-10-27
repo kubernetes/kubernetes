@@ -26,7 +26,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -411,7 +411,7 @@ func TestGetCandidateZone(t *testing.T) {
 
 	for _, test := range tests {
 		zones, err := getCandidateZones(test.cloud, test.node)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, test.expectedZones, zones)
 	}
 }
@@ -444,7 +444,7 @@ func TestFormatVolumeID(t *testing.T) {
 	}
 	for _, test := range tests {
 		volumeID, err := formatVolumeID(test.volumeIDFromPath)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, test.expectedVolumeID, volumeID, test.volumeIDFromPath)
 	}
 }

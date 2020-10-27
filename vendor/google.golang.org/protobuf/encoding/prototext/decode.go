@@ -54,6 +54,13 @@ type UnmarshalOptions struct {
 // Unmarshal reads the given []byte and populates the given proto.Message using options in
 // UnmarshalOptions object.
 func (o UnmarshalOptions) Unmarshal(b []byte, m proto.Message) error {
+	return o.unmarshal(b, m)
+}
+
+// unmarshal is a centralized function that all unmarshal operations go through.
+// For profiling purposes, avoid changing the name of this function or
+// introducing other code paths for unmarshal that do not go through this.
+func (o UnmarshalOptions) unmarshal(b []byte, m proto.Message) error {
 	proto.Reset(m)
 
 	if o.Resolver == nil {

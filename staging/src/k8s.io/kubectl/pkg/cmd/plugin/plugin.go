@@ -41,7 +41,7 @@ var (
 		Please refer to the documentation and examples for more information about how write your own plugins.
 
 		The easiest way to discover and install plugins is via the kubernetes sub-project krew.
-		To install krew, visit [krew.dev](https://github.com/kubernetes-sigs/krew/#installation)`)
+		To install krew, visit [krew.sigs.k8s.io](https://krew.sigs.k8s.io/docs/user-guide/setup/install/)`)
 
 	pluginListLong = templates.LongDesc(`
 		List all available plugin files on a user's PATH.

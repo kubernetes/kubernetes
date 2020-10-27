@@ -27,12 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/validatingwebhookconfiguration"
 )
 
-// REST implements a RESTStorage for pod disruption budgets against etcd
+// REST implements a RESTStorage for validatingWebhookConfiguration against etcd
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against pod disruption budgets.
+// NewREST returns a RESTStorage object that will work against validatingWebhookConfiguration.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:     func() runtime.Object { return &admissionregistration.ValidatingWebhookConfiguration{} },

@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 const (
@@ -375,7 +375,7 @@ func TestMapUnmap(t *testing.T) {
 	var devPath string
 
 	if customMapper, ok := mapper.(volume.CustomBlockVolumeMapper); ok {
-		err = customMapper.SetUpDevice()
+		_, err = customMapper.SetUpDevice()
 		if err != nil {
 			t.Errorf("Failed to SetUpDevice, err: %v", err)
 		}

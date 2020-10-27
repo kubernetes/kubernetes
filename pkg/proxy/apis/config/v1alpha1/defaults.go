@@ -25,8 +25,8 @@ import (
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
-	"k8s.io/kubernetes/pkg/master/ports"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/utils/pointer"
 )
@@ -60,6 +60,9 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 	}
 	if obj.IPTables.SyncPeriod.Duration == 0 {
 		obj.IPTables.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
+	}
+	if obj.IPTables.MinSyncPeriod.Duration == 0 {
+		obj.IPTables.MinSyncPeriod = metav1.Duration{Duration: 1 * time.Second}
 	}
 	if obj.IPVS.SyncPeriod.Duration == 0 {
 		obj.IPVS.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}

@@ -38,6 +38,9 @@ type OSInterface interface {
 	Pipe() (r *os.File, w *os.File, err error)
 	ReadDir(dirname string) ([]os.FileInfo, error)
 	Glob(pattern string) ([]string, error)
+	Open(name string) (*os.File, error)
+	OpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
+	Rename(oldpath, newpath string) error
 }
 
 // RealOS is used to dispatch the real system level operations.
@@ -104,4 +107,19 @@ func (RealOS) ReadDir(dirname string) ([]os.FileInfo, error) {
 // pattern.
 func (RealOS) Glob(pattern string) ([]string, error) {
 	return filepath.Glob(pattern)
+}
+
+// Open will call os.Open to return the file.
+func (RealOS) Open(name string) (*os.File, error) {
+	return os.Open(name)
+}
+
+// OpenFile will call os.OpenFile to return the file.
+func (RealOS) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
+	return os.OpenFile(name, flag, perm)
+}
+
+// Rename will call os.Rename to rename a file.
+func (RealOS) Rename(oldpath, newpath string) error {
+	return os.Rename(oldpath, newpath)
 }

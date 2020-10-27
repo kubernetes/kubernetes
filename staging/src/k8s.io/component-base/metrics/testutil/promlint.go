@@ -64,12 +64,9 @@ var exceptionMetrics = []string{
 	"node_collector_evictions_number",
 
 	// k8s.io/kubernetes/pkg/kubelet/server/stats
+	// The two metrics have been deprecated and will be removed in release v1.20+.
 	"container_cpu_usage_seconds_total", // non-counter metrics should not have "_total" suffix
 	"node_cpu_usage_seconds_total",      // non-counter metrics should not have "_total" suffix
-
-	// k8s.io/kubernetes/pkg/kubelet/pleg
-	"kubelet_running_container_count", // non-histogram and non-summary metrics should not have "_count" suffix
-	"kubelet_running_pod_count",       // non-histogram and non-summary metrics should not have "_count" suffix
 }
 
 // A Problem is an issue detected by a Linter.

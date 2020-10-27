@@ -111,7 +111,7 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 	}
 }
 
-func TestCreateLocalEtcdStaticPodManifestFileKustomize(t *testing.T) {
+func TestCreateLocalEtcdStaticPodManifestFileWithPatches(t *testing.T) {
 	// Create temp folder for the test case
 	tmpdir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpdir)
@@ -126,43 +126,38 @@ func TestCreateLocalEtcdStaticPodManifestFileKustomize(t *testing.T) {
 		},
 	}
 
-	kustomizePath := filepath.Join(tmpdir, "kustomize")
-	err := os.MkdirAll(kustomizePath, 0777)
+	patchesPath := filepath.Join(tmpdir, "patch-files")
+	err := os.MkdirAll(patchesPath, 0777)
 	if err != nil {
-		t.Fatalf("Couldn't create %s", kustomizePath)
+		t.Fatalf("Couldn't create %s", patchesPath)
 	}
 
 	patchString := dedent.Dedent(`
-    apiVersion: v1
-    kind: Pod
-    metadata:
-        name: etcd
-        namespace: kube-system
-        annotations:
-            kustomize: patch for etcd
-    `)
+	metadata:
+	  annotations:
+	    patched: "true"
+	`)
 
-	err = ioutil.WriteFile(filepath.Join(kustomizePath, "patch.yaml"), []byte(patchString), 0644)
+	err = ioutil.WriteFile(filepath.Join(patchesPath, kubeadmconstants.Etcd+".yaml"), []byte(patchString), 0644)
 	if err != nil {
 		t.Fatalf("WriteFile returned unexpected error: %v", err)
 	}
 
-	// Execute createStaticPodFunction with kustomizations
 	manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-	err = CreateLocalEtcdStaticPodManifestFile(manifestPath, kustomizePath, "", cfg, &kubeadmapi.APIEndpoint{})
+	err = CreateLocalEtcdStaticPodManifestFile(manifestPath, patchesPath, "", cfg, &kubeadmapi.APIEndpoint{})
 	if err != nil {
 		t.Errorf("Error executing createStaticPodFunction: %v", err)
 		return
 	}
 
-	pod, err := staticpodutil.ReadStaticPodFromDisk(filepath.Join(manifestPath, fmt.Sprintf("%s.yaml", kubeadmconstants.Etcd)))
+	pod, err := staticpodutil.ReadStaticPodFromDisk(filepath.Join(manifestPath, kubeadmconstants.Etcd+".yaml"))
 	if err != nil {
 		t.Errorf("Error executing ReadStaticPodFromDisk: %v", err)
 		return
 	}
 
-	if _, ok := pod.ObjectMeta.Annotations["kustomize"]; !ok {
-		t.Error("Kustomize did not apply patches corresponding to the resource")
+	if _, ok := pod.ObjectMeta.Annotations["patched"]; !ok {
+		t.Errorf("Patches were not applied to %s", kubeadmconstants.Etcd)
 	}
 }
 

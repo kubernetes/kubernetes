@@ -49,6 +49,12 @@ type Interface interface {
 	LoadBalancer() (LoadBalancer, bool)
 	// Instances returns an instances interface. Also returns true if the interface is supported, false otherwise.
 	Instances() (Instances, bool)
+	// InstancesV2 is an implementation for instances and should only be implemented by external cloud providers.
+	// Implementing InstancesV2 is behaviorally identical to Instances but is optimized to significantly reduce
+	// API calls to the cloud provider when registering and syncing nodes.
+	// Also returns true if the interface is supported, false otherwise.
+	// WARNING: InstancesV2 is an experimental interface and is subject to change in v1.20.
+	InstancesV2() (InstancesV2, bool)
 	// Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
 	Zones() (Zones, bool)
 	// Clusters returns a clusters interface.  Also returns true if the interface is supported, false otherwise.
@@ -186,6 +192,22 @@ type Instances interface {
 	InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error)
 }
 
+// InstancesV2 is an abstract, pluggable interface for cloud provider instances.
+// Unlike the Instances interface, it is designed for external cloud providers and should only be used by them.
+// WARNING: InstancesV2 is an experimental interface and is subject to change in v1.20.
+type InstancesV2 interface {
+	// InstanceExists returns true if the instance for the given node exists according to the cloud provider.
+	// Use the node.name or node.spec.providerID field to find the node in the cloud provider.
+	InstanceExists(ctx context.Context, node *v1.Node) (bool, error)
+	// InstanceShutdown returns true if the instance is shutdown according to the cloud provider.
+	// Use the node.name or node.spec.providerID field to find the node in the cloud provider.
+	InstanceShutdown(ctx context.Context, node *v1.Node) (bool, error)
+	// InstanceMetadata returns the instance's metadata. The values returned in InstanceMetadata are
+	// translated into specific fields in the Node object on registration.
+	// Use the node.name or node.spec.providerID field to find the node in the cloud provider.
+	InstanceMetadata(ctx context.Context, node *v1.Node) (*InstanceMetadata, error)
+}
+
 // Route is a representation of an advanced routing rule.
 type Route struct {
 	// Name is the name of the routing rule in the cloud-provider.
@@ -251,12 +273,36 @@ type PVLabeler interface {
 	GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error)
 }
 
-// InstanceMetadata contains metadata about the specific instance.
+// InstanceMetadata contains metadata about a specific instance.
+// Values returned in InstanceMetadata are translated into specific fields in Node.
 type InstanceMetadata struct {
-	// ProviderID is provider's id that instance belongs to.
+	// ProviderID is a unique ID used to idenfitify an instance on the cloud provider.
+	// The ProviderID set here will be set on the node's spec.providerID field.
+	// The provider ID format can be set by the cloud provider but providers should
+	// ensure the format does not change in any incompatible way.
+	//
+	// The provider ID format used by existing cloud provider has been:
+	//    <provider-name>://<instance-id>
+	// Existing providers setting this field should preserve the existing format
+	// currently being set in node.spec.providerID.
 	ProviderID string
-	// Type is instance's type.
-	Type string
+	// InstanceType is the instance's type.
+	// The InstanceType set here will be set using the following labels on the node object:
+	//   * node.kubernetes.io/instance-type=<instance-type>
+	//   * beta.kubernetes.io/instance-type=<instance-type> (DEPRECATED)
+	InstanceType string
 	// NodeAddress contains information for the instance's address.
+	// The node addresses returned here will be set on the node's status.addresses field.
 	NodeAddresses []v1.NodeAddress
+
+	// Zone is the zone that the instance is in.
+	// The value set here is applied as the following labels on the node:
+	//   * topology.kubernetes.io/zone=<zone>
+	//   * failure-domain.beta.kubernetes.io/zone=<zone> (DEPRECATED)
+	Zone string
+	// Region is the region that the instance is in.
+	// The value set here is applied as the following labels on the node:
+	//   * topology.kubernetes.io/region=<region>
+	//   * failure-domain.beta.kubernetes.io/region=<region> (DEPRECATED)
+	Region string
 }

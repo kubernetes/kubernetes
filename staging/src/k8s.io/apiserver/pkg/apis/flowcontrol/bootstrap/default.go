@@ -210,7 +210,7 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: 20,
+				AssuredConcurrencyShares: 100,
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -227,7 +227,7 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: 100,
+				AssuredConcurrencyShares: 20,
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -380,7 +380,7 @@ var (
 		"global-default", "global-default", 9900,
 		flowcontrol.FlowDistinguisherMethodByUserType,
 		flowcontrol.PolicyRulesWithSubjects{
-			Subjects: groups(serviceaccount.AllServiceAccountsGroup),
+			Subjects: groups(user.AllUnauthenticated, user.AllAuthenticated),
 			ResourceRules: []flowcontrol.ResourcePolicyRule{resourceRule(
 				[]string{flowcontrol.VerbAll},
 				[]string{flowcontrol.APIGroupAll},

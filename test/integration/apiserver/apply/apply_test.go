@@ -30,6 +30,7 @@ import (
 
 	"sigs.k8s.io/yaml"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -37,13 +38,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -52,7 +54,7 @@ func setup(t testing.TB, groupVersions ...schema.GroupVersion) (*httptest.Server
 	opts.EtcdOptions.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
 	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(&opts)
 	if len(groupVersions) > 0 {
-		resourceConfig := master.DefaultAPIResourceConfigSource()
+		resourceConfig := controlplane.DefaultAPIResourceConfigSource()
 		resourceConfig.EnableVersions(groupVersions...)
 		masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 	}
@@ -295,28 +297,28 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 		"kind": "Deployment",
 		"metadata": {
 			"name": "deployment",
-                        "labels": {"app": "nginx"}
+			"labels": {"app": "nginx"}
 		},
 		"spec": {
-                        "replicas": 3,
-                        "selector": {
-                                "matchLabels": {
-                                         "app": "nginx"
-                                }
-                        },
-                        "template": {
-                                "metadata": {
-                                        "labels": {
-                                                "app": "nginx"
-                                        }
-                                },
-                                "spec": {
-				        "containers": [{
-					        "name":  "nginx",
-					        "image": "nginx:latest"
-				        }]
-                                }
-                        }
+			"replicas": 3,
+			"selector": {
+				"matchLabels": {
+					 "app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
 		}
 	}`)
 
@@ -684,11 +686,16 @@ func TestApplyManagedFields(t *testing.T) {
 		t.Fatalf("Failed to marshal object: %v", err)
 	}
 
+	selfLink := ""
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.RemoveSelfLink) {
+		selfLink = `
+			"selfLink": "` + accessor.GetSelfLink() + `",`
+	}
+
 	expected := []byte(`{
 		"metadata": {
 			"name": "test-cm",
-			"namespace": "default",
-			"selfLink": "` + accessor.GetSelfLink() + `",
+			"namespace": "default",` + selfLink + `
 			"uid": "` + string(accessor.GetUID()) + `",
 			"resourceVersion": "` + accessor.GetResourceVersion() + `",
 			"creationTimestamp": "` + accessor.GetCreationTimestamp().UTC().Format(time.RFC3339) + `",
@@ -1575,7 +1582,108 @@ func TestErrorsDontFailPatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to patch object with empty FieldsType: %v", err)
 	}
+}
 
+func TestApplyDoesNotChangeManagedFieldsViaSubresources(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	podBytes := []byte(`{
+		"apiVersion": "v1",
+		"kind": "Pod",
+		"metadata": {
+			"name": "just-a-pod"
+		},
+		"spec": {
+			"containers": [{
+				"name":  "test-container-a",
+				"image": "test-image-one"
+			}]
+		}
+	}`)
+
+	liveObj, err := client.CoreV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("pods").
+		Name("just-a-pod").
+		Body(podBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	updateBytes := []byte(`{
+		"metadata": {
+			"managedFields": [{
+				"manager":"testing",
+				"operation":"Update",
+				"apiVersion":"v1",
+				"fieldsType":"FieldsV1",
+				"fieldsV1":{
+					"f:spec":{
+						"f:containers":{
+							"k:{\"name\":\"testing\"}":{
+								".":{},
+								"f:image":{},
+								"f:name":{}
+							}
+						}
+					}
+				}
+			}]
+		},
+		"status": {
+			"conditions": [{"type": "MyStatus", "status":"true"}]
+		}
+	}`)
+
+	updateActor := "update_managedfields_test"
+	newObj, err := client.CoreV1().RESTClient().
+		Patch(types.MergePatchType).
+		Namespace("default").
+		Param("fieldManager", updateActor).
+		Name("just-a-pod").
+		Resource("pods").
+		SubResource("status").
+		Body(updateBytes).
+		Do(context.TODO()).
+		Get()
+
+	if err != nil {
+		t.Fatalf("Error updating subresource: %v ", err)
+	}
+
+	liveAccessor, err := meta.Accessor(liveObj)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor for live object: %v", err)
+	}
+	newAccessor, err := meta.Accessor(newObj)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor for new object: %v", err)
+	}
+
+	liveManagedFields := liveAccessor.GetManagedFields()
+	if len(liveManagedFields) != 1 {
+		t.Fatalf("Expected managedFields in the live object to have exactly one entry, got %d: %v", len(liveManagedFields), liveManagedFields)
+	}
+
+	newManagedFields := newAccessor.GetManagedFields()
+	if len(newManagedFields) != 2 {
+		t.Fatalf("Expected managedFields in the new object to have exactly two entries, got %d: %v", len(newManagedFields), newManagedFields)
+	}
+
+	if !reflect.DeepEqual(liveManagedFields[0], newManagedFields[0]) {
+		t.Fatalf("managedFields updated via subresource:\n\nlive managedFields: %v\nnew managedFields: %v\n\n", liveManagedFields, newManagedFields)
+	}
+
+	if newManagedFields[1].Manager != updateActor {
+		t.Fatalf(`Expected managerFields to have an entry with manager set to %q`, updateActor)
+	}
 }
 
 // TestClearManagedFieldsWithUpdateEmptyList verifies it's possible to clear the managedFields by sending an empty list.
@@ -1633,6 +1741,16 @@ func TestClearManagedFieldsWithUpdateEmptyList(t *testing.T) {
 		t.Fatalf("Failed to patch object: %v", err)
 	}
 
+	_, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("test-cm").
+		Body([]byte(`{"metadata":{"labels": { "test-label": "v1" }}}`)).Do(context.TODO()).Get()
+
+	if err != nil {
+		t.Fatalf("Failed to patch object: %v", err)
+	}
+
 	object, err := client.CoreV1().RESTClient().Get().Namespace("default").Resource("configmaps").Name("test-cm").Do(context.TODO()).Get()
 	if err != nil {
 		t.Fatalf("Failed to retrieve object: %v", err)
@@ -1644,11 +1762,472 @@ func TestClearManagedFieldsWithUpdateEmptyList(t *testing.T) {
 	}
 
 	if managedFields := accessor.GetManagedFields(); len(managedFields) != 0 {
-		t.Fatalf("Failed to clear managedFields, got: %v", managedFields)
+		t.Fatalf("Failed to stop tracking managedFields, got: %v", managedFields)
 	}
 
 	if labels := accessor.GetLabels(); len(labels) < 1 {
 		t.Fatalf("Expected other fields to stay untouched, got: %v", object)
+	}
+}
+
+// TestApplyUnsetExclusivelyOwnedFields verifies that when owned fields are omitted from an applied
+// configuration, and no other managers own the field, it is removed.
+func TestApplyUnsetExclusivelyOwnedFields(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	// spec.replicas is a optional, defaulted field
+	// spec.template.spec.hostname is an optional, non-defaulted field
+	apply := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-exclusive-unset",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"replicas": 3,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"hostname": "test-hostname",
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-exclusive-unset").
+		Param("fieldManager", "apply_test").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// unset spec.replicas and spec.template.spec.hostname
+	apply = []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-exclusive-unset",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	patched, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-exclusive-unset").
+		Param("fieldManager", "apply_test").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	deployment, ok := patched.(*appsv1.Deployment)
+	if !ok {
+		t.Fatalf("Failed to convert response object to Deployment")
+	}
+	if *deployment.Spec.Replicas != 1 {
+		t.Errorf("Expected deployment.spec.replicas to be 1 (default value), but got %d", deployment.Spec.Replicas)
+	}
+	if len(deployment.Spec.Template.Spec.Hostname) != 0 {
+		t.Errorf("Expected deployment.spec.template.spec.hostname to be unset, but got %s", deployment.Spec.Template.Spec.Hostname)
+	}
+}
+
+// TestApplyUnsetSharedFields verifies that when owned fields are omitted from an applied
+// configuration, but other managers also own the field, is it not removed.
+func TestApplyUnsetSharedFields(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	// spec.replicas is a optional, defaulted field
+	// spec.template.spec.hostname is an optional, non-defaulted field
+	apply := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-shared-unset",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"replicas": 3,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"hostname": "test-hostname",
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	for _, fieldManager := range []string{"shared_owner_1", "shared_owner_2"} {
+		_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+			AbsPath("/apis/apps/v1").
+			Namespace("default").
+			Resource("deployments").
+			Name("deployment-shared-unset").
+			Param("fieldManager", fieldManager).
+			Body(apply).
+			Do(context.TODO()).
+			Get()
+		if err != nil {
+			t.Fatalf("Failed to create object using Apply patch: %v", err)
+		}
+	}
+
+	// unset spec.replicas and spec.template.spec.hostname
+	apply = []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-shared-unset",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	patched, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-shared-unset").
+		Param("fieldManager", "shared_owner_1").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	deployment, ok := patched.(*appsv1.Deployment)
+	if !ok {
+		t.Fatalf("Failed to convert response object to Deployment")
+	}
+	if *deployment.Spec.Replicas != 3 {
+		t.Errorf("Expected deployment.spec.replicas to be 3, but got %d", deployment.Spec.Replicas)
+	}
+	if deployment.Spec.Template.Spec.Hostname != "test-hostname" {
+		t.Errorf("Expected deployment.spec.template.spec.hostname to be \"test-hostname\", but got %s", deployment.Spec.Template.Spec.Hostname)
+	}
+}
+
+// TestApplyCanTransferFieldOwnershipToController verifies that when an applier creates an
+// object, a controller takes ownership of a field, and the applier
+// then omits the field from its applied configuration, that the field value persists.
+func TestApplyCanTransferFieldOwnershipToController(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	// Applier creates a deployment with replicas set to 3
+	apply := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-shared-map-item-removal",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"replicas": 3,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest",
+					}]
+				}
+			}
+		}
+	}`)
+
+	appliedObj, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-shared-map-item-removal").
+		Param("fieldManager", "test_applier").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// a controller takes over the replicas field
+	applied, ok := appliedObj.(*appsv1.Deployment)
+	if !ok {
+		t.Fatalf("Failed to convert response object to Deployment")
+	}
+	replicas := int32(4)
+	applied.Spec.Replicas = &replicas
+	_, err = client.AppsV1().Deployments("default").
+		Update(context.TODO(), applied, metav1.UpdateOptions{FieldManager: "test_updater"})
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// applier omits replicas
+	apply = []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-shared-map-item-removal",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest",
+					}]
+				}
+			}
+		}
+	}`)
+
+	patched, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-shared-map-item-removal").
+		Param("fieldManager", "test_applier").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// ensure the container is deleted even though a controller updated a field of the container
+	deployment, ok := patched.(*appsv1.Deployment)
+	if !ok {
+		t.Fatalf("Failed to convert response object to Deployment")
+	}
+	if *deployment.Spec.Replicas != 4 {
+		t.Errorf("Expected deployment.spec.replicas to be 4, but got %d", deployment.Spec.Replicas)
+	}
+}
+
+// TestApplyCanRemoveMapItemsContributedToByControllers verifies that when an applier creates an
+// object, a controller modifies the contents of the map item via update, and the applier
+// then omits the item from its applied configuration, that the item is removed.
+func TestApplyCanRemoveMapItemsContributedToByControllers(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	// Applier creates a deployment with a name=nginx container
+	apply := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-shared-map-item-removal",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest",
+					}]
+				}
+			}
+		}
+	}`)
+
+	appliedObj, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-shared-map-item-removal").
+		Param("fieldManager", "test_applier").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// a controller sets container.workingDir of the name=nginx container via an update
+	applied, ok := appliedObj.(*appsv1.Deployment)
+	if !ok {
+		t.Fatalf("Failed to convert response object to Deployment")
+	}
+	applied.Spec.Template.Spec.Containers[0].WorkingDir = "/home/replacement"
+	_, err = client.AppsV1().Deployments("default").
+		Update(context.TODO(), applied, metav1.UpdateOptions{FieldManager: "test_updater"})
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// applier removes name=nginx the container
+	apply = []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment-shared-map-item-removal",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"replicas": 3,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"hostname": "test-hostname",
+					"containers": [{
+						"name":  "other-container",
+						"image": "nginx:latest",
+					}]
+				}
+			}
+		}
+	}`)
+
+	patched, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment-shared-map-item-removal").
+		Param("fieldManager", "test_applier").
+		Body(apply).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// ensure the container is deleted even though a controller updated a field of the container
+	deployment, ok := patched.(*appsv1.Deployment)
+	if !ok {
+		t.Fatalf("Failed to convert response object to Deployment")
+	}
+	if len(deployment.Spec.Template.Spec.Containers) != 1 {
+		t.Fatalf("Expected 1 container after apply, got %d", len(deployment.Spec.Template.Spec.Containers))
+	}
+	if deployment.Spec.Template.Spec.Containers[0].Name != "other-container" {
+		t.Fatalf("Expected container to be named \"other-container\" but got %s", deployment.Spec.Template.Spec.Containers[0].Name)
 	}
 }
 
@@ -2000,5 +2579,235 @@ func benchRepeatedUpdate(client kubernetes.Interface, podName string) func(*test
 				b.Fatalf("Failed to patch object: %v", err)
 			}
 		}
+	}
+}
+
+func TestUpgradeClientSideToServerSideApply(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	obj := []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  annotations:
+    "kubectl.kubernetes.io/last-applied-configuration": |
+      {"kind":"Deployment","apiVersion":"apps/v1","metadata":{"name":"my-deployment","labels":{"app":"my-app"}},"spec":{"replicas": 3,"template":{"metadata":{"labels":{"app":"my-app"}},"spec":{"containers":[{"name":"my-c","image":"my-image"}]}}}}
+  labels:
+    app: my-app
+spec:
+  replicas: 100000
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: my-c
+        image: my-image
+`)
+
+	deployment, err := yamlutil.ToJSON(obj)
+	if err != nil {
+		t.Fatalf("Failed marshal yaml: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().Post().
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Body(deployment).Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	obj = []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels:
+    app: my-new-label
+spec:
+  replicas: 3 # expect conflict
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: my-c
+        image: my-image
+`)
+
+	deployment, err = yamlutil.ToJSON(obj)
+	if err != nil {
+		t.Fatalf("Failed marshal yaml: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("my-deployment").
+		Param("fieldManager", "kubectl").
+		Body(deployment).
+		Do(context.TODO()).
+		Get()
+	if !apierrors.IsConflict(err) {
+		t.Fatalf("Expected conflict error but got: %v", err)
+	}
+
+	obj = []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels:
+    app: my-new-label
+spec:
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: my-c
+        image: my-image-new
+`)
+
+	deployment, err = yamlutil.ToJSON(obj)
+	if err != nil {
+		t.Fatalf("Failed marshal yaml: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("my-deployment").
+		Param("fieldManager", "kubectl").
+		Body(deployment).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to apply object: %v", err)
+	}
+
+	deploymentObj, err := client.AppsV1().Deployments("default").Get(context.TODO(), "my-deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get object: %v", err)
+	}
+	if *deploymentObj.Spec.Replicas != 100000 {
+		t.Fatalf("expected to get obj with replicas %d, but got %d", 100000, *deploymentObj.Spec.Replicas)
+	}
+	if deploymentObj.Spec.Template.Spec.Containers[0].Image != "my-image-new" {
+		t.Fatalf("expected to get obj with image %s, but got %s", "my-image-new", deploymentObj.Spec.Template.Spec.Containers[0].Image)
+	}
+}
+
+func TestStopTrackingManagedFieldsOnFeatureDisabled(t *testing.T) {
+	sharedEtcd := framework.DefaultEtcdOptions()
+	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(&framework.MasterConfigOptions{
+		EtcdOptions: sharedEtcd,
+	})
+	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+	_, master, closeFn := framework.RunAMaster(masterConfig)
+	client, err := clientset.NewForConfig(&restclient.Config{Host: master.URL, QPS: -1})
+	if err != nil {
+		t.Fatalf("Error in create clientset: %v", err)
+	}
+
+	obj := []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: my-c
+        image: my-image
+`)
+
+	deployment, err := yamlutil.ToJSON(obj)
+	if err != nil {
+		t.Fatalf("Failed marshal yaml: %v", err)
+	}
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("my-deployment").
+		Param("fieldManager", "kubectl").
+		Body(deployment).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to apply object: %v", err)
+	}
+
+	deploymentObj, err := client.AppsV1().Deployments("default").Get(context.TODO(), "my-deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get object: %v", err)
+	}
+	if managed := deploymentObj.GetManagedFields(); managed == nil {
+		t.Errorf("object doesn't have managedFields")
+	}
+
+	// Restart server with server-side apply disabled
+	closeFn()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, false)()
+	_, master, closeFn = framework.RunAMaster(masterConfig)
+	client, err = clientset.NewForConfig(&restclient.Config{Host: master.URL, QPS: -1})
+	if err != nil {
+		t.Fatalf("Error in create clientset: %v", err)
+	}
+	defer closeFn()
+
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("my-deployment").
+		Param("fieldManager", "kubectl").
+		Body(deployment).
+		Do(context.TODO()).
+		Get()
+	if err == nil {
+		t.Errorf("expected to fail to apply object, but succeeded")
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("my-deployment").
+		Body([]byte(`{"metadata":{"labels": { "app": "v1" }}}`)).Do(context.TODO()).Get()
+	if err != nil {
+		t.Errorf("failed to update object: %v", err)
+	}
+
+	deploymentObj, err = client.AppsV1().Deployments("default").Get(context.TODO(), "my-deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get object: %v", err)
+	}
+	if managed := deploymentObj.GetManagedFields(); managed != nil {
+		t.Errorf("object has unexpected managedFields: %v", managed)
 	}
 }

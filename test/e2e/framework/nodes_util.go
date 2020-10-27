@@ -34,7 +34,7 @@ import (
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
-const etcdImage = "3.4.7-0"
+const etcdImage = "3.4.13-0"
 
 // EtcdUpgrade upgrades etcd on GCE.
 func EtcdUpgrade(targetStorage, targetVersion string) error {
@@ -46,18 +46,6 @@ func EtcdUpgrade(targetStorage, targetVersion string) error {
 	}
 }
 
-// MasterUpgrade upgrades master node on GCE/GKE.
-func MasterUpgrade(f *Framework, v string) error {
-	switch TestContext.Provider {
-	case "gce":
-		return masterUpgradeGCE(v, false)
-	case "gke":
-		return MasterUpgradeGKE(f.Namespace.Name, v)
-	default:
-		return fmt.Errorf("MasterUpgrade() is not implemented for provider %s", TestContext.Provider)
-	}
-}
-
 func etcdUpgradeGCE(targetStorage, targetVersion string) error {
 	env := append(
 		os.Environ(),
@@ -66,32 +54,6 @@ func etcdUpgradeGCE(targetStorage, targetVersion string) error {
 		"TEST_ETCD_IMAGE="+etcdImage)
 
 	_, _, err := RunCmdEnv(env, GCEUpgradeScript(), "-l", "-M")
-	return err
-}
-
-// MasterUpgradeGCEWithKubeProxyDaemonSet upgrades master node on GCE with enabling/disabling the daemon set of kube-proxy.
-// TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
-func MasterUpgradeGCEWithKubeProxyDaemonSet(v string, enableKubeProxyDaemonSet bool) error {
-	return masterUpgradeGCE(v, enableKubeProxyDaemonSet)
-}
-
-// TODO(mrhohn): Remove 'enableKubeProxyDaemonSet' when kube-proxy is run as a DaemonSet by default.
-func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
-	env := append(os.Environ(), fmt.Sprintf("KUBE_PROXY_DAEMONSET=%v", enableKubeProxyDaemonSet))
-	// TODO: Remove these variables when they're no longer needed for downgrades.
-	if TestContext.EtcdUpgradeVersion != "" && TestContext.EtcdUpgradeStorage != "" {
-		env = append(env,
-			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
-			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
-			"TEST_ETCD_IMAGE="+etcdImage)
-	} else {
-		// In e2e tests, we skip the confirmation prompt about
-		// implicit etcd upgrades to simulate the user entering "y".
-		env = append(env, "TEST_ALLOW_IMPLICIT_ETCD_UPGRADE=true")
-	}
-
-	v := "v" + rawV
-	_, _, err := RunCmdEnv(env, GCEUpgradeScript(), "-M", v)
 	return err
 }
 

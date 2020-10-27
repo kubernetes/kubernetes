@@ -70,9 +70,6 @@ func addOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods
 	err := wait.PollImmediate(framework.Poll, framework.SingleCallTimeout, func() (bool, error) {
 		node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 
@@ -102,9 +99,6 @@ func removeAvoidPodsOffNode(c clientset.Interface, nodeName string) {
 	err := wait.PollImmediate(framework.Poll, framework.SingleCallTimeout, func() (bool, error) {
 		node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 
@@ -144,7 +138,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		var err error
 
 		e2enode.WaitForTotalHealthy(cs, time.Minute)
-		_, nodeList, err = e2enode.GetMasterAndWorkerNodes(cs)
+		nodeList, err = e2enode.GetReadySchedulableNodes(cs)
 		if err != nil {
 			framework.Logf("Unexpected error occurred: %v", err)
 		}

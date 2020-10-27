@@ -61,12 +61,12 @@ func (ue *unretriableError) Error() string {
 }
 
 // FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster
-func FetchInitConfigurationFromCluster(client clientset.Interface, w io.Writer, logPrefix string, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
+func FetchInitConfigurationFromCluster(client clientset.Interface, w io.Writer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
 	fmt.Fprintf(w, "[%s] Reading configuration from the cluster...\n", logPrefix)
-	fmt.Fprintf(w, "[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -oyaml'\n", logPrefix, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
+	fmt.Fprintf(w, "[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -o yaml'\n", logPrefix, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
 
 	// Fetch the actual config from cluster
-	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane)
+	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane, skipComponentConfigs)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, w io.Writer, 
 }
 
 // getInitConfigurationFromCluster is separate only for testing purposes, don't call it directly, use FetchInitConfigurationFromCluster instead
-func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Interface, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
+func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Interface, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
 	// Also, the config map really should be KubeadmConfigConfigMap...
 	configMap, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
 	if err != nil {
@@ -99,9 +99,11 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 		return nil, errors.Wrap(err, "failed to decode cluster configuration data")
 	}
 
-	// gets the component configs from the corresponding config maps
-	if err := componentconfigs.FetchFromCluster(&initcfg.ClusterConfiguration, client); err != nil {
-		return nil, errors.Wrap(err, "failed to get component configs")
+	if !skipComponentConfigs {
+		// get the component configs from the corresponding config maps
+		if err := componentconfigs.FetchFromCluster(&initcfg.ClusterConfiguration, client); err != nil {
+			return nil, errors.Wrap(err, "failed to get component configs")
+		}
 	}
 
 	// if this isn't a new controlplane instance (e.g. in case of kubeadm upgrades)
@@ -123,7 +125,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 		// However, if newControlPlane == true, initcfg.NodeRegistration is not used at all and it's overwritten later on.
 		// Thus it's necessary to supply some default value, that will avoid the call to DetectCRISocket() and as
 		// initcfg.NodeRegistration is discarded, setting whatever value here is harmless.
-		initcfg.NodeRegistration.CRISocket = constants.DefaultDockerCRISocket
+		initcfg.NodeRegistration.CRISocket = "/var/run/unknown.sock"
 	}
 	return initcfg, nil
 }

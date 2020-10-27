@@ -52,10 +52,12 @@ const (
 	flagUsername         = "username"
 	flagPassword         = "password"
 	flagTimeout          = "request-timeout"
-	flagHTTPCacheDir     = "cache-dir"
+	flagCacheDir         = "cache-dir"
 )
 
-var defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
+var (
+	defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "cache")
+)
 
 // RESTClientGetter is an interface that the ConfigFlags describe to provide an easier way to mock for commands
 // and eliminate the direct coupling to a struct type.  Users may wish to duplicate this type in their own packages
@@ -224,14 +226,16 @@ func (f *ConfigFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 	// double it just so we don't end up here again for a while.  This config is only used for discovery.
 	config.Burst = 100
 
-	// retrieve a user-provided value for the "cache-dir"
-	// defaulting to ~/.kube/http-cache if no user-value is given.
-	httpCacheDir := defaultCacheDir
-	if f.CacheDir != nil {
-		httpCacheDir = *f.CacheDir
-	}
+	cacheDir := defaultCacheDir
 
-	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), config.Host)
+	// retrieve a user-provided value for the "cache-dir"
+	// override httpCacheDir and discoveryCacheDir if user-value is given.
+	if f.CacheDir != nil {
+		cacheDir = *f.CacheDir
+	}
+	httpCacheDir := filepath.Join(cacheDir, "http")
+	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(cacheDir, "discovery"), config.Host)
+
 	return diskcached.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(10*time.Minute))
 }
 
@@ -253,7 +257,7 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 		flags.StringVar(f.KubeConfig, "kubeconfig", *f.KubeConfig, "Path to the kubeconfig file to use for CLI requests.")
 	}
 	if f.CacheDir != nil {
-		flags.StringVar(f.CacheDir, flagHTTPCacheDir, *f.CacheDir, "Default HTTP cache directory")
+		flags.StringVar(f.CacheDir, flagCacheDir, *f.CacheDir, "Default cache directory")
 	}
 
 	// add config options

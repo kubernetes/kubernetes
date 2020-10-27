@@ -322,7 +322,7 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 	p.Continue = options.Continue
 	list := e.NewListFunc()
 	qualifiedResource := e.qualifiedResourceFromContext(ctx)
-	storageOpts := storage.ListOptions{ResourceVersion: options.ResourceVersion, Predicate: p}
+	storageOpts := storage.ListOptions{ResourceVersion: options.ResourceVersion, ResourceVersionMatch: options.ResourceVersionMatch, Predicate: p}
 	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
 			err := e.Storage.GetToList(ctx, key, storageOpts, list)
@@ -683,10 +683,7 @@ func shouldOrphanDependents(ctx context.Context, e *Store, accessor metav1.Objec
 	}
 
 	// Get default orphan policy from this REST object type if it exists
-	if defaultGCPolicy == rest.OrphanDependents {
-		return true
-	}
-	return false
+	return defaultGCPolicy == rest.OrphanDependents
 }
 
 // shouldDeleteDependents returns true if the finalizer for foreground deletion should be set

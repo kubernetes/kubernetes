@@ -41,9 +41,6 @@ func methodFamily(m string) string {
 	if i := strings.Index(m, "/"); i >= 0 {
 		m = m[:i] // remove everything from second slash
 	}
-	if i := strings.LastIndex(m, "."); i >= 0 {
-		m = m[i+1:] // cut down to last dotted component
-	}
 	return m
 }
 

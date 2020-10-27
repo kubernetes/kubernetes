@@ -12,6 +12,7 @@ message Metrics {
 	BlkIOStat blkio = 5;
 	RdmaStat rdma = 6;
 	repeated NetworkStat network = 7;
+	CgroupStats cgroup_stats = 8;
 }
 
 message HugetlbStat {
@@ -133,4 +134,18 @@ message NetworkStat {
 	uint64 tx_packets = 7;
 	uint64 tx_errors = 8;
 	uint64 tx_dropped = 9;
+}
+
+// CgroupStats exports per-cgroup statistics.
+message CgroupStats {
+	// number of tasks sleeping
+	uint64 nr_sleeping = 1;
+	// number of tasks running
+	uint64 nr_running = 2;
+	// number of tasks in stopped state
+	uint64 nr_stopped = 3;
+	// number of tasks in uninterruptible state
+	uint64 nr_uninterruptible = 4;
+	// number of tasks waiting on IO
+	uint64 nr_io_wait = 5;
 }

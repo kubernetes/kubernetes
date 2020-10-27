@@ -69,7 +69,8 @@ var (
 
 // TestSchedule100Node3KPods schedules 3k pods on 100 nodes.
 func TestSchedule100Node3KPods(t *testing.T) {
-	if testing.Short() {
+	// TODO (#93112) skip test until appropriate timeout established
+	if testing.Short() || true {
 		t.Skip("Skipping because we want to run short tests")
 	}
 

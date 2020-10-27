@@ -570,6 +570,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			a.group.Creater,
 			fqKindToRegister,
 			reqScope.HubGroupVersion,
+			isSubresource,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create field manager: %v", err)
@@ -592,6 +593,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if strings.HasSuffix(action.Path, "/{path:*}") {
 			requestScope = "resource"
 			operationSuffix = operationSuffix + "WithPath"
+		}
+		if strings.Index(action.Path, "/{name}") != -1 || action.Verb == "POST" {
+			requestScope = "resource"
 		}
 		if action.AllNamespaces {
 			requestScope = "cluster"
@@ -1077,6 +1081,10 @@ func typeToJSON(typeName string) string {
 	case "byte", "*byte":
 		return "string"
 	case "v1.DeletionPropagation", "*v1.DeletionPropagation":
+		return "string"
+	case "v1.ResourceVersionMatch", "*v1.ResourceVersionMatch":
+		return "string"
+	case "v1.IncludeObjectPolicy", "*v1.IncludeObjectPolicy":
 		return "string"
 
 	// TODO: Fix these when go-restful supports a way to specify an array query param:

@@ -35,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 )
 
@@ -174,6 +176,25 @@ func newBuilder(clientConfigFn ClientConfigFunc, restMapper RESTMapperFunc, cate
 		categoryExpanderFn: categoryExpander,
 		requireObject:      true,
 	}
+}
+
+// noopClientGetter implements RESTClientGetter returning only errors.
+// used as a dummy getter in a local-only builder.
+type noopClientGetter struct{}
+
+func (noopClientGetter) ToRESTConfig() (*rest.Config, error) {
+	return nil, fmt.Errorf("local operation only")
+}
+func (noopClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+	return nil, fmt.Errorf("local operation only")
+}
+func (noopClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
+	return nil, fmt.Errorf("local operation only")
+}
+
+// NewLocalBuilder returns a builder that is configured not to create REST clients and avoids asking the server for results.
+func NewLocalBuilder() *Builder {
+	return NewBuilder(noopClientGetter{}).Local()
 }
 
 func NewBuilder(restClientGetter RESTClientGetter) *Builder {

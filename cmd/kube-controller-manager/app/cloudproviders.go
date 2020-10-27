@@ -41,6 +41,8 @@ func createCloudProvider(cloudProvider string, externalCloudVolumePlugin string,
 		}
 		cloud, err = cloudprovider.InitCloudProvider(externalCloudVolumePlugin, cloudConfigFile)
 	} else {
+		cloudprovider.DeprecationWarningForProvider(cloudProvider)
+
 		loopMode = IncludeCloudLoops
 		cloud, err = cloudprovider.InitCloudProvider(cloudProvider, cloudConfigFile)
 	}

@@ -1,0 +1,25 @@
+language: go
+sudo: required
+os:
+  - linux
+go:
+  - "1.14.x"
+  - "1.13.x"
+  - tip
+env:
+  # Run the tests with CRIU master and criu-dev
+  - CRIU_BRANCH="master"
+  - CRIU_BRANCH="criu-dev"
+install:
+  - sudo apt-get update
+  - sudo apt-get install -y libprotobuf-dev libprotobuf-c0-dev protobuf-c-compiler protobuf-compiler python-protobuf libnl-3-dev libnet-dev libcap-dev
+  - go get github.com/checkpoint-restore/go-criu
+  - git clone --single-branch -b ${CRIU_BRANCH} https://github.com/checkpoint-restore/criu.git
+  - cd criu; make
+  - sudo install -D -m 755 criu/criu /usr/sbin/
+  - cd ..
+script:
+  # This builds the code without running the tests.
+  - make build phaul test/test test/phaul test/piggie
+  # Run actual test as root as it uses CRIU.
+  - sudo make test phaul-test

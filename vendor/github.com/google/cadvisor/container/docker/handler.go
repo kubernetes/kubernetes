@@ -34,8 +34,6 @@ import (
 
 	dockercontainer "github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
-	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
-	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	"golang.org/x/net/context"
 	"k8s.io/klog/v2"
 )
@@ -136,11 +134,9 @@ func newDockerContainerHandler(
 	cgroupPaths := common.MakeCgroupPaths(cgroupSubsystems.MountPoints, name)
 
 	// Generate the equivalent cgroup manager for this container.
-	cgroupManager := &cgroupfs.Manager{
-		Cgroups: &libcontainerconfigs.Cgroup{
-			Name: name,
-		},
-		Paths: cgroupPaths,
+	cgroupManager, err := containerlibcontainer.NewCgroupManager(name, cgroupPaths)
+	if err != nil {
+		return nil, err
 	}
 
 	rootFs := "/"

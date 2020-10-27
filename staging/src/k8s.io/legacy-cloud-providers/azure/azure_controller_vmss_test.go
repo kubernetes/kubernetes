@@ -98,13 +98,13 @@ func TestAttachDiskWithVMSS(t *testing.T) {
 		assert.NoError(t, err, test.desc)
 		testCloud := ss.cloud
 		testCloud.PrimaryScaleSetName = scaleSetName
-		expectedVMSS := buildTestVMSS(scaleSetName, []string{testLBBackendpoolID0})
+		expectedVMSS := buildTestVMSSWithLB(scaleSetName, "vmss00-vm-", []string{testLBBackendpoolID0}, false)
 		mockVMSSClient := testCloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), testCloud.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 		mockVMSSClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, scaleSetName).Return(expectedVMSS, nil).MaxTimes(1)
 		mockVMSSClient.EXPECT().CreateOrUpdate(gomock.Any(), testCloud.ResourceGroup, scaleSetName, gomock.Any()).Return(nil).MaxTimes(1)
 
-		expectedVMSSVMs, _, _ := buildTestVirtualMachineEnv(testCloud, scaleSetName, "", 0, test.vmssVMList, "succeeded")
+		expectedVMSSVMs, _, _ := buildTestVirtualMachineEnv(testCloud, scaleSetName, "", 0, test.vmssVMList, "succeeded", false)
 		for _, vmssvm := range expectedVMSSVMs {
 			vmssvm.StorageProfile = &compute.StorageProfile{
 				OsDisk: &compute.OSDisk{
@@ -194,13 +194,13 @@ func TestDetachDiskWithVMSS(t *testing.T) {
 		assert.NoError(t, err, test.desc)
 		testCloud := ss.cloud
 		testCloud.PrimaryScaleSetName = scaleSetName
-		expectedVMSS := buildTestVMSS(scaleSetName, []string{testLBBackendpoolID0})
+		expectedVMSS := buildTestVMSSWithLB(scaleSetName, "vmss00-vm-", []string{testLBBackendpoolID0}, false)
 		mockVMSSClient := testCloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), testCloud.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 		mockVMSSClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, scaleSetName).Return(expectedVMSS, nil).MaxTimes(1)
 		mockVMSSClient.EXPECT().CreateOrUpdate(gomock.Any(), testCloud.ResourceGroup, scaleSetName, gomock.Any()).Return(nil).MaxTimes(1)
 
-		expectedVMSSVMs, _, _ := buildTestVirtualMachineEnv(testCloud, scaleSetName, "", 0, test.vmssVMList, "succeeded")
+		expectedVMSSVMs, _, _ := buildTestVirtualMachineEnv(testCloud, scaleSetName, "", 0, test.vmssVMList, "succeeded", false)
 		for _, vmssvm := range expectedVMSSVMs {
 			vmssvm.StorageProfile = &compute.StorageProfile{
 				OsDisk: &compute.OSDisk{
@@ -297,13 +297,13 @@ func TestGetDataDisksWithVMSS(t *testing.T) {
 		assert.NoError(t, err, test.desc)
 		testCloud := ss.cloud
 		testCloud.PrimaryScaleSetName = scaleSetName
-		expectedVMSS := buildTestVMSS(scaleSetName, []string{testLBBackendpoolID0})
+		expectedVMSS := buildTestVMSSWithLB(scaleSetName, "vmss00-vm-", []string{testLBBackendpoolID0}, false)
 		mockVMSSClient := testCloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), testCloud.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
 		mockVMSSClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, scaleSetName).Return(expectedVMSS, nil).MaxTimes(1)
 		mockVMSSClient.EXPECT().CreateOrUpdate(gomock.Any(), testCloud.ResourceGroup, scaleSetName, gomock.Any()).Return(nil).MaxTimes(1)
 
-		expectedVMSSVMs, _, _ := buildTestVirtualMachineEnv(testCloud, scaleSetName, "", 0, []string{"vmss00-vm-000000"}, "succeeded")
+		expectedVMSSVMs, _, _ := buildTestVirtualMachineEnv(testCloud, scaleSetName, "", 0, []string{"vmss00-vm-000000"}, "succeeded", false)
 		if !test.isDataDiskNull {
 			for _, vmssvm := range expectedVMSSVMs {
 				vmssvm.StorageProfile = &compute.StorageProfile{

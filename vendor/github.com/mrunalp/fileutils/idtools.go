@@ -3,6 +3,7 @@ package fileutils
 import (
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 // MkdirAllNewAs creates a directory (include any along the path) and then modifies
@@ -14,9 +15,13 @@ func MkdirAllNewAs(path string, mode os.FileMode, ownerUID, ownerGID int) error 
 	// so that we can chown all of them properly at the end.  If chownExisting is false, we won't
 	// chown the full directory path if it exists
 	var paths []string
-	if _, err := os.Stat(path); err != nil && os.IsNotExist(err) {
+	st, err := os.Stat(path)
+	if err != nil && os.IsNotExist(err) {
 		paths = []string{path}
 	} else if err == nil {
+		if !st.IsDir() {
+			return &os.PathError{Op: "mkdir", Path: path, Err: syscall.ENOTDIR}
+		}
 		// nothing to do; directory path fully exists already
 		return nil
 	}
@@ -34,7 +39,7 @@ func MkdirAllNewAs(path string, mode os.FileMode, ownerUID, ownerGID int) error 
 		}
 	}
 
-	if err := os.MkdirAll(path, mode); err != nil && !os.IsExist(err) {
+	if err := os.MkdirAll(path, mode); err != nil {
 		return err
 	}
 

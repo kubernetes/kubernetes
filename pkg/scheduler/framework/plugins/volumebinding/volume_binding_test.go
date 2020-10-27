@@ -29,7 +29,8 @@ import (
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/utils/pointer"
 )
 
@@ -133,7 +134,8 @@ func TestVolumeBinding(t *testing.T) {
 				boundClaims: []*v1.PersistentVolumeClaim{
 					makePVC("pvc-a", "pv-a", waitSC.Name),
 				},
-				claimsToBind: []*v1.PersistentVolumeClaim{},
+				claimsToBind:     []*v1.PersistentVolumeClaim{},
+				podVolumesByNode: map[string]*scheduling.PodVolumes{},
 			},
 		},
 		{
@@ -157,6 +159,7 @@ func TestVolumeBinding(t *testing.T) {
 				claimsToBind: []*v1.PersistentVolumeClaim{
 					makePVC("pvc-a", "", waitSC.Name),
 				},
+				podVolumesByNode: map[string]*scheduling.PodVolumes{},
 			},
 			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, string(scheduling.ErrReasonBindConflict)),
 		},
@@ -198,6 +201,7 @@ func TestVolumeBinding(t *testing.T) {
 				claimsToBind: []*v1.PersistentVolumeClaim{
 					makePVC("pvc-b", "", waitSC.Name),
 				},
+				podVolumesByNode: map[string]*scheduling.PodVolumes{},
 			},
 			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, string(scheduling.ErrReasonNodeConflict), string(scheduling.ErrReasonBindConflict)),
 		},
@@ -205,7 +209,7 @@ func TestVolumeBinding(t *testing.T) {
 			name:                "pvc not found",
 			pod:                 makePod("pod-a", []string{"pvc-a"}),
 			node:                &v1.Node{},
-			wantPreFilterStatus: framework.NewStatus(framework.Error, `error getting PVC "default/pvc-a": could not find v1.PersistentVolumeClaim "default/pvc-a"`),
+			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "pvc-a" not found`),
 			wantFilterStatus:    nil,
 		},
 		{
@@ -220,7 +224,8 @@ func TestVolumeBinding(t *testing.T) {
 				boundClaims: []*v1.PersistentVolumeClaim{
 					makePVC("pvc-a", "pv-a", waitSC.Name),
 				},
-				claimsToBind: []*v1.PersistentVolumeClaim{},
+				claimsToBind:     []*v1.PersistentVolumeClaim{},
+				podVolumesByNode: map[string]*scheduling.PodVolumes{},
 			},
 			wantFilterStatus: framework.NewStatus(framework.Error, `could not find v1.PersistentVolume "pv-a"`),
 		},
@@ -228,14 +233,15 @@ func TestVolumeBinding(t *testing.T) {
 
 	for _, item := range table {
 		t.Run(item.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			opts := []framework.Option{
-				framework.WithClientSet(client),
-				framework.WithInformerFactory(informerFactory),
+			opts := []runtime.Option{
+				runtime.WithClientSet(client),
+				runtime.WithInformerFactory(informerFactory),
 			}
-			fh, err := framework.NewFramework(nil, nil, nil, opts...)
+			fh, err := runtime.NewFramework(nil, nil, nil, opts...)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -246,38 +252,33 @@ func TestVolumeBinding(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// Start informer factory after initialization
-			informerFactory.Start(ctx.Done())
-
-			// Feed testing data and wait for them to be synced
+			t.Log("Feed testing data and wait for them to be synced")
 			client.StorageV1().StorageClasses().Create(ctx, immediateSC, metav1.CreateOptions{})
 			client.StorageV1().StorageClasses().Create(ctx, waitSC, metav1.CreateOptions{})
 			if item.node != nil {
 				client.CoreV1().Nodes().Create(ctx, item.node, metav1.CreateOptions{})
 			}
-			if len(item.pvcs) > 0 {
-				for _, pvc := range item.pvcs {
-					client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, metav1.CreateOptions{})
-				}
+			for _, pvc := range item.pvcs {
+				client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, metav1.CreateOptions{})
 			}
-			if len(item.pvs) > 0 {
-				for _, pv := range item.pvs {
-					client.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
-				}
-			}
-			caches := informerFactory.WaitForCacheSync(ctx.Done())
-			for _, synced := range caches {
-				if !synced {
-					t.Errorf("error waiting for informer cache sync")
-				}
+			for _, pv := range item.pvs {
+				client.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
 			}
 
-			// Verify
+			t.Log("Start informer factory after initialization")
+			informerFactory.Start(ctx.Done())
+
+			t.Log("Wait for all started informers' cache were synced")
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			t.Log("Verify")
+
 			p := pl.(*VolumeBinding)
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(item.node)
 			state := framework.NewCycleState()
-			t.Logf("call PreFilter and check status")
+
+			t.Logf("Verify: call PreFilter and check status")
 			gotPreFilterStatus := p.PreFilter(ctx, state, item.pod)
 			if !reflect.DeepEqual(gotPreFilterStatus, item.wantPreFilterStatus) {
 				t.Errorf("filter prefilter status does not match: %v, want: %v", gotPreFilterStatus, item.wantPreFilterStatus)
@@ -286,7 +287,8 @@ func TestVolumeBinding(t *testing.T) {
 				// scheduler framework will skip Filter if PreFilter fails
 				return
 			}
-			t.Logf("check state after prefilter phase")
+
+			t.Logf("Verify: check state after prefilter phase")
 			stateData, err := getStateData(state)
 			if err != nil {
 				t.Fatal(err)
@@ -294,7 +296,8 @@ func TestVolumeBinding(t *testing.T) {
 			if !reflect.DeepEqual(stateData, item.wantStateAfterPreFilter) {
 				t.Errorf("state got after prefilter does not match: %v, want: %v", stateData, item.wantStateAfterPreFilter)
 			}
-			t.Logf("call Filter and check status")
+
+			t.Logf("Verify: call Filter and check status")
 			gotStatus := p.Filter(ctx, state, item.pod, nodeInfo)
 			if !reflect.DeepEqual(gotStatus, item.wantFilterStatus) {
 				t.Errorf("filter status does not match: %v, want: %v", gotStatus, item.wantFilterStatus)

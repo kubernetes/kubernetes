@@ -32,7 +32,7 @@ type inherited struct{}
 
 var inheritArgsFromEnv inherited
 
-func (_ *inherited) AsEnv() []string {
+func (*inherited) AsEnv() []string {
 	return nil
 }
 
@@ -60,8 +60,8 @@ func (args *Args) AsEnv() []string {
 		pluginArgsStr = stringify(args.PluginArgs)
 	}
 
-	// Duplicated values which come first will be overrided, so we must put the
-	// custom values in the end to avoid being overrided by the process environments.
+	// Duplicated values which come first will be overridden, so we must put the
+	// custom values in the end to avoid being overridden by the process environments.
 	env = append(env,
 		"CNI_COMMAND="+args.Command,
 		"CNI_CONTAINERID="+args.ContainerID,

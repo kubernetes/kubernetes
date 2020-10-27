@@ -23,7 +23,7 @@ import (
 	"os"
 	"strings"
 
-	mangen "github.com/cpuguy83/go-md2man/md2man"
+	mangen "github.com/cpuguy83/go-md2man/v2/md2man"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/cmd/genutils"

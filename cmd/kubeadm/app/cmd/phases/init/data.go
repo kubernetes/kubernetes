@@ -45,5 +45,5 @@ type InitData interface {
 	OutputWriter() io.Writer
 	Client() (clientset.Interface, error)
 	Tokens() []string
-	KustomizeDir() string
+	PatchesDir() string
 }

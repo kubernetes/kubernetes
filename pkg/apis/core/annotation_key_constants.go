@@ -39,17 +39,20 @@ const (
 
 	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
 	// to all containers of a pod.
+	// Deprecated: set a pod security context `seccompProfile` field.
 	SeccompPodAnnotationKey string = "seccomp.security.alpha.kubernetes.io/pod"
 
 	// SeccompContainerAnnotationKeyPrefix represents the key of a seccomp profile applied
 	// to one container of a pod.
+	// Deprecated: set a container security context `seccompProfile` field.
 	SeccompContainerAnnotationKeyPrefix string = "container.seccomp.security.alpha.kubernetes.io/"
 
 	// SeccompProfileRuntimeDefault represents the default seccomp profile used by container runtime.
+	// Deprecated: set a pod or container security context `seccompProfile` of type "RuntimeDefault" instead.
 	SeccompProfileRuntimeDefault string = "runtime/default"
 
 	// DeprecatedSeccompProfileDockerDefault represents the default seccomp profile used by docker.
-	// This is now deprecated and should be replaced by SeccompProfileRuntimeDefault.
+	// Deprecated: set a pod or container security context `seccompProfile` of type "RuntimeDefault" instead.
 	DeprecatedSeccompProfileDockerDefault string = "docker/default"
 
 	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)
@@ -60,10 +63,6 @@ const (
 	// an object (e.g. secret, config map) before fetching it again from apiserver.
 	// This annotation can be attached to node.
 	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
-
-	// BootstrapCheckpointAnnotationKey represents a Resource (Pod) that should be checkpointed by
-	// the kubelet prior to running
-	BootstrapCheckpointAnnotationKey string = "node.kubernetes.io/bootstrap-checkpoint"
 
 	// NonConvertibleAnnotationPrefix annotation key prefix used to identify non-convertible json paths.
 	NonConvertibleAnnotationPrefix = "non-convertible.kubernetes.io"

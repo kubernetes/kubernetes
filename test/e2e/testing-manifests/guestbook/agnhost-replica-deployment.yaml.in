@@ -19,7 +19,7 @@ spec:
       containers:
       - name: replica
         image: {{.AgnhostImage}}
-        args: [ "guestbook", "--replicaof", "agnhost-master", "--http-port", "6379" ]
+        args: [ "guestbook", "--replicaof", "agnhost-primary", "--http-port", "6379" ]
         resources:
           requests:
             cpu: 100m

@@ -31,6 +31,7 @@ import (
 func newBackend(cfg ServerConfig) backend.Backend {
 	bcfg := backend.DefaultBackendConfig()
 	bcfg.Path = cfg.backendPath()
+	bcfg.UnsafeNoFsync = cfg.UnsafeNoFsync
 	if cfg.BackendBatchLimit != 0 {
 		bcfg.BatchLimit = cfg.BackendBatchLimit
 		if cfg.Logger != nil {

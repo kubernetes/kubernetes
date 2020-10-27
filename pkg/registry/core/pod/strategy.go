@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -74,6 +75,8 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	}
 
 	podutil.DropDisabledPodFields(pod, nil)
+
+	applySeccompVersionSkew(pod)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -92,9 +95,7 @@ func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 		// Allow multiple huge pages on pod create if feature is enabled
 		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
 	}
-	allErrs := validation.ValidatePodCreate(pod, opts)
-	allErrs = append(allErrs, validation.ValidateConditionalPod(pod, nil, field.NewPath(""))...)
-	return allErrs
+	return validation.ValidatePodCreate(pod, opts)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -113,9 +114,7 @@ func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 		// Allow multiple huge pages on pod create if feature is enabled or if the old pod already has multiple hugepages specified
 		AllowMultipleHugePageResources: oldFailsSingleHugepagesValidation || utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
 	}
-	errorList := validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
-	errorList = append(errorList, validation.ValidateConditionalPod(obj.(*api.Pod), old.(*api.Pod), field.NewPath(""))...)
-	return errorList
+	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 }
 
 // AllowUnconditionalUpdate allows pods to be overwritten
@@ -313,7 +312,13 @@ func ResourceLocation(ctx context.Context, getter ResourceGetter, rt http.RoundT
 		Scheme: scheme,
 	}
 	if port == "" {
-		loc.Host = podIP
+		// when using an ipv6 IP as a hostname in a URL, it must be wrapped in [...]
+		// net.JoinHostPort does this for you.
+		if strings.Contains(podIP, ":") {
+			loc.Host = "[" + podIP + "]"
+		} else {
+			loc.Host = podIP
+		}
 	} else {
 		loc.Host = net.JoinHostPort(podIP, port)
 	}
@@ -567,4 +572,75 @@ func validateContainer(container string, pod *api.Pod) (string, error) {
 	}
 
 	return container, nil
+}
+
+// applySeccompVersionSkew implements the version skew behavior described in:
+// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/20190717-seccomp-ga.md#version-skew-strategy
+func applySeccompVersionSkew(pod *api.Pod) {
+	// get possible annotation and field
+	annotation, hasAnnotation := pod.Annotations[v1.SeccompPodAnnotationKey]
+	field, hasField := (*api.SeccompProfile)(nil), false
+
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SeccompProfile != nil {
+		field = pod.Spec.SecurityContext.SeccompProfile
+		hasField = true
+	}
+
+	// sync field and annotation
+	if hasField && !hasAnnotation {
+		newAnnotation := podutil.SeccompAnnotationForField(field)
+
+		if newAnnotation != "" {
+			if pod.Annotations == nil {
+				pod.Annotations = map[string]string{}
+			}
+			pod.Annotations[v1.SeccompPodAnnotationKey] = newAnnotation
+		}
+	} else if hasAnnotation && !hasField {
+		newField := podutil.SeccompFieldForAnnotation(annotation)
+
+		if newField != nil {
+			if pod.Spec.SecurityContext == nil {
+				pod.Spec.SecurityContext = &api.PodSecurityContext{}
+			}
+			pod.Spec.SecurityContext.SeccompProfile = newField
+		}
+	}
+
+	// Handle the containers of the pod
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(),
+		func(ctr *api.Container, _ podutil.ContainerType) bool {
+			// get possible annotation and field
+			key := api.SeccompContainerAnnotationKeyPrefix + ctr.Name
+			annotation, hasAnnotation := pod.Annotations[key]
+
+			field, hasField := (*api.SeccompProfile)(nil), false
+			if ctr.SecurityContext != nil && ctr.SecurityContext.SeccompProfile != nil {
+				field = ctr.SecurityContext.SeccompProfile
+				hasField = true
+			}
+
+			// sync field and annotation
+			if hasField && !hasAnnotation {
+				newAnnotation := podutil.SeccompAnnotationForField(field)
+
+				if newAnnotation != "" {
+					if pod.Annotations == nil {
+						pod.Annotations = map[string]string{}
+					}
+					pod.Annotations[key] = newAnnotation
+				}
+			} else if hasAnnotation && !hasField {
+				newField := podutil.SeccompFieldForAnnotation(annotation)
+
+				if newField != nil {
+					if ctr.SecurityContext == nil {
+						ctr.SecurityContext = &api.SecurityContext{}
+					}
+					ctr.SecurityContext.SeccompProfile = newField
+				}
+			}
+
+			return true
+		})
 }

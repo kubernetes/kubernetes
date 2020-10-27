@@ -650,9 +650,7 @@ func TestRelistIPChange(t *testing.T) {
 }
 
 func TestRunningPodAndContainerCount(t *testing.T) {
-	fakeRuntime := &containertest.FakeRuntime{}
-	runtimeCache, _ := kubecontainer.NewRuntimeCache(fakeRuntime)
-	metrics.Register(runtimeCache)
+	metrics.Register()
 	testPleg := newTestGenericPLEG()
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 
@@ -664,11 +662,20 @@ func TestRunningPodAndContainerCount(t *testing.T) {
 				createTestContainer("c2", kubecontainer.ContainerStateUnknown),
 				createTestContainer("c3", kubecontainer.ContainerStateUnknown),
 			},
+			Sandboxes: []*kubecontainer.Container{
+				createTestContainer("s1", kubecontainer.ContainerStateRunning),
+				createTestContainer("s2", kubecontainer.ContainerStateRunning),
+				createTestContainer("s3", kubecontainer.ContainerStateUnknown),
+			},
 		}},
 		{Pod: &kubecontainer.Pod{
 			ID: "4567",
 			Containers: []*kubecontainer.Container{
 				createTestContainer("c1", kubecontainer.ContainerStateExited),
+			},
+			Sandboxes: []*kubecontainer.Container{
+				createTestContainer("s1", kubecontainer.ContainerStateRunning),
+				createTestContainer("s2", kubecontainer.ContainerStateExited),
 			},
 		}},
 	}
@@ -682,22 +689,22 @@ func TestRunningPodAndContainerCount(t *testing.T) {
 	}{
 		{
 			name:        "test container count",
-			metricsName: "kubelet_running_container_count",
+			metricsName: "kubelet_running_containers",
 			wants: `
-# HELP kubelet_running_container_count [ALPHA] Number of containers currently running
-# TYPE kubelet_running_container_count gauge
-kubelet_running_container_count{container_state="exited"} 1
-kubelet_running_container_count{container_state="running"} 1
-kubelet_running_container_count{container_state="unknown"} 2
+# HELP kubelet_running_containers [ALPHA] Number of containers currently running
+# TYPE kubelet_running_containers gauge
+kubelet_running_containers{container_state="exited"} 1
+kubelet_running_containers{container_state="running"} 1
+kubelet_running_containers{container_state="unknown"} 2
 `,
 		},
 		{
 			name:        "test pod count",
-			metricsName: "kubelet_running_pod_count",
+			metricsName: "kubelet_running_pods",
 			wants: `
-# HELP kubelet_running_pod_count [ALPHA] Number of pods currently running
-# TYPE kubelet_running_pod_count gauge
-kubelet_running_pod_count 2
+# HELP kubelet_running_pods [ALPHA] Number of pods currently running
+# TYPE kubelet_running_pods gauge
+kubelet_running_pods 2
 `,
 		},
 	}

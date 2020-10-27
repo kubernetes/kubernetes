@@ -66,7 +66,7 @@ func (a *AlwaysPullImages) Admit(ctx context.Context, attributes admission.Attri
 		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
 
-	pods.VisitContainersWithPath(&pod.Spec, func(c *api.Container, _ *field.Path) bool {
+	pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), func(c *api.Container, _ *field.Path) bool {
 		c.ImagePullPolicy = api.PullAlways
 		return true
 	})
@@ -86,7 +86,7 @@ func (*AlwaysPullImages) Validate(ctx context.Context, attributes admission.Attr
 	}
 
 	var allErrs []error
-	pods.VisitContainersWithPath(&pod.Spec, func(c *api.Container, p *field.Path) bool {
+	pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), func(c *api.Container, p *field.Path) bool {
 		if c.ImagePullPolicy != api.PullAlways {
 			allErrs = append(allErrs, admission.NewForbidden(attributes,
 				field.NotSupported(p.Child("imagePullPolicy"), c.ImagePullPolicy, []string{string(api.PullAlways)}),

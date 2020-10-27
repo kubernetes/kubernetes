@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -207,7 +207,7 @@ var _ volume.DeviceUnmounter = &rbdDetacher{}
 // This method is idempotent, callers are responsible for retrying on failure.
 func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 	if pathExists, pathErr := mount.PathExists(deviceMountPath); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", deviceMountPath)
 		return nil

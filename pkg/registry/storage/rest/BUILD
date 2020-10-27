@@ -15,6 +15,7 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/registry/storage/csidriver/storage:go_default_library",
         "//pkg/registry/storage/csinode/storage:go_default_library",
+        "//pkg/registry/storage/csistoragecapacity/storage:go_default_library",
         "//pkg/registry/storage/storageclass/storage:go_default_library",
         "//pkg/registry/storage/volumeattachment/storage:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",

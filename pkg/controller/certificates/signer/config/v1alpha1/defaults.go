@@ -34,12 +34,6 @@ import (
 // run it in your wrapper struct of this type in its `SetDefaults_` method.
 func RecommendedDefaultCSRSigningControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.CSRSigningControllerConfiguration) {
 	zero := metav1.Duration{}
-	if obj.ClusterSigningCertFile == "" {
-		obj.ClusterSigningCertFile = "/etc/kubernetes/ca/ca.pem"
-	}
-	if obj.ClusterSigningKeyFile == "" {
-		obj.ClusterSigningKeyFile = "/etc/kubernetes/ca/ca.key"
-	}
 	if obj.ClusterSigningDuration == zero {
 		obj.ClusterSigningDuration = metav1.Duration{Duration: 365 * 24 * time.Hour}
 	}

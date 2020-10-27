@@ -51,3 +51,11 @@ func Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfig
 func Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(in *config.LeaderElectionConfiguration, out *LeaderElectionConfiguration, s conversion.Scope) error {
 	return autoConvert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(in, out, s)
 }
+
+func Convert_v1alpha1_LoggingConfiguration_To_config_LoggingConfiguration(in *LoggingConfiguration, out *config.LoggingConfiguration, s conversion.Scope) error {
+	return autoConvert_v1alpha1_LoggingConfiguration_To_config_LoggingConfiguration(in, out, s)
+}
+
+func Convert_config_LoggingConfiguration_To_v1alpha1_LoggingConfiguration(in *config.LoggingConfiguration, out *LoggingConfiguration, s conversion.Scope) error {
+	return autoConvert_config_LoggingConfiguration_To_v1alpha1_LoggingConfiguration(in, out, s)
+}

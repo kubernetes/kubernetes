@@ -169,6 +169,8 @@ type holder struct {
 
 	t *testing.T
 
+	warningHandler *warningHandler
+
 	recordGVR       metav1.GroupVersionResource
 	recordOperation string
 	recordNamespace string
@@ -203,6 +205,7 @@ func (h *holder) reset(t *testing.T) {
 	h.expectOldObject = false
 	h.expectOptionsGVK = schema.GroupVersionKind{}
 	h.expectOptions = false
+	h.warningHandler.reset()
 
 	// Set up the recorded map with nil records for all combinations
 	h.recorded = map[webhookOptions]*admissionRequest{}
@@ -215,8 +218,8 @@ func (h *holder) reset(t *testing.T) {
 	}
 }
 func (h *holder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1beta1.Operation, name, namespace string, object, oldObject, options bool) {
-	// Special-case namespaces, since the object name shows up in request attributes for update/delete requests
-	if len(namespace) == 0 && gvk.Group == "" && gvk.Version == "v1" && gvk.Kind == "Namespace" && operation != v1beta1.Create {
+	// Special-case namespaces, since the object name shows up in request attributes
+	if len(namespace) == 0 && gvk.Group == "" && gvk.Version == "v1" && gvk.Kind == "Namespace" {
 		namespace = name
 	}
 
@@ -231,6 +234,7 @@ func (h *holder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.
 	h.expectOldObject = oldObject
 	h.expectOptionsGVK = optionsGVK
 	h.expectOptions = options
+	h.warningHandler.reset()
 
 	// Set up the recorded map with nil records for all combinations
 	h.recorded = map[webhookOptions]*admissionRequest{}
@@ -314,13 +318,15 @@ func (h *holder) verify(t *testing.T) {
 	defer h.lock.Unlock()
 
 	for options, value := range h.recorded {
-		if err := h.verifyRequest(options.converted, value); err != nil {
+		if err := h.verifyRequest(options, value); err != nil {
 			t.Errorf("version: %v, phase:%v, converted:%v error: %v", options.version, options.phase, options.converted, err)
 		}
 	}
 }
 
-func (h *holder) verifyRequest(converted bool, request *admissionRequest) error {
+func (h *holder) verifyRequest(webhookOptions webhookOptions, request *admissionRequest) error {
+	converted := webhookOptions.converted
+
 	// Check if current resource should be exempted from Admission processing
 	if admissionExemptResources[gvr(h.recordGVR.Group, h.recordGVR.Version, h.recordGVR.Resource)] {
 		if request == nil {
@@ -357,6 +363,10 @@ func (h *holder) verifyRequest(converted bool, request *admissionRequest) error 
 		return fmt.Errorf("unexpected options: %#v", request.Options.Object)
 	}
 
+	if !h.warningHandler.hasWarning(makeWarning(webhookOptions.version, webhookOptions.phase, webhookOptions.converted)) {
+		return fmt.Errorf("no warning received from webhook")
+	}
+
 	return nil
 }
 
@@ -384,6 +394,34 @@ func (h *holder) verifyOptions(options runtime.Object) error {
 	return nil
 }
 
+type warningHandler struct {
+	lock     sync.Mutex
+	warnings map[string]bool
+}
+
+func (w *warningHandler) reset() {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	w.warnings = map[string]bool{}
+}
+func (w *warningHandler) hasWarning(warning string) bool {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	return w.warnings[warning]
+}
+func makeWarning(version string, phase string, converted bool) string {
+	return fmt.Sprintf("%v/%v/%v", version, phase, converted)
+}
+
+func (w *warningHandler) HandleWarningHeader(code int, agent string, message string) {
+	if code != 299 || len(message) == 0 {
+		return
+	}
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	w.warnings[message] = true
+}
+
 // TestWebhookAdmissionWithWatchCache tests communication between API server and webhook process.
 func TestWebhookAdmissionWithWatchCache(t *testing.T) {
 	testWebhookAdmission(t, true)
@@ -399,6 +437,7 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 	// holder communicates expectations to webhooks, and results from webhooks
 	holder := &holder{
 		t:                 t,
+		warningHandler:    &warningHandler{warnings: map[string]bool{}},
 		gvrToConvertedGVR: map[metav1.GroupVersionResource]metav1.GroupVersionResource{},
 		gvrToConvertedGVK: map[metav1.GroupVersionResource]schema.GroupVersionKind{},
 	}
@@ -441,6 +480,8 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
 		// force enable all resources so we can check storage.
 		"--runtime-config=api/all=true",
+		// enable feature-gates that protect resources to check their storage, too.
+		"--feature-gates=EphemeralContainers=true",
 	}, etcdConfig)
 	defer server.TearDownFn()
 
@@ -451,6 +492,7 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 	clientConfig := rest.CopyConfig(server.ClientConfig)
 	clientConfig.Impersonate.UserName = testClientUsername
 	clientConfig.Impersonate.Groups = []string{"system:masters", "system:authenticated"}
+	clientConfig.WarningHandler = holder.warningHandler
 	client, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1265,6 +1307,9 @@ func newV1beta1WebhookHandler(t *testing.T, holder *holder, phase string, conver
 		review.Kind = ""
 		review.Response.UID = ""
 
+		// test plumbing warnings back to the client
+		review.Response.Warnings = []string{makeWarning("v1beta1", phase, converted)}
+
 		// If we're mutating, and have an object, return a patch to exercise conversion
 		if phase == mutation && len(review.Request.Object.Raw) > 0 {
 			review.Response.Patch = []byte(`[{"op":"add","path":"/foo","value":"test"}]`)
@@ -1355,6 +1400,9 @@ func newV1WebhookHandler(t *testing.T, holder *holder, phase string, converted b
 			Allowed: true,
 			UID:     review.Request.UID,
 			Result:  &metav1.Status{Message: "admitted"},
+
+			// test plumbing warnings back
+			Warnings: []string{makeWarning("v1", phase, converted)},
 		}
 		// If we're mutating, and have an object, return a patch to exercise conversion
 		if phase == mutation && len(review.Request.Object.Raw) > 0 {

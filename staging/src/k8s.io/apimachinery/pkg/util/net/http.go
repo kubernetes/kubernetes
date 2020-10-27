@@ -62,8 +62,11 @@ func JoinPreservingTrailingSlash(elem ...string) string {
 
 // IsTimeout returns true if the given error is a network timeout error
 func IsTimeout(err error) bool {
-	neterr, ok := err.(net.Error)
-	return ok && neterr != nil && neterr.Timeout()
+	var neterr net.Error
+	if errors.As(err, &neterr) {
+		return neterr != nil && neterr.Timeout()
+	}
+	return false
 }
 
 // IsProbableEOF returns true if the given error resembles a connection termination
@@ -76,7 +79,8 @@ func IsProbableEOF(err error) bool {
 	if err == nil {
 		return false
 	}
-	if uerr, ok := err.(*url.Error); ok {
+	var uerr *url.Error
+	if errors.As(err, &uerr) {
 		err = uerr.Err
 	}
 	msg := err.Error()
@@ -453,7 +457,7 @@ redirectLoop:
 
 		// Only follow redirects to the same host. Otherwise, propagate the redirect response back.
 		if requireSameHostRedirects && location.Hostname() != originalLocation.Hostname() {
-			break redirectLoop
+			return nil, nil, fmt.Errorf("hostname mismatch: expected %s, found %s", originalLocation.Hostname(), location.Hostname())
 		}
 
 		// Reset the connection.

@@ -199,6 +199,21 @@ const (
 	// We need at least ten, because the DNS service is always at the tenth cluster clusterIP
 	MinimumAddressesInServiceSubnet = 10
 
+	// MaximumBitsForServiceSubnet defines maximum possible size of the service subnet in terms of bits.
+	// For example, if the value is 20, then the largest supported service subnet is /12 for IPv4 and /108 for IPv6.
+	// Note however that anything in between /108 and /112 will be clamped to /112 due to the limitations of the underlying allocation logic.
+	// TODO: https://github.com/kubernetes/enhancements/pull/1881
+	MaximumBitsForServiceSubnet = 20
+
+	// MinimumAddressesInPodSubnet defines minimum amount of pods in the cluster.
+	// We need at least more than services, an IPv4 /28 or IPv6 /128 subnet means 14 util addresses
+	MinimumAddressesInPodSubnet = 14
+
+	// PodSubnetNodeMaskMaxDiff is limited to 16 due to an issue with uncompressed IP bitmap in core:
+	// xref: #44918
+	// The node subnet mask size must be no more than the pod subnet mask size + 16
+	PodSubnetNodeMaskMaxDiff = 16
+
 	// DefaultTokenDuration specifies the default amount of time that a bootstrap token will be valid
 	// Default behaviour is 24 hours
 	DefaultTokenDuration = 24 * time.Hour
@@ -265,7 +280,7 @@ const (
 	MinExternalEtcdVersion = "3.2.18"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.4.7-0"
+	DefaultEtcdVersion = "3.4.13-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -329,7 +344,7 @@ const (
 	KubeDNSVersion = "1.14.13"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "1.6.7"
+	CoreDNSVersion = "1.7.0"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -349,6 +364,10 @@ const (
 
 	// ControlPlaneNumCPU is the number of CPUs required on control-plane
 	ControlPlaneNumCPU = 2
+
+	// ControlPlaneMem is the number of megabytes of memory required on the control-plane
+	// Below that amount of RAM running a stable control plane would be difficult.
+	ControlPlaneMem = 1700
 
 	// KubeadmCertsSecret specifies in what Secret in the kube-system namespace the certificates should be stored
 	KubeadmCertsSecret = "kubeadm-certs"
@@ -417,13 +436,13 @@ var (
 	ControlPlaneComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.18.0")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.19.0")
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = version.MustParseSemantic("v1.18.0")
+	MinimumKubeletVersion = version.MustParseSemantic("v1.19.0")
 
 	// CurrentKubernetesVersion specifies current Kubernetes version supported by kubeadm
-	CurrentKubernetesVersion = version.MustParseSemantic("v1.19.0")
+	CurrentKubernetesVersion = version.MustParseSemantic("v1.20.0")
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
@@ -433,8 +452,9 @@ var (
 		16: "3.3.17-0",
 		17: "3.4.3-0",
 		18: "3.4.3-0",
-		19: "3.4.7-0",
-		20: "3.4.7-0",
+		19: "3.4.9-1",
+		20: "3.4.13-0",
+		21: "3.4.13-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows

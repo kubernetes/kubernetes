@@ -185,7 +185,7 @@ func TestAzureTokenSource(t *testing.T) {
 				expiresOn    = "foo"
 			)
 			cfg := map[string]string{
-				cfgConfigMode:   string(configMode),
+				cfgConfigMode:   strconv.Itoa(int(configMode)),
 				cfgApiserverID:  serverID,
 				cfgClientID:     clientID,
 				cfgTenantID:     tenantID,
@@ -365,7 +365,7 @@ func TestAzureTokenSourceScenarios(t *testing.T) {
 				persister := newFakePersister()
 
 				cfg := map[string]string{
-					cfgConfigMode: string(configMode),
+					cfgConfigMode: strconv.Itoa(int(configMode)),
 				}
 				if tc.configToken != nil {
 					cfg = token2Cfg(tc.configToken)

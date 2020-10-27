@@ -11,6 +11,7 @@ go_test(
     srcs = ["healthz_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",

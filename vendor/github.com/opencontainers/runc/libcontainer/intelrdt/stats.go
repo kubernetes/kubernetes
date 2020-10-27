@@ -15,6 +15,19 @@ type MemBwInfo struct {
 	NumClosids    uint64 `json:"num_closids,omitempty"`
 }
 
+type MBMNumaNodeStats struct {
+	// The 'mbm_total_bytes' in 'container_id' group.
+	MBMTotalBytes uint64 `json:"mbm_total_bytes,omitempty"`
+
+	// The 'mbm_local_bytes' in 'container_id' group.
+	MBMLocalBytes uint64 `json:"mbm_local_bytes,omitempty"`
+}
+
+type CMTNumaNodeStats struct {
+	// The 'llc_occupancy' in 'container_id' group.
+	LLCOccupancy uint64 `json:"llc_occupancy,omitempty"`
+}
+
 type Stats struct {
 	// The read-only L3 cache information
 	L3CacheInfo *L3CacheInfo `json:"l3_cache_info,omitempty"`
@@ -33,6 +46,12 @@ type Stats struct {
 
 	// The memory bandwidth schema in 'container_id' group
 	MemBwSchema string `json:"mem_bw_schema,omitempty"`
+
+	// The memory bandwidth monitoring statistics from NUMA nodes in 'container_id' group
+	MBMStats *[]MBMNumaNodeStats `json:"mbm_stats,omitempty"`
+
+	// The cache monitoring technology statistics from NUMA nodes in 'container_id' group
+	CMTStats *[]CMTNumaNodeStats `json:"cmt_stats,omitempty"`
 }
 
 func NewStats() *Stats {

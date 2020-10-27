@@ -16,6 +16,7 @@ go_library(
         "//pkg/controller/deployment/config:go_default_library",
         "//pkg/controller/endpoint/config:go_default_library",
         "//pkg/controller/endpointslice/config:go_default_library",
+        "//pkg/controller/endpointslicemirroring/config:go_default_library",
         "//pkg/controller/garbagecollector/config:go_default_library",
         "//pkg/controller/job/config:go_default_library",
         "//pkg/controller/namespace/config:go_default_library",
@@ -26,7 +27,6 @@ go_library(
         "//pkg/controller/replicaset/config:go_default_library",
         "//pkg/controller/replication/config:go_default_library",
         "//pkg/controller/resourcequota/config:go_default_library",
-        "//pkg/controller/service/config:go_default_library",
         "//pkg/controller/serviceaccount/config:go_default_library",
         "//pkg/controller/statefulset/config:go_default_library",
         "//pkg/controller/ttlafterfinished/config:go_default_library",
@@ -35,7 +35,9 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/component-base/config:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/app/apis/config:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/service/config:go_default_library",
+        "//staging/src/k8s.io/controller-manager/config:go_default_library",
     ],
 )
 

@@ -47,7 +47,7 @@ type EndpointSliceCache struct {
 
 	makeEndpointInfo makeEndpointFunc
 	hostname         string
-	isIPv6Mode       *bool
+	ipFamily         v1.IPFamily
 	recorder         record.EventRecorder
 }
 
@@ -80,18 +80,18 @@ type endpointInfo struct {
 }
 
 // spToEndpointMap stores groups Endpoint objects by ServicePortName and
-// EndpointSlice name.
+// IP address.
 type spToEndpointMap map[ServicePortName]map[string]Endpoint
 
 // NewEndpointSliceCache initializes an EndpointSliceCache.
-func NewEndpointSliceCache(hostname string, isIPv6Mode *bool, recorder record.EventRecorder, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
+func NewEndpointSliceCache(hostname string, ipFamily v1.IPFamily, recorder record.EventRecorder, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
 	if makeEndpointInfo == nil {
 		makeEndpointInfo = standardEndpointInfo
 	}
 	return &EndpointSliceCache{
 		trackerByServiceMap: map[types.NamespacedName]*endpointSliceTracker{},
 		hostname:            hostname,
-		isIPv6Mode:          isIPv6Mode,
+		ipFamily:            ipFamily,
 		makeEndpointInfo:    makeEndpointInfo,
 		recorder:            recorder,
 	}
@@ -248,7 +248,7 @@ func (cache *EndpointSliceCache) addEndpointsByIP(serviceNN types.NamespacedName
 
 		// Filter out the incorrect IP version case. Any endpoint port that
 		// contains incorrect IP version will be ignored.
-		if cache.isIPv6Mode != nil && utilnet.IsIPv6String(endpoint.Addresses[0]) != *cache.isIPv6Mode {
+		if (cache.ipFamily == v1.IPv6Protocol) != utilnet.IsIPv6String(endpoint.Addresses[0]) {
 			// Emit event on the corresponding service which had a different IP
 			// version than the endpoint.
 			utilproxy.LogAndEmitIncorrectIPVersionEvent(cache.recorder, "endpointslice", endpoint.Addresses[0], serviceNN.Namespace, serviceNN.Name, "")

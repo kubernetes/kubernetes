@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	//lint:ignore SA1019 Need to keep deprecated package for compatibility.
 	"github.com/golang/protobuf/proto"
 
 	dto "github.com/prometheus/client_model/go"
@@ -606,7 +607,7 @@ func NewConstHistogram(
 }
 
 // MustNewConstHistogram is a version of NewConstHistogram that panics where
-// NewConstMetric would have returned an error.
+// NewConstHistogram would have returned an error.
 func MustNewConstHistogram(
 	desc *Desc,
 	count uint64,

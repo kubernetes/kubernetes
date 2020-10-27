@@ -24,7 +24,7 @@ go_test(
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/testing:go_default_library",
-        "//pkg/master:go_default_library",
+        "//pkg/controlplane:go_default_library",
         "//staging/src/k8s.io/api/admission/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
@@ -67,6 +67,10 @@ go_test(
         "//vendor/k8s.io/utils/pointer:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:aix": [
+            "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing:go_default_library",
+            "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:android": [
             "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing:go_default_library",
             "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
@@ -83,7 +87,15 @@ go_test(
             "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing:go_default_library",
             "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:illumos": [
+            "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing:go_default_library",
+            "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:ios": [
+            "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing:go_default_library",
+            "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:js": [
             "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing:go_default_library",
             "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
         ],

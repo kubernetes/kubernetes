@@ -58,6 +58,10 @@ func (cu *cadvisorClient) ContainerInfoV2(name string, options cadvisorapiv2.Req
 	return cu.winStatsClient.WinContainerInfos()
 }
 
+func (cu *cadvisorClient) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
+	return nil, nil
+}
+
 func (cu *cadvisorClient) SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
 	return nil, nil
 }

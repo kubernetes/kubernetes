@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -98,11 +99,15 @@ func TestRun(t *testing.T) {
 	}
 }
 
-func endpointReturnsStatusOK(client *kubernetes.Clientset, path string) bool {
-	res := client.CoreV1().RESTClient().Get().AbsPath(path).Do(context.TODO())
+func endpointReturnsStatusOK(client *kubernetes.Clientset, path string) (bool, error) {
+	res := client.CoreV1().RESTClient().Get().RequestURI(path).Do(context.TODO())
 	var status int
 	res.StatusCode(&status)
-	return status == http.StatusOK
+	_, err := res.Raw()
+	if err != nil {
+		return false, err
+	}
+	return status == http.StatusOK, nil
 }
 
 func TestLivezAndReadyz(t *testing.T) {
@@ -113,11 +118,11 @@ func TestLivezAndReadyz(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !endpointReturnsStatusOK(client, "/livez") {
-		t.Fatalf("livez should be healthy")
+	if statusOK, err := endpointReturnsStatusOK(client, "/livez"); err != nil || !statusOK {
+		t.Fatalf("livez should be healthy, got %v and error %v", statusOK, err)
 	}
-	if !endpointReturnsStatusOK(client, "/readyz") {
-		t.Fatalf("readyz should be healthy")
+	if statusOK, err := endpointReturnsStatusOK(client, "/readyz"); err != nil || !statusOK {
+		t.Fatalf("readyz should be healthy, got %v and error %v", statusOK, err)
 	}
 }
 
@@ -408,8 +413,8 @@ func verifyEndpointsWithIPs(servers []*kubeapiservertesting.TestServer, ips []st
 }
 
 func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
-	var leaseServers []*kubeapiservertesting.TestServer
-	var masterCountServers []*kubeapiservertesting.TestServer
+	var leaseServers = make([]*kubeapiservertesting.TestServer, leaseCount)
+	var masterCountServers = make([]*kubeapiservertesting.TestServer, masterCount)
 	etcd := framework.SharedEtcd()
 
 	instanceOptions := &kubeapiservertesting.TestServerInstanceOptions{
@@ -419,16 +424,22 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 	// cleanup the registry storage
 	defer registry.CleanupStorage()
 
+	wg := sync.WaitGroup{}
 	// 1. start masterCount api servers
 	for i := 0; i < masterCount; i++ {
 		// start master count api server
-		server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
-			"--endpoint-reconciler-type", "master-count",
-			"--advertise-address", fmt.Sprintf("10.0.1.%v", i+1),
-			"--apiserver-count", fmt.Sprintf("%v", masterCount),
-		}, etcd)
-		masterCountServers = append(masterCountServers, server)
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{
+				"--endpoint-reconciler-type", "master-count",
+				"--advertise-address", fmt.Sprintf("10.0.1.%v", i+1),
+				"--apiserver-count", fmt.Sprintf("%v", masterCount),
+			}, etcd)
+			masterCountServers[i] = server
+		}(i)
 	}
+	wg.Wait()
 
 	// 2. verify master count servers have registered
 	if err := wait.PollImmediate(3*time.Second, 2*time.Minute, func() (bool, error) {
@@ -449,14 +460,23 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 
 	// 3. start lease api servers
 	for i := 0; i < leaseCount; i++ {
-		options := []string{
-			"--endpoint-reconciler-type", "lease",
-			"--advertise-address", fmt.Sprintf("10.0.1.%v", i+10),
-		}
-		server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, options, etcd)
-		defer server.TearDownFn()
-		leaseServers = append(leaseServers, server)
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			options := []string{
+				"--endpoint-reconciler-type", "lease",
+				"--advertise-address", fmt.Sprintf("10.0.1.%v", i+10),
+			}
+			server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, options, etcd)
+			leaseServers[i] = server
+		}(i)
 	}
+	wg.Wait()
+	defer func() {
+		for i := 0; i < leaseCount; i++ {
+			leaseServers[i].TearDownFn()
+		}
+	}()
 
 	time.Sleep(3 * time.Second)
 
@@ -484,15 +504,15 @@ func testReconcilersMasterLease(t *testing.T, leaseCount int, masterCount int) {
 }
 
 func TestReconcilerMasterLeaseCombined(t *testing.T) {
-	testReconcilersMasterLease(t, 1, 3)
+	testReconcilersMasterLease(t, 1, 2)
 }
 
 func TestReconcilerMasterLeaseMultiMoreMasters(t *testing.T) {
-	testReconcilersMasterLease(t, 3, 2)
+	testReconcilersMasterLease(t, 2, 1)
 }
 
 func TestReconcilerMasterLeaseMultiCombined(t *testing.T) {
-	testReconcilersMasterLease(t, 3, 3)
+	testReconcilersMasterLease(t, 2, 2)
 }
 
 func TestMultiMasterNodePortAllocation(t *testing.T) {

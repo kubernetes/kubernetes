@@ -63,6 +63,14 @@ file {
       type_name: ".io.containerd.cgroups.v1.NetworkStat"
       json_name: "network"
     }
+    field {
+      name: "cgroup_stats"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.CgroupStats"
+      json_name: "cgroupStats"
+    }
   }
   message_type {
     name: "HugetlbStat"
@@ -706,6 +714,44 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_UINT64
       json_name: "txDropped"
+    }
+  }
+  message_type {
+    name: "CgroupStats"
+    field {
+      name: "nr_sleeping"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "nrSleeping"
+    }
+    field {
+      name: "nr_running"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "nrRunning"
+    }
+    field {
+      name: "nr_stopped"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "nrStopped"
+    }
+    field {
+      name: "nr_uninterruptible"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "nrUninterruptible"
+    }
+    field {
+      name: "nr_io_wait"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "nrIoWait"
     }
   }
   syntax: "proto3"

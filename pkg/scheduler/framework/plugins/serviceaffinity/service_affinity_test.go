@@ -18,6 +18,7 @@ package serviceaffinity
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -25,8 +26,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/fake"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
@@ -500,6 +501,9 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				p := &ServiceAffinity{
 					sharedLister:  snapshot,
 					serviceLister: fakeframework.ServiceLister(test.services),
+					args: config.ServiceAffinityArgs{
+						AffinityLabels: []string{"region", "zone"},
+					},
 				}
 				cycleState := framework.NewCycleState()
 				preFilterStatus := p.PreFilter(context.Background(), cycleState, test.pendingPod)
@@ -612,7 +616,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	}
 	cycleState := framework.NewCycleState()
 	gotStatus := p.Filter(context.Background(), cycleState, pod, nodeInfo)
-	wantStatus := framework.NewStatus(framework.Error, `error reading "PreFilterServiceAffinity" from cycleState: not found`)
+	wantStatus := framework.AsStatus(fmt.Errorf(`error reading "PreFilterServiceAffinity" from cycleState: not found`))
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
 	}

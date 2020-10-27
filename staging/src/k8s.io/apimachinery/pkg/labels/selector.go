@@ -68,13 +68,15 @@ func Everything() Selector {
 
 type nothingSelector struct{}
 
-func (n nothingSelector) Matches(_ Labels) bool                                      { return false }
-func (n nothingSelector) Empty() bool                                                { return false }
-func (n nothingSelector) String() string                                             { return "" }
-func (n nothingSelector) Add(_ ...Requirement) Selector                              { return n }
-func (n nothingSelector) Requirements() (Requirements, bool)                         { return nil, false }
-func (n nothingSelector) DeepCopySelector() Selector                                 { return n }
-func (n nothingSelector) RequiresExactMatch(label string) (value string, found bool) { return "", false }
+func (n nothingSelector) Matches(_ Labels) bool              { return false }
+func (n nothingSelector) Empty() bool                        { return false }
+func (n nothingSelector) String() string                     { return "" }
+func (n nothingSelector) Add(_ ...Requirement) Selector      { return n }
+func (n nothingSelector) Requirements() (Requirements, bool) { return nil, false }
+func (n nothingSelector) DeepCopySelector() Selector         { return n }
+func (n nothingSelector) RequiresExactMatch(label string) (value string, found bool) {
+	return "", false
+}
 
 // Nothing returns a selector that matches no labels
 func Nothing() Selector {
@@ -261,11 +263,11 @@ func (r *Requirement) Values() sets.String {
 }
 
 // Empty returns true if the internalSelector doesn't restrict selection space
-func (lsel internalSelector) Empty() bool {
-	if lsel == nil {
+func (s internalSelector) Empty() bool {
+	if s == nil {
 		return true
 	}
-	return len(lsel) == 0
+	return len(s) == 0
 }
 
 // String returns a human-readable string that represents this
@@ -328,51 +330,51 @@ func safeSort(in []string) []string {
 }
 
 // Add adds requirements to the selector. It copies the current selector returning a new one
-func (lsel internalSelector) Add(reqs ...Requirement) Selector {
-	var sel internalSelector
-	for ix := range lsel {
-		sel = append(sel, lsel[ix])
+func (s internalSelector) Add(reqs ...Requirement) Selector {
+	var ret internalSelector
+	for ix := range s {
+		ret = append(ret, s[ix])
 	}
 	for _, r := range reqs {
-		sel = append(sel, r)
+		ret = append(ret, r)
 	}
-	sort.Sort(ByKey(sel))
-	return sel
+	sort.Sort(ByKey(ret))
+	return ret
 }
 
 // Matches for a internalSelector returns true if all
 // its Requirements match the input Labels. If any
 // Requirement does not match, false is returned.
-func (lsel internalSelector) Matches(l Labels) bool {
-	for ix := range lsel {
-		if matches := lsel[ix].Matches(l); !matches {
+func (s internalSelector) Matches(l Labels) bool {
+	for ix := range s {
+		if matches := s[ix].Matches(l); !matches {
 			return false
 		}
 	}
 	return true
 }
 
-func (lsel internalSelector) Requirements() (Requirements, bool) { return Requirements(lsel), true }
+func (s internalSelector) Requirements() (Requirements, bool) { return Requirements(s), true }
 
 // String returns a comma-separated string of all
 // the internalSelector Requirements' human-readable strings.
-func (lsel internalSelector) String() string {
+func (s internalSelector) String() string {
 	var reqs []string
-	for ix := range lsel {
-		reqs = append(reqs, lsel[ix].String())
+	for ix := range s {
+		reqs = append(reqs, s[ix].String())
 	}
 	return strings.Join(reqs, ",")
 }
 
 // RequiresExactMatch introspect whether a given selector requires a single specific field
 // to be set, and if so returns the value it requires.
-func (lsel internalSelector) RequiresExactMatch(label string) (value string, found bool) {
-	for ix := range lsel {
-		if lsel[ix].key == label {
-			switch lsel[ix].operator {
+func (s internalSelector) RequiresExactMatch(label string) (value string, found bool) {
+	for ix := range s {
+		if s[ix].key == label {
+			switch s[ix].operator {
 			case selection.Equals, selection.DoubleEquals, selection.In:
-				if len(lsel[ix].strValues) == 1 {
-					return lsel[ix].strValues[0], true
+				if len(s[ix].strValues) == 1 {
+					return s[ix].strValues[0], true
 				}
 			}
 			return "", false
@@ -787,12 +789,12 @@ func (p *Parser) parseIdentifiersList() (sets.String, error) {
 // parseExactValue parses the only value for exact match style
 func (p *Parser) parseExactValue() (sets.String, error) {
 	s := sets.NewString()
-	tok, lit := p.lookahead(Values)
+	tok, _ := p.lookahead(Values)
 	if tok == EndOfStringToken || tok == CommaToken {
 		s.Insert("")
 		return s, nil
 	}
-	tok, lit = p.consume(Values)
+	tok, lit := p.consume(Values)
 	if tok == IdentifierToken {
 		s.Insert(lit)
 		return s, nil

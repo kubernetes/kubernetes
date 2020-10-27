@@ -19,9 +19,9 @@ package internal
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/v3/merge"
-	"sigs.k8s.io/structured-merge-diff/v3/typed"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/merge"
+	"sigs.k8s.io/structured-merge-diff/v4/typed"
 )
 
 // versionConverter is an implementation of

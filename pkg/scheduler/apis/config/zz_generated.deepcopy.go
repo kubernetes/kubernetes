@@ -33,6 +33,7 @@ func (in *Extender) DeepCopyInto(out *Extender) {
 		*out = new(ExtenderTLSConfig)
 		(*in).DeepCopyInto(*out)
 	}
+	out.HTTPTimeout = in.HTTPTimeout
 	if in.ManagedResources != nil {
 		in, out := &in.ManagedResources, &out.ManagedResources
 		*out = make([]ExtenderManagedResource, len(*in))
@@ -285,6 +286,11 @@ func (in *NodeResourcesFitArgs) DeepCopyInto(out *NodeResourcesFitArgs) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.IgnoredResourceGroups != nil {
+		in, out := &in.IgnoredResourceGroups, &out.IgnoredResourceGroups
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
@@ -482,11 +488,6 @@ func (in *Plugins) DeepCopyInto(out *Plugins) {
 	}
 	if in.PostBind != nil {
 		in, out := &in.PostBind, &out.PostBind
-		*out = new(PluginSet)
-		(*in).DeepCopyInto(*out)
-	}
-	if in.Unreserve != nil {
-		in, out := &in.Unreserve, &out.Unreserve
 		*out = new(PluginSet)
 		(*in).DeepCopyInto(*out)
 	}

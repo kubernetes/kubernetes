@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -155,10 +154,6 @@ func TestCheckReadyForTests(t *testing.T) {
 			nodeListErr: errors.New("Forced error"),
 			expected:    false,
 			expectedErr: "Forced error",
-		}, {
-			desc:        "Retryable errors from node list are reported but still return false",
-			nodeListErr: apierrors.NewTimeoutError("Retryable error", 10),
-			expected:    false,
 		},
 	}
 

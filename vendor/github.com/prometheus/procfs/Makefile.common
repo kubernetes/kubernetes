@@ -150,6 +150,17 @@ else
 	$(GO) get $(GOOPTS) -t ./...
 endif
 
+.PHONY: update-go-deps
+update-go-deps:
+	@echo ">> updating Go dependencies"
+	@for m in $$($(GO) list -mod=readonly -m -f '{{ if and (not .Indirect) (not .Main)}}{{.Path}}{{end}}' all); do \
+		$(GO) get $$m; \
+	done
+	GO111MODULE=$(GO111MODULE) $(GO) mod tidy
+ifneq (,$(wildcard vendor))
+	GO111MODULE=$(GO111MODULE) $(GO) mod vendor
+endif
+
 .PHONY: common-test-short
 common-test-short: $(GOTEST_DIR)
 	@echo ">> running short tests"

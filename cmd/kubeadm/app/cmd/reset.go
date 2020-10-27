@@ -94,7 +94,7 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 	client, err := getClientset(options.kubeconfigPath, false)
 	if err == nil {
 		klog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", options.kubeconfigPath)
-		cfg, err = configutil.FetchInitConfigurationFromCluster(client, out, "reset", false)
+		cfg, err = configutil.FetchInitConfigurationFromCluster(client, out, "reset", false, false)
 		if err != nil {
 			klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
 		}
@@ -158,8 +158,8 @@ func AddResetFlags(flagSet *flag.FlagSet, resetOptions *resetOptions) {
 	cmdutil.AddCRISocketFlag(flagSet, &resetOptions.criSocketPath)
 }
 
-// NewCmdReset returns the "kubeadm reset" command
-func NewCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra.Command {
+// newCmdReset returns the "kubeadm reset" command
+func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra.Command {
 	if resetOptions == nil {
 		resetOptions = newResetOptions()
 	}

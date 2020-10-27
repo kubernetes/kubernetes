@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -51,9 +52,10 @@ const (
 var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-datastore")
 	var (
-		client       clientset.Interface
-		namespace    string
-		scParameters map[string]string
+		client                     clientset.Interface
+		namespace                  string
+		scParameters               map[string]string
+		vSphereCSIMigrationEnabled bool
 	)
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("vsphere")
@@ -63,6 +65,7 @@ var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", 
 		scParameters = make(map[string]string)
 		_, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
 		framework.ExpectNoError(err)
+		vSphereCSIMigrationEnabled = GetAndExpectBoolEnvVar(VSphereCSIMigrationEnabled)
 	})
 
 	ginkgo.It("verify dynamically provisioned pv using storageclass fails on an invalid datastore", func() {
@@ -71,7 +74,12 @@ var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", 
 		scParameters[DiskFormat] = ThinDisk
 		err := invokeInvalidDatastoreTestNeg(client, namespace, scParameters)
 		framework.ExpectError(err)
-		errorMsg := `Failed to provision volume with StorageClass \"` + datastoreSCName + `\": Datastore '` + invalidDatastore + `' not found`
+		var errorMsg string
+		if !vSphereCSIMigrationEnabled {
+			errorMsg = `Failed to provision volume with StorageClass \"` + datastoreSCName + `\": Datastore '` + invalidDatastore + `' not found`
+		} else {
+			errorMsg = `failed to find datastoreURL for datastore name: \"` + invalidDatastore + `\"`
+		}
 		if !strings.Contains(err.Error(), errorMsg) {
 			framework.ExpectNoError(err, errorMsg)
 		}
@@ -95,5 +103,12 @@ func invokeInvalidDatastoreTestNeg(client clientset.Interface, namespace string,
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
-	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
+
+	var eventErrorMessages string
+	for _, event := range eventList.Items {
+		if event.Type != v1.EventTypeNormal {
+			eventErrorMessages = eventErrorMessages + event.Message + ";"
+		}
+	}
+	return fmt.Errorf("event messages: %+q", eventErrorMessages)
 }

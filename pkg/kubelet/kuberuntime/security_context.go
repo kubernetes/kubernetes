@@ -17,9 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"fmt"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -37,7 +35,7 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	}
 
 	// set SeccompProfilePath.
-	synthesized.SeccompProfilePath = m.getSeccompProfileFromAnnotations(pod.Annotations, container.Name)
+	synthesized.SeccompProfilePath = m.getSeccompProfile(pod.Annotations, container.Name, pod.Spec.SecurityContext, container.SecurityContext)
 
 	// set ApparmorProfile.
 	synthesized.ApparmorProfile = apparmor.GetProfileNameFromPodAnnotations(pod.Annotations, container.Name)
@@ -74,31 +72,6 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	synthesized.ReadonlyPaths = securitycontext.ConvertToRuntimeReadonlyPaths(effectiveSc.ProcMount)
 
 	return synthesized
-}
-
-// verifyRunAsNonRoot verifies RunAsNonRoot.
-func verifyRunAsNonRoot(pod *v1.Pod, container *v1.Container, uid *int64, username string) error {
-	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
-	// If the option is not set, or if running as root is allowed, return nil.
-	if effectiveSc == nil || effectiveSc.RunAsNonRoot == nil || !*effectiveSc.RunAsNonRoot {
-		return nil
-	}
-
-	if effectiveSc.RunAsUser != nil {
-		if *effectiveSc.RunAsUser == 0 {
-			return fmt.Errorf("container's runAsUser breaks non-root policy")
-		}
-		return nil
-	}
-
-	switch {
-	case uid != nil && *uid == 0:
-		return fmt.Errorf("container has runAsNonRoot and image will run as root")
-	case uid == nil && len(username) > 0:
-		return fmt.Errorf("container has runAsNonRoot and image has non-numeric user (%s), cannot verify user is non-root", username)
-	default:
-		return nil
-	}
 }
 
 // convertToRuntimeSecurityContext converts v1.SecurityContext to runtimeapi.SecurityContext.

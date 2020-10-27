@@ -218,7 +218,7 @@ func (d *discovery) createSelf(contents string) error {
 	return err
 }
 
-func (d *discovery) checkCluster() ([]*client.Node, int, uint64, error) {
+func (d *discovery) checkCluster() ([]*client.Node, uint64, uint64, error) {
 	configKey := path.Join("/", d.cluster, "_config")
 	ctx, cancel := context.WithTimeout(context.Background(), client.DefaultRequestTimeout)
 	// find cluster size
@@ -247,7 +247,7 @@ func (d *discovery) checkCluster() ([]*client.Node, int, uint64, error) {
 		}
 		return nil, 0, 0, err
 	}
-	size, err := strconv.Atoi(resp.Node.Value)
+	size, err := strconv.ParseUint(resp.Node.Value, 10, 0)
 	if err != nil {
 		return nil, 0, 0, ErrBadSizeKey
 	}
@@ -288,7 +288,7 @@ func (d *discovery) checkCluster() ([]*client.Node, int, uint64, error) {
 		if path.Base(nodes[i].Key) == path.Base(d.selfKey()) {
 			break
 		}
-		if i >= size-1 {
+		if uint64(i) >= size-1 {
 			return nodes[:size], size, resp.Index, ErrFullCluster
 		}
 	}
@@ -316,7 +316,7 @@ func (d *discovery) logAndBackoffForRetry(step string) {
 	d.clock.Sleep(retryTimeInSecond)
 }
 
-func (d *discovery) checkClusterRetry() ([]*client.Node, int, uint64, error) {
+func (d *discovery) checkClusterRetry() ([]*client.Node, uint64, uint64, error) {
 	if d.retries < nRetries {
 		d.logAndBackoffForRetry("cluster status check")
 		return d.checkCluster()
@@ -336,8 +336,8 @@ func (d *discovery) waitNodesRetry() ([]*client.Node, error) {
 	return nil, ErrTooManyRetries
 }
 
-func (d *discovery) waitNodes(nodes []*client.Node, size int, index uint64) ([]*client.Node, error) {
-	if len(nodes) > size {
+func (d *discovery) waitNodes(nodes []*client.Node, size uint64, index uint64) ([]*client.Node, error) {
+	if uint64(len(nodes)) > size {
 		nodes = nodes[:size]
 	}
 	// watch from the next index
@@ -369,16 +369,16 @@ func (d *discovery) waitNodes(nodes []*client.Node, size int, index uint64) ([]*
 	}
 
 	// wait for others
-	for len(all) < size {
+	for uint64(len(all)) < size {
 		if d.lg != nil {
 			d.lg.Info(
 				"found peers from discovery server; waiting for more",
 				zap.String("discovery-url", d.url.String()),
 				zap.Int("found-peers", len(all)),
-				zap.Int("needed-peers", size-len(all)),
+				zap.Int("needed-peers", int(size-uint64(len(all)))),
 			)
 		} else {
-			plog.Noticef("found %d peer(s), waiting for %d more", len(all), size-len(all))
+			plog.Noticef("found %d peer(s), waiting for %d more", len(all), size-uint64(len(all)))
 		}
 		resp, err := w.Next(context.Background())
 		if err != nil {
@@ -415,7 +415,7 @@ func (d *discovery) selfKey() string {
 	return path.Join("/", d.cluster, d.id.String())
 }
 
-func nodesToCluster(ns []*client.Node, size int) (string, error) {
+func nodesToCluster(ns []*client.Node, size uint64) (string, error) {
 	s := make([]string, len(ns))
 	for i, n := range ns {
 		s[i] = n.Value
@@ -425,7 +425,7 @@ func nodesToCluster(ns []*client.Node, size int) (string, error) {
 	if err != nil {
 		return us, ErrInvalidURL
 	}
-	if m.Len() != size {
+	if uint64(m.Len()) != size {
 		return us, ErrDuplicateName
 	}
 	return us, nil

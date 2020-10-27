@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
-	cputopology "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
@@ -114,7 +114,7 @@ func (th *TopologyHint) IsEqual(topologyHint TopologyHint) bool {
 // or `a` NUMANodeAffinity attribute is narrower than `b` NUMANodeAffinity attribute.
 func (th *TopologyHint) LessThan(other TopologyHint) bool {
 	if th.Preferred != other.Preferred {
-		return th.Preferred == true
+		return th.Preferred
 	}
 	return th.NUMANodeAffinity.IsNarrowerThan(other.NUMANodeAffinity)
 }
@@ -122,12 +122,12 @@ func (th *TopologyHint) LessThan(other TopologyHint) bool {
 var _ Manager = &manager{}
 
 //NewManager creates a new TopologyManager based on provided policy
-func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string) (Manager, error) {
+func NewManager(topology []cadvisorapi.Node, topologyPolicyName string) (Manager, error) {
 	klog.Infof("[topologymanager] Creating topology manager with %s policy", topologyPolicyName)
 
 	var numaNodes []int
-	for node := range numaNodeInfo {
-		numaNodes = append(numaNodes, node)
+	for _, node := range topology {
+		numaNodes = append(numaNodes, node.Id)
 	}
 
 	if topologyPolicyName != PolicyNone && len(numaNodes) > maxAllowableNUMANodes {

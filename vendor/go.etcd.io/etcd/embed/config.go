@@ -273,14 +273,18 @@ type Config struct {
 	AuthToken  string `json:"auth-token"`
 	BcryptCost uint   `json:"bcrypt-cost"`
 
+	//The AuthTokenTTL in seconds of the simple token
+	AuthTokenTTL uint `json:"auth-token-ttl"`
+
 	ExperimentalInitialCorruptCheck bool          `json:"experimental-initial-corrupt-check"`
 	ExperimentalCorruptCheckTime    time.Duration `json:"experimental-corrupt-check-time"`
 	ExperimentalEnableV2V3          string        `json:"experimental-enable-v2v3"`
 	// ExperimentalBackendFreelistType specifies the type of freelist that boltdb backend uses (array and map are supported types).
 	ExperimentalBackendFreelistType string `json:"experimental-backend-bbolt-freelist-type"`
 	// ExperimentalEnableLeaseCheckpoint enables primary lessor to persist lease remainingTTL to prevent indefinite auto-renewal of long lived leases.
-	ExperimentalEnableLeaseCheckpoint bool `json:"experimental-enable-lease-checkpoint"`
-	ExperimentalCompactionBatchLimit  int  `json:"experimental-compaction-batch-limit"`
+	ExperimentalEnableLeaseCheckpoint       bool          `json:"experimental-enable-lease-checkpoint"`
+	ExperimentalCompactionBatchLimit        int           `json:"experimental-compaction-batch-limit"`
+	ExperimentalWatchProgressNotifyInterval time.Duration `json:"experimental-watch-progress-notify-interval"`
 
 	// ForceNewCluster starts a new cluster even if previously started; unsafe.
 	ForceNewCluster bool `json:"force-new-cluster"`
@@ -335,6 +339,10 @@ type Config struct {
 	// Only valid if "logger" option is "capnslog".
 	// WARN: DO NOT USE THIS!
 	LogPkgLevels string `json:"log-package-levels"`
+
+	// UnsafeNoFsync disables all uses of fsync.
+	// Setting this is unsafe and will cause data loss.
+	UnsafeNoFsync bool `json:"unsafe-no-fsync"`
 }
 
 // configYAML holds the config suitable for yaml parsing
@@ -406,8 +414,9 @@ func NewConfig() *Config {
 		CORS:          map[string]struct{}{"*": {}},
 		HostWhitelist: map[string]struct{}{"*": {}},
 
-		AuthToken:  "simple",
-		BcryptCost: uint(bcrypt.DefaultCost),
+		AuthToken:    "simple",
+		BcryptCost:   uint(bcrypt.DefaultCost),
+		AuthTokenTTL: 300,
 
 		PreVote: false, // TODO: enable by default in v3.5
 
