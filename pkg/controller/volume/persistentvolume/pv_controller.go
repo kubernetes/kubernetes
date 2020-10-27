@@ -577,9 +577,10 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 		if err != nil {
 			return err
 		}
-		if !found && metav1.HasAnnotation(volume.ObjectMeta, pvutil.AnnBoundByController) {
-			// If PV is bound by external PV binder (e.g. kube-scheduler), it's
-			// possible on heavy load that corresponding PVC is not synced to
+		if !found {
+			// If the PV was created by an external PV provisioner or
+			// bound by external PV binder (e.g. kube-scheduler), it's
+			// possible under heavy load that the corresponding PVC is not synced to
 			// controller local cache yet. So we need to double-check PVC in
 			//   1) informer cache
 			//   2) apiserver if not found in informer cache
