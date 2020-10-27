@@ -342,7 +342,7 @@ func TestValidateCustomResource(t *testing.T) {
 				},
 			},
 			failingObjects: []failingObject{
-				{object: map[string]interface{}{"field": "foo"}, expectErrs: []string{"field: Invalid value: \"\": field in body should match '+, but pattern is invalid: error parsing regexp: missing argument to repetition operator: `+`'"}},
+				{object: map[string]interface{}{"field": "foo"}, expectErrs: []string{"field: Invalid value: \"foo\": field in body should match '+, but pattern is invalid: error parsing regexp: missing argument to repetition operator: `+`'"}},
 			},
 		},
 		{name: "required field",
