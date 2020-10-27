@@ -637,7 +637,7 @@ func (EphemeralVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_Event = map[string]string{
-	"":                   "Event is a report of an event somewhere in the cluster.",
+	"":                   "Event is a report of an event somewhere in the cluster.  Events have a limited retention time and triggers and messages may evolve with time.  Event consumers should not rely on the timing of an event with a given Reason reflecting a consistent underlying trigger, or the continued existence of events with that Reason.  Events should be treated as informative, best-effort, supplemental data.",
 	"metadata":           "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"involvedObject":     "The object that this event is about.",
 	"reason":             "This should be a short, machine understandable string that gives the reason for the transition into the object's current status.",
