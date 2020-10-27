@@ -137,7 +137,7 @@ const (
 	housekeepingPeriod = time.Second * 2
 
 	// Period for performing eviction monitoring.
-	// TODO ensure this is in sync with internal cadvisor housekeeping.
+	// ensure this is kept in sync with internal cadvisor housekeeping.
 	evictionMonitoringPeriod = time.Second * 10
 
 	// The path in containers' filesystems where the hosts file is mounted.
@@ -442,9 +442,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	nodeLister := corelisters.NewNodeLister(nodeIndexer)
 
-	// TODO: get the real node object of ourself,
-	// and use the real node name and UID.
-	// TODO: what is namespace for node?
+	// construct a node reference used for events
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      string(nodeName),
@@ -958,8 +956,6 @@ type Kubelet struct {
 	streamingRuntime kubecontainer.StreamingRuntime
 
 	// Container runtime service (needed by container runtime Start()).
-	// TODO(CD): try to make this available without holding a reference in this
-	//           struct. For example, by adding a getter to generic runtime.
 	runtimeService internalapi.RuntimeService
 
 	// reasonCache caches the failure reason of the last creation of all containers, which is
@@ -1079,7 +1075,6 @@ type Kubelet struct {
 	// maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
 	lastNodeUnschedulable bool
 
-	// TODO: think about moving this to be centralized in PodWorkers in follow-on.
 	// the list of handlers to call during pod admission.
 	admitHandlers lifecycle.PodAdmitHandlers
 
@@ -1337,7 +1332,6 @@ func (kl *Kubelet) initializeModules() error {
 func (kl *Kubelet) initializeRuntimeDependentModules() {
 	if err := kl.cadvisor.Start(); err != nil {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
-		// TODO(random-liu): Add backoff logic in the babysitter
 		klog.Fatalf("Failed to start cAdvisor %v", err)
 	}
 
@@ -1744,7 +1738,6 @@ func (kl *Kubelet) deletePod(pod *v1.Pod) error {
 	podPair := kubecontainer.PodPair{APIPod: pod, RunningPod: &runningPod}
 
 	kl.podKiller.KillPod(&podPair)
-	// TODO: delete the mirror pod here?
 
 	// We leave the volume/directory cleanup to the periodic cleanup routine.
 	return nil
@@ -2070,8 +2063,6 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 			kl.handleMirrorPod(pod, start)
 			continue
 		}
-		// TODO: Evaluate if we need to validate and reject updates.
-
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		kl.dispatchWork(pod, kubetypes.SyncPodUpdate, mirrorPod, start)
 	}
@@ -2160,7 +2151,6 @@ func (kl *Kubelet) updateRuntimeUp() {
 		return
 	}
 	// Periodically log the whole runtime status for debugging.
-	// TODO(random-liu): Consider to send node event when optional
 	// condition is unmet.
 	klog.V(4).Infof("Container runtime status: %v", s)
 	networkReady := s.GetRuntimeCondition(kubecontainer.NetworkReady)

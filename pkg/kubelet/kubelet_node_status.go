@@ -524,8 +524,6 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 // message for the node.
 func (kl *Kubelet) recordNodeStatusEvent(eventType, event string) {
 	klog.V(2).Infof("Recording %s event message for node %s", event, kl.nodeName)
-	// TODO: This requires a transaction, either both node status is updated
-	// and event is recorded or neither should happen, see issue #6055.
 	kl.recorder.Eventf(kl.nodeRef, eventType, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
