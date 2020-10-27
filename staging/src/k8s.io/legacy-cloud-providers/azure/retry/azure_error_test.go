@@ -31,25 +31,25 @@ import (
 
 func TestNewError(t *testing.T) {
 	rawErr := fmt.Errorf("HTTP status code (404)")
-	newerr := NewError(true, rawErr)
-	assert.Equal(t, true, newerr.Retriable)
-	assert.Equal(t, rawErr, newerr.RawError)
+	newErr := NewError(true, rawErr)
+	assert.Equal(t, true, newErr.Retriable)
+	assert.Equal(t, rawErr, newErr.RawError)
 }
 
 func TestGetRetriableError(t *testing.T) {
 	rawErr := fmt.Errorf("HTTP status code (404)")
-	newerr := GetRetriableError(rawErr)
-	assert.Equal(t, true, newerr.Retriable)
-	assert.Equal(t, rawErr, newerr.RawError)
+	newErr := GetRetriableError(rawErr)
+	assert.Equal(t, true, newErr.Retriable)
+	assert.Equal(t, rawErr, newErr.RawError)
 }
 
 func TestGetRateLimitError(t *testing.T) {
 	opType := "write"
 	opName := "opNameTest"
 	rawErr := fmt.Errorf("azure cloud provider rate limited(%s) for operation %q", opType, opName)
-	newerr := GetRateLimitError(true, opName)
-	assert.Equal(t, true, newerr.Retriable)
-	assert.Equal(t, rawErr, newerr.RawError)
+	newErr := GetRateLimitError(true, opName)
+	assert.Equal(t, true, newErr.Retriable)
+	assert.Equal(t, rawErr, newErr.RawError)
 }
 
 func TestGetThrottlingError(t *testing.T) {
@@ -57,10 +57,10 @@ func TestGetThrottlingError(t *testing.T) {
 	reason := "reasontest"
 	rawErr := fmt.Errorf("azure cloud provider throttled for operation %s with reason %q", operation, reason)
 	onehourlater := time.Now().Add(time.Hour * 1)
-	newerr := GetThrottlingError(operation, reason, onehourlater)
-	assert.Equal(t, true, newerr.Retriable)
-	assert.Equal(t, rawErr, newerr.RawError)
-	assert.Equal(t, onehourlater, newerr.RetryAfter)
+	newErr := GetThrottlingError(operation, reason, onehourlater)
+	assert.Equal(t, true, newErr.Retriable)
+	assert.Equal(t, rawErr, newErr.RawError)
+	assert.Equal(t, onehourlater, newErr.RetryAfter)
 }
 
 func TestGetError(t *testing.T) {
@@ -344,7 +344,7 @@ func TestIsThrottled(t *testing.T) {
 }
 
 func TestIsErrorRetriable(t *testing.T) {
-	// flase case
+	// false case
 	result := IsErrorRetriable(nil)
 	assert.Equal(t, false, result)
 

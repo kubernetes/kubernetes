@@ -68,7 +68,7 @@ type Interface interface {
 	PutResource(ctx context.Context, resourceID string, parameters interface{}) (*http.Response, *retry.Error)
 
 	// PutResources puts a list of resources from resources map[resourceID]parameters.
-	// Those resources sync requests are sequential while async requests are concurent. It 's especially
+	// Those resources sync requests are sequential while async requests are concurrent. It 's especially
 	// useful when the ARM API doesn't support concurrent requests.
 	PutResources(ctx context.Context, resources map[string]interface{}) map[string]*PutResourcesResponse
 

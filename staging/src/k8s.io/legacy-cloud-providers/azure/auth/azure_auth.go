@@ -213,7 +213,7 @@ func GetNetworkResourceServicePrincipalToken(config *AzureAuthConfig, env *azure
 }
 
 // ParseAzureEnvironment returns the azure environment.
-// If 'resourceManagerEndpoint' is set, the environment is computed by quering the cloud's resource manager endpoint.
+// If 'resourceManagerEndpoint' is set, the environment is computed by querying the cloud's resource manager endpoint.
 // Otherwise, a pre-defined Environment is looked up by name.
 func ParseAzureEnvironment(cloudName, resourceManagerEndpoint, identitySystem string) (*azure.Environment, error) {
 	var env azure.Environment

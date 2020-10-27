@@ -68,9 +68,9 @@ func (az *Cloud) RequestBackoff() (resourceRequestBackoff wait.Backoff) {
 }
 
 // Event creates a event for the specified object.
-func (az *Cloud) Event(obj runtime.Object, eventtype, reason, message string) {
+func (az *Cloud) Event(obj runtime.Object, eventType, reason, message string) {
 	if obj != nil && reason != "" {
-		az.eventRecorder.Event(obj, eventtype, reason, message)
+		az.eventRecorder.Event(obj, eventType, reason, message)
 	}
 }
 
@@ -359,7 +359,7 @@ func (az *Cloud) CreateOrUpdateRouteTable(routeTable network.RouteTable) error {
 	}
 	// Invalidate the cache because another new operation has canceled the current request.
 	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCanceledErrorMessage) {
-		klog.V(3).Infof("Route table cache for %s is cleanup because CreateOrUpdateRouteTable is canceld by another operation", *routeTable.Name)
+		klog.V(3).Infof("Route table cache for %s is cleanup because CreateOrUpdateRouteTable is canceled by another operation", *routeTable.Name)
 		az.rtCache.Delete(*routeTable.Name)
 	}
 	klog.Errorf("RouteTablesClient.CreateOrUpdate(%s) failed: %v", az.RouteTableName, rerr.Error())
@@ -384,7 +384,7 @@ func (az *Cloud) CreateOrUpdateRoute(route network.Route) error {
 	}
 	// Invalidate the cache because another new operation has canceled the current request.
 	if strings.Contains(strings.ToLower(rerr.Error().Error()), operationCanceledErrorMessage) {
-		klog.V(3).Infof("Route cache for %s is cleanup because CreateOrUpdateRouteTable is canceld by another operation", *route.Name)
+		klog.V(3).Infof("Route cache for %s is cleanup because CreateOrUpdateRouteTable is canceled by another operation", *route.Name)
 		az.rtCache.Delete(az.RouteTableName)
 	}
 	return rerr.Error()

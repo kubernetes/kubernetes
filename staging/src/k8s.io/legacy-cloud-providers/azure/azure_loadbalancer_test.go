@@ -56,7 +56,7 @@ func TestFindProbe(t *testing.T) {
 			expected: false,
 		},
 		{
-			msg: "probe names match while ports unmatch should return false",
+			msg: "probe names match while ports don't should return false",
 			existingProbe: []network.Probe{
 				{
 					Name: to.StringPtr("httpProbe"),
@@ -74,7 +74,7 @@ func TestFindProbe(t *testing.T) {
 			expected: false,
 		},
 		{
-			msg: "probe ports match while names unmatch should return false",
+			msg: "probe ports match while names don't should return false",
 			existingProbe: []network.Probe{
 				{
 					Name: to.StringPtr("probe1"),
@@ -129,7 +129,7 @@ func TestFindRule(t *testing.T) {
 			expected: false,
 		},
 		{
-			msg: "rule names unmatch should return false",
+			msg: "rule names don't match should return false",
 			existingRule: []network.LoadBalancingRule{
 				{
 					Name: to.StringPtr("httpProbe1"),
@@ -147,7 +147,7 @@ func TestFindRule(t *testing.T) {
 			expected: false,
 		},
 		{
-			msg: "rule names match while frontend ports unmatch should return false",
+			msg: "rule names match while frontend ports don't should return false",
 			existingRule: []network.LoadBalancingRule{
 				{
 					Name: to.StringPtr("httpProbe"),
@@ -165,7 +165,7 @@ func TestFindRule(t *testing.T) {
 			expected: false,
 		},
 		{
-			msg: "rule names match while backend ports unmatch should return false",
+			msg: "rule names match while backend ports don't should return false",
 			existingRule: []network.LoadBalancingRule{
 				{
 					Name: to.StringPtr("httpProbe"),
@@ -183,7 +183,7 @@ func TestFindRule(t *testing.T) {
 			expected: false,
 		},
 		{
-			msg: "rule names match while idletimeout unmatch should return false",
+			msg: "rule names match while idletimeout don't should return false",
 			existingRule: []network.LoadBalancingRule{
 				{
 					Name: to.StringPtr("httpRule"),
@@ -217,7 +217,7 @@ func TestFindRule(t *testing.T) {
 			expected: true,
 		},
 		{
-			msg: "rule names match while LoadDistribution unmatch should return false",
+			msg: "rule names match while LoadDistribution don't should return false",
 			existingRule: []network.LoadBalancingRule{
 				{
 					Name: to.StringPtr("probe1"),
@@ -722,7 +722,7 @@ func TestShouldReleaseExistingOwnedPublicIP(t *testing.T) {
 	}
 }
 
-func TestgetIPTagMap(t *testing.T) {
+func TestGetIPTagMap(t *testing.T) {
 	tests := []struct {
 		desc     string
 		input    string
@@ -1170,7 +1170,7 @@ func TestGetServiceLoadBalancer(t *testing.T) {
 			expectedError:  false,
 		},
 		{
-			desc:           "getServiceLoadBalancer shall report error if there're loadbalancer mode annotations on a standard lb",
+			desc:           "getServiceLoadBalancer shall report error if there are loadbalancer mode annotations on a standard lb",
 			service:        getTestService("service1", v1.ProtocolTCP, nil, false, 80),
 			annotations:    map[string]string{ServiceAnnotationLoadBalancerMode: "__auto__"},
 			sku:            "standard",
