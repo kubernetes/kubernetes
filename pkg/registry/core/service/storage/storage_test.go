@@ -18,6 +18,7 @@ package storage
 
 import (
 	"net"
+	"reflect"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -322,6 +323,155 @@ func makeServiceList() (undefaulted, defaulted *api.ServiceList) {
 	return undefaulted, defaulted
 }
 
+func TestServiceDefaultOnRead(t *testing.T) {
+	// Helper makes a mostly-valid Service.  Test-cases can tweak it as needed.
+	makeService := func(tweak func(*api.Service)) *api.Service {
+		svc := &api.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "svc", Namespace: "ns"},
+			Spec: api.ServiceSpec{
+				Type:       api.ServiceTypeClusterIP,
+				ClusterIP:  "1.2.3.4",
+				ClusterIPs: []string{"1.2.3.4"},
+			},
+		}
+		if tweak != nil {
+			tweak(svc)
+		}
+		return svc
+	}
+	// Helper makes a mostly-valid ServiceList.  Test-cases can tweak it as needed.
+	makeServiceList := func(tweak func(*api.ServiceList)) *api.ServiceList {
+		list := &api.ServiceList{
+			Items: []api.Service{{
+				ObjectMeta: metav1.ObjectMeta{Name: "svc", Namespace: "ns"},
+				Spec: api.ServiceSpec{
+					Type:       api.ServiceTypeClusterIP,
+					ClusterIP:  "1.2.3.4",
+					ClusterIPs: []string{"1.2.3.4"},
+				},
+			}},
+		}
+		if tweak != nil {
+			tweak(list)
+		}
+		return list
+	}
+
+	testCases := []struct {
+		name      string
+		input     runtime.Object
+		expectErr bool
+		expect    runtime.Object
+	}{{
+		name:   "no change v4",
+		input:  makeService(nil),
+		expect: makeService(nil),
+	}, {
+		name: "missing clusterIPs v4",
+		input: makeService(func(svc *api.Service) {
+			svc.Spec.ClusterIPs = nil
+		}),
+		expect: makeService(nil),
+	}, {
+		name: "no change v6",
+		input: makeService(func(svc *api.Service) {
+			svc.Spec.ClusterIP = "2000::"
+			svc.Spec.ClusterIPs = []string{"2000::"}
+		}),
+		expect: makeService(func(svc *api.Service) {
+			svc.Spec.ClusterIP = "2000::"
+			svc.Spec.ClusterIPs = []string{"2000::"}
+		}),
+	}, {
+		name: "missing clusterIPs v6",
+		input: makeService(func(svc *api.Service) {
+			svc.Spec.ClusterIP = "2000::"
+			svc.Spec.ClusterIPs = nil
+		}),
+		expect: makeService(func(svc *api.Service) {
+			svc.Spec.ClusterIP = "2000::"
+			svc.Spec.ClusterIPs = []string{"2000::"}
+		}),
+	}, {
+		name:   "list, no change v4",
+		input:  makeServiceList(nil),
+		expect: makeServiceList(nil),
+	}, {
+		name: "list, missing clusterIPs v4",
+		input: makeServiceList(func(list *api.ServiceList) {
+			list.Items[0].Spec.ClusterIPs = nil
+		}),
+		expect: makeService(nil),
+	}, {
+		name:      "not Service or ServiceList",
+		input:     &api.Pod{},
+		expectErr: false,
+	}}
+
+	for _, tc := range testCases {
+		makeStorage := func(t *testing.T) (*GenericREST, *etcd3testing.EtcdTestServer) {
+			etcdStorage, server := registrytest.NewEtcdStorage(t, "")
+			restOptions := generic.RESTOptions{
+				StorageConfig:           etcdStorage,
+				Decorator:               generic.UndecoratedStorage,
+				DeleteCollectionWorkers: 1,
+				ResourcePrefix:          "services",
+			}
+
+			_, cidr, err := net.ParseCIDR("10.0.0.0/24")
+			if err != nil {
+				t.Fatalf("failed to parse CIDR")
+			}
+
+			serviceStorage, _, err := NewGenericREST(restOptions, *cidr, false)
+			if err != nil {
+				t.Fatalf("unexpected error from REST storage: %v", err)
+			}
+			return serviceStorage, server
+		}
+		t.Run(tc.name, func(t *testing.T) {
+			storage, server := makeStorage(t)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+
+			tmp := tc.input.DeepCopyObject()
+			err := storage.defaultOnRead(tmp)
+			if err != nil && !tc.expectErr {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if err == nil && tc.expectErr {
+				t.Errorf("unexpected success")
+			}
+
+			svc, ok := tmp.(*api.Service)
+			if !ok {
+				list, ok := tmp.(*api.ServiceList)
+				if !ok {
+					return
+				}
+				svc = &list.Items[0]
+			}
+
+			exp, ok := tc.expect.(*api.Service)
+			if !ok {
+				list, ok := tc.expect.(*api.ServiceList)
+				if !ok {
+					return
+				}
+				exp = &list.Items[0]
+			}
+
+			// Verify fields we know are affected
+			if svc.Spec.ClusterIP != exp.Spec.ClusterIP {
+				t.Errorf("clusterIP: expected %v, got %v", exp.Spec.ClusterIP, svc.Spec.ClusterIP)
+			}
+			if !reflect.DeepEqual(svc.Spec.ClusterIPs, exp.Spec.ClusterIPs) {
+				t.Errorf("clusterIPs: expected %v, got %v", exp.Spec.ClusterIPs, svc.Spec.ClusterIPs)
+			}
+		})
+	}
+}
+
 func TestServiceDefaulting(t *testing.T) {
 	makeStorage := func(t *testing.T, primaryCIDR string, isDualStack bool) (*GenericREST, *StatusREST, *etcd3testing.EtcdTestServer) {
 		etcdStorage, server := registrytest.NewEtcdStorage(t, "")
@@ -455,15 +605,15 @@ func TestServiceDefaulting(t *testing.T) {
 			}
 
 			copyUndefaultedList := undefaultedServiceList.DeepCopy()
-			// run for each service
+			// run for each Service
 			for i, svc := range copyUndefaultedList.Items {
-				storage.defaultServiceOnRead(&svc)
+				storage.defaultOnRead(&svc)
 				compareSvc(svc, defaultedServiceList.Items[i])
 			}
 
 			copyUndefaultedList = undefaultedServiceList.DeepCopy()
-			// run as a servicr list
-			storage.defaultServiceOnRead(copyUndefaultedList)
+			// run as a ServiceList
+			storage.defaultOnRead(copyUndefaultedList)
 			for i, svc := range copyUndefaultedList.Items {
 				compareSvc(svc, defaultedServiceList.Items[i])
 			}

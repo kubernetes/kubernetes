@@ -97,7 +97,7 @@ func (strategy svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Ob
 	service := obj.(*api.Service)
 	service.Status = api.ServiceStatus{}
 
-	normalizeClusterIPs(nil, service)
+	NormalizeClusterIPs(nil, service)
 	dropServiceDisabledFields(service, nil)
 }
 
@@ -107,7 +107,7 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 	oldService := old.(*api.Service)
 	newService.Status = oldService.Status
 
-	normalizeClusterIPs(oldService, newService)
+	NormalizeClusterIPs(oldService, newService)
 	dropServiceDisabledFields(newService, oldService)
 	dropTypeDependentFields(newService, oldService)
 	trimFieldsForDualStackDowngrade(newService, oldService)
@@ -224,8 +224,9 @@ func (serviceStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtim
 	return validation.ValidateServiceStatusUpdate(obj.(*api.Service), old.(*api.Service))
 }
 
-// normalizeClusterIPs adjust clusterIPs based on ClusterIP
-func normalizeClusterIPs(oldSvc *api.Service, newSvc *api.Service) {
+// NormalizeClusterIPs adjust clusterIPs based on ClusterIP.  This must not
+// consider any other fields.
+func NormalizeClusterIPs(oldSvc, newSvc *api.Service) {
 	// In all cases here, we don't need to over-think the inputs.  Validation
 	// will be called on the new object soon enough.  All this needs to do is
 	// try to divine what user meant with these linked fields. The below

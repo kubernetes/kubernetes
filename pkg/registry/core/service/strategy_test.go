@@ -704,7 +704,7 @@ func TestNormalizeClusterIPs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			normalizeClusterIPs(tc.oldService, tc.newService)
+			NormalizeClusterIPs(tc.oldService, tc.newService)
 
 			if tc.newService == nil {
 				t.Fatalf("unexpected new service to be nil")
