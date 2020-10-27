@@ -39,8 +39,9 @@ type FrameworkFactory func(config.KubeSchedulerProfile, ...frameworkruntime.Opti
 // Profile is a scheduling profile.
 type Profile struct {
 	framework.Framework
-	Recorder events.EventRecorder
-	Name     string
+	Recorder                 events.EventRecorder
+	Name                     string
+	PercentageOfNodesToScore int32
 }
 
 // NewProfile builds a Profile for the given configuration.
@@ -53,9 +54,10 @@ func NewProfile(cfg config.KubeSchedulerProfile, frameworkFact FrameworkFactory,
 		return nil, err
 	}
 	return &Profile{
-		Name:      cfg.SchedulerName,
-		Framework: fwk,
-		Recorder:  recorder,
+		Name:                     cfg.SchedulerName,
+		Framework:                fwk,
+		Recorder:                 recorder,
+		PercentageOfNodesToScore: cfg.PercentageOfNodesToScore,
 	}, nil
 }
 

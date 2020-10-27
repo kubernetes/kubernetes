@@ -211,12 +211,15 @@ func (g *genericScheduler) selectHost(nodeScoreList framework.NodeScoreList) (st
 
 // numFeasibleNodesToFind returns the number of feasible nodes that once found, the scheduler stops
 // its search for more feasible nodes.
-func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes int32) {
-	if numAllNodes < minFeasibleNodesToFind || g.percentageOfNodesToScore >= 100 {
+func (g *genericScheduler) numFeasibleNodesToFind(prof *profile.Profile, numAllNodes int32) (numNodes int32) {
+	adaptivePercentage := g.percentageOfNodesToScore
+	if prof.PercentageOfNodesToScore != 0 {
+		adaptivePercentage = prof.PercentageOfNodesToScore
+	}
+	if numAllNodes < minFeasibleNodesToFind || adaptivePercentage >= 100 {
 		return numAllNodes
 	}
 
-	adaptivePercentage := g.percentageOfNodesToScore
 	if adaptivePercentage <= 0 {
 		basePercentageOfNodesToScore := int32(50)
 		adaptivePercentage = basePercentageOfNodesToScore - numAllNodes/125
@@ -275,7 +278,7 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, prof *p
 		return nil, err
 	}
 
-	numNodesToFind := g.numFeasibleNodesToFind(int32(len(allNodes)))
+	numNodesToFind := g.numFeasibleNodesToFind(prof, int32(len(allNodes)))
 
 	// Create feasible list with enough space to avoid growing it
 	// and allow assigning.

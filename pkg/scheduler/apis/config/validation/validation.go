@@ -81,6 +81,10 @@ func validateKubeSchedulerProfile(path *field.Path, profile *config.KubeSchedule
 	if len(profile.SchedulerName) == 0 {
 		allErrs = append(allErrs, field.Required(path.Child("schedulerName"), ""))
 	}
+	if profile.PercentageOfNodesToScore < 0 || profile.PercentageOfNodesToScore > 100 {
+		allErrs = append(allErrs, field.Invalid(path.Child("percentageOfNodesToScore"),
+			profile.PercentageOfNodesToScore, "not in valid range [0-100]"))
+	}
 	return allErrs
 }
 

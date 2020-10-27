@@ -69,6 +69,8 @@ type KubeSchedulerConfiguration struct {
 	// then scheduler stops finding further feasible nodes once it finds 150 feasible ones.
 	// When the value is 0, default percentage (5%--50% based on the size of the cluster) of the
 	// nodes will be scored.
+	// Note: It will be overridden by the profile-level score percentage when that is available.
+	// DEPRECATED: This will be removed in v1beta2, please use scheduler profiles to configure it instead.
 	PercentageOfNodesToScore *int32 `json:"percentageOfNodesToScore,omitempty"`
 
 	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
@@ -129,6 +131,16 @@ type KubeSchedulerProfile struct {
 	// If SchedulerName matches with the pod's "spec.schedulerName", then the pod
 	// is scheduled with this profile.
 	SchedulerName *string `json:"schedulerName,omitempty"`
+
+	// PercentageOfNodesToScore is the percentage of all nodes that once found feasible
+	// for running a pod, the scheduler stops its search for more feasible nodes in
+	// the cluster. This helps improve scheduler's performance. Scheduler always tries to find
+	// at least "minFeasibleNodesToFind" feasible nodes no matter what the value of this flag is.
+	// Example: if the cluster size is 500 nodes and the value of this flag is 30,
+	// then scheduler stops finding further feasible nodes once it finds 150 feasible ones.
+	// When the value is 0, adaptative percentage (5%--50% based on the size of the cluster) of the
+	// nodes will be scored.
+	PercentageOfNodesToScore *int32 `json:"percentageOfNodesToScore,omitempty"`
 
 	// Plugins specify the set of plugins that should be enabled or disabled.
 	// Enabled plugins are the ones that should be enabled in addition to the

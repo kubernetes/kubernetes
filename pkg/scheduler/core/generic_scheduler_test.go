@@ -1119,39 +1119,53 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 	tests := []struct {
 		name                     string
 		percentageOfNodesToScore int32
+		prof                     *profile.Profile
 		numAllNodes              int32
 		wantNumNodes             int32
 	}{
 		{
 			name:         "not set percentageOfNodesToScore and nodes number not more than 50",
+			prof:         &profile.Profile{},
 			numAllNodes:  10,
 			wantNumNodes: 10,
 		},
 		{
 			name:                     "set percentageOfNodesToScore and nodes number not more than 50",
 			percentageOfNodesToScore: 40,
+			prof:                     &profile.Profile{},
 			numAllNodes:              10,
 			wantNumNodes:             10,
 		},
 		{
 			name:         "not set percentageOfNodesToScore and nodes number more than 50",
+			prof:         &profile.Profile{},
 			numAllNodes:  1000,
 			wantNumNodes: 420,
 		},
 		{
 			name:                     "set percentageOfNodesToScore and nodes number more than 50",
+			prof:                     &profile.Profile{},
 			percentageOfNodesToScore: 40,
 			numAllNodes:              1000,
 			wantNumNodes:             400,
 		},
 		{
 			name:         "not set percentageOfNodesToScore and nodes number more than 50*125",
+			prof:         &profile.Profile{},
 			numAllNodes:  6000,
 			wantNumNodes: 300,
 		},
 		{
 			name:                     "set percentageOfNodesToScore and nodes number more than 50*125",
 			percentageOfNodesToScore: 40,
+			prof:                     &profile.Profile{},
+			numAllNodes:              6000,
+			wantNumNodes:             2400,
+		},
+		{
+			name:                     "the percentageOfNodesToScore of Profile should override the global config",
+			percentageOfNodesToScore: 10,
+			prof:                     &profile.Profile{PercentageOfNodesToScore: 40},
 			numAllNodes:              6000,
 			wantNumNodes:             2400,
 		},
@@ -1161,7 +1175,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 			g := &genericScheduler{
 				percentageOfNodesToScore: tt.percentageOfNodesToScore,
 			}
-			if gotNumNodes := g.numFeasibleNodesToFind(tt.numAllNodes); gotNumNodes != tt.wantNumNodes {
+			if gotNumNodes := g.numFeasibleNodesToFind(tt.prof, tt.numAllNodes); gotNumNodes != tt.wantNumNodes {
 				t.Errorf("genericScheduler.numFeasibleNodesToFind() = %v, want %v", gotNumNodes, tt.wantNumNodes)
 			}
 		})
@@ -1190,7 +1204,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 	prof := &profile.Profile{Framework: fwk}
 	// To make numAllNodes % nodesToFind != 0
 	g.percentageOfNodesToScore = 30
-	nodesToFind := int(g.numFeasibleNodesToFind(int32(numAllNodes)))
+	nodesToFind := int(g.numFeasibleNodesToFind(prof, int32(numAllNodes)))
 
 	// Iterating over all nodes more than twice
 	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {
