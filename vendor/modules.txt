@@ -113,11 +113,9 @@ github.com/PuerkitoBio/purell
 # github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 => github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
 github.com/PuerkitoBio/urlesc
 # github.com/PuerkitoBio/urlesc => github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
-# github.com/agnivade/levenshtein => github.com/agnivade/levenshtein v1.0.1
 # github.com/ajstarks/svgo => github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af
 # github.com/alecthomas/template => github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
 # github.com/alecthomas/units => github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4
-# github.com/andreyvit/diff => github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883
 # github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e => github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 ## explicit
 github.com/armon/circbuf
@@ -416,9 +414,9 @@ github.com/go-logr/logr
 github.com/go-openapi/analysis
 # github.com/go-openapi/analysis => github.com/go-openapi/analysis v0.19.5
 github.com/go-openapi/analysis/internal
-# github.com/go-openapi/errors v0.19.2 => github.com/go-openapi/errors v0.19.2
+# github.com/go-openapi/errors v0.19.5 => github.com/go-openapi/errors v0.19.5
 github.com/go-openapi/errors
-# github.com/go-openapi/errors => github.com/go-openapi/errors v0.19.2
+# github.com/go-openapi/errors => github.com/go-openapi/errors v0.19.5
 # github.com/go-openapi/jsonpointer v0.19.3 => github.com/go-openapi/jsonpointer v0.19.3
 github.com/go-openapi/jsonpointer
 # github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.3
@@ -443,10 +441,10 @@ github.com/go-openapi/strfmt
 # github.com/go-openapi/swag v0.19.5 => github.com/go-openapi/swag v0.19.5
 github.com/go-openapi/swag
 # github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.5
-# github.com/go-openapi/validate v0.19.5 => github.com/go-openapi/validate v0.19.5
+# github.com/go-openapi/validate v0.19.9-0.20200613183935-c0f6196cdffe => github.com/go-openapi/validate v0.19.9-0.20200613183935-c0f6196cdffe
 ## explicit
 github.com/go-openapi/validate
-# github.com/go-openapi/validate => github.com/go-openapi/validate v0.19.5
+# github.com/go-openapi/validate => github.com/go-openapi/validate v0.19.9-0.20200613183935-c0f6196cdffe
 # github.com/go-ozzo/ozzo-validation v3.5.0+incompatible => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 ## explicit
 github.com/go-ozzo/ozzo-validation
@@ -978,7 +976,6 @@ github.com/satori/go.uuid
 # github.com/seccomp/libseccomp-golang v0.9.1 => github.com/seccomp/libseccomp-golang v0.9.1
 github.com/seccomp/libseccomp-golang
 # github.com/seccomp/libseccomp-golang => github.com/seccomp/libseccomp-golang v0.9.1
-# github.com/sergi/go-diff => github.com/sergi/go-diff v1.0.0
 # github.com/shurcooL/sanitized_anchor_name v1.0.0 => github.com/shurcooL/sanitized_anchor_name v1.0.0
 github.com/shurcooL/sanitized_anchor_name
 # github.com/shurcooL/sanitized_anchor_name => github.com/shurcooL/sanitized_anchor_name v1.0.0
@@ -1048,7 +1045,6 @@ github.com/tmc/grpc-websocket-proxy/wsproxy
 # github.com/urfave/negroni v1.0.0 => github.com/urfave/negroni v1.0.0
 ## explicit
 # github.com/urfave/negroni => github.com/urfave/negroni v1.0.0
-# github.com/vektah/gqlparser => github.com/vektah/gqlparser v1.1.2
 # github.com/vishvananda/netlink v1.1.0 => github.com/vishvananda/netlink v1.1.0
 ## explicit
 github.com/vishvananda/netlink

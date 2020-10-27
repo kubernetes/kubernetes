@@ -6,10 +6,10 @@ go 1.15
 
 require (
 	github.com/emicklei/go-restful v2.9.5+incompatible
-	github.com/go-openapi/errors v0.19.2
+	github.com/go-openapi/errors v0.19.5
 	github.com/go-openapi/spec v0.19.3
 	github.com/go-openapi/strfmt v0.19.3
-	github.com/go-openapi/validate v0.19.5
+	github.com/go-openapi/validate v0.19.9-0.20200613183935-c0f6196cdffe
 	github.com/gogo/protobuf v1.3.1
 	github.com/google/go-cmp v0.4.0
 	github.com/google/gofuzz v1.1.0
