@@ -133,8 +133,12 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
 		klog.Infof("HTTP2 has been explicitly disabled")
 	} else if allowsHTTP2(t) {
-		if err := http2.ConfigureTransport(t, http2.WithReadIdleTimeout(30*time.Second), http2.WithPingTimeout(1*time.Second)); err != nil {
+		t2, err := http2.ConfigureTransports(t)
+		if err != nil {
 			klog.Warningf("Transport failed http2 configuration: %v", err)
+		} else {
+			t2.ReadIdleTimeout = 10 * time.Second
+			t2.PingTimeout = 2 * time.Second
 		}
 	}
 	return t
