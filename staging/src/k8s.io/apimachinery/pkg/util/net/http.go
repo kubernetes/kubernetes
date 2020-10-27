@@ -33,6 +33,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -132,7 +133,7 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
 		klog.Infof("HTTP2 has been explicitly disabled")
 	} else if allowsHTTP2(t) {
-		if err := http2.ConfigureTransport(t); err != nil {
+		if err := configureHttp2Transport(t); err != nil {
 			klog.Warningf("Transport failed http2 configuration: %v", err)
 		}
 	}
@@ -152,6 +153,43 @@ func allowsHTTP2(t *http.Transport) bool {
 	}
 	// the transport explicitly set NextProtos and excluded http/2
 	return false
+}
+
+// configureHttp2Transport explicitly configures a net/http HTTP/1 Transport
+// to use golang.org/x/net HTTP/2 instead of bundled HTTP/2.
+// It gives us an opportunity to configure the underlying HTTP/2 Transport.
+// It will return error if the HTTP/1 Transport has already been HTTP/2-enabled.
+func configureHttp2Transport(t1 *http.Transport) error {
+	h2t, err := http2.ConfigureTransports(t1)
+	if err != nil {
+		return err
+	}
+
+	// There are several confirmed flaws with Go's http2 implementation.
+	// So we need to explicitly enable the "http2: connection health check" introduced in golang/net/pull/55
+	// to recover from such "fatal" situations.
+	// Upstream golang issues:
+	//   # golang/go/issues/39750
+	//   # golang/go/issues/40201
+	//   # golang/go/issues/41721
+	// Associated Kubernetes issues:
+	//   # kubernetes/kubernetes/issues/87615
+	if idleConnTimeout := t1.IdleConnTimeout / 2; idleConnTimeout > 0 {
+		// h2Transport configured here does not dial any new connection,
+		// we can set the interval of healthCheck to half of h1Transport's IdleConnTimeout.
+		// By default, ReadIdleTimeout is not configured.
+		h2t.ReadIdleTimeout = idleConnTimeout
+	} else {
+		// The default IdleConnTimeout for h1Transport is 90s
+		h2t.ReadIdleTimeout = defaultTransport.IdleConnTimeout / 2
+	}
+	// The default PingTimeout is 15s.
+	// Our configuration should not below default value.
+	if pingTimeout := h2t.ReadIdleTimeout / 2; pingTimeout > 15*time.Second {
+		h2t.PingTimeout = pingTimeout
+	}
+
+	return nil
 }
 
 type RoundTripperWrapper interface {
