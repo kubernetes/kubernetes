@@ -24,6 +24,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -672,6 +673,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	ginkgo.Context("PriorityClass endpoints", func() {
 		var cs clientset.Interface
 		f := framework.NewDefaultFramework("sched-preemption-path")
+		testUUID := uuid.New().String()
 		var pcs []*schedulingv1.PriorityClass
 
 		ginkgo.BeforeEach(func() {
@@ -679,7 +681,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			// Create 2 PriorityClass: p1, p2.
 			for i := 1; i <= 2; i++ {
 				name, val := fmt.Sprintf("p%d", i), int32(i)
-				pc, err := cs.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: name}, Value: val}, metav1.CreateOptions{})
+				pc, err := cs.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"e2e": testUUID}}, Value: val}, metav1.CreateOptions{})
 				if err != nil {
 					framework.Logf("Failed to create priority '%v/%v'. Reason: %v. Msg: %v", name, val, apierrors.ReasonForError(err), err)
 				}
@@ -703,11 +705,9 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				}
 			}
 
-			// Cannot run collection deletion which would delete all system level priority classes.
-			for _, pc := range pcs {
-				err := cs.SchedulingV1().PriorityClasses().Delete(context.TODO(), pc.Name, *metav1.NewDeleteOptions(0))
-				framework.ExpectNoError(err)
-			}
+			// Collection deletion on created PriorityClasses.
+			err := cs.SchedulingV1().PriorityClasses().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: fmt.Sprintf("e2e=%v", testUUID)})
+			framework.ExpectNoError(err)
 		})
 
 		/*
