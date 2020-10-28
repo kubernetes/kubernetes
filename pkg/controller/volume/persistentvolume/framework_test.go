@@ -47,6 +47,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 )
 
+func init() {
+	klog.InitFlags(nil)
+}
+
 // This is a unit test framework for persistent volume controller.
 // It fills the controller with test claims/volumes and can simulate these
 // scenarios:
