@@ -1072,3 +1072,130 @@ func TestReleaseLeaseConfigMaps(t *testing.T) {
 func TestReleaseLeaseLeases(t *testing.T) {
 	testReleaseLease(t, "leases")
 }
+
+func TestReleaseOnCancellation_Endpoints(t *testing.T) {
+	testReleaseOnCancellation(t, "endpoints")
+}
+
+func TestReleaseOnCancellation_ConfigMaps(t *testing.T) {
+	testReleaseOnCancellation(t, "configmaps")
+}
+
+func TestReleaseOnCancellation_Leases(t *testing.T) {
+	testReleaseOnCancellation(t, "leases")
+}
+
+func testReleaseOnCancellation(t *testing.T, objectType string) {
+	var (
+		onNewLeader   = make(chan struct{})
+		onRenewCalled = make(chan struct{})
+		onRenewResume = make(chan struct{})
+		onRelease     = make(chan struct{})
+
+		lockObj runtime.Object
+		updates int
+	)
+
+	resourceLockConfig := rl.ResourceLockConfig{
+		Identity: "baz",
+		// TODO - uncomment this to introduce errors
+		//		EventRecorder: &record.FakeRecorder{},
+	}
+	c := &fake.Clientset{}
+
+	c.AddReactor("get", objectType, func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+		if lockObj != nil {
+			return true, lockObj, nil
+		}
+		return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
+	})
+
+	// create lock
+	c.AddReactor("create", objectType, func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+		lockObj = action.(fakeclient.CreateAction).GetObject()
+		return true, lockObj, nil
+	})
+
+	c.AddReactor("update", objectType, func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+		updates++
+
+		// Second update (first renew) should return our canceled error
+		// FakeClient doesn't do anything with the context so we're doing this ourselves
+		if updates == 2 {
+			close(onRenewCalled)
+			<-onRenewResume
+			return true, nil, context.Canceled
+		} else if updates == 3 {
+			close(onRelease)
+		}
+
+		lockObj = action.(fakeclient.UpdateAction).GetObject()
+		return true, lockObj, nil
+
+	})
+
+	c.AddReactor("*", "*", func(action fakeclient.Action) (bool, runtime.Object, error) {
+		t.Errorf("unreachable action. testclient called too many times: %+v", action)
+		return true, nil, fmt.Errorf("unreachable action")
+	})
+
+	lock, err := rl.New(objectType, "foo", "bar", c.CoreV1(), c.CoordinationV1(), resourceLockConfig)
+	if err != nil {
+		t.Fatal("resourcelock.New() = ", err)
+	}
+
+	lec := LeaderElectionConfig{
+		Lock:          lock,
+		LeaseDuration: 15 * time.Second,
+		RenewDeadline: 2 * time.Second,
+		RetryPeriod:   1 * time.Second,
+
+		// This is what we're testing
+		ReleaseOnCancel: true,
+
+		Callbacks: LeaderCallbacks{
+			OnNewLeader:      func(identity string) {},
+			OnStoppedLeading: func() {},
+			OnStartedLeading: func(context.Context) {
+				close(onNewLeader)
+			},
+		},
+	}
+
+	elector, err := NewLeaderElector(lec)
+	if err != nil {
+		t.Fatal("Failed to create leader elector: ", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go elector.Run(ctx)
+
+	// Wait for us to become the leader
+	select {
+	case <-onNewLeader:
+	case <-time.After(10 * time.Second):
+		t.Fatal("failed to become the leader")
+	}
+
+	// Wait for renew (update) to be invoked
+	select {
+	case <-onRenewCalled:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the elector failed to renew the lock")
+	}
+
+	// Cancel the context - stopping the elector while
+	// it's running
+	cancel()
+
+	// Resume the update call to return the cancellation
+	// which should trigger the release flow
+	close(onRenewResume)
+
+	select {
+	case <-onRelease:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the lock was not released")
+	}
+}
