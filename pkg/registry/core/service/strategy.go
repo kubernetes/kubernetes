@@ -96,7 +96,7 @@ func (strategy svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Ob
 	service.Status = api.ServiceStatus{}
 
 	normalizeClusterIPs(nil, service)
-	strategy.dropServiceDisabledFields(service, nil)
+	dropServiceDisabledFields(service, nil)
 }
 
 // PrepareForUpdate sets contextual defaults and clears fields that are not allowed to be set by end users on update.
@@ -106,7 +106,7 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 	newService.Status = oldService.Status
 
 	normalizeClusterIPs(oldService, newService)
-	strategy.dropServiceDisabledFields(newService, oldService)
+	dropServiceDisabledFields(newService, oldService)
 	// if service was converted from ClusterIP => ExternalName
 	// then clear ClusterIPs, IPFamilyPolicy and IPFamilies
 	clearClusterIPRelatedFields(newService, oldService)
@@ -166,8 +166,8 @@ func (svcStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) e
 //     if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
 //         newSvc.Spec.MyFeature = nil
 //     }
-func (strategy svcStrategy) dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && !strategy.serviceDualStackFieldsInUse(oldSvc) {
+func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && !serviceDualStackFieldsInUse(oldSvc) {
 		newSvc.Spec.IPFamilies = nil
 		newSvc.Spec.IPFamilyPolicy = nil
 		if len(newSvc.Spec.ClusterIPs) > 1 {
@@ -182,7 +182,7 @@ func (strategy svcStrategy) dropServiceDisabledFields(newSvc *api.Service, oldSv
 }
 
 // returns true if svc.Spec.ServiceIPFamily field is in use
-func (strategy svcStrategy) serviceDualStackFieldsInUse(svc *api.Service) bool {
+func serviceDualStackFieldsInUse(svc *api.Service) bool {
 	if svc == nil {
 		return false
 	}
