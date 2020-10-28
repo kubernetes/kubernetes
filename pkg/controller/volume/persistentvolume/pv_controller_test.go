@@ -79,6 +79,17 @@ func TestControllerSync(t *testing.T) {
 			},
 		},
 		{
+			"5-2-2 - complete bind when PV and PVC both exist",
+			newVolumeArray("volume5-2", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty),
+			newVolumeArray("volume5-2", "1Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, pvutil.AnnBoundByController),
+			newClaimArray("claim5-2", "uid5-2", "1Gi", "", v1.ClaimPending, nil),
+			newClaimArray("claim5-2", "uid5-2", "1Gi", "volume5-2", v1.ClaimBound, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
+			noevents, noerrors,
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+				return nil
+			},
+		},
+		{
 			// deleteClaim with a bound claim makes bound volume released.
 			"5-3 - delete claim",
 			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, pvutil.AnnBoundByController),
