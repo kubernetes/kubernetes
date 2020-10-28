@@ -20,8 +20,10 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -107,9 +109,7 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 
 	normalizeClusterIPs(oldService, newService)
 	dropServiceDisabledFields(newService, oldService)
-	// if service was converted from ClusterIP => ExternalName
-	// then clear ClusterIPs, IPFamilyPolicy and IPFamilies
-	clearClusterIPRelatedFields(newService, oldService)
+	dropTypeDependentFields(newService, oldService)
 	trimFieldsForDualStackDowngrade(newService, oldService)
 }
 
@@ -298,23 +298,136 @@ func sameStringSlice(a []string, b []string) bool {
 	return true
 }
 
-// clearClusterIPRelatedFields ensures a backward compatible behavior when the user uses
-// an older client to convert a service from ClusterIP to ExternalName. We do that by removing
-// the newly introduced fields.
-func clearClusterIPRelatedFields(newService, oldService *api.Service) {
-	if newService.Spec.Type == api.ServiceTypeExternalName && oldService.Spec.Type != api.ServiceTypeExternalName {
-		// IMPORTANT: this function is always called AFTER ClusterIPs normalization
-		// which clears ClusterIPs according to ClusterIP. The below checks for ClusterIP
-		clusterIPReset := len(newService.Spec.ClusterIP) == 0 && len(oldService.Spec.ClusterIP) > 0
+// This is an unusual case.  Service has a number of inter-related fields and
+// in order to avoid breaking clients we try really hard to infer what users
+// mean when they change them.
+//
+// Services are effectively a discriminated union, where `type` is the
+// discriminator. Some fields just don't make sense with some types, so we
+// clear them.
+//
+// As a rule, we almost never change user input.  This can get tricky when APIs
+// evolve and new dependent fields are added.  This specific case includes
+// fields that are allocated from a pool and need to be released.  Anyone who
+// is contemplating copying this pattern should think REALLY hard about almost
+// any other option.
+func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
+	// For now we are only wiping on updates.  This minimizes potential
+	// confusion since many of the cases we are handling here are pretty niche.
+	if oldSvc == nil {
+		return
+	}
 
-		if clusterIPReset {
-			// reset other fields
-			newService.Spec.ClusterIP = ""
-			newService.Spec.ClusterIPs = nil
-			newService.Spec.IPFamilies = nil
-			newService.Spec.IPFamilyPolicy = nil
+	// In all of these cases we only want to wipe a field if we a) know it no
+	// longer applies; b) might have initialized it automatically; c) know the
+	// user did not ALSO try to change it (in which case it should fail in
+	// validation).
+
+	// If the user is switching to a type that does not need a value in
+	// clusterIP/clusterIPs (even "None" counts as a value), we might be able
+	// to wipe some fields.
+	if needsClusterIP(oldSvc) && !needsClusterIP(newSvc) {
+		if sameClusterIPs(oldSvc, newSvc) {
+			// These will be deallocated later.
+			newSvc.Spec.ClusterIP = ""
+			newSvc.Spec.ClusterIPs = nil
+		}
+		if sameIPFamilies(oldSvc, newSvc) {
+			newSvc.Spec.IPFamilies = nil
+		}
+		if sameIPFamilyPolicy(oldSvc, newSvc) {
+			newSvc.Spec.IPFamilyPolicy = nil
 		}
 	}
+
+	// If the user is switching to a type that doesn't use NodePorts AND they
+	// did not change any NodePort values, we can wipe them.  They will be
+	// deallocated later.
+	if needsNodePort(oldSvc) && !needsNodePort(newSvc) && sameNodePorts(oldSvc, newSvc) {
+		for i := range newSvc.Spec.Ports {
+			newSvc.Spec.Ports[i].NodePort = 0
+		}
+	}
+
+	// If the user is switching to a case that doesn't use HealthCheckNodePort AND they
+	// did not change the HealthCheckNodePort value, we can wipe it.  It will
+	// be deallocated later.
+	if needsHCNodePort(oldSvc) && !needsHCNodePort(newSvc) && sameHCNodePort(oldSvc, newSvc) {
+		newSvc.Spec.HealthCheckNodePort = 0
+	}
+
+	// NOTE: there are other fields like `selector` which we could wipe.
+	// Historically we did not wipe them and they are not allocated from
+	// finite pools, so we are (currently) choosing to leave them alone.
+}
+
+func needsClusterIP(svc *api.Service) bool {
+	if svc.Spec.Type == api.ServiceTypeExternalName {
+		return false
+	}
+	return true
+}
+
+func sameClusterIPs(oldSvc, newSvc *api.Service) bool {
+	sameSingular := oldSvc.Spec.ClusterIP == newSvc.Spec.ClusterIP
+	samePlural := sameStringSlice(oldSvc.Spec.ClusterIPs, newSvc.Spec.ClusterIPs)
+	return sameSingular && samePlural
+}
+
+func sameIPFamilies(oldSvc, newSvc *api.Service) bool {
+	return reflect.DeepEqual(oldSvc.Spec.IPFamilies, newSvc.Spec.IPFamilies)
+}
+
+func getIPFamilyPolicy(svc *api.Service) string {
+	if svc.Spec.IPFamilyPolicy == nil {
+		return ""
+	}
+	return string(*svc.Spec.IPFamilyPolicy)
+}
+
+func sameIPFamilyPolicy(oldSvc, newSvc *api.Service) bool {
+	return getIPFamilyPolicy(oldSvc) == getIPFamilyPolicy(newSvc)
+}
+
+func needsNodePort(svc *api.Service) bool {
+	if svc.Spec.Type == api.ServiceTypeNodePort || svc.Spec.Type == api.ServiceTypeLoadBalancer {
+		return true
+	}
+	return false
+}
+
+func sameNodePorts(oldSvc, newSvc *api.Service) bool {
+	// Helper to make a set of NodePort values.
+	allNodePorts := func(svc *api.Service) sets.Int {
+		out := sets.NewInt()
+		for i := range svc.Spec.Ports {
+			if svc.Spec.Ports[i].NodePort != 0 {
+				out.Insert(int(svc.Spec.Ports[i].NodePort))
+			}
+		}
+		return out
+	}
+
+	oldPorts := allNodePorts(oldSvc)
+	newPorts := allNodePorts(newSvc)
+
+	// Users can add, remove, or modify ports, as long as they don't add any
+	// net-new NodePorts.
+	return oldPorts.IsSuperset(newPorts)
+}
+
+func needsHCNodePort(svc *api.Service) bool {
+	if svc.Spec.Type != api.ServiceTypeLoadBalancer {
+		return false
+	}
+	if svc.Spec.ExternalTrafficPolicy != api.ServiceExternalTrafficPolicyTypeLocal {
+		return false
+	}
+	return true
+}
+
+func sameHCNodePort(oldSvc, newSvc *api.Service) bool {
+	return oldSvc.Spec.HealthCheckNodePort == newSvc.Spec.HealthCheckNodePort
 }
 
 // this func allows user to downgrade a service by just changing

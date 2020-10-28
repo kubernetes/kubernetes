@@ -76,13 +76,13 @@
         "timeoutSeconds": 2072604405
       }
     },
-    "ipFamilies": [
-      "x"
-    ],
     "topologyKeys": [
       "30"
     ],
-    "ipFamilyPolicy": ";Ơ歿:狞夌碕ʂ"
+    "ipFamilies": [
+      "斬³;Ơ歿:狞夌碕ʂɭîcP$Iņɖ"
+    ],
+    "ipFamilyPolicy": "9ȫŚ"
   },
   "status": {
     "loadBalancer": {
