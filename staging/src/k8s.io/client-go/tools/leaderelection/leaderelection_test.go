@@ -1097,9 +1097,8 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 	)
 
 	resourceLockConfig := rl.ResourceLockConfig{
-		Identity: "baz",
-		// TODO - uncomment this to introduce errors
-		//		EventRecorder: &record.FakeRecorder{},
+		Identity:      "baz",
+		EventRecorder: &record.FakeRecorder{},
 	}
 	c := &fake.Clientset{}
 
