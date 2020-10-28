@@ -343,7 +343,7 @@ func NewNodeController(
 		}
 
 		if err != nil {
-			return nil, err
+			glog.Errorf("Failed to allocate cidr for a node: %v... this may result in invalid pods later on", err)
 		}
 
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
