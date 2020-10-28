@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
@@ -142,29 +141,6 @@ func (m *mockHintProvider) GetPodTopologyHints(pod *v1.Pod) map[string][]Topolog
 func (m *mockHintProvider) Allocate(pod *v1.Pod, container *v1.Container) error {
 	//return allocateError
 	return nil
-}
-
-func TestGetAffinity(t *testing.T) {
-	tcases := []struct {
-		name          string
-		containerName string
-		podUID        string
-		expected      TopologyHint
-	}{
-		{
-			name:          "case1",
-			containerName: "nginx",
-			podUID:        "0aafa4c4-38e8-11e9-bcb1-a4bf01040474",
-			expected:      TopologyHint{},
-		},
-	}
-	for _, tc := range tcases {
-		mngr := manager{}
-		actual := mngr.GetAffinity(tc.podUID, tc.containerName)
-		if !reflect.DeepEqual(actual, tc.expected) {
-			t.Errorf("Expected Affinity in result to be %v, got %v", tc.expected, actual)
-		}
-	}
 }
 
 func TestAccumulateProvidersHints(t *testing.T) {
@@ -414,76 +390,6 @@ func TestCalculateAffinity(t *testing.T) {
 	}
 }
 
-func TestAddContainer(t *testing.T) {
-	testCases := []struct {
-		name        string
-		containerID string
-		podUID      types.UID
-	}{
-		{
-			name:        "Case1",
-			containerID: "nginx",
-			podUID:      "0aafa4c4-38e8-11e9-bcb1-a4bf01040474",
-		},
-		{
-			name:        "Case2",
-			containerID: "Busy_Box",
-			podUID:      "b3ee37fc-39a5-11e9-bcb1-a4bf01040474",
-		},
-	}
-	mngr := manager{}
-	mngr.podMap = make(map[string]string)
-	for _, tc := range testCases {
-		pod := v1.Pod{}
-		pod.UID = tc.podUID
-		err := mngr.AddContainer(&pod, tc.containerID)
-		if err != nil {
-			t.Errorf("Expected error to be nil but got: %v", err)
-		}
-		if val, ok := mngr.podMap[tc.containerID]; ok {
-			if reflect.DeepEqual(val, pod.UID) {
-				t.Errorf("Error occurred")
-			}
-		} else {
-			t.Errorf("Error occurred, Pod not added to podMap")
-		}
-	}
-}
-
-func TestRemoveContainer(t *testing.T) {
-	testCases := []struct {
-		name        string
-		containerID string
-		podUID      types.UID
-	}{
-		{
-			name:        "Case1",
-			containerID: "nginx",
-			podUID:      "0aafa4c4-38e8-11e9-bcb1-a4bf01040474",
-		},
-		{
-			name:        "Case2",
-			containerID: "Busy_Box",
-			podUID:      "b3ee37fc-39a5-11e9-bcb1-a4bf01040474",
-		},
-	}
-	var len1, len2 int
-	mngr := manager{}
-	mngr.podMap = make(map[string]string)
-	for _, tc := range testCases {
-		mngr.podMap[tc.containerID] = string(tc.podUID)
-		len1 = len(mngr.podMap)
-		err := mngr.RemoveContainer(tc.containerID)
-		len2 = len(mngr.podMap)
-		if err != nil {
-			t.Errorf("Expected error to be nil but got: %v", err)
-		}
-		if len1-len2 != 1 {
-			t.Errorf("Remove Pod resulted in error")
-		}
-	}
-
-}
 func TestAddHintProvider(t *testing.T) {
 	tcases := []struct {
 		name string
