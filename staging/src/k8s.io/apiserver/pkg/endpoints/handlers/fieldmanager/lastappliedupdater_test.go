@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager_test
+package fieldmanager
 
 import (
 	"strings"
@@ -22,15 +22,14 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"sigs.k8s.io/yaml"
 )
 
 func TestLastAppliedUpdater(t *testing.T) {
 	f := NewTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"),
 		false,
-		func(m fieldmanager.Manager) fieldmanager.Manager {
-			return fieldmanager.NewLastAppliedUpdater(m)
+		func(m Manager) Manager {
+			return NewLastAppliedUpdater(m)
 		})
 
 	originalLastApplied := `nonempty`

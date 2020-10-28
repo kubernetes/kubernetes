@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package internal
+package fieldmanager
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,7 +35,7 @@ type versionConverter struct {
 var _ merge.Converter = &versionConverter{}
 
 // NewVersionConverter builds a VersionConverter from a TypeConverter and an ObjectConvertor.
-func NewVersionConverter(t TypeConverter, o runtime.ObjectConvertor, h schema.GroupVersion) merge.Converter {
+func newVersionConverter(t TypeConverter, o runtime.ObjectConvertor, h schema.GroupVersion) merge.Converter {
 	return &versionConverter{
 		typeConverter:   t,
 		objectConvertor: o,
@@ -49,7 +49,7 @@ func NewVersionConverter(t TypeConverter, o runtime.ObjectConvertor, h schema.Gr
 }
 
 // NewCRDVersionConverter builds a VersionConverter for CRDs from a TypeConverter and an ObjectConvertor.
-func NewCRDVersionConverter(t TypeConverter, o runtime.ObjectConvertor, h schema.GroupVersion) merge.Converter {
+func newCRDVersionConverter(t TypeConverter, o runtime.ObjectConvertor, h schema.GroupVersion) merge.Converter {
 	return &versionConverter{
 		typeConverter:   t,
 		objectConvertor: o,
