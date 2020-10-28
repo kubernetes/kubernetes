@@ -92,8 +92,12 @@ func (cml *ConfigMapLock) Update(ctx context.Context, ler LeaderElectionRecord) 
 		cml.cm.Annotations = make(map[string]string)
 	}
 	cml.cm.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
-	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Update(ctx, cml.cm, metav1.UpdateOptions{})
-	return err
+	cm, err := cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Update(ctx, cml.cm, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	cml.cm = cm
+	return nil
 }
 
 // RecordEvent in leader election while adding meta-data
