@@ -26,9 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-openapi/spec"
-	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/validate"
+	goopenapispec "github.com/go-openapi/spec"
 
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
@@ -86,6 +84,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
+	"k8s.io/kube-openapi/pkg/validation/validate"
 )
 
 // crdHandler serves the `/apis` endpoint.
@@ -128,7 +129,7 @@ type crdHandler struct {
 	// staticOpenAPISpec is used as a base for the schema of CR's for the
 	// purpose of managing fields, it is how CR handlers get the structure
 	// of TypeMeta and ObjectMeta
-	staticOpenAPISpec *spec.Swagger
+	staticOpenAPISpec *goopenapispec.Swagger
 
 	// The limit on the request size that would be accepted and decoded in a write request
 	// 0 means no limit.
@@ -183,7 +184,7 @@ func NewCustomResourceDefinitionHandler(
 	authorizer authorizer.Authorizer,
 	requestTimeout time.Duration,
 	minRequestTimeout time.Duration,
-	staticOpenAPISpec *spec.Swagger,
+	staticOpenAPISpec *goopenapispec.Swagger,
 	maxRequestBodyBytes int64) (*crdHandler, error) {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
@@ -1309,7 +1310,7 @@ func serverStartingError() error {
 // buildOpenAPIModelsForApply constructs openapi models from any validation schemas specified in the custom resource,
 // and merges it with the models defined in the static OpenAPI spec.
 // Returns nil models if the ServerSideApply feature is disabled, or the static spec is nil, or an error is encountered.
-func buildOpenAPIModelsForApply(staticOpenAPISpec *spec.Swagger, crd *apiextensionsv1.CustomResourceDefinition) (proto.Models, error) {
+func buildOpenAPIModelsForApply(staticOpenAPISpec *goopenapispec.Swagger, crd *apiextensionsv1.CustomResourceDefinition) (proto.Models, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		return nil, nil
 	}
@@ -1317,7 +1318,7 @@ func buildOpenAPIModelsForApply(staticOpenAPISpec *spec.Swagger, crd *apiextensi
 		return nil, nil
 	}
 
-	specs := []*spec.Swagger{}
+	specs := []*goopenapispec.Swagger{}
 	for _, v := range crd.Spec.Versions {
 		s, err := builder.BuildSwagger(crd, v.Name, builder.Options{V2: false, StripDefaults: true, StripValueValidation: true, StripNullable: true, AllowNonStructural: true})
 		if err != nil {
