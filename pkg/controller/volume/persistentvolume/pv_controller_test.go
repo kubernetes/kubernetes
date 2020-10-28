@@ -273,9 +273,7 @@ func TestControllerSync(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		klog.V(4).Infof("starting test %q", test.name)
-
+	doit := func(test controllerTest) {
 		// Initialize the controller
 		client := &fake.Clientset{}
 
@@ -352,6 +350,13 @@ func TestControllerSync(t *testing.T) {
 		close(stopCh)
 
 		evaluateTestResults(ctrl, reactor.VolumeReactor, test, t)
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			doit(test)
+		})
 	}
 }
 
