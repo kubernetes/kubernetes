@@ -173,8 +173,10 @@ func TestCheckGeneratedNameError(t *testing.T) {
 	}
 }
 
-func makeValidService() api.Service {
-	return api.Service{
+func makeValidService() *api.Service {
+	preferDual := api.IPFamilyPolicyPreferDualStack
+
+	return &api.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "valid",
 			Namespace:       "default",
@@ -186,9 +188,33 @@ func makeValidService() api.Service {
 			Selector:        map[string]string{"key": "val"},
 			SessionAffinity: "None",
 			Type:            api.ServiceTypeClusterIP,
-			Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675, TargetPort: intstr.FromInt(8675)}},
+			Ports: []api.ServicePort{
+				makeValidServicePort("p", "TCP", 8675),
+				makeValidServicePort("q", "TCP", 309),
+			},
+			ClusterIP:      "1.2.3.4",
+			ClusterIPs:     []string{"1.2.3.4", "5:6:7::8"},
+			IPFamilyPolicy: &preferDual,
+			IPFamilies:     []api.IPFamily{"IPv4", "IPv6"},
 		},
 	}
+}
+
+func makeValidServicePort(name string, proto api.Protocol, port int32) api.ServicePort {
+	return api.ServicePort{
+		Name:       name,
+		Protocol:   proto,
+		Port:       port,
+		TargetPort: intstr.FromInt(int(port)),
+	}
+}
+
+func makeValidServiceCustom(tweaks ...func(svc *api.Service)) *api.Service {
+	svc := makeValidService()
+	for _, fn := range tweaks {
+		fn(svc)
+	}
+	return svc
 }
 
 // TODO: This should be done on types that are not part of our API
@@ -248,9 +274,9 @@ func TestBeforeUpdate(t *testing.T) {
 
 		oldSvc := makeValidService()
 		newSvc := makeValidService()
-		tc.tweakSvc(&oldSvc, &newSvc)
+		tc.tweakSvc(oldSvc, newSvc)
 		ctx := genericapirequest.NewDefaultContext()
-		err := rest.BeforeUpdate(strategy, ctx, runtime.Object(&oldSvc), runtime.Object(&newSvc))
+		err := rest.BeforeUpdate(strategy, ctx, runtime.Object(oldSvc), runtime.Object(newSvc))
 		if tc.expectErr && err == nil {
 			t.Errorf("unexpected non-error for %q", tc.name)
 		}
@@ -278,14 +304,14 @@ func TestServiceStatusStrategy(t *testing.T) {
 			},
 		},
 	}
-	testStatusStrategy.PrepareForUpdate(ctx, &newService, &oldService)
+	testStatusStrategy.PrepareForUpdate(ctx, newService, oldService)
 	if newService.Status.LoadBalancer.Ingress[0].IP != "127.0.0.2" {
 		t.Errorf("Service status updates should allow change of status fields")
 	}
 	if newService.Spec.SessionAffinity != "None" {
 		t.Errorf("PrepareForUpdate should have preserved old spec")
 	}
-	errs := testStatusStrategy.ValidateUpdate(ctx, &newService, &oldService)
+	errs := testStatusStrategy.ValidateUpdate(ctx, newService, oldService)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error %v", errs)
 	}
@@ -379,8 +405,7 @@ func TestDropDisabledField(t *testing.T) {
 			old := tc.oldSvc.DeepCopy()
 
 			// to test against user using IPFamily not set on cluster
-			svcStrategy := svcStrategy{ipFamilies: []api.IPFamily{api.IPv4Protocol}}
-			svcStrategy.dropServiceDisabledFields(tc.svc, tc.oldSvc)
+			dropServiceDisabledFields(tc.svc, tc.oldSvc)
 
 			// old node  should never be changed
 			if !reflect.DeepEqual(tc.oldSvc, old) {
@@ -704,193 +729,193 @@ func TestNormalizeClusterIPs(t *testing.T) {
 
 }
 
-func TestClearClusterIPRelatedFields(t *testing.T) {
-	//
-	// NOTE the data fed to this test assums that ClusterIPs normalization is
-	// already done check PrepareFor*(..) strategy
-	//
-	singleStack := api.IPFamilyPolicySingleStack
-	requireDualStack := api.IPFamilyPolicyRequireDualStack
-	testCases := []struct {
-		name        string
-		oldService  *api.Service
-		newService  *api.Service
-		shouldClear bool
-	}{
-		{
-			name:        "should clear, single stack converting to external name",
-			shouldClear: true,
-
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &singleStack,
-					ClusterIP:      "10.0.0.4",
-					ClusterIPs:     []string{"10.0.0.4"},
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeExternalName,
-					IPFamilyPolicy: &singleStack,
-					ClusterIP:      "",
-					ClusterIPs:     nil,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-				},
-			},
-		},
-
-		{
-			name:        "should clear, dual stack converting to external name(normalization removed all ips)",
-			shouldClear: true,
-
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIP:      "2000::1",
-					ClusterIPs:     []string{"2000::1", "10.0.0.4"},
-					IPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeExternalName,
-					IPFamilyPolicy: &singleStack,
-					ClusterIP:      "",
-					ClusterIPs:     nil,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-				},
-			},
-		},
-
-		{
-			name:        "should NOT clear, single stack converting to external name ClusterIPs was not cleared",
-			shouldClear: false,
-
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &singleStack,
-					ClusterIP:      "2000::1",
-					ClusterIPs:     []string{"2000::1"},
-					IPFamilies:     []api.IPFamily{api.IPv6Protocol},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeExternalName,
-					IPFamilyPolicy: &singleStack,
-					ClusterIP:      "2000::1",
-					ClusterIPs:     []string{"2000::1"},
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-				},
-			},
-		},
-
-		{
-			name:        "should NOT clear, dualstack cleared primary and changed ClusterIPs",
-			shouldClear: true,
-
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIP:      "2000::1",
-					ClusterIPs:     []string{"2000::1", "10.0.0.4"},
-					IPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeExternalName,
-					IPFamilyPolicy: &singleStack,
-					ClusterIP:      "",
-					ClusterIPs:     []string{"2000::1", "10.0.0.5"},
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-				},
-			},
-		},
-		{
-			name:        "should clear, dualstack user removed ClusterIPs",
-			shouldClear: true,
-
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIP:      "2000::1",
-					ClusterIPs:     []string{"2000::1", "10.0.0.4"},
-					IPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				},
-			},
-
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeExternalName,
-					IPFamilyPolicy: &singleStack,
-					ClusterIP:      "",
-					ClusterIPs:     nil,
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-				},
-			},
-		},
-		{
-			name:        "should NOT clear, dualstack service changing selector",
-			shouldClear: false,
-
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					Selector:       map[string]string{"foo": "bar"},
-					IPFamilyPolicy: &requireDualStack,
-					ClusterIP:      "2000::1",
-					ClusterIPs:     []string{"2000::1", "10.0.0.4"},
-					IPFamilies:     []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					Type:           api.ServiceTypeClusterIP,
-					Selector:       map[string]string{"foo": "baz"},
-					IPFamilyPolicy: &singleStack,
-					ClusterIP:      "2000::1",
-					ClusterIPs:     []string{"2000::1", "10.0.0.4"},
-					IPFamilies:     []api.IPFamily{api.IPv4Protocol},
-				},
-			},
-		},
+func TestDropTypeDependentFields(t *testing.T) {
+	// Tweaks used below.
+	setTypeExternalName := func(svc *api.Service) {
+		svc.Spec.Type = api.ServiceTypeExternalName
+	}
+	setTypeNodePort := func(svc *api.Service) {
+		svc.Spec.Type = api.ServiceTypeNodePort
+	}
+	setTypeClusterIP := func(svc *api.Service) {
+		svc.Spec.Type = api.ServiceTypeClusterIP
+	}
+	setTypeLoadBalancer := func(svc *api.Service) {
+		svc.Spec.Type = api.ServiceTypeLoadBalancer
+	}
+	clearClusterIPs := func(svc *api.Service) {
+		svc.Spec.ClusterIP = ""
+		svc.Spec.ClusterIPs = nil
+	}
+	changeClusterIPs := func(svc *api.Service) {
+		svc.Spec.ClusterIP += "0"
+		svc.Spec.ClusterIPs[0] += "0"
+	}
+	setNodePorts := func(svc *api.Service) {
+		for i := range svc.Spec.Ports {
+			svc.Spec.Ports[i].NodePort = int32(30000 + i)
+		}
+	}
+	changeNodePorts := func(svc *api.Service) {
+		for i := range svc.Spec.Ports {
+			svc.Spec.Ports[i].NodePort += 100
+		}
+	}
+	clearIPFamilies := func(svc *api.Service) {
+		svc.Spec.IPFamilies = nil
+	}
+	changeIPFamilies := func(svc *api.Service) {
+		svc.Spec.IPFamilies[0] = svc.Spec.IPFamilies[1]
+	}
+	clearIPFamilyPolicy := func(svc *api.Service) {
+		svc.Spec.IPFamilyPolicy = nil
+	}
+	changeIPFamilyPolicy := func(svc *api.Service) {
+		single := api.IPFamilyPolicySingleStack
+		svc.Spec.IPFamilyPolicy = &single
+	}
+	addPort := func(svc *api.Service) {
+		svc.Spec.Ports = append(svc.Spec.Ports, makeValidServicePort("new", "TCP", 0))
+	}
+	delPort := func(svc *api.Service) {
+		svc.Spec.Ports = svc.Spec.Ports[0 : len(svc.Spec.Ports)-1]
+	}
+	changePort := func(svc *api.Service) {
+		svc.Spec.Ports[0].Port += 100
+		svc.Spec.Ports[0].Protocol = "UDP"
+	}
+	setHCNodePort := func(svc *api.Service) {
+		svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+		svc.Spec.HealthCheckNodePort = int32(32000)
+	}
+	changeHCNodePort := func(svc *api.Service) {
+		svc.Spec.HealthCheckNodePort += 100
+	}
+	patches := func(fns ...func(svc *api.Service)) func(svc *api.Service) {
+		return func(svc *api.Service) {
+			for _, fn := range fns {
+				fn(svc)
+			}
+		}
 	}
 
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			clearClusterIPRelatedFields(testCase.newService, testCase.oldService)
+	testCases := []struct {
+		name   string
+		svc    *api.Service
+		patch  func(svc *api.Service)
+		expect *api.Service
+	}{
+		{ // clusterIP cases
+			name:   "don't clear clusterIP et al",
+			svc:    makeValidService(),
+			patch:  nil,
+			expect: makeValidService(),
+		}, {
+			name:   "clear clusterIP et al",
+			svc:    makeValidService(),
+			patch:  setTypeExternalName,
+			expect: makeValidServiceCustom(setTypeExternalName, clearClusterIPs, clearIPFamilies, clearIPFamilyPolicy),
+		}, {
+			name:   "don't clear changed clusterIP",
+			svc:    makeValidService(),
+			patch:  patches(setTypeExternalName, changeClusterIPs),
+			expect: makeValidServiceCustom(setTypeExternalName, changeClusterIPs, clearIPFamilies, clearIPFamilyPolicy),
+		}, {
+			name:   "don't clear changed ipFamilies",
+			svc:    makeValidService(),
+			patch:  patches(setTypeExternalName, changeIPFamilies),
+			expect: makeValidServiceCustom(setTypeExternalName, clearClusterIPs, changeIPFamilies, clearIPFamilyPolicy),
+		}, {
+			name:   "don't clear changed ipFamilyPolicy",
+			svc:    makeValidService(),
+			patch:  patches(setTypeExternalName, changeIPFamilyPolicy),
+			expect: makeValidServiceCustom(setTypeExternalName, clearClusterIPs, clearIPFamilies, changeIPFamilyPolicy),
+		}, { // nodePort cases
+			name:   "don't clear nodePorts for type=NodePort",
+			svc:    makeValidServiceCustom(setTypeNodePort, setNodePorts),
+			patch:  nil,
+			expect: makeValidServiceCustom(setTypeNodePort, setNodePorts),
+		}, {
+			name:   "don't clear nodePorts for type=LoadBalancer",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setNodePorts),
+			patch:  nil,
+			expect: makeValidServiceCustom(setTypeLoadBalancer, setNodePorts),
+		}, {
+			name:   "clear nodePorts",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setNodePorts),
+			patch:  setTypeClusterIP,
+			expect: makeValidService(),
+		}, {
+			name:   "don't clear changed nodePorts",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setNodePorts),
+			patch:  patches(setTypeClusterIP, changeNodePorts),
+			expect: makeValidServiceCustom(setNodePorts, changeNodePorts),
+		}, {
+			name:   "clear nodePorts when adding a port",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setNodePorts),
+			patch:  patches(setTypeClusterIP, addPort),
+			expect: makeValidServiceCustom(addPort),
+		}, {
+			name:   "don't clear nodePorts when adding a port with NodePort",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setNodePorts),
+			patch:  patches(setTypeClusterIP, addPort, setNodePorts),
+			expect: makeValidServiceCustom(addPort, setNodePorts),
+		}, {
+			name:   "clear nodePorts when removing a port",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setNodePorts),
+			patch:  patches(setTypeClusterIP, delPort),
+			expect: makeValidServiceCustom(delPort),
+		}, {
+			name:   "clear nodePorts when changing a port",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setNodePorts),
+			patch:  patches(setTypeClusterIP, changePort),
+			expect: makeValidServiceCustom(changePort),
+		}, { // healthCheckNodePort cases
+			name:   "don't clear healthCheckNodePort for type=LoadBalancer",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setHCNodePort),
+			patch:  nil,
+			expect: makeValidServiceCustom(setTypeLoadBalancer, setHCNodePort),
+		}, {
+			name:   "clear healthCheckNodePort",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setHCNodePort),
+			patch:  setTypeClusterIP,
+			expect: makeValidService(),
+		}, {
+			name:   "don't clear changed healthCheckNodePort",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setHCNodePort),
+			patch:  patches(setTypeClusterIP, changeHCNodePort),
+			expect: makeValidServiceCustom(setHCNodePort, changeHCNodePort),
+		}}
 
-			if testCase.shouldClear && len(testCase.newService.Spec.ClusterIPs) != 0 {
-				t.Fatalf("expected clusterIPs to be cleared")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tc.svc.DeepCopy()
+			if tc.patch != nil {
+				tc.patch(result)
 			}
-
-			if testCase.shouldClear && len(testCase.newService.Spec.IPFamilies) != 0 {
-				t.Fatalf("expected ipfamilies to be cleared")
+			dropTypeDependentFields(result, tc.svc)
+			if result.Spec.ClusterIP != tc.expect.Spec.ClusterIP {
+				t.Errorf("expected clusterIP %q, got %q", tc.expect.Spec.ClusterIP, result.Spec.ClusterIP)
 			}
-
-			if testCase.shouldClear && testCase.newService.Spec.IPFamilyPolicy != nil {
-				t.Fatalf("expected ipfamilypolicy to be cleared")
+			if !reflect.DeepEqual(result.Spec.ClusterIPs, tc.expect.Spec.ClusterIPs) {
+				t.Errorf("expected clusterIPs %q, got %q", tc.expect.Spec.ClusterIP, result.Spec.ClusterIP)
 			}
-
-			if !testCase.shouldClear && len(testCase.newService.Spec.ClusterIPs) == 0 {
-				t.Fatalf("expected clusterIPs NOT to be cleared")
+			if !reflect.DeepEqual(result.Spec.IPFamilies, tc.expect.Spec.IPFamilies) {
+				t.Errorf("expected ipFamilies %q, got %q", tc.expect.Spec.IPFamilies, result.Spec.IPFamilies)
 			}
-
-			if !testCase.shouldClear && len(testCase.newService.Spec.IPFamilies) == 0 {
-				t.Fatalf("expected ipfamilies NOT to be cleared")
+			if !reflect.DeepEqual(result.Spec.IPFamilyPolicy, tc.expect.Spec.IPFamilyPolicy) {
+				t.Errorf("expected ipFamilyPolicy %q, got %q", getIPFamilyPolicy(tc.expect), getIPFamilyPolicy(result))
 			}
-
-			if !testCase.shouldClear && testCase.newService.Spec.IPFamilyPolicy == nil {
-				t.Fatalf("expected ipfamilypolicy NOT to be cleared")
+			for i := range result.Spec.Ports {
+				resultPort := result.Spec.Ports[i].NodePort
+				expectPort := tc.expect.Spec.Ports[i].NodePort
+				if resultPort != expectPort {
+					t.Errorf("failed %q: expected Ports[%d].NodePort %d, got %d", tc.name, i, expectPort, resultPort)
+				}
 			}
-
+			if result.Spec.HealthCheckNodePort != tc.expect.Spec.HealthCheckNodePort {
+				t.Errorf("failed %q: expected healthCheckNodePort %d, got %d", tc.name, tc.expect.Spec.HealthCheckNodePort, result.Spec.HealthCheckNodePort)
+			}
 		})
 	}
 }
