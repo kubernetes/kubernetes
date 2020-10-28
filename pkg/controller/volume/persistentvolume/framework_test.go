@@ -632,9 +632,7 @@ func evaluateTestResults(ctrl *PersistentVolumeController, reactor *pvtesting.Vo
 //    controllerTest.testCall *once*.
 // 3. Compare resulting volumes and claims with expected volumes and claims.
 func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storage.StorageClass, pods []*v1.Pod) {
-	for _, test := range tests {
-		klog.V(4).Infof("starting test %q", test.name)
-
+	doit := func(t *testing.T, test controllerTest) {
 		// Initialize the controller
 		client := &fake.Clientset{}
 		ctrl, err := newTestController(client, nil, true)
@@ -678,6 +676,13 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 		}
 
 		evaluateTestResults(ctrl, reactor.VolumeReactor, test, t)
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			doit(t, test)
+		})
 	}
 }
 
