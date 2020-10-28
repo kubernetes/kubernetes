@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"net"
@@ -103,7 +102,7 @@ func main() {
 	namespace := metav1.NamespaceSystem
 	envNamespace := os.Getenv("NAMESPACE")
 	if envNamespace != "" {
-		if _, err := client.CoreV1().Namespaces().Get(context.TODO(), envNamespace, metav1.GetOptions{}); err != nil {
+		if _, err := client.CoreV1().Namespaces().Get(envNamespace, metav1.GetOptions{}); err != nil {
 			klog.Fatalf("%s namespace doesn't exist: %v", envNamespace, err)
 		}
 		namespace = envNamespace
@@ -118,7 +117,7 @@ func main() {
 	// Look for endpoints associated with the Elasticsearch logging service.
 	// First wait for the service to become available.
 	for t := time.Now(); time.Since(t) < 5*time.Minute; time.Sleep(10 * time.Second) {
-		elasticsearch, err = client.CoreV1().Services(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
+		elasticsearch, err = client.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
 		if err == nil {
 			break
 		}
@@ -135,7 +134,7 @@ func main() {
 	// Wait for some endpoints.
 	count, _ := strconv.Atoi(os.Getenv("MINIMUM_MASTER_NODES"))
 	for t := time.Now(); time.Since(t) < 5*time.Minute; time.Sleep(10 * time.Second) {
-		endpoints, err = client.CoreV1().Endpoints(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
+		endpoints, err = client.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
 		if err != nil {
 			continue
 		}
