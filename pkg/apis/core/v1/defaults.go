@@ -161,6 +161,10 @@ func SetDefaults_Service(obj *v1.Service) {
 				// NOTE: strategy handles cases where ClusterIPs is used (but not ClusterIP).
 			}
 		}
+
+		// any other defaulting depends on cluster configuration.
+		// further IPFamilies, IPFamilyPolicy defaulting is in ClusterIP alloc/reserve logic
+		// note: conversion logic handles cases where ClusterIPs is used (but not ClusterIP).
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) &&
