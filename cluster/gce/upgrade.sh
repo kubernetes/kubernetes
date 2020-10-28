@@ -462,7 +462,9 @@ function update-coredns-config() {
 
   # clean up
   cleanup() {
-    rm -rf "${download_dir}"
+    if [ -n "${download_dir:-}" ]; then
+      rm -rf "${download_dir}"
+    fi
   }
   trap cleanup RETURN
 
