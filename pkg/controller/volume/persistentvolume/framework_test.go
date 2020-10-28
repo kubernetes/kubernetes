@@ -95,6 +95,11 @@ type controllerTest struct {
 	test testCall
 }
 
+// annSkipLocalStore can be used to mark initial PVs or PVCs that are meant to be added only
+// to the fake apiserver (i.e. available via Get) but not to the local store (i.e. the controller
+// won't have them in its cache).
+const annSkipLocalStore = "pv-testing-skip-local-store"
+
 type testCall func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error
 
 const testNamespace = "default"
@@ -641,9 +646,15 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 		}
 		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
+			if metav1.HasAnnotation(claim.ObjectMeta, annSkipLocalStore) {
+				continue
+			}
 			ctrl.claims.Add(claim)
 		}
 		for _, volume := range test.initialVolumes {
+			if metav1.HasAnnotation(volume.ObjectMeta, annSkipLocalStore) {
+				continue
+			}
 			ctrl.volumes.store.Add(volume)
 		}
 		reactor.AddClaims(test.initialClaims)
