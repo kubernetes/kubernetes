@@ -68,10 +68,10 @@ func TestSetStatusCondition(t *testing.T) {
 				{Type: "second", Status: metav1.ConditionTrue, LastTransitionTime: metav1.Time{Time: oneHourBefore}},
 				{Type: "third"},
 			},
-			toAdd: metav1.Condition{Type: "second", Status: metav1.ConditionTrue, LastTransitionTime: metav1.Time{Time: oneHourAfter}, Reason: "reason", Message: "message"},
+			toAdd: metav1.Condition{Type: "second", Status: metav1.ConditionTrue, LastTransitionTime: metav1.Time{Time: oneHourAfter}, Reason: "reason", Message: "message", ObservedGeneration: 3},
 			expected: []metav1.Condition{
 				{Type: "first"},
-				{Type: "second", Status: metav1.ConditionTrue, LastTransitionTime: metav1.Time{Time: oneHourBefore}, Reason: "reason", Message: "message"},
+				{Type: "second", Status: metav1.ConditionTrue, LastTransitionTime: metav1.Time{Time: oneHourBefore}, Reason: "reason", Message: "message", ObservedGeneration: 3},
 				{Type: "third"},
 			},
 		},
