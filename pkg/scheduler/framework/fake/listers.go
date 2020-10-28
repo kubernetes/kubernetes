@@ -291,7 +291,7 @@ func (pvs PersistentVolumeLister) Get(pvID string) (*v1.PersistentVolume, error)
 			return &pv, nil
 		}
 	}
-	return nil, fmt.Errorf("Unable to find persistent volume: %s", pvID)
+	return nil, fmt.Errorf("unable to find persistent volume: %s", pvID)
 }
 
 // List lists all PersistentVolumes in the indexer.
@@ -311,7 +311,7 @@ func (classes StorageClassLister) Get(name string) (*storagev1.StorageClass, err
 			return &sc, nil
 		}
 	}
-	return nil, fmt.Errorf("Unable to find storage class: %s", name)
+	return nil, fmt.Errorf("unable to find storage class: %s", name)
 }
 
 // List lists all StorageClass in the indexer.
