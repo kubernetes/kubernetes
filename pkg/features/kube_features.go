@@ -664,7 +664,7 @@ const (
 	// Enables kubelet support to size memory backed volumes
 	SizeMemoryBackedVolumes featuregate.Feature = "SizeMemoryBackedVolumes"
 
-	// owner: TBD ?
+	// owner: @Sh4d1
 	// alpha: v1.21
 	// LoadBalancerIPMode enables the IPMode field in the LoadBalancerIngress status of a Service
 	LoadBalancerIPMode featuregate.Feature = "LoadBalancerIPMode"
