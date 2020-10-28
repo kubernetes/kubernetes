@@ -35,12 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/klog/v2"
 
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
 	registry "k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
@@ -194,122 +192,11 @@ func (rs *REST) Export(ctx context.Context, name string, opts metav1.ExportOptio
 }
 
 func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
-	service := obj.(*api.Service)
-
-	// bag of clusterIPs allocated in the process of creation
-	// failed allocation will automatically trigger release
-	var toReleaseClusterIPs map[api.IPFamily]string
-
-	if err := rest.BeforeCreate(rs.strategy, ctx, obj); err != nil {
-		return nil, err
-	}
-
-	// TODO: this should probably move to strategy.PrepareForCreate()
-	defer func() {
-		released, err := rs.releaseClusterIPs(toReleaseClusterIPs)
-		if err != nil {
-			klog.Warningf("failed to release clusterIPs for failed new service:%v allocated:%v released:%v error:%v",
-				service.Name, toReleaseClusterIPs, released, err)
-		}
-	}()
-
-	// try set ip families (for missing ip families)
-	// we do it here, since we want this to be visible
-	// even when dryRun == true
-	if err := rs.tryDefaultValidateServiceClusterIPFields(service); err != nil {
-		return nil, err
-	}
-
-	var err error
-	if !dryrun.IsDryRun(options.DryRun) {
-		toReleaseClusterIPs, err = rs.allocServiceClusterIPs(service)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts, dryrun.IsDryRun(options.DryRun))
-	defer nodePortOp.Finish()
-
-	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
-		if err := initNodePorts(service, nodePortOp); err != nil {
-			return nil, err
-		}
-	}
-
-	// Handle ExternalTraffic related fields during service creation.
-	if apiservice.NeedsHealthCheck(service) {
-		if err := allocateHealthCheckNodePort(service, nodePortOp); err != nil {
-			return nil, errors.NewInternalError(err)
-		}
-	}
-	if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
-		return nil, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
-	}
-
-	out, err := rs.services.Create(ctx, service, createValidation, options)
-	if err != nil {
-		err = rest.CheckGeneratedNameError(rs.strategy, err, service)
-	}
-
-	if err == nil {
-		el := nodePortOp.Commit()
-		if el != nil {
-			// these should be caught by an eventual reconciliation / restart
-			utilruntime.HandleError(fmt.Errorf("error(s) committing service node-ports changes: %v", el))
-		}
-
-		// no clusterips to release
-		toReleaseClusterIPs = nil
-	}
-
-	return out, err
+	return rs.services.Create(ctx, obj, createValidation, options)
 }
 
 func (rs *REST) Delete(ctx context.Context, id string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	// TODO: handle graceful
-	obj, _, err := rs.services.Delete(ctx, id, deleteValidation, options)
-	if err != nil {
-		return nil, false, err
-	}
-
-	svc := obj.(*api.Service)
-	// (khenidak) double check that this is in fact the best place for this
-
-	// delete strategy handles graceful delete only. It expects strategy
-	// to implement Graceful-Delete related interface. Hence we are not doing
-	// the below there. instead we are doing it locally. Until strategy.BeforeDelete works without
-	// having to implement graceful delete management
-	// set ClusterIPs based on ClusterIP
-	// because we depend on ClusterIPs and data might be saved without ClusterIPs ..
-
-	if svc.Spec.ClusterIPs == nil && len(svc.Spec.ClusterIP) > 0 {
-		svc.Spec.ClusterIPs = []string{svc.Spec.ClusterIP}
-	}
-
-	// Only perform the cleanup if this is a non-dryrun deletion
-	if !dryrun.IsDryRun(options.DryRun) {
-		// TODO: can leave dangling endpoints, and potentially return incorrect
-		// endpoints if a new service is created with the same name
-		_, _, err = rs.endpoints.Delete(ctx, id, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
-		if err != nil && !errors.IsNotFound(err) {
-			return nil, false, err
-		}
-
-		rs.releaseAllocatedResources(svc)
-	}
-
-	// TODO: this is duplicated from the generic storage, when this wrapper is fully removed we can drop this
-	details := &metav1.StatusDetails{
-		Name: svc.Name,
-		UID:  svc.UID,
-	}
-	if info, ok := genericapirequest.RequestInfoFrom(ctx); ok {
-		details.Group = info.APIGroup
-		details.Kind = info.Resource // legacy behavior
-	}
-	status := &metav1.Status{Status: metav1.StatusSuccess, Details: details}
-	return status, true, nil
+	return rs.services.Delete(ctx, id, deleteValidation, options)
 }
 
 func (rs *REST) releaseAllocatedResources(svc *api.Service) {
@@ -397,115 +284,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 }
 
 func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	oldObj, err := rs.services.Get(ctx, name, &metav1.GetOptions{})
-	if err != nil {
-		// Support create on update, if forced to.
-		if forceAllowCreate {
-			obj, err := objInfo.UpdatedObject(ctx, nil)
-			if err != nil {
-				return nil, false, err
-			}
-			createdObj, err := rs.Create(ctx, obj, createValidation, &metav1.CreateOptions{DryRun: options.DryRun})
-			if err != nil {
-				return nil, false, err
-			}
-			return createdObj, true, nil
-		}
-		return nil, false, err
-	}
-	oldService := oldObj.(*api.Service)
-	obj, err := objInfo.UpdatedObject(ctx, oldService)
-	if err != nil {
-		return nil, false, err
-	}
-
-	service := obj.(*api.Service)
-
-	if !rest.ValidNamespace(ctx, &service.ObjectMeta) {
-		return nil, false, errors.NewConflict(api.Resource("services"), service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
-	}
-
-	// Copy over non-user fields
-	if err := rest.BeforeUpdate(rs.strategy, ctx, service, oldService); err != nil {
-		return nil, false, err
-	}
-
-	var allocated map[api.IPFamily]string
-	var toReleaseIPs map[api.IPFamily]string
-
-	performRelease := false // when set, any clusterIP that should be released will be released
-	// cleanup
-	// on failure: Any allocated ip must be released back
-	// on failure: any ip that should be released, will *not* be released
-	// on success: any ip that should be released, will  be released
-	defer func() {
-		// release the allocated, this is expected to be cleared if the entire function ran to success
-		if allocated_released, err := rs.releaseClusterIPs(allocated); err != nil {
-			klog.V(4).Infof("service %v/%v failed to clean up after failed service update error:%v. Allocated/Released:%v/%v", service.Namespace, service.Name, err, allocated, allocated_released)
-
-		}
-		// performRelease is set when the enture function ran to success
-		if performRelease {
-			if toReleaseIPs_released, err := rs.releaseClusterIPs(toReleaseIPs); err != nil {
-				klog.V(4).Infof("service %v/%v failed to clean up after failed service update error:%v. ShouldRelease/Released:%v/%v", service.Namespace, service.Name, err, toReleaseIPs, toReleaseIPs_released)
-			}
-		}
-	}()
-
-	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts, dryrun.IsDryRun(options.DryRun))
-	defer nodePortOp.Finish()
-
-	// try set ip families (for missing ip families)
-	if err := rs.tryDefaultValidateServiceClusterIPFields(service); err != nil {
-		return nil, false, err
-	}
-
-	if !dryrun.IsDryRun(options.DryRun) {
-		allocated, toReleaseIPs, err = rs.handleClusterIPsForUpdatedService(oldService, service)
-		if err != nil {
-			return nil, false, err
-		}
-	}
-	// Update service from NodePort or LoadBalancer to ExternalName or ClusterIP, should release NodePort if exists.
-	if (oldService.Spec.Type == api.ServiceTypeNodePort || oldService.Spec.Type == api.ServiceTypeLoadBalancer) &&
-		(service.Spec.Type == api.ServiceTypeExternalName || service.Spec.Type == api.ServiceTypeClusterIP) {
-		releaseNodePorts(oldService, nodePortOp)
-	}
-	// Update service from any type to NodePort or LoadBalancer, should update NodePort.
-	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
-		if err := updateNodePorts(oldService, service, nodePortOp); err != nil {
-			return nil, false, err
-		}
-	}
-	// Update service from LoadBalancer to non-LoadBalancer, should remove any LoadBalancerStatus.
-	if service.Spec.Type != api.ServiceTypeLoadBalancer {
-		// Although loadbalancer delete is actually asynchronous, we don't need to expose the user to that complexity.
-		service.Status.LoadBalancer = api.LoadBalancerStatus{}
-	}
-
-	// Handle ExternalTraffic related updates.
-	success, err := rs.healthCheckNodePortUpdate(oldService, service, nodePortOp)
-	if !success || err != nil {
-		return nil, false, err
-	}
-	externalTrafficPolicyUpdate(oldService, service)
-	if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
-		return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
-	}
-
-	out, created, err := rs.services.Update(ctx, service.Name, rest.DefaultUpdatedObjectInfo(service), createValidation, updateValidation, forceAllowCreate, options)
-	if err == nil {
-		el := nodePortOp.Commit()
-		if el != nil {
-			// problems should be fixed by an eventual reconciliation / restart
-			utilruntime.HandleError(fmt.Errorf("error(s) committing NodePorts changes: %v", el))
-		}
-	}
-	// all good
-	allocated = nil       // if something was allocated, keep it allocated
-	performRelease = true // if something that should be released then go ahead and release it
-
-	return out, created, err
+	return rs.services.Update(ctx, name, objInfo, createValidation, updateValidation, forceAllowCreate, options)
 }
 
 // Implement Redirector.

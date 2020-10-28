@@ -146,14 +146,29 @@ type Store struct {
 	// specific cases where storage of the value is not appropriate, since
 	// they cannot be watched.
 	Decorator ObjectFunc
+
 	// CreateStrategy implements resource-specific behavior during creation.
 	CreateStrategy rest.RESTCreateStrategy
+	// BeginCreate is an optional hook that returns a "transaction-like"
+	// commit/cleanup function which will be called at the end of operation,
+	// whether it succeeds or not.  If the overall operation panics, the
+	// cleanup function will not be called.  Almost nobody should use this
+	// hook.
+	//FIXME: do we need to pass obj to cleanup?
+	BeginCreate func(obj runtime.Object, options *metav1.CreateOptions) (func(runtime.Object, error), error)
 	// AfterCreate implements a further operation to run after a resource is
 	// created and before it is decorated, optional.
 	AfterCreate ObjectFunc
 
 	// UpdateStrategy implements resource-specific behavior during updates.
 	UpdateStrategy rest.RESTUpdateStrategy
+	// BeginUpdate is an optional hook that returns a "transaction-like"
+	// commit/cleanup function which will be called at the end of operation,
+	// whether it succeeds or not.  If the overall operation panics, the
+	// cleanup function will not be called.  Almost nobody should use this
+	// hook.
+	//FIXME: do we need to pass objs to cleanup?
+	BeginUpdate func(obj, old runtime.Object, options *metav1.UpdateOptions) (func(runtime.Object, runtime.Object, error), error)
 	// AfterUpdate implements a further operation to run after a resource is
 	// updated and before it is decorated, optional.
 	AfterUpdate ObjectFunc
@@ -171,9 +186,11 @@ type Store struct {
 	// If specified, this is checked in addition to standard finalizer,
 	// deletionTimestamp, and deletionGracePeriodSeconds checks.
 	ShouldDeleteDuringUpdate func(ctx context.Context, key string, obj, existing runtime.Object) bool
+
 	// ExportStrategy implements resource-specific behavior during export,
 	// optional. Exported objects are not decorated.
 	ExportStrategy rest.RESTExportStrategy
+
 	// TableConvertor is an optional interface for transforming items or lists
 	// of items into tabular output. If unset, the default will be used.
 	TableConvertor rest.TableConvertor
@@ -337,6 +354,30 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 
 // Create inserts a new item according to the unique key from the object.
 func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	var cleanup func(runtime.Object, error)
+
+	if e.BeginCreate != nil {
+		fn, err := e.BeginCreate(obj, options)
+		if err != nil {
+			// If the hook returned a function, we should call it.
+			if fn != nil {
+				fn(obj, err)
+			}
+			return nil, err
+		}
+		cleanup = fn
+	}
+
+	obj, err := e.createImpl(ctx, obj, createValidation, options)
+
+	if cleanup != nil {
+		cleanup(obj, err)
+	}
+
+	return obj, err
+}
+
+func (e *Store) createImpl(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 		return nil, err
 	}
@@ -500,24 +541,47 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		doUnconditionalUpdate := newResourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
 
 		if existingResourceVersion == 0 {
-			creating = true
-			creatingObj = obj
-			if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
-				return nil, nil, err
-			}
-			// at this point we have a fully formed object.  It is time to call the validators that the apiserver
-			// handling chain wants to enforce.
-			if createValidation != nil {
-				if err := createValidation(ctx, obj.DeepCopyObject()); err != nil {
-					return nil, nil, err
+			var cleanup func(runtime.Object, error)
+
+			if e.BeginCreate != nil {
+				fn, err := e.BeginCreate(obj, options)
+				if err != nil {
+					// If the hook returned a function, we should call it.
+					if fn != nil {
+						fn(err)
+					}
+					return nil, err
 				}
-			}
-			ttl, err := e.calculateTTL(obj, 0, false)
-			if err != nil {
-				return nil, nil, err
+				cleanup = fn
 			}
 
-			return obj, &ttl, nil
+			doCreate := func() (runtime.Object, *uint64, error) {
+				creating = true
+				creatingObj = obj
+				if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
+					return nil, nil, err
+				}
+				// at this point we have a fully formed object.  It is time to call the validators that the apiserver
+				// handling chain wants to enforce.
+				if createValidation != nil {
+					if err := createValidation(ctx, obj.DeepCopyObject()); err != nil {
+						return nil, nil, err
+					}
+				}
+				ttl, err := e.calculateTTL(obj, 0, false)
+				if err != nil {
+					return nil, nil, err
+				}
+
+				return obj, &ttl, nil
+			}
+			obj, ttl, err := doCreate()
+
+			if cleanup != nil {
+				cleanup(obj, err)
+			}
+
+			return obj, ttl, err
 		}
 
 		creating = false
@@ -544,30 +608,53 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 				return nil, nil, apierrors.NewConflict(qualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg))
 			}
 		}
-		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
-			return nil, nil, err
-		}
-		// at this point we have a fully formed object.  It is time to call the validators that the apiserver
-		// handling chain wants to enforce.
-		if updateValidation != nil {
-			if err := updateValidation(ctx, obj.DeepCopyObject(), existing.DeepCopyObject()); err != nil {
+		var cleanup func(runtime.Object, runtime.Object, error)
+
+		if e.BeginUpdate != nil {
+			fn, err := e.BeginUpdate(obj, existing, options)
+			if err != nil {
+				// If the hook returned a function, we should call it.
+				if fn != nil {
+					fn(obj, existing, err)
+				}
 				return nil, nil, err
 			}
+			cleanup = fn
 		}
-		// Check the default delete-during-update conditions, and store-specific conditions if provided
-		if ShouldDeleteDuringUpdate(ctx, key, obj, existing) &&
-			(e.ShouldDeleteDuringUpdate == nil || e.ShouldDeleteDuringUpdate(ctx, key, obj, existing)) {
-			deleteObj = obj
-			return nil, nil, errEmptiedFinalizers
+
+		doUpdate := func() (runtime.Object, *uint64, error) {
+			if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
+				return nil, nil, err
+			}
+			// at this point we have a fully formed object.  It is time to call the validators that the apiserver
+			// handling chain wants to enforce.
+			if updateValidation != nil {
+				if err := updateValidation(ctx, obj.DeepCopyObject(), existing.DeepCopyObject()); err != nil {
+					return nil, nil, err
+				}
+			}
+			// Check the default delete-during-update conditions, and store-specific conditions if provided
+			if ShouldDeleteDuringUpdate(ctx, key, obj, existing) &&
+				(e.ShouldDeleteDuringUpdate == nil || e.ShouldDeleteDuringUpdate(ctx, key, obj, existing)) {
+				deleteObj = obj
+				return nil, nil, errEmptiedFinalizers
+			}
+			ttl, err := e.calculateTTL(obj, res.TTL, true)
+			if err != nil {
+				return nil, nil, err
+			}
+			if int64(ttl) != res.TTL {
+				return obj, &ttl, nil
+			}
+			return obj, nil, nil
 		}
-		ttl, err := e.calculateTTL(obj, res.TTL, true)
-		if err != nil {
-			return nil, nil, err
+		obj, ttl, err := doUpdate()
+
+		if cleanup != nil {
+			cleanup(obj, existing, err)
 		}
-		if int64(ttl) != res.TTL {
-			return obj, &ttl, nil
-		}
-		return obj, nil, nil
+
+		return obj, ttl, err
 	}, dryrun.IsDryRun(options.DryRun))
 
 	if err != nil {

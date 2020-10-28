@@ -18,22 +18,30 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"net"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/klog/v2"
+	apiservice "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service"
 	registry "k8s.io/kubernetes/pkg/registry/core/service"
+	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 
 	netutil "k8s.io/utils/net"
 
+	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -86,6 +94,8 @@ func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet,
 	}
 	genericStore := &GenericREST{store, primaryIPFamily, secondaryFamily}
 	store.Decorator = genericStore.defaultServiceOnRead // default on read
+	store.BeginCreate = genericStore.beginCreate
+	store.BeginUpdate = genericStore.beginUpdate
 
 	return genericStore, &StatusREST{store: &statusStore}, nil
 }
@@ -233,4 +243,164 @@ func (r *GenericREST) defaultAServiceOnRead(service *api.Service) error {
 	}
 
 	return nil
+}
+
+func (r *GenericREST) beginCreate(obj runtime.Object, options *metav1.CreateOptions) (func(runtime.Object, error), error) {
+	service := obj.(*api.Service)
+
+	// try set ip families (for missing ip families)
+	// we do it here, since we want this to be visible
+	// even when dryRun == true
+	if err := r.tryDefaultValidateServiceClusterIPFields(service); err != nil {
+		return nil, err
+	}
+
+	// bag of clusterIPs allocated in the process of creation
+	// failed allocation will automatically trigger release
+	var toReleaseClusterIPs map[api.IPFamily]string
+
+	// node-port state to clean up
+	nodePortOp := portallocator.StartOperation(r.serviceNodePorts, dryrun.IsDryRun(options.DryRun))
+
+	// Our cleanup callback
+	finish := func(_ runtime.Object, result error) {
+		if result == nil {
+			el := nodePortOp.Commit()
+			if el != nil {
+				// these should be caught by an eventual reconciliation / restart
+				utilruntime.HandleError(fmt.Errorf("error(s) committing service node-ports changes: %v", el))
+			}
+		} else {
+			released, err := r.releaseClusterIPs(toReleaseClusterIPs)
+			if err != nil {
+				klog.Warningf("failed to release clusterIPs for failed new service:%v allocated:%v released:%v error:%v",
+					service.Name, toReleaseClusterIPs, released, err)
+			}
+		}
+		nodePortOp.Finish()
+	}
+
+	//
+	// Do allocations
+	//
+
+	var err error
+	if !dryrun.IsDryRun(options.DryRun) {
+		toReleaseClusterIPs, err = r.allocServiceClusterIPs(service)
+		if err != nil {
+			return finish, err
+		}
+	}
+
+	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
+		if err := initNodePorts(service, nodePortOp); err != nil {
+			return finish, err
+		}
+	}
+
+	// Handle ExternalTraffic related fields during service creation.
+	if apiservice.NeedsHealthCheck(service) {
+		if err := allocateHealthCheckNodePort(service, nodePortOp); err != nil {
+			return finish, errors.NewInternalError(err)
+		}
+	}
+
+	//FIXME: move this somewhere more appropriate
+	if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
+		return finish, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
+	}
+
+	return finish, nil
+}
+
+func (r *GenericREST) beginUpdate(obj, oldObj runtime.Object, options *metav1.CreateOptions) (func(runtime.Object, runtime.Object, error), error) {
+	service := obj.(*api.Service)
+	oldService := oldObj.(*api.Service)
+
+	var allocated map[api.IPFamily]string
+	var toReleaseIPs map[api.IPFamily]string
+	nodePortOp := portallocator.StartOperation(r.serviceNodePorts, dryrun.IsDryRun(options.DryRun))
+
+	// Our cleanup callback
+	finish := func(_, _ runtime.Object, result error) {
+		if result == nil {
+			toReleaseIPsReleased, err := r.releaseClusterIPs(toReleaseIPs)
+			if err != nil {
+				klog.V(4).Infof("service %v/%v failed to clean up after failed service update error:%v. ShouldRelease/Released:%v/%v", service.Namespace, service.Name, err, toReleaseIPs, toReleaseIPsReleased)
+			}
+			el := nodePortOp.Commit()
+			if el != nil {
+				// these should be caught by an eventual reconciliation / restart
+				utilruntime.HandleError(fmt.Errorf("error(s) committing service node-ports changes: %v", el))
+			}
+		} else {
+			allocatedReleased, err := r.releaseClusterIPs(allocated)
+			if err != nil {
+				klog.V(4).Infof("service %v/%v failed to clean up after failed service update error:%v. Allocated/Released:%v/%v", service.Namespace, service.Name, err, allocated, allocatedReleased)
+			}
+			nodePortOp.Finish()
+		}
+	}
+
+	//
+	// Do allocations
+	//
+
+	// try set ip families (for missing ip families)
+	if err := r.tryDefaultValidateServiceClusterIPFields(service); err != nil {
+		return finish, err
+	}
+
+	if !dryrun.IsDryRun(options.DryRun) {
+		var err error
+		allocated, toReleaseIPs, err = r.handleClusterIPsForUpdatedService(oldService, service)
+		if err != nil {
+			return finish, err
+		}
+	}
+	// Update service from NodePort or LoadBalancer to ExternalName or ClusterIP, should release NodePort if exists.
+	if (oldService.Spec.Type == api.ServiceTypeNodePort || oldService.Spec.Type == api.ServiceTypeLoadBalancer) &&
+		(service.Spec.Type == api.ServiceTypeExternalName || service.Spec.Type == api.ServiceTypeClusterIP) {
+		releaseNodePorts(oldService, nodePortOp)
+	}
+	// Update service from any type to NodePort or LoadBalancer, should update NodePort.
+	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
+		if err := updateNodePorts(oldService, service, nodePortOp); err != nil {
+			return finish, err
+		}
+	}
+	// Update service from LoadBalancer to non-LoadBalancer, should remove any LoadBalancerStatus.
+	if service.Spec.Type != api.ServiceTypeLoadBalancer {
+		// Although loadbalancer delete is actually asynchronous, we don't need to expose the user to that complexity.
+		service.Status.LoadBalancer = api.LoadBalancerStatus{}
+	}
+
+	// Handle ExternalTraffic related updates.
+	success, err := r.healthCheckNodePortUpdate(oldService, service, nodePortOp)
+	if !success || err != nil {
+		return finish, err
+	}
+	externalTrafficPolicyUpdate(oldService, service)
+
+	//FIXME: move this somewhere more appropriate
+	if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
+		return finish, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
+	}
+
+	return finish, nil
+}
+
+func (r *GenericREST) afterDelete(obj runtime.Object) error {
+	svc := obj.(*api.Service)
+
+	//FIXME: this is weird.  I am not sure we should do it here, but other
+	// options are not obvious.
+	// TODO: can leave dangling endpoints, and potentially return incorrect
+	// endpoints if a new service is created with the same name
+	_, _, err = rs.endpoints.Delete(ctx, id, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return nil, false, err
+	}
+
+	r.releaseAllocatedResources(svc)
 }
