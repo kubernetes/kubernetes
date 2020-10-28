@@ -374,6 +374,11 @@ function start-kube-apiserver {
   # params is passed by reference, so no "$"
   setup-etcd-encryption "${src_file}" params
 
+  local healthcheck_ip="127.0.0.1"
+  if [[ ${KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP:-} == "true" ]]; then
+    healthcheck_ip=$(hostname -i)
+  fi
+
   params="$(convert-manifest-params "${params}")"
   # Evaluate variables.
   local -r kube_apiserver_docker_tag="${KUBE_API_SERVER_DOCKER_TAG:-$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)}"
@@ -404,6 +409,7 @@ function start-kube-apiserver {
   sed -i -e "s@{{webhook_exec_auth_plugin_volume}}@${webhook_exec_auth_plugin_volume}@g" "${src_file}"
   sed -i -e "s@{{konnectivity_socket_mount}}@${default_konnectivity_socket_mnt}@g" "${src_file}"
   sed -i -e "s@{{konnectivity_socket_volume}}@${default_konnectivity_socket_vol}@g" "${src_file}"
+  sed -i -e "s@{{healthcheck_ip}}@${healthcheck_ip}@g" "${src_file}"
 
   cp "${src_file}" "${ETC_MANIFESTS:-/etc/kubernetes/manifests}"
 }
