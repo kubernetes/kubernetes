@@ -84,6 +84,46 @@ func TestList(t *testing.T) {
 	}
 }
 
+func Test_ListKind(t *testing.T) {
+	scheme := runtime.NewScheme()
+
+	client := NewSimpleDynamicClient(scheme,
+		&unstructured.UnstructuredList{
+			Object: map[string]interface{}{
+				"apiVersion": "group/version",
+				"kind":       "TheKindList",
+			},
+			Items: []unstructured.Unstructured{
+				*newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+				*newUnstructured("group/version", "TheKind", "ns-foo", "name-bar"),
+				*newUnstructured("group/version", "TheKind", "ns-foo", "name-baz"),
+			},
+		},
+	)
+	listFirst, err := client.Resource(schema.GroupVersionResource{Group: "group", Version: "version", Resource: "thekinds"}).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedList := &unstructured.UnstructuredList{
+		Object: map[string]interface{}{
+			"apiVersion": "group/version",
+			"kind":       "TheKindList",
+			"metadata": map[string]interface{}{
+				"resourceVersion": "",
+			},
+		},
+		Items: []unstructured.Unstructured{
+			*newUnstructured("group/version", "TheKind", "ns-foo", "name-bar"),
+			*newUnstructured("group/version", "TheKind", "ns-foo", "name-baz"),
+			*newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+		},
+	}
+	if !equality.Semantic.DeepEqual(listFirst, expectedList) {
+		t.Fatal(diff.ObjectGoPrintDiff(expectedList, listFirst))
+	}
+}
+
 type patchTestCase struct {
 	name                  string
 	object                runtime.Object

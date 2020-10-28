@@ -35,9 +35,8 @@ import (
 
 func NewSimpleDynamicClient(scheme *runtime.Scheme, objects ...runtime.Object) *FakeDynamicClient {
 	// In order to use List with this client, you have to have the v1.List registered in your scheme. Neat thing though
-	// it does NOT have to be the *same* list. UnstructuredList returned from this fake client will NOT have apiVersion and kind set,
-	// but each Unstructured object in Items will preserve their respective apiVersion and kind. As a result, schema conversion for
-	// *List kinds will not work and conversion of each Unstructured object in Items will be required instead.
+	// it does NOT have to be the *same* list. The fake object tracker will do a best-effort guess at preserving the TypeMeta
+	// of UnstructuredList.
 	scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: "fake-dynamic-client-group", Version: "v1", Kind: "List"}, &unstructured.UnstructuredList{})
 
 	codecs := serializer.NewCodecFactory(scheme)
@@ -302,12 +301,19 @@ func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOption
 	if err := c.client.scheme.Convert(obj, retUnstructured, nil); err != nil {
 		return nil, err
 	}
+
 	entireList, err := retUnstructured.ToList()
 	if err != nil {
 		return nil, err
 	}
 
-	list := &unstructured.UnstructuredList{}
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	list := &unstructured.UnstructuredList{
+		Object: map[string]interface{}{
+			"apiVersion": gvk.GroupVersion().String(),
+			"kind":       gvk.Kind,
+		},
+	}
 	list.SetResourceVersion(entireList.GetResourceVersion())
 	for i := range entireList.Items {
 		item := &entireList.Items[i]

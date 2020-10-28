@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -195,10 +196,11 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 }
 
 type tracker struct {
-	scheme  ObjectScheme
-	decoder runtime.Decoder
-	lock    sync.RWMutex
-	objects map[schema.GroupVersionResource]map[types.NamespacedName]runtime.Object
+	scheme       ObjectScheme
+	decoder      runtime.Decoder
+	lock         sync.RWMutex
+	objects      map[schema.GroupVersionResource]map[types.NamespacedName]runtime.Object
+	gvrToListGVK map[schema.GroupVersionResource]schema.GroupVersionKind
 	// The value type of watchers is a map of which the key is either a namespace or
 	// all/non namespace aka "" and its value is list of fake watchers.
 	// Manipulations on resources will broadcast the notification events into the
@@ -213,10 +215,11 @@ var _ ObjectTracker = &tracker{}
 // of objects for the fake clientset. Mostly useful for unit tests.
 func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracker {
 	return &tracker{
-		scheme:   scheme,
-		decoder:  decoder,
-		objects:  make(map[schema.GroupVersionResource]map[types.NamespacedName]runtime.Object),
-		watchers: make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
+		scheme:       scheme,
+		decoder:      decoder,
+		objects:      make(map[schema.GroupVersionResource]map[types.NamespacedName]runtime.Object),
+		gvrToListGVK: make(map[schema.GroupVersionResource]schema.GroupVersionKind),
+		watchers:     make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
 	}
 }
 
@@ -256,6 +259,15 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 	if err := meta.SetList(list, matchingObjs); err != nil {
 		return nil, err
 	}
+
+	// Find the real List GVK based on the GVR and overwrite the object's GVK accordingly.
+	// This way the true TypeMeta of UnstructuredList can be preserved.
+	realListGVK, ok := t.gvrToListGVK[gvr]
+	if !ok {
+		return list.DeepCopyObject(), nil
+	}
+
+	list.GetObjectKind().SetGroupVersionKind(realListGVK)
 	return list.DeepCopyObject(), nil
 }
 
@@ -422,6 +434,35 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 }
 
 func (t *tracker) addList(obj runtime.Object, replaceExisting bool) error {
+	gvks, _, err := t.scheme.ObjectKinds(obj)
+	if err != nil {
+		return err
+	}
+
+	if partial, ok := obj.(*metav1.PartialObjectMetadata); ok && len(partial.TypeMeta.APIVersion) > 0 {
+		gvks = []schema.GroupVersionKind{partial.TypeMeta.GroupVersionKind()}
+	}
+
+	if len(gvks) == 0 {
+		return fmt.Errorf("no registered kinds for %v", obj)
+	}
+
+	for _, gvk := range gvks {
+		// NOTE: UnsafeGuessListKindToResource is a heuristic and default match. The
+		// actual registration in apiserver can specify arbitrary route for a
+		// gvk. If a test uses such objects, it cannot preset the tracker with
+		// objects via Add(). Instead, it should trigger the Create() function
+		// of the tracker, where an arbitrary gvr can be specified.
+		gvr, _ := unsafeGuessListKindToResource(gvk)
+
+		// Resource doesn't have the concept of "__internal" version, just set it to "".
+		if gvr.Version == runtime.APIVersionInternal {
+			gvr.Version = ""
+		}
+
+		t.gvrToListGVK[gvr] = gvk
+	}
+
 	list, err := meta.ExtractList(obj)
 	if err != nil {
 		return err
@@ -458,6 +499,43 @@ func (t *tracker) Delete(gvr schema.GroupVersionResource, ns, name string) error
 		w.Delete(obj)
 	}
 	return nil
+}
+
+// unsafeGuessListKindToResource converts a list Kind to a resource name.
+// Broken. This method only "sort of" works. It assumes that Kinds and Resources match
+// and they aren't guaranteed to do so.
+func unsafeGuessListKindToResource(kind schema.GroupVersionKind) ( /*plural*/ schema.GroupVersionResource /*singular*/, schema.GroupVersionResource) {
+	kindName := kind.Kind
+	if len(kindName) == 0 {
+		return schema.GroupVersionResource{}, schema.GroupVersionResource{}
+	}
+
+	// only handle *List kinds
+	if !strings.HasSuffix(kindName, "List") {
+		return schema.GroupVersionResource{}, schema.GroupVersionResource{}
+	}
+
+	// extract non-list kind
+	kindName = strings.TrimSuffix(kindName, "List")
+
+	singularName := strings.ToLower(kindName)
+	singular := kind.GroupVersion().WithResource(singularName)
+
+	// unpluralized suffixes for resources
+	for _, skip := range []string{"endpoints"} {
+		if strings.HasSuffix(singularName, skip) {
+			return singular, singular
+		}
+	}
+
+	switch string(singularName[len(singularName)-1]) {
+	case "s":
+		return kind.GroupVersion().WithResource(singularName + "es"), singular
+	case "y":
+		return kind.GroupVersion().WithResource(strings.TrimSuffix(singularName, "y") + "ies"), singular
+	}
+
+	return kind.GroupVersion().WithResource(singularName + "s"), singular
 }
 
 // filterByNamespace returns all objects in the collection that
