@@ -25,8 +25,10 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 )
 
 func TestListPodResourcesV1(t *testing.T) {
@@ -138,6 +140,8 @@ func TestListPodResourcesV1(t *testing.T) {
 			m.On("GetDevices", string(podUID), containerName).Return(tc.devices)
 			m.On("GetCPUs", string(podUID), containerName).Return(tc.cpus)
 			m.On("UpdateAllocatedDevices").Return()
+			m.On("GetAllocatableCPUs").Return(cpuset.CPUSet{})
+			m.On("GetAllocatableDevices").Return(devicemanager.NewResourceDeviceInstances())
 			server := NewV1PodResourcesServer(m, m, m)
 			resp, err := server.List(context.TODO(), &podresourcesapi.ListPodResourcesRequest{})
 			if err != nil {
@@ -145,6 +149,140 @@ func TestListPodResourcesV1(t *testing.T) {
 			}
 			if !equalListResponse(tc.expectedResponse, resp) {
 				t.Errorf("want resp = %s, got %s", tc.expectedResponse.String(), resp.String())
+			}
+		})
+	}
+}
+
+func TestAllocatableResources(t *testing.T) {
+	allDevs := devicemanager.ResourceDeviceInstances{
+		"resource": {
+			"dev0": {
+				ID:     "GPU-fef8089b-4820-abfc-e83e-94318197576e",
+				Health: "Healthy",
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{
+						{
+							ID: 0,
+						},
+					},
+				},
+			},
+			"dev1": {
+				ID:     "VF-8536e1e8-9dc6-4645-9aea-882db92e31e7",
+				Health: "Healthy",
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{
+						{
+							ID: 1,
+						},
+					},
+				},
+			},
+		},
+	}
+	allCPUs := cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
+
+	for _, tc := range []struct {
+		desc                                 string
+		allCPUs                              cpuset.CPUSet
+		allDevices                           devicemanager.ResourceDeviceInstances
+		expectedAllocatableResourcesResponse *podresourcesapi.AllocatableResourcesResponse
+	}{
+		{
+			desc:                                 "no devices, no CPUs",
+			allCPUs:                              cpuset.CPUSet{},
+			allDevices:                           devicemanager.NewResourceDeviceInstances(),
+			expectedAllocatableResourcesResponse: &podresourcesapi.AllocatableResourcesResponse{},
+		},
+		{
+			desc:       "no devices, all CPUs",
+			allCPUs:    allCPUs,
+			allDevices: devicemanager.NewResourceDeviceInstances(),
+			expectedAllocatableResourcesResponse: &podresourcesapi.AllocatableResourcesResponse{
+				CpuIds: allCPUs.ToSliceNoSortInt64(),
+			},
+		},
+		{
+			desc:       "with devices, all CPUs",
+			allCPUs:    allCPUs,
+			allDevices: allDevs,
+			expectedAllocatableResourcesResponse: &podresourcesapi.AllocatableResourcesResponse{
+				CpuIds: allCPUs.ToSliceNoSortInt64(),
+				Devices: []*podresourcesapi.ContainerDevices{
+					{
+						ResourceName: "resource",
+						DeviceIds:    []string{"dev0"},
+						Topology: &podresourcesapi.TopologyInfo{
+							Nodes: []*podresourcesapi.NUMANode{
+								{
+									ID: 0,
+								},
+							},
+						},
+					},
+					{
+						ResourceName: "resource",
+						DeviceIds:    []string{"dev1"},
+						Topology: &podresourcesapi.TopologyInfo{
+							Nodes: []*podresourcesapi.NUMANode{
+								{
+									ID: 1,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc:       "with devices, no CPUs",
+			allCPUs:    cpuset.CPUSet{},
+			allDevices: allDevs,
+			expectedAllocatableResourcesResponse: &podresourcesapi.AllocatableResourcesResponse{
+				Devices: []*podresourcesapi.ContainerDevices{
+					{
+						ResourceName: "resource",
+						DeviceIds:    []string{"dev0"},
+						Topology: &podresourcesapi.TopologyInfo{
+							Nodes: []*podresourcesapi.NUMANode{
+								{
+									ID: 0,
+								},
+							},
+						},
+					},
+					{
+						ResourceName: "resource",
+						DeviceIds:    []string{"dev1"},
+						Topology: &podresourcesapi.TopologyInfo{
+							Nodes: []*podresourcesapi.NUMANode{
+								{
+									ID: 1,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			m := new(mockProvider)
+			m.On("GetDevices", "", "").Return([]*podresourcesapi.ContainerDevices{})
+			m.On("GetCPUs", "", "").Return(cpuset.CPUSet{})
+			m.On("UpdateAllocatedDevices").Return()
+			m.On("GetAllocatableDevices").Return(tc.allDevices)
+			m.On("GetAllocatableCPUs").Return(tc.allCPUs)
+			server := NewV1PodResourcesServer(m, m, m)
+
+			resp, err := server.GetAllocatableResources(context.TODO(), &podresourcesapi.AllocatableResourcesRequest{})
+			if err != nil {
+				t.Errorf("want err = %v, got %q", nil, err)
+			}
+
+			if !equalAllocatableResourcesResponse(tc.expectedAllocatableResourcesResponse, resp) {
+				t.Errorf("want resp = %s, got %s", tc.expectedAllocatableResourcesResponse.String(), resp.String())
 			}
 		})
 	}
@@ -177,25 +315,48 @@ func equalListResponse(respA, respB *podresourcesapi.ListPodResourcesResponse) b
 				return false
 			}
 
-			if len(cntA.Devices) != len(cntB.Devices) {
+			if !equalContainerDevices(cntA.Devices, cntB.Devices) {
 				return false
 			}
-
-			for kdx := 0; kdx < len(cntA.Devices); kdx++ {
-				cntDevA := cntA.Devices[kdx]
-				cntDevB := cntB.Devices[kdx]
-
-				if cntDevA.ResourceName != cntDevB.ResourceName {
-					return false
-				}
-				if !equalTopology(cntDevA.Topology, cntDevB.Topology) {
-					return false
-				}
-				if !equalStrings(cntDevA.DeviceIds, cntDevB.DeviceIds) {
-					return false
-				}
-			}
 		}
+	}
+	return true
+}
+
+func equalContainerDevices(devA, devB []*podresourcesapi.ContainerDevices) bool {
+	if len(devA) != len(devB) {
+		return false
+	}
+
+	// the ordering of container devices in the response is not defined,
+	// so we need to do a full scan, failing at first mismatch
+	for idx := 0; idx < len(devA); idx++ {
+		if !containsContainerDevice(devA[idx], devB) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func containsContainerDevice(cntDev *podresourcesapi.ContainerDevices, devs []*podresourcesapi.ContainerDevices) bool {
+	for idx := 0; idx < len(devs); idx++ {
+		if equalContainerDevice(cntDev, devs[idx]) {
+			return true
+		}
+	}
+	return false
+}
+
+func equalContainerDevice(cntDevA, cntDevB *podresourcesapi.ContainerDevices) bool {
+	if cntDevA.ResourceName != cntDevB.ResourceName {
+		return false
+	}
+	if !equalTopology(cntDevA.Topology, cntDevB.Topology) {
+		return false
+	}
+	if !equalStrings(cntDevA.DeviceIds, cntDevB.DeviceIds) {
+		return false
 	}
 	return true
 }
@@ -230,4 +391,11 @@ func equalTopology(a, b *podresourcesapi.TopologyInfo) bool {
 		return false
 	}
 	return reflect.DeepEqual(a, b)
+}
+
+func equalAllocatableResourcesResponse(respA, respB *podresourcesapi.AllocatableResourcesResponse) bool {
+	if !equalInt64s(respA.CpuIds, respB.CpuIds) {
+		return false
+	}
+	return equalContainerDevices(respA.Devices, respB.Devices)
 }

@@ -77,6 +77,9 @@ type Manager interface {
 
 	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 	UpdateAllocatedDevices()
+
+	// GetAllocatableDevices returns information about all the devices known to the manager
+	GetAllocatableDevices() ResourceDeviceInstances
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.

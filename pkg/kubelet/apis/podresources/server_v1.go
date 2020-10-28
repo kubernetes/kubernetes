@@ -70,3 +70,33 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *v1.ListPodResource
 		PodResources: podResources,
 	}, nil
 }
+
+// GetAllocatableResources returns information about all the resources known by the server - this more like the capacity, not like the current amount of free resources.
+func (p *v1PodResourcesServer) GetAllocatableResources(ctx context.Context, req *v1.AllocatableResourcesRequest) (*v1.AllocatableResourcesResponse, error) {
+	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1").Inc()
+
+	allDevices := p.devicesProvider.GetAllocatableDevices()
+	var respDevs []*v1.ContainerDevices
+
+	for resourceName, resourceDevs := range allDevices {
+		for devID, dev := range resourceDevs {
+			for _, node := range dev.GetTopology().GetNodes() {
+				numaNode := node.GetID()
+				respDevs = append(respDevs, &v1.ContainerDevices{
+					ResourceName: resourceName,
+					DeviceIds:    []string{devID},
+					Topology: &v1.TopologyInfo{
+						Nodes: []*v1.NUMANode{
+							{ID: numaNode},
+						},
+					},
+				})
+			}
+		}
+	}
+
+	return &v1.AllocatableResourcesResponse{
+		Devices: respDevs,
+		CpuIds:  p.cpusProvider.GetAllocatableCPUs().ToSliceNoSortInt64(),
+	}, nil
+}

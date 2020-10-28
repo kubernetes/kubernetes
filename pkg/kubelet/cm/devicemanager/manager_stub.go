@@ -93,3 +93,8 @@ func (h *ManagerStub) ShouldResetExtendedResourceCapacity() bool {
 func (h *ManagerStub) UpdateAllocatedDevices() {
 	return
 }
+
+// GetAllocatableDevices returns nothing
+func (h *ManagerStub) GetAllocatableDevices() ResourceDeviceInstances {
+	return nil
+}

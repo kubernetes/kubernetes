@@ -1073,8 +1073,16 @@ func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podr
 	return cm.deviceManager.GetDevices(podUID, containerName)
 }
 
+func (cm *containerManagerImpl) GetAllocatableDevices() devicemanager.ResourceDeviceInstances {
+	return cm.deviceManager.GetAllocatableDevices()
+}
+
 func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) cpuset.CPUSet {
 	return cm.cpuManager.GetCPUs(podUID, containerName).Clone()
+}
+
+func (cm *containerManagerImpl) GetAllocatableCPUs() cpuset.CPUSet {
+	return cm.cpuManager.GetAllocatableCPUs()
 }
 
 func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {

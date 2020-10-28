@@ -28,6 +28,7 @@ import (
 	podresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 )
 
 type mockProvider struct {
@@ -51,6 +52,16 @@ func (m *mockProvider) GetCPUs(podUID, containerName string) cpuset.CPUSet {
 
 func (m *mockProvider) UpdateAllocatedDevices() {
 	m.Called()
+}
+
+func (m *mockProvider) GetAllocatableDevices() devicemanager.ResourceDeviceInstances {
+	args := m.Called()
+	return args.Get(0).(devicemanager.ResourceDeviceInstances)
+}
+
+func (m *mockProvider) GetAllocatableCPUs() cpuset.CPUSet {
+	args := m.Called()
+	return args.Get(0).(cpuset.CPUSet)
 }
 
 func TestListPodResourcesV1alpha1(t *testing.T) {

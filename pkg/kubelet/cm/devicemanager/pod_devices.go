@@ -346,3 +346,21 @@ func (pdev *podDevices) getContainerDevices(podUID, contName string) []*podresou
 	}
 	return cDev
 }
+
+// ResourceDeviceInstances is a map ping resource name -> device name -> device data
+type ResourceDeviceInstances map[string]map[string]pluginapi.Device
+
+func NewResourceDeviceInstances() ResourceDeviceInstances {
+	return make(ResourceDeviceInstances)
+}
+
+func (rdev ResourceDeviceInstances) Clone() ResourceDeviceInstances {
+	clone := NewResourceDeviceInstances()
+	for resourceName, resourceDevs := range rdev {
+		clone[resourceName] = make(map[string]pluginapi.Device)
+		for devID, dev := range resourceDevs {
+			clone[resourceName][devID] = dev
+		}
+	}
+	return clone
+}

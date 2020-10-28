@@ -187,8 +187,8 @@ func (p *staticPolicy) validateState(s state.State) error {
 	return nil
 }
 
-// assignableCPUs returns the set of unassigned CPUs minus the reserved set.
-func (p *staticPolicy) assignableCPUs(s state.State) cpuset.CPUSet {
+// GetAllocatableCPUs returns the set of unassigned CPUs minus the reserved set.
+func (p *staticPolicy) GetAllocatableCPUs(s state.State) cpuset.CPUSet {
 	return s.GetDefaultCPUSet().Difference(p.reserved)
 }
 
@@ -258,14 +258,14 @@ func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerNa
 func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bitmask.BitMask, reusableCPUs cpuset.CPUSet) (cpuset.CPUSet, error) {
 	klog.Infof("[cpumanager] allocateCpus: (numCPUs: %d, socket: %v)", numCPUs, numaAffinity)
 
-	assignableCPUs := p.assignableCPUs(s).Union(reusableCPUs)
+	allocatableCPUs := p.GetAllocatableCPUs(s).Union(reusableCPUs)
 
 	// If there are aligned CPUs in numaAffinity, attempt to take those first.
 	result := cpuset.NewCPUSet()
 	if numaAffinity != nil {
 		alignedCPUs := cpuset.NewCPUSet()
 		for _, numaNodeID := range numaAffinity.GetBits() {
-			alignedCPUs = alignedCPUs.Union(assignableCPUs.Intersection(p.topology.CPUDetails.CPUsInNUMANodes(numaNodeID)))
+			alignedCPUs = alignedCPUs.Union(allocatableCPUs.Intersection(p.topology.CPUDetails.CPUsInNUMANodes(numaNodeID)))
 		}
 
 		numAlignedToAlloc := alignedCPUs.Size()
@@ -282,7 +282,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 	}
 
 	// Get any remaining CPUs from what's leftover after attempting to grab aligned ones.
-	remainingCPUs, err := takeByTopology(p.topology, assignableCPUs.Difference(result), numCPUs-result.Size())
+	remainingCPUs, err := takeByTopology(p.topology, allocatableCPUs.Difference(result), numCPUs-result.Size())
 	if err != nil {
 		return cpuset.NewCPUSet(), err
 	}
@@ -368,7 +368,7 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v
 	}
 
 	// Get a list of available CPUs.
-	available := p.assignableCPUs(s)
+	available := p.GetAllocatableCPUs(s)
 
 	// Get a list of reusable CPUs (e.g. CPUs reused from initContainers).
 	// It should be an empty CPUSet for a newly created pod.
@@ -423,7 +423,7 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 	}
 
 	// Get a list of available CPUs.
-	available := p.assignableCPUs(s)
+	available := p.GetAllocatableCPUs(s)
 
 	// Get a list of reusable CPUs (e.g. CPUs reused from initContainers).
 	// It should be an empty CPUSet for a newly created pod.

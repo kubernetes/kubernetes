@@ -36,6 +36,7 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -234,4 +235,12 @@ func (cm *containerManagerImpl) UpdateAllocatedDevices() {
 
 func (cm *containerManagerImpl) GetCPUs(_, _ string) cpuset.CPUSet {
 	return cpuset.CPUSet{}
+}
+
+func (cm *containerManagerImpl) GetAllocatableCPUs() cpuset.CPUSet {
+	return cpuset.CPUSet{}
+}
+
+func (cm *containerManagerImpl) GetAllocatableDevices() devicemanager.ResourceDeviceInstances {
+	return nil
 }

@@ -85,8 +85,8 @@ type ManagerImpl struct {
 	// e.g. a new device is advertised, two old devices are deleted and a running device fails.
 	callback monitorCallback
 
-	// allDevices is a map by resource name of all the devices currently registered to the device manager
-	allDevices map[string]map[string]pluginapi.Device
+	// allDevices holds all the devices currently registered to the device manager
+	allDevices ResourceDeviceInstances
 
 	// healthyDevices contains all of the registered healthy resourceNames and their exported device IDs.
 	healthyDevices map[string]sets.String
@@ -1066,6 +1066,15 @@ func (m *ManagerImpl) isDevicePluginResource(resource string) bool {
 		return true
 	}
 	return false
+}
+
+// GetAllocatableDevices returns information about all the devices known to the manager
+func (m *ManagerImpl) GetAllocatableDevices() ResourceDeviceInstances {
+	m.mutex.Lock()
+	resp := m.allDevices.Clone()
+	m.mutex.Unlock()
+	klog.V(4).Infof("known devices: %d", len(resp))
+	return resp
 }
 
 // GetDevices returns the devices used by the specified container

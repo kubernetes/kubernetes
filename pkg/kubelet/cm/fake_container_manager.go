@@ -26,6 +26,7 @@ import (
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -200,5 +201,19 @@ func (cm *FakeContainerManager) GetCPUs(_, _ string) cpuset.CPUSet {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetCPUs")
+	return cpuset.CPUSet{}
+}
+
+func (cm *FakeContainerManager) GetAllocatableDevices() devicemanager.ResourceDeviceInstances {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetAllocatableDevices")
+	return nil
+}
+
+func (cm *FakeContainerManager) GetAllocatableCPUs() cpuset.CPUSet {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetAllocatableCPUs")
 	return cpuset.CPUSet{}
 }
