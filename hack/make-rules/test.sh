@@ -52,7 +52,8 @@ kube::test::find_go_packages() {
             -e '^k8s.io/kubernetes/test/e2e$' \
             -e '^k8s.io/kubernetes/test/e2e_node(/.*)?$' \
             -e '^k8s.io/kubernetes/test/e2e_kubeadm(/.*)?$' \
-            -e '^k8s.io/.*/test/integration(/.*)?$'
+            -e '^k8s.io/.*/test/integration(/.*)?$' \
+            -e '^k8s.io/kubernetes/openshift-hack/e2e(/.*)?$'
   )
 }
 

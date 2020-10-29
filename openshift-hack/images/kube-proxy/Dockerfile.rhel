@@ -1,0 +1,15 @@
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
+WORKDIR /go/src/k8s.io/kubernetes
+COPY . .
+RUN make WHAT='cmd/kube-proxy' && \
+    mkdir -p /tmp/build && \
+    cp /go/src/k8s.io/kubernetes/_output/local/bin/linux/$(go env GOARCH)/kube-proxy /tmp/build
+
+FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+RUN INSTALL_PKGS="conntrack-tools iptables nftables" && \
+    yum install -y --setopt=tsflags=nodocs $INSTALL_PKGS && \
+    yum clean all && rm -rf /var/cache/*
+COPY --from=builder /tmp/build/* /usr/bin/
+LABEL io.k8s.display-name="Kubernetes kube-proxy" \
+      io.k8s.description="Provides kube-proxy for external CNI plugins" \
+      io.openshift.tags="openshift,kube-proxy"

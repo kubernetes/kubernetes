@@ -63,7 +63,9 @@ func newConfig(platform string) *packages.Config {
 		mode = mode | packages.NeedTypesInfo
 	}
 	env := append(os.Environ(),
-		"CGO_ENABLED=1",
+		// OpenShift doesn't build with CGO, since we use host-provided SSL
+		// binaries for FIPS compatibility.
+		// "CGO_ENABLED=1",
 		fmt.Sprintf("GOOS=%s", goos),
 		fmt.Sprintf("GOARCH=%s", goarch))
 	tagstr := "selinux"

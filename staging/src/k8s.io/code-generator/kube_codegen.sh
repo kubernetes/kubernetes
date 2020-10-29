@@ -27,6 +27,8 @@ set -o pipefail
 
 KUBE_CODEGEN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
+GOFLAGS=-mod=readonly
+
 function kube::codegen::internal::findz() {
     # We use `find` rather than `git ls-files` because sometimes external
     # projects use this across repos.  This is an imperfect wrapper of find,
