@@ -83,6 +83,7 @@ kube::golang::server_targets() {
     vendor/k8s.io/kube-aggregator
     vendor/k8s.io/apiextensions-apiserver
     cluster/gce/gci/mounter
+    cmd/watch-termination
   )
   echo "${targets[@]}"
 }
