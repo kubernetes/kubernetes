@@ -137,6 +137,11 @@ controller, and serviceaccounts controller.`,
 				return err
 			}
 
+			if err := ShimForOpenShift(s, c); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				return err
+			}
+
 			// add feature enablement metrics
 			fg := s.ComponentGlobalsRegistry.FeatureGateFor(featuregate.DefaultKubeComponent)
 			fg.(featuregate.MutableFeatureGate).AddMetrics()
@@ -364,6 +369,8 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 
 // ControllerContext defines the context object for controller
 type ControllerContext struct {
+	OpenShiftContext config.OpenShiftContext
+
 	// ClientBuilder will provide a client for this controller to use
 	ClientBuilder clientbuilder.ControllerClientBuilder
 
@@ -607,7 +614,12 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 	}
 
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
-	sharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim))
+	var sharedInformers informers.SharedInformerFactory
+	if InformerFactoryOverride == nil {
+		sharedInformers = informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim))
+	} else {
+		sharedInformers = InformerFactoryOverride
+	}
 
 	metadataClient := metadata.NewForConfigOrDie(rootClientBuilder.ConfigOrDie("metadata-informers"))
 	metadataInformers := metadatainformer.NewSharedInformerFactoryWithOptions(metadataClient, ResyncPeriod(s)(), metadatainformer.WithTransform(trim))
@@ -627,6 +639,7 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 	}, 30*time.Second, ctx.Done())
 
 	controllerContext := ControllerContext{
+		OpenShiftContext:                s.OpenShiftContext,
 		ClientBuilder:                   clientBuilder,
 		InformerFactory:                 sharedInformers,
 		ObjectOrMetadataInformerFactory: informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
@@ -808,10 +821,10 @@ func startServiceAccountTokenController(ctx context.Context, controllerContext C
 		controllerContext.InformerFactory.Core().V1().ServiceAccounts(),
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		rootClientBuilder.ClientOrDie("tokens-controller"),
-		serviceaccountcontroller.TokensControllerOptions{
+		applyOpenShiftServiceServingCertCA(serviceaccountcontroller.TokensControllerOptions{
 			TokenGenerator: tokenGenerator,
 			RootCA:         rootCA,
-		},
+		}),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating Tokens controller: %v", err)
