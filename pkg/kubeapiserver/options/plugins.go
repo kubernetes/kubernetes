@@ -142,7 +142,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 }
 
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
-func defaultOffAdmissionPlugins() sets.String {
+func DefaultOffAdmissionPlugins() sets.String {
 	defaultOnPlugins := sets.NewString(
 		lifecycle.PluginName,                    // NamespaceLifecycle
 		limitranger.PluginName,                  // LimitRanger
