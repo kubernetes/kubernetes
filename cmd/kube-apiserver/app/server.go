@@ -20,11 +20,13 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/admissionenablement"
 	"k8s.io/kubernetes/openshift-kube-apiserver/enablement"
@@ -32,14 +34,17 @@ import (
 
 	"github.com/spf13/cobra"
 
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -64,6 +69,8 @@ import (
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/apis/core"
+	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/controlplane"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
@@ -71,6 +78,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	eventstorage "k8s.io/kubernetes/pkg/registry/core/event/storage"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -262,6 +270,13 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	opts.Metrics.Apply()
 	serviceaccount.RegisterMetrics()
 
+	var eventStorage *eventstorage.REST
+	eventStorage, err = eventstorage.NewREST(genericConfig.RESTOptionsGetter, uint64(opts.EventTTL.Seconds()))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	genericConfig.EventSink = eventRegistrySink{eventStorage}
+
 	config := &controlplane.Config{
 		GenericConfig: genericConfig,
 		ExtraConfig: controlplane.ExtraConfig{
@@ -433,4 +448,39 @@ func buildServiceResolver(enabledAggregatorRouting bool, hostname string, inform
 		serviceResolver = aggregatorapiserver.NewLoopbackServiceResolver(serviceResolver, localHost)
 	}
 	return serviceResolver
+}
+
+// eventRegistrySink wraps an event registry in order to be used as direct event sync, without going through the API.
+type eventRegistrySink struct {
+	*eventstorage.REST
+}
+
+var _ genericapiserver.EventSink = eventRegistrySink{}
+
+func (s eventRegistrySink) Create(v1event *corev1.Event) (*corev1.Event, error) {
+	ctx := request.WithNamespace(request.WithRequestInfo(request.NewContext(), &request.RequestInfo{APIVersion: "v1"}), v1event.Namespace)
+	// since we are bypassing the API set a hard timeout for the storage layer
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	var event core.Event
+	if err := v1.Convert_v1_Event_To_core_Event(v1event, &event, nil); err != nil {
+		return nil, err
+	}
+
+	obj, err := s.REST.Create(ctx, &event, nil, &metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	ret, ok := obj.(*core.Event)
+	if !ok {
+		return nil, fmt.Errorf("expected corev1.Event, got %T", obj)
+	}
+
+	var v1ret corev1.Event
+	if err := v1.Convert_core_Event_To_v1_Event(ret, &v1ret, nil); err != nil {
+		return nil, err
+	}
+
+	return &v1ret, nil
 }

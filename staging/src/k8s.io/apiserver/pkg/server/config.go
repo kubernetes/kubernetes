@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -36,6 +37,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/cryptobyte"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -71,6 +73,8 @@ import (
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/features"
@@ -266,6 +270,9 @@ type Config struct {
 	// rejected with a 429 status code and a 'Retry-After' response.
 	ShutdownSendRetryAfter bool
 
+	// EventSink receives events about the life cycle of the API server, e.g. readiness, serving, signals and termination.
+	EventSink EventSink
+
 	//===========================================================================
 	// values below here are targets for removal
 	//===========================================================================
@@ -304,6 +311,11 @@ type Config struct {
 	// This grace period is orthogonal to other grace periods, and
 	// it is not overridden by any other grace period.
 	ShutdownWatchTerminationGracePeriod time.Duration
+}
+
+// EventSink allows to create events.
+type EventSink interface {
+	Create(event *corev1.Event) (*corev1.Event, error)
 }
 
 type RecommendedConfig struct {
@@ -699,6 +711,10 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 		c.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: c.ExternalAddress}
 	}
 
+	if c.EventSink == nil {
+		c.EventSink = nullEventSink{}
+	}
+
 	AuthorizeClientBearerToken(c.LoopbackClientConfig, &c.Authentication, &c.Authorization)
 
 	if c.RequestInfoResolver == nil {
@@ -726,6 +742,22 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
 func (c *RecommendedConfig) Complete() CompletedConfig {
+	if c.ClientConfig != nil {
+		ref, err := eventReference()
+		if err != nil {
+			klog.Warningf("Failed to derive event reference, won't create events: %v", err)
+			c.EventSink = nullEventSink{}
+		} else {
+			ns := ref.Namespace
+			if len(ns) == 0 {
+				ns = "default"
+			}
+			c.EventSink = &v1.EventSinkImpl{
+				Interface: kubernetes.NewForConfigOrDie(c.ClientConfig).CoreV1().Events(ns),
+			}
+		}
+	}
+
 	return c.Config.Complete(c.SharedInformerFactory)
 }
 
@@ -733,6 +765,39 @@ var allowedMediaTypes = []string{
 	runtime.ContentTypeJSON,
 	runtime.ContentTypeYAML,
 	runtime.ContentTypeProtobuf,
+}
+
+func eventReference() (*corev1.ObjectReference, error) {
+	ns := os.Getenv("POD_NAMESPACE")
+	pod := os.Getenv("POD_NAME")
+	if len(ns) == 0 && len(pod) > 0 {
+		serviceAccountNamespaceFile := "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+		if _, err := os.Stat(serviceAccountNamespaceFile); err == nil {
+			bs, err := ioutil.ReadFile(serviceAccountNamespaceFile)
+			if err != nil {
+				return nil, err
+			}
+			ns = string(bs)
+		}
+	}
+	if len(ns) == 0 {
+		pod = ""
+		ns = "kube-system"
+	}
+	if len(pod) == 0 {
+		return &corev1.ObjectReference{
+			Kind:       "Namespace",
+			Name:       ns,
+			APIVersion: "v1",
+		}, nil
+	}
+
+	return &corev1.ObjectReference{
+		Kind:       "Pod",
+		Namespace:  ns,
+		Name:       pod,
+		APIVersion: "v1",
+	}, nil
 }
 
 // New creates a new server which logically combines the handling chain with the passed server.
@@ -822,7 +887,16 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		Version: c.Version,
 
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
+
+		eventSink: c.EventSink,
 	}
+
+	ref, err := eventReference()
+	if err != nil {
+		klog.Warningf("Failed to derive event reference, won't create events: %v", err)
+		c.EventSink = nullEventSink{}
+	}
+	s.eventRef = ref
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		manager := c.AggregatedDiscoveryGroupManager
@@ -1027,6 +1101,8 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithRequestDeadline(handler, c.AuditBackend, c.AuditPolicyRuleEvaluator,
 		c.LongRunningFunc, c.Serializer, c.RequestTimeout)
 	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.NonLongRunningRequestWaitGroup)
+	handler = WithNonReadyRequestLogging(handler, c.lifecycleSignals.HasBeenReady)
+	handler = WithLateConnectionFilter(handler)
 	if c.ShutdownWatchTerminationGracePeriod > 0 {
 		handler = genericfilters.WithWatchTerminationDuringShutdown(handler, c.lifecycleSignals, c.WatchRequestWaitGroup)
 	}
@@ -1169,4 +1245,10 @@ func SetHostnameFuncForTests(name string) {
 		err = nil
 		return
 	}
+}
+
+type nullEventSink struct{}
+
+func (nullEventSink) Create(event *corev1.Event) (*corev1.Event, error) {
+	return nil, nil
 }
