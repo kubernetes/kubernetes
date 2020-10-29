@@ -31,7 +31,7 @@ import (
 
 const runAsUserNameContainerName = "run-as-username-container"
 
-var _ = SIGDescribe("[Feature:Windows] SecurityContext RunAsUserName", func() {
+var _ = SIGDescribe("[Feature:Windows] SecurityContext", func() {
 	f := framework.NewDefaultFramework("windows-run-as-username")
 
 	ginkgo.It("should be able create pods and run containers with a given username", func() {
@@ -71,6 +71,24 @@ var _ = SIGDescribe("[Feature:Windows] SecurityContext RunAsUserName", func() {
 		f.TestContainerOutput("check overridden username", pod, 0, []string{"ContainerUser"})
 		f.TestContainerOutput("check pod SecurityContext username", pod, 1, []string{"ContainerAdministrator"})
 	})
+	ginkgo.It("should ignore Linux Specific SecurityContext if set", func() {
+		ginkgo.By("Creating a pod with SELinux options")
+
+		windowsPodWithSELinux := createTestPod(f, "mcr.microsoft.com/powershell:lts-nanoserver-1809", windowsOS)
+		windowsPodWithSELinux.Spec.Containers[0].Args = []string{"test-webserver-with-selinux"}
+		windowsPodWithSELinux.Spec.SecurityContext = &v1.PodSecurityContext{}
+		containerUserName := "ContainerAdministrator"
+		windowsPodWithSELinux.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{Level: "s0:c24,c9"}
+		windowsPodWithSELinux.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
+			WindowsOptions: &v1.WindowsSecurityContextOptions{RunAsUserName: &containerUserName}}
+		windowsPodWithSELinux.Spec.Tolerations = []v1.Toleration{{Key: "os", Value: "Windows"}}
+		windowsPodWithSELinux, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(),
+			windowsPodWithSELinux, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		framework.Logf("Created pod %v", windowsPodWithSELinux)
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, windowsPodWithSELinux.Name,
+			f.Namespace.Name), "failed to wait for pod %s to be running", windowsPodWithSELinux.Name)
+	})
 })
 
 func runAsUserNamePod(username *string) *v1.Pod {
@@ -80,6 +98,7 @@ func runAsUserNamePod(username *string) *v1.Pod {
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
+			NodeSelector: map[string]string{"kubernetes.io/os": "windows"},
 			Containers: []v1.Container{
 				{
 					Name:    runAsUserNameContainerName,
