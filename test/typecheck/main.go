@@ -74,6 +74,9 @@ var (
 		// Tools we use for maintaining the code base but not necessarily
 		// ship as part of the release
 		"hack/tools",
+		// Tooling specific to openshift that is not shipped as part
+		// of a release.
+		"openshift-hack",
 	}
 )
 

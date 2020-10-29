@@ -44,6 +44,40 @@ if [[ ${EXCLUDE_FILES_REMAKE:-} =~ ^[yY]$ ]]; then
     )
 fi
 
+# Excluded checks for openshift/kubernetes fork that are always skipped.
+EXCLUDED_PATTERNS+=(
+  "verify-boilerplate.sh"            # Carries do not require boilerplate
+  "verify-bazel.sh"                  # Bazel is not used downstream
+  "verify-no-vendor-cycles.sh"       # Incompatible with the way many carries are specified
+  "verify-publishing-bot.py"         # Verifies the upstream rules, which are not maintained in o/k
+  "verify-staging-meta-files.sh"     # Staging meta files are not maintained downstream
+)
+
+# Skipped checks for openshift/kubernetes fork that need to be fixed.
+#
+# Where a check is excluded due to 'inconsistent behavior between
+# local and ci execution', the fix will require finding a way to
+# compare current and generated results without 'cp -a' since this
+# command does not execute without error in downstream ci.
+EXCLUDED_PATTERNS+=(
+  "verify-codegen.sh"                       # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-conformance-yaml.sh"              # TODO(soltysh) I don't expect us needing this
+  "verify-e2e-test-ownership.sh"            # TODO(soltysh) Is it worth fixing this check?
+  "verify-external-dependencies-version.sh" # TODO(soltysh) I don't expect us needing this
+  "verify-generated-files-remake.sh"        # TODO(marun) Is it worth fixing this check?
+  "verify-generated-protobuf.sh"            # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-golangci-lint.sh"                 # TODO(soltysh) Need golangci-lint
+  "verify-golint.sh"                        # TODO(marun) Cleanup carried code
+  "verify-hack-tools.sh"                    # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-internal-modules.sh"              # TODO(soltysh) Currently fails on our ginkgo dependency
+  "verify-openapi-spec.sh"                  # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-shellcheck.sh"                    # TODO(soltysh) Fix problems in openshift-hack shells
+  "verify-spelling.sh"                      # TODO(marun) Need to ensure installation of misspell command
+  "verify-staticcheck.sh"                   # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-vendor-licenses.sh"               # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-structured-logging.sh"            # TODO(soltysh) I don't expect us needed it now
+)
+
 # Exclude typecheck in certain cases, if they're running in a separate job.
 if [[ ${EXCLUDE_TYPECHECK:-} =~ ^[yY]$ ]]; then
   EXCLUDED_PATTERNS+=(
