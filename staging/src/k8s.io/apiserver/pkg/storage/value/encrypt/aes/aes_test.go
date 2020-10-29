@@ -730,10 +730,12 @@ func TestRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	aes24block, err := aes.NewCipher(bytes.Repeat([]byte("b"), 24))
+	/* FIPS disabled
+	aes24block, err := aes.NewCipher([]byte(bytes.Repeat([]byte("b"), 24)))
 	if err != nil {
 		t.Fatal(err)
 	}
+	*/
 	key32 := bytes.Repeat([]byte("c"), 32)
 	aes32block, err := aes.NewCipher(key32)
 	if err != nil {
@@ -746,10 +748,10 @@ func TestRoundTrip(t *testing.T) {
 		t    value.Transformer
 	}{
 		{name: "GCM 16 byte key", t: newGCMTransformer(t, aes16block, nil)},
-		{name: "GCM 24 byte key", t: newGCMTransformer(t, aes24block, nil)},
+		// FIPS disabled {name: "GCM 24 byte key", t: newGCMTransformer(t, aes24block, nil)},
 		{name: "GCM 32 byte key", t: newGCMTransformer(t, aes32block, nil)},
 		{name: "GCM 16 byte unsafe key", t: newGCMTransformerWithUniqueKeyUnsafeTest(t, aes16block, nil)},
-		{name: "GCM 24 byte unsafe key", t: newGCMTransformerWithUniqueKeyUnsafeTest(t, aes24block, nil)},
+		// FIPS disabled {name: "GCM 24 byte unsafe key", t: newGCMTransformerWithUniqueKeyUnsafeTest(t, aes24block, nil)},
 		{name: "GCM 32 byte unsafe key", t: newGCMTransformerWithUniqueKeyUnsafeTest(t, aes32block, nil)},
 		{name: "GCM 32 byte seed", t: newHKDFExtendedNonceGCMTransformerTest(t, nil, key32)},
 		{name: "CBC 32 byte key", t: NewCBCTransformer(aes32block)},
