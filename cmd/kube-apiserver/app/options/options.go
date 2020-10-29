@@ -93,6 +93,8 @@ type ServerRunOptions struct {
 	ServiceAccountTokenMaxExpiration time.Duration
 
 	ShowHiddenMetricsForVersion string
+
+	OpenShiftConfig string
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters
@@ -270,6 +272,10 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 
 	fs.StringVar(&s.ServiceAccountSigningKeyFile, "service-account-signing-key-file", s.ServiceAccountSigningKeyFile, ""+
 		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key.")
+
+	fs.StringVar(&s.OpenShiftConfig, "openshift-config", s.OpenShiftConfig, "config for openshift")
+	fs.MarkDeprecated("openshift-config", "to be removed")
+	fs.MarkHidden("openshift-config")
 
 	return fss
 }

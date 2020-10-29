@@ -115,8 +115,6 @@ func (a *AdmissionOptions) ApplyTo(
 		return nil
 	}
 
-	a.GenericAdmission.Decorators = append(a.GenericAdmission.Decorators, Decorators...)
-
 	if a.PluginNames != nil {
 		// pass PluginNames to generic AdmissionOptions
 		a.GenericAdmission.EnablePlugins, a.GenericAdmission.DisablePlugins = computePluginNames(a.PluginNames, a.GenericAdmission.RecommendedPluginOrder)
