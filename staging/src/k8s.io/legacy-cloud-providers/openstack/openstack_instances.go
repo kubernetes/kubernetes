@@ -49,6 +49,16 @@ const (
 func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	klog.V(4).Info("openstack.Instances() called")
 
+	err := os.ensureCloudProviderWasInitialized()
+	if err != nil {
+		// cannot initialize cloud provider - return empty instances without compute instance,
+		// it will be generated later with any call of an Instances' receiver.
+		klog.Errorf("cannot initialize cloud provider, only limited functionality is available : %v", err)
+		return &Instances{
+			opts: os.metadataOpts,
+		}, true
+	}
+
 	compute, err := os.NewComputeV2()
 	if err != nil {
 		klog.Errorf("unable to access compute v2 API : %v", err)
@@ -88,6 +98,48 @@ func (i *Instances) AddSSHKeyToAllInstances(ctx context.Context, user string, ke
 func (i *Instances) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
 	klog.V(4).Infof("NodeAddresses(%v) called", name)
 
+	// check if the node is local, in this case we can get its addresses from the metadata service
+	// without additional requests to Nova.
+	md, err := getMetadata(i.opts.SearchOrder)
+	if err != nil {
+		return nil, err
+	}
+	if localName := types.NodeName(md.Name); localName == name {
+		localAddress, publicAddress, err := getNodeAddresses()
+		if err != nil {
+			return nil, err
+		}
+
+		addrs := []v1.NodeAddress{
+			{
+				Type:    v1.NodeHostName,
+				Address: md.Name,
+			},
+		}
+
+		if localAddress != "" {
+			addrs = append(addrs, v1.NodeAddress{
+				Type:    v1.NodeInternalIP,
+				Address: localAddress,
+			})
+		}
+
+		if publicAddress != "" {
+			addrs = append(addrs, v1.NodeAddress{
+				Type:    v1.NodeExternalIP,
+				Address: publicAddress,
+			})
+		}
+
+		klog.V(4).Infof("NodeAddresses(%v) => %v", name, addrs)
+		return addrs, nil
+	}
+
+	// Can't return remote Node addresses using Nova metadata
+	if i.compute == nil {
+		return nil, cloudprovider.NotImplemented
+	}
+
 	addrs, err := getAddressesByName(i.compute, name)
 	if err != nil {
 		return nil, err
@@ -101,6 +153,11 @@ func (i *Instances) NodeAddresses(ctx context.Context, name types.NodeName) ([]v
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (i *Instances) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
+	// Can't return remote Node addresses using Nova metadata
+	if i.compute == nil {
+		return nil, cloudprovider.NotImplemented
+	}
+
 	instanceID, err := instanceIDFromProviderID(providerID)
 
 	if err != nil {
@@ -124,6 +181,11 @@ func (i *Instances) NodeAddressesByProviderID(ctx context.Context, providerID st
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exist.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (i *Instances) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
+	// Can't be implemented with Nova metadata
+	if i.compute == nil {
+		return false, cloudprovider.NotImplemented
+	}
+
 	instanceID, err := instanceIDFromProviderID(providerID)
 	if err != nil {
 		return false, err
@@ -142,6 +204,11 @@ func (i *Instances) InstanceExistsByProviderID(ctx context.Context, providerID s
 
 // InstanceShutdownByProviderID returns true if the instances is in safe state to detach volumes
 func (i *Instances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	// Can't be implemented with Nova metadata
+	if i.compute == nil {
+		return false, cloudprovider.NotImplemented
+	}
+
 	instanceID, err := instanceIDFromProviderID(providerID)
 	if err != nil {
 		return false, err
@@ -173,6 +240,22 @@ func (os *OpenStack) InstanceID() (string, error) {
 
 // InstanceID returns the cloud provider ID of the specified instance.
 func (i *Instances) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
+	// check if the node is local, in this case we can get its ID from the metadata service
+	// without additional requests to Nova.
+	md, err := getMetadata(i.opts.SearchOrder)
+	if err != nil {
+		return "", err
+	}
+	localName := types.NodeName(md.Name)
+	if localName == name {
+		return "/" + md.UUID, nil
+	}
+
+	// Can't be implemented with Nova metadata
+	if i.compute == nil {
+		return "", cloudprovider.NotImplemented
+	}
+
 	srv, err := getServerByName(i.compute, name)
 	if err != nil {
 		if err == ErrNotFound {
@@ -189,6 +272,11 @@ func (i *Instances) InstanceID(ctx context.Context, name types.NodeName) (string
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (i *Instances) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
+	// Can't be implemented with Nova metadata
+	if i.compute == nil {
+		return "", cloudprovider.NotImplemented
+	}
+
 	instanceID, err := instanceIDFromProviderID(providerID)
 
 	if err != nil {
@@ -206,6 +294,22 @@ func (i *Instances) InstanceTypeByProviderID(ctx context.Context, providerID str
 
 // InstanceType returns the type of the specified instance.
 func (i *Instances) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
+	// check if the node is local, in this case we can get its type from the metadata service
+	// without additional requests to Nova.
+	md, err := getMetadata(i.opts.SearchOrder)
+	if err != nil {
+		return "", err
+	}
+	localName := types.NodeName(md.Name)
+	if localName == name {
+		return getIntanceType()
+	}
+
+	// Can't be implemented with Nova metadata
+	if i.compute == nil {
+		return "", cloudprovider.NotImplemented
+	}
+
 	srv, err := getServerByName(i.compute, name)
 
 	if err != nil {

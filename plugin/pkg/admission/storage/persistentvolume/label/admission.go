@@ -24,9 +24,12 @@ import (
 	"io"
 	"sync"
 
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/client-go/informers"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudvolume "k8s.io/cloud-provider/volume"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
@@ -51,12 +54,14 @@ func Register(plugins *admission.Plugins) {
 }
 
 var _ = admission.Interface(&persistentVolumeLabel{})
+var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&persistentVolumeLabel{})
 
 type persistentVolumeLabel struct {
 	*admission.Handler
 
 	mutex              sync.Mutex
 	cloudConfig        []byte
+	sharedInformer     informers.SharedInformerFactory
 	awsPVLabeler       cloudprovider.PVLabeler
 	gcePVLabeler       cloudprovider.PVLabeler
 	azurePVLabeler     cloudprovider.PVLabeler
@@ -84,6 +89,20 @@ func newPersistentVolumeLabel() *persistentVolumeLabel {
 
 func (l *persistentVolumeLabel) SetCloudConfig(cloudConfig []byte) {
 	l.cloudConfig = cloudConfig
+}
+
+func (l *persistentVolumeLabel) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	secretInformer := f.Core().V1().Secrets()
+	l.sharedInformer = f
+	l.SetReadyFunc(secretInformer.Informer().HasSynced)
+}
+
+// ValidateInitialization ensures lister is set.
+func (l *persistentVolumeLabel) ValidateInitialization() error {
+	if l.sharedInformer == nil {
+		return fmt.Errorf("missing shared informer")
+	}
+	return nil
 }
 
 func nodeSelectorRequirementKeysExistInNodeSelectorTerms(reqs []api.NodeSelectorRequirement, terms []api.NodeSelectorTerm) bool {
@@ -394,6 +413,11 @@ func (l *persistentVolumeLabel) getOpenStackPVLabeler() (cloudprovider.PVLabeler
 		cloudProvider, err := cloudprovider.GetCloudProvider("openstack", cloudConfigReader)
 		if err != nil || cloudProvider == nil {
 			return nil, err
+		}
+
+		cloudProviderWithInformer, ok := cloudProvider.(cloudprovider.InformerUser)
+		if ok {
+			cloudProviderWithInformer.SetInformers(l.sharedInformer)
 		}
 
 		openStackPVLabeler, ok := cloudProvider.(cloudprovider.PVLabeler)
