@@ -136,7 +136,7 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 		t.Fatalf("failed to validate ServerRunOptions: %v", utilerrors.NewAggregate(errs))
 	}
 
-	kubeAPIServerConfig, _, _, err := app.CreateKubeAPIServerConfig(completedOptions)
+	kubeAPIServerConfig, _, _, err := app.CreateKubeAPIServerConfig(completedOptions, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
