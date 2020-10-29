@@ -722,7 +722,9 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				conf.FeatureGates["invalid"] = true
 				return conf
 			},
-			errMsg: "unrecognized feature gate: invalid",
+			// In OpenShift we need to tolerate unrecognized feature gates
+			// errMsg: "unrecognized feature gate: invalid",
+			errMsg: "",
 		},
 	}
 
