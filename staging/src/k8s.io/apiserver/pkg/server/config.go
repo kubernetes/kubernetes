@@ -248,6 +248,9 @@ type Config struct {
 
 	// StorageVersionManager holds the storage versions of the API resources installed by this server.
 	StorageVersionManager storageversion.Manager
+
+	// A func that returns whether the server is terminating. This can be nil.
+	IsTerminating func() bool
 }
 
 type RecommendedConfig struct {
@@ -785,7 +788,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithWarningRecorder(handler)
 	handler = genericapifilters.WithCacheControl(handler)
 	handler = genericfilters.WithHSTS(handler, c.HSTSDirectives)
-	handler = genericfilters.WithHTTPLogging(handler)
+	handler = genericfilters.WithHTTPLogging(handler, c.IsTerminating)
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
 		handler = genericapifilters.WithTracing(handler, c.TracerProvider)
 	}
