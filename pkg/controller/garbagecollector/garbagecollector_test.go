@@ -47,8 +47,8 @@ import (
 	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 type testRESTMapper struct {
@@ -82,7 +82,7 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	gc, err := NewGarbageCollector(metadataClient, rm, map[schema.GroupResource]struct{}{},
-		controller.NewInformerFactory(sharedInformers, metadataInformers), alwaysStarted)
+		informerfactory.NewInformerFactory(sharedInformers, metadataInformers), alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
