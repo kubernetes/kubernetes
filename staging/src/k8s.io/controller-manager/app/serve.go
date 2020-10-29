@@ -48,7 +48,7 @@ func BuildHandlerChain(apiHandler http.Handler, authorizationInfo *apiserver.Aut
 	}
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericapifilters.WithCacheControl(handler)
-	handler = genericfilters.WithPanicRecovery(handler, requestInfoResolver)
+	handler = genericfilters.WithPanicRecovery(handler, requestInfoResolver, nil)
 
 	return handler
 }
