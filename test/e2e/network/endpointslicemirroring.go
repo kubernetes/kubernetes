@@ -79,28 +79,34 @@ var _ = SIGDescribe("EndpointSliceMirroring", func() {
 					framework.Logf("Error listing EndpointSlices: %v", err)
 					return false, nil
 				}
-				if len(esList.Items) != 1 {
-					framework.Logf("Waiting for 1 EndpointSlice to exist, got %d", len(esList.Items))
+				if len(esList.Items) == 0 {
+					framework.Logf("Waiting for at least 1 EndpointSlice to exist, got %d", len(esList.Items))
 					return false, nil
 				}
-				epSlice := esList.Items[0]
-				if len(epSlice.Ports) != 1 {
-					return false, fmt.Errorf("Expected EndpointSlice to have 1 Port, got %d", len(epSlice.Ports))
-				}
-				port := epSlice.Ports[0]
-				if *port.Port != int32(80) {
-					return false, fmt.Errorf("Expected port to be 80, got %d", *port.Port)
-				}
-				if len(epSlice.Endpoints) != 1 {
-					return false, fmt.Errorf("Expected EndpointSlice to have 1 endpoints, got %d", len(epSlice.Endpoints))
-				}
-				endpoint := epSlice.Endpoints[0]
-				if len(endpoint.Addresses) != 1 {
-					return false, fmt.Errorf("Expected EndpointSlice endpoint to have 1 address, got %d", len(endpoint.Addresses))
-				}
-				address := endpoint.Addresses[0]
-				if address != "10.1.2.3" {
-					return false, fmt.Errorf("Expected EndpointSlice to have 10.1.2.3 as address, got %s", address)
+
+				// Due to informer caching, it's possible for the controller
+				// to create a second EndpointSlice if it does not see the
+				// first EndpointSlice that was created during a sync. All
+				// EndpointSlices created should be valid though.
+				for _, epSlice := range esList.Items {
+					if len(epSlice.Ports) != 1 {
+						return false, fmt.Errorf("Expected EndpointSlice to have 1 Port, got %d", len(epSlice.Ports))
+					}
+					port := epSlice.Ports[0]
+					if *port.Port != int32(80) {
+						return false, fmt.Errorf("Expected port to be 80, got %d", *port.Port)
+					}
+					if len(epSlice.Endpoints) != 1 {
+						return false, fmt.Errorf("Expected EndpointSlice to have 1 endpoints, got %d", len(epSlice.Endpoints))
+					}
+					endpoint := epSlice.Endpoints[0]
+					if len(endpoint.Addresses) != 1 {
+						return false, fmt.Errorf("Expected EndpointSlice endpoint to have 1 address, got %d", len(endpoint.Addresses))
+					}
+					address := endpoint.Addresses[0]
+					if address != "10.1.2.3" {
+						return false, fmt.Errorf("Expected EndpointSlice to have 10.1.2.3 as address, got %s", address)
+					}
 				}
 
 				return true, nil
