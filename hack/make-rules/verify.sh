@@ -43,6 +43,33 @@ if [[ ${EXCLUDE_FILES_REMAKE:-} =~ ^[yY]$ ]]; then
     )
 fi
 
+# Excluded checks for openshift/kubernetes fork that are always skipped.
+EXCLUDED_PATTERNS+=(
+  "verify-boilerplate.sh"            # Carries do not require boilerplate
+  "verify-bazel.sh"                  # Bazel is not used downstream
+  "verify-no-vendor-cycles.sh"       # Incompatible with the way many carries are specified
+  "verify-publishing-bot.py"         # Verifies the upstream rules, which are not maintained in o/k
+  "verify-staging-meta-files.sh"     # Staging meta files are not maintained downstream
+)
+
+# Skipped checks for openshift/kubernetes fork that need to be fixed.
+#
+# Where a check is excluded due to 'inconsistent behavior between
+# local and ci execution', the fix will require finding a way to
+# compare current and generated results without 'cp -a' since this
+# command does not execute without error in downstream ci.
+EXCLUDED_PATTERNS+=(
+  "verify-codegen.sh"                # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-generated-files-remake.sh" # TODO(marun) Is it worth fixing this check?
+  "verify-generated-protobuf.sh"     # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-golint.sh"                 # TODO(marun) Cleanup carried code
+  "verify-hack-tools.sh"             # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-openapi-spec.sh"           # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-spelling.sh"               # TODO(marun) Need to ensure installation of misspell command
+  "verify-staticcheck.sh"            # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-vendor-licenses.sh"        # TODO(marun) Fix inconsistent behavior between local and ci execution
+)
+
 # Exclude typecheck in certain cases, if they're running in a separate job.
 if [[ ${EXCLUDE_TYPECHECK:-} =~ ^[yY]$ ]]; then
   EXCLUDED_PATTERNS+=(
