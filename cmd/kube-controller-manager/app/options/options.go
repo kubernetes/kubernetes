@@ -109,6 +109,8 @@ type KubeControllerManagerOptions struct {
 
 	// Parsedflags holds the parsed CLI flags.
 	ParsedFlags *cliflag.NamedFlagSets
+
+	OpenShiftContext kubecontrollerconfig.OpenShiftContext
 }
 
 // NewKubeControllerManagerOptions creates a new KubeControllerManagerOptions with a default config.
@@ -295,6 +297,8 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fs.StringVar(&s.Generic.ClientConnection.Kubeconfig, "kubeconfig", s.Generic.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization and master location information (the master location can be overridden by the master flag).")
 
 	s.ComponentGlobalsRegistry.AddFlags(fss.FlagSet("generic"))
+	fs.StringVar(&s.OpenShiftContext.OpenShiftConfig, "openshift-config", s.OpenShiftContext.OpenShiftConfig, "indicates that this process should be compatible with openshift start master")
+	fs.MarkHidden("openshift-config")
 
 	return fss
 }
@@ -402,6 +406,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 			return err
 		}
 	}
+
+	c.OpenShiftContext = s.OpenShiftContext
+
 	return nil
 }
 

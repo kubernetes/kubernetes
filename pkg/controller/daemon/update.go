@@ -179,7 +179,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 				if err != nil {
 					return fmt.Errorf("couldn't get node for nodeName %q: %v", nodeName, err)
 				}
-				if shouldRun, _ := NodeShouldRunDaemonPod(node, ds); !shouldRun {
+				if shouldRun, _ := dsc.nodeShouldRunDaemonPod(node, ds); !shouldRun {
 					logger.V(5).Info("DaemonSet pod on node is not available and does not match scheduling constraints, remove old pod", "daemonset", klog.KObj(ds), "node", nodeName, "oldPod", klog.KObj(oldPod))
 					oldPodsToDelete = append(oldPodsToDelete, oldPod.Name)
 					continue
@@ -196,7 +196,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 				if err != nil {
 					return fmt.Errorf("couldn't get node for nodeName %q: %v", nodeName, err)
 				}
-				if shouldRun, _ := NodeShouldRunDaemonPod(node, ds); !shouldRun {
+				if shouldRun, _ := dsc.nodeShouldRunDaemonPod(node, ds); !shouldRun {
 					shouldNotRunPodsToDelete = append(shouldNotRunPodsToDelete, oldPod.Name)
 					continue
 				}
@@ -586,7 +586,7 @@ func (dsc *DaemonSetsController) updatedDesiredNodeCounts(ctx context.Context, d
 	logger := klog.FromContext(ctx)
 	for i := range nodeList {
 		node := nodeList[i]
-		wantToRun, _ := NodeShouldRunDaemonPod(node, ds)
+		wantToRun, _ := dsc.nodeShouldRunDaemonPod(node, ds)
 		if !wantToRun {
 			continue
 		}

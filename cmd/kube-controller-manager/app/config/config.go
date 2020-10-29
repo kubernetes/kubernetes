@@ -29,7 +29,8 @@ import (
 // Config is the main context object for the controller manager.
 type Config struct {
 	// Flagz is the Reader interface to get flags for the flagz page.
-	Flagz flagz.Reader
+	Flagz            flagz.Reader
+	OpenShiftContext OpenShiftContext
 
 	ComponentConfig kubectrlmgrconfig.KubeControllerManagerConfiguration
 
