@@ -25,6 +25,12 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "$KUBE_ROOT/build/common.sh"
 
+# Allow running without docker (e.g. in openshift ci)
+if [[ "${OS_RUN_WITHOUT_DOCKER:-}" ]]; then
+  "${@}"
+  exit 0
+fi
+
 KUBE_RUN_COPY_OUTPUT="${KUBE_RUN_COPY_OUTPUT:-y}"
 
 kube::build::verify_prereqs

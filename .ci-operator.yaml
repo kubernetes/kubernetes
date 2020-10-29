@@ -1,0 +1,4 @@
+build_root_image:
+  name: release
+  namespace: openshift
+  tag: rhel-8-release-golang-1.20-openshift-4.14
