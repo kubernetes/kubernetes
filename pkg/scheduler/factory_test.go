@@ -124,12 +124,12 @@ func TestCreateFromConfig(t *testing.T) {
 				Filter: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "NodeUnschedulable"},
-						{Name: "NodeResourcesFit"},
 						{Name: "NodeName"},
-						{Name: "NodePorts"},
-						{Name: "NodeAffinity"},
-						{Name: "VolumeRestrictions"},
 						{Name: "TaintToleration"},
+						{Name: "NodeAffinity"},
+						{Name: "NodePorts"},
+						{Name: "NodeResourcesFit"},
+						{Name: "VolumeRestrictions"},
 						{Name: "EBSLimits"},
 						{Name: "GCEPDLimits"},
 						{Name: "NodeVolumeLimits"},
