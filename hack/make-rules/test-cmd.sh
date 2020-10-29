@@ -56,9 +56,7 @@ function run_kube_apiserver() {
   ENABLE_FEATURE_GATES="ServerSideApply=true"
 
   "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
-    --insecure-bind-address="127.0.0.1" \
     --bind-address="127.0.0.1" \
-    --insecure-port="${API_PORT}" \
     --authorization-mode="${AUTHORIZATION_MODE}" \
     --secure-port="${SECURE_API_PORT}" \
     --feature-gates="${ENABLE_FEATURE_GATES}" \
@@ -73,7 +71,7 @@ function run_kube_apiserver() {
     --token-auth-file=hack/testdata/auth-tokens.csv 1>&2 &
   export APISERVER_PID=$!
 
-  kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver"
+  kube::util::wait_for_url_with_bearer_token "https://127.0.0.1:${SECURE_API_PORT}/healthz" "admin-token" "apiserver"
 }
 
 # Runs run_kube_controller_manager
@@ -85,11 +83,33 @@ function run_kube_controller_manager() {
   make -C "${KUBE_ROOT}" WHAT="cmd/kube-controller-manager"
 
   # Start controller manager
+  kube::log::status 'Generate kubeconfig for controller-manager'
+  local config
+  config="$(mktemp controller-manager.kubeconfig.XXXXX)"
+  cat <<EOF > "$config"
+kind: Config
+users:
+- name: controller-manager
+  user:
+    token: admin-token
+clusters:
+- cluster:
+    server: https://127.0.0.1:${SECURE_API_PORT}
+    insecure-skip-tls-verify: true
+  name: local
+contexts:
+- context:
+    cluster: local
+    user: controller-manager
+  name: local-context
+current-context: local-context
+EOF
+
   kube::log::status "Starting controller-manager"
   "${KUBE_OUTPUT_HOSTBIN}/kube-controller-manager" \
     --port="${CTLRMGR_PORT}" \
     --kube-api-content-type="${KUBE_TEST_API_TYPE-}" \
-    --master="127.0.0.1:${API_PORT}" 1>&2 &
+    --kubeconfig="${config}" 1>&2 &
   export CTLRMGR_PID=$!
 
   kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager"
@@ -101,7 +121,7 @@ function run_kube_controller_manager() {
 # Exports:
 #   SUPPORTED_RESOURCES(Array of all resources supported by the apiserver).
 function create_node() {
-  kubectl create -f - -s "http://127.0.0.1:${API_PORT}" << __EOF__
+  kubectl create -f - << __EOF__
 {
   "kind": "Node",
   "apiVersion": "v1",

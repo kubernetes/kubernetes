@@ -55,8 +55,6 @@ func (a *APIServer) Start() error {
 		return err
 	}
 	o.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
-	// Disable insecure serving
-	o.InsecureServing.BindPort = 0
 	o.ServiceClusterIPRanges = ipnet.String()
 	o.AllowPrivileged = true
 	if err := generateTokenFile(tokenFilePath); err != nil {

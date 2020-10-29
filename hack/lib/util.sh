@@ -45,6 +45,7 @@ kube::util::wait_for_url() {
   local wait=${3:-1}
   local times=${4:-30}
   local maxtime=${5:-1}
+  local extra_args=${6:-}
 
   command -v curl >/dev/null || {
     kube::log::usage "curl must be installed"
@@ -54,7 +55,9 @@ kube::util::wait_for_url() {
   local i
   for i in $(seq 1 "${times}"); do
     local out
-    if out=$(curl --max-time "${maxtime}" -gkfs "${url}" 2>/dev/null); then
+    # shellcheck disable=SC2086
+    # Disabling because "${extra_args}" needs to allow for expansion here
+    if out=$(curl --max-time "${maxtime}" -gkfs $extra_args "${url}" 2>/dev/null); then
       kube::log::status "On try ${i}, ${prefix}: ${out}"
       return 0
     fi
@@ -62,6 +65,17 @@ kube::util::wait_for_url() {
   done
   kube::log::error "Timed out waiting for ${prefix} to answer at ${url}; tried ${times} waiting ${wait} between each"
   return 1
+}
+
+kube::util::wait_for_url_with_bearer_token() {
+  local url=$1
+  local token=$2
+  local prefix=${3:-}
+  local wait=${4:-1}
+  local times=${5:-30}
+  local maxtime=${6:-1}
+
+  kube::util::wait_for_url "${url}" "${prefix}" "${wait}" "${times}" "${maxtime}" "--oauth2-bearer ${token}"
 }
 
 # Example:  kube::util::wait_for_success 120 5 "kubectl get nodes|grep localhost"
