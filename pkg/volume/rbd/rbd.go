@@ -803,9 +803,9 @@ type rbdMounter struct {
 	Mon           []string
 	ID            string
 	Keyring       string
-	Secret        string
+	Secret        string `datapolicy:"token"`
 	fsType        string
-	adminSecret   string
+	adminSecret   string `datapolicy:"token"`
 	adminID       string
 	mountOptions  []string
 	imageFormat   string

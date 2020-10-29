@@ -461,7 +461,7 @@ type provisionerConfig struct {
 	userKey            string
 	secretNamespace    string
 	secretName         string
-	secretValue        string
+	secretValue        string `datapolicy:"token"`
 	clusterID          string
 	gidMin             int
 	gidMax             int

@@ -61,7 +61,7 @@ type sioClient struct {
 	client              *sio.Client
 	gateway             string
 	username            string
-	password            string
+	password            string `datapolicy:"password"`
 	insecure            bool
 	certsEnabled        bool
 	system              *siotypes.System
