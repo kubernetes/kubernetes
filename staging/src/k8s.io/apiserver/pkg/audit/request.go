@@ -153,8 +153,15 @@ func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.Gr
 		return
 	}
 
+	copy, ok, err := copyWithoutManagedFields(obj)
+	if err != nil {
+		klog.Warningf("error while dropping managed fields from the request for %q error: %v", reflect.TypeOf(obj).Name(), err)
+	}
+	if ok {
+		obj = copy
+	}
+
 	// TODO(audit): hook into the serializer to avoid double conversion
-	var err error
 	ae.RequestObject, err = encodeObject(obj, gvr.GroupVersion(), s)
 	if err != nil {
 		// TODO(audit): add error slice to audit event struct
@@ -193,8 +200,16 @@ func LogResponseObject(ae *auditinternal.Event, obj runtime.Object, gv schema.Gr
 	if ae.Level.Less(auditinternal.LevelRequestResponse) {
 		return
 	}
+
+	copy, ok, err := copyWithoutManagedFields(obj)
+	if err != nil {
+		klog.Warningf("error while dropping managed fields from the response for %q error: %v", reflect.TypeOf(obj).Name(), err)
+	}
+	if ok {
+		obj = copy
+	}
+
 	// TODO(audit): hook into the serializer to avoid double conversion
-	var err error
 	ae.ResponseObject, err = encodeObject(obj, gv, s)
 	if err != nil {
 		klog.Warningf("Audit failed for %q response: %v", reflect.TypeOf(obj).Name(), err)
@@ -243,4 +258,63 @@ func maybeTruncateUserAgent(req *http.Request) string {
 	}
 
 	return ua
+}
+
+// copyWithoutManagedFields will make a deep copy of the specified object and will discard
+// managed fields from the copy.
+// The specified object is expected to be a meta.Object or a "list". The specified object obj
+// is treated as readonly and hence not mutated.
+// On return, an error is set if the function runs into any error while removing the managed fields.
+// On return, the boolean value is true if the copy has been made successfully, otherwise false.
+func copyWithoutManagedFields(obj runtime.Object) (runtime.Object, bool, error) {
+	removeManagedFields := func(obj runtime.Object) error {
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			return err
+		}
+		accessor.SetManagedFields(nil)
+		return nil
+	}
+
+	isAccessor := true
+	if _, err := meta.Accessor(obj); err != nil {
+		isAccessor = false
+	}
+	isList := meta.IsListType(obj)
+
+	_, isTable := obj.(*metav1.Table)
+	if !isAccessor && !isList && !isTable {
+		return nil, false, nil
+	}
+
+	copy := obj.DeepCopyObject()
+
+	if isAccessor {
+		if err := removeManagedFields(copy); err != nil {
+			return nil, false, err
+		}
+	}
+
+	if isList {
+		if err := meta.EachListItem(copy, removeManagedFields); err != nil {
+			return nil, false, err
+		}
+	}
+
+	if isTable {
+		table := copy.(*metav1.Table)
+		for i := range table.Rows {
+			rowObj := table.Rows[i].Object
+
+			if rowObj.Object == nil {
+				continue
+			}
+
+			if err := removeManagedFields(rowObj.Object); err != nil {
+				return nil, false, err
+			}
+		}
+	}
+
+	return copy, true, nil
 }
