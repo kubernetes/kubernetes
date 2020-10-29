@@ -94,6 +94,7 @@ type KubeControllerManagerOptions struct {
 	Master                      string
 	Kubeconfig                  string
 	ShowHiddenMetricsForVersion string
+	OpenShiftContext            kubecontrollerconfig.OpenShiftContext
 }
 
 // NewKubeControllerManagerOptions creates a new KubeControllerManagerOptions with a default config.
@@ -261,6 +262,8 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fs := fss.FlagSet("misc")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
+	fs.StringVar(&s.OpenShiftContext.OpenShiftConfig, "openshift-config", s.OpenShiftContext.OpenShiftConfig, "indicates that this process should be compatible with openshift start master")
+	fs.MarkHidden("openshift-config")
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fss.FlagSet("generic"))
 
 	return fss
@@ -360,6 +363,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 			return err
 		}
 	}
+
+	c.OpenShiftContext = s.OpenShiftContext
+
 	return nil
 }
 
