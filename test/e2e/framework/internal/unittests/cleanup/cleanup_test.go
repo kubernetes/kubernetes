@@ -113,7 +113,6 @@ INFO: before
 < Exit [BeforeEach] e2e - cleanup_test.go:63 <time>
 > Enter [BeforeEach] e2e - set up framework | framework.go:xxx <time>
 STEP: Creating a kubernetes client - framework.go:xxx <time>
-INFO: >>> kubeConfig: yyy/kube.config
 STEP: Building a namespace api object, basename test-namespace - framework.go:xxx <time>
 INFO: Skipping waiting for service account
 < Exit [BeforeEach] e2e - set up framework | framework.go:xxx <time>

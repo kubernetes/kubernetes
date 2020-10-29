@@ -1003,8 +1003,6 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 		params.Timeout = 10 * time.Second
 	}
 
-	framework.Logf("Poking %q", url)
-
 	resp, err := httpGetNoConnectionPoolTimeout(url, params.Timeout)
 	if err != nil {
 		ret.Error = err
@@ -1056,7 +1054,8 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 	}
 
 	ret.Status = HTTPSuccess
-	framework.Logf("Poke(%q): success", url)
+	// causes excessive logging that provides no value
+	// framework.Logf("Poke(%q): success", url)
 	return ret
 }
 
