@@ -25,12 +25,12 @@ import (
 	goruntime "runtime"
 
 	"github.com/spf13/cobra"
-
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
@@ -123,6 +123,11 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	go func() {
+		stopCh := server.SetupSignalHandler()
+		<-stopCh
+		cancel()
+	}()
 
 	cc, sched, err := Setup(ctx, opts, registryOptions...)
 	if err != nil {
@@ -202,9 +207,18 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 				sched.Run(ctx)
 			},
 			OnStoppedLeading: func() {
-				klog.Fatalf("leaderelection lost")
+				select {
+				case <-ctx.Done():
+					// We were asked to terminate. Exit 0.
+					klog.Info("Requested to terminate. Exiting.")
+					os.Exit(0)
+				default:
+					// We lost the lock.
+					klog.Exitf("leaderelection lost")
+				}
 			},
 		}
+		cc.LeaderElection.ReleaseOnCancel = true
 		leaderElector, err := leaderelection.NewLeaderElector(*cc.LeaderElection)
 		if err != nil {
 			return fmt.Errorf("couldn't create leader elector: %v", err)
