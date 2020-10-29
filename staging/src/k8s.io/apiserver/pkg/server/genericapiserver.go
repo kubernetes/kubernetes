@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	gpath "path"
 	"strings"
 	"sync"
@@ -30,6 +31,7 @@ import (
 
 	"golang.org/x/time/rate"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -284,6 +286,10 @@ type GenericAPIServer struct {
 	// This grace period is orthogonal to other grace periods, and
 	// it is not overridden by any other grace period.
 	ShutdownWatchTerminationGracePeriod time.Duration
+
+	// EventSink creates events.
+	eventSink EventSink
+	eventRef  *corev1.ObjectReference
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -527,7 +533,10 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 
 	go func() {
 		defer delayedStopCh.Signal()
-		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", delayedStopCh.Name())
+		defer func() {
+			klog.V(1).InfoS("[graceful-termination] shutdown event", "name", delayedStopCh.Name())
+			s.Eventf(corev1.EventTypeNormal, delayedStopCh.Name(), "The minimal shutdown duration of %v finished", s.ShutdownDelayDuration)
+		}()
 
 		<-stopCh
 
@@ -536,9 +545,27 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		// and stop sending traffic to this server.
 		shutdownInitiatedCh.Signal()
 		klog.V(1).InfoS("[graceful-termination] shutdown event", "name", shutdownInitiatedCh.Name())
+		s.Eventf(corev1.EventTypeNormal, shutdownInitiatedCh.Name(), "Received signal to terminate, becoming unready, but keeping serving")
 
 		time.Sleep(s.ShutdownDelayDuration)
 	}()
+
+	lateStopCh := make(chan struct{})
+	if s.ShutdownDelayDuration > 0 {
+		go func() {
+			defer close(lateStopCh)
+
+			<-stopCh
+
+			time.Sleep(s.ShutdownDelayDuration * 8 / 10)
+		}()
+	}
+
+	s.SecureServingInfo.Listener = &terminationLoggingListener{
+		Listener:   s.SecureServingInfo.Listener,
+		lateStopCh: lateStopCh,
+	}
+	unexpectedRequestsEventf.Store(s.Eventf)
 
 	// close socket after delayed stopCh
 	shutdownTimeout := s.ShutdownTimeout
@@ -586,13 +613,17 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		<-listenerStoppedCh
 		httpServerStoppedListeningCh.Signal()
 		klog.V(1).InfoS("[graceful-termination] shutdown event", "name", httpServerStoppedListeningCh.Name())
+		s.Eventf(corev1.EventTypeNormal, httpServerStoppedListeningCh.Name(), "HTTP Server has stopped listening")
 	}()
 
 	// we don't accept new request as soon as both ShutdownDelayDuration has
 	// elapsed and preshutdown hooks have completed.
 	preShutdownHooksHasStoppedCh := s.lifecycleSignals.PreShutdownHooksStopped
 	go func() {
-		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", notAcceptingNewRequestCh.Name())
+		defer func() {
+			klog.V(1).InfoS("[graceful-termination] shutdown event", "name", notAcceptingNewRequestCh.Name())
+			s.Eventf(corev1.EventTypeNormal, drainedCh.Name(), "All non long-running request(s) in-flight have drained")
+		}()
 		defer notAcceptingNewRequestCh.Signal()
 
 		// wait for the delayed stopCh before closing the handler chain
@@ -679,6 +710,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		defer func() {
 			preShutdownHooksHasStoppedCh.Signal()
 			klog.V(1).InfoS("[graceful-termination] pre-shutdown hooks completed", "name", preShutdownHooksHasStoppedCh.Name())
+			s.Eventf(corev1.EventTypeNormal, "TerminationPreShutdownHooksFinished", "All pre-shutdown hooks have been finished")
 		}()
 		err = s.RunPreShutdownHooks()
 	}()
@@ -699,6 +731,8 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	<-stoppedCh
 
 	klog.V(1).Info("[graceful-termination] apiserver is exiting")
+	s.Eventf(corev1.EventTypeNormal, "TerminationGracefulTerminationFinished", "All pending requests processed")
+
 	return nil
 }
 
@@ -1017,4 +1051,34 @@ func getResourceNamesForGroup(apiPrefix string, apiGroupInfo *APIGroupInfo, path
 	}
 
 	return resourceNames, nil
+}
+
+// Eventf creates an event with the API server as source, either in default namespace against default namespace, or
+// if POD_NAME/NAMESPACE are set against that pod.
+func (s *GenericAPIServer) Eventf(eventType, reason, messageFmt string, args ...interface{}) {
+	t := metav1.Time{Time: time.Now()}
+	host, _ := os.Hostname() // expicitly ignore error. Empty host is fine
+
+	ref := *s.eventRef
+	if len(ref.Namespace) == 0 {
+		ref.Namespace = "default" // TODO: event broadcaster sets event ns to default. We have to match. Odd.
+	}
+
+	e := &corev1.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
+			Namespace: ref.Namespace,
+		},
+		InvolvedObject: ref,
+		Reason:         reason,
+		Message:        fmt.Sprintf(messageFmt, args...),
+		Type:           eventType,
+		Source:         corev1.EventSource{Component: "apiserver", Host: host},
+	}
+
+	klog.V(2).Infof("Event(%#v): type: '%v' reason: '%v' %v", e.InvolvedObject, e.Type, e.Reason, e.Message)
+
+	if _, err := s.eventSink.Create(e); err != nil {
+		klog.Warningf("failed to create event %s/%s: %v", e.Namespace, e.Name, err)
+	}
 }
