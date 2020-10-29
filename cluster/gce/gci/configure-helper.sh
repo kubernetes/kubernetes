@@ -1748,6 +1748,10 @@ function prepare-etcd-manifest {
     etcd_extra_args+=" --listen-metrics-urls=${etcd_listen_metrics_urls} "
   fi
 
+  if [[ -n "${ETCD_PROGRESS_NOTIFY_INTERVAL:-}" ]]; then
+    etcd_extra_args+=" --experimental-watch-progress-notify-interval=${ETCD_PROGRESS_NOTIFY_INTERVAL}"
+  fi
+
   # If etcd is configured to listen on host IP, an additional client listening URL is added.
   local etcd_listen_client_urls="${etcd_apiserver_protocol}://${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}:$2"
   if [[ ${ETCD_LISTEN_ON_HOST_IP:-} == "true" ]] ; then
