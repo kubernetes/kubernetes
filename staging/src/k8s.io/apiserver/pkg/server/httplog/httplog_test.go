@@ -67,7 +67,7 @@ func TestWithLogging(t *testing.T) {
 	shouldLogRequest := func() bool { return true }
 	var handler http.Handler
 	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-	handler = withLogging(withLogging(handler, DefaultStacktracePred, shouldLogRequest), DefaultStacktracePred, shouldLogRequest)
+	handler = withLogging(withLogging(handler, DefaultStacktracePred, shouldLogRequest, nil), DefaultStacktracePred, shouldLogRequest, nil)
 
 	func() {
 		defer func() {
@@ -111,7 +111,7 @@ func TestLogOf(t *testing.T) {
 					t.Errorf("Expected %v, got %v", test.want, got)
 				}
 			})
-			handler = withLogging(handler, DefaultStacktracePred, func() bool { return test.shouldLogRequest })
+			handler = withLogging(handler, DefaultStacktracePred, func() bool { return test.shouldLogRequest }, nil)
 			w := httptest.NewRecorder()
 			handler.ServeHTTP(w, req)
 		})
@@ -135,7 +135,7 @@ func TestUnlogged(t *testing.T) {
 			}
 		})
 		if makeLogger {
-			handler = WithLogging(handler, DefaultStacktracePred)
+			handler = WithLogging(handler, DefaultStacktracePred, nil)
 		}
 
 		handler.ServeHTTP(origWriter, req)
@@ -216,7 +216,7 @@ func TestRespLoggerWithDecoratedResponseWriter(t *testing.T) {
 				}
 			})
 
-			handler = withLogging(handler, DefaultStacktracePred, func() bool { return true })
+			handler = withLogging(handler, DefaultStacktracePred, func() bool { return true }, nil)
 			handler.ServeHTTP(test.r(), req)
 		})
 	}
