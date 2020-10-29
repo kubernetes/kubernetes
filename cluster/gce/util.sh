@@ -1461,6 +1461,11 @@ EOF
 ETCD_LISTEN_CLIENT_IP: $(yaml-quote "${ETCD_LISTEN_CLIENT_IP}")
 EOF
     fi
+    if [ -n "${ETCD_PROGRESS_NOTIFY_INTERVAL:-}" ]; then
+      cat >>"$file" <<EOF
+ETCD_PROGRESS_NOTIFY_INTERVAL: $(yaml-quote "${ETCD_PROGRESS_NOTIFY_INTERVAL}")
+EOF
+    fi
 
   else
     # Node-only env vars.
