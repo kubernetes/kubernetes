@@ -640,6 +640,7 @@ function start_controller_manager {
       --v="${LOG_LEVEL}" \
       --vmodule="${LOG_SPEC}" \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
+      --service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}" \
       --root-ca-file="${ROOT_CA_FILE}" \
       --cluster-signing-cert-file="${CLUSTER_SIGNING_CERT_FILE}" \
       --cluster-signing-key-file="${CLUSTER_SIGNING_KEY_FILE}" \
