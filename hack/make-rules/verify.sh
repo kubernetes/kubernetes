@@ -39,6 +39,23 @@ EXCLUDED_PATTERNS=(
   "verify-openapi-docs-urls.sh"  # Spams docs URLs, don't run in CI.
   )
 
+# Excluded checks for openshift/kubernetes fork that are always skipped.
+EXCLUDED_PATTERNS+=(
+  "verify-boilerplate.sh"            # Carries do not require boilerplate
+  "verify-no-vendor-cycles.sh"       # Incompatible with the way many carries are specified
+  "verify-publishing-bot.py"         # Verifies the upstream rules, which are not maintained in o/k
+)
+
+# Skipped checks for openshift/kubernetes fork that need to be fixed.
+EXCLUDED_PATTERNS+=(
+  "verify-openapi-spec.sh"                  # TODO(soltysh) Fails in CI during trap phase
+  "verify-golangci-lint.sh"                 # TODO(soltysh) Fails to build required tooling
+  "verify-shellcheck.sh"                    # TODO(soltysh) Requires either docker or local shellcheck
+  "verify-spelling.sh"                      # TODO(soltysh) Need to ensure installation of misspell command
+  "verify-mocks.sh"                         # TODO(soltysh) I don't expect us needed mocks re-generation
+  "verify-e2e-suites.sh"                    # TODO(atiratree) needs to be patched for openshift-hack dir and --list-tests option is disabled by 'UPSTREAM: <carry>: temporarily disable reporting e2e text bugs and enforce 2nd labeling to make tests work'
+)
+
 # Exclude typecheck in certain cases, if they're running in a separate job.
 if [[ ${EXCLUDE_TYPECHECK:-} =~ ^[yY]$ ]]; then
   EXCLUDED_PATTERNS+=(

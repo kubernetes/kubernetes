@@ -50,6 +50,7 @@ kube::test::find_dirs() {
           -o -path './third_party/*' \
           -o -path './staging/*' \
           -o -path './vendor/*' \
+          -o -path './openshift-hack/e2e/*' \
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | LC_ALL=C sort -u
 
