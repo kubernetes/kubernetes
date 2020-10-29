@@ -42,6 +42,12 @@ const (
 	resizePollInterval = 2 * time.Second
 	// total time to wait for cloudprovider or file system resize to finish
 	totalResizeWaitPeriod = 10 * time.Minute
+
+	// resizedPodStartupTimeout defines time we should wait for pod that uses offline
+	// resized volume to startup. This time is higher than default PodStartTimeout because
+	// typically time to detach and then attach a volume is amortized in this time duration.
+	resizedPodStartupTimeout = 10 * time.Minute
+
 	// time to wait for PVC conditions to sync
 	pvcConditionSyncPeriod = 2 * time.Minute
 )
@@ -214,7 +220,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 				SeLinuxLabel:  e2epv.SELinuxLabel,
 				NodeSelection: l.config.ClientNodeSelection,
 			}
-			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, framework.PodStartTimeout)
+			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, resizedPodStartupTimeout)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod2)
 				framework.ExpectNoError(err, "while cleaning up pod before exiting resizing test")

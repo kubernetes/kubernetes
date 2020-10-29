@@ -23,7 +23,7 @@ import (
 	"regexp"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -147,6 +147,11 @@ func TestSyncHandler(t *testing.T) {
 			return nil, nil
 		})
 
+		if test.pv != nil {
+			fakeKubeClient.AddReactor("get", "persistentvolumes", func(action coretesting.Action) (bool, runtime.Object, error) {
+				return true, test.pv, nil
+			})
+		}
 		fakeKubeClient.AddReactor("patch", "persistentvolumeclaims", func(action coretesting.Action) (bool, runtime.Object, error) {
 			if action.GetSubresource() == "status" {
 				patchActionaction, _ := action.(coretesting.PatchAction)
