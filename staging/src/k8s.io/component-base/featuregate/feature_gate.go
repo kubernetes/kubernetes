@@ -327,9 +327,8 @@ func (f *featureGate) unsafeSetFromMap(enabled map[Feature]bool, m map[string]bo
 		key := Feature(k)
 		versionedSpecs, ok := known[key]
 		if !ok {
-			// early return if encounters an unknown feature.
-			errs = append(errs, fmt.Errorf("unrecognized feature gate: %s", k))
-			return errs
+			klog.Warningf("unrecognized feature gate: %s", k)
+			continue
 		}
 		featureSpec := featureSpecAtEmulationVersion(versionedSpecs, emulationVersion)
 		if featureSpec.LockToDefault && featureSpec.Default != v {
