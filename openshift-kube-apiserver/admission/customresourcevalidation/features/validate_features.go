@@ -50,6 +50,25 @@ func toFeatureGateV1(uncastObj runtime.Object) (*configv1.FeatureGate, field.Err
 type featureGateV1 struct {
 }
 
+func validateOKDFeatureSet(spec configv1.FeatureGateSpec) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if spec.FeatureSet == configv1.OKD && !IsSCOS() {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec.featureSet"), "OKD featureset is not supported on OpenShift clusters"))
+	}
+
+	return allErrs
+}
+
+func validateOKDFeatureSetUpdate(oldSpec, newSpec configv1.FeatureGateSpec) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// Only validate if transitioning TO OKD featureset, not if it's already set
+	if newSpec.FeatureSet == configv1.OKD && oldSpec.FeatureSet != configv1.OKD && !IsSCOS() {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec.featureSet"), "OKD featureset is not supported on OpenShift clusters"))
+	}
+
+	return allErrs
+}
+
 func (featureGateV1) ValidateCreate(_ context.Context, uncastObj runtime.Object) field.ErrorList {
 	obj, allErrs := toFeatureGateV1(uncastObj)
 	if len(allErrs) > 0 {
@@ -57,6 +76,7 @@ func (featureGateV1) ValidateCreate(_ context.Context, uncastObj runtime.Object)
 	}
 
 	allErrs = append(allErrs, validation.ValidateObjectMeta(&obj.ObjectMeta, false, customresourcevalidation.RequireNameCluster, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, validateOKDFeatureSet(obj.Spec)...)
 
 	return allErrs
 }
@@ -72,6 +92,7 @@ func (featureGateV1) ValidateUpdate(_ context.Context, uncastObj runtime.Object,
 	}
 
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &oldObj.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, validateOKDFeatureSetUpdate(oldObj.Spec, obj.Spec)...)
 
 	return allErrs
 }

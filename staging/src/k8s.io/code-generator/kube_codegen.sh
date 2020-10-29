@@ -26,6 +26,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_CODEGEN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+GOFLAGS=-mod=readonly
 
 # This file is intended for out-of-tree projects running code generators.
 # In that context, all in-tree Kubernetes types (e.g. metav1.TypeMeta,

@@ -1,0 +1,1 @@
+../openshift-hack/update-kubensenter.sh

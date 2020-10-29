@@ -32,7 +32,7 @@ export GOBIN="${KUBE_OUTPUT_BIN}"
 PATH="${GOBIN}:${PATH}"
 
 # Install whydeadcode
-go install github.com/aarzilli/whydeadcode@latest
+go install -mod=readonly github.com/aarzilli/whydeadcode@latest
 
 # Prefer full path for running zeitgeist
 WHYDEADCODE_BIN="$(which whydeadcode)"

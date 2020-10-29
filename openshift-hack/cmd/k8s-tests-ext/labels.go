@@ -1,0 +1,65 @@
+package main
+
+import (
+	et "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
+)
+
+func addLabelsToSpecs(specs et.ExtensionTestSpecs) {
+	var namesByLabel = map[string][]string{
+		// tests that must be run without competition
+		"[Serial]": {
+			"[Disruptive]",
+			"[Feature:Performance]", // requires isolation
+
+			"Service endpoints latency", // requires low latency
+			"Clean up pods on node",     // schedules up to max pods per node
+			"DynamicProvisioner should test that deleting a claim before the volume is provisioned deletes the volume", // test is very disruptive to other tests
+
+			"Should be able to support the 1.7 Sample API Server using the current Aggregator", // down apiservices break other clients today https://bugzilla.redhat.com/show_bug.cgi?id=1623195
+
+			"should prevent Ingress creation if more than 1 IngressClass marked as default", // https://bugzilla.redhat.com/show_bug.cgi?id=1822286
+
+			"[sig-network] IngressClass [Feature:Ingress] should set default value on new IngressClass", //https://bugzilla.redhat.com/show_bug.cgi?id=1833583
+
+			"[Feature:Networking-Performance]", //https://issues.redhat.com/browse/OCPBUGS-70170
+		},
+		"[sig-node]": {
+			"[NodeConformance]",
+			"NodeLease",
+			"lease API",
+			"[NodeFeature",
+			"[NodeAlphaFeature",
+			"Probing container",
+			"Security Context When creating a",
+			"Downward API should create a pod that prints his name and namespace",
+			"Liveness liveness pods should be automatically restarted",
+			"Secret should create a pod that reads a secret",
+			"Pods should delete a collection of pods",
+			"Pods should run through the lifecycle of Pods and PodStatus",
+		},
+		"[sig-cluster-lifecycle]": {
+			"Feature:ClusterAutoscalerScalability",
+			"recreate nodes and ensure they function",
+		},
+		"[sig-arch]": {
+			// not run, assigned to arch as catch-all
+			"[Feature:GKELocalSSD]",
+			"[Feature:GKENodePool]",
+		},
+		// tests that will be configured to run manually through their own dedicated prow jobs
+		"[DedicatedJob]": {
+			"[Feature:HPA]",
+			"[Feature:HPAConfigurableTolerance]",
+		},
+	}
+
+	for label, names := range namesByLabel {
+		var selectFunctions []et.SelectFunction
+		for _, name := range names {
+			selectFunctions = append(selectFunctions, et.NameContains(name))
+		}
+
+		//TODO: once annotation logic has been removed, it might also be necessary to annotate the test name with the label as well
+		specs.SelectAny(selectFunctions).AddLabel(label)
+	}
+}

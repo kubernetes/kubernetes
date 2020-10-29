@@ -27,4 +27,4 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/verify-generated.sh"
 
-kube::verify::generated "YAML files need to be formatted" "Please run 'hack/update-owners-fmt.sh'" hack/update-owners-fmt.sh
+GOFLAGS=-mod=readonly kube::verify::generated "YAML files need to be formatted" "Please run 'hack/update-owners-fmt.sh'" hack/update-owners-fmt.sh

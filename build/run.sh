@@ -32,5 +32,11 @@ if [[ ! "${KUBE_RUN_COPY_OUTPUT}" =~ ^[yY]$ ]]; then
    kube::log::error "KUBE_RUN_COPY_OUTPUT no longer means anything as we bind-mount instead of rsyncing, so output is always persisted"
 fi
 
+# Allow running without docker (e.g. in openshift ci)
+if [[ "${OS_RUN_WITHOUT_DOCKER:-}" ]]; then
+  "${@}"
+  exit 0
+fi
+
 kube::build::verify_prereqs
 kube::build::run_build_command "$@"

@@ -39,6 +39,8 @@ PRINT_HELP ?=
 WHAT ?=
 TESTS ?=
 BRANCH ?=
+TAGS ?=
+GO_BUILD_FLAGS := $(if ${TAGS},-tags=${TAGS},)
 
 # We don't need make's built-in rules.
 MAKEFLAGS += --no-builtin-rules
@@ -60,6 +62,9 @@ else
 $(error Both KUBE_GOFLAGS and GOFLAGS are set. Please use just GOFLAGS)
 endif
 endif
+
+# Add build tags to GOFLAGS
+GOFLAGS := $(GOFLAGS) $(GO_BUILD_FLAGS)
 
 # This controls the verbosity of the build.  Higher numbers mean more output.
 KUBE_VERBOSE ?= 1

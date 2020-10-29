@@ -43,6 +43,8 @@ else
   exit $ret
 fi
 
+GOFLAGS=-mod=readonly
+
 # smoke test
 echo "Smoke testing examples by compiling..."
 pushd "${SCRIPT_ROOT}"

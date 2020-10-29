@@ -50,7 +50,7 @@ if [[ "${DBG_CODEGEN}" == 1 ]]; then
 fi
 
 echo "installing goimports from hack/tools"
-go -C "${KUBE_ROOT}/hack/tools" install golang.org/x/tools/cmd/goimports
+go -C "${KUBE_ROOT}/hack/tools" install -mod=readonly golang.org/x/tools/cmd/goimports
 
 kube::protoc::install
 
@@ -916,7 +916,7 @@ function codegen::subprojects() {
         CODEGEN_PKG="${codegen}" \
         UPDATE_API_KNOWN_VIOLATIONS="${UPDATE_API_KNOWN_VIOLATIONS}" \
         API_KNOWN_VIOLATIONS_DIR="${API_KNOWN_VIOLATIONS_DIR}" \
-            ./hack/update-codegen.sh > >(indent) 2> >(indent >&2)
+            GOFLAGS=-mod=readonly ./hack/update-codegen.sh > >(indent) 2> >(indent >&2)
         popd >/dev/null
     done
 }

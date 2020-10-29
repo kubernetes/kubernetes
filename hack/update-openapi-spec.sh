@@ -28,7 +28,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::util::require-jq
 kube::golang::setup_env
-kube::etcd::install
+# kube::etcd::install
 
 # We need to call `make` here because that includes all of the compile and link
 # flags that we use for a production build, which we need for this script.

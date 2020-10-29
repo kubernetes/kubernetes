@@ -32,8 +32,8 @@ PROTOC_VERSION=23.4
 # $1: Full path to the directory where the api.proto file is
 function kube::protoc::generate_proto() {
   kube::golang::setup_env
-  go -C "${KUBE_ROOT}/hack/tools" install google.golang.org/protobuf/cmd/protoc-gen-go
-  go -C "${KUBE_ROOT}/hack/tools" install google.golang.org/grpc/cmd/protoc-gen-go-grpc
+  go -C "${KUBE_ROOT}/hack/tools" install -mod=readonly google.golang.org/protobuf/cmd/protoc-gen-go
+  go -C "${KUBE_ROOT}/hack/tools" install -mod=readonly google.golang.org/grpc/cmd/protoc-gen-go-grpc
 
   kube::protoc::check_protoc
 

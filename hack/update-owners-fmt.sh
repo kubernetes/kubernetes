@@ -32,5 +32,5 @@ find_owners_files() {
         ':!:vendor/*/OWNERS*'
 }
 
-go -C "${KUBE_ROOT}/hack/tools" install sigs.k8s.io/yaml/yamlfmt
+GOFLAGS=-mod=readonly go -C "${KUBE_ROOT}/hack/tools" install sigs.k8s.io/yaml/yamlfmt
 find_owners_files | xargs yamlfmt -o yaml -w
