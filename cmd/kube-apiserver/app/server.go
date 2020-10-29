@@ -26,6 +26,10 @@ import (
 	"net/url"
 	"os"
 
+	"k8s.io/kubernetes/openshift-kube-apiserver/admission/admissionenablement"
+	"k8s.io/kubernetes/openshift-kube-apiserver/enablement"
+	"k8s.io/kubernetes/openshift-kube-apiserver/openshiftkubeapiserver"
+
 	"github.com/spf13/cobra"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -102,6 +106,35 @@ cluster's shared state through which all other components interact.`,
 				return err
 			}
 			cliflag.PrintFlags(fs)
+
+			if len(s.OpenShiftConfig) > 0 {
+				// if we are running openshift, we modify the admission chain defaults accordingly
+				admissionenablement.InstallOpenShiftAdmissionPlugins(s)
+
+				openshiftConfig, err := enablement.GetOpenshiftConfig(s.OpenShiftConfig)
+				if err != nil {
+					klog.Fatal(err)
+				}
+				enablement.ForceOpenShift(openshiftConfig)
+
+				args, err := openshiftkubeapiserver.ConfigToFlags(openshiftConfig)
+				if err != nil {
+					return err
+				}
+
+				// hopefully this resets the flags?
+				if err := cmd.ParseFlags(args); err != nil {
+					return err
+				}
+
+				// print merged flags (merged from OpenshiftConfig)
+				cliflag.PrintFlags(cmd.Flags())
+
+				enablement.ForceGlobalInitializationForOpenShift()
+			} else {
+				// print default flags
+				cliflag.PrintFlags(cmd.Flags())
+			}
 
 			// set default options
 			completedOptions, err := s.Complete()
@@ -311,6 +344,15 @@ func CreateKubeAPIServerConfig(opts options.CompletedOptions) (
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create real dynamic external client: %w", err)
 	}
+
+	if err := openshiftkubeapiserver.OpenShiftKubeAPIServerConfigPatch(genericConfig, versionedInformers, &pluginInitializers); err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to patch: %v", err)
+	}
+
+	if enablement.IsOpenShift() {
+		admissionenablement.SetAdmissionDefaults(&opts.CompletedOptions, versionedInformers, clientgoExternalClient)
+	}
+
 	err = opts.Admission.ApplyTo(
 		genericConfig,
 		versionedInformers,

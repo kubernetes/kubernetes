@@ -52,6 +52,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
+
+	"k8s.io/kubernetes/openshift-kube-apiserver/enablement"
 )
 
 // BuildGenericConfig takes the master server options and produces the genericapiserver.Config associated with it
@@ -133,6 +135,8 @@ func BuildGenericConfig(
 	// Disable compression for self-communication, since we are going to be
 	// on a fast local network
 	genericConfig.LoopbackClientConfig.DisableCompression = true
+
+	enablement.SetLoopbackClientConfig(genericConfig.LoopbackClientConfig)
 
 	kubeClientConfig := genericConfig.LoopbackClientConfig
 	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)
