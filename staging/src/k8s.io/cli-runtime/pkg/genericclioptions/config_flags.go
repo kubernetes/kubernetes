@@ -92,11 +92,11 @@ type ConfigFlags struct {
 	CertFile         *string
 	KeyFile          *string
 	CAFile           *string
-	BearerToken      *string
+	BearerToken      *string `datapolicy:"token"`
 	Impersonate      *string
 	ImpersonateGroup *[]string
 	Username         *string
-	Password         *string
+	Password         *string `datapolicy:"password"`
 	Timeout          *string
 
 	clientConfig clientcmd.ClientConfig
