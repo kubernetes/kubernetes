@@ -53,6 +53,18 @@ const (
 
 	// configDriveID is used as an identifier on the metadata search order configuration.
 	configDriveID = "configDrive"
+
+	// We have to use AWS compatible metadata for the next urls, because OpenStack doesn't
+	// provide this information.
+
+	// instanceTypeURL contains url to get the instance type from metadata server.
+	instanceTypeURL = "http://169.254.169.254/2009-04-04/meta-data/instance-type"
+
+	// localAddressURL contains url to get the instance local ip address from metadata server.
+	localAddressURL = "http://169.254.169.254/2009-04-04/meta-data/local-ipv4"
+
+	// publicAddressURL contains url to get the instance public ip address from metadata server.
+	publicAddressURL = "http://169.254.169.254/2009-04-04/meta-data/public-ipv4"
 )
 
 // ErrBadMetadata is used to indicate a problem parsing data from metadata server
@@ -159,11 +171,62 @@ func getMetadataFromMetadataService(metadataVersion string) (*Metadata, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("unexpected status code when reading metadata from %s: %s", metadataURL, resp.Status)
-		return nil, err
+		return nil, fmt.Errorf("unexpected status code when reading metadata from %s: %s", metadataURL, resp.Status)
 	}
 
 	return parseMetadata(resp.Body)
+}
+
+func getIntanceType() (string, error) {
+	klog.V(4).Infof("Attempting to fetch instance type from %s", instanceTypeURL)
+	resp, err := http.Get(instanceTypeURL)
+	if err != nil {
+		return "", fmt.Errorf("error fetching %s: %v", instanceTypeURL, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code when reading instance type from %s: %s", instanceTypeURL, resp.Status)
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("cannot read the response body %s: %v", instanceTypeURL, err)
+	}
+
+	return string(body), nil
+}
+
+func getNodeAddress(url string) (string, error) {
+	klog.V(4).Infof("Attempting to fetch instance address from %s", url)
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("error fetching %s: %v", url, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code when reading instance address from %s: %s", url, resp.Status)
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("cannot read the response body %s: %v", url, err)
+	}
+
+	return string(body), nil
+}
+
+func getNodeAddresses() (string, string, error) {
+	localAddess, err := getNodeAddress(localAddressURL)
+	if err != nil {
+		return "", "", err
+	}
+
+	publicAddress, err := getNodeAddress(publicAddressURL)
+	if err != nil {
+		return "", "", err
+	}
+
+	return localAddess, publicAddress, nil
 }
 
 // Metadata is fixed for the current host, so cache the value process-wide
