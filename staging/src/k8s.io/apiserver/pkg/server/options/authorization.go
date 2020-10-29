@@ -216,5 +216,10 @@ func (s *DelegatingAuthorizationOptions) getClient() (kubernetes.Interface, erro
 	clientConfig.Burst = 400
 	clientConfig.Timeout = s.ClientTimeout
 
-	return kubernetes.NewForConfig(clientConfig)
+	// make the client use protobuf
+	protoConfig := rest.CopyConfig(clientConfig)
+	protoConfig.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
+	protoConfig.ContentType = "application/vnd.kubernetes.protobuf"
+
+	return kubernetes.NewForConfig(protoConfig)
 }
