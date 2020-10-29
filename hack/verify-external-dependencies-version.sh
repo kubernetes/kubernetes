@@ -31,7 +31,7 @@ export GOBIN="${KUBE_OUTPUT_BIN}"
 PATH="${GOBIN}:${PATH}"
 
 # Install zeitgeist
-go install sigs.k8s.io/zeitgeist@v0.2.0
+GO111MODULE=on go install -mod=readonly sigs.k8s.io/zeitgeist@v0.2.0
 
 # Prefer full path for running zeitgeist
 ZEITGEIST_BIN="$(which zeitgeist)"

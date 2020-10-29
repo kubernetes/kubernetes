@@ -1,0 +1,117 @@
+#!/bin/bash
+
+# shellcheck disable=SC2016
+usage() {
+    echo "A command line wrapper to run commands or shells inside the"
+    echo "kubens.service mount namespace."
+    echo
+    echo "Usage:"
+    echo "    $(basename "$0") [--verbose|--quiet] [command ...]"
+    echo
+    echo 'Autodetect whether the `kubens.service` has pinned a mount namespace in a'
+    echo 'well-known location, and if so, join it by passing it and the user-specified'
+    echo 'command to nsenter(1). If `kubens.service` has not set up the mount namespace,'
+    echo 'the user-specified command is still executed by nsenter(1) but no namespace is'
+    echo 'entered.'
+    echo
+    echo 'If $KUBENSMNT is set in the environment, skip autodetection and attempt to join'
+    echo 'that mount namespace by passing it and the user-specified command to'
+    echo 'nsenter(1). If the mount namespace is missing or invalid, the command will'
+    echo 'fail.'
+    echo
+    echo 'In either case, if no command is given on the command line, nsenter(1) will'
+    echo 'spawn a new interactive shell which will be inside the mount namespace if'
+    echo 'detected.'
+    exit 1
+}
+
+LOGLEVEL=${KUBENSENTER_LOG:-1}
+_log() {
+    local level=$1; shift
+    if [[ $level -le $LOGLEVEL ]]; then
+        echo "kubensenter: $*" >&2
+    fi
+}
+
+info() {
+    _log 1 "$*"
+}
+
+debug() {
+    _log 2 "$*"
+}
+
+# Returns 0 if the argument given is a mount namespace
+ismnt() {
+    local nsfs
+    nsfs=$(findmnt -o SOURCE -n -t nsfs "$1")
+    [[ $nsfs =~ ^nsfs\[mnt:\[ ]]
+}
+
+# Set KUBENSMNT to the default location that kubens.service uses if KUBENSMNT isn't already set.
+DEFAULT_KUBENSMNT=${DEFAULT_KUBENSMNT:-"/run/kubens/mnt"}
+autodetect() {
+    local default=$DEFAULT_KUBENSMNT
+    if [[ -n $KUBENSMNT ]]; then
+        debug "Autodetect: \$KUBENSMNT already set"
+        return 0
+    fi
+    if [[ ! -e $default ]]; then
+        debug "Autodetect: No mount namespace found at $default"
+        return 1
+    fi
+    if ! ismnt "$default"; then
+        info "Autodetect: Stale or mismatched namespace at $default"
+        return 1
+    fi
+    KUBENSMNT=$default
+    info "Autodetect: kubens.service namespace found at $KUBENSMNT"
+    return 0
+}
+
+# Wrap the user-given command in nsenter, joining the mount namespace set in $KUBENSMNT if set
+kubensenter() {
+    local nsarg
+    if [[ -n $KUBENSMNT ]]; then
+        debug "Joining mount namespace in $KUBENSMNT"
+        nsarg=$(printf -- "--mount=%q" "$KUBENSMNT")
+    else
+        debug "KUBENSMNT not set; running normally"
+        # Intentional fallthrough to run nsenter anyway:
+        # - If $@ is non-empty, nsenter effectively runs `exec "$@"`
+        # - If $@ is empty, nsenter spawns a new shell
+    fi
+    # Using 'exec' is important here; Without it, systemd may have trouble
+    # seeing the underlying process especially if it's using 'Type=notify'
+    # semantics.
+    # shellcheck disable=SC2086
+    # ^- Intentionally collapse $nsarg if not set (and we've already shell-quoted it above if we did set it)
+    exec nsenter $nsarg "$@"
+}
+
+main() {
+    while [[ -n $1 ]]; do
+        case "$1" in
+            -h | --help)
+                usage
+                ;;
+            -v | --verbose)
+                shift
+                ((LOGLEVEL++))
+                ;;
+            -q | --quiet)
+                shift
+                ((LOGLEVEL--))
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    autodetect
+    kubensenter "$@"
+}
+
+# bash modulino
+[[ "${BASH_SOURCE[0]}" == "$0" ]] && main "$@"

@@ -78,6 +78,8 @@ kube::golang::server_targets() {
     staging/src/k8s.io/kube-aggregator
     staging/src/k8s.io/apiextensions-apiserver
     cluster/gce/gci/mounter
+    cmd/watch-termination
+    openshift-hack/cmd/k8s-tests
   )
   echo "${targets[@]}"
 }
@@ -316,20 +318,7 @@ readonly KUBE_ALL_TARGETS=(
 )
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
-readonly KUBE_STATIC_BINARIES=(
-  apiextensions-apiserver
-  kube-aggregator
-  kube-apiserver
-  kube-controller-manager
-  kube-scheduler
-  kube-proxy
-  kube-log-runner
-  kubeadm
-  kubectl
-  kubectl-convert
-  kubemark
-  mounter
-)
+readonly KUBE_STATIC_BINARIES=()
 
 # Fully-qualified package names that we want to instrument for coverage information.
 readonly KUBE_COVERAGE_INSTRUMENTED_PACKAGES=(
@@ -495,7 +484,7 @@ kube::golang::set_platform_envs() {
 
   # if CC is defined for platform then always enable it
   ccenv=$(echo "$platform" | awk -F/ '{print "KUBE_" toupper($1) "_" toupper($2) "_CC"}')
-  if [ -n "${!ccenv-}" ]; then 
+  if [ -n "${!ccenv-}" ]; then
     export CGO_ENABLED=1
     export CC="${!ccenv}"
   fi
@@ -506,27 +495,6 @@ kube::golang::set_platform_envs() {
 #   env-var GO_VERSION is the desired go version to use, downloading it if needed (defaults to content of .go-version)
 #   env-var FORCE_HOST_GO set to a non-empty value uses the go version in the $PATH and skips ensuring $GO_VERSION is used
 kube::golang::internal::verify_go_version() {
-  # default GO_VERSION to content of .go-version
-  GO_VERSION="${GO_VERSION:-"$(cat "${KUBE_ROOT}/.go-version")"}"
-  if [ "${GOTOOLCHAIN:-auto}" != 'auto' ]; then
-    # no-op, just respect GOTOOLCHAIN
-    :
-  elif [ -n "${FORCE_HOST_GO:-}" ]; then
-    # ensure existing host version is used, like before GOTOOLCHAIN existed
-    export GOTOOLCHAIN='local'
-  else
-    # otherwise, we want to ensure the go version matches GO_VERSION
-    GOTOOLCHAIN="go${GO_VERSION}"
-    export GOTOOLCHAIN
-    # if go is either not installed or too old to respect GOTOOLCHAIN then use gimme
-    if ! (command -v go >/dev/null && [ "$(go version | cut -d' ' -f3)" = "${GOTOOLCHAIN}" ]); then
-      export GIMME_ENV_PREFIX=${GIMME_ENV_PREFIX:-"${KUBE_OUTPUT}/.gimme/envs"}
-      export GIMME_VERSION_PREFIX=${GIMME_VERSION_PREFIX:-"${KUBE_OUTPUT}/.gimme/versions"}
-      # eval because the output of this is shell to set PATH etc.
-      eval "$("${KUBE_ROOT}/third_party/gimme/gimme" "${GO_VERSION}")"
-    fi
-  fi
-
   if [[ -z "$(command -v go)" ]]; then
     kube::log::usage_from_stdin <<EOF
 Can't find 'go' in PATH, please fix and retry.
@@ -599,7 +567,11 @@ kube::golang::setup_gomaxprocs() {
   # when running in a container, please see https://github.com/golang/go/issues/33803
   if [[ -z "${GOMAXPROCS:-}" ]]; then
     if ! command -v ncpu >/dev/null 2>&1; then
-      go -C "${KUBE_ROOT}/hack/tools" install ./ncpu || echo "Will not automatically set GOMAXPROCS"
+      # shellcheck disable=SC2164
+      pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+      GO111MODULE=on go install -mod=readonly ./ncpu || echo "Will not automatically set GOMAXPROCS"
+      # shellcheck disable=SC2164
+      popd >/dev/null
     fi
     if command -v ncpu >/dev/null 2>&1; then
       GOMAXPROCS=$(ncpu)

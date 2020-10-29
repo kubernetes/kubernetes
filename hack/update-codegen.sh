@@ -762,7 +762,7 @@ function codegen::subprojects() {
         CODEGEN_PKG="${codegen}" \
         UPDATE_API_KNOWN_VIOLATIONS="${UPDATE_API_KNOWN_VIOLATIONS}" \
         API_KNOWN_VIOLATIONS_DIR="${API_KNOWN_VIOLATIONS_DIR}" \
-            ./hack/update-codegen.sh > >(indent) 2> >(indent >&2)
+            GOFLAGS=-mod=readonly ./hack/update-codegen.sh > >(indent) 2> >(indent >&2)
         popd >/dev/null
     done
 }

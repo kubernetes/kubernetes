@@ -1,0 +1,20 @@
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17 AS builder
+WORKDIR /go/src/k8s.io/kubernetes
+COPY . .
+RUN make WHAT=openshift-hack/e2e/k8s-e2e.test; \
+    make WHAT=vendor/github.com/onsi/ginkgo/v2/ginkgo; \
+    mkdir -p /tmp/build; \
+    cp /go/src/k8s.io/kubernetes/_output/local/bin/linux/$(go env GOARCH)/k8s-e2e.test /tmp/build/; \
+    cp /go/src/k8s.io/kubernetes/_output/local/bin/linux/$(go env GOARCH)/ginkgo /tmp/build/; \
+    cp /go/src/k8s.io/kubernetes/openshift-hack/test-kubernetes-e2e.sh /tmp/build/
+
+FROM registry.ci.openshift.org/ocp/4.16:tools
+COPY --from=builder /tmp/build/k8s-e2e.test /usr/bin/
+COPY --from=builder /tmp/build/ginkgo /usr/bin/
+COPY --from=builder /tmp/build/test-kubernetes-e2e.sh /usr/bin/
+RUN yum install --setopt=tsflags=nodocs -y git gzip util-linux && yum clean all && rm -rf /var/cache/yum/* && \
+    git config --system user.name test && \
+    git config --system user.email test@test.com && \
+    chmod g+w /etc/passwd
+LABEL io.k8s.display-name="Kubernetes End-to-End Tests" \
+      io.openshift.tags="k8s,tests,e2e"

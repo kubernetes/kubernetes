@@ -1,0 +1,12 @@
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17 AS builder
+WORKDIR /go/src/github.com/openshift/kubernetes/build/pause
+COPY . .
+RUN mkdir -p bin && \
+    gcc -Os -Wall -Werror -o bin/pause ./linux/pause.c
+
+FROM registry.ci.openshift.org/ocp/4.16:base-rhel9
+COPY --from=builder /go/src/github.com/openshift/kubernetes/build/pause/bin/pause /usr/bin/pod
+LABEL io.k8s.display-name="OpenShift Pod" \
+      io.k8s.description="This is a component of OpenShift and contains the binary that holds the pod namespaces." \
+      io.openshift.tags="openshift"
+ENTRYPOINT [ "/usr/bin/pod" ]

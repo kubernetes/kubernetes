@@ -32,7 +32,9 @@ export GOBIN="${KUBE_OUTPUT_BIN}"
 PATH="${GOBIN}:${PATH}"
 
 # Install tools we need
-go -C "${KUBE_ROOT}/hack/tools" install github.com/client9/misspell/cmd/misspell
+pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+  GO111MODULE=on go install -mod=readonly github.com/client9/misspell/cmd/misspell
+popd >/dev/null
 
 # Spell checking
 # All the skipping files are defined in hack/.spelling_failures
