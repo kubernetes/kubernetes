@@ -46,8 +46,11 @@ func newDaemonSetController(ctx context.Context, controllerContext ControllerCon
 		return nil, err
 	}
 
-	dsc, err := daemon.NewDaemonSetsController(
+	dsc, err := daemon.NewNodeSelectorAwareDaemonSetsController(
 		ctx,
+		controllerContext.OpenShiftContext.OpenShiftDefaultProjectNodeSelector,
+		controllerContext.OpenShiftContext.KubeDefaultProjectNodeSelector,
+		controllerContext.InformerFactory.Core().V1().Namespaces(),
 		controllerContext.InformerFactory.Apps().V1().DaemonSets(),
 		controllerContext.InformerFactory.Apps().V1().ControllerRevisions(),
 		controllerContext.InformerFactory.Core().V1().Pods(),

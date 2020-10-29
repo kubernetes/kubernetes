@@ -83,10 +83,10 @@ func newServiceAccountTokenController(
 		controllerContext.InformerFactory.Core().V1().ServiceAccounts(),
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		client,
-		serviceaccountcontroller.TokensControllerOptions{
+		applyOpenShiftServiceServingCertCA(serviceaccountcontroller.TokensControllerOptions{
 			TokenGenerator: tokenGenerator,
 			RootCA:         rootCA,
-		},
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Tokens controller: %w", err)
