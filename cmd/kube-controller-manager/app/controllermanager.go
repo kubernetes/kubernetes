@@ -230,7 +230,11 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 				klog.Warningf("--use-service-account-credentials was specified without providing a --service-account-private-key-file")
 			}
 
-			if shouldTurnOnDynamicClient(c.Client) {
+			// TODO be sure to drop this commit/`false` below in 4.7.  The cloud credential operator is updating the issuer URL in 4.6
+			//  https://github.com/openshift/cloud-credential-operator/blob/8d54516/pkg/operator/oidcdiscoveryendpoint/controller.go#L244-L271
+			//  This causes the previously issued to tokens to be invalid.  This transition should only happen in 4.6 and the name should
+			//  be stabl-ish from 4.6 to 4.7, so we can go back to this dynamic client without issues.
+			if false && shouldTurnOnDynamicClient(c.Client) {
 				klog.V(1).Infof("using dynamic client builder")
 				//Dynamic builder will use TokenRequest feature and refresh service account token periodically
 				clientBuilder = controller.NewDynamicClientBuilder(
