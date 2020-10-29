@@ -33,7 +33,7 @@ type CertificateAuthority struct {
 	// RawCert is an optional field to determine if signing cert/key pairs have changed
 	RawCert []byte
 	// RawKey is an optional field to determine if signing cert/key pairs have changed
-	RawKey []byte
+	RawKey []byte `datapolicy:"security-key"`
 
 	Certificate *x509.Certificate
 	PrivateKey  crypto.Signer
