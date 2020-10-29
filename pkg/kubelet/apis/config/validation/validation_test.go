@@ -783,7 +783,9 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				conf.FeatureGates["invalid"] = true
 				return conf
 			},
-			errMsg: "unrecognized feature gate: invalid",
+			// In OpenShift we need to tolerate unrecognized feature gates
+			// errMsg: "unrecognized feature gate: invalid",
+			errMsg: "",
 		}, {
 			name: "invalid configuration: invalid ImageMinimumGCAge",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
