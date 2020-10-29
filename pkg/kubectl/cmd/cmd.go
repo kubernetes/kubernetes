@@ -318,7 +318,7 @@ func NewDefaultKubectlCommandWithArgs(pluginHandler PluginHandler, args []string
 		// the specified command does not already exist
 		if _, _, err := cmd.Find(cmdPathPieces); err != nil {
 			if err := HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
-				fmt.Fprintf(errout, "%v\n", err)
+				fmt.Fprintf(errout, "Error: %v\n", err)
 				os.Exit(1)
 			}
 		}
@@ -393,13 +393,17 @@ func (h *DefaultPluginHandler) Execute(executablePath string, cmdArgs, environme
 // HandlePluginCommand receives a pluginHandler and command-line arguments and attempts to find
 // a plugin executable on the PATH that satisfies the given arguments.
 func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) error {
-	remainingArgs := []string{} // all "non-flag" arguments
-
-	for idx := range cmdArgs {
-		if strings.HasPrefix(cmdArgs[idx], "-") {
+	var remainingArgs []string // all "non-flag" arguments
+	for _, arg := range cmdArgs {
+		if strings.HasPrefix(arg, "-") {
 			break
 		}
-		remainingArgs = append(remainingArgs, strings.Replace(cmdArgs[idx], "-", "_", -1))
+		remainingArgs = append(remainingArgs, strings.Replace(arg, "-", "_", -1))
+	}
+
+	if len(remainingArgs) == 0 {
+		// the length of cmdArgs is at least 1
+		return fmt.Errorf("flags cannot be placed before plugin name: %s", cmdArgs[0])
 	}
 
 	foundBinaryPath := ""
