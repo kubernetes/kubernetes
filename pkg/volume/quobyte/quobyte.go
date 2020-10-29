@@ -49,7 +49,7 @@ type quobytePlugin struct {
 // Quobyte API server and holds all information
 type quobyteAPIConfig struct {
 	quobyteUser      string
-	quobytePassword  string
+	quobytePassword  string `datapolicy:"password"`
 	quobyteAPIServer string
 }
 

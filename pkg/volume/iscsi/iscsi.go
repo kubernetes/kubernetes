@@ -283,7 +283,7 @@ type iscsiDisk struct {
 	Iface         string
 	chapDiscovery bool
 	chapSession   bool
-	secret        map[string]string
+	secret        map[string]string `datapolicy:"token"`
 	InitiatorName string
 	plugin        *iscsiPlugin
 	// Utility interface that provides API calls to the provider to attach/detach disks.
