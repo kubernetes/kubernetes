@@ -927,6 +927,13 @@ func TestAttacherDetach(t *testing.T) {
 				return false, nil, nil
 			},
 		},
+		// The watcher error triggered by this test case will result in the
+		// Detach() call on L984 timing out after 2 minutes since an error
+		// condition is logged but not returned. Thus this test will only pass if
+		// the default value for KUBE_TEST_TIMEOUT in hack/make-rules/test.sh is
+		// greater than the default of 120s. It's not clear why this test was
+		// merged at all given that a watcher error is only logged and cannot be
+		// observed by the test.
 		{
 			name:         "API watch error happen",
 			volID:        "vol-005",
