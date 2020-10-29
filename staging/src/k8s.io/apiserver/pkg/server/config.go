@@ -18,8 +18,10 @@ package server
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	goruntime "runtime"
 	"runtime/debug"
 	"sort"
@@ -32,6 +34,7 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/google/uuid"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -66,6 +69,8 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
@@ -213,6 +218,9 @@ type Config struct {
 	// If not specify any in flags, then genericapiserver will only enable defaultAPIResourceConfig.
 	MergedResourceConfig *serverstore.ResourceConfig
 
+	// EventSink receives events about the life cycle of the API server, e.g. readiness, serving, signals and termination.
+	EventSink EventSink
+
 	//===========================================================================
 	// values below here are targets for removal
 	//===========================================================================
@@ -232,8 +240,16 @@ type Config struct {
 	// StorageVersionManager holds the storage versions of the API resources installed by this server.
 	StorageVersionManager storageversion.Manager
 
+	// hasBeenReadyCh is closed when /readyz succeeds for the first time.
+	hasBeenReadyCh chan struct{}
+
 	// A func that returns whether the server is terminating. This can be nil.
 	IsTerminating func() bool
+}
+
+// EventSink allows to create events.
+type EventSink interface {
+	Create(event *corev1.Event) (*corev1.Event, error)
 }
 
 type RecommendedConfig struct {
@@ -341,6 +357,8 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		LongRunningFunc:       genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
+
+		hasBeenReadyCh: make(chan struct{}),
 	}
 }
 
@@ -503,6 +521,10 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 		c.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: c.ExternalAddress}
 	}
 
+	if c.EventSink == nil {
+		c.EventSink = nullEventSink{}
+	}
+
 	AuthorizeClientBearerToken(c.LoopbackClientConfig, &c.Authentication, &c.Authorization)
 
 	if c.RequestInfoResolver == nil {
@@ -530,7 +552,56 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
 func (c *RecommendedConfig) Complete() CompletedConfig {
+	if c.ClientConfig != nil {
+		ref, err := eventReference()
+		if err != nil {
+			klog.Warningf("Failed to derive event reference, won't create events: %v", err)
+			c.EventSink = nullEventSink{}
+		} else {
+			ns := ref.Namespace
+			if len(ns) == 0 {
+				ns = "default"
+			}
+			c.EventSink = &v1.EventSinkImpl{
+				Interface: kubernetes.NewForConfigOrDie(c.ClientConfig).CoreV1().Events(ns),
+			}
+		}
+	}
+
 	return c.Config.Complete(c.SharedInformerFactory)
+}
+
+func eventReference() (*corev1.ObjectReference, error) {
+	ns := os.Getenv("POD_NAMESPACE")
+	pod := os.Getenv("POD_NAME")
+	if len(ns) == 0 && len(pod) > 0 {
+		serviceAccountNamespaceFile := "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+		if _, err := os.Stat(serviceAccountNamespaceFile); err == nil {
+			bs, err := ioutil.ReadFile(serviceAccountNamespaceFile)
+			if err != nil {
+				return nil, err
+			}
+			ns = string(bs)
+		}
+	}
+	if len(ns) == 0 {
+		pod = ""
+		ns = "kube-system"
+	}
+	if len(pod) == 0 {
+		return &corev1.ObjectReference{
+			Kind:       "Namespace",
+			Name:       ns,
+			APIVersion: "v1",
+		}, nil
+	}
+
+	return &corev1.ObjectReference{
+		Kind:       "Pod",
+		Namespace:  ns,
+		Name:       pod,
+		APIVersion: "v1",
+	}, nil
 }
 
 // New creates a new server which logically combines the handling chain with the passed server.
@@ -584,6 +655,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		livezChecks:      c.LivezChecks,
 		readyzChecks:     c.ReadyzChecks,
 		readinessStopCh:  make(chan struct{}),
+		hasBeenReadyCh:   c.hasBeenReadyCh,
 		livezGracePeriod: c.LivezGracePeriod,
 
 		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
@@ -593,7 +665,16 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 		APIServerID:           c.APIServerID,
 		StorageVersionManager: c.StorageVersionManager,
+
+		eventSink: c.EventSink,
 	}
+
+	ref, err := eventReference()
+	if err != nil {
+		klog.Warningf("Failed to derive event reference, won't create events: %v", err)
+		c.EventSink = nullEventSink{}
+	}
+	s.eventRef = ref
 
 	for {
 		if c.JSONPatchMaxCopyBytes <= 0 {
@@ -751,6 +832,8 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc, c.RequestTimeout)
 	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)
+	handler = WithNonReadyRequestLogging(handler, c.hasBeenReadyCh)
+	handler = WithLateConnectionFilter(handler)
 	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 	if c.SecureServing != nil && !c.SecureServing.DisableHTTP2 && c.GoawayChance > 0 {
 		handler = genericfilters.WithProbabilisticGoaway(handler, c.GoawayChance)
@@ -856,4 +939,10 @@ func AuthorizeClientBearerToken(loopback *restclient.Config, authn *Authenticati
 		tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
 		authz.Authorizer = authorizerunion.New(tokenAuthorizer, authz.Authorizer)
 	}
+}
+
+type nullEventSink struct{}
+
+func (nullEventSink) Create(event *corev1.Event) (*corev1.Event, error) {
+	return nil, nil
 }
