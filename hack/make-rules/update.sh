@@ -36,6 +36,8 @@ if ! ${ALL} ; then
 fi
 
 BASH_TARGETS=(
+	update-kubensenter
+	update-test-annotations
 	update-codegen
 	update-generated-api-compatibility-data
 	update-generated-docs
