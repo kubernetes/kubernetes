@@ -87,7 +87,7 @@ type Config struct {
 	AuthConfigPersister AuthProviderConfigPersister
 
 	// Exec-based authentication provider.
-	Exec Exec
+	ExecProvider *clientcmdapi.ExecConfig
 
 	// TLSClientConfig contains settings to enable transport layer security
 	TLSClientConfig
@@ -192,38 +192,10 @@ func (c *Config) String() string {
 	if cc.AuthConfigPersister != nil {
 		cc.AuthConfigPersister = sanitizedAuthConfigPersister{cc.AuthConfigPersister}
 	}
-	if cc.Exec.Config != nil {
-		cc.Exec.Config = sanitizedObject{Object: cc.Exec.Config}
+	if cc.ExecProvider != nil && cc.ExecProvider.Config != nil {
+		cc.ExecProvider.Config = sanitizedObject{Object: cc.ExecProvider.Config}
 	}
 	return fmt.Sprintf("%#v", cc)
-}
-
-// Exec plugin authentication provider.
-type Exec struct {
-	// ExecProvider provides the config needed to execute the exec plugin.
-	ExecProvider *clientcmdapi.ExecConfig
-
-	// Config holds additional config data that is specific to the exec
-	// plugin with regards to the cluster being authenticated to.
-	//
-	// This data is sourced from the clientcmd Cluster object's extensions[exec] field:
-	//
-	// clusters:
-	// - name: my-cluster
-	//   cluster:
-	//     ...
-	//     extensions:
-	//     - name: exec  # reserved extension name for per cluster exec config
-	//       extension:
-	//         audience: 06e3fbd18de8  # arbitrary config
-	//
-	// In some environments, the user config may be exactly the same across many clusters
-	// (i.e. call this exec plugin) minus some details that are specific to each cluster
-	// such as the audience.  This field allows the per cluster config to be directly
-	// specified with the cluster info.  Using this field to store secret data is not
-	// recommended as one of the prime benefits of exec plugins is that no secrets need
-	// to be stored directly in the kubeconfig.
-	Config runtime.Object
 }
 
 // ImpersonationConfig has all the available impersonation options
@@ -627,7 +599,7 @@ func AnonymousClientConfig(config *Config) *Config {
 
 // CopyConfig returns a copy of the given config
 func CopyConfig(config *Config) *Config {
-	return &Config{
+	c := &Config{
 		Host:            config.Host,
 		APIPath:         config.APIPath,
 		ContentConfig:   config.ContentConfig,
@@ -642,10 +614,7 @@ func CopyConfig(config *Config) *Config {
 		},
 		AuthProvider:        config.AuthProvider,
 		AuthConfigPersister: config.AuthConfigPersister,
-		Exec: Exec{
-			ExecProvider: config.Exec.ExecProvider,
-			Config:       config.Exec.Config,
-		},
+		ExecProvider:        config.ExecProvider,
 		TLSClientConfig: TLSClientConfig{
 			Insecure:   config.TLSClientConfig.Insecure,
 			ServerName: config.TLSClientConfig.ServerName,
@@ -669,4 +638,8 @@ func CopyConfig(config *Config) *Config {
 		Dial:               config.Dial,
 		Proxy:              config.Proxy,
 	}
+	if config.ExecProvider != nil && config.ExecProvider.Config != nil {
+		c.ExecProvider.Config = config.ExecProvider.Config.DeepCopyObject()
+	}
+	return c
 }

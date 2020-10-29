@@ -81,8 +81,10 @@ func RegisterConversions(s *runtime.Scheme) error {
 
 func autoConvert_v1beta1_Cluster_To_clientauthentication_Cluster(in *Cluster, out *clientauthentication.Cluster, s conversion.Scope) error {
 	out.Server = in.Server
-	out.ServerName = in.ServerName
-	out.CAData = *(*[]byte)(unsafe.Pointer(&in.CAData))
+	out.TLSServerName = in.TLSServerName
+	out.InsecureSkipTLSVerify = in.InsecureSkipTLSVerify
+	out.CertificateAuthorityData = *(*[]byte)(unsafe.Pointer(&in.CertificateAuthorityData))
+	out.ProxyURL = in.ProxyURL
 	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Config, &out.Config, s); err != nil {
 		return err
 	}
@@ -96,8 +98,10 @@ func Convert_v1beta1_Cluster_To_clientauthentication_Cluster(in *Cluster, out *c
 
 func autoConvert_clientauthentication_Cluster_To_v1beta1_Cluster(in *clientauthentication.Cluster, out *Cluster, s conversion.Scope) error {
 	out.Server = in.Server
-	out.ServerName = in.ServerName
-	out.CAData = *(*[]byte)(unsafe.Pointer(&in.CAData))
+	out.TLSServerName = in.TLSServerName
+	out.InsecureSkipTLSVerify = in.InsecureSkipTLSVerify
+	out.CertificateAuthorityData = *(*[]byte)(unsafe.Pointer(&in.CertificateAuthorityData))
+	out.ProxyURL = in.ProxyURL
 	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Config, &out.Config, s); err != nil {
 		return err
 	}
@@ -136,8 +140,14 @@ func Convert_clientauthentication_ExecCredential_To_v1beta1_ExecCredential(in *c
 }
 
 func autoConvert_v1beta1_ExecCredentialSpec_To_clientauthentication_ExecCredentialSpec(in *ExecCredentialSpec, out *clientauthentication.ExecCredentialSpec, s conversion.Scope) error {
-	if err := Convert_v1beta1_Cluster_To_clientauthentication_Cluster(&in.Cluster, &out.Cluster, s); err != nil {
-		return err
+	if in.Cluster != nil {
+		in, out := &in.Cluster, &out.Cluster
+		*out = new(clientauthentication.Cluster)
+		if err := Convert_v1beta1_Cluster_To_clientauthentication_Cluster(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Cluster = nil
 	}
 	return nil
 }
@@ -150,8 +160,14 @@ func Convert_v1beta1_ExecCredentialSpec_To_clientauthentication_ExecCredentialSp
 func autoConvert_clientauthentication_ExecCredentialSpec_To_v1beta1_ExecCredentialSpec(in *clientauthentication.ExecCredentialSpec, out *ExecCredentialSpec, s conversion.Scope) error {
 	// WARNING: in.Response requires manual conversion: does not exist in peer-type
 	// WARNING: in.Interactive requires manual conversion: does not exist in peer-type
-	if err := Convert_clientauthentication_Cluster_To_v1beta1_Cluster(&in.Cluster, &out.Cluster, s); err != nil {
-		return err
+	if in.Cluster != nil {
+		in, out := &in.Cluster, &out.Cluster
+		*out = new(Cluster)
+		if err := Convert_clientauthentication_Cluster_To_v1beta1_Cluster(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Cluster = nil
 	}
 	return nil
 }

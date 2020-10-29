@@ -87,10 +87,10 @@ func newCache() *cache {
 
 var spewConfig = &spew.ConfigState{DisableMethods: true, Indent: " "}
 
-func cacheKey(conf *api.ExecConfig, cluster clientauthentication.Cluster) string {
+func cacheKey(conf *api.ExecConfig, cluster *clientauthentication.Cluster) string {
 	key := struct {
 		conf    *api.ExecConfig
-		cluster clientauthentication.Cluster
+		cluster *clientauthentication.Cluster
 	}{
 		conf:    conf,
 		cluster: cluster,
@@ -162,11 +162,11 @@ func (s *sometimes) Do(f func()) {
 }
 
 // GetAuthenticator returns an exec-based plugin for providing client credentials.
-func GetAuthenticator(config *api.ExecConfig, cluster clientauthentication.Cluster) (*Authenticator, error) {
+func GetAuthenticator(config *api.ExecConfig, cluster *clientauthentication.Cluster) (*Authenticator, error) {
 	return newAuthenticator(globalCache, config, cluster)
 }
 
-func newAuthenticator(c *cache, config *api.ExecConfig, cluster clientauthentication.Cluster) (*Authenticator, error) {
+func newAuthenticator(c *cache, config *api.ExecConfig, cluster *clientauthentication.Cluster) (*Authenticator, error) {
 	key := cacheKey(config, cluster)
 	if a, ok := c.get(key); ok {
 		return a, nil
@@ -178,10 +178,11 @@ func newAuthenticator(c *cache, config *api.ExecConfig, cluster clientauthentica
 	}
 
 	a := &Authenticator{
-		cmd:     config.Command,
-		args:    config.Args,
-		group:   gv,
-		cluster: cluster,
+		cmd:                config.Command,
+		args:               config.Args,
+		group:              gv,
+		cluster:            cluster,
+		provideClusterInfo: config.ProvideClusterInfo,
 
 		installHint: config.InstallHint,
 		sometimes: &sometimes{
@@ -208,11 +209,12 @@ func newAuthenticator(c *cache, config *api.ExecConfig, cluster clientauthentica
 // The plugin input and output are defined by the API group client.authentication.k8s.io.
 type Authenticator struct {
 	// Set by the config
-	cmd     string
-	args    []string
-	group   schema.GroupVersion
-	env     []string
-	cluster clientauthentication.Cluster
+	cmd                string
+	args               []string
+	group              schema.GroupVersion
+	env                []string
+	cluster            *clientauthentication.Cluster
+	provideClusterInfo bool
 
 	// Used to avoid log spew by rate limiting install hint printing. We didn't do
 	// this by interval based rate limiting alone since that way may have prevented
@@ -374,8 +376,10 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 		Spec: clientauthentication.ExecCredentialSpec{
 			Response:    r,
 			Interactive: a.interactive,
-			Cluster:     a.cluster,
 		},
+	}
+	if a.provideClusterInfo {
+		cred.Spec.Cluster = a.cluster
 	}
 
 	env := append(a.environ(), a.env...)

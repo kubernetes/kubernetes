@@ -836,7 +836,7 @@ clusters:
 - cluster:
     server: https://localhost:8080
     extensions:
-    - name: exec
+    - name: client.authentication.k8s.io/exec
       extension:
         audience: foo
         other: bar
@@ -858,6 +858,7 @@ users:
       - arg-1
       - arg-2
       command: foo-command
+      provideClusterInfo: true
 `
 	tmpfile, err := ioutil.TempFile("", "kubeconfig")
 	if err != nil {
@@ -871,15 +872,18 @@ users:
 	if err != nil {
 		t.Error(err)
 	}
-	if !reflect.DeepEqual(config.Exec.ExecProvider.Args, []string{"arg-1", "arg-2"}) {
-		t.Errorf("Got args %v when they should be %v\n", config.Exec.ExecProvider.Args, []string{"arg-1", "arg-2"})
+	if !reflect.DeepEqual(config.ExecProvider.Args, []string{"arg-1", "arg-2"}) {
+		t.Errorf("Got args %v when they should be %v\n", config.ExecProvider.Args, []string{"arg-1", "arg-2"})
+	}
+	if !config.ExecProvider.ProvideClusterInfo {
+		t.Error("Wanted provider cluster info to be true")
 	}
 	want := &runtime.Unknown{
 		Raw:         []byte(`{"audience":"foo","other":"bar"}`),
 		ContentType: "application/json",
 	}
-	if !reflect.DeepEqual(config.Exec.Config, want) {
-		t.Errorf("Got config %v when it should be %v\n", config.Exec.Config, want)
+	if !reflect.DeepEqual(config.ExecProvider.Config, want) {
+		t.Errorf("Got config %v when it should be %v\n", config.ExecProvider.Config, want)
 	}
 }
 
