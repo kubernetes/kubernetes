@@ -36,6 +36,7 @@ import (
 	versionedinformers "k8s.io/client-go/informers"
 	certinformersv1beta1 "k8s.io/client-go/informers/certificates/v1beta1"
 	resourceinformers "k8s.io/client-go/informers/resource/v1"
+	"k8s.io/kubernetes/openshift-kube-apiserver/authorization/scopeauthorizer"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
@@ -136,6 +137,9 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 				&rbac.ClusterRoleGetter{Lister: config.VersionedInformerFactory.Rbac().V1().ClusterRoles().Lister()},
 				&rbac.ClusterRoleBindingLister{Lister: config.VersionedInformerFactory.Rbac().V1().ClusterRoleBindings().Lister()},
 			)
+		case authzconfig.AuthorizerType(modes.ModeScope):
+			// Wrap with an authorizer that detects unsafe requests and modifies verbs/resources appropriately so policy can address them separately
+			r.scopeLimitedAuthorizer = scopeauthorizer.NewAuthorizer(config.VersionedInformerFactory.Rbac().V1().ClusterRoles().Lister())
 		}
 	}
 
