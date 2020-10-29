@@ -66,7 +66,7 @@ type authDirective struct {
 }
 
 type acrAuthResponse struct {
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refresh_token" datapolicy:"token"`
 }
 
 // 5 minutes buffer time to allow timeshift between local machine and AAD

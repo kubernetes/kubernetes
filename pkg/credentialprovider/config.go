@@ -39,9 +39,9 @@ const (
 // DockerConfigJSON represents ~/.docker/config.json file info
 // see https://github.com/docker/docker/pull/12009
 type DockerConfigJSON struct {
-	Auths DockerConfig `json:"auths"`
+	Auths DockerConfig `json:"auths" datapolicy:"token"`
 	// +optional
-	HTTPHeaders map[string]string `json:"HttpHeaders,omitempty"`
+	HTTPHeaders map[string]string `json:"HttpHeaders,omitempty" datapolicy:"token"`
 }
 
 // DockerConfig represents the config file used by the docker CLI.
@@ -52,7 +52,7 @@ type DockerConfig map[string]DockerConfigEntry
 // DockerConfigEntry wraps a docker config as a entry
 type DockerConfigEntry struct {
 	Username string
-	Password string
+	Password string `datapolicy:"password"`
 	Email    string
 	Provider DockerConfigProvider
 }
@@ -254,11 +254,11 @@ type dockerConfigEntryWithAuth struct {
 	// +optional
 	Username string `json:"username,omitempty"`
 	// +optional
-	Password string `json:"password,omitempty"`
+	Password string `json:"password,omitempty" datapolicy:"password"`
 	// +optional
 	Email string `json:"email,omitempty"`
 	// +optional
-	Auth string `json:"auth,omitempty"`
+	Auth string `json:"auth,omitempty" datapolicy:"token"`
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.

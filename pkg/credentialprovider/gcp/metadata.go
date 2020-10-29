@@ -261,7 +261,7 @@ func (g *containerRegistryProvider) Enabled() bool {
 // tokenBlob is used to decode the JSON blob containing an access token
 // that is returned by GCE metadata.
 type tokenBlob struct {
-	AccessToken string `json:"access_token"`
+	AccessToken string `json:"access_token" datapolicy:"token"`
 }
 
 // Provide implements DockerConfigProvider
