@@ -61,6 +61,8 @@ type Extra struct {
 	EndpointReconcilerType string
 
 	MasterCount int
+
+	OpenShiftConfig string
 }
 
 // NewServerRunOptions creates and returns ServerRunOptions according to the given featureGate and effectiveVersion of the server binary to run.
@@ -155,6 +157,10 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
 		"The number of apiservers running in the cluster, must be a positive number. (In use when --endpoint-reconciler-type=master-count is enabled.)")
 	fs.MarkDeprecated("apiserver-count", "apiserver-count is deprecated and will be removed in a future version.")
+
+	fs.StringVar(&s.OpenShiftConfig, "openshift-config", s.OpenShiftConfig, "config for openshift")
+	fs.MarkDeprecated("openshift-config", "to be removed")
+	fs.MarkHidden("openshift-config")
 
 	return fss
 }
