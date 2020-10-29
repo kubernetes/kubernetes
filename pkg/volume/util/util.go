@@ -26,6 +26,7 @@ import (
 	"runtime"
 	"strings"
 
+	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
@@ -175,7 +176,7 @@ func checkVolumeNodeAffinity(pv *v1.PersistentVolume, node *v1.Node) error {
 	if pv.Spec.NodeAffinity.Required != nil {
 		terms := pv.Spec.NodeAffinity.Required
 		klog.V(10).Infof("Match for Required node selector terms %+v", terms)
-		if matches, err := v1helper.MatchNodeSelectorTerms(node, terms); err != nil {
+		if matches, err := corev1.MatchNodeSelectorTerms(node, terms); err != nil {
 			return err
 		} else if !matches {
 			return fmt.Errorf("no matching NodeSelectorTerms")
