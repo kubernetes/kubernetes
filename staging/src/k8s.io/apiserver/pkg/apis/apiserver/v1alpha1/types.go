@@ -139,7 +139,7 @@ type TLSConfig struct {
 	// Must be absent/empty if TCPTransport.URL is prefixed with http://
 	// Must be configured if TCPTransport.URL is prefixed with https://
 	// +optional
-	ClientKey string `json:"clientKey,omitempty"`
+	ClientKey string `json:"clientKey,omitempty" datapolicy:"security-key"`
 
 	// clientCert is the file location of the client certificate to be used in mtls handshakes with the konnectivity server.
 	// Must be absent/empty if TCPTransport.URL is prefixed with http://

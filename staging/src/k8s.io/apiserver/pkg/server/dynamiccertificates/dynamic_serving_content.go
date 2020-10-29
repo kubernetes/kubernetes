@@ -39,7 +39,7 @@ type DynamicCertKeyPairContent struct {
 	keyFile string
 
 	// servingCert is a certKeyContent that contains the last read, non-zero length content of the key and cert
-	certKeyPair atomic.Value
+	certKeyPair atomic.Value `datapolicy:"security-key"`
 
 	listeners []Listener
 

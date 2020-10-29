@@ -38,7 +38,7 @@ type SNICertKeyContentProvider interface {
 // certKeyContent holds the content for the cert and key
 type certKeyContent struct {
 	cert []byte
-	key  []byte
+	key  []byte `datapolicy:"security-key"`
 }
 
 func (c *certKeyContent) Equal(rhs *certKeyContent) bool {

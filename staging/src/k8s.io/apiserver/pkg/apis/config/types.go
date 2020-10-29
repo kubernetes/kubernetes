@@ -73,7 +73,7 @@ type Key struct {
 	// name is the name of the key to be used while storing data to disk.
 	Name string
 	// secret is the actual key, encoded in base64.
-	Secret string
+	Secret string `datapolicy:"token"`
 }
 
 // String implements Stringer interface in a log safe way.

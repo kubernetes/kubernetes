@@ -53,8 +53,8 @@ type RequestHeaderAuthRequestProvider interface {
 var _ RequestHeaderAuthRequestProvider = &RequestHeaderAuthRequestController{}
 
 type requestHeaderBundle struct {
-	UsernameHeaders     []string
-	GroupHeaders        []string
+	UsernameHeaders     []string `datapolicy:"token"`
+	GroupHeaders        []string `datapolicy:"token"`
 	ExtraHeaderPrefixes []string
 	AllowedClientNames  []string
 }

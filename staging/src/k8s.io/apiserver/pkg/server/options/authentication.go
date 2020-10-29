@@ -41,8 +41,8 @@ type RequestHeaderAuthenticationOptions struct {
 	// before trusting usernames in headers.
 	ClientCAFile string
 
-	UsernameHeaders     []string
-	GroupHeaders        []string
+	UsernameHeaders     []string `datapolicy:"token"`
+	GroupHeaders        []string `datapolicy:"token"`
 	ExtraHeaderPrefixes []string
 	AllowedNames        []string
 }

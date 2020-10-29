@@ -373,7 +373,7 @@ type endpoint struct {
 	// not used.  Access token is optional per the OIDC distributed claims
 	// specification.
 	// See: http://openid.net/specs/openid-connect-core-1_0.html#DistributedExample
-	AccessToken string `json:"access_token,omitempty"`
+	AccessToken string `json:"access_token,omitempty" datapolicy:"token"`
 	// JWT is the container for aggregated claims.  Not supported at the moment.
 	// See: http://openid.net/specs/openid-connect-core-1_0.html#AggregatedExample
 	JWT string `json:"JWT,omitempty"`
