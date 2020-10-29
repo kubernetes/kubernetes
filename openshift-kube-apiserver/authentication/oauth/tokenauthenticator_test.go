@@ -2,6 +2,8 @@ package oauth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"testing"
 	"time"
@@ -42,6 +44,76 @@ func TestAuthenticateTokenInvalidUID(t *testing.T) {
 	}
 	if userInfo != nil {
 		t.Errorf("Unexpected user: %v", userInfo)
+	}
+}
+
+func TestAuthenticateTokenFormats(t *testing.T) {
+	h := sha256.Sum256([]byte("token"))
+	tokenSha256 := base64.RawURLEncoding.EncodeToString(h[:])
+
+	h2 := sha256.Sum256([]byte("token2"))
+	token2Sha256 := base64.RawURLEncoding.EncodeToString(h2[:])
+
+	fakeOAuthClient := oauthfake.NewSimpleClientset(
+		&oauthv1.OAuthAccessToken{
+			ObjectMeta: metav1.ObjectMeta{Name: "sha256~" + tokenSha256, CreationTimestamp: metav1.Time{Time: time.Now()}},
+			ExpiresIn:  600, // 10 minutes
+			UserName:   "tokenUser",
+			UserUID:    "tokenUserID",
+		},
+		&oauthv1.OAuthAccessToken{
+			ObjectMeta: metav1.ObjectMeta{Name: "token2", CreationTimestamp: metav1.Time{Time: time.Now()}},
+			ExpiresIn:  600, // 10 minutes
+			UserName:   "token2User",
+			UserUID:    "token2UserID",
+		},
+	)
+	fakeUserClient := userfake.NewSimpleClientset(
+		&userv1.User{ObjectMeta: metav1.ObjectMeta{Name: "tokenUser", UID: "tokenUserID"}},
+		&userv1.User{ObjectMeta: metav1.ObjectMeta{Name: "token2User", UID: "token2UserID"}},
+	)
+
+	tokenAuthenticator := NewTokenAuthenticator(fakeOAuthClient.OauthV1().OAuthAccessTokens(), fakeUserClient.UserV1().Users(), NoopGroupMapper{}, nil, NewUIDValidator())
+
+	type Test struct {
+		name             string
+		bearerToken      string
+		expectedError    bool
+		expectedFound    bool
+		expectedUserName string
+	}
+	for _, test := range []Test{
+		{"unknown", "unknown", true, false, ""},
+		{"unprefixed token", "token", true, false, ""},
+		{"prefixed token", "sha256~token", false, true, "tokenUser"},
+		{"unprefixed hash token", tokenSha256, true, false, ""},
+		{"prefixed hash token", "sha256~" + tokenSha256, true, false, ""},
+		{"unprefixed token2", "token2", false, true, "token2User"},
+		{"prefixed token2", "sha256~token2", true, false, ""},
+		{"unprefixed hash token2", token2Sha256, true, false, ""},
+		{"prefixed hash token2", "sha256~" + token2Sha256, true, false, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			userInfo, found, err := tokenAuthenticator.AuthenticateToken(context.TODO(), test.bearerToken)
+			if !test.expectedError && err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if test.expectedError && err == nil {
+				t.Fatalf("Unexpected non-error: found=%v userInfo=%#v", found, userInfo)
+			}
+			if !test.expectedFound && found {
+				t.Fatalf("Expected error, but token was found: %#v", userInfo)
+			}
+			if test.expectedFound && !found {
+				t.Fatalf("Expected token to be found, but it was not")
+			}
+			if userInfo != nil && userInfo.User.GetName() != test.expectedUserName {
+				t.Errorf("Wrong user name, expected %q, got %q", test.expectedUserName, userInfo.User.GetName())
+			}
+			if userInfo == nil && len(test.expectedUserName) > 0 {
+				t.Errorf("Got no user info, but expected user name %q", test.expectedUserName)
+			}
+		})
 	}
 }
 
