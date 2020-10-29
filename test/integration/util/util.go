@@ -373,7 +373,7 @@ func InitTestScheduler(
 	policy *schedulerapi.Policy,
 ) *TestContext {
 	// Pod preemption is enabled by default scheduler configuration.
-	return InitTestSchedulerWithOptions(t, testCtx, policy, time.Second)
+	return InitTestSchedulerWithOptions(t, testCtx, policy)
 }
 
 // InitTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
@@ -382,11 +382,10 @@ func InitTestSchedulerWithOptions(
 	t *testing.T,
 	testCtx *TestContext,
 	policy *schedulerapi.Policy,
-	resyncPeriod time.Duration,
 	opts ...scheduler.Option,
 ) *TestContext {
 	// 1. Create scheduler
-	testCtx.InformerFactory = scheduler.NewInformerFactory(testCtx.ClientSet, resyncPeriod)
+	testCtx.InformerFactory = scheduler.NewInformerFactory(testCtx.ClientSet, 0)
 
 	var err error
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
