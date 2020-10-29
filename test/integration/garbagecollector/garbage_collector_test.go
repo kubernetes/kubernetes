@@ -45,8 +45,8 @@ import (
 	"k8s.io/client-go/metadata/metadatainformer"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/controller-manager/pkg/informerfactory"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -249,7 +249,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 		metadataClient,
 		restMapper,
 		garbagecollector.DefaultIgnoredResources(),
-		controller.NewInformerFactory(sharedInformers, metadataInformers),
+		informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
 		alwaysStarted,
 	)
 	if err != nil {

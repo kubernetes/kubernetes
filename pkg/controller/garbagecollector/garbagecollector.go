@@ -38,7 +38,7 @@ import (
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/controller-manager/pkg/informerfactory"
 
 	// import known versions
 	_ "k8s.io/client-go/kubernetes"
@@ -77,7 +77,7 @@ func NewGarbageCollector(
 	metadataClient metadata.Interface,
 	mapper resettableRESTMapper,
 	ignoredResources map[schema.GroupResource]struct{},
-	sharedInformers controller.InformerFactory,
+	sharedInformers informerfactory.InformerFactory,
 	informersStarted <-chan struct{},
 ) (*GarbageCollector, error) {
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")

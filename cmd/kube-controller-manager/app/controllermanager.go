@@ -60,6 +60,7 @@ import (
 	"k8s.io/component-base/version/verflag"
 	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/controller-manager/pkg/clientbuilder"
+	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
@@ -311,7 +312,7 @@ type ControllerContext struct {
 	// and dynamic resources by their metadata. All generic controllers currently use
 	// object metadata - if a future controller needs access to the full object this
 	// would become GenericInformerFactory and take a dynamic client.
-	ObjectOrMetadataInformerFactory controller.InformerFactory
+	ObjectOrMetadataInformerFactory informerfactory.InformerFactory
 
 	// ComponentConfig provides access to init options for a given controller
 	ComponentConfig kubectrlmgrconfig.KubeControllerManagerConfiguration
@@ -496,7 +497,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 	ctx := ControllerContext{
 		ClientBuilder:                   clientBuilder,
 		InformerFactory:                 sharedInformers,
-		ObjectOrMetadataInformerFactory: controller.NewInformerFactory(sharedInformers, metadataInformers),
+		ObjectOrMetadataInformerFactory: informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
 		ComponentConfig:                 s.ComponentConfig,
 		RESTMapper:                      restMapper,
 		AvailableResources:              availableResources,
