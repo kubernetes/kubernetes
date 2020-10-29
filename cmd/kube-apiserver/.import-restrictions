@@ -2,6 +2,7 @@ rules:
   - selectorRegexp: k8s[.]io/kubernetes
     allowedPrefixes:
       - k8s.io/kubernetes/cmd/kube-apiserver
+      - k8s.io/kubernetes/openshift-kube-apiserver
       - k8s.io/kubernetes/pkg
       - k8s.io/kubernetes/plugin
       - k8s.io/kubernetes/test/utils

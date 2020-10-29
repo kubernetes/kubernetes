@@ -25,7 +25,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 cd "${KUBE_ROOT}"
-if git --no-pager grep -E $'^(import |\t)[a-z]+[A-Z_][a-zA-Z]* "[^"]+"$' -- '**/*.go' ':(exclude)vendor/*' ':(exclude)**/*.pb.go'; then
+if git --no-pager grep -E $'^(import |\t)[a-z]+[A-Z_][a-zA-Z]* "[^"]+"$' -- '**/*.go' ':(exclude)vendor/*' ':(exclude)**/vendor/*' ':(exclude)**/*.pb.go'; then
   echo "!!! Some package aliases break go conventions."
   echo "To fix these errors, do not use capitalized or underlined characters"
   echo "in pkg aliases. Refer to https://blog.golang.org/package-names for more info."

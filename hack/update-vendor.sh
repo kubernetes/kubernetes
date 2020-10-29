@@ -356,7 +356,8 @@ xargs -L 100 go mod edit -fmt
 # disallow transitive dependencies on k8s.io/kubernetes
 loopback_deps=()
 kube::util::read-array loopback_deps < <(go mod graph | grep ' k8s.io/kubernetes' || true)
-if [[ -n ${loopback_deps[*]:+"${loopback_deps[*]}"} ]]; then
+## Allow apiserver-library-go to depend on k8s.io/kubernetes
+if [[ -n ${loopback_deps[*]:+"${loopback_deps[*]}"} && ! "${loopback_deps[*]}" =~ github.com/openshift/apiserver-library-go ]]; then
   kube::log::error "Disallowed transitive k8s.io/kubernetes dependencies exist via the following imports:" >&22 2>&1
   kube::log::error "${loopback_deps[@]}" >&22 2>&1
   exit 1
@@ -400,7 +401,7 @@ hack/update-vendor-licenses.sh
 kube::log::status "vendor: creating OWNERS file" >&11
 rm -f "vendor/OWNERS"
 cat <<__EOF__ > "vendor/OWNERS"
-# See the OWNERS docs at https://go.k8s.io/owners
+See the OWNERS docs at https://go.k8s.io/owners
 
 options:
   # make root approval non-recursive
