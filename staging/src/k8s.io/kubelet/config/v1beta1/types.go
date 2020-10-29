@@ -125,7 +125,7 @@ type KubeletConfiguration struct {
 	// it may disrupt the ability to read the latest set of static pods from StaticPodURL.
 	// Default: nil
 	// +optional
-	StaticPodURLHeader map[string][]string `json:"staticPodURLHeader,omitempty"`
+	StaticPodURLHeader map[string][]string `json:"staticPodURLHeader,omitempty" datapolicy:"token"`
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
 	// for all interfaces).
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
