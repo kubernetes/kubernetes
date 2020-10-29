@@ -172,7 +172,7 @@ type Cloud struct {
 // TODO: replace gcfg with json
 type ConfigGlobal struct {
 	TokenURL  string `gcfg:"token-url"`
-	TokenBody string `gcfg:"token-body"`
+	TokenBody string `gcfg:"token-body" datapolicy:"token"`
 	// ProjectID and NetworkProjectID can either be the numeric or string-based
 	// unique identifier that starts with [a-z].
 	ProjectID string `gcfg:"project-id"`
