@@ -51,7 +51,7 @@ func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.H
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericapifilters.WithWarningRecorder(handler)
 	handler = genericapifilters.WithCacheControl(handler)
-	handler = genericfilters.WithPanicRecovery(handler, requestInfoResolver)
+	handler = genericfilters.WithPanicRecovery(handler, requestInfoResolver, nil)
 
 	return handler
 }
