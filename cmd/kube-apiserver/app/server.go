@@ -186,13 +186,17 @@ func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan
 	if err != nil {
 		return nil, err
 	}
-	apiExtensionsServer, err := createAPIExtensionsServer(apiExtensionsConfig, genericapiserver.NewEmptyDelegate())
+	apiExtensionsServer, err := createAPIExtensionsServer(apiExtensionsConfig, StartingDelegate)
 	if err != nil {
 		return nil, err
 	}
 
 	kubeAPIServer, err := CreateKubeAPIServer(kubeAPIServerConfig, apiExtensionsServer.GenericAPIServer)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := PatchKubeAPIServerServer(kubeAPIServer); err != nil {
 		return nil, err
 	}
 
@@ -353,6 +357,7 @@ func CreateKubeAPIServerConfig(s completedServerRunOptions) (
 func buildGenericConfig(
 	s *options.ServerRunOptions,
 	proxyTransport *http.Transport,
+
 ) (
 	genericConfig *genericapiserver.Config,
 	versionedInformers clientgoinformers.SharedInformerFactory,
@@ -463,6 +468,12 @@ func buildGenericConfig(
 	pluginInitializers, admissionPostStartHook, err = admissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider)
 	if err != nil {
 		lastErr = fmt.Errorf("failed to create admission plugin initializer: %v", err)
+		return
+	}
+
+	StartingDelegate, err = PatchKubeAPIServerConfig(genericConfig, versionedInformers, &pluginInitializers)
+	if err != nil {
+		lastErr = fmt.Errorf("failed to patch: %v", err)
 		return
 	}
 
