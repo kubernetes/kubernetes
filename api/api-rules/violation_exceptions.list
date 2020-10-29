@@ -466,6 +466,10 @@ API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,Raw
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,IntVal
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,StrVal
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,Type
+API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,CertificateAuthorityData
+API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,InsecureSkipTLSVerify
+API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,ProxyURL
+API rule violation: names_match,k8s.io/client-go/pkg/apis/clientauthentication/v1beta1,Cluster,TLSServerName
 API rule violation: names_match,k8s.io/cloud-provider/app/apis/config/v1alpha1,CloudControllerManagerConfiguration,Generic
 API rule violation: names_match,k8s.io/cloud-provider/app/apis/config/v1alpha1,CloudControllerManagerConfiguration,KubeCloudShared
 API rule violation: names_match,k8s.io/cloud-provider/app/apis/config/v1alpha1,CloudControllerManagerConfiguration,NodeStatusUpdateFrequency

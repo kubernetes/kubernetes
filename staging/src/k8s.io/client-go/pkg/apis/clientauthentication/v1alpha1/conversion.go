@@ -22,5 +22,6 @@ import (
 )
 
 func Convert_clientauthentication_ExecCredentialSpec_To_v1alpha1_ExecCredentialSpec(in *clientauthentication.ExecCredentialSpec, out *ExecCredentialSpec, s conversion.Scope) error {
+	// This conversion intentionally omits the Cluster field which is only supported in newer versions.
 	return autoConvert_clientauthentication_ExecCredentialSpec_To_v1alpha1_ExecCredentialSpec(in, out, s)
 }

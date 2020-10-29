@@ -40,9 +40,12 @@ type ExecCredential struct {
 // ExecCredentialSpec holds request and runtime specific information provided by
 // the transport.
 type ExecCredentialSpec struct {
-	// Cluster contains information to allow an exec plugin to communicate
-	// with the kubernetes cluster being authenticated to.
-	Cluster Cluster `json:"cluster"`
+	// Cluster contains information to allow an exec plugin to communicate with the
+	// kubernetes cluster being authenticated to. Note that Cluster is non-nil only
+	// when provideClusterInfo is set to true in the exec provider config (i.e.,
+	// ExecConfig.ProvideClusterInfo).
+	// +optional
+	Cluster *Cluster `json:"cluster,omitempty"`
 }
 
 // ExecCredentialStatus holds credentials for the transport to use.
@@ -64,19 +67,32 @@ type ExecCredentialStatus struct {
 
 // Cluster contains information to allow an exec plugin to communicate
 // with the kubernetes cluster being authenticated to.
+//
+// To ensure that this struct contains everything someone would need to communicate
+// with a kubernetes cluster (just like they would via a kubeconfig), the fields
+// should shadow "k8s.io/client-go/tools/clientcmd/api/v1".Cluster, with the exception
+// of CertificateAuthority, since CA data will always be passed to the plugin as bytes.
 type Cluster struct {
 	// Server is the address of the kubernetes cluster (https://hostname:port).
 	Server string `json:"server"`
-	// ServerName is passed to the server for SNI and is used in the client to check server
-	// certificates against. If ServerName is empty, the hostname used to contact the
-	// server is used.
+	// TLSServerName is passed to the server for SNI and is used in the client to
+	// check server certificates against. If ServerName is empty, the hostname
+	// used to contact the server is used.
 	// +optional
-	ServerName string `json:"serverName,omitempty"`
+	TLSServerName string `json:"tls-server-name,omitempty"`
+	// InsecureSkipTLSVerify skips the validity check for the server's certificate.
+	// This will make your HTTPS connections insecure.
+	// +optional
+	InsecureSkipTLSVerify bool `json:"insecure-skip-tls-verify,omitempty"`
 	// CAData contains PEM-encoded certificate authority certificates.
 	// If empty, system roots should be used.
 	// +listType=atomic
 	// +optional
-	CAData []byte `json:"caData,omitempty"`
+	CertificateAuthorityData []byte `json:"certificate-authority-data,omitempty"`
+	// ProxyURL is the URL to the proxy to be used for all requests to this
+	// cluster.
+	// +optional
+	ProxyURL string `json:"proxy-url,omitempty"`
 	// Config holds additional config data that is specific to the exec
 	// plugin with regards to the cluster being authenticated to.
 	//
@@ -87,7 +103,7 @@ type Cluster struct {
 	//   cluster:
 	//     ...
 	//     extensions:
-	//     - name: exec  # reserved extension name for per cluster exec config
+	//     - name: client.authentication.k8s.io/exec  # reserved extension name for per cluster exec config
 	//       extension:
 	//         audience: 06e3fbd18de8  # arbitrary config
 	//

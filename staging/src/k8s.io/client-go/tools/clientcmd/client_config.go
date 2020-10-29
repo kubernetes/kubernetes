@@ -34,6 +34,11 @@ import (
 	"github.com/imdario/mergo"
 )
 
+const (
+	// clusterExtensionKey is reserved in the cluster extensions list for exec plugin config.
+	clusterExtensionKey = "client.authentication.k8s.io/exec"
+)
+
 var (
 	// ClusterDefaults has the same behavior as the old EnvVar and DefaultCluster fields
 	// DEPRECATED will be replaced
@@ -269,9 +274,9 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 		mergedConfig.AuthConfigPersister = persistAuthConfig
 	}
 	if configAuthInfo.Exec != nil {
-		mergedConfig.Exec.ExecProvider = configAuthInfo.Exec
+		mergedConfig.ExecProvider = configAuthInfo.Exec
 		mergedConfig.ExecProvider.InstallHint = cleanANSIEscapeCodes(mergedConfig.ExecProvider.InstallHint)
-		mergedConfig.Exec.Config = configClusterInfo.Extensions["exec"] // this key is reserved in the extensions list for exec plugin config
+		mergedConfig.ExecProvider.Config = configClusterInfo.Extensions[clusterExtensionKey]
 	}
 
 	// if there still isn't enough information to authenticate the user, try prompting
@@ -314,7 +319,7 @@ func canIdentifyUser(config restclient.Config) bool {
 		(len(config.CertFile) > 0 || len(config.CertData) > 0) ||
 		len(config.BearerToken) > 0 ||
 		config.AuthProvider != nil ||
-		config.Exec.ExecProvider != nil
+		config.ExecProvider != nil
 }
 
 // cleanANSIEscapeCodes takes an arbitrary string and ensures that there are no
