@@ -1818,6 +1818,12 @@ func testSetup(t *testing.T) (context.Context, *store, *integration.ClusterV3) {
 func testPropogateStore(ctx context.Context, t *testing.T, store *store, obj *example.Pod) (string, *example.Pod) {
 	// Setup store with a key and grab the output for returning.
 	key := "/testkey"
+	return key, testPropogateStoreWithKey(ctx, t, store, key, obj)
+}
+
+// testPropogateStoreWithKey helps propagate store with objects, the given object will be stored at the specified key.
+func testPropogateStoreWithKey(ctx context.Context, t *testing.T, store *store, key string, obj *example.Pod) *example.Pod {
+	// Setup store with the specified key and grab the output for returning.
 	v, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		panic("unable to convert output object to pointer")
@@ -1830,7 +1836,7 @@ func testPropogateStore(ctx context.Context, t *testing.T, store *store, obj *ex
 	if err := store.Create(ctx, key, obj, setOutput, 0); err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
-	return key, setOutput
+	return setOutput
 }
 
 func TestPrefix(t *testing.T) {
@@ -2074,4 +2080,42 @@ func TestConsistentList(t *testing.T) {
 		t.Errorf("inconsistent lists: %#v, %#v", result3, result4)
 	}
 
+}
+
+func TestCount(t *testing.T) {
+	ctx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+
+	resourceA := "/foo.bar.io/abc"
+
+	// resourceA is intentionally a prefix of resourceB to ensure that the count
+	// for resourceA does not include any objects from resourceB.
+	resourceB := fmt.Sprintf("%sdef", resourceA)
+
+	resourceACountExpected := 5
+	for i := 1; i <= resourceACountExpected; i++ {
+		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("foo-%d", i)}}
+
+		key := fmt.Sprintf("%s/%d", resourceA, i)
+		testPropogateStoreWithKey(ctx, t, store, key, obj)
+	}
+
+	resourceBCount := 4
+	for i := 1; i <= resourceBCount; i++ {
+		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("foo-%d", i)}}
+
+		key := fmt.Sprintf("%s/%d", resourceB, i)
+		testPropogateStoreWithKey(ctx, t, store, key, obj)
+	}
+
+	resourceACountGot, err := store.Count(resourceA)
+	if err != nil {
+		t.Fatalf("store.Count failed: %v", err)
+	}
+
+	// count for resourceA should not include the objects for resourceB
+	// even though resourceA is a prefix of resourceB.
+	if int64(resourceACountExpected) != resourceACountGot {
+		t.Fatalf("store.Count for resource %s: expected %d but got %d", resourceA, resourceACountExpected, resourceACountGot)
+	}
 }
