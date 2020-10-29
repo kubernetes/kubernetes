@@ -108,8 +108,8 @@ func TestTimeout(t *testing.T) {
 		}), func(w http.ResponseWriter, req *http.Request, err interface{}) {
 			gotPanic <- err
 			http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)
-		}),
-	))
+		}, nil),
+	)
 	defer ts.Close()
 
 	// No timeouts
@@ -250,7 +250,7 @@ func TestErrConnKilled(t *testing.T) {
 		GrouplessAPIPrefixes: sets.NewString("api"),
 	}
 
-	ts := httptest.NewServer(WithPanicRecovery(handler, resolver))
+	ts := httptest.NewServer(WithPanicRecovery(handler, resolver, nil))
 	defer ts.Close()
 
 	_, err = http.Get(ts.URL)
@@ -308,7 +308,7 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 	}
 
 	// test server
-	ts := httptest.NewUnstartedServer(WithPanicRecovery(handler, resolver))
+	ts := httptest.NewUnstartedServer(WithPanicRecovery(handler, resolver, nil))
 	tsCert, err := tls.X509KeyPair(tsCrt, tsKey)
 	if err != nil {
 		t.Fatalf("backend: invalid x509/key pair: %v", err)
