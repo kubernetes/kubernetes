@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/openshift-kube-apiserver/enablement"
 	"k8s.io/kubernetes/openshift-kube-apiserver/openshiftkubeapiserver"
 
-	"github.com/go-openapi/spec"
 	"github.com/spf13/cobra"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -376,7 +375,6 @@ func CreateKubeAPIServerConfig(s completedServerRunOptions) (
 func buildGenericConfig(
 	s *options.ServerRunOptions,
 	proxyTransport *http.Transport,
-
 ) (
 	genericConfig *genericapiserver.Config,
 	versionedInformers clientgoinformers.SharedInformerFactory,
