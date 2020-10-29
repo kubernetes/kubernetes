@@ -179,7 +179,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		allIncorrectIPs = append(allIncorrectIPs, incorrectIPs[0])
 	}
 
-	if len(incorrectIPs) > 0 {
+	if len(allIncorrectIPs) > 0 {
 		klog.V(4).Infof("service change tracker(%v) ignored the following load balancer(%s) ingress ips for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(incorrectIPs, ","), service.Namespace, service.Name)
 
 	}
