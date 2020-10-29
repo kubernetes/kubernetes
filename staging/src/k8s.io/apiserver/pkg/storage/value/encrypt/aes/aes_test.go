@@ -653,11 +653,13 @@ func TestRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	aes24block, err := aes.NewCipher(bytes.Repeat([]byte("b"), 24))
+	/* FIPS disabled
+	aes24block, err := aes.NewCipher([]byte(bytes.Repeat([]byte("b"), 24)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	aes32block, err := aes.NewCipher(bytes.Repeat([]byte("c"), 32))
+	*/
+	aes32block, err := aes.NewCipher([]byte(bytes.Repeat([]byte("c"), 32)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -669,10 +671,10 @@ func TestRoundTrip(t *testing.T) {
 		t       value.Transformer
 	}{
 		{name: "GCM 16 byte key", t: newGCMTransformer(t, aes16block)},
-		{name: "GCM 24 byte key", t: newGCMTransformer(t, aes24block)},
+		// FIPS disabled {name: "GCM 24 byte key", t: newGCMTransformer(t, aes24block)},
 		{name: "GCM 32 byte key", t: newGCMTransformer(t, aes32block)},
 		{name: "GCM 16 byte unsafe key", t: newGCMTransformerWithUniqueKeyUnsafeTest(t, aes16block)},
-		{name: "GCM 24 byte unsafe key", t: newGCMTransformerWithUniqueKeyUnsafeTest(t, aes24block)},
+		// FIPS disabled {name: "GCM 24 byte unsafe key", t: newGCMTransformerWithUniqueKeyUnsafeTest(t, aes24block)},
 		{name: "GCM 32 byte unsafe key", t: newGCMTransformerWithUniqueKeyUnsafeTest(t, aes32block)},
 		{name: "CBC 32 byte key", t: NewCBCTransformer(aes32block)},
 	}
