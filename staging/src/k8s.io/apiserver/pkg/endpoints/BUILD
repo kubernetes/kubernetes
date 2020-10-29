@@ -110,6 +110,7 @@ filegroup(
         ":package-srcs",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/deprecation:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/discovery:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/endpoints/filterlatency:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/filters:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/metrics:all-srcs",

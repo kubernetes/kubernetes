@@ -100,6 +100,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authorization/union:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/discovery:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/endpoints/filterlatency:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/filters:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters:go_default_library",

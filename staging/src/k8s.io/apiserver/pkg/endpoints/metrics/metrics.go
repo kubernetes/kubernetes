@@ -196,6 +196,16 @@ var (
 		[]string{"verb", "resource", "subresource"},
 	)
 
+	requestFilterDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "apiserver_request_filter_duration_seconds",
+			Help:           "Request filter latency distribution in seconds, for each filter type",
+			Buckets:        []float64{0.0, 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 5.0},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"filter"},
+	)
+
 	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 
 	metrics = []resettableCollector{
@@ -213,6 +223,7 @@ var (
 		currentInqueueRequests,
 		requestTerminationsTotal,
 		apiSelfRequestCounter,
+		requestFilterDuration,
 	}
 
 	// these are the known (e.g. whitelisted/known) content types which we will report for
@@ -300,6 +311,10 @@ func UpdateInflightRequestMetrics(phase string, nonmutating, mutating int) {
 			currentInqueueRequests.WithLabelValues(kc.kind).Set(float64(kc.count))
 		}
 	}
+}
+
+func RecordFilterLatency(name string, elapsed time.Duration) {
+	requestFilterDuration.WithLabelValues(name).Observe(elapsed.Seconds())
 }
 
 // RecordRequestTermination records that the request was terminated early as part of a resource
