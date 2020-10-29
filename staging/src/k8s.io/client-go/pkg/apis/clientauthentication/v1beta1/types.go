@@ -58,11 +58,11 @@ type ExecCredentialStatus struct {
 	// +optional
 	ExpirationTimestamp *metav1.Time `json:"expirationTimestamp,omitempty"`
 	// Token is a bearer token used by the client for request authentication.
-	Token string `json:"token,omitempty"`
+	Token string `json:"token,omitempty" datapolicy:"token"`
 	// PEM-encoded client TLS certificates (including intermediates, if any).
 	ClientCertificateData string `json:"clientCertificateData,omitempty"`
 	// PEM-encoded private key for the above certificate.
-	ClientKeyData string `json:"clientKeyData,omitempty"`
+	ClientKeyData string `json:"clientKeyData,omitempty" datapolicy:"security-key"`
 }
 
 // Cluster contains information to allow an exec plugin to communicate

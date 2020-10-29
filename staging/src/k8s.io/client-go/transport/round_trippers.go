@@ -167,7 +167,7 @@ func (rt *userAgentRoundTripper) WrappedRoundTripper() http.RoundTripper { retur
 
 type basicAuthRoundTripper struct {
 	username string
-	password string
+	password string `datapolicy:"password"`
 	rt       http.RoundTripper
 }
 
@@ -305,7 +305,7 @@ func (rt *bearerAuthRoundTripper) WrappedRoundTripper() http.RoundTripper { retu
 
 // requestInfo keeps track of information about a request/response combination
 type requestInfo struct {
-	RequestHeaders http.Header
+	RequestHeaders http.Header `datapolicy:"token"`
 	RequestVerb    string
 	RequestURL     string
 

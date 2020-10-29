@@ -35,10 +35,10 @@ type Config struct {
 
 	// Username and password for basic authentication
 	Username string
-	Password string
+	Password string `datapolicy:"password"`
 
 	// Bearer token for authentication
-	BearerToken string
+	BearerToken string `datapolicy:"token"`
 
 	// Path to a file containing a BearerToken.
 	// If set, the contents are periodically read.
