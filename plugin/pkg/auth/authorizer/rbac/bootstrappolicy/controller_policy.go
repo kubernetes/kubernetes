@@ -162,6 +162,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			// resource that is owned by the service and sets blockOwnerDeletion=true in its ownerRef.
 			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("services/finalizers").RuleOrDie(),
 			rbacv1helpers.NewRule("get", "list", "create", "update", "delete").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
+			rbacv1helpers.NewRule("create").Groups(discoveryGroup).Resources("endpointslices/restricted").RuleOrDie(),
 			eventsRule(),
 		},
 	})
@@ -178,6 +179,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			// see https://github.com/openshift/kubernetes/blob/8691466059314c3f7d6dcffcbb76d14596ca716c/pkg/controller/endpointslicemirroring/utils.go#L87-L88
 			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("endpoints/finalizers").RuleOrDie(),
 			rbacv1helpers.NewRule("get", "list", "create", "update", "delete").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
+			rbacv1helpers.NewRule("create").Groups(discoveryGroup).Resources("endpointslices/restricted").RuleOrDie(),
 			eventsRule(),
 		},
 	})

@@ -518,6 +518,12 @@ items:
     - list
     - update
   - apiGroups:
+    - discovery.k8s.io
+    resources:
+    - endpointslices/restricted
+    verbs:
+    - create
+  - apiGroups:
     - ""
     - events.k8s.io
     resources:
@@ -567,6 +573,12 @@ items:
     - get
     - list
     - update
+  - apiGroups:
+    - discovery.k8s.io
+    resources:
+    - endpointslices/restricted
+    verbs:
+    - create
   - apiGroups:
     - ""
     - events.k8s.io
