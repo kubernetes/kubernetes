@@ -35,7 +35,10 @@ if ! ${ALL} ; then
 	echo "Running in short-circuit mode; run with FORCE_ALL=true to force all scripts to run."
 fi
 
+# Skip bazel since it's not used downstream
 BASH_TARGETS="
+	update-kubensenter
+	update-test-annotations
 	update-generated-protobuf
 	update-codegen
 	update-generated-runtime

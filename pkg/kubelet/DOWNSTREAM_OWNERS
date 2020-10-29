@@ -1,0 +1,17 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+# Downstream reviewers, don't have to match those in OWNERS
+reviewers:
+  - rphillips
+  - sjenning
+  - mrunalp
+
+# Sub-package approvers from upstream with permission to approve downstream backports following these rules:
+# - they MUST be approvers upstream (here compare https://github.com/kubernetes/kubernetes/blob/17bb2fc050ec786b60db7d8d6d4d3ac8eeac205b/pkg/kubelet/OWNERS#L10-L11)
+# - they may approve "UPSTREAM: <PR>: ..." changes that merged upstream.
+# - carry patches for "UPSTREAM: <carry>: ..." and any unmerged PRs of the previous kind will have to be approved by the top-level approvers.
+approvers:
+  - sjenning
+  - mrunalp
+
+component: node
