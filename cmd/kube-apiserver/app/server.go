@@ -29,6 +29,11 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/openshift-kube-apiserver/configdefault"
+	"k8s.io/kubernetes/openshift-kube-apiserver/enablement"
+	"k8s.io/kubernetes/openshift-kube-apiserver/openshiftkubeapiserver"
+
+	"github.com/go-openapi/spec"
 	"github.com/spf13/cobra"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -118,6 +123,31 @@ cluster's shared state through which all other components interact.`,
 			}
 			cliflag.PrintFlags(fs)
 
+			if len(s.OpenShiftConfig) > 0 {
+				enablement.ForceOpenShift()
+				openshiftConfig, err := enablement.GetOpenshiftConfig(s.OpenShiftConfig)
+				if err != nil {
+					klog.Fatal(err)
+				}
+
+				// this forces a patch to be called
+				// TODO we're going to try to remove bits of the patching.
+				configPatchFn, serverPatchContext := openshiftkubeapiserver.NewOpenShiftKubeAPIServerConfigPatch(genericapiserver.NewEmptyDelegate(), openshiftConfig)
+				OpenShiftKubeAPIServerConfigPatch = configPatchFn
+				OpenShiftKubeAPIServerServerPatch = serverPatchContext.PatchServer
+
+				args, err := openshiftkubeapiserver.ConfigToFlags(openshiftConfig)
+				if err != nil {
+					return err
+				}
+				// hopefully this resets the flags?
+				if err := cmd.ParseFlags(args); err != nil {
+					return err
+				}
+
+				enablement.ForceGlobalInitializationForOpenShift(s)
+			}
+
 			// set default options
 			completedOptions, err := Complete(s)
 			if err != nil {
@@ -199,6 +229,10 @@ func CreateServerChain(completedOptions completedServerRunOptions) (*aggregatora
 
 	kubeAPIServer, err := CreateKubeAPIServer(kubeAPIServerConfig, apiExtensionsServer.GenericAPIServer)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := PatchKubeAPIServerServer(kubeAPIServer); err != nil {
 		return nil, err
 	}
 
@@ -345,6 +379,7 @@ func CreateKubeAPIServerConfig(s completedServerRunOptions) (
 func buildGenericConfig(
 	s *options.ServerRunOptions,
 	proxyTransport *http.Transport,
+
 ) (
 	genericConfig *genericapiserver.Config,
 	versionedInformers clientgoinformers.SharedInformerFactory,
@@ -465,6 +500,15 @@ func buildGenericConfig(
 		return
 	}
 
+	StartingDelegate, err = PatchKubeAPIServerConfig(genericConfig, versionedInformers, &pluginInitializers)
+	if err != nil {
+		lastErr = fmt.Errorf("failed to patch: %v", err)
+		return
+	}
+
+	if enablement.IsOpenShift() {
+		configdefault.SetAdmissionDefaults(s, versionedInformers, clientgoExternalClient)
+	}
 	err = s.Admission.ApplyTo(
 		genericConfig,
 		versionedInformers,
