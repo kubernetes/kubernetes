@@ -26,6 +26,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_CODEGEN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+GOFLAGS=-mod=readonly
 
 # Callers which want a specific tag of the k8s.io/code-generator repo should
 # set the KUBE_CODEGEN_TAG to the tag name, e.g. KUBE_CODEGEN_TAG="release-1.32"

@@ -308,7 +308,7 @@ hack/update-vendor-licenses.sh
 kube::log::status "vendor: creating OWNERS file" >&11
 rm -f "vendor/OWNERS"
 cat <<__EOF__ > "vendor/OWNERS"
-# See the OWNERS docs at https://go.k8s.io/owners
+See the OWNERS docs at https://go.k8s.io/owners
 
 options:
   # make root approval non-recursive
@@ -326,7 +326,7 @@ for repo in $(kube::util::list_staging_repos); do
     echo "=== checking k8s.io/${repo}"
     cd "staging/src/k8s.io/${repo}"
     loopback_deps=()
-    kube::util::read-array loopback_deps < <(go list all 2>/dev/null | grep k8s.io/kubernetes/ || true)
+    kube::util::read-array loopback_deps < <(go list all 2>/dev/null | grep k8s.io/kubernetes/ | grep -v github.com/openshift/apiserver-library-go || true)
     if (( "${#loopback_deps[@]}" > 0 )); then
       kube::log::error "${#loopback_deps[@]} disallowed ${repo} -> k8s.io/kubernetes dependencies exist via the following imports: $(go mod why "${loopback_deps[@]}")" >&22 2>&1
       exit 1
@@ -336,8 +336,9 @@ done
 
 kube::log::status "go.mod: prevent k8s.io/kubernetes --> * --> k8s.io/kubernetes dep" >&11
 loopback_deps=()
-kube::util::read-array loopback_deps < <(go mod graph | grep ' k8s.io/kubernetes' || true)
-if (( "${#loopback_deps[@]}" > 0 )); then
+kube::util::read-array loopback_deps < <(go mod graph | grep ' k8s.io/kubernetes' | grep -v github.com/openshift/apiserver-library-go || true)
+# Allow apiserver-library-go to depend on k8s.io/kubernetes
+if [[ -n ${loopback_deps[*]:+"${loopback_deps[*]}"} && ! "${loopback_deps[*]}" =~ github.com/openshift/apiserver-library-go ]]; then
   kube::log::error "${#loopback_deps[@]} disallowed transitive k8s.io/kubernetes dependencies exist via the following imports:" >&22 2>&1
   kube::log::error "${loopback_deps[@]}" >&22 2>&1
   exit 1
