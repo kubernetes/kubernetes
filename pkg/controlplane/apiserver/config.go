@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/admissionenablement"
 	"k8s.io/kubernetes/openshift-kube-apiserver/enablement"
 	"k8s.io/kubernetes/openshift-kube-apiserver/openshiftkubeapiserver"
+	eventstorage "k8s.io/kubernetes/pkg/registry/core/event/storage"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -292,6 +293,13 @@ func CreateConfig(
 
 	opts.Metrics.Apply()
 	serviceaccount.RegisterMetrics()
+
+	var eventStorage *eventstorage.REST
+	eventStorage, err := eventstorage.NewREST(genericConfig.RESTOptionsGetter, uint64(opts.EventTTL.Seconds()))
+	if err != nil {
+		return nil, nil, err
+	}
+	genericConfig.EventSink = eventRegistrySink{eventStorage}
 
 	config := &Config{
 		Generic: genericConfig,
