@@ -37,7 +37,7 @@ var (
 // Config represents vSphere configuration
 type Config struct {
 	Username          string
-	Password          string
+	Password          string `datapolicy:"password"`
 	Hostname          string
 	Port              string
 	Datacenters       string
@@ -54,7 +54,7 @@ type ConfigFile struct {
 		// vCenter username.
 		User string `gcfg:"user"`
 		// vCenter password in clear text.
-		Password string `gcfg:"password"`
+		Password string `gcfg:"password" datapolicy:"password"`
 		// vCenter port.
 		VCenterPort string `gcfg:"port"`
 		// True if vCenter uses self-signed cert.
