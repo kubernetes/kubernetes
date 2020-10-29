@@ -5270,14 +5270,14 @@ func (m *ImageStatusResponse) GetInfo() map[string]string {
 // AuthConfig contains authorization information for connecting to a registry.
 type AuthConfig struct {
 	Username      string `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
-	Password      string `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	Password      string `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty" datapolicy:"password"`
 	Auth          string `protobuf:"bytes,3,opt,name=auth,proto3" json:"auth,omitempty"`
 	ServerAddress string `protobuf:"bytes,4,opt,name=server_address,json=serverAddress,proto3" json:"server_address,omitempty"`
 	// IdentityToken is used to authenticate the user and get
 	// an access token for the registry.
-	IdentityToken string `protobuf:"bytes,5,opt,name=identity_token,json=identityToken,proto3" json:"identity_token,omitempty"`
+	IdentityToken string `protobuf:"bytes,5,opt,name=identity_token,json=identityToken,proto3" json:"identity_token,omitempty datapolicy:"token"`
 	// RegistryToken is a bearer token to be sent to a registry
-	RegistryToken        string   `protobuf:"bytes,6,opt,name=registry_token,json=registryToken,proto3" json:"registry_token,omitempty"`
+	RegistryToken        string   `protobuf:"bytes,6,opt,name=registry_token,json=registryToken,proto3" json:"registry_token,omitempty" datapolicy:"token"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
