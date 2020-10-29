@@ -52,7 +52,7 @@ func TestFeatureGateFlag(t *testing.T) {
 				testAlphaGate: false,
 				testBetaGate:  false,
 			},
-			parseError: "unrecognized feature gate: fooBarBaz",
+			//parseError: "unrecognized feature gate: fooBarBaz",
 		},
 		{
 			arg: "AllAlpha=false",
@@ -356,7 +356,7 @@ func TestFeatureGateSetFromMap(t *testing.T) {
 				testAlphaGate: false,
 				testBetaGate:  false,
 			},
-			setmapError: "unrecognized feature gate:",
+			//setmapError: "unrecognized feature gate:",
 		},
 		{
 			name: "set locked gates",
