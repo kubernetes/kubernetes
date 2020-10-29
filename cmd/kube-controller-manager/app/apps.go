@@ -33,7 +33,10 @@ import (
 )
 
 func startDaemonSetController(ctx ControllerContext) (http.Handler, bool, error) {
-	dsc, err := daemon.NewDaemonSetsController(
+	dsc, err := daemon.NewNodeSelectorAwareDaemonSetsController(
+		ctx.OpenShiftContext.OpenShiftDefaultProjectNodeSelector,
+		ctx.OpenShiftContext.KubeDefaultProjectNodeSelector,
+		ctx.InformerFactory.Core().V1().Namespaces(),
 		ctx.InformerFactory.Apps().V1().DaemonSets(),
 		ctx.InformerFactory.Apps().V1().ControllerRevisions(),
 		ctx.InformerFactory.Core().V1().Pods(),
