@@ -4936,7 +4936,7 @@ type Secret struct {
 	// base64 encoded string, representing the arbitrary (possibly non-string)
 	// data value here.
 	// +optional
-	Data map[string][]byte
+	Data map[string][]byte `datapolicy:"password,security-key,token"`
 
 	// Used to facilitate programmatic handling of secret data.
 	// +optional
