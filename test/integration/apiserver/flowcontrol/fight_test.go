@@ -69,7 +69,7 @@ func TestConfigConsumerFight(t *testing.T) {
 		myConfig := rest.CopyConfig(loopbackConfig)
 		myConfig = rest.AddUserAgent(myConfig, fmt.Sprintf("invert=%v, i=%d", invert, i))
 		myClientset := clientset.NewForConfigOrDie(myConfig)
-		fcIfc := myClientset.FlowcontrolV1alpha1()
+		fcIfc := myClientset.FlowcontrolV1beta1()
 		// Wait until at least one FlowSchema has been defined by the config producer
 		err := wait.Poll(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 			_, err := fcIfc.FlowSchemas().Get(ctx, fsName, metav1.GetOptions{})

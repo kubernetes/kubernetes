@@ -330,14 +330,19 @@ func (cfgCtlr *configController) processNextWorkItem() bool {
 
 // SyncReport describes the outcome of a call to SyncOne
 type SyncReport struct {
+	DigestReport
+
+	// NeedRetry indicates whether to requeue with exponential backoff
+	NeedRetry bool
+}
+
+// DigestReport describes the outcome of a call to SyncOne
+type DigestReport struct {
 	// TriedWrites indicates whether status updates were attempted
 	TriedWrites bool
 
 	// DidWrites indicates whether status updates were successful
 	DidWrites bool
-
-	// NeedRetry indicates whether to requeue with exponential backoff
-	NeedRetry bool
 
 	// Wait, if non-zero, indicates to requeue after this delay
 	Wait time.Duration
@@ -360,7 +365,7 @@ func (cfgCtlr *configController) SyncOne() SyncReport {
 		return SyncReport{NeedRetry: true}
 	}
 	report := SyncReport{}
-	report.TriedWrites, report.DidWrites, report.Wait, err = cfgCtlr.digestConfigObjects(newPLs, newFSs)
+	report.DigestReport, err = cfgCtlr.digestConfigObjects(newPLs, newFSs)
 	if err == nil {
 		return report
 	}
@@ -410,11 +415,10 @@ type fsStatusUpdate struct {
 
 // digestConfigObjects is given all the API objects that configure
 // cfgCtlr and writes its consequent new configState.
-func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.PriorityLevelConfiguration, newFSs []*flowcontrol.FlowSchema) (bool, bool, time.Duration, error) {
+func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.PriorityLevelConfiguration, newFSs []*flowcontrol.FlowSchema) (DigestReport, error) {
 	fsStatusUpdates, wait := cfgCtlr.lockAndDigestConfigObjects(newPLs, newFSs)
 	var triedWrites, didWrites bool
 	var errs []error
-	// fieldManager := "api-priority-and-fairness-config-consumer-v1"
 	for _, fsu := range fsStatusUpdates {
 		enc, err := json.Marshal(fsu.condition)
 		if err != nil {
@@ -423,7 +427,10 @@ func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.Prior
 		}
 		klog.V(4).Infof("%s writing Condition %s to FlowSchema %s, which had ResourceVersion=%s, because its previous value was %s", cfgCtlr.name, string(enc), fsu.flowSchema.Name, fsu.flowSchema.ResourceVersion, fcfmt.Fmt(fsu.oldValue))
 		triedWrites = true
-		fs2, err := cfgCtlr.flowcontrolClient.FlowSchemas().Patch(context.TODO(), fsu.flowSchema.Name, apitypes.StrategicMergePatchType, []byte(fmt.Sprintf(`{"status": {"conditions": [ %s ] } }`, string(enc))), metav1.PatchOptions{FieldManager: cfgCtlr.asFieldManager}, "status")
+		fsIfc := cfgCtlr.flowcontrolClient.FlowSchemas()
+		patchBytes := []byte(fmt.Sprintf(`{"status": {"conditions": [ %s ] } }`, string(enc)))
+		patchOptions := metav1.PatchOptions{FieldManager: cfgCtlr.asFieldManager}
+		fs2, err := fsIfc.Patch(context.Background(), fsu.flowSchema.Name, apitypes.StrategicMergePatchType, patchBytes, patchOptions, "status")
 		switch {
 		case err == nil:
 			cfgCtlr.noteStatusUpdate(fsu.flowSchema, fs2)
@@ -441,10 +448,10 @@ func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.Prior
 			errs = append(errs, errors.Wrap(err, fmt.Sprintf("failed to set a status.condition for FlowSchema %s", fsu.flowSchema.Name)))
 		}
 	}
-	return triedWrites, didWrites, wait, errorutils.NewAggregate(errs)
+	return DigestReport{TriedWrites: triedWrites, DidWrites: didWrites, Wait: wait}, errorutils.NewAggregate(errs)
 }
 
-func (cfgCtlr *configController) noteStatusUpdate(fs, fs2 *fctypesv1a1.FlowSchema) {
+func (cfgCtlr *configController) noteStatusUpdate(fs, fs2 *flowcontrol.FlowSchema) {
 	klog.V(5).Infof("%s at %s: successful update of FlowSchema %s from ResourceVersion %s to %s", cfgCtlr.name, cfgCtlr.clock.Now().Format(timeFmt), fs.Name, fs.ResourceVersion, fs2.ResourceVersion)
 	cfgCtlr.embargoTime = nil
 }
