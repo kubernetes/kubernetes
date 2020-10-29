@@ -546,17 +546,14 @@ func (g *Cloud) ensureInternalHealthCheck(name string, svcName types.NamespacedN
 	return hc, nil
 }
 
-func (g *Cloud) ensureInternalInstanceGroup(name, zone string, nodes []*v1.Node) (string, error) {
+func (g *Cloud) ensureInternalInstanceGroup(name, zone string, nodes []string) (string, error) {
 	klog.V(2).Infof("ensureInternalInstanceGroup(%v, %v): checking group that it contains %v nodes", name, zone, len(nodes))
 	ig, err := g.GetInstanceGroup(name, zone)
 	if err != nil && !isNotFound(err) {
 		return "", err
 	}
 
-	kubeNodes := sets.NewString()
-	for _, n := range nodes {
-		kubeNodes.Insert(n.Name)
-	}
+	kubeNodes := sets.NewString(nodes...)
 
 	// Individual InstanceGroup has a limit for 1000 instances in it.
 	// As a result, it's not possible to add more to it.
@@ -622,8 +619,46 @@ func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]s
 	zonedNodes := splitNodesByZone(nodes)
 	klog.V(2).Infof("ensureInternalInstanceGroups(%v): %d nodes over %d zones in region %v", name, len(nodes), len(zonedNodes), g.region)
 	var igLinks []string
-	for zone, nodes := range zonedNodes {
-		igLink, err := g.ensureInternalInstanceGroup(name, zone, nodes)
+	gceZonedNodes := map[string][]string{}
+	for zone, zNodes := range zonedNodes {
+		hosts, err := g.getFoundInstanceByNames(nodeNames(zNodes))
+		if err != nil {
+			return nil, err
+		}
+		names := sets.NewString()
+		for _, h := range hosts {
+			names.Insert(h.Name)
+		}
+		skip := sets.NewString()
+
+		igs, err := g.candidateExternalInstanceGroups(zone)
+		if err != nil {
+			return nil, err
+		}
+		for _, ig := range igs {
+			if strings.EqualFold(ig.Name, name) {
+				continue
+			}
+			instances, err := g.ListInstancesInInstanceGroup(ig.Name, zone, allInstances)
+			if err != nil {
+				return nil, err
+			}
+			groupInstances := sets.NewString()
+			for _, ins := range instances {
+				parts := strings.Split(ins.Instance, "/")
+				groupInstances.Insert(parts[len(parts)-1])
+			}
+			if names.HasAll(groupInstances.UnsortedList()...) {
+				igLinks = append(igLinks, ig.SelfLink)
+				skip.Insert(groupInstances.UnsortedList()...)
+			}
+		}
+		if remaining := names.Difference(skip).UnsortedList(); len(remaining) > 0 {
+			gceZonedNodes[zone] = remaining
+		}
+	}
+	for zone, gceNodes := range gceZonedNodes {
+		igLink, err := g.ensureInternalInstanceGroup(name, zone, gceNodes)
 		if err != nil {
 			return []string{}, err
 		}
@@ -631,6 +666,13 @@ func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]s
 	}
 
 	return igLinks, nil
+}
+
+func (g *Cloud) candidateExternalInstanceGroups(zone string) ([]*compute.InstanceGroup, error) {
+	if g.externalInstanceGroupsPrefix == "" {
+		return nil, nil
+	}
+	return g.ListInstanceGroupsWithPrefix(zone, g.externalInstanceGroupsPrefix)
 }
 
 func (g *Cloud) ensureInternalInstanceGroupsDeleted(name string) error {
