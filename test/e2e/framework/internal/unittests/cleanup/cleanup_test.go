@@ -105,7 +105,6 @@ INFO: before
 [BeforeEach] e2e
   set up framework | framework.go:xxx
 STEP: Creating a kubernetes client
-INFO: >>> kubeConfig: yyy/kube.config
 STEP: Building a namespace api object, basename test-namespace
 INFO: Skipping waiting for service account
 [BeforeEach] e2e
