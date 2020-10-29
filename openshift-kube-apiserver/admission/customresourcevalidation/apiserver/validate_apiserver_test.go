@@ -3,12 +3,11 @@ package apiserver
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/validation/field"
-
 	configv1 "github.com/openshift/api/config/v1"
 	configclientfake "github.com/openshift/client-go/config/clientset/versioned/fake"
 	configv1client "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func TestValidateSNINames(t *testing.T) {
@@ -113,5 +112,134 @@ func TestValidateSNINames(t *testing.T) {
 			test.validateErrors(t, instance.validateSNINames(test.apiserver))
 		})
 
+	}
+}
+
+func Test_validateTLSSecurityProfile(t *testing.T) {
+	rootFieldPath := field.NewPath("testSpec")
+
+	tests := []struct {
+		name    string
+		profile *configv1.TLSSecurityProfile
+		want    field.ErrorList
+	}{
+		{
+			name:    "nil profile",
+			profile: nil,
+			want:    field.ErrorList{},
+		},
+		{
+			name:    "empty profile",
+			profile: &configv1.TLSSecurityProfile{},
+			want:    field.ErrorList{},
+		},
+		{
+			name: "type does not match set field",
+			profile: &configv1.TLSSecurityProfile{
+				Type:   configv1.TLSProfileIntermediateType,
+				Modern: &configv1.ModernTLSProfile{},
+			},
+			want: field.ErrorList{
+				field.Required(rootFieldPath.Child("intermediate"), "type set to Intermediate, but the corresponding field is unset"),
+			},
+		},
+		{
+			name: "modern type - currently unsupported",
+			profile: &configv1.TLSSecurityProfile{
+				Type:   configv1.TLSProfileModernType,
+				Modern: &configv1.ModernTLSProfile{},
+			},
+			want: field.ErrorList{
+				field.NotSupported(rootFieldPath.Child("type"), configv1.TLSProfileModernType,
+					[]string{
+						string(configv1.TLSProfileOldType),
+						string(configv1.TLSProfileIntermediateType),
+						string(configv1.TLSProfileCustomType),
+					}),
+			},
+		},
+		{
+			name: "unknown type",
+			profile: &configv1.TLSSecurityProfile{
+				Type: "something",
+			},
+			want: field.ErrorList{
+				field.Invalid(rootFieldPath.Child("type"), "something", "unknown type, valid values are: [Old Intermediate Custom]"),
+			},
+		},
+		{
+			name: "unknown cipher",
+			profile: &configv1.TLSSecurityProfile{
+				Type: "Custom",
+				Custom: &configv1.CustomTLSProfile{
+					TLSProfileSpec: configv1.TLSProfileSpec{
+						Ciphers: []string{
+							"UNKNOWN_CIPHER",
+						},
+					},
+				},
+			},
+			want: field.ErrorList{
+				field.Invalid(rootFieldPath.Child("custom", "ciphers"), []string{"UNKNOWN_CIPHER"}, "no supported cipher suite found"),
+			},
+		},
+		{
+			name: "unknown cipher but a normal cipher",
+			profile: &configv1.TLSSecurityProfile{
+				Type: "Custom",
+				Custom: &configv1.CustomTLSProfile{
+					TLSProfileSpec: configv1.TLSProfileSpec{
+						Ciphers: []string{
+							"UNKNOWN_CIPHER", "ECDHE-ECDSA-CHACHA20-POLY1305",
+						},
+					},
+				},
+			},
+			want: field.ErrorList{},
+		},
+		{
+			name: "no ciphers in custom profile",
+			profile: &configv1.TLSSecurityProfile{
+				Type: "Custom",
+				Custom: &configv1.CustomTLSProfile{
+					TLSProfileSpec: configv1.TLSProfileSpec{},
+				},
+			},
+			want: field.ErrorList{
+				field.Invalid(rootFieldPath.Child("custom", "ciphers"), []string(nil), "no supported cipher suite found"),
+			},
+		},
+		{
+			name: "min tls 1.3 - currently unsupported",
+			profile: &configv1.TLSSecurityProfile{
+				Type: "Custom",
+				Custom: &configv1.CustomTLSProfile{
+					TLSProfileSpec: configv1.TLSProfileSpec{
+						Ciphers:       []string{"ECDHE-ECDSA-CHACHA20-POLY1305"},
+						MinTLSVersion: configv1.VersionTLS13,
+					},
+				},
+			},
+			want: field.ErrorList{
+				field.NotSupported(rootFieldPath.Child("custom", "minTLSVersion"), configv1.VersionTLS13, []string{string(configv1.VersionTLS10), string(configv1.VersionTLS11), string(configv1.VersionTLS12)}),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := validateTLSSecurityProfile(rootFieldPath, tt.profile)
+
+			if len(tt.want) != len(got) {
+				t.Errorf("expected %d errors, got %d: %v", len(tt.want), len(got), got)
+				return
+			}
+
+			for i, err := range got {
+				if err.Error() != tt.want[i].Error() {
+					t.Errorf("expected %v, got %v", tt.want, got)
+					break
+				}
+			}
+		})
 	}
 }
