@@ -113,10 +113,19 @@ controller, and serviceaccounts controller.`,
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
-			cliflag.PrintFlags(cmd.Flags())
+
+			if err := ShimFlagsForOpenShift(s, cmd); err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
 
 			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault.List())
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
+
+			if err := ShimForOpenShift(s, c); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -245,6 +254,10 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		}
 		saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
 
+		if err := createPVRecyclerSA(c.OpenShiftContext.OpenShiftConfig, rootClientBuilder); err != nil {
+			klog.Fatalf("error creating recycler serviceaccount: %v", err)
+		}
+
 		if err := StartControllers(controllerContext, saTokenControllerInitFunc, NewControllerInitializers(controllerContext.LoopMode), unsecuredMux); err != nil {
 			klog.Fatalf("error starting controllers: %v", err)
 		}
@@ -301,6 +314,8 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 
 // ControllerContext defines the context object for controller
 type ControllerContext struct {
+	OpenShiftContext config.OpenShiftContext
+
 	// ClientBuilder will provide a client for this controller to use
 	ClientBuilder controller.ControllerClientBuilder
 
@@ -463,7 +478,12 @@ func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 // the shared-informers client and token controller.
 func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}) (ControllerContext, error) {
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
-	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
+	var sharedInformers informers.SharedInformerFactory
+	if InformerFactoryOverride == nil {
+		sharedInformers = informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
+	} else {
+		sharedInformers = InformerFactoryOverride
+	}
 
 	metadataClient := metadata.NewForConfigOrDie(rootClientBuilder.ConfigOrDie("metadata-informers"))
 	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, ResyncPeriod(s)())
@@ -494,6 +514,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 	}
 
 	ctx := ControllerContext{
+		OpenShiftContext:                s.OpenShiftContext,
 		ClientBuilder:                   clientBuilder,
 		InformerFactory:                 sharedInformers,
 		ObjectOrMetadataInformerFactory: controller.NewInformerFactory(sharedInformers, metadataInformers),
@@ -591,10 +612,10 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 		ctx.InformerFactory.Core().V1().ServiceAccounts(),
 		ctx.InformerFactory.Core().V1().Secrets(),
 		c.rootClientBuilder.ClientOrDie("tokens-controller"),
-		serviceaccountcontroller.TokensControllerOptions{
+		applyOpenShiftServiceServingCertCA(serviceaccountcontroller.TokensControllerOptions{
 			TokenGenerator: tokenGenerator,
 			RootCA:         rootCA,
-		},
+		}),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating Tokens controller: %v", err)
