@@ -195,6 +195,10 @@ func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.Grou
 	apiServiceName := groupVersion.Version + "." + groupVersion.Group
 
 	if apiserver.APIServiceAlreadyExists(groupVersion) {
+		// Removing APIService from sync means the CRD registration controller won't sync this APIService
+		// anymore. If the APIService is managed externally, this will mean the external component can
+		// update this APIService without CRD controller stomping the changes on it.
+		c.apiServiceRegistration.RemoveAPIServiceToSync(apiServiceName)
 		return nil
 	}
 
