@@ -152,6 +152,9 @@ func ValidateKubeletFlags(f *KubeletFlags) error {
 	invalidLabelErrs := make(map[string][]string)
 	for k, v := range f.NodeLabels {
 		if isKubernetesLabel(k) && !kubeletapis.IsKubeletLabel(k) {
+			if kubeletapis.IsForbiddenOpenshiftLabel(k) {
+				continue
+			}
 			unknownLabels.Insert(k)
 		}
 
