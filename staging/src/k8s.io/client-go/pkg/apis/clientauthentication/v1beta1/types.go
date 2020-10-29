@@ -96,7 +96,8 @@ type Cluster struct {
 	// Config holds additional config data that is specific to the exec
 	// plugin with regards to the cluster being authenticated to.
 	//
-	// This data is sourced from the clientcmd Cluster object's extensions[exec] field:
+	// This data is sourced from the clientcmd Cluster object's
+	// extensions[client.authentication.k8s.io/exec] field:
 	//
 	// clusters:
 	// - name: my-cluster
