@@ -378,9 +378,6 @@ func InitISCSIDriver() testsuites.TestDriver {
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
-				"ext2",
-				// TODO: fix iSCSI driver can work with ext3
-				//"ext3",
 				"ext4",
 			),
 			TopologyKeys: []string{v1.LabelHostname},
@@ -560,9 +557,6 @@ func InitRbdDriver() testsuites.TestDriver {
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
-				"ext2",
-				// TODO: fix rbd driver can work with ext3
-				//"ext3",
 				"ext4",
 			),
 			Capabilities: map[testsuites.Capability]bool{
@@ -1076,7 +1070,6 @@ func InitCinderDriver() testsuites.TestDriver {
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
-				"ext3",
 			),
 			TopologyKeys: []string{v1.LabelZoneFailureDomain},
 			Capabilities: map[testsuites.Capability]bool{
@@ -1515,7 +1508,6 @@ func InitAzureDiskDriver() testsuites.TestDriver {
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
-				"ext3",
 				"ext4",
 				"xfs",
 			),
@@ -1656,8 +1648,6 @@ func InitAwsDriver() testsuites.TestDriver {
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
-				"ext2",
-				"ext3",
 				"ext4",
 				"xfs",
 				"ntfs",
@@ -1813,8 +1803,6 @@ var (
 	localVolumeSupportedFsTypes        = map[utils.LocalVolumeType]sets.String{
 		utils.LocalVolumeBlock: sets.NewString(
 			"", // Default fsType
-			"ext2",
-			"ext3",
 			"ext4",
 			//"xfs", disabled see issue https://github.com/kubernetes/kubernetes/issues/74095
 		),
