@@ -18,6 +18,7 @@ package dualstack
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"reflect"
@@ -25,9 +26,13 @@ import (
 	"testing"
 	"time"
 
+	jsonpatch "github.com/evanphx/json-patch"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -1303,6 +1308,129 @@ func TestPreferDualStack(t *testing.T) {
 	if err := validateServiceAndClusterIPFamily(upgraded, []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}); err != nil {
 		t.Fatalf("Unexpected error validating the service(after upgrade) %s %v", svc.Name, err)
 	}
+}
+
+type labelsForMergePatch struct {
+	Labels map[string]string `json:"lables,omitempty"`
+}
+
+// tests an update service while dualstack flag is off
+func TestServiceUpdate(t *testing.T) {
+	// Create an IPv4 single stack control-plane
+	serviceCIDR := "10.0.0.0/16"
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, false)()
+
+	cfg := framework.NewIntegrationTestMasterConfig()
+	_, cidr, err := net.ParseCIDR(serviceCIDR)
+	if err != nil {
+		t.Fatalf("bad cidr: %v", err)
+	}
+	cfg.ExtraConfig.ServiceIPRange = *cidr
+	_, s, closeFn := framework.RunAMaster(cfg)
+	defer closeFn()
+
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+
+	// Wait until the default "kubernetes" service is created.
+	if err = wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
+		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return false, err
+		}
+		return !apierrors.IsNotFound(err), nil
+	}); err != nil {
+		t.Fatalf("creating kubernetes service timed out")
+	}
+
+	serviceName := "test-service"
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: serviceName,
+		},
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{
+				{
+					Port:       443,
+					TargetPort: intstr.FromInt(443),
+				},
+			},
+		},
+	}
+
+	// create the service
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc, metav1.CreateOptions{})
+	// if no error was expected validate the service otherwise return
+	if err != nil {
+		t.Errorf("unexpected error creating service:%v", err)
+		return
+	}
+
+	svc, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Unexpected error to get the service %s %v", svc.Name, err)
+	}
+
+	// update using put
+	svc.Labels = map[string]string{"x": "y"}
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Update(context.TODO(), svc, metav1.UpdateOptions{})
+	if err != nil {
+		t.Errorf("Unexpected error updating the service %s %v", svc.Name, err)
+	}
+
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error to get the service %s %v", svc.Name, err)
+	}
+
+	// update using StrategicMergePatchType
+	labels := labelsForMergePatch{
+		Labels: map[string]string{"foo": "bar"},
+	}
+
+	patchBytes, err := json.Marshal(&labels)
+	if err != nil {
+		t.Fatalf("failed to json.Marshal labels: %v", err)
+	}
+
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Patch(context.TODO(), svc.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error patching service using strategic merge patch. %v", err)
+	}
+
+	current, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error to get the service %s %v", svc.Name, err)
+	}
+
+	// update using json patch
+	toUpdate := current.DeepCopy()
+	currentJSON, err := json.Marshal(current)
+	if err != nil {
+		t.Fatalf("unexpected error marshal current service. %v", err)
+	}
+	toUpdate.Labels = map[string]string{"alpha": "bravo"}
+	toUpdateJSON, err := json.Marshal(toUpdate)
+	if err != nil {
+		t.Fatalf("unexpected error marshal toupdate service. %v", err)
+	}
+
+	patchBytes, err = jsonpatch.CreateMergePatch(currentJSON, toUpdateJSON)
+	if err != nil {
+		t.Fatalf("unexpected error creating json patch. %v", err)
+	}
+
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Patch(context.TODO(), svc.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error patching service using merge patch. %v", err)
+	}
+
+	// validate the service was created correctly if it was not expected to fail
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error to get the service %s %v", svc.Name, err)
+	}
+
 }
 
 // validateServiceAndClusterIPFamily checks that the service has the expected IPFamilies
