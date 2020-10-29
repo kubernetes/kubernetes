@@ -61,22 +61,22 @@ echo "dummy_token,admin,admin" > "${TMP_DIR}/tokenauth.csv"
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
 "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
-  --insecure-bind-address="${API_HOST}" \
   --bind-address="${API_HOST}" \
-  --insecure-port="${API_PORT}" \
+  --secure-port="${API_PORT}" \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
   --runtime-config="api/all=true" \
   --token-auth-file="${TMP_DIR}/tokenauth.csv" \
-  --service-account-issuer="https://kubernetes.devault.svc/" \
+  --authorization-mode=RBAC \
+  --service-account-issuer="https://kubernetes.default.svc/" \
   --service-account-signing-key-file="${KUBE_ROOT}/staging/src/k8s.io/client-go/util/cert/testdata/dontUseThisKey.pem" \
   --logtostderr \
   --v=2 \
   --service-cluster-ip-range="10.0.0.0/24" >"${API_LOGFILE}" 2>&1 &
 APISERVER_PID=$!
 
-if ! kube::util::wait_for_url "${API_HOST}:${API_PORT}/healthz" "apiserver: "; then
+if ! kube::util::wait_for_url "https://${API_HOST}:${API_PORT}/healthz" "apiserver: "; then
   kube::log::error "Here are the last 10 lines from kube-apiserver (${API_LOGFILE})"
   kube::log::error "=== BEGIN OF LOG ==="
   tail -10 "${API_LOGFILE}" >&2 || :
@@ -86,7 +86,7 @@ fi
 
 kube::log::status "Updating " "${OPENAPI_ROOT_DIR}"
 
-curl -w "\n" -fs "${API_HOST}:${API_PORT}/openapi/v2" | jq -S '.info.version="unversioned"' > "${OPENAPI_ROOT_DIR}/swagger.json"
+curl -w "\n" -kfs --oauth2-bearer dummy_token "https://${API_HOST}:${API_PORT}/openapi/v2" | jq -S '.info.version="unversioned"' > "${OPENAPI_ROOT_DIR}/swagger.json"
 
 kube::log::status "SUCCESS"
 
