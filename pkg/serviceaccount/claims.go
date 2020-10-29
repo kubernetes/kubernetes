@@ -49,7 +49,7 @@ type kubernetes struct {
 	Namespace string          `json:"namespace,omitempty"`
 	Svcacct   ref             `json:"serviceaccount,omitempty"`
 	Pod       *ref            `json:"pod,omitempty"`
-	Secret    *ref            `json:"secret,omitempty"`
+	Secret    *ref            `json:"secret,omitempty" datapolicy:"token"`
 	WarnAfter jwt.NumericDate `json:"warnafter,omitempty"`
 }
 
