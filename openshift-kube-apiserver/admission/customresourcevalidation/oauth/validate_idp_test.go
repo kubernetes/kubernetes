@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -143,9 +145,12 @@ func TestValidateOAuthSpec(t *testing.T) {
 			args: args{
 				spec: configv1.OAuthSpec{
 					TokenConfig: configv1.TokenConfig{
-						AccessTokenInactivityTimeoutSeconds: -50,
+						AccessTokenInactivityTimeout: &metav1.Duration{Duration: -50 * time.Second},
 					},
 				},
+			},
+			want: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "tokenConfig", "accessTokenInactivityTimeout"), metav1.Duration{Duration: -50 * time.Second}, fmt.Sprintf("the minimum acceptable token timeout value is %d seconds", MinimumInactivityTimeoutSeconds)),
 			},
 		},
 		{
@@ -153,7 +158,7 @@ func TestValidateOAuthSpec(t *testing.T) {
 			args: args{
 				spec: configv1.OAuthSpec{
 					TokenConfig: configv1.TokenConfig{
-						AccessTokenInactivityTimeoutSeconds: 32578,
+						AccessTokenInactivityTimeout: &metav1.Duration{Duration: 32578 * time.Second},
 					},
 				},
 			},
@@ -163,9 +168,12 @@ func TestValidateOAuthSpec(t *testing.T) {
 			args: args{
 				spec: configv1.OAuthSpec{
 					TokenConfig: configv1.TokenConfig{
-						AccessTokenInactivityTimeoutSeconds: 0,
+						AccessTokenInactivityTimeout: &metav1.Duration{Duration: 0},
 					},
 				},
+			},
+			want: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "tokenConfig", "accessTokenInactivityTimeout"), metav1.Duration{Duration: 0 * time.Second}, fmt.Sprintf("the minimum acceptable token timeout value is %d seconds", MinimumInactivityTimeoutSeconds)),
 			},
 		},
 		{
@@ -173,12 +181,12 @@ func TestValidateOAuthSpec(t *testing.T) {
 			args: args{
 				spec: configv1.OAuthSpec{
 					TokenConfig: configv1.TokenConfig{
-						AccessTokenInactivityTimeoutSeconds: 250,
+						AccessTokenInactivityTimeout: &metav1.Duration{Duration: 250 * time.Second},
 					},
 				},
 			},
 			want: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "tokenConfig", "accessTokenInactivityTimeoutSeconds"), 250, fmt.Sprintf("the minimum acceptable token timeout value is %d seconds", MinimumInactivityTimeoutSeconds)),
+				field.Invalid(field.NewPath("spec", "tokenConfig", "accessTokenInactivityTimeout"), metav1.Duration{Duration: 250 * time.Second}, fmt.Sprintf("the minimum acceptable token timeout value is %d seconds", MinimumInactivityTimeoutSeconds)),
 			},
 		},
 		{
@@ -246,8 +254,8 @@ func TestValidateOAuthSpec(t *testing.T) {
 						},
 					},
 					TokenConfig: configv1.TokenConfig{
-						AccessTokenInactivityTimeoutSeconds: -1,
-						AccessTokenMaxAgeSeconds:            216000,
+						AccessTokenInactivityTimeout: &metav1.Duration{Duration: 300 * time.Second},
+						AccessTokenMaxAgeSeconds:     216000,
 					},
 					Templates: configv1.OAuthTemplates{
 						Login:             configv1.SecretNameReference{Name: "my-login-template"},
