@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"runtime"
 	"runtime/pprof"
 
@@ -44,21 +45,32 @@ func initProfiling() error {
 		if err != nil {
 			return err
 		}
-		return pprof.StartCPUProfile(f)
+		err = pprof.StartCPUProfile(f)
+		if err != nil {
+			return err
+		}
 	// Block and mutex profiles need a call to Set{Block,Mutex}ProfileRate to
 	// output anything. We choose to sample all events.
 	case "block":
 		runtime.SetBlockProfileRate(1)
-		return nil
 	case "mutex":
 		runtime.SetMutexProfileFraction(1)
-		return nil
 	default:
 		// Check the profile name is valid.
 		if profile := pprof.Lookup(profileName); profile == nil {
 			return fmt.Errorf("unknown profile '%s'", profileName)
 		}
 	}
+
+	// If the command is interrupted before the end (ctrl-c), flush the
+	// profiling files
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		<-c
+		flushProfiling()
+		os.Exit(0)
+	}()
 
 	return nil
 }
