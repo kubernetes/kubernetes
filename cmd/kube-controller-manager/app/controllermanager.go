@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -138,7 +139,8 @@ controller, and serviceaccounts controller.`,
 				os.Exit(1)
 			}
 
-			if err := Run(c.Complete(), wait.NeverStop); err != nil {
+			stopCh := server.SetupSignalHandler()
+			if err := Run(c.Complete(), stopCh); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -285,10 +287,18 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 				run(ctx, startSATokenController, initializersFunc)
 			},
 			OnStoppedLeading: func() {
-				klog.ErrorS(nil, "leaderelection lost")
-				klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+				select {
+				case <-stopCh:
+					// We were asked to terminate. Exit 0.
+					klog.Info("Requested to terminate. Exiting.")
+					os.Exit(0)
+				default:
+					// We lost the lock.
+					klog.ErrorS(nil, "leaderelection lost")
+					klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+				}
 			},
-		})
+		}, stopCh)
 
 	// If Leader Migration is enabled, proceed to attempt the migration lock.
 	if leaderMigrator != nil {
@@ -309,10 +319,18 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 					run(ctx, nil, createInitializersFunc(leaderMigrator.FilterFunc, leadermigration.ControllerMigrated))
 				},
 				OnStoppedLeading: func() {
-					klog.ErrorS(nil, "migration leaderelection lost")
-					klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+					select {
+					case <-stopCh:
+						// We were asked to terminate. Exit 0.
+						klog.Info("Requested to terminate. Exiting.")
+						os.Exit(0)
+					default:
+						// We lost the lock.
+						klog.ErrorS(nil, "migration leaderelection lost")
+						klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+					}
 				},
-			})
+			}, stopCh)
 	}
 
 	select {}
@@ -701,7 +719,7 @@ func createClientBuilders(c *config.CompletedConfig) (clientBuilder clientbuilde
 
 // leaderElectAndRun runs the leader election, and runs the callbacks once the leader lease is acquired.
 // TODO: extract this function into staging/controller-manager
-func leaderElectAndRun(c *config.CompletedConfig, lockIdentity string, electionChecker *leaderelection.HealthzAdaptor, resourceLock string, leaseName string, callbacks leaderelection.LeaderCallbacks) {
+func leaderElectAndRun(c *config.CompletedConfig, lockIdentity string, electionChecker *leaderelection.HealthzAdaptor, resourceLock string, leaseName string, callbacks leaderelection.LeaderCallbacks, stopCh <-chan struct{}) {
 	rl, err := resourcelock.NewFromKubeconfig(resourceLock,
 		c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
 		leaseName,
@@ -715,7 +733,13 @@ func leaderElectAndRun(c *config.CompletedConfig, lockIdentity string, electionC
 		klog.Fatalf("error creating lock: %v", err)
 	}
 
-	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
+	leCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		<-stopCh
+		cancel()
+	}()
+	leaderelection.RunOrDie(leCtx, leaderelection.LeaderElectionConfig{
 		Lock:          rl,
 		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
