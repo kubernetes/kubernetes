@@ -152,6 +152,9 @@ type APIAggregator struct {
 	// is the versions for the group.
 	handledGroupVersions map[string]sets.Set[string]
 
+	// handledAlwaysLocalDelegatePaths are the URL paths that already have routes registered
+	handledAlwaysLocalDelegatePaths sets.String
+
 	// lister is used to add group handling for /apis/<group> aggregator lookups based on
 	// controller state
 	lister listers.APIServiceLister
@@ -236,18 +239,19 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	}
 
 	s := &APIAggregator{
-		GenericAPIServer:           genericServer,
-		delegateHandler:            delegationTarget.UnprotectedHandler(),
-		proxyTransportDial:         proxyTransportDial,
-		proxyHandlers:              map[string]*proxyHandler{},
-		handledGroupVersions:       map[string]sets.Set[string]{},
-		lister:                     informerFactory.Apiregistration().V1().APIServices().Lister(),
-		APIRegistrationInformers:   informerFactory,
-		serviceResolver:            c.ExtraConfig.ServiceResolver,
-		openAPIConfig:              c.GenericConfig.OpenAPIConfig,
-		openAPIV3Config:            c.GenericConfig.OpenAPIV3Config,
-		proxyCurrentCertKeyContent: func() (bytes []byte, bytes2 []byte) { return nil, nil },
-		rejectForwardingRedirects:  c.ExtraConfig.RejectForwardingRedirects,
+		GenericAPIServer:                genericServer,
+		delegateHandler:                 delegationTarget.UnprotectedHandler(),
+		proxyTransportDial:              proxyTransportDial,
+		proxyHandlers:                   map[string]*proxyHandler{},
+		handledGroupVersions:            map[string]sets.Set[string]{},
+		handledAlwaysLocalDelegatePaths: sets.String{},
+		lister:                          informerFactory.Apiregistration().V1().APIServices().Lister(),
+		APIRegistrationInformers:        informerFactory,
+		serviceResolver:                 c.ExtraConfig.ServiceResolver,
+		openAPIConfig:                   c.GenericConfig.OpenAPIConfig,
+		openAPIV3Config:                 c.GenericConfig.OpenAPIV3Config,
+		proxyCurrentCertKeyContent:      func() (bytes []byte, bytes2 []byte) { return nil, nil },
+		rejectForwardingRedirects:       c.ExtraConfig.RejectForwardingRedirects,
 	}
 
 	// used later  to filter the served resource by those that have expired.
@@ -587,6 +591,18 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	if exist {
 		versions.Insert(apiService.Spec.Version)
 		return nil
+	}
+
+	// For some resources we always want to delegate to local API server.
+	// These resources have to exists as CRD to be served locally.
+	for _, alwaysLocalDelegatePath := range alwaysLocalDelegatePathPrefixes.List() {
+		if s.handledAlwaysLocalDelegatePaths.Has(alwaysLocalDelegatePath) {
+			continue
+		}
+		s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(alwaysLocalDelegatePath, proxyHandler.localDelegate)
+		// Always use local delegate for this prefix
+		s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandlePrefix(alwaysLocalDelegatePath+"/", proxyHandler.localDelegate)
+		s.handledAlwaysLocalDelegatePaths.Insert(alwaysLocalDelegatePath)
 	}
 
 	// it's time to register the group aggregation endpoint
