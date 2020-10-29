@@ -40,9 +40,9 @@ type createAuthInfoOptions struct {
 	name              string
 	clientCertificate cliflag.StringFlag
 	clientKey         cliflag.StringFlag
-	token             cliflag.StringFlag
+	token             cliflag.StringFlag `datapolicy:"token"`
 	username          cliflag.StringFlag
-	password          cliflag.StringFlag
+	password          cliflag.StringFlag `datapolicy:"password"`
 	embedCertData     cliflag.Tristate
 	authProvider      cliflag.StringFlag
 
