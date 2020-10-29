@@ -411,7 +411,7 @@ func CheckTestingNSDeletedExcept(ctx context.Context, c clientset.Interface, ski
 
 // restclientConfig returns a config holds the information needed to build connection to kubernetes clusters.
 func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
-	Logf(">>> kubeConfig: %s", TestContext.KubeConfig)
+	//Logf(">>> kubeConfig: %s", TestContext.KubeConfig)
 	if TestContext.KubeConfig == "" {
 		return nil, fmt.Errorf("KubeConfig must be specified to load client config")
 	}
@@ -420,7 +420,7 @@ func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 		return nil, fmt.Errorf("error loading KubeConfig: %v", err.Error())
 	}
 	if kubeContext != "" {
-		Logf(">>> kubeContext: %s", kubeContext)
+		//Logf(">>> kubeContext: %s", kubeContext)
 		c.CurrentContext = kubeContext
 	}
 	return c, nil
