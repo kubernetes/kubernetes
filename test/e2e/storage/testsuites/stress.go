@@ -81,10 +81,11 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 	var (
 		dInfo = driver.GetDriverInfo()
 		cs    clientset.Interface
+		l     *stressTest
 	)
 
+	// Check preconditions before setting up namespace via framework below.
 	ginkgo.BeforeEach(func() {
-		// Check preconditions.
 		if dInfo.StressTestOptions == nil {
 			e2eskipper.Skipf("Driver %s doesn't specify stress test options -- skipping", dInfo.Name)
 		}
@@ -104,9 +105,9 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("stress")
 
-	init := func() *stressTest {
+	init := func() {
 		cs = f.ClientSet
-		l := &stressTest{}
+		l = &stressTest{}
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
@@ -115,11 +116,26 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 		l.pods = []*v1.Pod{}
 		l.testOptions = *dInfo.StressTestOptions
 		l.ctx, l.cancel = context.WithCancel(context.Background())
-
-		return l
 	}
 
-	cleanup := func(l *stressTest) {
+	createPodsAndVolumes := func() {
+		for i := 0; i < l.testOptions.NumPods; i++ {
+			framework.Logf("Creating resources for pod %v/%v", i, l.testOptions.NumPods-1)
+			r := CreateVolumeResource(driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange)
+			l.resources = append(l.resources, r)
+			podConfig := e2epod.Config{
+				NS:           f.Namespace.Name,
+				PVCs:         []*v1.PersistentVolumeClaim{r.Pvc},
+				SeLinuxLabel: e2epv.SELinuxLabel,
+			}
+			pod, err := e2epod.MakeSecPod(&podConfig)
+			framework.ExpectNoError(err)
+
+			l.pods = append(l.pods, pod)
+		}
+	}
+
+	cleanup := func() {
 		var errs []error
 
 		framework.Logf("Stopping and waiting for all test routines to finish")
@@ -141,27 +157,16 @@ func (t *stressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.Te
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
+	ginkgo.BeforeEach(func() {
+		init()
+		createPodsAndVolumes()
+	})
+
+	f.AddAfterEach("cleanup", func(f *framework.Framework, failed bool) {
+		cleanup()
+	})
+
 	ginkgo.It("multiple pods should access different volumes repeatedly [Slow] [Serial]", func() {
-		l := init()
-		defer func() {
-			cleanup(l)
-		}()
-
-		for i := 0; i < l.testOptions.NumPods; i++ {
-			framework.Logf("Creating resources for pod %v/%v", i, l.testOptions.NumPods-1)
-			r := CreateVolumeResource(driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange)
-			l.resources = append(l.resources, r)
-			podConfig := e2epod.Config{
-				NS:           f.Namespace.Name,
-				PVCs:         []*v1.PersistentVolumeClaim{r.Pvc},
-				SeLinuxLabel: e2epv.SELinuxLabel,
-			}
-			pod, err := e2epod.MakeSecPod(&podConfig)
-			framework.ExpectNoError(err)
-
-			l.pods = append(l.pods, pod)
-		}
-
 		// Restart pod repeatedly
 		for i := 0; i < l.testOptions.NumPods; i++ {
 			podIndex := i
