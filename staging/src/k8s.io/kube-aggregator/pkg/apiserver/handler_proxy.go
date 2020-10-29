@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
@@ -122,6 +123,14 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		r.localDelegate.ServeHTTP(w, req)
 		return
+	}
+
+	// some groupResources should always be delegated
+	if requestInfo, ok := genericapirequest.RequestInfoFrom(req.Context()); ok {
+		if alwaysLocalDelegateGroupResource[schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}] {
+			r.localDelegate.ServeHTTP(w, req)
+			return
+		}
 	}
 
 	if !handlingInfo.serviceAvailable {
