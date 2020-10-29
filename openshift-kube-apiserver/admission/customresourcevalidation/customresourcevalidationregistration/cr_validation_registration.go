@@ -10,6 +10,7 @@ import (
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/console"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/features"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/image"
+	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/network"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/oauth"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/project"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/rolebindingrestriction"
@@ -31,6 +32,7 @@ var AllCustomResourceValidators = []string{
 	clusterresourcequota.PluginName,
 	securitycontextconstraints.PluginName,
 	rolebindingrestriction.PluginName,
+	network.PluginName,
 
 	// this one is special because we don't work without it.
 	securitycontextconstraints.DefaultingPluginName,
@@ -54,7 +56,8 @@ func RegisterCustomResourceValidation(plugins *admission.Plugins) {
 	securitycontextconstraints.Register(plugins)
 	// This plugin validates the authorization.openshift.io/v1 RoleBindingRestriction resources.
 	rolebindingrestriction.Register(plugins)
-
+	// This plugin validates the network.config.openshift.io object for service node port range changes
+	network.Register(plugins)
 	// this one is special because we don't work without it.
 	securitycontextconstraints.RegisterDefaulting(plugins)
 }
