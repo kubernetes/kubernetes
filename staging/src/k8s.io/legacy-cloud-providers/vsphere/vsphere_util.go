@@ -569,6 +569,7 @@ func (vs *VSphere) checkDiskAttached(ctx context.Context, nodes []k8stypes.NodeN
 					return nodesToRetry, err
 				}
 				klog.V(4).Infof("Verifying Volume Paths by devices for node %s and VM %s", nodeName, nodeInfo.vm)
+				vs.vsphereVolumeMap.Add(nodeName, devices)
 				vclib.VerifyVolumePathsForVMDevices(devices, nodeVolumes[nodeName], convertToString(nodeName), attached)
 			}
 		}
@@ -599,7 +600,10 @@ func (vs *VSphere) checkDiskAttached(ctx context.Context, nodes []k8stypes.NodeN
 		}
 		nodeUUID = strings.ToLower(nodeUUID)
 		klog.V(9).Infof("Verifying volume for node %s with nodeuuid %q: %v", nodeName, nodeUUID, vmMoMap)
-		vclib.VerifyVolumePathsForVM(vmMoMap[nodeUUID], nodeVolumes[nodeName], convertToString(nodeName), attached)
+		vmMo := vmMoMap[nodeUUID]
+		vmDevices := object.VirtualDeviceList(vmMo.Config.Hardware.Device)
+		vs.vsphereVolumeMap.Add(nodeName, vmDevices)
+		vclib.VerifyVolumePathsForVMDevices(vmDevices, nodeVolumes[nodeName], convertToString(nodeName), attached)
 	}
 	return nodesToRetry, nil
 }
