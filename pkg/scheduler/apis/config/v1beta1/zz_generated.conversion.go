@@ -290,6 +290,9 @@ func Convert_config_InterPodAffinityArgs_To_v1beta1_InterPodAffinityArgs(in *con
 }
 
 func autoConvert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in *v1beta1.KubeSchedulerConfiguration, out *config.KubeSchedulerConfiguration, s conversion.Scope) error {
+	if err := metav1.Convert_Pointer_int32_To_int32(&in.Parallelism, &out.Parallelism, s); err != nil {
+		return err
+	}
 	if err := v1alpha1.Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
@@ -330,6 +333,9 @@ func autoConvert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfi
 }
 
 func autoConvert_config_KubeSchedulerConfiguration_To_v1beta1_KubeSchedulerConfiguration(in *config.KubeSchedulerConfiguration, out *v1beta1.KubeSchedulerConfiguration, s conversion.Scope) error {
+	if err := metav1.Convert_int32_To_Pointer_int32(&in.Parallelism, &out.Parallelism, s); err != nil {
+		return err
+	}
 	// WARNING: in.AlgorithmSource requires manual conversion: does not exist in peer-type
 	if err := v1alpha1.Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
