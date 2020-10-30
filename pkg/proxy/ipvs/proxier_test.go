@@ -4404,7 +4404,7 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 			t.Errorf("Failed to get ipvs services, err: %v", err)
 		}
 		if len(services) != testCase.expectedServices {
-			t.Errorf("Expect %d ipvs services, got %d", testCase.expectedServices, len(services))
+			t.Errorf("Expected %d ipvs services, got %d", testCase.expectedServices, len(services))
 		}
 	}
 }

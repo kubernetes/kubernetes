@@ -208,7 +208,7 @@ func topologyKeysInUse(svc *api.Service) bool {
 	return len(svc.Spec.TopologyKeys) > 0
 }
 
-// returns true is svc.Status.LoadBalancer.Ingress[].IPMode fields are in use
+// returns true when the LoadBalancer Ingress IPMode fields are in use.
 func loadbalancerIPModeInUse(svc *api.Service) bool {
 	if svc == nil {
 		return false
