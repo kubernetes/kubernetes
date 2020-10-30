@@ -5290,14 +5290,14 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 		*out = new(SessionAffinityConfig)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.IPFamilies != nil {
-		in, out := &in.IPFamilies, &out.IPFamilies
-		*out = make([]IPFamily, len(*in))
-		copy(*out, *in)
-	}
 	if in.TopologyKeys != nil {
 		in, out := &in.TopologyKeys, &out.TopologyKeys
 		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.IPFamilies != nil {
+		in, out := &in.IPFamilies, &out.IPFamilies
+		*out = make([]IPFamily, len(*in))
 		copy(*out, *in)
 	}
 	if in.IPFamilyPolicy != nil {

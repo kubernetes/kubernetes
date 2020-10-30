@@ -1550,21 +1550,25 @@ var _ = SIGDescribe("Services", func() {
 		// Change the services back to ClusterIP.
 
 		ginkgo.By("changing TCP service back to type=ClusterIP")
-		_, err = tcpJig.UpdateService(func(s *v1.Service) {
+		tcpReadback, err := tcpJig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeClusterIP
-			s.Spec.Ports[0].NodePort = 0
 		})
 		framework.ExpectNoError(err)
+		if tcpReadback.Spec.Ports[0].NodePort != 0 {
+			framework.Fail("TCP Spec.Ports[0].NodePort was not cleared")
+		}
 		// Wait for the load balancer to be destroyed asynchronously
 		_, err = tcpJig.WaitForLoadBalancerDestroy(tcpIngressIP, svcPort, loadBalancerCreateTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("changing UDP service back to type=ClusterIP")
-		_, err = udpJig.UpdateService(func(s *v1.Service) {
+		udpReadback, err := udpJig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeClusterIP
-			s.Spec.Ports[0].NodePort = 0
 		})
 		framework.ExpectNoError(err)
+		if udpReadback.Spec.Ports[0].NodePort != 0 {
+			framework.Fail("UDP Spec.Ports[0].NodePort was not cleared")
+		}
 		if loadBalancerSupportsUDP {
 			// Wait for the load balancer to be destroyed asynchronously
 			_, err = udpJig.WaitForLoadBalancerDestroy(udpIngressIP, svcPort, loadBalancerCreateTimeout)
@@ -1767,9 +1771,11 @@ var _ = SIGDescribe("Services", func() {
 		externalNameService, err := jig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeExternalName
 			s.Spec.ExternalName = externalServiceFQDN
-			s.Spec.ClusterIP = ""
 		})
 		framework.ExpectNoError(err)
+		if externalNameService.Spec.ClusterIP != "" {
+			framework.Failf("Spec.ClusterIP was not cleared")
+		}
 		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
 		err = jig.CheckServiceReachability(externalNameService, execPod)
 		framework.ExpectNoError(err)
@@ -1809,10 +1815,11 @@ var _ = SIGDescribe("Services", func() {
 		externalNameService, err := jig.UpdateService(func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeExternalName
 			s.Spec.ExternalName = externalServiceFQDN
-			s.Spec.ClusterIP = ""
-			s.Spec.Ports[0].NodePort = 0
 		})
 		framework.ExpectNoError(err)
+		if externalNameService.Spec.ClusterIP != "" {
+			framework.Failf("Spec.ClusterIP was not cleared")
+		}
 		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
 		err = jig.CheckServiceReachability(externalNameService, execPod)
 		framework.ExpectNoError(err)
