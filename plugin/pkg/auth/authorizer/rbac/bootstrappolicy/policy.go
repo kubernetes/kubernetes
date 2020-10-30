@@ -153,6 +153,10 @@ func NodeRules() []rbacv1.PolicyRule {
 
 		// CSI
 		rbacv1helpers.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie(),
+
+		// Use the Node authorization to limit a node to create tokens for service accounts running on that node
+		// Use the NodeRestriction admission plugin to limit a node to create tokens bound to pods on that node
+		rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("serviceaccounts/token").RuleOrDie(),
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
@@ -160,13 +164,6 @@ func NodeRules() []rbacv1.PolicyRule {
 		// Use the NodeRestriction admission plugin to limit a node to just update the status stanza.
 		pvcStatusPolicyRule := rbacv1helpers.NewRule("get", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, pvcStatusPolicyRule)
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-		// Use the Node authorization to limit a node to create tokens for service accounts running on that node
-		// Use the NodeRestriction admission plugin to limit a node to create tokens bound to pods on that node
-		tokenRequestRule := rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("serviceaccounts/token").RuleOrDie()
-		nodePolicyRules = append(nodePolicyRules, tokenRequestRule)
 	}
 
 	// CSI
