@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
 	"net"
 	"net/url"
 	"os"
@@ -48,6 +49,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	cloudprovider "k8s.io/cloud-provider"
 	nodehelpers "k8s.io/cloud-provider/node/helpers"
+	volerr "k8s.io/cloud-provider/volume/errors"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog/v2"
 
@@ -95,6 +97,7 @@ type VSphere struct {
 	hostName string
 	// Maps the VSphere IP address to VSphereInstance
 	vsphereInstanceMap map[string]*VSphereInstance
+	vsphereVolumeMap   *VsphereVolumeMap
 	// Responsible for managing discovery of k8s node, their location etc.
 	nodeManager          *NodeManager
 	vmUUID               string
@@ -542,6 +545,7 @@ func buildVSphereFromConfig(cfg VSphereConfig) (*VSphere, error) {
 			nodeInfoMap:        make(map[string]*NodeInfo),
 			registeredNodes:    make(map[string]*v1.Node),
 		},
+		vsphereVolumeMap:     NewVsphereVolumeMap(),
 		isSecretInfoProvided: isSecretInfoProvided,
 		isSecretManaged:      !cfg.Global.SecretNotManaged,
 		cfg:                  &cfg,
@@ -950,6 +954,20 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, storagePolicyName string, nodeN
 		}
 	}
 	klog.V(4).Infof("AttachDisk executed for node %s and volume %s with diskUUID %s. Err: %s", convertToString(nodeName), vmDiskPath, diskUUID, err)
+	if err != nil {
+		// if attach failed, we should check if disk is attached somewhere else. This can happen for several reasons
+		// and throwing a dangling volume error here will allow attach-detach controller to detach disk from a node
+		// where it is not needed.
+		existingNode, ok := vs.vsphereVolumeMap.CheckForVolume(vmDiskPath)
+		if ok {
+			attached, newVolumePath, diskAttachedError := vs.DiskIsAttached(vmDiskPath, existingNode)
+			// if disk is attached somewhere else then we can throw a dangling error
+			if diskAttachedError == nil && attached && (nodeName != existingNode) {
+				klog.V(3).Infof("found dangling volume %s to node %s", vmDiskPath, existingNode)
+				return "", volerr.NewDanglingError(err.Error(), existingNode, newVolumePath)
+			}
+		}
+	}
 	vclib.RecordvSphereMetric(vclib.OperationAttachVolume, requestTime, err)
 	return diskUUID, err
 }
@@ -1083,6 +1101,7 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 // 5b. If VMs are removed from vSphere inventory they are ignored.
 func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) (map[k8stypes.NodeName]map[string]bool, error) {
 	disksAreAttachedInternal := func(nodeVolumes map[k8stypes.NodeName][]string) (map[k8stypes.NodeName]map[string]bool, error) {
+		vs.vsphereVolumeMap.StartDiskVerification()
 
 		// disksAreAttach checks whether disks are attached to the nodes.
 		// Returns nodes that need to be retried if retry is true
@@ -1194,7 +1213,10 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 			for nodeName, volPaths := range attached {
 				disksAttached[convertToK8sType(nodeName)] = volPaths
 			}
+
 		}
+		// any volume which we could not verify will be removed from the map.
+		vs.vsphereVolumeMap.RemoveUnverified()
 		klog.V(4).Infof("DisksAreAttach successfully executed. result: %+v", attached)
 		return disksAttached, nil
 	}
