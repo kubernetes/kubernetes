@@ -66,6 +66,7 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//pkg/util/procfs:go_default_library",
+            "//staging/src/k8s.io/api/rbac/v1:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -85,6 +86,7 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/util/procfs:go_default_library",
+            "//staging/src/k8s.io/api/rbac/v1:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
