@@ -101,6 +101,14 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (pr
 		v := version.Get()
 		headers.Set("User-Agent", fmt.Sprintf("kube-probe/%s.%s", v.Major, v.Minor))
 	}
+	if _, ok := headers["Accept"]; !ok {
+		// Accept header was not defined. accept all
+		headers.Set("Accept", "*/*")
+	}
+	if headers.Get("Accept") == "" {
+		// Accept header was overridden but is empty. removing
+		headers.Del("Accept")
+	}
 	req.Header = headers
 	if headers.Get("Host") != "" {
 		req.Host = headers.Get("Host")
