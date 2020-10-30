@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "init_windows_test.go",
         "server_bootstrap_test.go",
         "server_test.go",
     ],
@@ -158,6 +159,7 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/windows/service:go_default_library",
+            "//vendor/golang.org/x/sys/windows:go_default_library",
         ],
         "//conditions:default": [],
     }),
