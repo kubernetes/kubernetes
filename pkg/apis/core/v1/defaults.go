@@ -169,10 +169,10 @@ func SetDefaults_Service(obj *v1.Service) {
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) &&
 		obj.Spec.Type == v1.ServiceTypeLoadBalancer {
+		ipMode := v1.LoadBalancerIPModeVIP
 
 		for _, ing := range obj.Status.LoadBalancer.Ingress {
 			if ing.IPMode == nil {
-				ipMode := v1.LoadBalancerIPModeVIP
 				ing.IPMode = &ipMode
 			}
 		}
