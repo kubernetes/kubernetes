@@ -1071,3 +1071,39 @@ func TestIsProbableEOF(t *testing.T) {
 		})
 	}
 }
+
+func setEnv(key, value string) func() {
+	originalValue := os.Getenv(key)
+	os.Setenv(key, value)
+	return func() {
+		os.Setenv(key, originalValue)
+	}
+}
+
+func TestReadIdleTimeoutSeconds(t *testing.T) {
+	reset := setEnv("HTTP2_READ_IDLE_TIMEOUT_SECONDS", "60")
+	if e, a := 60, readIdleTimeoutSeconds(); e != a {
+		t.Errorf("expected %d, got %d", e, a)
+	}
+	reset()
+
+	reset = setEnv("HTTP2_READ_IDLE_TIMEOUT_SECONDS", "illegal value")
+	if e, a := 30, readIdleTimeoutSeconds(); e != a {
+		t.Errorf("expected %d, got %d", e, a)
+	}
+	reset()
+}
+
+func TestPingTimeoutSeconds(t *testing.T) {
+	reset := setEnv("HTTP2_PING_TIMEOUT_SECONDS", "60")
+	if e, a := 60, pingTimeoutSeconds(); e != a {
+		t.Errorf("expected %d, got %d", e, a)
+	}
+	reset()
+
+	reset = setEnv("HTTP2_PING_TIMEOUT_SECONDS", "illegal value")
+	if e, a := 15, pingTimeoutSeconds(); e != a {
+		t.Errorf("expected %d, got %d", e, a)
+	}
+	reset()
+}

@@ -140,6 +140,36 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 	return t
 }
 
+func readIdleTimeoutSeconds() int {
+	ret := 30
+	// User can set the readIdleTimeout to 0 to disable the HTTP/2
+	// connection health check.
+	if s := os.Getenv("HTTP2_READ_IDLE_TIMEOUT_SECONDS"); len(s) > 0 {
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			klog.Warningf("Illegal HTTP2_READ_IDLE_TIMEOUT_SECONDS(%q): %v."+
+				" Default value %d is used", s, err, ret)
+			return ret
+		}
+		ret = i
+	}
+	return ret
+}
+
+func pingTimeoutSeconds() int {
+	ret := 15
+	if s := os.Getenv("HTTP2_PING_TIMEOUT_SECONDS"); len(s) > 0 {
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			klog.Warningf("Illegal HTTP2_PING_TIMEOUT_SECONDS(%q): %v."+
+				" Default value %d is used", s, err, ret)
+			return ret
+		}
+		ret = i
+	}
+	return ret
+}
+
 func configureHTTP2Transport(t *http.Transport) error {
 	t2, err := http2.ConfigureTransports(t)
 	if err != nil {
@@ -153,8 +183,8 @@ func configureHTTP2Transport(t *http.Transport) error {
 	// by default, which caused
 	// https://github.com/kubernetes/client-go/issues/374 and
 	// https://github.com/kubernetes/kubernetes/issues/87615.
-	t2.ReadIdleTimeout = 30 * time.Second
-	t2.PingTimeout = 15 * time.Second
+	t2.ReadIdleTimeout = time.Duration(readIdleTimeoutSeconds()) * time.Second
+	t2.PingTimeout = time.Duration(pingTimeoutSeconds()) * time.Second
 	return nil
 }
 
