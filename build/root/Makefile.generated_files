@@ -106,6 +106,11 @@ ALL_K8S_TAG_FILES := $(shell                             \
         | xargs grep --color=never -l '^// *+k8s:'       \
 )
 
+# Helper variables used for substitutions.
+comma:= ,
+empty:=
+space:= $(empty) $(empty)
+
 
 #
 # Code generation logic.
@@ -224,6 +229,7 @@ DEEPCOPY_DIRS := $(shell                                             \
         | LC_ALL=C sort -u                                           \
 )
 DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
+DEEPCOPY_PKGS := $(addprefix $(PRJ_SRC_PATH)/, $(DEEPCOPY_DIRS))
 
 # Reset the list of packages that need generation.
 $(shell mkdir -p $$(dirname $(META_DIR)/$(DEEPCOPY_GEN)))
@@ -231,10 +237,15 @@ $(shell rm -f $(META_DIR)/$(DEEPCOPY_GEN).todo)
 
 # This rule aggregates the set of files to generate and then generates them all
 # in a single run of the tool.
+#
+# As described in #96015, whenever some files require regeneration,
+# given the limitations of code-generators which don't process imported
+# dependencies, we need to pass all directories as inputs, as functions
+# we may want to use may be defined outside of the directory to regenerate.
 .PHONY: gen_deepcopy
 gen_deepcopy: $(DEEPCOPY_GEN) $(META_DIR)/$(DEEPCOPY_GEN).todo
 	if [[ -s $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                 \
-	    pkgs=$$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -);  \
+	    pkgs=$(subst $(space),$(comma),$(DEEPCOPY_PKGS));              \
 	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                           \
 	        echo "DBG: running $(DEEPCOPY_GEN) for $$pkgs";            \
 	    fi;                                                            \
@@ -320,6 +331,7 @@ DEFAULTER_DIRS := $(shell                                            \
 )
 
 DEFAULTER_FILES := $(addsuffix /$(DEFAULTER_FILENAME), $(DEFAULTER_DIRS))
+DEFAULTER_PKGS := $(addprefix $(PRJ_SRC_PATH)/, $(DEFAULTER_DIRS))
 
 # Reset the list of packages that need generation.
 $(shell mkdir -p $$(dirname $(META_DIR)/$(DEFAULTER_GEN)))
@@ -327,10 +339,15 @@ $(shell rm -f $(META_DIR)/$(DEFAULTER_GEN).todo)
 
 # This rule aggregates the set of files to generate and then generates them all
 # in a single run of the tool.
+#
+# As described in #96015, whenever some files require regeneration,
+# given the limitations of code-generators which don't process imported
+# dependencies, we need to pass all directories as inputs, as functions
+# we may want to use may be defined outside of the directory to regenerate.
 .PHONY: gen_defaulter
 gen_defaulter: $(DEFAULTER_GEN) $(META_DIR)/$(DEFAULTER_GEN).todo
 	if [[ -s $(META_DIR)/$(DEFAULTER_GEN).todo ]]; then                 \
-	    pkgs=$$(cat $(META_DIR)/$(DEFAULTER_GEN).todo | paste -sd, -);  \
+	    pkgs=$(subst $(space),$(comma),$(DEFAULTER_PKGS));              \
 	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                            \
 	        echo "DBG: running $(DEFAULTER_GEN) for $$pkgs";            \
 	    fi;                                                             \
@@ -423,6 +440,7 @@ CONVERSION_DIRS := $(shell                                              \
 )
 
 CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
+CONVERSION_PKGS := $(addprefix  $(PRJ_SRC_PATH)/, $(CONVERSION_DIRS))
 CONVERSION_EXTRA_PEER_DIRS := k8s.io/kubernetes/pkg/apis/core,k8s.io/kubernetes/pkg/apis/core/v1,k8s.io/api/core/v1
 
 # Reset the list of packages that need generation.
@@ -431,10 +449,15 @@ $(shell rm -f $(META_DIR)/$(CONVERSION_GEN).todo)
 
 # This rule aggregates the set of files to generate and then generates them all
 # in a single run of the tool.
+#
+# As described in #96015, whenever some files require regeneration,
+# given the limitations of code-generators which don't process imported
+# dependencies, we need to pass all directories as inputs, as functions
+# we may want to use may be defined outside of the directory to regenerate.
 .PHONY: gen_conversion
 gen_conversion: $(CONVERSION_GEN) $(META_DIR)/$(CONVERSION_GEN).todo
 	if [[ -s $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                 \
-	    pkgs=$$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -);  \
+	    pkgs=$(subst $(space),$(comma),$(CONVERSION_PKGS));              \
 	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                             \
 	        echo "DBG: running $(CONVERSION_GEN) for $$pkgs";            \
 	    fi;                                                              \
