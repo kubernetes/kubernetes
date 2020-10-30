@@ -186,11 +186,11 @@ func TestSyncServicePodSelection(t *testing.T) {
 	client, esController := newController([]string{"node-1"}, time.Duration(0))
 	ns := metav1.NamespaceDefault
 
-	pod1 := newPod(1, ns, true, 0)
+	pod1 := newPod(1, ns, true, 0, false)
 	esController.podStore.Add(pod1)
 
 	// ensure this pod will not match the selector
-	pod2 := newPod(2, ns, true, 0)
+	pod2 := newPod(2, ns, true, 0, false)
 	pod2.Labels["foo"] = "boo"
 	esController.podStore.Add(pod2)
 
@@ -341,11 +341,11 @@ func TestSyncServiceFull(t *testing.T) {
 	namespace := metav1.NamespaceDefault
 	serviceName := "all-the-protocols"
 
-	pod1 := newPod(1, namespace, true, 0)
+	pod1 := newPod(1, namespace, true, 0, false)
 	pod1.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}}
 	esController.podStore.Add(pod1)
 
-	pod2 := newPod(2, namespace, true, 0)
+	pod2 := newPod(2, namespace, true, 0, false)
 	pod2.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.5"}, {IP: "1234::5678:0000:0000:9abc:def0"}}
 	esController.podStore.Add(pod2)
 
@@ -499,7 +499,7 @@ func TestPodAddsBatching(t *testing.T) {
 			for i, add := range tc.adds {
 				time.Sleep(add.delay)
 
-				p := newPod(i, ns, true, 0)
+				p := newPod(i, ns, true, 0, false)
 				esController.podStore.Add(p)
 				esController.addPod(p)
 			}
@@ -789,7 +789,7 @@ func TestPodDeleteBatching(t *testing.T) {
 func addPods(t *testing.T, esController *endpointSliceController, namespace string, podsCount int) {
 	t.Helper()
 	for i := 0; i < podsCount; i++ {
-		pod := newPod(i, namespace, true, 0)
+		pod := newPod(i, namespace, true, 0, false)
 		esController.podStore.Add(pod)
 	}
 }

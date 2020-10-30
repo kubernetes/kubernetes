@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -34,6 +35,7 @@ import (
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	"k8s.io/kubernetes/pkg/features"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -60,7 +62,11 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service, 
 		}
 	}
 
-	ready := service.Spec.PublishNotReadyAddresses || podutil.IsPodReady(pod)
+	accepting := podutil.IsPodReady(pod)
+	terminating := pod.DeletionTimestamp != nil
+	// For compatibility reasons, "ready" should never be "true" if a pod is terminatng, unless
+	// publishNotReadyAddresses was set.
+	ready := service.Spec.PublishNotReadyAddresses || (accepting && !terminating)
 	ep := discovery.Endpoint{
 		Addresses: getEndpointAddresses(pod.Status, service, addressType),
 		Conditions: discovery.EndpointConditions{
@@ -74,6 +80,11 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service, 
 			UID:             pod.ObjectMeta.UID,
 			ResourceVersion: pod.ObjectMeta.ResourceVersion,
 		},
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition) {
+		ep.Conditions.Accepting = &accepting
+		ep.Conditions.Terminating = &terminating
 	}
 
 	if endpointutil.ShouldSetHostname(pod, service) {
