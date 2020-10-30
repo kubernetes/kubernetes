@@ -200,7 +200,7 @@ var (
 		&compbasemetrics.HistogramOpts{
 			Name:           "apiserver_request_filter_duration_seconds",
 			Help:           "Request filter latency distribution in seconds, for each filter type",
-			Buckets:        []float64{0.0, 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 5.0},
+			Buckets:        []float64{0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 5.0},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"filter"},
