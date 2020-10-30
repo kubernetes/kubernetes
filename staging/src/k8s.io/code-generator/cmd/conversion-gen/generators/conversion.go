@@ -260,11 +260,13 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			continue
 		}
 		skipUnsafe := false
+		extraDirs := []string{}
 		if customArgs, ok := arguments.CustomArgs.(*conversionargs.CustomArgs); ok {
 			if len(peerPkgs) > 0 {
 				peerPkgs = append(peerPkgs, customArgs.BasePeerDirs...)
 				peerPkgs = append(peerPkgs, customArgs.ExtraPeerDirs...)
 			}
+			extraDirs = customArgs.ExtraDirs
 			skipUnsafe = customArgs.SkipUnsafe
 		}
 
@@ -296,9 +298,12 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		for i := range peerPkgs {
 			peerPkgs[i] = genutil.Vendorless(peerPkgs[i])
 		}
+		for i := range extraDirs {
+			extraDirs[i] = genutil.Vendorless(extraDirs[i])
+		}
 
 		// Make sure our peer-packages are added and fully parsed.
-		for _, pp := range peerPkgs {
+		for _, pp := range append(peerPkgs, extraDirs...) {
 			context.AddDir(pp)
 			p := context.Universe[pp]
 			if nil == p {
