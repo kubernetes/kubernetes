@@ -73,12 +73,13 @@ var timeoutForNodePodCIDR = 5 * time.Minute
 
 // NewProxyServer returns a new ProxyServer.
 func NewProxyServer(o *Options) (*ProxyServer, error) {
-	return newProxyServer(o.config, o.CleanupAndExit, o.master)
+	return newProxyServer(o.config, o.CleanupAndExit, o.CleanupIPVS, o.master)
 }
 
 func newProxyServer(
 	config *proxyconfigapi.KubeProxyConfiguration,
 	cleanupAndExit bool,
+	cleanupIPVS bool,
 	master string) (*ProxyServer, error) {
 
 	if config == nil {
@@ -116,6 +117,7 @@ func newProxyServer(
 			execer:         execer,
 			IpvsInterface:  ipvsInterface,
 			IpsetInterface: ipsetInterface,
+			CleanupIPVS:    cleanupIPVS,
 		}, nil
 	}
 
