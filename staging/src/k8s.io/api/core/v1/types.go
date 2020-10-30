@@ -4124,8 +4124,8 @@ type ServiceSpec struct {
 	LoadBalancerIP string `json:"loadBalancerIP,omitempty" protobuf:"bytes,8,opt,name=loadBalancerIP"`
 
 	// If specified and supported by the platform, this will restrict traffic through the cloud-provider
-	// load-balancer will be restricted to the specified client IPs. This field will be ignored if the
-	// cloud-provider does not support the feature."
+	// load-balancer to be limited to the specified client IPs. This field will be ignored if the
+	// cloud-provider does not support the feature.
 	// More info: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/
 	// +optional
 	LoadBalancerSourceRanges []string `json:"loadBalancerSourceRanges,omitempty" protobuf:"bytes,9,opt,name=loadBalancerSourceRanges"`
