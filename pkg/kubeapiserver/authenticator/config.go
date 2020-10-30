@@ -17,6 +17,7 @@ limitations under the License.
 package authenticator
 
 import (
+	"errors"
 	"time"
 
 	"github.com/go-openapi/spec"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	tokenunion "k8s.io/apiserver/pkg/authentication/token/union"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 
@@ -286,13 +286,11 @@ func newServiceAccountAuthenticator(iss string, keyfiles []string, apiAudiences 
 }
 
 func newWebhookTokenAuthenticator(config Config) (authenticator.Token, error) {
-	// Provide a default if WebhookRetryBackoff has not been set by the user.
-	retryBackoff := config.WebhookRetryBackoff
-	if retryBackoff == nil {
-		retryBackoff = genericoptions.DefaultAuthWebhookRetryBackoff()
+	if config.WebhookRetryBackoff == nil {
+		return nil, errors.New("retry backoff parameters for authentication webhook has not been specified")
 	}
 
-	webhookTokenAuthenticator, err := webhook.New(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnVersion, config.APIAudiences, *retryBackoff, config.CustomDial)
+	webhookTokenAuthenticator, err := webhook.New(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnVersion, config.APIAudiences, *config.WebhookRetryBackoff, config.CustomDial)
 	if err != nil {
 		return nil, err
 	}
