@@ -373,7 +373,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 					Values:   []string{diskController.GetLocation()},
 				},
 				{
-					Key:      v1.LabelZoneFailureDomain,
+					Key:      v1.LabelFailureDomainBetaZone,
 					Operator: v1.NodeSelectorOpIn,
 					Values:   []string{strconv.Itoa(i)},
 				},

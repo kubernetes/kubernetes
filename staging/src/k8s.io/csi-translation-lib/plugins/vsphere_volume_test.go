@@ -30,7 +30,7 @@ func TestTranslatevSphereInTreeStorageClassToCSI(t *testing.T) {
 	translator := NewvSphereCSITranslator()
 	topologySelectorTerm := v1.TopologySelectorTerm{[]v1.TopologySelectorLabelRequirement{
 		{
-			Key:    v1.LabelZoneFailureDomain,
+			Key:    v1.LabelFailureDomainBetaZone,
 			Values: []string{"zone-a"},
 		},
 		{

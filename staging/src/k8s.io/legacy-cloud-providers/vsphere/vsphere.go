@@ -1736,7 +1736,7 @@ func (vs *VSphere) GetVolumeLabels(volumePath string) (map[string]string, error)
 	labels := make(map[string]string)
 	if len(dsZones) > 0 {
 		labels[v1.LabelZoneRegion] = dsZones[0].Region
-		labels[v1.LabelZoneFailureDomain] = dsZones[0].FailureDomain
+		labels[v1.LabelFailureDomainBetaZone] = dsZones[0].FailureDomain
 	}
 	return labels, nil
 }

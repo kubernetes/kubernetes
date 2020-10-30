@@ -203,7 +203,7 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 						node.Name, vm, res.vc, res.datacenter.Name())
 
 					// Get the node zone information
-					nodeFd := node.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
+					nodeFd := node.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone]
 					nodeRegion := node.ObjectMeta.Labels[v1.LabelZoneRegion]
 					nodeZone := &cloudprovider.Zone{FailureDomain: nodeFd, Region: nodeRegion}
 					nodeInfo := &NodeInfo{dataCenter: res.datacenter, vm: vm, vcServer: res.vc, vmUUID: nodeUUID, zone: nodeZone}

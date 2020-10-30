@@ -180,7 +180,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		// Instance could run in a different zone in multi-zone test. Figure out which zone
 		// it is in before proceeding.
 		zone := cloudConfig.Zone
-		if zoneInLabel, ok := nodeList.Items[0].Labels[v1.LabelZoneFailureDomain]; ok {
+		if zoneInLabel, ok := nodeList.Items[0].Labels[v1.LabelFailureDomainBetaZone]; ok {
 			zone = zoneInLabel
 		}
 		removedTags := gce.SetInstanceTags(cloudConfig, nodesNames[0], zone, []string{})
