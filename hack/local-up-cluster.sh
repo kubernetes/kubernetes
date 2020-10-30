@@ -852,6 +852,10 @@ EOF
       done
     fi >>/tmp/kube-proxy.yaml
 
+    if [[ "${NET_PLUGIN}" == "kubenet" && -n ${CLUSTER_CIDR} ]]; then
+        echo "clusterCIDR: \"${CLUSTER_CIDR}\"" >> /tmp/kube-proxy.yaml
+    fi
+
     if [[ "${REUSE_CERTS}" != true ]]; then
         generate_kubeproxy_certs
     fi
