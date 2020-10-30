@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1alpha1
 
 import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 )
 
-func Convert_clientauthentication_ExecCredentialSpec_To_v1beta1_ExecCredentialSpec(in *clientauthentication.ExecCredentialSpec, out *ExecCredentialSpec, s conversion.Scope) error {
-	// This conversion intentionally omits the Response and Interactive fields, which were only
-	// supported in v1alpha1.
-	return autoConvert_clientauthentication_ExecCredentialSpec_To_v1beta1_ExecCredentialSpec(in, out, s)
+func Convert_clientauthentication_ExecCredentialSpec_To_v1alpha1_ExecCredentialSpec(in *clientauthentication.ExecCredentialSpec, out *ExecCredentialSpec, s conversion.Scope) error {
+	// This conversion intentionally omits the Cluster field which is only supported in newer versions.
+	return autoConvert_clientauthentication_ExecCredentialSpec_To_v1alpha1_ExecCredentialSpec(in, out, s)
 }
