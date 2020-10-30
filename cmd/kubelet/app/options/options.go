@@ -111,6 +111,13 @@ type KubeletFlags struct {
 	// Its corresponding flag only gets registered in Windows builds.
 	WindowsService bool
 
+	// WindowsPriorityClass sets the priority class associated with the Kubelet process
+	// Its corresponding flag only gets registered in Windows builds
+	// The default priority class associated with any process in Windows is NORMAL_PRIORITY_CLASS. Keeping it as is
+	// to maintain backwards compatibility.
+	// Source: https://docs.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities
+	WindowsPriorityClass string
+
 	// remoteRuntimeEndpoint is the endpoint of remote runtime service
 	RemoteRuntimeEndpoint string
 	// remoteImageEndpoint is the endpoint of remote image service
