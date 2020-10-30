@@ -260,9 +260,10 @@ func TestAddFlags(t *testing.T) {
 				ClientCA: "/client-ca",
 			},
 			WebHook: &kubeoptions.WebHookAuthenticationOptions{
-				CacheTTL:   180000000000,
-				ConfigFile: "/token-webhook-config",
-				Version:    "v1beta1",
+				CacheTTL:     180000000000,
+				ConfigFile:   "/token-webhook-config",
+				Version:      "v1beta1",
+				RetryBackoff: apiserveroptions.DefaultAuthWebhookRetryBackoff(),
 			},
 			BootstrapToken: &kubeoptions.BootstrapTokenAuthenticationOptions{},
 			OIDC: &kubeoptions.OIDCAuthenticationOptions{
@@ -284,6 +285,7 @@ func TestAddFlags(t *testing.T) {
 			WebhookCacheAuthorizedTTL:   180000000000,
 			WebhookCacheUnauthorizedTTL: 60000000000,
 			WebhookVersion:              "v1beta1",
+			WebhookRetryBackoff:         apiserveroptions.DefaultAuthWebhookRetryBackoff(),
 		},
 		CloudProvider: &kubeoptions.CloudProviderOptions{
 			CloudConfigFile: "/cloud-config",

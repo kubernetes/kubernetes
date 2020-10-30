@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
 	"k8s.io/apiserver/pkg/server"
@@ -35,6 +36,17 @@ import (
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
+
+// DefaultAuthWebhookRetryBackoff is the default backoff parameters for
+// both authentication and authorization webhook used by the apiserver.
+func DefaultAuthWebhookRetryBackoff() *wait.Backoff {
+	return &wait.Backoff{
+		Duration: 500 * time.Millisecond,
+		Factor:   1.5,
+		Jitter:   0.2,
+		Steps:    5,
+	}
+}
 
 type RequestHeaderAuthenticationOptions struct {
 	// ClientCAFile is the root certificate bundle to verify client certificates on incoming requests
@@ -177,6 +189,11 @@ type DelegatingAuthenticationOptions struct {
 	// TolerateInClusterLookupFailure indicates failures to look up authentication configuration from the cluster configmap should not be fatal.
 	// Setting this can result in an authenticator that will reject all requests.
 	TolerateInClusterLookupFailure bool
+
+	// WebhookRetryBackoff specifies the backoff parameters for the authentication webhook retry logic.
+	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
+	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
+	WebhookRetryBackoff *wait.Backoff
 }
 
 func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
@@ -189,12 +206,22 @@ func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
 			GroupHeaders:        []string{"x-remote-group"},
 			ExtraHeaderPrefixes: []string{"x-remote-extra-"},
 		},
+		WebhookRetryBackoff: DefaultAuthWebhookRetryBackoff(),
 	}
+}
+
+// WithCustomRetryBackoff sets the custom backoff parameters for the authentication webhook retry logic.
+func (s *DelegatingAuthenticationOptions) WithCustomRetryBackoff(backoff wait.Backoff) {
+	s.WebhookRetryBackoff = &backoff
 }
 
 func (s *DelegatingAuthenticationOptions) Validate() []error {
 	allErrors := []error{}
 	allErrors = append(allErrors, s.RequestHeader.Validate()...)
+
+	if s.WebhookRetryBackoff != nil && s.WebhookRetryBackoff.Steps <= 0 {
+		allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 1, but is: %d", s.WebhookRetryBackoff.Steps))
+	}
 
 	return allErrors
 }
@@ -233,8 +260,9 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 	}
 
 	cfg := authenticatorfactory.DelegatingAuthenticatorConfig{
-		Anonymous: true,
-		CacheTTL:  s.CacheTTL,
+		Anonymous:           true,
+		CacheTTL:            s.CacheTTL,
+		WebhookRetryBackoff: s.WebhookRetryBackoff,
 	}
 
 	client, err := s.getClient()

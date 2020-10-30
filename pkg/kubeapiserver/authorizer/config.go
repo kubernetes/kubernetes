@@ -21,9 +21,11 @@ import (
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/authorization/union"
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	versionedinformers "k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
@@ -53,6 +55,10 @@ type Config struct {
 	WebhookCacheAuthorizedTTL time.Duration
 	// TTL for caching of unauthorized responses from the webhook server.
 	WebhookCacheUnauthorizedTTL time.Duration
+	// WebhookRetryBackoff specifies the backoff parameters for the authorization webhook retry logic.
+	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
+	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
+	WebhookRetryBackoff *wait.Backoff
 
 	VersionedInformerFactory versionedinformers.SharedInformerFactory
 
@@ -104,10 +110,17 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			authorizers = append(authorizers, abacAuthorizer)
 			ruleResolvers = append(ruleResolvers, abacAuthorizer)
 		case modes.ModeWebhook:
+			// Provide a default if WebhookRetryBackoff has not been set by the user.
+			retryBackoff := config.WebhookRetryBackoff
+			if retryBackoff == nil {
+				retryBackoff = genericoptions.DefaultAuthWebhookRetryBackoff()
+			}
+
 			webhookAuthorizer, err := webhook.New(config.WebhookConfigFile,
 				config.WebhookVersion,
 				config.WebhookCacheAuthorizedTTL,
 				config.WebhookCacheUnauthorizedTTL,
+				*retryBackoff,
 				config.CustomDial)
 			if err != nil {
 				return nil, nil, err
