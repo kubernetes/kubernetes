@@ -24,6 +24,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -110,6 +111,24 @@ func TestHTTPProbeChecker(t *testing.T) {
 		w.Write([]byte(output))
 	}
 
+	// Handler that returns the number of request headers in the body
+	headerCounterHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(strconv.Itoa(len(r.Header))))
+	}
+
+	// Handler that returns the keys of request headers in the body
+	headerKeysNamesHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		keys := make([]string, 0, len(r.Header))
+		for k := range r.Header {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		w.Write([]byte(strings.Join(keys, "\n")))
+	}
+
 	redirectHandler := func(s int, bad bool) func(w http.ResponseWriter, r *http.Request) {
 		return func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/" {
@@ -134,6 +153,18 @@ func TestHTTPProbeChecker(t *testing.T) {
 			handler: handleReq(http.StatusOK, "ok body"),
 			health:  probe.Success,
 			accBody: "ok body",
+		},
+		{
+			handler:    headerCounterHandler,
+			reqHeaders: http.Header{},
+			health:     probe.Success,
+			accBody:    "4",
+		},
+		{
+			handler:    headerKeysNamesHandler,
+			reqHeaders: http.Header{},
+			health:     probe.Success,
+			accBody:    "Accept\nAccept-Encoding\nConnection\nUser-Agent",
 		},
 		{
 			handler: headerEchoHandler,
@@ -164,6 +195,64 @@ func TestHTTPProbeChecker(t *testing.T) {
 			reqHeaders: http.Header{},
 			health:     probe.Success,
 			accBody:    "User-Agent: kube-probe/",
+		},
+		{
+			handler: headerEchoHandler,
+			reqHeaders: http.Header{
+				"User-Agent": {"foo/1.0"},
+				"Accept":     {"text/html"},
+			},
+			health:  probe.Success,
+			accBody: "Accept: text/html",
+		},
+		{
+			handler: headerEchoHandler,
+			reqHeaders: http.Header{
+				"User-Agent": {"foo/1.0"},
+				"Accept":     {"foo/*"},
+			},
+			health:  probe.Success,
+			accBody: "User-Agent: foo/1.0",
+		},
+		{
+			handler: headerEchoHandler,
+			reqHeaders: http.Header{
+				"X-Muffins-Or-Cupcakes": {"muffins"},
+				"Accept":                {"foo/*"},
+			},
+			health:  probe.Success,
+			accBody: "X-Muffins-Or-Cupcakes: muffins",
+		},
+		{
+			handler: headerEchoHandler,
+			reqHeaders: http.Header{
+				"Accept": {"foo/*"},
+			},
+			health:  probe.Success,
+			accBody: "Accept: foo/*",
+		},
+		{
+			handler: headerEchoHandler,
+			reqHeaders: http.Header{
+				"Accept": {""},
+			},
+			health:  probe.Success,
+			notBody: "Accept:",
+		},
+		{
+			handler: headerEchoHandler,
+			reqHeaders: http.Header{
+				"User-Agent": {"foo/1.0"},
+				"Accept":     {""},
+			},
+			health:  probe.Success,
+			notBody: "Accept:",
+		},
+		{
+			handler:    headerEchoHandler,
+			reqHeaders: http.Header{},
+			health:     probe.Success,
+			accBody:    "Accept: */*",
 		},
 		{
 			// Echo handler that returns the contents of Host in the body
