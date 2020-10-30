@@ -12,6 +12,7 @@ go_library(
     deps = [
         "//pkg/serviceaccount:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticatorfactory:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/group:go_default_library",
@@ -25,6 +26,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authentication/token/tokenfile:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/token/union:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/dynamiccertificates:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook:go_default_library",
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth:go_default_library",

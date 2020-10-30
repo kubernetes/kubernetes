@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -37,7 +38,11 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const retryBackoff = 500 * time.Millisecond
+// DefaultRetryBackoff returns the default backoff parameters for webhook retry.
+func DefaultRetryBackoff() *wait.Backoff {
+	backoff := webhook.DefaultRetryBackoffWithInitialDelay(500 * time.Millisecond)
+	return &backoff
+}
 
 // Ensure WebhookTokenAuthenticator implements the authenticator.Token interface.
 var _ authenticator.Token = (*WebhookTokenAuthenticator)(nil)
@@ -47,16 +52,16 @@ type tokenReviewer interface {
 }
 
 type WebhookTokenAuthenticator struct {
-	tokenReview    tokenReviewer
-	initialBackoff time.Duration
-	implicitAuds   authenticator.Audiences
+	tokenReview  tokenReviewer
+	retryBackoff wait.Backoff
+	implicitAuds authenticator.Audiences
 }
 
 // NewFromInterface creates a webhook authenticator using the given tokenReview
 // client. It is recommend to wrap this authenticator with the token cache
 // authenticator implemented in
 // k8s.io/apiserver/pkg/authentication/token/cache.
-func NewFromInterface(tokenReview authenticationv1client.TokenReviewInterface, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
+func NewFromInterface(tokenReview authenticationv1client.TokenReviewInterface, implicitAuds authenticator.Audiences, retryBackoff wait.Backoff) (*WebhookTokenAuthenticator, error) {
 	return newWithBackoff(tokenReview, retryBackoff, implicitAuds)
 }
 
@@ -64,8 +69,8 @@ func NewFromInterface(tokenReview authenticationv1client.TokenReviewInterface, i
 // file. It is recommend to wrap this authenticator with the token cache
 // authenticator implemented in
 // k8s.io/apiserver/pkg/authentication/token/cache.
-func New(kubeConfigFile string, version string, implicitAuds authenticator.Audiences, customDial utilnet.DialFunc) (*WebhookTokenAuthenticator, error) {
-	tokenReview, err := tokenReviewInterfaceFromKubeconfig(kubeConfigFile, version, customDial)
+func New(kubeConfigFile string, version string, implicitAuds authenticator.Audiences, retryBackoff wait.Backoff, customDial utilnet.DialFunc) (*WebhookTokenAuthenticator, error) {
+	tokenReview, err := tokenReviewInterfaceFromKubeconfig(kubeConfigFile, version, retryBackoff, customDial)
 	if err != nil {
 		return nil, err
 	}
@@ -73,8 +78,8 @@ func New(kubeConfigFile string, version string, implicitAuds authenticator.Audie
 }
 
 // newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(tokenReview tokenReviewer, initialBackoff time.Duration, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
-	return &WebhookTokenAuthenticator{tokenReview, initialBackoff, implicitAuds}, nil
+func newWithBackoff(tokenReview tokenReviewer, retryBackoff wait.Backoff, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
+	return &WebhookTokenAuthenticator{tokenReview, retryBackoff, implicitAuds}, nil
 }
 
 // AuthenticateToken implements the authenticator.Token interface.
@@ -102,7 +107,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 		err    error
 		auds   authenticator.Audiences
 	)
-	webhook.WithExponentialBackoff(ctx, w.initialBackoff, func() error {
+	webhook.WithExponentialBackoff(ctx, w.retryBackoff, func() error {
 		result, err = w.tokenReview.Create(ctx, r, metav1.CreateOptions{})
 		return err
 	}, webhook.DefaultShouldRetry)
@@ -154,7 +159,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 // tokenReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,
 // and returns a TokenReviewInterface that uses that client. Note that the client submits TokenReview
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
-func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string, customDial utilnet.DialFunc) (tokenReviewer, error) {
+func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string, retryBackoff wait.Backoff, customDial utilnet.DialFunc) (tokenReviewer, error) {
 	localScheme := runtime.NewScheme()
 	if err := scheme.AddToScheme(localScheme); err != nil {
 		return nil, err
@@ -166,7 +171,7 @@ func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string, c
 		if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
 			return nil, err
 		}
-		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0, customDial)
+		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, retryBackoff, customDial)
 		if err != nil {
 			return nil, err
 		}
@@ -177,7 +182,7 @@ func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string, c
 		if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
 			return nil, err
 		}
-		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0, customDial)
+		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, retryBackoff, customDial)
 		if err != nil {
 			return nil, err
 		}
