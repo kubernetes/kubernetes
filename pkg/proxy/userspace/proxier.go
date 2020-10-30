@@ -44,6 +44,13 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
+const numBurstSyncs int = 2
+
+var zeroIPv4 = net.ParseIP("0.0.0.0")
+var localhostIPv4 = net.ParseIP("127.0.0.1")
+var zeroIPv6 = net.ParseIP("::")
+var localhostIPv6 = net.ParseIP("::1")
+
 type portal struct {
 	ip         net.IP
 	port       int
@@ -115,11 +122,10 @@ func logTimeout(err error) bool {
 	return false
 }
 
-// ProxySocketFunc is a function which constructs a ProxySocket from a protocol, ip, and port
+// ProxySocketFunc is a function which constructs a ProxySocket from a protocol, ip, and port, part of Proxier.
 type ProxySocketFunc func(protocol v1.Protocol, ip net.IP, port int) (ProxySocket, error)
 
-const numBurstSyncs int = 2
-
+// serviceChange is where we track updates to services between sync periods, serving as the data structure for the Proxier implementation.
 type serviceChange struct {
 	current  *v1.Service
 	previous *v1.Service
@@ -139,36 +145,40 @@ type Proxier struct {
 	// TODO(imroc): implement node handler for userspace proxier.
 	config.NoopNodeHandler
 
-	loadBalancer    LoadBalancer
-	mu              sync.Mutex // protects serviceMap
-	serviceMap      map[proxy.ServicePortName]*ServiceInfo
-	syncPeriod      time.Duration
-	minSyncPeriod   time.Duration
-	udpIdleTimeout  time.Duration
+	loadBalancer   LoadBalancer
+	mu             sync.Mutex // protects serviceMap
+	serviceMap     map[proxy.ServicePortName]*ServiceInfo
+	syncPeriod     time.Duration
+	minSyncPeriod  time.Duration
+	udpIdleTimeout time.Duration
+	hostIP         net.IP
+
+	// specific to linux implementation
 	portMapMutex    sync.Mutex
 	portMap         map[portMapKey]*portMapValue
 	listenIP        net.IP
 	iptables        iptables.Interface
-	hostIP          net.IP
 	localAddrs      netutils.IPSet
 	proxyPorts      PortAllocator
 	makeProxySocket ProxySocketFunc
 	exec            utilexec.Interface
+
+	// protects serviceChanges and track them
+	serviceChangesLock sync.Mutex
+	serviceChanges     map[types.NamespacedName]*serviceChange // map of service changes
+	syncRunner         asyncRunnerInterface                    // governs calls to syncProxyRules
+
 	// endpointsSynced and servicesSynced are set to 1 when the corresponding
 	// objects are synced after startup. This is used to avoid updating iptables
 	// with some partial data after kube-proxy restart.
 	endpointsSynced int32
 	servicesSynced  int32
 	initialized     int32
-	// protects serviceChanges
-	serviceChangesLock sync.Mutex
-	serviceChanges     map[types.NamespacedName]*serviceChange // map of service changes
-	syncRunner         asyncRunnerInterface                    // governs calls to syncProxyRules
 
 	stopChan chan struct{}
 }
 
-// assert Proxier is a proxy.Provider
+// assert Proxier fully implements proxy.Provider interface
 var _ proxy.Provider = &Proxier{}
 
 // A key for the portMap.  The ip has to be a string because slices can't be map
@@ -200,11 +210,13 @@ var (
 
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
 // which to listen.  Because of the iptables logic, It is assumed that there
-// is only a single Proxier active on a machine. An error will be returned if
-// the proxier cannot be started due to an invalid ListenIP (loopback) or
-// if iptables fails to update or acquire the initial lock. Once a proxier is
-// created, it will keep iptables up to date in the background and will not
-// terminate if a particular iptables call fails.
+// is only a single Proxier active on a machine.
+// An error will be returned in two cases:
+// 1) the proxier cannot be started due to an invalid ListenIP (such as loopback)
+// 2) iptables fails to update or acquire the initial lock
+// Once a proxier is created, it will:
+// 1) keep iptables up to date in the background
+// 2) stay alive even if particular iptables calls fail
 func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, exec utilexec.Interface, pr utilnet.PortRange, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, nodePortAddresses []string) (*Proxier, error) {
 	return NewCustomProxier(loadBalancer, listenIP, iptables, exec, pr, syncPeriod, minSyncPeriod, udpIdleTimeout, nodePortAddresses, newProxySocket)
 }
@@ -273,6 +285,13 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 	klog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, numBurstSyncs)
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("userspace-proxy-sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, numBurstSyncs)
 	return proxier, nil
+}
+
+// cleanupStaleStickySessions up any stale sticky session records in the hash map.
+func (proxier *Proxier) cleanupStaleStickySessions() {
+	for name := range proxier.serviceMap {
+		proxier.loadBalancer.CleanupStaleStickySessions(name)
+	}
 }
 
 // CleanupLeftovers removes all iptables rules and chains created by the Proxier
@@ -426,13 +445,7 @@ func (proxier *Proxier) ensurePortals() {
 	}
 }
 
-// clean up any stale sticky session records in the hash map.
-func (proxier *Proxier) cleanupStaleStickySessions() {
-	for name := range proxier.serviceMap {
-		proxier.loadBalancer.CleanupStaleStickySessions(name)
-	}
-}
-
+// stopProxyInternal deletes proxy information and sets its state for being stopped.
 func (proxier *Proxier) stopProxy(service proxy.ServicePortName, info *ServiceInfo) error {
 	delete(proxier.serviceMap, service)
 	info.setAlive(false)
@@ -450,8 +463,7 @@ func (proxier *Proxier) getServiceInfo(service proxy.ServicePortName) (*ServiceI
 }
 
 // addServiceOnPortInternal starts listening for a new service, returning the ServiceInfo.
-// Pass proxyPort=0 to allocate a random port. The timeout only applies to UDP
-// connections, for now.
+// Pass proxyPort=0 to allocate a random port. The timeout only applies to UDP connections, for now.
 func (proxier *Proxier) addServiceOnPortInternal(service proxy.ServicePortName, protocol v1.Protocol, proxyPort int, timeout time.Duration) (*ServiceInfo, error) {
 	sock, err := proxier.makeProxySocket(protocol, proxier.listenIP, proxyPort)
 	if err != nil {
@@ -487,6 +499,7 @@ func (proxier *Proxier) addServiceOnPortInternal(service proxy.ServicePortName, 
 	return si, nil
 }
 
+// cleanupPortalAndProxy closes a service "portal", which results in downstream deletion of iptables routes that are programmed for a service.
 func (proxier *Proxier) cleanupPortalAndProxy(serviceName proxy.ServicePortName, info *ServiceInfo) error {
 	if err := proxier.closePortal(serviceName, info); err != nil {
 		return fmt.Errorf("Failed to close portal for %q: %v", serviceName, err)
@@ -497,6 +510,7 @@ func (proxier *Proxier) cleanupPortalAndProxy(serviceName proxy.ServicePortName,
 	return nil
 }
 
+// mergeService returns all existing
 func (proxier *Proxier) mergeService(service *v1.Service) sets.String {
 	if service == nil {
 		return nil
@@ -921,6 +935,7 @@ func (proxier *Proxier) openNodePort(nodePort int, protocol v1.Protocol, proxyIP
 	return nil
 }
 
+// closePortal handles all the logic for closing whatever proxying state are associated with a service.
 func (proxier *Proxier) closePortal(service proxy.ServicePortName, info *ServiceInfo) error {
 	// Collect errors and report them all at the end.
 	el := proxier.closeOnePortal(info.portal, info.protocol, proxier.listenIP, info.proxyPort, service)
@@ -943,6 +958,7 @@ func (proxier *Proxier) closePortal(service proxy.ServicePortName, info *Service
 	return utilerrors.NewAggregate(el)
 }
 
+// closeOnePortal handles the deletion of iptables rules for a specific service portal, for example, a nodePort.
 func (proxier *Proxier) closeOnePortal(portal portal, protocol v1.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) []error {
 	el := []error{}
 	if proxier.localAddrs.Len() > 0 && proxier.localAddrs.Has(portal.ip) {
@@ -1116,13 +1132,6 @@ func iptablesFlush(ipt iptables.Interface) error {
 	}
 	return utilerrors.NewAggregate(el)
 }
-
-// Used below.
-var zeroIPv4 = net.ParseIP("0.0.0.0")
-var localhostIPv4 = net.ParseIP("127.0.0.1")
-
-var zeroIPv6 = net.ParseIP("::")
-var localhostIPv6 = net.ParseIP("::1")
 
 // Build a slice of iptables args that are common to from-container and from-host portal rules.
 func iptablesCommonPortalArgs(destIP net.IP, addPhysicalInterfaceMatch bool, addDstLocalMatch bool, destPort int, protocol v1.Protocol, service proxy.ServicePortName) []string {

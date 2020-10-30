@@ -107,6 +107,8 @@ type EndpointsConfig struct {
 
 // NewEndpointsConfig creates a new EndpointsConfig.
 func NewEndpointsConfig(endpointsInformer coreinformers.EndpointsInformer, resyncPeriod time.Duration) *EndpointsConfig {
+	klog.Infof("creating new endpoints config with resync period of %v", resyncPeriod)
+
 	result := &EndpointsConfig{
 		listerSynced: endpointsInformer.Informer().HasSynced,
 	}
@@ -198,6 +200,8 @@ type EndpointSliceConfig struct {
 
 // NewEndpointSliceConfig creates a new EndpointSliceConfig.
 func NewEndpointSliceConfig(endpointSliceInformer discoveryinformers.EndpointSliceInformer, resyncPeriod time.Duration) *EndpointSliceConfig {
+	klog.Infof("creating new endpoint slice config with resync period of %v", resyncPeriod)
+
 	result := &EndpointSliceConfig{
 		listerSynced: endpointSliceInformer.Informer().HasSynced,
 	}
@@ -324,6 +328,8 @@ func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
 	}
 }
 
+// handleAddService calls every ServiceHandler implementation and triggers its OnServiceAdd implementation.  This
+// is specific to your underlying proxy technology (i.e. this ultimately might result in iptables or netsh rules being added)
 func (c *ServiceConfig) handleAddService(obj interface{}) {
 	service, ok := obj.(*v1.Service)
 	if !ok {
@@ -336,6 +342,8 @@ func (c *ServiceConfig) handleAddService(obj interface{}) {
 	}
 }
 
+// handleUpdateService calls every ServiceHandler and triggers OnServiceUpdate implementation. This is
+// specific to your underlying proxy technology.
 func (c *ServiceConfig) handleUpdateService(oldObj, newObj interface{}) {
 	oldService, ok := oldObj.(*v1.Service)
 	if !ok {
@@ -353,6 +361,8 @@ func (c *ServiceConfig) handleUpdateService(oldObj, newObj interface{}) {
 	}
 }
 
+// handleDeleteService calls every ServiceHandler and triggers OnServiceUpdate implementation. This is
+// specific to your underlying proxy technology.
 func (c *ServiceConfig) handleDeleteService(obj interface{}) {
 	service, ok := obj.(*v1.Service)
 	if !ok {
@@ -372,8 +382,7 @@ func (c *ServiceConfig) handleDeleteService(obj interface{}) {
 	}
 }
 
-// NodeHandler is an abstract interface of objects which receive
-// notifications about node object changes.
+// NodeHandler is an interface of objects which receive notifications about node object changes.
 type NodeHandler interface {
 	// OnNodeAdd is called whenever creation of new node object
 	// is observed.

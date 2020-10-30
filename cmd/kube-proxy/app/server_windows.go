@@ -178,31 +178,33 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 	}, nil
 }
 
+// getProxyMode attempts to use the kernel proxy (if requested), but will fall back to user space if necessary.  In cases where an unknown proxy is sent, userspace proxy is also used.
 func getProxyMode(proxyMode string, kcompat winkernel.KernelCompatTester) string {
 	if proxyMode == proxyModeUserspace {
 		return proxyModeUserspace
 	} else if proxyMode == proxyModeKernelspace {
-		return tryWinKernelSpaceProxy(kcompat)
-	}
-	return proxyModeUserspace
-}
-
-func tryWinKernelSpaceProxy(kcompat winkernel.KernelCompatTester) string {
-	// Check for Windows Kernel Version if we can support Kernel Space proxy
-	// Check for Windows Version
-
-	// guaranteed false on error, error only necessary for debugging
-	useWinKernelProxy, err := winkernel.CanUseWinKernelProxier(kcompat)
-	if err != nil {
-		klog.Errorf("Can't determine whether to use windows kernel proxy, using userspace proxier: %v", err)
+		proxyModeActual, err := tryWinKernelSpaceProxy(kcompat)
+		if err != nil {
+			fmt.Errorf("Can't determine whether to use windows kernel proxy %v (using proxy mode: %v)", err, proxyModeActual)
+		}
+		return proxyModeActual
+	} else {
+		klog.V(1).Infof("Using userspace proxy, unknown proxy input %v", proxyMode)
 		return proxyModeUserspace
 	}
-	if useWinKernelProxy {
-		return proxyModeKernelspace
+}
+
+// tryWinKernelSpaceProxy attempts to use the kernelspace proxy, based on the version (because HNS needs to be working properly for kernel proxying to work)
+func tryWinKernelSpaceProxy(kcompat winkernel.KernelCompatTester) (string, error) {
+	useWinKernelProxy, err := winkernel.CanUseWinKernelProxier(kcompat)
+	if err != nil {
+		return proxyModeUserspace, err
 	}
-	// Fallback.
+	if useWinKernelProxy {
+		return proxyModeKernelspace, nil
+	}
 	klog.V(1).Infof("Can't use winkernel proxy, using userspace proxier")
-	return proxyModeUserspace
+	return proxyModeUserspace, nil
 }
 
 // nodeIPTuple takes an addresses and return a tuple (ipv4,ipv6)

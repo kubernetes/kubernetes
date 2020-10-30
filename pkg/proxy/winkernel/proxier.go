@@ -106,8 +106,8 @@ type loadBalancerFlags struct {
 	isIPv6          bool
 }
 
-// internal struct for string service information
-type serviceInfo struct {
+// ServiceInfo is an internal struct for string service information
+type ServiceInfo struct {
 	*proxy.BaseServiceInfo
 	targetPort             int
 	externalIPs            []*externalIPInfo
@@ -224,10 +224,10 @@ func (proxier *Proxier) onEndpointsMapChange(svcPortName *proxy.ServicePortName)
 	svc, exists := proxier.serviceMap[*svcPortName]
 
 	if exists {
-		svcInfo, ok := svc.(*serviceInfo)
+		svcInfo, ok := svc.(*ServiceInfo)
 
 		if !ok {
-			klog.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+			klog.Errorf("Failed to cast ServiceInfo %q", svcPortName.String())
 			return
 		}
 
@@ -271,10 +271,10 @@ func (proxier *Proxier) onServiceMapChange(svcPortName *proxy.ServicePortName) {
 	svc, exists := proxier.serviceMap[*svcPortName]
 
 	if exists {
-		svcInfo, ok := svc.(*serviceInfo)
+		svcInfo, ok := svc.(*ServiceInfo)
 
 		if !ok {
-			klog.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+			klog.Errorf("Failed to cast ServiceInfo %q", svcPortName.String())
 			return
 		}
 
@@ -347,9 +347,9 @@ func (refCountMap endPointsReferenceCountMap) getRefCount(hnsID string) *uint16 
 	return refCount
 }
 
-// returns a new proxy.ServicePort which abstracts a serviceInfo
+// returns a new proxy.ServicePort which abstracts a ServiceInfo
 func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.BaseServiceInfo) proxy.ServicePort {
-	info := &serviceInfo{BaseServiceInfo: baseInfo}
+	info := &ServiceInfo{BaseServiceInfo: baseInfo}
 	preserveDIP := service.Annotations["preserve-destination"] == "true"
 	localTrafficDSR := service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
 	err := hcn.DSRSupported()
@@ -666,7 +666,7 @@ func CleanupLeftovers() (encounteredError bool) {
 	return encounteredError
 }
 
-func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint) {
+func (svcInfo *ServiceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint) {
 	Log(svcInfo, "Service Cleanup", 3)
 	// Skip the svcInfo.policyApplied check to remove all the policies
 	svcInfo.deleteAllHnsLoadBalancerPolicy()
@@ -684,7 +684,7 @@ func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint) {
 	svcInfo.policyApplied = false
 }
 
-func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy() {
+func (svcInfo *ServiceInfo) deleteAllHnsLoadBalancerPolicy() {
 	// Remove the Hns Policy corresponding to this service
 	hns := svcInfo.hns
 	hns.deleteLoadBalancer(svcInfo.hnsID)
@@ -885,9 +885,9 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 
 func (proxier *Proxier) cleanupAllPolicies() {
 	for svcName, svc := range proxier.serviceMap {
-		svcInfo, ok := svc.(*serviceInfo)
+		svcInfo, ok := svc.(*ServiceInfo)
 		if !ok {
-			klog.Errorf("Failed to cast serviceInfo %q", svcName.String())
+			klog.Errorf("Failed to cast ServiceInfo %q", svcName.String())
 			continue
 		}
 		svcInfo.cleanupAllPolicies(proxier.endpointsMap[svcName])
@@ -968,9 +968,9 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Program HNS by adding corresponding policies for each service.
 	for svcName, svc := range proxier.serviceMap {
-		svcInfo, ok := svc.(*serviceInfo)
+		svcInfo, ok := svc.(*ServiceInfo)
 		if !ok {
-			klog.Errorf("Failed to cast serviceInfo %q", svcName.String())
+			klog.Errorf("Failed to cast ServiceInfo %q", svcName.String())
 			continue
 		}
 

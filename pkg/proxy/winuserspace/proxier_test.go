@@ -29,7 +29,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -208,7 +208,7 @@ func waitForNumProxyLoops(t *testing.T, p *Proxier, want int32) {
 	t.Errorf("expected %d ProxyLoops running, got %d", want, got)
 }
 
-func waitForNumProxyClients(t *testing.T, s *serviceInfo, want int, timeout time.Duration) {
+func waitForNumProxyClients(t *testing.T, s *ServiceInfo, want int, timeout time.Duration) {
 	var got int
 	now := time.Now()
 	deadline := now.Add(timeout)
@@ -251,14 +251,11 @@ func TestTCPProxy(t *testing.T) {
 	})
 
 	listenIP := "0.0.0.0"
-	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
 	waitForNumProxyLoops(t, p, 0)
 
 	servicePortPortalName := ServicePortPortalName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: service.Port, PortalIPName: listenIP}
-	svcInfo, err := p.addServicePortPortal(servicePortPortalName, "TCP", listenIP, 0, time.Second)
+	svcInfo, err := p.addServiceOnPortPortal(servicePortPortalName, "TCP", listenIP, 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -278,14 +275,11 @@ func TestUDPProxy(t *testing.T) {
 	})
 
 	listenIP := "0.0.0.0"
-	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
 	waitForNumProxyLoops(t, p, 0)
 
 	servicePortPortalName := ServicePortPortalName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: service.Port, PortalIPName: listenIP}
-	svcInfo, err := p.addServicePortPortal(servicePortPortalName, "UDP", listenIP, 0, time.Second)
+	svcInfo, err := p.addServiceOnPortPortal(servicePortPortalName, "UDP", listenIP, 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -305,14 +299,11 @@ func TestUDPProxyTimeout(t *testing.T) {
 	})
 
 	listenIP := "0.0.0.0"
-	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
 	waitForNumProxyLoops(t, p, 0)
 
 	servicePortPortalName := ServicePortPortalName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: service.Port, PortalIPName: listenIP}
-	svcInfo, err := p.addServicePortPortal(servicePortPortalName, "UDP", listenIP, 0, time.Second)
+	svcInfo, err := p.addServiceOnPortPortal(servicePortPortalName, "UDP", listenIP, 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -344,14 +335,11 @@ func TestMultiPortProxy(t *testing.T) {
 	})
 
 	listenIP := "0.0.0.0"
-	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
 	waitForNumProxyLoops(t, p, 0)
 
 	servicePortPortalNameP := ServicePortPortalName{NamespacedName: types.NamespacedName{Namespace: serviceP.Namespace, Name: serviceP.Name}, Port: serviceP.Port, PortalIPName: listenIP}
-	svcInfoP, err := p.addServicePortPortal(servicePortPortalNameP, "TCP", listenIP, 0, time.Second)
+	svcInfoP, err := p.addServiceOnPortPortal(servicePortPortalNameP, "TCP", listenIP, 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -359,7 +347,7 @@ func TestMultiPortProxy(t *testing.T) {
 	waitForNumProxyLoops(t, p, 1)
 
 	servicePortPortalNameQ := ServicePortPortalName{NamespacedName: types.NamespacedName{Namespace: serviceQ.Namespace, Name: serviceQ.Name}, Port: serviceQ.Port, PortalIPName: listenIP}
-	svcInfoQ, err := p.addServicePortPortal(servicePortPortalNameQ, "UDP", listenIP, 0, time.Second)
+	svcInfoQ, err := p.addServiceOnPortPortal(servicePortPortalNameQ, "UDP", listenIP, 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -374,10 +362,7 @@ func TestMultiPortOnServiceAdd(t *testing.T) {
 	serviceX := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: "testnamespace", Name: "echo"}, Port: "x"}
 
 	listenIP := "0.0.0.0"
-	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
 	waitForNumProxyLoops(t, p, 0)
 
 	p.OnServiceAdd(&v1.Service{
@@ -440,14 +425,12 @@ func TestTCPProxyStop(t *testing.T) {
 	})
 
 	listenIP := "0.0.0.0"
-	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
+
 	waitForNumProxyLoops(t, p, 0)
 
 	servicePortPortalName := ServicePortPortalName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: service.Port, PortalIPName: listenIP}
-	svcInfo, err := p.addServicePortPortal(servicePortPortalName, "TCP", listenIP, 0, time.Second)
+	svcInfo, err := p.addServiceOnPortPortal(servicePortPortalName, "TCP", listenIP, 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -484,14 +467,11 @@ func TestUDPProxyStop(t *testing.T) {
 	})
 
 	listenIP := "0.0.0.0"
-	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
 	waitForNumProxyLoops(t, p, 0)
 
 	servicePortPortalName := ServicePortPortalName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: service.Port, PortalIPName: listenIP}
-	svcInfo, err := p.addServicePortPortal(servicePortPortalName, "UDP", listenIP, 0, time.Second)
+	svcInfo, err := p.addServiceOnPortPortal(servicePortPortalName, "UDP", listenIP, 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -522,14 +502,11 @@ func TestTCPProxyUpdateDelete(t *testing.T) {
 	})
 
 	listenIP := "0.0.0.0"
-	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
 	waitForNumProxyLoops(t, p, 0)
 
 	servicePortPortalName := ServicePortPortalName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: service.Port, PortalIPName: listenIP}
-	svcInfo, err := p.addServicePortPortal(servicePortPortalName, "TCP", listenIP, 0, time.Second)
+	svcInfo, err := p.addServiceOnPortPortal(servicePortPortalName, "TCP", listenIP, 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -567,14 +544,11 @@ func TestUDPProxyUpdateDelete(t *testing.T) {
 	})
 
 	listenIP := "0.0.0.0"
-	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
 	waitForNumProxyLoops(t, p, 0)
 
 	servicePortPortalName := ServicePortPortalName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: service.Port, PortalIPName: listenIP}
-	svcInfo, err := p.addServicePortPortal(servicePortPortalName, "UDP", listenIP, 0, time.Second)
+	svcInfo, err := p.addServiceOnPortPortal(servicePortPortalName, "UDP", listenIP, 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -612,14 +586,11 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb.OnEndpointsAdd(endpoint)
 
 	listenIP := "0.0.0.0"
-	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
 	waitForNumProxyLoops(t, p, 0)
 
 	servicePortPortalName := ServicePortPortalName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: service.Port, PortalIPName: listenIP}
-	svcInfo, err := p.addServicePortPortal(servicePortPortalName, "TCP", listenIP, 0, time.Second)
+	svcInfo, err := p.addServiceOnPortPortal(servicePortPortalName, "TCP", listenIP, 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -674,14 +645,11 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb.OnEndpointsAdd(endpoint)
 
 	listenIP := "0.0.0.0"
-	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
 	waitForNumProxyLoops(t, p, 0)
 
 	servicePortPortalName := ServicePortPortalName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: service.Port, PortalIPName: listenIP}
-	svcInfo, err := p.addServicePortPortal(servicePortPortalName, "UDP", listenIP, 0, time.Second)
+	svcInfo, err := p.addServiceOnPortPortal(servicePortPortalName, "UDP", listenIP, 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -735,14 +703,11 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 	})
 
 	listenIP := "0.0.0.0"
-	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
 	waitForNumProxyLoops(t, p, 0)
 
 	servicePortPortalName := ServicePortPortalName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: service.Port, PortalIPName: listenIP}
-	svcInfo, err := p.addServicePortPortal(servicePortPortalName, "TCP", listenIP, 0, time.Second)
+	svcInfo, err := p.addServiceOnPortPortal(servicePortPortalName, "TCP", listenIP, 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -783,14 +748,11 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 	})
 
 	listenIP := "0.0.0.0"
-	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
 	waitForNumProxyLoops(t, p, 0)
 
 	servicePortPortalName := ServicePortPortalName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: service.Port, PortalIPName: listenIP}
-	svcInfo, err := p.addServicePortPortal(servicePortPortalName, "UDP", listenIP, 0, time.Second)
+	svcInfo, err := p.addServiceOnPortPortal(servicePortPortalName, "UDP", listenIP, 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -828,14 +790,11 @@ func TestProxyUpdatePublicIPs(t *testing.T) {
 	})
 
 	listenIP := "0.0.0.0"
-	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
 	waitForNumProxyLoops(t, p, 0)
 
 	servicePortPortalName := ServicePortPortalName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: service.Port, PortalIPName: listenIP}
-	svcInfo, err := p.addServicePortPortal(servicePortPortalName, "TCP", listenIP, 0, time.Second)
+	svcInfo, err := p.addServiceOnPortPortal(servicePortPortalName, "TCP", listenIP, 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
@@ -881,14 +840,11 @@ func TestProxyUpdatePortal(t *testing.T) {
 	lb.OnEndpointsAdd(endpoint)
 
 	listenIP := "0.0.0.0"
-	p, err := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := createProxier(lb, net.ParseIP(listenIP), netshtest.NewFake(), net.ParseIP("127.0.0.1"), time.Minute, udpIdleTimeoutForTest)
 	waitForNumProxyLoops(t, p, 0)
 
 	servicePortPortalName := ServicePortPortalName{NamespacedName: types.NamespacedName{Namespace: service.Namespace, Name: service.Name}, Port: service.Port, PortalIPName: listenIP}
-	svcInfo, err := p.addServicePortPortal(servicePortPortalName, "TCP", listenIP, 0, time.Second)
+	svcInfo, err := p.addServiceOnPortPortal(servicePortPortalName, "TCP", listenIP, 0, time.Second)
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}

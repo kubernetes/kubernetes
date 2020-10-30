@@ -34,9 +34,8 @@ type Provider interface {
 
 	// Sync immediately synchronizes the Provider's current state to proxy rules.
 	Sync()
-	// SyncLoop runs periodic work.
-	// This is expected to run as a goroutine or as the main loop of the app.
-	// It does not return.
+	// SyncLoop runs periodic work which isn't done via events/watches, and is expected to run as a goroutine or as the main loop of the app.
+	// It does not return.  For example, the SyncLoop might do the work of cleaning up old sessions that have timed out.
 	SyncLoop()
 }
 

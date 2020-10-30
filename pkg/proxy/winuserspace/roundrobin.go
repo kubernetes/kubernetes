@@ -53,8 +53,8 @@ type affinityPolicy struct {
 
 // LoadBalancerRR is a round-robin load balancer.
 type LoadBalancerRR struct {
-	lock     sync.RWMutex
-	services map[proxy.ServicePortName]*balancerState
+	lock                    sync.RWMutex
+	winLoadbalancedServices map[proxy.ServicePortName]*balancerState
 }
 
 // Ensure this implements LoadBalancer.
@@ -77,10 +77,11 @@ func newAffinityPolicy(affinityType v1.ServiceAffinity, ttlSeconds int) *affinit
 // NewLoadBalancerRR returns a new LoadBalancerRR.
 func NewLoadBalancerRR() *LoadBalancerRR {
 	return &LoadBalancerRR{
-		services: map[proxy.ServicePortName]*balancerState{},
+		winLoadbalancedServices: map[proxy.ServicePortName]*balancerState{},
 	}
 }
 
+// NewService creates a new round robin internal loadbalancer.
 func (lb *LoadBalancerRR) NewService(svcPort proxy.ServicePortName, affinityType v1.ServiceAffinity, ttlSeconds int) error {
 	klog.V(4).Infof("LoadBalancerRR NewService %q", svcPort)
 	lb.lock.Lock()
@@ -89,29 +90,30 @@ func (lb *LoadBalancerRR) NewService(svcPort proxy.ServicePortName, affinityType
 	return nil
 }
 
-// This assumes that lb.lock is already held.
+// newServiceInternal adds a new internal loadbalancer and returns it to the caller.  This assumes that lb.lock is already held.
 func (lb *LoadBalancerRR) newServiceInternal(svcPort proxy.ServicePortName, affinityType v1.ServiceAffinity, ttlSeconds int) *balancerState {
 	if ttlSeconds == 0 {
 		ttlSeconds = int(v1.DefaultClientIPServiceAffinitySeconds) //default to 3 hours if not specified.  Should 0 be unlimited instead????
 	}
 
-	if _, exists := lb.services[svcPort]; !exists {
-		lb.services[svcPort] = &balancerState{affinity: *newAffinityPolicy(affinityType, ttlSeconds)}
+	if _, exists := lb.winLoadbalancedServices[svcPort]; !exists {
+		lb.winLoadbalancedServices[svcPort] = &balancerState{affinity: *newAffinityPolicy(affinityType, ttlSeconds)}
 		klog.V(4).Infof("LoadBalancerRR service %q did not exist, created", svcPort)
 	} else if affinityType != "" {
-		lb.services[svcPort].affinity.affinityType = affinityType
+		lb.winLoadbalancedServices[svcPort].affinity.affinityType = affinityType
 	}
-	return lb.services[svcPort]
+	return lb.winLoadbalancedServices[svcPort]
 }
 
+// DeleteService removes a service from the round robin loadbalancer, which results in asynchronous removal of the service proxy.
 func (lb *LoadBalancerRR) DeleteService(svcPort proxy.ServicePortName) {
 	klog.V(4).Infof("LoadBalancerRR DeleteService %q", svcPort)
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
-	delete(lb.services, svcPort)
+	delete(lb.winLoadbalancedServices, svcPort)
 }
 
-// return true if this service is using some form of session affinity.
+// isSessionAffinity returns true if this service is using some form of session affinity.
 func isSessionAffinity(affinity *affinityPolicy) bool {
 	// Should never be empty string, but checking for it to be safe.
 	if affinity.affinityType == "" || affinity.affinityType == v1.ServiceAffinityNone {
@@ -120,15 +122,14 @@ func isSessionAffinity(affinity *affinityPolicy) bool {
 	return true
 }
 
-// NextEndpoint returns a service endpoint.
-// The service endpoint is chosen using the round-robin algorithm.
+// NextEndpoint returns a service endpoint, which is chosen using the round-robin algorithm.
 func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr net.Addr, sessionAffinityReset bool) (string, error) {
 	// Coarse locking is simple.  We can get more fine-grained if/when we
 	// can prove it matters.
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 
-	state, exists := lb.services[svcPort]
+	state, exists := lb.winLoadbalancedServices[svcPort]
 	if !exists || state == nil {
 		return "", ErrMissingServiceEntry
 	}
@@ -196,7 +197,7 @@ func (lb *LoadBalancerRR) updateAffinityMap(svcPort proxy.ServicePortName, newEn
 	for _, newEndpoint := range newEndpoints {
 		allEndpoints[newEndpoint] = 1
 	}
-	state, exists := lb.services[svcPort]
+	state, exists := lb.winLoadbalancedServices[svcPort]
 	if !exists {
 		return
 	}
@@ -220,7 +221,7 @@ func (lb *LoadBalancerRR) OnEndpointsAdd(endpoints *v1.Endpoints) {
 	for portname := range portsToEndpoints {
 		svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}, Port: portname}
 		newEndpoints := portsToEndpoints[portname]
-		state, exists := lb.services[svcPort]
+		state, exists := lb.winLoadbalancedServices[svcPort]
 
 		if !exists || state == nil || len(newEndpoints) > 0 {
 			klog.V(1).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", svcPort, newEndpoints)
@@ -249,7 +250,7 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoint
 	for portname := range portsToEndpoints {
 		svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}, Port: portname}
 		newEndpoints := portsToEndpoints[portname]
-		state, exists := lb.services[svcPort]
+		state, exists := lb.winLoadbalancedServices[svcPort]
 
 		curEndpoints := []string{}
 		if state != nil {
@@ -277,7 +278,7 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoint
 		if _, exists := registeredEndpoints[svcPort]; !exists {
 			klog.V(2).Infof("LoadBalancerRR: Removing endpoints for %s", svcPort)
 			// Reset but don't delete.
-			state := lb.services[svcPort]
+			state := lb.winLoadbalancedServices[svcPort]
 			state.endpoints = []string{}
 			state.index = 0
 			state.affinity.affinityMap = map[string]*affinityState{}
@@ -295,7 +296,7 @@ func (lb *LoadBalancerRR) OnEndpointsDelete(endpoints *v1.Endpoints) {
 		svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}, Port: portname}
 		klog.V(2).Infof("LoadBalancerRR: Removing endpoints for %s", svcPort)
 		// If the service is still around, reset but don't delete.
-		if state, ok := lb.services[svcPort]; ok {
+		if state, ok := lb.winLoadbalancedServices[svcPort]; ok {
 			state.endpoints = []string{}
 			state.index = 0
 			state.affinity.affinityMap = map[string]*affinityState{}
@@ -321,7 +322,7 @@ func (lb *LoadBalancerRR) CleanupStaleStickySessions(svcPort proxy.ServicePortNa
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 
-	state, exists := lb.services[svcPort]
+	state, exists := lb.winLoadbalancedServices[svcPort]
 	if !exists {
 		return
 	}

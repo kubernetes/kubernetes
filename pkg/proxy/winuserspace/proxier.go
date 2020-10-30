@@ -39,13 +39,17 @@ import (
 
 const allAvailableInterfaces string = ""
 
+var localhostIPv4 = net.ParseIP("127.0.0.1")
+var localhostIPv6 = net.ParseIP("::1")
+
 type portal struct {
 	ip         string
 	port       int
 	isExternal bool
 }
 
-type serviceInfo struct {
+// ServiceInfo contains information and state for a particular proxied service
+type ServiceInfo struct {
 	isAliveAtomic       int32 // Only access this with atomic ops
 	portal              portal
 	protocol            v1.Protocol
@@ -56,7 +60,7 @@ type serviceInfo struct {
 	sessionAffinityType v1.ServiceAffinity
 }
 
-func (info *serviceInfo) setAlive(b bool) {
+func (info *ServiceInfo) setAlive(b bool) {
 	var i int32
 	if b {
 		i = 1
@@ -64,7 +68,7 @@ func (info *serviceInfo) setAlive(b bool) {
 	atomic.StoreInt32(&info.isAliveAtomic, i)
 }
 
-func (info *serviceInfo) isAlive() bool {
+func (info *ServiceInfo) isAlive() bool {
 	return atomic.LoadInt32(&info.isAliveAtomic) != 0
 }
 
@@ -88,15 +92,17 @@ type Proxier struct {
 
 	loadBalancer   LoadBalancer
 	mu             sync.Mutex // protects serviceMap
-	serviceMap     map[ServicePortPortalName]*serviceInfo
+	serviceMap     map[ServicePortPortalName]*ServiceInfo
 	syncPeriod     time.Duration
 	udpIdleTimeout time.Duration
 	numProxyLoops  int32 // use atomic ops to access this; mostly for testing
-	netsh          netsh.Interface
 	hostIP         net.IP
+
+	// specific to windows implementation
+	netsh netsh.Interface
 }
 
-// assert Proxier is a proxy.Provider
+// assert Proxier fully implements proxy.Provider interface
 var _ proxy.Provider = &Proxier{}
 
 var (
@@ -106,14 +112,13 @@ var (
 	ErrProxyOnLocalhost = fmt.Errorf("cannot proxy on localhost")
 )
 
-// Used below.
-var localhostIPv4 = net.ParseIP("127.0.0.1")
-var localhostIPv6 = net.ParseIP("::1")
-
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
 // which to listen. It is assumed that there is only a single Proxier active
-// on a machine. An error will be returned if the proxier cannot be started
-// due to an invalid ListenIP (loopback)
+// on a machine.
+// An error will be returned in any of the following cases:
+// 1) the proxier cannot be started (due to an invalid ListenIP - such as loopback)
+// 2) the host interface cannot be selected
+// 3) Other downstream dependencies of this function fail (i.e. the createProxiser function)
 func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, netsh netsh.Interface, pr utilnet.PortRange, syncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
 		return nil, ErrProxyOnLocalhost
@@ -121,22 +126,22 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, netsh netsh.Interfac
 
 	hostIP, err := utilnet.ChooseHostInterface()
 	if err != nil {
-		return nil, fmt.Errorf("failed to select a host interface: %v", err)
+		return nil, fmt.Errorf("NewProxier failed to select a host interface: %v", err)
 	}
 
 	klog.V(2).Infof("Setting proxy IP to %v", hostIP)
-	return createProxier(loadBalancer, listenIP, netsh, hostIP, syncPeriod, udpIdleTimeout)
+	return createProxier(loadBalancer, listenIP, netsh, hostIP, syncPeriod, udpIdleTimeout), nil
 }
 
-func createProxier(loadBalancer LoadBalancer, listenIP net.IP, netsh netsh.Interface, hostIP net.IP, syncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
+func createProxier(loadBalancer LoadBalancer, listenIP net.IP, netsh netsh.Interface, hostIP net.IP, syncPeriod, udpIdleTimeout time.Duration) *Proxier {
 	return &Proxier{
 		loadBalancer:   loadBalancer,
-		serviceMap:     make(map[ServicePortPortalName]*serviceInfo),
+		serviceMap:     make(map[ServicePortPortalName]*ServiceInfo),
 		syncPeriod:     syncPeriod,
 		udpIdleTimeout: udpIdleTimeout,
 		netsh:          netsh,
 		hostIP:         hostIP,
-	}, nil
+	}
 }
 
 // Sync is called to immediately synchronize the proxier state
@@ -144,7 +149,8 @@ func (proxier *Proxier) Sync() {
 	proxier.cleanupStaleStickySessions()
 }
 
-// SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
+// SyncLoop runs periodic work, implementing the Proxy Provider interface.
+// This is expected to run as a goroutine or as the main loop of the app.  It does not return.
 func (proxier *Proxier) SyncLoop() {
 	t := time.NewTicker(proxier.syncPeriod)
 	defer t.Stop()
@@ -176,37 +182,40 @@ func (proxier *Proxier) cleanupStaleStickySessions() {
 	}
 }
 
-// This assumes proxier.mu is not locked.
-func (proxier *Proxier) stopProxy(service ServicePortPortalName, info *serviceInfo) error {
+// stopProxy stops the proxy.  This assumes proxier.mu is not locked.
+func (proxier *Proxier) stopProxy(service ServicePortPortalName, info *ServiceInfo) error {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	return proxier.stopProxyInternal(service, info)
 }
 
-// This assumes proxier.mu is locked.
-func (proxier *Proxier) stopProxyInternal(service ServicePortPortalName, info *serviceInfo) error {
+// stopProxyInternal deletes proxy information and sets its state for being stopped.  This assumes proxier.mu is locked.  This function
+// ends the life of a proxy by setting its "alive" status to false.  This is picked up by the proxy and the corresponding closure of
+// ongoing ProxyLoop is then allowed to exit.
+func (proxier *Proxier) stopProxyInternal(service ServicePortPortalName, info *ServiceInfo) error {
 	delete(proxier.serviceMap, service)
 	info.setAlive(false)
 	err := info.socket.Close()
 	return err
 }
 
-func (proxier *Proxier) getServiceInfo(service ServicePortPortalName) (*serviceInfo, bool) {
+func (proxier *Proxier) getServiceInfo(service ServicePortPortalName) (*ServiceInfo, bool) {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	info, ok := proxier.serviceMap[service]
 	return info, ok
 }
 
-func (proxier *Proxier) setServiceInfo(service ServicePortPortalName, info *serviceInfo) {
+func (proxier *Proxier) setServiceInfo(service ServicePortPortalName, info *ServiceInfo) {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	proxier.serviceMap[service] = info
 }
 
-// addServicePortPortal starts listening for a new service, returning the serviceInfo.
-// The timeout only applies to UDP connections, for now.
-func (proxier *Proxier) addServicePortPortal(servicePortPortalName ServicePortPortalName, protocol v1.Protocol, listenIP string, port int, timeout time.Duration) (*serviceInfo, error) {
+// addServiceOnPortPortal starts listening for a new service, returning the ServiceInfo.
+// The timeout only applies to UDP connections, for now.  It creates a dedicated socket, and starts a goroutine for the new service which handles creation of the
+// proxying loop on the corresponding socket.
+func (proxier *Proxier) addServiceOnPortPortal(servicePortPortalName ServicePortPortalName, protocol v1.Protocol, listenIP string, port int, timeout time.Duration) (*ServiceInfo, error) {
 	var serviceIP net.IP
 	if listenIP != allAvailableInterfaces {
 		if serviceIP = net.ParseIP(listenIP); serviceIP == nil {
@@ -226,7 +235,7 @@ func (proxier *Proxier) addServicePortPortal(servicePortPortalName ServicePortPo
 	if err != nil {
 		return nil, err
 	}
-	si := &serviceInfo{
+	si := &ServiceInfo{
 		isAliveAtomic: 1,
 		portal: portal{
 			ip:         listenIP,
@@ -253,7 +262,8 @@ func (proxier *Proxier) addServicePortPortal(servicePortPortalName ServicePortPo
 	return si, nil
 }
 
-func (proxier *Proxier) closeServicePortPortal(servicePortPortalName ServicePortPortalName, info *serviceInfo) error {
+// closeServicePortPortal
+func (proxier *Proxier) closeServicePortPortal(servicePortPortalName ServicePortPortalName, info *ServiceInfo) error {
 	// turn off the proxy
 	if err := proxier.stopProxy(servicePortPortalName, info); err != nil {
 		return err
@@ -290,6 +300,9 @@ func getListenIPPortMap(service *v1.Service, listenPort int, nodePort int) map[s
 	return listenIPPortMap
 }
 
+// mergeService returns a "set" of service portals, using a map as the container for the unique set values.
+// each service portal internally will result in a "ProxyLoop".  To see how this is cleaned up ,look at the
+// unmergeService method.
 func (proxier *Proxier) mergeService(service *v1.Service) map[ServicePortPortalName]bool {
 	if service == nil {
 		return nil
@@ -326,7 +339,7 @@ func (proxier *Proxier) mergeService(service *v1.Service) map[ServicePortPortalN
 				}
 			}
 			klog.V(1).Infof("Adding new service %q at %s/%s", servicePortPortalName, net.JoinHostPort(listenIP, strconv.Itoa(listenPort)), protocol)
-			info, err := proxier.addServicePortPortal(servicePortPortalName, protocol, listenIP, listenPort, proxier.udpIdleTimeout)
+			info, err := proxier.addServiceOnPortPortal(servicePortPortalName, protocol, listenIP, listenPort, proxier.udpIdleTimeout)
 			if err != nil {
 				klog.Errorf("Failed to start proxy for %q: %v", servicePortPortalName, err)
 				continue
@@ -354,6 +367,7 @@ func (proxier *Proxier) mergeService(service *v1.Service) map[ServicePortPortalN
 	return existingPortPortals
 }
 
+// unmergeService implements the removal of services, ultimately resulting in their cleanup.
 func (proxier *Proxier) unmergeService(service *v1.Service, existingPortPortals map[ServicePortPortalName]bool) {
 	if service == nil {
 		return
@@ -411,27 +425,27 @@ func (proxier *Proxier) unmergeService(service *v1.Service, existingPortPortals 
 	}
 }
 
-// OnServiceAdd is called whenever creation of new service object
-// is observed.
+// OnServiceAdd is called whenever creation of new service object is observed.  When a service is merged by this method, a new socket may get created which is listened against
+// by an underlying proxy routine.  It implements the ServiceHandler interface.
 func (proxier *Proxier) OnServiceAdd(service *v1.Service) {
 	_ = proxier.mergeService(service)
 }
 
 // OnServiceUpdate is called whenever modification of an existing
-// service object is observed.
+// service object is observed.  It implements the ServiceHandler interface.
 func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) {
 	existingPortPortals := proxier.mergeService(service)
 	proxier.unmergeService(oldService, existingPortPortals)
 }
 
 // OnServiceDelete is called whenever deletion of an existing service
-// object is observed.
+// object is observed.  It implements the ServiceHandler interface.
 func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 	proxier.unmergeService(service, map[ServicePortPortalName]bool{})
 }
 
 // OnServiceSynced is called once all the initial event handlers were
-// called and the state is fully propagated to local cache.
+// called and the state is fully propagated to local cache.  It implements the ServiceHandler interface.
 func (proxier *Proxier) OnServiceSynced() {
 }
 
@@ -459,7 +473,7 @@ func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.loadBalancer.OnEndpointsSynced()
 }
 
-func sameConfig(info *serviceInfo, service *v1.Service, protocol v1.Protocol, listenPort int) bool {
+func sameConfig(info *ServiceInfo, service *v1.Service, protocol v1.Protocol, listenPort int) bool {
 	return info.protocol == protocol && info.portal.port == listenPort && info.sessionAffinityType == service.Spec.SessionAffinity
 }
 
@@ -474,6 +488,12 @@ func isClosedError(err error) bool {
 	return strings.HasSuffix(err.Error(), "use of closed network connection")
 }
 
+// netsh is used by the proxier to add and remove IP addresses from the windows kernel
+// on a typical VM, the resulting netsh commands here might be like:
+// name = vEthernet (HNS Internal NIC+) address
+// address = 100.2.2.1
+// mask = 255.0.0.0
+
 func (proxier *Proxier) netshIPv4AddressAddArgs(destIP net.IP) []string {
 	intName := proxier.netsh.GetInterfaceToAddIP()
 	args := []string{
@@ -481,7 +501,6 @@ func (proxier *Proxier) netshIPv4AddressAddArgs(destIP net.IP) []string {
 		"name=" + intName,
 		"address=" + destIP.String(),
 	}
-
 	return args
 }
 
@@ -492,6 +511,5 @@ func (proxier *Proxier) netshIPv4AddressDeleteArgs(destIP net.IP) []string {
 		"name=" + intName,
 		"address=" + destIP.String(),
 	}
-
 	return args
 }

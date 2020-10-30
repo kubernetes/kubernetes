@@ -151,6 +151,7 @@ func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr ne
 	sessionAffinityEnabled := isSessionAffinity(&state.affinity)
 
 	var ipaddr string
+
 	if sessionAffinityEnabled {
 		// Caution: don't shadow ipaddr
 		var err error
@@ -160,8 +161,8 @@ func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr ne
 		}
 		if !sessionAffinityReset {
 			sessionAffinity, exists := state.affinity.affinityMap[ipaddr]
+			// return the last used endpoint unless the affinity timeout has already expired
 			if exists && int(time.Since(sessionAffinity.lastUsed).Seconds()) < state.affinity.ttlSeconds {
-				// Affinity wins.
 				endpoint := sessionAffinity.endpoint
 				sessionAffinity.lastUsed = time.Now()
 				klog.V(4).Infof("NextEndpoint for service %q from IP %s with sessionAffinity %#v: %s", svcPort, ipaddr, sessionAffinity, endpoint)
@@ -169,7 +170,8 @@ func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr ne
 			}
 		}
 	}
-	// Take the next endpoint.
+
+	// No previous Session affinity was returned so we take the next endpoint.
 	endpoint := state.endpoints[state.index]
 	state.index = (state.index + 1) % len(state.endpoints)
 

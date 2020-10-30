@@ -182,9 +182,9 @@ func TestCreateServiceVip(t *testing.T) {
 	proxier.syncProxyRules()
 
 	svc := proxier.serviceMap[svcPortName]
-	svcInfo, ok := svc.(*serviceInfo)
+	svcInfo, ok := svc.(*ServiceInfo)
 	if !ok {
-		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+		t.Errorf("Failed to cast ServiceInfo %q", svcPortName.String())
 
 	} else {
 		if svcInfo.remoteEndpoint == nil {
@@ -694,9 +694,9 @@ func TestCreateLoadBalancer(t *testing.T) {
 	proxier.syncProxyRules()
 
 	svc := proxier.serviceMap[svcPortName]
-	svcInfo, ok := svc.(*serviceInfo)
+	svcInfo, ok := svc.(*ServiceInfo)
 	if !ok {
-		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+		t.Errorf("Failed to cast ServiceInfo %q", svcPortName.String())
 
 	} else {
 		if svcInfo.hnsID != guid {
@@ -754,9 +754,9 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 	proxier.syncProxyRules()
 
 	svc := proxier.serviceMap[svcPortName]
-	svcInfo, ok := svc.(*serviceInfo)
+	svcInfo, ok := svc.(*ServiceInfo)
 	if !ok {
-		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+		t.Errorf("Failed to cast ServiceInfo %q", svcPortName.String())
 
 	} else {
 		if svcInfo.hnsID != guid {
@@ -819,9 +819,9 @@ func TestEndpointSlice(t *testing.T) {
 	proxier.syncProxyRules()
 
 	svc := proxier.serviceMap[svcPortName]
-	svcInfo, ok := svc.(*serviceInfo)
+	svcInfo, ok := svc.(*ServiceInfo)
 	if !ok {
-		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+		t.Errorf("Failed to cast ServiceInfo %q", svcPortName.String())
 
 	} else {
 		if svcInfo.hnsID != guid {

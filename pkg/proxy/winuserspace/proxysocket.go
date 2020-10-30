@@ -64,7 +64,7 @@ const (
 	dnsClassInternet uint16 = 0x01
 )
 
-// Abstraction over TCP/UDP sockets which are proxied.
+// proxySocket is an abstraction over TCP/UDP sockets which are proxied to via the userspace service.
 type proxySocket interface {
 	// Addr gets the net.Addr for a proxySocket.
 	Addr() net.Addr
@@ -73,7 +73,7 @@ type proxySocket interface {
 	// while sessions are active.
 	Close() error
 	// ProxyLoop proxies incoming connections for the specified service to the service endpoints.
-	ProxyLoop(service ServicePortPortalName, info *serviceInfo, proxier *Proxier)
+	ProxyLoop(service ServicePortPortalName, info *ServiceInfo, proxier *Proxier)
 	// ListenPort returns the host port that the proxySocket is listening on
 	ListenPort() int
 }
@@ -153,7 +153,8 @@ func tryConnect(service ServicePortPortalName, srcAddr net.Addr, protocol string
 	return nil, fmt.Errorf("failed to connect to an endpoint.")
 }
 
-func (tcp *tcpProxySocket) ProxyLoop(service ServicePortPortalName, myInfo *serviceInfo, proxier *Proxier) {
+// ProxyLoop is the user space proxy which continuously waits for incoming connections on a tcp socket, and then starts a new goroutine to proxy those connections.
+func (tcp *tcpProxySocket) ProxyLoop(service ServicePortPortalName, myInfo *ServiceInfo, proxier *Proxier) {
 	for {
 		if !myInfo.isAlive() {
 			// The service port was closed or replaced.
@@ -498,7 +499,8 @@ func processDNSResponsePacket(
 	return drop, length, nil
 }
 
-func (udp *udpProxySocket) ProxyLoop(service ServicePortPortalName, myInfo *serviceInfo, proxier *Proxier) {
+// ProxyLoop runs forever until its "alive" status changes to false.
+func (udp *udpProxySocket) ProxyLoop(service ServicePortPortalName, myInfo *ServiceInfo, proxier *Proxier) {
 	var buffer [4096]byte // 4KiB should be enough for most whole-packets
 	var dnsSearch []string
 	if isDNSService(service.Port) {
@@ -510,10 +512,9 @@ func (udp *udpProxySocket) ProxyLoop(service ServicePortPortalName, myInfo *serv
 			dnsSearch = append(dnsSearch, suffixList...)
 		}
 	}
-
+	klog.V(3).Infof("ProxyLoop is now starting for service %v", myInfo)
 	for {
 		if !myInfo.isAlive() {
-			// The service port was closed or replaced.
 			break
 		}
 
@@ -560,6 +561,7 @@ func (udp *udpProxySocket) ProxyLoop(service ServicePortPortalName, myInfo *serv
 			continue
 		}
 	}
+	klog.V(3).Infof("ProxyLoop is now closing for service %v", myInfo)
 }
 
 func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, dnsClients *dnsClientCache, cliAddr net.Addr, proxier *Proxier, service ServicePortPortalName, timeout time.Duration, dnsSearch []string) (net.Conn, error) {
@@ -590,7 +592,7 @@ func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, dnsClients
 }
 
 // This function is expected to be called as a goroutine.
-// TODO: Track and log bytes copied, like TCP
+// TODO: Track and log bytes copied, like TCP proxyLoop
 func (udp *udpProxySocket) proxyClient(cliAddr net.Addr, svrConn net.Conn, activeClients *clientCache, dnsClients *dnsClientCache, service ServicePortPortalName, timeout time.Duration, dnsSearch []string) {
 	defer svrConn.Close()
 	var buffer [4096]byte
