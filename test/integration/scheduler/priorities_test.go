@@ -72,9 +72,9 @@ func TestNodeAffinity(t *testing.T) {
 	testCtx := initTestSchedulerForPriorityTest(t, nodeaffinity.Name)
 	defer testutils.CleanupTest(t, testCtx)
 	// Add a few nodes.
-	_, err := createNodes(testCtx.ClientSet, "testnode", st.MakeNode(), 4)
+	_, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode(), 4)
 	if err != nil {
-		t.Fatalf("Cannot create nodes: %v", err)
+		t.Fatal(err)
 	}
 	// Add a label to one of the nodes.
 	labelKey := "kubernetes.io/node-topologyKey"
@@ -126,9 +126,9 @@ func TestPodAffinity(t *testing.T) {
 	// Add a few nodes.
 	topologyKey := "node-topologykey"
 	topologyValue := "topologyvalue"
-	nodesInTopology, err := createNodes(testCtx.ClientSet, "in-topology", st.MakeNode().Label(topologyKey, topologyValue), 5)
+	nodesInTopology, err := createAndWaitForNodesInCache(testCtx, "in-topology", st.MakeNode().Label(topologyKey, topologyValue), 5)
 	if err != nil {
-		t.Fatalf("Cannot create nodes: %v", err)
+		t.Fatal(err)
 	}
 	// Add a pod with a label and wait for it to schedule.
 	labelKey := "service"
@@ -142,9 +142,9 @@ func TestPodAffinity(t *testing.T) {
 		t.Fatalf("Error running the attractor pod: %v", err)
 	}
 	// Add a few more nodes without the topology label.
-	_, err = createNodes(testCtx.ClientSet, "other-node", st.MakeNode(), 5)
+	_, err = createAndWaitForNodesInCache(testCtx, "other-node", st.MakeNode(), 5)
 	if err != nil {
-		t.Fatalf("Cannot create the second set of nodes: %v", err)
+		t.Fatal(err)
 	}
 	// Add a new pod with affinity to the attractor pod.
 	podName := "pod-with-podaffinity"
@@ -215,9 +215,9 @@ func TestImageLocality(t *testing.T) {
 	}
 
 	// Add a few nodes.
-	_, err = createNodes(testCtx.ClientSet, "testnode", st.MakeNode(), 10)
+	_, err = createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode(), 10)
 	if err != nil {
-		t.Fatalf("cannot create nodes: %v", err)
+		t.Fatal(err)
 	}
 
 	// Create a pod with containers each having the specified image.

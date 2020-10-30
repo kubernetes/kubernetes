@@ -825,6 +825,10 @@ func TestSchedulerInformers(t *testing.T) {
 					t.Fatalf("Error creating node %v: %v", nodeConf.name, err)
 				}
 			}
+			// Ensure nodes are present in scheduler cache.
+			if err := waitForNodesInCache(testCtx.Scheduler, len(test.nodes)); err != nil {
+				t.Fatal(err)
+			}
 
 			pods := make([]*v1.Pod, len(test.existingPods))
 			var err error
