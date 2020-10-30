@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -30,8 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -219,13 +223,15 @@ func TestPodToEndpoint(t *testing.T) {
 	svcPublishNotReady, _ := newServiceAndEndpointMeta("publishnotready", ns)
 	svcPublishNotReady.Spec.PublishNotReadyAddresses = true
 
-	readyPod := newPod(1, ns, true, 1)
-	readyPodHostname := newPod(1, ns, true, 1)
+	readyPod := newPod(1, ns, true, 1, false)
+	readyTerminatingPod := newPod(1, ns, true, 1, true)
+	readyPodHostname := newPod(1, ns, true, 1, false)
 	readyPodHostname.Spec.Subdomain = svc.Name
 	readyPodHostname.Spec.Hostname = "example-hostname"
 
-	unreadyPod := newPod(1, ns, false, 1)
-	multiIPPod := newPod(1, ns, true, 1)
+	unreadyPod := newPod(1, ns, false, 1, false)
+	unreadyTerminatingPod := newPod(1, ns, false, 1, true)
+	multiIPPod := newPod(1, ns, true, 1, false)
 	multiIPPod.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}, {IP: "1234::5678:0000:0000:9abc:def0"}}
 
 	node1 := &v1.Node{
@@ -245,6 +251,7 @@ func TestPodToEndpoint(t *testing.T) {
 		svc                      *v1.Service
 		expectedEndpoint         discovery.Endpoint
 		publishNotReadyAddresses bool
+		terminatingGateEnabled   bool
 	}{
 		{
 			name: "Ready pod",
@@ -381,13 +388,121 @@ func TestPodToEndpoint(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Ready pod, terminating gate enabled",
+			pod:  readyPod,
+			svc:  &svc,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(true),
+					Accepting:   utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(false),
+				},
+				Topology: map[string]string{"kubernetes.io/hostname": "node-1"},
+				TargetRef: &v1.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       ns,
+					Name:            readyPod.Name,
+					UID:             readyPod.UID,
+					ResourceVersion: readyPod.ResourceVersion,
+				},
+			},
+			terminatingGateEnabled: true,
+		},
+		{
+			name: "Ready terminating pod, terminating gate disabled",
+			pod:  readyTerminatingPod,
+			svc:  &svc,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.BoolPtr(false),
+				},
+				Topology: map[string]string{"kubernetes.io/hostname": "node-1"},
+				TargetRef: &v1.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       ns,
+					Name:            readyPod.Name,
+					UID:             readyPod.UID,
+					ResourceVersion: readyPod.ResourceVersion,
+				},
+			},
+			terminatingGateEnabled: false,
+		},
+		{
+			name: "Ready terminating pod, terminating gate enabled",
+			pod:  readyTerminatingPod,
+			svc:  &svc,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(false),
+					Accepting:   utilpointer.BoolPtr(true),
+					Terminating: utilpointer.BoolPtr(true),
+				},
+				Topology: map[string]string{"kubernetes.io/hostname": "node-1"},
+				TargetRef: &v1.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       ns,
+					Name:            readyPod.Name,
+					UID:             readyPod.UID,
+					ResourceVersion: readyPod.ResourceVersion,
+				},
+			},
+			terminatingGateEnabled: true,
+		},
+		{
+			name: "Not ready terminating pod, terminating gate disabled",
+			pod:  unreadyTerminatingPod,
+			svc:  &svc,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready: utilpointer.BoolPtr(false),
+				},
+				Topology: map[string]string{"kubernetes.io/hostname": "node-1"},
+				TargetRef: &v1.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       ns,
+					Name:            readyPod.Name,
+					UID:             readyPod.UID,
+					ResourceVersion: readyPod.ResourceVersion,
+				},
+			},
+			terminatingGateEnabled: false,
+		},
+		{
+			name: "Not ready terminating pod, terminating gate enabled",
+			pod:  unreadyTerminatingPod,
+			svc:  &svc,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses: []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{
+					Ready:       utilpointer.BoolPtr(false),
+					Accepting:   utilpointer.BoolPtr(false),
+					Terminating: utilpointer.BoolPtr(true),
+				},
+				Topology: map[string]string{"kubernetes.io/hostname": "node-1"},
+				TargetRef: &v1.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       ns,
+					Name:            readyPod.Name,
+					UID:             readyPod.UID,
+					ResourceVersion: readyPod.ResourceVersion,
+				},
+			},
+			terminatingGateEnabled: true,
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceTerminatingCondition, testCase.terminatingGateEnabled)()
+
 			endpoint := podToEndpoint(testCase.pod, testCase.node, testCase.svc, discovery.AddressTypeIPv4)
 			if !reflect.DeepEqual(testCase.expectedEndpoint, endpoint) {
-				t.Errorf("Expected endpoint: %v, got: %v", testCase.expectedEndpoint, endpoint)
+				t.Errorf("Expected endpoint: %+v, got: %+v", testCase.expectedEndpoint, endpoint)
 			}
 		})
 	}
@@ -811,18 +926,26 @@ func TestSetEndpointSliceLabels(t *testing.T) {
 
 // Test helpers
 
-func newPod(n int, namespace string, ready bool, nPorts int) *v1.Pod {
+func newPod(n int, namespace string, ready bool, nPorts int, terminating bool) *v1.Pod {
 	status := v1.ConditionTrue
 	if !ready {
 		status = v1.ConditionFalse
 	}
 
+	var deletionTimestamp *metav1.Time
+	if terminating {
+		deletionTimestamp = &metav1.Time{
+			Time: time.Now(),
+		}
+	}
+
 	p := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      fmt.Sprintf("pod%d", n),
-			Labels:    map[string]string{"foo": "bar"},
+			Namespace:         namespace,
+			Name:              fmt.Sprintf("pod%d", n),
+			Labels:            map[string]string{"foo": "bar"},
+			DeletionTimestamp: deletionTimestamp,
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{
