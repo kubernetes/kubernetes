@@ -391,9 +391,18 @@ function DownloadAndInstall-GKEMetadataServer {
     Log-Output -Fatal ("Missing GKE_METADATA_SERVER_URL " +
                        "for downloading gke-metadata-server: $(Out-String $kube_env)")
   }
+
+  $tar_url = ${kube_env}['GKE_METADATA_SERVER_URL']
+  $sha_url = $tar_url + ".sha512"
+  MustDownload-File -URLs $sha_url `
+      -OutFile "${env:NODE_DIR}\gke-metadata-server.exe.sha512"
+  $sha = $(Get-Content "${env:NODE_DIR}\gke-metadata-server.exe.sha512")
+
   MustDownload-File `
-      -URLs ${kube_env}['GKE_METADATA_SERVER_URL'] `
-      -OutFile "${env:NODE_DIR}\gke-metadata-server.exe"
+      -URLs $tar_url `
+      -OutFile "${env:NODE_DIR}\gke-metadata-server.exe" `
+      -Hash $sha `
+      -Algorithm SHA512
 }
 
 # Sets up the gke-metadata-server arguments and starts it as native Windows service
