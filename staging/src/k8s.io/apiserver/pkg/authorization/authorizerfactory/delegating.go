@@ -17,6 +17,7 @@ limitations under the License.
 package authorizerfactory
 
 import (
+	"errors"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -44,16 +45,14 @@ type DelegatingAuthorizerConfig struct {
 }
 
 func (c DelegatingAuthorizerConfig) New() (authorizer.Authorizer, error) {
-	// Provide a default if WebhookRetryBackoff has not been set by the user.
-	retryBackoff := c.WebhookRetryBackoff
-	if retryBackoff == nil {
-		retryBackoff = webhook.DefaultRetryBackoff()
+	if c.WebhookRetryBackoff == nil {
+		return nil, errors.New("retry backoff parameters for delegating authorization webhook has not been specified")
 	}
 
 	return webhook.NewFromInterface(
 		c.SubjectAccessReviewClient,
 		c.AllowCacheTTL,
 		c.DenyCacheTTL,
-		*retryBackoff,
+		*c.WebhookRetryBackoff,
 	)
 }

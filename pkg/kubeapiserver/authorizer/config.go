@@ -17,6 +17,7 @@ limitations under the License.
 package authorizer
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -25,7 +26,6 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/authorization/union"
-	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	versionedinformers "k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
@@ -110,17 +110,14 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			authorizers = append(authorizers, abacAuthorizer)
 			ruleResolvers = append(ruleResolvers, abacAuthorizer)
 		case modes.ModeWebhook:
-			// Provide a default if WebhookRetryBackoff has not been set by the user.
-			retryBackoff := config.WebhookRetryBackoff
-			if retryBackoff == nil {
-				retryBackoff = genericoptions.DefaultAuthWebhookRetryBackoff()
+			if config.WebhookRetryBackoff == nil {
+				return nil, nil, errors.New("retry backoff parameters for authorization webhook has not been specified")
 			}
-
 			webhookAuthorizer, err := webhook.New(config.WebhookConfigFile,
 				config.WebhookVersion,
 				config.WebhookCacheAuthorizedTTL,
 				config.WebhookCacheUnauthorizedTTL,
-				*retryBackoff,
+				*config.WebhookRetryBackoff,
 				config.CustomDial)
 			if err != nil {
 				return nil, nil, err
