@@ -46,31 +46,3 @@ type GenericControllerManagerConfiguration struct {
 	// DebuggingConfiguration holds configuration for Debugging related features.
 	Debugging componentbaseconfigv1alpha1.DebuggingConfiguration
 }
-
-// LeaderMigrationConfiguration provides versioned configuration for all migrating leader locks.
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type LeaderMigrationConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
-
-	// LeaderName is the name of the leader election resource that protects the migration
-	// E.g. 1-20-KCM-to-1-21-CCM
-	LeaderName string `json:"leaderName"`
-
-	// ResourceLock indicates the resource object type that will be used to lock
-	// Should be "leases" or "endpoints"
-	ResourceLock string `json:"resourceLock"`
-
-	// ControllerLeaders contains a list of migrating leader lock configurations
-	ControllerLeaders []ControllerLeaderConfiguration `json:"controllerLeaders"`
-}
-
-// ControllerLeaderConfiguration provides the configuration for a migrating leader lock.
-type ControllerLeaderConfiguration struct {
-	// Name is the name of the controller being migrated
-	// E.g. service-controller, route-controller, cloud-node-controller, etc
-	Name string `json:"name"`
-
-	// Component is the name of the component in which the controller should be running.
-	// E.g. kube-controller-manager, cloud-controller-manager, etc
-	Component string `json:"component"`
-}
