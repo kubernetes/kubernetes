@@ -522,7 +522,7 @@ func GetClusterZones(c clientset.Interface) (sets.String, error) {
 			zones.Insert(zone)
 		}
 
-		if zone, found := node.Labels[v1.LabelZoneFailureDomainStable]; found {
+		if zone, found := node.Labels[v1.LabelTopologyZone]; found {
 			zones.Insert(zone)
 		}
 	}

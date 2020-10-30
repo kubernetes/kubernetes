@@ -41,7 +41,7 @@ func RecreateNodes(c clientset.Interface, nodes []v1.Node) error {
 			continue
 		}
 
-		if zone, ok := node.Labels[v1.LabelZoneFailureDomainStable]; ok {
+		if zone, ok := node.Labels[v1.LabelTopologyZone]; ok {
 			nodeNamesByZone[zone] = append(nodeNamesByZone[zone], node.Name)
 			continue
 		}

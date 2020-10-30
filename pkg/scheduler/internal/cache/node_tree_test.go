@@ -114,10 +114,10 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-9",
 			Labels: map[string]string{
-				v1.LabelZoneRegionStable:        "region-2",
-				v1.LabelZoneFailureDomainStable: "zone-2",
-				v1.LabelZoneRegion:              "region-2",
-				v1.LabelZoneFailureDomain:       "zone-2",
+				v1.LabelZoneRegionStable:  "region-2",
+				v1.LabelTopologyZone:      "zone-2",
+				v1.LabelZoneRegion:        "region-2",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	},

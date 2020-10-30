@@ -19,7 +19,7 @@ package apis
 import (
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -34,7 +34,7 @@ const (
 
 var kubeletLabels = sets.NewString(
 	v1.LabelHostname,
-	v1.LabelZoneFailureDomainStable,
+	v1.LabelTopologyZone,
 	v1.LabelZoneRegionStable,
 	v1.LabelZoneFailureDomain,
 	v1.LabelZoneRegion,

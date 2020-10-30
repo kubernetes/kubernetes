@@ -52,7 +52,7 @@ const (
 var volumeZoneLabels = sets.NewString(
 	v1.LabelZoneFailureDomain,
 	v1.LabelZoneRegion,
-	v1.LabelZoneFailureDomainStable,
+	v1.LabelTopologyZone,
 	v1.LabelZoneRegionStable,
 )
 

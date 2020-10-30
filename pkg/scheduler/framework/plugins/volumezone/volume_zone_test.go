@@ -58,7 +58,7 @@ func TestSingleZone(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{v1.LabelZoneRegion: "us-west1"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_Stable_1", Labels: map[string]string{v1.LabelZoneFailureDomainStable: "us-west1-a"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_Stable_1", Labels: map[string]string{v1.LabelTopologyZone: "us-west1-a"}},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_Stable_2", Labels: map[string]string{v1.LabelZoneRegionStable: "us-west1", "uselessLabel": "none"}},
@@ -167,7 +167,7 @@ func TestSingleZone(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{v1.LabelZoneFailureDomainStable: "us-west1-a", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelTopologyZone: "us-west1-a", "uselessLabel": "none"},
 				},
 			},
 		},
@@ -198,7 +198,7 @@ func TestSingleZone(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{v1.LabelZoneFailureDomainStable: "no_us-west1-a", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelTopologyZone: "no_us-west1-a", "uselessLabel": "none"},
 				},
 			},
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
@@ -234,10 +234,10 @@ func TestMultiZone(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-c__us-west1-a"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_Stable_1", Labels: map[string]string{v1.LabelZoneFailureDomainStable: "us-west1-a"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_Stable_1", Labels: map[string]string{v1.LabelTopologyZone: "us-west1-a"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_Stable_2", Labels: map[string]string{v1.LabelZoneFailureDomainStable: "us-west1-c__us-west1-a"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_Stable_2", Labels: map[string]string{v1.LabelTopologyZone: "us-west1-c__us-west1-a"}},
 		},
 	}
 
@@ -310,7 +310,7 @@ func TestMultiZone(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{v1.LabelZoneFailureDomainStable: "us-west1-a", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelTopologyZone: "us-west1-a", "uselessLabel": "none"},
 				},
 			},
 		},
@@ -320,7 +320,7 @@ func TestMultiZone(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{v1.LabelZoneFailureDomainStable: "us-west1-b", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelTopologyZone: "us-west1-b", "uselessLabel": "none"},
 				},
 			},
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
