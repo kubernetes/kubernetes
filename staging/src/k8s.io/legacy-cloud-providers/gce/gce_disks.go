@@ -859,7 +859,7 @@ func (g *Cloud) GetAutoLabelsForPD(disk *Disk) (map[string]string, error) {
 			return nil, fmt.Errorf("PD did not have zone/region information: %v", disk)
 		}
 		labels[v1.LabelFailureDomainBetaZone] = zoneInfo.zone
-		labels[v1.LabelZoneRegion] = disk.Region
+		labels[v1.LabelFailureDomainBetaRegion] = disk.Region
 	case multiZone:
 		if zoneInfo.replicaZones == nil || zoneInfo.replicaZones.Len() <= 0 {
 			// Unexpected, but sanity-check
@@ -867,7 +867,7 @@ func (g *Cloud) GetAutoLabelsForPD(disk *Disk) (map[string]string, error) {
 		}
 		labels[v1.LabelFailureDomainBetaZone] =
 			volumehelpers.ZonesSetToLabelValue(zoneInfo.replicaZones)
-		labels[v1.LabelZoneRegion] = disk.Region
+		labels[v1.LabelFailureDomainBetaRegion] = disk.Region
 	case nil:
 		// Unexpected, but sanity-check
 		return nil, fmt.Errorf("PD did not have ZoneInfo: %v", disk)

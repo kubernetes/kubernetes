@@ -173,13 +173,13 @@ func (l *persistentVolumeLabel) findVolumeLabels(volume *api.PersistentVolume) (
 
 	// All cloud providers set only these two labels.
 	domain, domainOK := existingLabels[v1.LabelFailureDomainBetaZone]
-	region, regionOK := existingLabels[v1.LabelZoneRegion]
+	region, regionOK := existingLabels[v1.LabelFailureDomainBetaRegion]
 	isDynamicallyProvisioned := metav1.HasAnnotation(volume.ObjectMeta, persistentvolume.AnnDynamicallyProvisioned)
 	if isDynamicallyProvisioned && domainOK && regionOK {
 		// PV already has all the labels and we can trust the dynamic provisioning that it provided correct values.
 		return map[string]string{
-			v1.LabelFailureDomainBetaZone: domain,
-			v1.LabelZoneRegion:            region,
+			v1.LabelFailureDomainBetaZone:   domain,
+			v1.LabelFailureDomainBetaRegion: region,
 		}, nil
 	}
 

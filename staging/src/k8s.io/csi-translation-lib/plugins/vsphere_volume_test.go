@@ -34,7 +34,7 @@ func TestTranslatevSphereInTreeStorageClassToCSI(t *testing.T) {
 			Values: []string{"zone-a"},
 		},
 		{
-			Key:    v1.LabelZoneRegion,
+			Key:    v1.LabelFailureDomainBetaRegion,
 			Values: []string{"region-a"},
 		},
 	}}

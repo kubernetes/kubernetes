@@ -287,8 +287,8 @@ func Test_GetZoneKey(t *testing.T) {
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						v1.LabelFailureDomainBetaZone: "zone1",
-						v1.LabelZoneRegion:            "region1",
+						v1.LabelFailureDomainBetaZone:   "zone1",
+						v1.LabelFailureDomainBetaRegion: "region1",
 					},
 				},
 			},
@@ -311,10 +311,10 @@ func Test_GetZoneKey(t *testing.T) {
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						v1.LabelTopologyZone:          "zone1",
-						v1.LabelTopologyRegion:        "region1",
-						v1.LabelFailureDomainBetaZone: "zone1",
-						v1.LabelZoneRegion:            "region1",
+						v1.LabelTopologyZone:            "zone1",
+						v1.LabelTopologyRegion:          "region1",
+						v1.LabelFailureDomainBetaZone:   "zone1",
+						v1.LabelFailureDomainBetaRegion: "region1",
 					},
 				},
 			},
@@ -325,10 +325,10 @@ func Test_GetZoneKey(t *testing.T) {
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						v1.LabelTopologyZone:          "zone1",
-						v1.LabelTopologyRegion:        "region1",
-						v1.LabelFailureDomainBetaZone: "zone2",
-						v1.LabelZoneRegion:            "region2",
+						v1.LabelTopologyZone:            "zone1",
+						v1.LabelTopologyRegion:          "region1",
+						v1.LabelFailureDomainBetaZone:   "zone2",
+						v1.LabelFailureDomainBetaRegion: "region2",
 					},
 				},
 			},

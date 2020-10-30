@@ -232,7 +232,7 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, al
 			volumeLabels[v1.LabelFailureDomainBetaZone] = volumeAZ
 		}
 		if volumeRegion != "" {
-			volumeLabels[v1.LabelZoneRegion] = volumeRegion
+			volumeLabels[v1.LabelFailureDomainBetaRegion] = volumeRegion
 		}
 	}
 	return volumeID, volSizeGiB, volumeLabels, fstype, nil

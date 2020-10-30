@@ -195,7 +195,7 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 		v1.LabelTopologyZone,
 		v1.LabelTopologyRegion,
 		v1.LabelFailureDomainBetaZone,
-		v1.LabelZoneRegion,
+		v1.LabelFailureDomainBetaRegion,
 		v1.LabelInstanceTypeStable,
 		v1.LabelInstanceType,
 		v1.LabelOSStable,
@@ -398,8 +398,8 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 				node.ObjectMeta.Labels[v1.LabelTopologyZone] = zone.FailureDomain
 			}
 			if zone.Region != "" {
-				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegion, zone.Region)
-				node.ObjectMeta.Labels[v1.LabelZoneRegion] = zone.Region
+				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelFailureDomainBetaRegion, zone.Region)
+				node.ObjectMeta.Labels[v1.LabelFailureDomainBetaRegion] = zone.Region
 				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelTopologyRegion, zone.Region)
 				node.ObjectMeta.Labels[v1.LabelTopologyRegion] = zone.Region
 			}

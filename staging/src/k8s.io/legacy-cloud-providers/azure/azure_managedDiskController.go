@@ -351,7 +351,7 @@ func (c *Cloud) GetAzureDiskLabels(diskURI string) (map[string]string, error) {
 	}
 
 	labels := map[string]string{
-		v1.LabelZoneRegion: c.Location,
+		v1.LabelFailureDomainBetaRegion: c.Location,
 	}
 	// no azure credential is set, return nil
 	if c.DisksClient == nil {

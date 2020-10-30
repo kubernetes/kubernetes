@@ -488,8 +488,8 @@ func TestGetLabelsForVolume_Basic(t *testing.T) {
 		t.Errorf("Failure domain is '%v', but zone is '%v'",
 			labels[v1.LabelFailureDomainBetaZone], zone)
 	}
-	if labels[v1.LabelZoneRegion] != gceRegion {
-		t.Errorf("Region is '%v', but region is 'us-central1'", labels[v1.LabelZoneRegion])
+	if labels[v1.LabelFailureDomainBetaRegion] != gceRegion {
+		t.Errorf("Region is '%v', but region is 'us-central1'", labels[v1.LabelFailureDomainBetaRegion])
 	}
 }
 
@@ -528,8 +528,8 @@ func TestGetLabelsForVolume_NoZone(t *testing.T) {
 		t.Errorf("Failure domain is '%v', but zone is '%v'",
 			labels[v1.LabelFailureDomainBetaZone], zone)
 	}
-	if labels[v1.LabelZoneRegion] != gceRegion {
-		t.Errorf("Region is '%v', but region is 'europe-west1'", labels[v1.LabelZoneRegion])
+	if labels[v1.LabelFailureDomainBetaRegion] != gceRegion {
+		t.Errorf("Region is '%v', but region is 'europe-west1'", labels[v1.LabelFailureDomainBetaRegion])
 	}
 }
 
@@ -621,8 +621,8 @@ func TestGetLabelsForVolume_DupDisk(t *testing.T) {
 		t.Errorf("Failure domain is '%v', but zone is '%v'",
 			labels[v1.LabelFailureDomainBetaZone], zone)
 	}
-	if labels[v1.LabelZoneRegion] != gceRegion {
-		t.Errorf("Region is '%v', but region is 'us-west1'", labels[v1.LabelZoneRegion])
+	if labels[v1.LabelFailureDomainBetaRegion] != gceRegion {
+		t.Errorf("Region is '%v', but region is 'us-west1'", labels[v1.LabelFailureDomainBetaRegion])
 	}
 }
 
@@ -751,8 +751,8 @@ func TestGetAutoLabelsForPD(t *testing.T) {
 			}
 
 			// Validate labels
-			if got := labels[v1.LabelZoneRegion]; got != gceRegion {
-				t.Errorf("labels[v1.LabelZoneRegion] = %v; want: %v", got, gceRegion)
+			if got := labels[v1.LabelFailureDomainBetaRegion]; got != gceRegion {
+				t.Errorf("labels[v1.LabelFailureDomainBetaRegion] = %v; want: %v", got, gceRegion)
 			}
 		})
 	}

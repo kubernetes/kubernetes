@@ -29,8 +29,8 @@ import (
 
 var (
 	defaultZoneLabels = map[string]string{
-		v1.LabelFailureDomainBetaZone: "us-east-1a",
-		v1.LabelZoneRegion:            "us-east-1",
+		v1.LabelFailureDomainBetaZone:   "us-east-1a",
+		v1.LabelFailureDomainBetaRegion: "us-east-1",
 	}
 	regionalPDLabels = map[string]string{
 		v1.LabelFailureDomainBetaZone: "europe-west1-b__europe-west1-c",

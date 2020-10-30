@@ -237,15 +237,15 @@ func Test_PVLAdmission(t *testing.T) {
 			name:    "existing labels from dynamic provisioning are not changed",
 			handler: newPersistentVolumeLabel(),
 			pvlabeler: mockVolumeLabels(map[string]string{
-				v1.LabelFailureDomainBetaZone: "domain1",
-				v1.LabelZoneRegion:            "region1",
+				v1.LabelFailureDomainBetaZone:   "domain1",
+				v1.LabelFailureDomainBetaRegion: "region1",
 			}),
 			preAdmissionPV: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "awsebs", Namespace: "myns",
 					Labels: map[string]string{
-						v1.LabelFailureDomainBetaZone: "existingDomain",
-						v1.LabelZoneRegion:            "existingRegion",
+						v1.LabelFailureDomainBetaZone:   "existingDomain",
+						v1.LabelFailureDomainBetaRegion: "existingRegion",
 					},
 					Annotations: map[string]string{
 						persistentvolume.AnnDynamicallyProvisioned: "kubernetes.io/aws-ebs",
@@ -264,8 +264,8 @@ func Test_PVLAdmission(t *testing.T) {
 					Name:      "awsebs",
 					Namespace: "myns",
 					Labels: map[string]string{
-						v1.LabelFailureDomainBetaZone: "existingDomain",
-						v1.LabelZoneRegion:            "existingRegion",
+						v1.LabelFailureDomainBetaZone:   "existingDomain",
+						v1.LabelFailureDomainBetaRegion: "existingRegion",
 					},
 					Annotations: map[string]string{
 						persistentvolume.AnnDynamicallyProvisioned: "kubernetes.io/aws-ebs",
@@ -283,7 +283,7 @@ func Test_PVLAdmission(t *testing.T) {
 								{
 									MatchExpressions: []api.NodeSelectorRequirement{
 										{
-											Key:      v1.LabelZoneRegion,
+											Key:      v1.LabelFailureDomainBetaRegion,
 											Operator: api.NodeSelectorOpIn,
 											Values:   []string{"existingRegion"},
 										},
@@ -305,15 +305,15 @@ func Test_PVLAdmission(t *testing.T) {
 			name:    "existing labels from user are changed",
 			handler: newPersistentVolumeLabel(),
 			pvlabeler: mockVolumeLabels(map[string]string{
-				v1.LabelFailureDomainBetaZone: "domain1",
-				v1.LabelZoneRegion:            "region1",
+				v1.LabelFailureDomainBetaZone:   "domain1",
+				v1.LabelFailureDomainBetaRegion: "region1",
 			}),
 			preAdmissionPV: &api.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "awsebs", Namespace: "myns",
 					Labels: map[string]string{
-						v1.LabelFailureDomainBetaZone: "existingDomain",
-						v1.LabelZoneRegion:            "existingRegion",
+						v1.LabelFailureDomainBetaZone:   "existingDomain",
+						v1.LabelFailureDomainBetaRegion: "existingRegion",
 					},
 				},
 				Spec: api.PersistentVolumeSpec{
@@ -329,8 +329,8 @@ func Test_PVLAdmission(t *testing.T) {
 					Name:      "awsebs",
 					Namespace: "myns",
 					Labels: map[string]string{
-						v1.LabelFailureDomainBetaZone: "domain1",
-						v1.LabelZoneRegion:            "region1",
+						v1.LabelFailureDomainBetaZone:   "domain1",
+						v1.LabelFailureDomainBetaRegion: "region1",
 					},
 				},
 				Spec: api.PersistentVolumeSpec{
@@ -345,7 +345,7 @@ func Test_PVLAdmission(t *testing.T) {
 								{
 									MatchExpressions: []api.NodeSelectorRequirement{
 										{
-											Key:      v1.LabelZoneRegion,
+											Key:      v1.LabelFailureDomainBetaRegion,
 											Operator: api.NodeSelectorOpIn,
 											Values:   []string{"region1"},
 										},
