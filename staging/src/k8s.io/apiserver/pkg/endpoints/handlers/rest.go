@@ -49,6 +49,12 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const (
+	// 34 chose as a number close to 30 that is likely to be unique enough to jump out at me the next time I see a timeout.
+	// Everyone chooses 30.
+	requestTimeout = 34 * time.Second
+)
+
 // RequestScope encapsulates common fields across all RESTful handler methods.
 type RequestScope struct {
 	Namer ScopeNamer
@@ -213,7 +219,7 @@ type resultFunc func() (runtime.Object, error)
 
 // finishRequest makes a given resultFunc asynchronous and handles errors returned by the response.
 // An api.Status object with status != success is considered an "error", which interrupts the normal response flow.
-func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object, err error) {
+func finishRequest(ctx context.Context, fn resultFunc) (result runtime.Object, err error) {
 	// these channels need to be buffered to prevent the goroutine below from hanging indefinitely
 	// when the select statement reads something other than the one the goroutine sends on.
 	ch := make(chan runtime.Object, 1)
@@ -257,8 +263,8 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 		return nil, err
 	case p := <-panicCh:
 		panic(p)
-	case <-time.After(timeout):
-		return nil, errors.NewTimeoutError(fmt.Sprintf("request did not complete within requested timeout %s", timeout), 0)
+	case <-ctx.Done():
+		return nil, errors.NewTimeoutError(fmt.Sprintf("request did not complete within requested timeout %s", ctx.Err()), 0)
 	}
 }
 
