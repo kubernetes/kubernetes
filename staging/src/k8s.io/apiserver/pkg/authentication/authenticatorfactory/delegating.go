@@ -85,13 +85,10 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 	}
 
 	if c.TokenAccessReviewClient != nil {
-		// Provide a default if WebhookRetryBackoff has not been set by the user.
-		retryBackoff := c.WebhookRetryBackoff
-		if retryBackoff == nil {
-			retryBackoff = webhooktoken.DefaultRetryBackoff()
+		if c.WebhookRetryBackoff == nil {
+			return nil, nil, errors.New("retry backoff parameters for delegating authentication webhook has not been specified")
 		}
-
-		tokenAuth, err := webhooktoken.NewFromInterface(c.TokenAccessReviewClient, c.APIAudiences, *retryBackoff)
+		tokenAuth, err := webhooktoken.NewFromInterface(c.TokenAccessReviewClient, c.APIAudiences, *c.WebhookRetryBackoff)
 		if err != nil {
 			return nil, nil, err
 		}
