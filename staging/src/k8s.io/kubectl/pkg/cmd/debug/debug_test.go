@@ -18,13 +18,18 @@ package debug
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/utils/pointer"
 )
 
@@ -62,10 +67,10 @@ func TestGenerateDebugContainer(t *testing.T) {
 		{
 			name: "namespace targeting",
 			opts: &DebugOptions{
-				Container:  "debugger",
-				Image:      "busybox",
-				PullPolicy: corev1.PullIfNotPresent,
-				Target:     "myapp",
+				Container:       "debugger",
+				Image:           "busybox",
+				PullPolicy:      corev1.PullIfNotPresent,
+				TargetContainer: "myapp",
 			},
 			expected: &corev1.EphemeralContainer{
 				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
@@ -972,6 +977,264 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			pod := tc.opts.generateNodeDebugPod(tc.nodeName)
 			if diff := cmp.Diff(tc.expected, pod); diff != "" {
 				t.Error("unexpected diff in generated object: (-want +got):\n", diff)
+			}
+		})
+	}
+}
+
+func TestCompleteAndValidate(t *testing.T) {
+	tf := cmdtesting.NewTestFactory()
+	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+	cmpFilter := cmp.FilterPath(func(p cmp.Path) bool {
+		switch p.String() {
+		// IOStreams contains unexported fields
+		case "IOStreams":
+			return true
+		}
+		return false
+	}, cmp.Ignore())
+
+	tests := []struct {
+		name, args string
+		wantOpts   *DebugOptions
+		wantError  bool
+	}{
+		{
+			name:      "No targets",
+			args:      "--image=image",
+			wantError: true,
+		},
+		{
+			name:      "Invalid environment variables",
+			args:      "--image=busybox --env=FOO mypod",
+			wantError: true,
+		},
+		{
+			name:      "Invalid image name",
+			args:      "--image=image:label@deadbeef mypod",
+			wantError: true,
+		},
+		{
+			name:      "Invalid pull policy",
+			args:      "--image=image --image-pull-policy=whenever-you-feel-like-it",
+			wantError: true,
+		},
+		{
+			name:      "TTY without stdin",
+			args:      "--image=image --tty",
+			wantError: true,
+		},
+		{
+			name: "Set image pull policy",
+			args: "--image=busybox --image-pull-policy=Always mypod",
+			wantOpts: &DebugOptions{
+				Args:           []string{},
+				Image:          "busybox",
+				Namespace:      "default",
+				PullPolicy:     corev1.PullPolicy("Always"),
+				ShareProcesses: true,
+				TargetNames:    []string{"mypod"},
+			},
+		},
+		{
+			name: "Multiple targets",
+			args: "--image=busybox mypod1 mypod2",
+			wantOpts: &DebugOptions{
+				Args:           []string{},
+				Image:          "busybox",
+				Namespace:      "default",
+				ShareProcesses: true,
+				TargetNames:    []string{"mypod1", "mypod2"},
+			},
+		},
+		{
+			name: "Arguments with dash",
+			args: "--image=busybox mypod1 mypod2 -- echo 1 2",
+			wantOpts: &DebugOptions{
+				Args:           []string{"echo", "1", "2"},
+				Image:          "busybox",
+				Namespace:      "default",
+				ShareProcesses: true,
+				TargetNames:    []string{"mypod1", "mypod2"},
+			},
+		},
+		{
+			name: "Interactive no attach",
+			args: "-ti --image=busybox --attach=false mypod",
+			wantOpts: &DebugOptions{
+				Args:           []string{},
+				Attach:         false,
+				Image:          "busybox",
+				Interactive:    true,
+				Namespace:      "default",
+				ShareProcesses: true,
+				TargetNames:    []string{"mypod"},
+				TTY:            true,
+			},
+		},
+		{
+			name: "Set environment variables",
+			args: "--image=busybox --env=FOO=BAR,BAZ=BAZ mypod",
+			wantOpts: &DebugOptions{
+				Args: []string{},
+				Env: []v1.EnvVar{
+					{Name: "FOO", Value: "BAR"},
+					{Name: "BAZ", Value: "BAZ"},
+				},
+				Image:          "busybox",
+				Namespace:      "default",
+				ShareProcesses: true,
+				TargetNames:    []string{"mypod"},
+			},
+		},
+		{
+			name: "Ephemeral container: interactive session minimal args",
+			args: "mypod -it --image=busybox",
+			wantOpts: &DebugOptions{
+				Args:           []string{},
+				Attach:         true,
+				Image:          "busybox",
+				Interactive:    true,
+				Namespace:      "default",
+				ShareProcesses: true,
+				TargetNames:    []string{"mypod"},
+				TTY:            true,
+			},
+		},
+		{
+			name: "Ephemeral container: non-interactive debugger with image and name",
+			args: "--image=myproj/debug-tools --image-pull-policy=Always -c debugger mypod",
+			wantOpts: &DebugOptions{
+				Args:           []string{},
+				Container:      "debugger",
+				Image:          "myproj/debug-tools",
+				Namespace:      "default",
+				PullPolicy:     corev1.PullPolicy("Always"),
+				ShareProcesses: true,
+				TargetNames:    []string{"mypod"},
+			},
+		},
+		{
+			name:      "Ephemeral container: image not specified",
+			args:      "mypod",
+			wantError: true,
+		},
+		{
+			name:      "Ephemeral container: replace not allowed",
+			args:      "--replace --image=busybox mypod",
+			wantError: true,
+		},
+		{
+			name:      "Ephemeral container: same-node not allowed",
+			args:      "--same-node --image=busybox mypod",
+			wantError: true,
+		},
+		{
+			name: "Pod copy: interactive debug container minimal args",
+			args: "mypod -it --image=busybox --copy-to=my-debugger",
+			wantOpts: &DebugOptions{
+				Args:           []string{},
+				Attach:         true,
+				CopyTo:         "my-debugger",
+				Image:          "busybox",
+				Interactive:    true,
+				Namespace:      "default",
+				ShareProcesses: true,
+				TargetNames:    []string{"mypod"},
+				TTY:            true,
+			},
+		},
+		{
+			name: "Pod copy: non-interactive with debug container, image name and command",
+			args: "mypod --image=busybox --container=my-container --copy-to=my-debugger -- sleep 1d",
+			wantOpts: &DebugOptions{
+				Args:           []string{"sleep", "1d"},
+				Container:      "my-container",
+				CopyTo:         "my-debugger",
+				Image:          "busybox",
+				Namespace:      "default",
+				ShareProcesses: true,
+				TargetNames:    []string{"mypod"},
+			},
+		},
+		{
+			name:      "Pod copy: no image specified",
+			args:      "mypod -it --copy-to=my-debugger",
+			wantError: true,
+		},
+		{
+			name:      "Pod copy: --target not allowed",
+			args:      "mypod --target --image=busybox --copy-to=my-debugger",
+			wantError: true,
+		},
+		{
+			name: "Node: interactive session minimal args",
+			args: "node/mynode -it --image=busybox",
+			wantOpts: &DebugOptions{
+				Args:           []string{},
+				Attach:         true,
+				Image:          "busybox",
+				Interactive:    true,
+				Namespace:      "default",
+				ShareProcesses: true,
+				TargetNames:    []string{"node/mynode"},
+				TTY:            true,
+			},
+		},
+		{
+			name:      "Node: no image specified",
+			args:      "node/mynode -it",
+			wantError: true,
+		},
+		{
+			name:      "Node: replace not allowed",
+			args:      "--image=busybox --replace node/mynode",
+			wantError: true,
+		},
+		{
+			name:      "Node: same-node not allowed",
+			args:      "--image=busybox --same-node node/mynode",
+			wantError: true,
+		},
+		{
+			name:      "Node: --target not allowed",
+			args:      "node/mynode --target --image=busybox",
+			wantError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := NewDebugOptions(ioStreams)
+			var gotError error
+
+			cmd := &cobra.Command{
+				Run: func(cmd *cobra.Command, args []string) {
+					gotError = opts.Complete(tf, cmd, args)
+					if gotError != nil {
+						return
+					}
+					gotError = opts.Validate(cmd)
+				},
+			}
+			cmd.SetArgs(strings.Split(tc.args, " "))
+			addDebugFlags(cmd, opts)
+
+			cmdError := cmd.Execute()
+
+			if tc.wantError {
+				if cmdError != nil || gotError != nil {
+					return
+				}
+				t.Fatalf("CompleteAndValidate got nil errors but wantError: %v", tc.wantError)
+			} else if cmdError != nil {
+				t.Fatalf("cmd.Execute got error '%v' executing test cobra.Command, wantError: %v", cmdError, tc.wantError)
+			} else if gotError != nil {
+				t.Fatalf("CompleteAndValidate got error: '%v', wantError: %v", gotError, tc.wantError)
+			}
+
+			if diff := cmp.Diff(tc.wantOpts, opts, cmpFilter, cmpopts.IgnoreUnexported(DebugOptions{})); diff != "" {
+				t.Error("CompleteAndValidate unexpected diff in generated object: (-want +got):\n", diff)
 			}
 		})
 	}

@@ -248,6 +248,7 @@ package_group(
         "//staging/src/k8s.io/kubectl/pkg/cmd/config",
         "//staging/src/k8s.io/kubectl/pkg/cmd/cp",
         "//staging/src/k8s.io/kubectl/pkg/cmd/create",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/debug",
         "//staging/src/k8s.io/kubectl/pkg/cmd/delete",
         "//staging/src/k8s.io/kubectl/pkg/cmd/describe",
         "//staging/src/k8s.io/kubectl/pkg/cmd/drain",
