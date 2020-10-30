@@ -891,6 +891,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		testPodImage2 := imageutils.GetE2EImage(imageutils.Httpd)
 		testPodLabels := map[string]string{"test-pod-static": "true"}
 		testPodLabelsFlat := "test-pod-static=true"
+		zero := int64(0)
 
 		w := &cache.ListWatch{
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
@@ -907,6 +908,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Labels: testPodLabels,
 			},
 			Spec: v1.PodSpec{
+				TerminationGracePeriodSeconds: &zero,
 				Containers: []v1.Container{
 					{
 						Name:  testPodName,
@@ -920,7 +922,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.ExpectNoError(err, "failed to create Pod %v in namespace %v", testPod.ObjectMeta.Name, testNamespaceName)
 
 		ginkgo.By("watching for Pod to be ready")
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 		defer cancel()
 		_, err = watchtools.Until(ctx, podsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			if pod, ok := event.Object.(*v1.Pod); ok {
@@ -943,6 +945,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				Labels: map[string]string{"test-pod": "patched"},
 			},
 			Spec: v1.PodSpec{
+				TerminationGracePeriodSeconds: &zero,
 				Containers: []v1.Container{{
 					Name:  testPodName,
 					Image: testPodImage2,
@@ -1009,11 +1012,11 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.ExpectEqual(podStatusFieldPatchCount, podStatusFieldPatchCountTotal, "failed to update PodStatus - field patch count doesn't match the total")
 
 		ginkgo.By("deleting the Pod via a Collection with a LabelSelector")
-		err = f.ClientSet.CoreV1().Pods(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: testPodLabelsFlat})
+		err = f.ClientSet.CoreV1().Pods(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &zero}, metav1.ListOptions{LabelSelector: testPodLabelsFlat})
 		framework.ExpectNoError(err, "failed to delete Pod by collection")
 
 		ginkgo.By("watching for the Pod to be deleted")
-		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel = context.WithTimeout(context.Background(), 1*time.Minute)
 		defer cancel()
 		_, err = watchtools.Until(ctx, podsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			switch event.Type {
