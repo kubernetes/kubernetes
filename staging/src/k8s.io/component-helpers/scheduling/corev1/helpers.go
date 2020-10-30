@@ -17,13 +17,8 @@ limitations under the License.
 package corev1
 
 import (
-	"fmt"
-
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
-	apierrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 )
 
 // PodPriority returns priority of the given pod.
@@ -46,103 +41,5 @@ func MatchNodeSelectorTerms(
 	if node == nil {
 		return false, nil
 	}
-	var errors []error
-	for _, req := range nodeSelector.NodeSelectorTerms {
-		// nil or empty term selects no objects
-		if len(req.MatchExpressions) == 0 && len(req.MatchFields) == 0 {
-			continue
-		}
-
-		if len(req.MatchExpressions) != 0 {
-			labelSelector, err := nodeSelectorRequirementsAsSelector(req.MatchExpressions)
-			if err != nil {
-				errors = append(errors, err)
-				continue
-			}
-			if labelSelector == nil || !labelSelector.Matches(labels.Set(node.Labels)) {
-				continue
-			}
-		}
-
-		if len(req.MatchFields) != 0 && len(node.Name) > 0 {
-			fieldSelector, err := nodeSelectorRequirementsAsFieldSelector(req.MatchFields)
-			if err != nil {
-				errors = append(errors, err)
-				continue
-			}
-			if fieldSelector == nil || !fieldSelector.Matches(fields.Set{"metadata.name": node.Name}) {
-				continue
-			}
-		}
-
-		return true, nil
-	}
-
-	return false, apierrors.NewAggregate(errors)
-}
-
-// nodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
-// labels.Selector.
-func nodeSelectorRequirementsAsSelector(nsm []v1.NodeSelectorRequirement) (labels.Selector, error) {
-	if len(nsm) == 0 {
-		return labels.Nothing(), nil
-	}
-	selector := labels.NewSelector()
-	for _, expr := range nsm {
-		var op selection.Operator
-		switch expr.Operator {
-		case v1.NodeSelectorOpIn:
-			op = selection.In
-		case v1.NodeSelectorOpNotIn:
-			op = selection.NotIn
-		case v1.NodeSelectorOpExists:
-			op = selection.Exists
-		case v1.NodeSelectorOpDoesNotExist:
-			op = selection.DoesNotExist
-		case v1.NodeSelectorOpGt:
-			op = selection.GreaterThan
-		case v1.NodeSelectorOpLt:
-			op = selection.LessThan
-		default:
-			return nil, fmt.Errorf("%q is not a valid node selector operator", expr.Operator)
-		}
-		r, err := labels.NewRequirement(expr.Key, op, expr.Values)
-		if err != nil {
-			return nil, err
-		}
-		selector = selector.Add(*r)
-	}
-	return selector, nil
-}
-
-// nodeSelectorRequirementsAsFieldSelector converts the []NodeSelectorRequirement core type into a struct that implements
-// fields.Selector.
-func nodeSelectorRequirementsAsFieldSelector(nsm []v1.NodeSelectorRequirement) (fields.Selector, error) {
-	if len(nsm) == 0 {
-		return fields.Nothing(), nil
-	}
-
-	selectors := []fields.Selector{}
-	for _, expr := range nsm {
-		switch expr.Operator {
-		case v1.NodeSelectorOpIn:
-			if len(expr.Values) != 1 {
-				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
-					len(expr.Values), expr.Operator)
-			}
-			selectors = append(selectors, fields.OneTermEqualSelector(expr.Key, expr.Values[0]))
-
-		case v1.NodeSelectorOpNotIn:
-			if len(expr.Values) != 1 {
-				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
-					len(expr.Values), expr.Operator)
-			}
-			selectors = append(selectors, fields.OneTermNotEqualSelector(expr.Key, expr.Values[0]))
-
-		default:
-			return nil, fmt.Errorf("%q is not a valid node field selector operator", expr.Operator)
-		}
-	}
-
-	return fields.AndSelectors(selectors...), nil
+	return nodeaffinity.NewLazyErrorNodeSelector(nodeSelector).Match(node)
 }
