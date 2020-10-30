@@ -125,6 +125,8 @@ func Convert_discovery_Endpoint_To_v1alpha1_Endpoint(in *discovery.Endpoint, out
 
 func autoConvert_v1alpha1_EndpointConditions_To_discovery_EndpointConditions(in *v1alpha1.EndpointConditions, out *discovery.EndpointConditions, s conversion.Scope) error {
 	out.Ready = (*bool)(unsafe.Pointer(in.Ready))
+	out.Accepting = (*bool)(unsafe.Pointer(in.Accepting))
+	out.Terminating = (*bool)(unsafe.Pointer(in.Terminating))
 	return nil
 }
 
@@ -135,6 +137,8 @@ func Convert_v1alpha1_EndpointConditions_To_discovery_EndpointConditions(in *v1a
 
 func autoConvert_discovery_EndpointConditions_To_v1alpha1_EndpointConditions(in *discovery.EndpointConditions, out *v1alpha1.EndpointConditions, s conversion.Scope) error {
 	out.Ready = (*bool)(unsafe.Pointer(in.Ready))
+	out.Accepting = (*bool)(unsafe.Pointer(in.Accepting))
+	out.Terminating = (*bool)(unsafe.Pointer(in.Terminating))
 	return nil
 }
 
