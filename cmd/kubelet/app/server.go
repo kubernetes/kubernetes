@@ -414,7 +414,7 @@ func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	logOption.Apply()
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
-	if err := initForOS(s.KubeletFlags.WindowsService); err != nil {
+	if err := initForOS(s.KubeletFlags.WindowsService, s.KubeletFlags.WindowsPriorityClass); err != nil {
 		return fmt.Errorf("failed OS init: %v", err)
 	}
 	if err := run(ctx, s, kubeDeps, featureGate); err != nil {
