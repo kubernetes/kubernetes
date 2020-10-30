@@ -953,6 +953,7 @@ var map_LoadBalancerIngress = map[string]string{
 	"":         "LoadBalancerIngress represents the status of a load-balancer ingress point: traffic intended for the service should be sent to an ingress point.",
 	"ip":       "IP is set for load-balancer ingress points that are IP based (typically GCE or OpenStack load-balancers)",
 	"hostname": "Hostname is set for load-balancer ingress points that are DNS based (typically AWS load-balancers)",
+	"ipMode":   "IPMode specifies the IP mode to use for this ingress Defaults to `VIP` if IP is set, null otherwise",
 }
 
 func (LoadBalancerIngress) SwaggerDoc() map[string]string {

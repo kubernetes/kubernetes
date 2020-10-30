@@ -2036,6 +2036,11 @@ message LoadBalancerIngress {
   // (typically AWS load-balancers)
   // +optional
   optional string hostname = 2;
+
+  // IPMode specifies the IP mode to use for this ingress
+  // Defaults to `VIP` if IP is set, null otherwise
+  // +optional
+  optional string ipMode = 3;
 }
 
 // LoadBalancerStatus represents the status of a load-balancer.
