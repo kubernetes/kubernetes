@@ -218,17 +218,17 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		controlPlaneAddresses := framework.GetControlPlaneAddresses(cs)
 		for _, instanceAddress := range controlPlaneAddresses {
-			assertNotReachableHTTPTimeout(instanceAddress, ports.InsecureKubeControllerManagerPort, firewallTestTCPTimeout)
-			assertNotReachableHTTPTimeout(instanceAddress, kubeschedulerconfig.DefaultInsecureSchedulerPort, firewallTestTCPTimeout)
+			assertNotReachableHTTPTimeout(instanceAddress, "/healthz", ports.KubeControllerManagerPort, firewallTestTCPTimeout, true)
+			assertNotReachableHTTPTimeout(instanceAddress, "/healthz", kubeschedulerconfig.DefaultKubeSchedulerPort, firewallTestTCPTimeout, true)
 		}
-		assertNotReachableHTTPTimeout(nodeAddr, ports.KubeletPort, firewallTestTCPTimeout)
-		assertNotReachableHTTPTimeout(nodeAddr, ports.KubeletReadOnlyPort, firewallTestTCPTimeout)
-		assertNotReachableHTTPTimeout(nodeAddr, ports.ProxyStatusPort, firewallTestTCPTimeout)
+		assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletPort, firewallTestTCPTimeout, false)
+		assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletReadOnlyPort, firewallTestTCPTimeout, false)
+		assertNotReachableHTTPTimeout(nodeAddr, "/", ports.ProxyStatusPort, firewallTestTCPTimeout, false)
 	})
 })
 
-func assertNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) {
-	result := e2enetwork.PokeHTTP(ip, port, "/", &e2enetwork.HTTPPokeParams{Timeout: timeout})
+func assertNotReachableHTTPTimeout(ip, path string, port int, timeout time.Duration, enableHTTPS bool) {
+	result := e2enetwork.PokeHTTP(ip, port, path, &e2enetwork.HTTPPokeParams{Timeout: timeout, EnableHTTPS: enableHTTPS})
 	if result.Status == e2enetwork.HTTPError {
 		framework.Failf("Unexpected error checking for reachability of %s:%d: %v", ip, port, result.Error)
 	}
