@@ -34,16 +34,14 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
-	ports "k8s.io/cloud-provider"
-	ccmconfig "k8s.io/cloud-provider/app/apis/config"
-	ccmconfigscheme "k8s.io/cloud-provider/app/apis/config/scheme"
-	ccmconfigv1alpha1 "k8s.io/cloud-provider/app/apis/config/v1alpha1"
-	cpoptions "k8s.io/cloud-provider/options"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider/app/config"
+	ccmconfig "k8s.io/cloud-provider/config"
+	ccmconfigscheme "k8s.io/cloud-provider/config/install"
+	ccmconfigv1alpha1 "k8s.io/cloud-provider/config/v1alpha1"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmoptions "k8s.io/controller-manager/options"
 	"k8s.io/controller-manager/pkg/clientbuilder"
-	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
-
 	// add the related feature gates
 	_ "k8s.io/controller-manager/pkg/features/register"
 )
@@ -58,8 +56,8 @@ const (
 // CloudControllerManagerOptions is the main context object for the controller manager.
 type CloudControllerManagerOptions struct {
 	Generic           *cmoptions.GenericControllerManagerConfigurationOptions
-	KubeCloudShared   *cpoptions.KubeCloudSharedOptions
-	ServiceController *cpoptions.ServiceControllerOptions
+	KubeCloudShared   *KubeCloudSharedOptions
+	ServiceController *ServiceControllerOptions
 
 	SecureServing *apiserveroptions.SecureServingOptionsWithLoopback
 	// TODO: remove insecure serving mode
@@ -83,8 +81,8 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 
 	s := CloudControllerManagerOptions{
 		Generic:         cmoptions.NewGenericControllerManagerConfigurationOptions(&componentConfig.Generic),
-		KubeCloudShared: cpoptions.NewKubeCloudSharedOptions(&componentConfig.KubeCloudShared),
-		ServiceController: &cpoptions.ServiceControllerOptions{
+		KubeCloudShared: NewKubeCloudSharedOptions(&componentConfig.KubeCloudShared),
+		ServiceController: &ServiceControllerOptions{
 			ServiceControllerConfiguration: &componentConfig.ServiceController,
 		},
 		SecureServing: apiserveroptions.NewSecureServingOptions().WithLoopback(),
@@ -105,7 +103,7 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 	// Set the PairName but leave certificate directory blank to generate in-memory by default
 	s.SecureServing.ServerCert.CertDirectory = ""
 	s.SecureServing.ServerCert.PairName = "cloud-controller-manager"
-	s.SecureServing.BindPort = ports.CloudControllerManagerPort
+	s.SecureServing.BindPort = cloudprovider.CloudControllerManagerPort
 
 	s.Generic.LeaderElection.ResourceName = "cloud-controller-manager"
 	s.Generic.LeaderElection.ResourceNamespace = "kube-system"
@@ -149,7 +147,7 @@ func (o *CloudControllerManagerOptions) Flags(allControllers, disabledByDefaultC
 }
 
 // ApplyTo fills up cloud controller manager config with options.
-func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config, userAgent string) error {
+func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent string) error {
 	var err error
 	if err = o.Generic.ApplyTo(&c.ComponentConfig.Generic); err != nil {
 		return err
@@ -240,7 +238,7 @@ func (o *CloudControllerManagerOptions) Validate(allControllers, disabledByDefau
 }
 
 // resyncPeriod computes the time interval a shared informer waits before resyncing with the api server
-func resyncPeriod(c *cloudcontrollerconfig.Config) func() time.Duration {
+func resyncPeriod(c *config.Config) func() time.Duration {
 	return func() time.Duration {
 		factor := rand.Float64() + 1
 		return time.Duration(float64(c.ComponentConfig.Generic.MinResyncPeriod.Nanoseconds()) * factor)
@@ -248,7 +246,7 @@ func resyncPeriod(c *cloudcontrollerconfig.Config) func() time.Duration {
 }
 
 // Config return a cloud controller manager config objective
-func (o *CloudControllerManagerOptions) Config(allControllers, disabledByDefaultControllers []string) (*cloudcontrollerconfig.Config, error) {
+func (o *CloudControllerManagerOptions) Config(allControllers, disabledByDefaultControllers []string) (*config.Config, error) {
 	if err := o.Validate(allControllers, disabledByDefaultControllers); err != nil {
 		return nil, err
 	}
@@ -257,7 +255,7 @@ func (o *CloudControllerManagerOptions) Config(allControllers, disabledByDefault
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	c := &cloudcontrollerconfig.Config{}
+	c := &config.Config{}
 	if err := o.ApplyTo(c, CloudControllerManagerUserAgent); err != nil {
 		return nil, err
 	}

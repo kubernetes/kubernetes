@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	cpconfig "k8s.io/cloud-provider/app/apis/config"
+	cpconfig "k8s.io/cloud-provider/config"
 	cpoptions "k8s.io/cloud-provider/options"
 	serviceconfig "k8s.io/cloud-provider/service/config"
 	componentbaseconfig "k8s.io/component-base/config"

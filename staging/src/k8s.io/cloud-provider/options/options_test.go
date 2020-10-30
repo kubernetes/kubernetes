@@ -26,8 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	cpconfig "k8s.io/cloud-provider/app/apis/config"
-	cpoptions "k8s.io/cloud-provider/options"
+	cpconfig "k8s.io/cloud-provider/config"
 	serviceconfig "k8s.io/cloud-provider/service/config"
 	componentbaseconfig "k8s.io/component-base/config"
 	cmconfig "k8s.io/controller-manager/config"
@@ -67,7 +66,7 @@ func TestDefaultFlags(t *testing.T) {
 				},
 			},
 		},
-		KubeCloudShared: &cpoptions.KubeCloudSharedOptions{
+		KubeCloudShared: &KubeCloudSharedOptions{
 			KubeCloudSharedConfiguration: &cpconfig.KubeCloudSharedConfiguration{
 				RouteReconciliationPeriod: metav1.Duration{Duration: 10 * time.Second},
 				NodeMonitorPeriod:         metav1.Duration{Duration: 5 * time.Second},
@@ -77,14 +76,14 @@ func TestDefaultFlags(t *testing.T) {
 				CIDRAllocatorType:         "",
 				ConfigureCloudRoutes:      true,
 			},
-			CloudProvider: &cpoptions.CloudProviderOptions{
+			CloudProvider: &CloudProviderOptions{
 				CloudProviderConfiguration: &cpconfig.CloudProviderConfiguration{
 					Name:            "",
 					CloudConfigFile: "",
 				},
 			},
 		},
-		ServiceController: &cpoptions.ServiceControllerOptions{
+		ServiceController: &ServiceControllerOptions{
 			ServiceControllerConfiguration: &serviceconfig.ServiceControllerConfiguration{
 				ConcurrentServiceSyncs: 1,
 			},
@@ -200,7 +199,7 @@ func TestAddFlags(t *testing.T) {
 				},
 			},
 		},
-		KubeCloudShared: &cpoptions.KubeCloudSharedOptions{
+		KubeCloudShared: &KubeCloudSharedOptions{
 			KubeCloudSharedConfiguration: &cpconfig.KubeCloudSharedConfiguration{
 				RouteReconciliationPeriod: metav1.Duration{Duration: 30 * time.Second},
 				NodeMonitorPeriod:         metav1.Duration{Duration: 5 * time.Second},
@@ -210,14 +209,14 @@ func TestAddFlags(t *testing.T) {
 				CIDRAllocatorType:         "RangeAllocator",
 				ConfigureCloudRoutes:      false,
 			},
-			CloudProvider: &cpoptions.CloudProviderOptions{
+			CloudProvider: &CloudProviderOptions{
 				CloudProviderConfiguration: &cpconfig.CloudProviderConfiguration{
 					Name:            "gce",
 					CloudConfigFile: "/cloud-config",
 				},
 			},
 		},
-		ServiceController: &cpoptions.ServiceControllerOptions{
+		ServiceController: &ServiceControllerOptions{
 			ServiceControllerConfiguration: &serviceconfig.ServiceControllerConfiguration{
 				ConcurrentServiceSyncs: 1,
 			},
