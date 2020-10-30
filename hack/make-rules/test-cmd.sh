@@ -107,12 +107,11 @@ EOF
 
   kube::log::status "Starting controller-manager"
   "${KUBE_OUTPUT_HOSTBIN}/kube-controller-manager" \
-    --port="${CTLRMGR_PORT}" \
     --kube-api-content-type="${KUBE_TEST_API_TYPE-}" \
     --kubeconfig="${config}" 1>&2 &
   export CTLRMGR_PID=$!
 
-  kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager"
+  kube::util::wait_for_url "https://127.0.0.1:${SECURE_CTLRMGR_PORT}/healthz" "controller-manager"
 }
 
 # Creates a node object with name 127.0.0.1. This is required because we do not

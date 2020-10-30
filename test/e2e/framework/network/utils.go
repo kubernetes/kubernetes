@@ -18,6 +18,7 @@ package network
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -805,6 +806,7 @@ type HTTPPokeParams struct {
 	ExpectCode     int // default = 200
 	BodyContains   string
 	RetriableCodes []int
+	EnableHTTPS    bool
 }
 
 // HTTPPokeResult is a struct for HTTP poke result.
@@ -851,8 +853,18 @@ const (
 // The result body will be populated if the HTTP transaction was completed, even
 // if the other test params make this a failure).
 func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPokeResult {
+	// Set default params.
+	if params == nil {
+		params = &HTTPPokeParams{}
+	}
+
 	hostPort := net.JoinHostPort(host, strconv.Itoa(port))
-	url := fmt.Sprintf("http://%s%s", hostPort, path)
+	var url string
+	if params.EnableHTTPS {
+		url = fmt.Sprintf("https://%s%s", hostPort, path)
+	} else {
+		url = fmt.Sprintf("http://%s%s", hostPort, path)
+	}
 
 	ret := HTTPPokeResult{}
 
@@ -867,10 +879,6 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 		return ret
 	}
 
-	// Set default params.
-	if params == nil {
-		params = &HTTPPokeParams{}
-	}
 	if params.ExpectCode == 0 {
 		params.ExpectCode = http.StatusOK
 	}
@@ -937,6 +945,7 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Response, error) {
 	tr := utilnet.SetTransportDefaults(&http.Transport{
 		DisableKeepAlives: true,
+		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
 	})
 	client := &http.Client{
 		Transport: tr,

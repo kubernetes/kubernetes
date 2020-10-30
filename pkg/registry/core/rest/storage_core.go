@@ -341,6 +341,7 @@ type componentStatusStorage struct {
 
 func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.Server {
 	// this is fragile, which assumes that the default port is being used
+	// TODO: switch to secure port until these components remove the ability to serve insecurely.
 	serversToValidate := map[string]*componentstatus.Server{
 		"controller-manager": {Addr: "127.0.0.1", Port: ports.InsecureKubeControllerManagerPort, Path: "/healthz"},
 		"scheduler":          {Addr: "127.0.0.1", Port: kubeschedulerconfig.DefaultInsecureSchedulerPort, Path: "/healthz"},
