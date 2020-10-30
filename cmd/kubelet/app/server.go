@@ -414,7 +414,7 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 func Run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
-	if err := initForOS(s.KubeletFlags.WindowsService); err != nil {
+	if err := initForOS(s.KubeletFlags.WindowsService, s.KubeletFlags.WindowsPriorityClass); err != nil {
 		return fmt.Errorf("failed OS init: %v", err)
 	}
 	if err := run(s, kubeDeps, featureGate, stopCh); err != nil {
