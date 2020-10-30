@@ -39,7 +39,6 @@ import (
 )
 
 // This file tests the scheduler priority functions.
-
 func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *testutils.TestContext {
 	prof := schedulerconfig.KubeSchedulerProfile{
 		SchedulerName: v1.DefaultSchedulerName,
