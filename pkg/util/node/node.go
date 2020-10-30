@@ -196,7 +196,7 @@ func GetZoneKey(node *v1.Node) string {
 	// TODO: prefer stable labels for region in v1.18
 	region, ok := labels[v1.LabelZoneRegion]
 	if !ok {
-		region, _ = labels[v1.LabelZoneRegionStable]
+		region, _ = labels[v1.LabelTopologyRegion]
 	}
 
 	if region == "" && zone == "" {

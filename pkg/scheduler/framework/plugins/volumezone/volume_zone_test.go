@@ -61,7 +61,7 @@ func TestSingleZone(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_Stable_1", Labels: map[string]string{v1.LabelTopologyZone: "us-west1-a"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_Stable_2", Labels: map[string]string{v1.LabelZoneRegionStable: "us-west1", "uselessLabel": "none"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_Stable_2", Labels: map[string]string{v1.LabelTopologyRegion: "us-west1", "uselessLabel": "none"}},
 		},
 	}
 
@@ -177,7 +177,7 @@ func TestSingleZone(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{v1.LabelZoneRegionStable: "us-west1", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelTopologyRegion: "us-west1", "uselessLabel": "none"},
 				},
 			},
 		},
@@ -187,7 +187,7 @@ func TestSingleZone(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{v1.LabelZoneRegionStable: "no_us-west1", "uselessLabel": "none"},
+					Labels: map[string]string{v1.LabelTopologyRegion: "no_us-west1", "uselessLabel": "none"},
 				},
 			},
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),

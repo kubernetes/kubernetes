@@ -67,7 +67,7 @@ var labelReconcileInfo = []struct {
 		// the source of truth
 		// TODO: switch the primary key to GA labels in v1.21
 		primaryKey:            v1.LabelZoneRegion,
-		secondaryKey:          v1.LabelZoneRegionStable,
+		secondaryKey:          v1.LabelTopologyRegion,
 		ensureSecondaryExists: true,
 	},
 	{
@@ -513,13 +513,13 @@ func (cnc *CloudNodeController) getNodeModifiersFromCloudProvider(
 	}
 	if instanceMeta.Region != "" {
 		klog.V(2).Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegion, instanceMeta.Region)
-		klog.V(2).Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegionStable, instanceMeta.Region)
+		klog.V(2).Infof("Adding node label from cloud provider: %s=%s", v1.LabelTopologyRegion, instanceMeta.Region)
 		nodeModifiers = append(nodeModifiers, func(n *v1.Node) {
 			if n.Labels == nil {
 				n.Labels = map[string]string{}
 			}
 			n.Labels[v1.LabelZoneRegion] = instanceMeta.Region
-			n.Labels[v1.LabelZoneRegionStable] = instanceMeta.Region
+			n.Labels[v1.LabelTopologyRegion] = instanceMeta.Region
 		})
 	}
 

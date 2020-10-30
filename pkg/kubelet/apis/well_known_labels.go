@@ -35,7 +35,7 @@ const (
 var kubeletLabels = sets.NewString(
 	v1.LabelHostname,
 	v1.LabelTopologyZone,
-	v1.LabelZoneRegionStable,
+	v1.LabelTopologyRegion,
 	v1.LabelZoneFailureDomain,
 	v1.LabelZoneRegion,
 	v1.LabelInstanceType,

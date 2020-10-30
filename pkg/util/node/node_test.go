@@ -299,8 +299,8 @@ func Test_GetZoneKey(t *testing.T) {
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						v1.LabelTopologyZone:     "zone1",
-						v1.LabelZoneRegionStable: "region1",
+						v1.LabelTopologyZone:   "zone1",
+						v1.LabelTopologyRegion: "region1",
 					},
 				},
 			},
@@ -312,7 +312,7 @@ func Test_GetZoneKey(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						v1.LabelTopologyZone:      "zone1",
-						v1.LabelZoneRegionStable:  "region1",
+						v1.LabelTopologyRegion:    "region1",
 						v1.LabelZoneFailureDomain: "zone1",
 						v1.LabelZoneRegion:        "region1",
 					},
@@ -326,7 +326,7 @@ func Test_GetZoneKey(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						v1.LabelTopologyZone:      "zone1",
-						v1.LabelZoneRegionStable:  "region1",
+						v1.LabelTopologyRegion:    "region1",
 						v1.LabelZoneFailureDomain: "zone2",
 						v1.LabelZoneRegion:        "region2",
 					},

@@ -53,7 +53,7 @@ var volumeZoneLabels = sets.NewString(
 	v1.LabelZoneFailureDomain,
 	v1.LabelZoneRegion,
 	v1.LabelTopologyZone,
-	v1.LabelZoneRegionStable,
+	v1.LabelTopologyRegion,
 )
 
 // Name returns name of the plugin. It is used in logs, etc.

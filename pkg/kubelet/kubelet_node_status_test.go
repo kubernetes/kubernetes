@@ -1413,7 +1413,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 					Labels: map[string]string{
 						v1.LabelHostname:           "new-hostname",
 						v1.LabelTopologyZone:       "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:   "new-zone-region",
+						v1.LabelTopologyRegion:     "new-zone-region",
 						v1.LabelZoneFailureDomain:  "new-zone-failure-domain",
 						v1.LabelZoneRegion:         "new-zone-region",
 						v1.LabelInstanceTypeStable: "new-instance-type",
@@ -1432,7 +1432,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			finalLabels: map[string]string{
 				v1.LabelHostname:           "new-hostname",
 				v1.LabelTopologyZone:       "new-zone-failure-domain",
-				v1.LabelZoneRegionStable:   "new-zone-region",
+				v1.LabelTopologyRegion:     "new-zone-region",
 				v1.LabelZoneFailureDomain:  "new-zone-failure-domain",
 				v1.LabelZoneRegion:         "new-zone-region",
 				v1.LabelInstanceTypeStable: "new-instance-type",
@@ -1448,7 +1448,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 					Labels: map[string]string{
 						v1.LabelHostname:           "new-hostname",
 						v1.LabelTopologyZone:       "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:   "new-zone-region",
+						v1.LabelTopologyRegion:     "new-zone-region",
 						v1.LabelZoneFailureDomain:  "new-zone-failure-domain",
 						v1.LabelZoneRegion:         "new-zone-region",
 						v1.LabelInstanceTypeStable: "new-instance-type",
@@ -1463,7 +1463,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 					Labels: map[string]string{
 						v1.LabelHostname:           "old-hostname",
 						v1.LabelTopologyZone:       "old-zone-failure-domain",
-						v1.LabelZoneRegionStable:   "old-zone-region",
+						v1.LabelTopologyRegion:     "old-zone-region",
 						v1.LabelZoneFailureDomain:  "old-zone-failure-domain",
 						v1.LabelZoneRegion:         "old-zone-region",
 						v1.LabelInstanceTypeStable: "old-instance-type",
@@ -1477,7 +1477,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			finalLabels: map[string]string{
 				v1.LabelHostname:           "new-hostname",
 				v1.LabelTopologyZone:       "new-zone-failure-domain",
-				v1.LabelZoneRegionStable:   "new-zone-region",
+				v1.LabelTopologyRegion:     "new-zone-region",
 				v1.LabelZoneFailureDomain:  "new-zone-failure-domain",
 				v1.LabelZoneRegion:         "new-zone-region",
 				v1.LabelInstanceTypeStable: "new-instance-type",
@@ -1493,7 +1493,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 					Labels: map[string]string{
 						v1.LabelHostname:           "new-hostname",
 						v1.LabelTopologyZone:       "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:   "new-zone-region",
+						v1.LabelTopologyRegion:     "new-zone-region",
 						v1.LabelZoneFailureDomain:  "new-zone-failure-domain",
 						v1.LabelZoneRegion:         "new-zone-region",
 						v1.LabelInstanceTypeStable: "new-instance-type",
@@ -1508,7 +1508,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 					Labels: map[string]string{
 						v1.LabelHostname:           "new-hostname",
 						v1.LabelTopologyZone:       "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:   "new-zone-region",
+						v1.LabelTopologyRegion:     "new-zone-region",
 						v1.LabelZoneFailureDomain:  "new-zone-failure-domain",
 						v1.LabelZoneRegion:         "new-zone-region",
 						v1.LabelInstanceTypeStable: "new-instance-type",
@@ -1523,7 +1523,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			finalLabels: map[string]string{
 				v1.LabelHostname:           "new-hostname",
 				v1.LabelTopologyZone:       "new-zone-failure-domain",
-				v1.LabelZoneRegionStable:   "new-zone-region",
+				v1.LabelTopologyRegion:     "new-zone-region",
 				v1.LabelZoneFailureDomain:  "new-zone-failure-domain",
 				v1.LabelZoneRegion:         "new-zone-region",
 				v1.LabelInstanceTypeStable: "new-instance-type",
@@ -1545,7 +1545,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 					Labels: map[string]string{
 						v1.LabelHostname:           "new-hostname",
 						v1.LabelTopologyZone:       "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:   "new-zone-region",
+						v1.LabelTopologyRegion:     "new-zone-region",
 						v1.LabelZoneFailureDomain:  "new-zone-failure-domain",
 						v1.LabelZoneRegion:         "new-zone-region",
 						v1.LabelInstanceTypeStable: "new-instance-type",
@@ -1560,7 +1560,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			finalLabels: map[string]string{
 				v1.LabelHostname:           "new-hostname",
 				v1.LabelTopologyZone:       "new-zone-failure-domain",
-				v1.LabelZoneRegionStable:   "new-zone-region",
+				v1.LabelTopologyRegion:     "new-zone-region",
 				v1.LabelZoneFailureDomain:  "new-zone-failure-domain",
 				v1.LabelZoneRegion:         "new-zone-region",
 				v1.LabelInstanceTypeStable: "new-instance-type",
@@ -1577,7 +1577,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 					Labels: map[string]string{
 						v1.LabelHostname:           "new-hostname",
 						v1.LabelTopologyZone:       "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:   "new-zone-region",
+						v1.LabelTopologyRegion:     "new-zone-region",
 						v1.LabelZoneFailureDomain:  "new-zone-failure-domain",
 						v1.LabelZoneRegion:         "new-zone-region",
 						v1.LabelInstanceTypeStable: "new-instance-type",
@@ -1592,7 +1592,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 					Labels: map[string]string{
 						v1.LabelHostname:           "new-hostname",
 						v1.LabelTopologyZone:       "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:   "new-zone-region",
+						v1.LabelTopologyRegion:     "new-zone-region",
 						v1.LabelZoneFailureDomain:  "new-zone-failure-domain",
 						v1.LabelZoneRegion:         "new-zone-region",
 						v1.LabelInstanceTypeStable: "new-instance-type",
@@ -1606,7 +1606,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			finalLabels: map[string]string{
 				v1.LabelHostname:           "new-hostname",
 				v1.LabelTopologyZone:       "new-zone-failure-domain",
-				v1.LabelZoneRegionStable:   "new-zone-region",
+				v1.LabelTopologyRegion:     "new-zone-region",
 				v1.LabelZoneFailureDomain:  "new-zone-failure-domain",
 				v1.LabelZoneRegion:         "new-zone-region",
 				v1.LabelInstanceTypeStable: "new-instance-type",
@@ -1622,7 +1622,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 					Labels: map[string]string{
 						v1.LabelHostname:           "new-hostname",
 						v1.LabelTopologyZone:       "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:   "new-zone-region",
+						v1.LabelTopologyRegion:     "new-zone-region",
 						v1.LabelZoneFailureDomain:  "new-zone-failure-domain",
 						v1.LabelZoneRegion:         "new-zone-region",
 						v1.LabelInstanceTypeStable: "new-instance-type",
@@ -1639,7 +1639,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			finalLabels: map[string]string{
 				v1.LabelHostname:           "new-hostname",
 				v1.LabelTopologyZone:       "new-zone-failure-domain",
-				v1.LabelZoneRegionStable:   "new-zone-region",
+				v1.LabelTopologyRegion:     "new-zone-region",
 				v1.LabelZoneFailureDomain:  "new-zone-failure-domain",
 				v1.LabelZoneRegion:         "new-zone-region",
 				v1.LabelInstanceTypeStable: "new-instance-type",
@@ -1655,7 +1655,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 					Labels: map[string]string{
 						v1.LabelHostname:           "new-hostname",
 						v1.LabelTopologyZone:       "new-zone-failure-domain",
-						v1.LabelZoneRegionStable:   "new-zone-region",
+						v1.LabelTopologyRegion:     "new-zone-region",
 						v1.LabelZoneFailureDomain:  "new-zone-failure-domain",
 						v1.LabelZoneRegion:         "new-zone-region",
 						v1.LabelInstanceTypeStable: "new-instance-type",
@@ -1679,7 +1679,7 @@ func TestUpdateDefaultLabels(t *testing.T) {
 			finalLabels: map[string]string{
 				v1.LabelHostname:           "new-hostname",
 				v1.LabelTopologyZone:       "new-zone-failure-domain",
-				v1.LabelZoneRegionStable:   "new-zone-region",
+				v1.LabelTopologyRegion:     "new-zone-region",
 				v1.LabelZoneFailureDomain:  "new-zone-failure-domain",
 				v1.LabelZoneRegion:         "new-zone-region",
 				v1.LabelInstanceTypeStable: "new-instance-type",
