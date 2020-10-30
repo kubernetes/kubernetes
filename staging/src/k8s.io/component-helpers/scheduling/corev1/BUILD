@@ -9,14 +9,25 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/component-helpers/scheduling/corev1",
     importpath = "k8s.io/component-helpers/scheduling/corev1",
     visibility = ["//visibility:public"],
-    deps = ["//staging/src/k8s.io/api/core/v1:go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/selection:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+    ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["helpers_test.go"],
     embed = [":go_default_library"],
-    deps = ["//staging/src/k8s.io/api/core/v1:go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+    ],
 )
 
 filegroup(
