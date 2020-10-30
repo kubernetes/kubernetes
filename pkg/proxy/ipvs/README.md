@@ -265,7 +265,7 @@ ip_vs
 ip_vs_rr
 ip_vs_wrr
 ip_vs_sh
-nf_conntrack_ipv4
+nf_conntrack_ipv4(replaced by nf_conntrack in kernel 4.19 and above)
 ```
 1. have been compiled into the node kernel. Use
 
@@ -300,6 +300,8 @@ modprobe -- ip_vs_rr
 modprobe -- ip_vs_wrr
 modprobe -- ip_vs_sh
 modprobe -- nf_conntrack_ipv4
+# replaced by nf_conntrack in kernel 4.19 and above
+# modprobe -- nf_conntrack
 
 # to check loaded modules, use
 lsmod | grep -e ip_vs -e nf_conntrack_ipv4
