@@ -72,8 +72,8 @@ func (in *EndpointConditions) DeepCopyInto(out *EndpointConditions) {
 		*out = new(bool)
 		**out = **in
 	}
-	if in.Accepting != nil {
-		in, out := &in.Accepting, &out.Accepting
+	if in.Serving != nil {
+		in, out := &in.Serving, &out.Serving
 		*out = new(bool)
 		**out = **in
 	}

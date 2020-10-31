@@ -41,19 +41,19 @@ func Test_dropConditionsOnCreate(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
@@ -63,19 +63,19 @@ func Test_dropConditionsOnCreate(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
@@ -89,19 +89,19 @@ func Test_dropConditionsOnCreate(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
@@ -111,19 +111,19 @@ func Test_dropConditionsOnCreate(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
@@ -161,19 +161,19 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
@@ -183,19 +183,19 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
@@ -205,19 +205,19 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
@@ -231,19 +231,19 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
@@ -253,19 +253,19 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
@@ -275,19 +275,19 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
@@ -301,19 +301,19 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
@@ -323,19 +323,19 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
@@ -345,19 +345,19 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   nil,
+							Serving:     nil,
 							Terminating: nil,
 						},
 					},
@@ -371,13 +371,13 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(false),
 							Terminating: utilpointer.BoolPtr(false),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
 					},
@@ -392,13 +392,13 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(false),
 							Terminating: utilpointer.BoolPtr(false),
 						},
 					},
@@ -413,13 +413,13 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 				Endpoints: []discovery.Endpoint{
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(true),
 						},
 					},
 					{
 						Conditions: discovery.EndpointConditions{
-							Accepting:   utilpointer.BoolPtr(false),
+							Serving:     utilpointer.BoolPtr(false),
 							Terminating: utilpointer.BoolPtr(false),
 						},
 					},

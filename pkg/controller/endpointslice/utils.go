@@ -62,11 +62,11 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service, 
 		}
 	}
 
-	accepting := podutil.IsPodReady(pod)
+	serving := podutil.IsPodReady(pod)
 	terminating := pod.DeletionTimestamp != nil
 	// For compatibility reasons, "ready" should never be "true" if a pod is terminatng, unless
 	// publishNotReadyAddresses was set.
-	ready := service.Spec.PublishNotReadyAddresses || (accepting && !terminating)
+	ready := service.Spec.PublishNotReadyAddresses || (serving && !terminating)
 	ep := discovery.Endpoint{
 		Addresses: getEndpointAddresses(pod.Status, service, addressType),
 		Conditions: discovery.EndpointConditions{
@@ -83,7 +83,7 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service, 
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition) {
-		ep.Conditions.Accepting = &accepting
+		ep.Conditions.Serving = &serving
 		ep.Conditions.Terminating = &terminating
 	}
 

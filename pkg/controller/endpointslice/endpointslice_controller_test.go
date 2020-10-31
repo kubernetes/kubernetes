@@ -664,7 +664,7 @@ func TestSyncService(t *testing.T) {
 				{
 					Conditions: discovery.EndpointConditions{
 						Ready:       utilpointer.BoolPtr(true),
-						Accepting:   utilpointer.BoolPtr(true),
+						Serving:     utilpointer.BoolPtr(true),
 						Terminating: utilpointer.BoolPtr(false),
 					},
 					Addresses: []string{"10.0.0.1"},
@@ -674,7 +674,7 @@ func TestSyncService(t *testing.T) {
 				{
 					Conditions: discovery.EndpointConditions{
 						Ready:       utilpointer.BoolPtr(false),
-						Accepting:   utilpointer.BoolPtr(true),
+						Serving:     utilpointer.BoolPtr(true),
 						Terminating: utilpointer.BoolPtr(true),
 					},
 					Addresses: []string{"10.0.0.2"},
@@ -884,7 +884,7 @@ func TestSyncService(t *testing.T) {
 				{
 					Conditions: discovery.EndpointConditions{
 						Ready:       utilpointer.BoolPtr(true),
-						Accepting:   utilpointer.BoolPtr(true),
+						Serving:     utilpointer.BoolPtr(true),
 						Terminating: utilpointer.BoolPtr(false),
 					},
 					Addresses: []string{"10.0.0.1"},
@@ -894,7 +894,7 @@ func TestSyncService(t *testing.T) {
 				{
 					Conditions: discovery.EndpointConditions{
 						Ready:       utilpointer.BoolPtr(false),
-						Accepting:   utilpointer.BoolPtr(false),
+						Serving:     utilpointer.BoolPtr(false),
 						Terminating: utilpointer.BoolPtr(true),
 					},
 					Addresses: []string{"10.0.0.2"},
