@@ -176,11 +176,16 @@ func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
 }
 
 func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
-	pod := newObj.(*v1.Pod)
-	if sched.skipPodUpdate(pod) {
+	oldPod, newPod := oldObj.(*v1.Pod), newObj.(*v1.Pod)
+	// Bypass update event that carries identical objects; otherwise, a duplicated
+	// Pod may go through scheduling and cause unexpected behavior (see #96071).
+	if oldPod.ResourceVersion == newPod.ResourceVersion {
 		return
 	}
-	if err := sched.SchedulingQueue.Update(oldObj.(*v1.Pod), pod); err != nil {
+	if sched.skipPodUpdate(newPod) {
+		return
+	}
+	if err := sched.SchedulingQueue.Update(oldPod, newPod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to update %T: %v", newObj, err))
 	}
 }
