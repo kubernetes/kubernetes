@@ -178,7 +178,7 @@ func TestReconcile1Pod(t *testing.T) {
 						Addresses: []string{"1.2.3.4"},
 						Conditions: discovery.EndpointConditions{
 							Ready:       utilpointer.BoolPtr(true),
-							Accepting:   utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
 							Terminating: utilpointer.BoolPtr(false),
 						},
 						Topology: map[string]string{

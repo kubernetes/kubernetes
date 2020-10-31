@@ -110,9 +110,9 @@ func dropDisabledConditionsOnCreate(endpointSlice *discovery.EndpointSlice) {
 		return
 	}
 
-	// Always drop the accepting / terminating conditions on create when feature gate is disabled.
+	// Always drop the serving/terminating conditions on create when feature gate is disabled.
 	for i := range endpointSlice.Endpoints {
-		endpointSlice.Endpoints[i].Conditions.Accepting = nil
+		endpointSlice.Endpoints[i].Conditions.Serving = nil
 		endpointSlice.Endpoints[i].Conditions.Terminating = nil
 	}
 }
@@ -125,10 +125,10 @@ func dropDisabledConditionsOnUpdate(oldEPS, newEPS *discovery.EndpointSlice) {
 		return
 	}
 
-	// Only drop the accepting/terminating condition if the existing EndpointSlice doesn't have it set.
+	// Only drop the serving/terminating condition if the existing EndpointSlice doesn't have it set.
 	dropConditions := true
 	for _, ep := range oldEPS.Endpoints {
-		if ep.Conditions.Accepting != nil || ep.Conditions.Terminating != nil {
+		if ep.Conditions.Serving != nil || ep.Conditions.Terminating != nil {
 			dropConditions = false
 			break
 		}
@@ -136,7 +136,7 @@ func dropDisabledConditionsOnUpdate(oldEPS, newEPS *discovery.EndpointSlice) {
 
 	if dropConditions {
 		for i := range newEPS.Endpoints {
-			newEPS.Endpoints[i].Conditions.Accepting = nil
+			newEPS.Endpoints[i].Conditions.Serving = nil
 			newEPS.Endpoints[i].Conditions.Terminating = nil
 		}
 	}
