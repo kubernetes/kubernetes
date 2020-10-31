@@ -192,6 +192,31 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 			expectError:          true,
 			expectedErrorMessage: "Only one reference can have Controller set to true",
 		},
+		{
+			description: "simple fail - duplicate UIDs",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "2",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			expectError:          true,
+			expectedErrorMessage: `field.ownerReferences[2].uid: Duplicate value: "1"`,
+		},
 	}
 
 	for _, tc := range testCases {

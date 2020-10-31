@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -84,8 +85,9 @@ func validateOwnerReference(ownerReference metav1.OwnerReference, fldPath *field
 // ValidateOwnerReferences validates that a set of owner references are correctly defined.
 func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	seen := make(map[types.UID]struct{})
 	controllerName := ""
-	for _, ref := range ownerReferences {
+	for i, ref := range ownerReferences {
 		allErrs = append(allErrs, validateOwnerReference(ref, fldPath)...)
 		if ref.Controller != nil && *ref.Controller {
 			if controllerName != "" {
@@ -94,6 +96,11 @@ func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *f
 			} else {
 				controllerName = ref.Name
 			}
+		}
+		if _, ok := seen[ref.UID]; !ok {
+			seen[ref.UID] = struct{}{}
+		} else {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i).Child("uid"), ref.UID))
 		}
 	}
 	return allErrs
