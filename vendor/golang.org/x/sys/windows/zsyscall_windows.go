@@ -212,6 +212,7 @@ var (
 	procResumeThread                                         = modkernel32.NewProc("ResumeThread")
 	procSetPriorityClass                                     = modkernel32.NewProc("SetPriorityClass")
 	procGetPriorityClass                                     = modkernel32.NewProc("GetPriorityClass")
+	procQueryInformationJobObject                            = modkernel32.NewProc("QueryInformationJobObject")
 	procSetInformationJobObject                              = modkernel32.NewProc("SetInformationJobObject")
 	procGenerateConsoleCtrlEvent                             = modkernel32.NewProc("GenerateConsoleCtrlEvent")
 	procGetProcessId                                         = modkernel32.NewProc("GetProcessId")
@@ -2332,6 +2333,18 @@ func GetPriorityClass(process Handle) (ret uint32, err error) {
 	r0, _, e1 := syscall.Syscall(procGetPriorityClass.Addr(), 1, uintptr(process), 0, 0)
 	ret = uint32(r0)
 	if ret == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+
+func QueryInformationJobObject(job Handle, JobObjectInformationClass int32, JobObjectInformation uintptr, JobObjectInformationLength uint32, retlen *uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procQueryInformationJobObject.Addr(), 5, uintptr(job), uintptr(JobObjectInformationClass), uintptr(JobObjectInformation), uintptr(JobObjectInformationLength), uintptr(unsafe.Pointer(retlen)), 0)
+	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
 		} else {
