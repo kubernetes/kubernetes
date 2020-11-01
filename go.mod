@@ -349,7 +349,7 @@ replace (
 	github.com/mitchellh/mapstructure => github.com/mitchellh/mapstructure v1.1.2
 	github.com/moby/ipvs => github.com/moby/ipvs v1.0.1
 	github.com/moby/sys/mountinfo => github.com/moby/sys/mountinfo v0.1.3
-	github.com/moby/term => github.com/moby/term v0.0.0-20200312100748-672ec06f55cd
+	github.com/moby/term => github.com/moby/term v0.0.0-20201101162038-25d840ce174a
 	github.com/modern-go/concurrent => github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 	github.com/modern-go/reflect2 => github.com/modern-go/reflect2 v1.0.1
 	github.com/mohae/deepcopy => github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb

@@ -10,6 +10,7 @@ require (
 )
 
 replace (
+	github.com/creack/pty => github.com/creack/pty v1.1.7
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
