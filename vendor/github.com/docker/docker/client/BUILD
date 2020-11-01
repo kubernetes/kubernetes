@@ -123,6 +123,7 @@ go_library(
     importpath = "github.com/docker/docker/client",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/github.com/containerd/containerd/platforms:go_default_library",
         "//vendor/github.com/docker/distribution/reference:go_default_library",
         "//vendor/github.com/docker/docker/api:go_default_library",
         "//vendor/github.com/docker/docker/api/types:go_default_library",
@@ -140,6 +141,7 @@ go_library(
         "//vendor/github.com/docker/go-connections/sockets:go_default_library",
         "//vendor/github.com/docker/go-connections/tlsconfig:go_default_library",
         "//vendor/github.com/opencontainers/go-digest:go_default_library",
+        "//vendor/github.com/opencontainers/image-spec/specs-go/v1:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )

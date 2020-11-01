@@ -5,6 +5,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/go-units"
 )
 
 // DNSConfig specifies DNS related configurations in resolver configuration file (resolv.conf)
@@ -67,10 +68,13 @@ type ContainerSpec struct {
 	// The format of extra hosts on swarmkit is specified in:
 	// http://man7.org/linux/man-pages/man5/hosts.5.html
 	//    IP_address canonical_hostname [aliases...]
-	Hosts     []string            `json:",omitempty"`
-	DNSConfig *DNSConfig          `json:",omitempty"`
-	Secrets   []*SecretReference  `json:",omitempty"`
-	Configs   []*ConfigReference  `json:",omitempty"`
-	Isolation container.Isolation `json:",omitempty"`
-	Sysctls   map[string]string   `json:",omitempty"`
+	Hosts          []string            `json:",omitempty"`
+	DNSConfig      *DNSConfig          `json:",omitempty"`
+	Secrets        []*SecretReference  `json:",omitempty"`
+	Configs        []*ConfigReference  `json:",omitempty"`
+	Isolation      container.Isolation `json:",omitempty"`
+	Sysctls        map[string]string   `json:",omitempty"`
+	CapabilityAdd  []string            `json:",omitempty"`
+	CapabilityDrop []string            `json:",omitempty"`
+	Ulimits        []*units.Ulimit     `json:",omitempty"`
 }

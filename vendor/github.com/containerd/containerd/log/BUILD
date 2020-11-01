@@ -2,15 +2,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["jsonmessage.go"],
-    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/pkg/jsonmessage",
-    importpath = "github.com/docker/docker/pkg/jsonmessage",
+    srcs = ["context.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/containerd/containerd/log",
+    importpath = "github.com/containerd/containerd/log",
     visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/github.com/docker/go-units:go_default_library",
-        "//vendor/github.com/moby/term:go_default_library",
-        "//vendor/github.com/morikuni/aec:go_default_library",
-    ],
+    deps = ["//vendor/github.com/sirupsen/logrus:go_default_library"],
 )
 
 filegroup(

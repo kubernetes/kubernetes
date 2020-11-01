@@ -6,10 +6,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/api/types/network",
     importpath = "github.com/docker/docker/api/types/network",
     visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/github.com/docker/docker/api/types/filters:go_default_library",
-        "//vendor/github.com/docker/docker/errdefs:go_default_library",
-    ],
+    deps = ["//vendor/github.com/docker/docker/api/types/filters:go_default_library"],
 )
 
 filegroup(

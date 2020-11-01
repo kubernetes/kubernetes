@@ -22,6 +22,7 @@ go_library(
         "//vendor/github.com/docker/docker/api/types/mount:go_default_library",
         "//vendor/github.com/docker/docker/api/types/network:go_default_library",
         "//vendor/github.com/docker/docker/api/types/swarm/runtime:go_default_library",
+        "//vendor/github.com/docker/go-units:go_default_library",
     ],
 )
 
