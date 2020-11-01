@@ -10,6 +10,7 @@ go_library(
         "tc_darwin.go",
         "tc_freebsd.go",
         "tc_linux.go",
+        "tc_netbsd.go",
         "tc_openbsd_cgo.go",
         "tc_openbsd_nocgo.go",
         "tc_solaris_cgo.go",
@@ -34,6 +35,9 @@ go_library(
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:openbsd": [
