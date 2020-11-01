@@ -298,7 +298,7 @@ github.com/coreos/pkg/dlopen
 ## explicit
 # github.com/cpuguy83/go-md2man/v2 => github.com/cpuguy83/go-md2man/v2 v2.0.0
 github.com/cpuguy83/go-md2man/v2/md2man
-# github.com/creack/pty => github.com/creack/pty v1.1.7
+# github.com/creack/pty => github.com/creack/pty v1.1.11
 # github.com/cyphar/filepath-securejoin v0.2.2 => github.com/cyphar/filepath-securejoin v0.2.2
 github.com/cyphar/filepath-securejoin
 # github.com/cyphar/filepath-securejoin => github.com/cyphar/filepath-securejoin v0.2.2
