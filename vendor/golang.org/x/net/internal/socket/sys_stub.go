@@ -6,11 +6,7 @@
 
 package socket
 
-import (
-	"net"
-	"runtime"
-	"unsafe"
-)
+import "net"
 
 const (
 	sysAF_UNSPEC = 0x0
@@ -19,16 +15,6 @@ const (
 
 	sysSOCK_RAW = 0x3
 )
-
-func probeProtocolStack() int {
-	switch runtime.GOARCH {
-	case "amd64p32", "mips64p32":
-		return 4
-	default:
-		var p uintptr
-		return int(unsafe.Sizeof(p))
-	}
-}
 
 func marshalInetAddr(ip net.IP, port int, zone string) []byte {
 	return nil
