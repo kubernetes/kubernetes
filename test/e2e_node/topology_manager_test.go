@@ -391,6 +391,11 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	runMultipleGuPods(f)
 }
 
+// waitForAllContainerRemoval waits until all the containers on a given pod are really gone.
+// This is needed by the e2e tests which involve exclusive resource allocation (cpu, topology manager; podresources; etc.)
+// In these cases, we need to make sure the tests clean up after themselves to make sure each test runs in
+// a pristine environment. The only way known so far to do that is to introduce this wait.
+// Worth noting, however, that this makes the test runtime much bigger.
 func waitForAllContainerRemoval(podName, podNS string) {
 	rs, _, err := getCRIClient()
 	framework.ExpectNoError(err)
@@ -569,7 +574,7 @@ func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
 	ginkgo.By(fmt.Sprintf("Delete SRIOV device plugin pod %s/%s", sd.pod.Namespace, sd.pod.Name))
 	err = f.ClientSet.CoreV1().Pods(sd.pod.Namespace).Delete(context.TODO(), sd.pod.Name, deleteOptions)
 	framework.ExpectNoError(err)
-	waitForContainerRemoval(sd.pod.Spec.Containers[0].Name, sd.pod.Name, sd.pod.Namespace)
+	waitForAllContainerRemoval(sd.pod.Name, sd.pod.Namespace)
 
 	ginkgo.By(fmt.Sprintf("Deleting configMap %v/%v", metav1.NamespaceSystem, sd.configMap.Name))
 	err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(context.TODO(), sd.configMap.Name, deleteOptions)
