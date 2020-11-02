@@ -469,14 +469,6 @@ const (
 	// Expects the OpenStack Cinder CSI Driver to be installed and configured on all nodes.
 	CSIMigrationOpenStackComplete featuregate.Feature = "CSIMigrationOpenStackComplete"
 
-	// owner: @MrHohn
-	// alpha: v1.15
-	// beta:  v1.16
-	// GA: v1.17
-	//
-	// Enables Finalizer Protection for Service LoadBalancers.
-	ServiceLoadBalancerFinalizer featuregate.Feature = "ServiceLoadBalancerFinalizer"
-
 	// owner: @RobertKrawitz
 	// alpha: v1.15
 	//
@@ -707,7 +699,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ProcMountType:                  {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:               {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:            {Default: true, PreRelease: featuregate.Beta},
-	ServiceLoadBalancerFinalizer:   {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: true, PreRelease: featuregate.Beta},
 	VolumePVCDataSource:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
