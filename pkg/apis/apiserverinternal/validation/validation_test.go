@@ -340,6 +340,7 @@ func TestValidateStorageVersionName(t *testing.T) {
 		for _, msg := range errs {
 			if msg == tc.expectedErr {
 				found = true
+				break
 			}
 		}
 		if !found {

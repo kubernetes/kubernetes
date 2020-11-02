@@ -94,6 +94,7 @@ func validateServerStorageVersion(ssv apiserverinternal.ServerStorageVersion, fl
 		}
 		if dv == ssv.EncodingVersion {
 			found = true
+			break
 		}
 	}
 	if !found {
