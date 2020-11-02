@@ -51,6 +51,8 @@ const (
 	sizeofIovec  = 0x10
 	sizeofMsghdr = 0x38
 
+	sizeofCmsghdr = 0x10
+
 	sizeofSockaddrInet  = 0x10
 	sizeofSockaddrInet6 = 0x1c
 )

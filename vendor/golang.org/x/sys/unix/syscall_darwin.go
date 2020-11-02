@@ -13,9 +13,28 @@
 package unix
 
 import (
+	"errors"
 	"syscall"
 	"unsafe"
 )
+
+const ImplementsGetwd = true
+
+func Getwd() (string, error) {
+	buf := make([]byte, 2048)
+	attrs, err := getAttrList(".", attrList{CommonAttr: attrCmnFullpath}, buf, 0)
+	if err == nil && len(attrs) == 1 && len(attrs[0]) >= 2 {
+		wd := string(attrs[0])
+		// Sanity check that it's an absolute path and ends
+		// in a null byte, which we then strip.
+		if wd[0] == '/' && wd[len(wd)-1] == 0 {
+			return wd[:len(wd)-1], nil
+		}
+	}
+	// If pkg/os/getwd.go gets ENOTSUP, it will fall back to the
+	// slow algorithm.
+	return "", ENOTSUP
+}
 
 // SockaddrDatalink implements the Sockaddr interface for AF_LINK type sockets.
 type SockaddrDatalink struct {
@@ -29,11 +48,6 @@ type SockaddrDatalink struct {
 	Data   [12]int8
 	raw    RawSockaddrDatalink
 }
-
-// Some external packages rely on SYS___SYSCTL being defined to implement their
-// own sysctl wrappers. Provide it here, even though direct syscalls are no
-// longer supported on darwin.
-const SYS___SYSCTL = 202
 
 // Translate "kern.hostname" to []_C_int{0,1,2,3}.
 func nametomib(name string) (mib []_C_int, err error) {
@@ -78,6 +92,11 @@ func direntNamlen(buf []byte) (uint64, bool) {
 func PtraceAttach(pid int) (err error) { return ptrace(PT_ATTACH, pid, 0, 0) }
 func PtraceDetach(pid int) (err error) { return ptrace(PT_DETACH, pid, 0, 0) }
 
+const (
+	attrBitMapCount = 5
+	attrCmnFullpath = 0x08000000
+)
+
 type attrList struct {
 	bitmapCount uint16
 	_           uint16
@@ -87,6 +106,54 @@ type attrList struct {
 	FileAttr    uint32
 	Forkattr    uint32
 }
+
+func getAttrList(path string, attrList attrList, attrBuf []byte, options uint) (attrs [][]byte, err error) {
+	if len(attrBuf) < 4 {
+		return nil, errors.New("attrBuf too small")
+	}
+	attrList.bitmapCount = attrBitMapCount
+
+	var _p0 *byte
+	_p0, err = BytePtrFromString(path)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := getattrlist(_p0, unsafe.Pointer(&attrList), unsafe.Pointer(&attrBuf[0]), uintptr(len(attrBuf)), int(options)); err != nil {
+		return nil, err
+	}
+	size := *(*uint32)(unsafe.Pointer(&attrBuf[0]))
+
+	// dat is the section of attrBuf that contains valid data,
+	// without the 4 byte length header. All attribute offsets
+	// are relative to dat.
+	dat := attrBuf
+	if int(size) < len(attrBuf) {
+		dat = dat[:size]
+	}
+	dat = dat[4:] // remove length prefix
+
+	for i := uint32(0); int(i) < len(dat); {
+		header := dat[i:]
+		if len(header) < 8 {
+			return attrs, errors.New("truncated attribute header")
+		}
+		datOff := *(*int32)(unsafe.Pointer(&header[0]))
+		attrLen := *(*uint32)(unsafe.Pointer(&header[4]))
+		if datOff < 0 || uint32(datOff)+attrLen > uint32(len(dat)) {
+			return attrs, errors.New("truncated results; attrBuf too small")
+		}
+		end := uint32(datOff) + attrLen
+		attrs = append(attrs, dat[datOff:end])
+		i = end
+		if r := i % 4; r != 0 {
+			i += (4 - r)
+		}
+	}
+	return
+}
+
+//sys getattrlist(path *byte, list unsafe.Pointer, buf unsafe.Pointer, size uintptr, options int) (err error)
 
 //sysnb pipe() (r int, w int, err error)
 
@@ -329,8 +396,6 @@ func Sendfile(outfd int, infd int, offset *int64, count int) (written int, err e
 //sys	Chroot(path string) (err error)
 //sys	ClockGettime(clockid int32, time *Timespec) (err error)
 //sys	Close(fd int) (err error)
-//sys	Clonefile(src string, dst string, flags int) (err error)
-//sys	Clonefileat(srcDirfd int, src string, dstDirfd int, dst string, flags int) (err error)
 //sys	Dup(fd int) (nfd int, err error)
 //sys	Dup2(from int, to int) (err error)
 //sys	Exchangedata(path1 string, path2 string, options int) (err error)
@@ -342,12 +407,10 @@ func Sendfile(outfd int, infd int, offset *int64, count int) (written int, err e
 //sys	Fchmodat(dirfd int, path string, mode uint32, flags int) (err error)
 //sys	Fchown(fd int, uid int, gid int) (err error)
 //sys	Fchownat(dirfd int, path string, uid int, gid int, flags int) (err error)
-//sys	Fclonefileat(srcDirfd int, dstDirfd int, dst string, flags int) (err error)
 //sys	Flock(fd int, how int) (err error)
 //sys	Fpathconf(fd int, name int) (val int, err error)
 //sys	Fsync(fd int) (err error)
 //sys	Ftruncate(fd int, length int64) (err error)
-//sys	Getcwd(buf []byte) (n int, err error)
 //sys	Getdtablesize() (size int)
 //sysnb	Getegid() (egid int)
 //sysnb	Geteuid() (uid int)
