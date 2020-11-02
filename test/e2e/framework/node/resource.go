@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	netutil "k8s.io/utils/net"
 	"net"
 	"strings"
 	"time"
@@ -246,6 +247,26 @@ func GetInternalIP(node *v1.Node) (string, error) {
 		return "", fmt.Errorf("Couldn't get the internal IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 	}
 	return host, nil
+}
+
+// GetAddressesByTypeAndFamily returns a list of addresses of the given addressType for the given node
+// and filtered by IPFamily
+func GetAddressesByTypeAndFamily(node *v1.Node, addressType v1.NodeAddressType, family v1.IPFamily) (ips []string) {
+	for _, nodeAddress := range node.Status.Addresses {
+		if nodeAddress.Type != addressType {
+			continue
+		}
+		if nodeAddress.Address == "" {
+			continue
+		}
+		if family == v1.IPv6Protocol && netutil.IsIPv6String(nodeAddress.Address) {
+			ips = append(ips, nodeAddress.Address)
+		}
+		if family == v1.IPv4Protocol && !netutil.IsIPv6String(nodeAddress.Address) {
+			ips = append(ips, nodeAddress.Address)
+		}
+	}
+	return
 }
 
 // GetAddresses returns a list of addresses of the given addressType for the given node
