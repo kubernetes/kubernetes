@@ -238,7 +238,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 // GuaranteedUpdate implements storage.Interface.GuaranteedUpdate.
 func (s *store) GuaranteedUpdate(
 	ctx context.Context, key string, out runtime.Object, ignoreNotFound bool,
-	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion ...runtime.Object) error {
+	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, suggestion runtime.Object) error {
 	trace := utiltrace.New("GuaranteedUpdate etcd3", utiltrace.Field{"type", getTypeName(out)})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
@@ -260,8 +260,8 @@ func (s *store) GuaranteedUpdate(
 
 	var origState *objState
 	var mustCheckData bool
-	if len(suggestion) == 1 && suggestion[0] != nil {
-		origState, err = s.getStateFromObject(suggestion[0])
+	if suggestion != nil {
+		origState, err = s.getStateFromObject(suggestion)
 		if err != nil {
 			return err
 		}

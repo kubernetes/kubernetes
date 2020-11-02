@@ -319,7 +319,7 @@ func (d *dummyStorage) List(_ context.Context, _ string, _ storage.ListOptions, 
 	podList.ListMeta = metav1.ListMeta{ResourceVersion: "100"}
 	return d.err
 }
-func (d *dummyStorage) GuaranteedUpdate(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ ...runtime.Object) error {
+func (d *dummyStorage) GuaranteedUpdate(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ runtime.Object) error {
 	return fmt.Errorf("unimplemented")
 }
 func (d *dummyStorage) Count(_ string) (int64, error) {
