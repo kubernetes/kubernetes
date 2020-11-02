@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 )
 
 func binding(roleRef rbacv1.RoleRef, subjects []rbacv1.Subject) *rbacv1.ClusterRoleBinding {
@@ -81,10 +81,10 @@ func TestDiffObjectReferenceLists(t *testing.T) {
 
 	for k, tc := range tests {
 		onlyA, onlyB := diffSubjectLists(tc.A, tc.B)
-		if !helper.Semantic.DeepEqual(onlyA, tc.ExpectedOnlyA) {
+		if !apiequality.Semantic.DeepEqual(onlyA, tc.ExpectedOnlyA) {
 			t.Errorf("%s: Expected %#v, got %#v", k, tc.ExpectedOnlyA, onlyA)
 		}
-		if !helper.Semantic.DeepEqual(onlyB, tc.ExpectedOnlyB) {
+		if !apiequality.Semantic.DeepEqual(onlyB, tc.ExpectedOnlyB) {
 			t.Errorf("%s: Expected %#v, got %#v", k, tc.ExpectedOnlyB, onlyB)
 		}
 	}
@@ -174,7 +174,7 @@ func TestComputeUpdate(t *testing.T) {
 			t.Errorf("%s: Expected\n\t%v\ngot\n\t%v (%v)", k, tc.ExpectedUpdateNeeded, updateNeeded, result.Operation)
 			continue
 		}
-		if updateNeeded && !helper.Semantic.DeepEqual(updatedBinding, tc.ExpectedUpdatedBinding) {
+		if updateNeeded && !apiequality.Semantic.DeepEqual(updatedBinding, tc.ExpectedUpdatedBinding) {
 			t.Errorf("%s: Expected\n\t%v %v\ngot\n\t%v %v", k, tc.ExpectedUpdatedBinding.RoleRef, tc.ExpectedUpdatedBinding.Subjects, updatedBinding.RoleRef, updatedBinding.Subjects)
 		}
 	}
