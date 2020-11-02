@@ -4,6 +4,8 @@
 
 package cpu
 
+const cacheLineSize = 256
+
 const (
 	// bit mask values from /usr/include/bits/hwcap.h
 	hwcap_ZARCH  = 2

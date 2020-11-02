@@ -50,7 +50,6 @@ const (
 	HardwareProfileChange = Cmd(windows.SERVICE_CONTROL_HARDWAREPROFILECHANGE)
 	PowerEvent            = Cmd(windows.SERVICE_CONTROL_POWEREVENT)
 	SessionChange         = Cmd(windows.SERVICE_CONTROL_SESSIONCHANGE)
-	PreShutdown           = Cmd(windows.SERVICE_CONTROL_PRESHUTDOWN)
 )
 
 // Accepted is used to describe commands accepted by the service.
@@ -66,7 +65,6 @@ const (
 	AcceptHardwareProfileChange = Accepted(windows.SERVICE_ACCEPT_HARDWAREPROFILECHANGE)
 	AcceptPowerEvent            = Accepted(windows.SERVICE_ACCEPT_POWEREVENT)
 	AcceptSessionChange         = Accepted(windows.SERVICE_ACCEPT_SESSIONCHANGE)
-	AcceptPreShutdown           = Accepted(windows.SERVICE_ACCEPT_PRESHUTDOWN)
 )
 
 // Status combines State and Accepted commands to fully describe running service.
@@ -203,9 +201,6 @@ func (s *service) updateStatus(status *Status, ec *exitCode) error {
 	}
 	if status.Accepts&AcceptSessionChange != 0 {
 		t.ControlsAccepted |= windows.SERVICE_ACCEPT_SESSIONCHANGE
-	}
-	if status.Accepts&AcceptPreShutdown != 0 {
-		t.ControlsAccepted |= windows.SERVICE_ACCEPT_PRESHUTDOWN
 	}
 	if ec.errno == 0 {
 		t.Win32ExitCode = windows.NO_ERROR

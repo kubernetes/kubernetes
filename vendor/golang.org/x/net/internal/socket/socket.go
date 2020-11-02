@@ -90,9 +90,17 @@ func (o *Option) SetInt(c *Conn, v int) error {
 	return o.set(c, b)
 }
 
+func controlHeaderLen() int {
+	return roundup(sizeofCmsghdr)
+}
+
+func controlMessageLen(dataLen int) int {
+	return roundup(sizeofCmsghdr) + dataLen
+}
+
 // ControlMessageSpace returns the whole length of control message.
 func ControlMessageSpace(dataLen int) int {
-	return controlMessageSpace(dataLen)
+	return roundup(sizeofCmsghdr) + roundup(dataLen)
 }
 
 // A ControlMessage represents the head message in a stream of control
