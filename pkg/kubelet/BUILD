@@ -308,6 +308,7 @@ filegroup(
         "//pkg/kubelet/logs:all-srcs",
         "//pkg/kubelet/metrics:all-srcs",
         "//pkg/kubelet/network:all-srcs",
+        "//pkg/kubelet/nodeshutdown/systemd:all-srcs",
         "//pkg/kubelet/nodestatus:all-srcs",
         "//pkg/kubelet/oom:all-srcs",
         "//pkg/kubelet/pleg:all-srcs",
