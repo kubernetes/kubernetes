@@ -100,6 +100,7 @@ func getNodeSummary() (*stats.Summary, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse /stats/summary to go struct: %+v", resp)
 	}
+	klog.Infof("DEBUG: Summary stats %v", summary)
 	return &summary, nil
 }
 
