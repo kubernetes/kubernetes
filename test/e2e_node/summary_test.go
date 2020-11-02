@@ -89,8 +89,12 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"Name":      gstruct.Ignore(),
 					"StartTime": recent(maxStartAge),
 					"CPU": ptrMatchAllFields(gstruct.Fields{
-						"Time":                 recent(maxStatsAge),
-						"UsageNanoCores":       bounded(10000, 2e9),
+						"Time": recent(maxStatsAge),
+						// CRI stats provider tries to estimate the value of UsageNanoCores. This value can be
+						// either 0 or between 10000 and 2e9.
+						// Please refer, https://github.com/kubernetes/kubernetes/pull/95345#discussion_r501630942
+						// for more information.
+						"UsageNanoCores":       gomega.SatisfyAny(gomega.BeZero(), bounded(10000, 2e9)),
 						"UsageCoreNanoSeconds": bounded(10000000, 1e15),
 					}),
 					"Memory": ptrMatchAllFields(gstruct.Fields{
