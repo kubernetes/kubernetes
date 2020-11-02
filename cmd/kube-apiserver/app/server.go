@@ -677,8 +677,17 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	}
 
 	if s.Etcd.EnableWatchCache {
+		sizes := kubeapiserver.DefaultWatchCacheSizes()
 		// Ensure that overrides parse correctly.
-		if _, err := serveroptions.ParseWatchCacheSizes(s.Etcd.WatchCacheSizes); err != nil {
+		userSpecified, err := serveroptions.ParseWatchCacheSizes(s.Etcd.WatchCacheSizes)
+		if err != nil {
+			return options, err
+		}
+		for resource, size := range userSpecified {
+			sizes[resource] = size
+		}
+		s.Etcd.WatchCacheSizes, err = serveroptions.WriteWatchCacheSizes(sizes)
+		if err != nil {
 			return options, err
 		}
 	}
