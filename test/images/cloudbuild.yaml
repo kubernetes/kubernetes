@@ -38,4 +38,4 @@ substitutions:
   # a branch like 'master' or 'release-0.2', or a tag like 'v0.2'.
   _PULL_BASE_REF: 'master'
   # _WHAT will contain the image name to be built and published to the staging registry.
-  _WHAT: 'all-conformance'
+  _WHAT: 'updated-images'

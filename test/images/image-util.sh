@@ -262,6 +262,15 @@ if [[ "${WHAT}" == "all-conformance" ]]; then
   for image in "${conformance_images[@]}"; do
     eval "${TASK}" "${image}" "$@"
   done
+elif [[ "${WHAT}" == "updated-images" ]]; then
+  # if updated-images is selected it obtains the images modified respect master and updates them
+  # this is required for the postsubmit job used to update the stating repo and not having to
+  # rebuild all the images. This script is assumed to run always against master.
+  shift
+  updated_images=$(git diff --dirstat=files,0 master -- "${KUBE_ROOT}"/test/images/* | cut -d "/" -f 3)
+  for image in ${updated_images}; do
+    eval "${TASK}" "${image}" "$@"
+  done
 else
   eval "${TASK}" "$@"
 fi
