@@ -375,6 +375,13 @@ type KubeletConfiguration struct {
 	Logging componentbaseconfig.LoggingConfiguration
 	// EnableSystemLogHandler enables /logs handler.
 	EnableSystemLogHandler bool
+	// ShutdownGracePeriod specifies the total duration that the node should delay the shutdown and total grace period for pod termination during a node shutdown.
+	// Defaults to 30 seconds, requires GracefulNodeShutdown feature gate to be enabled.
+	ShutdownGracePeriod metav1.Duration
+	// ShutdownGracePeriodCriticalPods specifies the duration used to terminate critical pods during a node shutdown. This should be less than ShutdownGracePeriod.
+	// Defaults to 10 seconds, requires GracefulNodeShutdown feature gate to be enabled.
+	// For example, if ShutdownGracePeriod=30s, and ShutdownGracePeriodCriticalPods=10s, during a node shutdown the first 20 seconds would be reserved for gracefully terminating normal pods, and the last 10 seconds would be reserved for terminating critical pods.
+	ShutdownGracePeriodCriticalPods metav1.Duration
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
