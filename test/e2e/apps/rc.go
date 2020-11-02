@@ -135,7 +135,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 					Spec: v1.PodSpec{
 						Containers: []v1.Container{{
 							Name:  testRcName,
-							Image: "nginx",
+							Image: imageutils.GetE2EImage(imageutils.Nginx),
 						}},
 					},
 				},
