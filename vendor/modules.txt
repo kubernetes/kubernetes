@@ -7,6 +7,7 @@ bitbucket.org/bertimus9/systemstat
 # cloud.google.com/go/bigquery => cloud.google.com/go/bigquery v1.0.1
 cloud.google.com/go/compute/metadata
 # cloud.google.com/go/datastore => cloud.google.com/go/datastore v1.0.0
+# cloud.google.com/go/firestore => cloud.google.com/go/firestore v1.1.0
 # cloud.google.com/go/pubsub => cloud.google.com/go/pubsub v1.0.1
 # cloud.google.com/go/storage => cloud.google.com/go/storage v1.0.0
 # dmitri.shuralyov.com/gpu/mtl => dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9
@@ -122,7 +123,8 @@ github.com/PuerkitoBio/urlesc
 ## explicit
 github.com/armon/circbuf
 # github.com/armon/circbuf => github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
-# github.com/armon/consul-api => github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6
+# github.com/armon/go-metrics => github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da
+# github.com/armon/go-radix => github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310
 # github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a => github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
 github.com/asaskevich/govalidator
 # github.com/asaskevich/govalidator => github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
@@ -180,6 +182,7 @@ github.com/aws/aws-sdk-go/service/sts/stsiface
 github.com/beorn7/perks/quantile
 # github.com/bgentry/speakeasy => github.com/bgentry/speakeasy v0.1.0
 # github.com/bifurcation/mint => github.com/bifurcation/mint v0.0.0-20180715133206-93c51c6ce115
+# github.com/bketelsen/crypt => github.com/bketelsen/crypt v0.0.3-0.20200106085610-5cbc8cc4026c
 # github.com/blang/semver v3.5.0+incompatible => github.com/blang/semver v3.5.0+incompatible
 ## explicit
 github.com/blang/semver
@@ -269,7 +272,7 @@ github.com/containernetworking/cni/pkg/version
 github.com/coredns/corefile-migration/migration
 github.com/coredns/corefile-migration/migration/corefile
 # github.com/coreos/bbolt => github.com/coreos/bbolt v1.3.2
-# github.com/coreos/etcd => github.com/coreos/etcd v3.3.10+incompatible
+# github.com/coreos/etcd => github.com/coreos/etcd v3.3.13+incompatible
 # github.com/coreos/go-oidc v2.1.0+incompatible => github.com/coreos/go-oidc v2.1.0+incompatible
 ## explicit
 github.com/coreos/go-oidc
@@ -631,9 +634,9 @@ github.com/gophercloud/gophercloud/pagination
 ## explicit
 # github.com/gorilla/context => github.com/gorilla/context v1.1.1
 # github.com/gorilla/mux => github.com/gorilla/mux v1.7.3
-# github.com/gorilla/websocket v1.4.0 => github.com/gorilla/websocket v1.4.0
+# github.com/gorilla/websocket v1.4.2 => github.com/gorilla/websocket v1.4.2
 github.com/gorilla/websocket
-# github.com/gorilla/websocket => github.com/gorilla/websocket v1.4.0
+# github.com/gorilla/websocket => github.com/gorilla/websocket v1.4.2
 # github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 => github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
 github.com/gregjones/httpcache
 # github.com/gregjones/httpcache => github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
@@ -649,7 +652,18 @@ github.com/grpc-ecosystem/go-grpc-prometheus
 github.com/grpc-ecosystem/grpc-gateway/internal
 github.com/grpc-ecosystem/grpc-gateway/runtime
 github.com/grpc-ecosystem/grpc-gateway/utilities
+# github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.1.0
+# github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.1.1
+# github.com/hashicorp/errwrap => github.com/hashicorp/errwrap v1.0.0
+# github.com/hashicorp/go-cleanhttp => github.com/hashicorp/go-cleanhttp v0.5.1
+# github.com/hashicorp/go-immutable-radix => github.com/hashicorp/go-immutable-radix v1.0.0
+# github.com/hashicorp/go-msgpack => github.com/hashicorp/go-msgpack v0.5.3
+# github.com/hashicorp/go-multierror => github.com/hashicorp/go-multierror v1.0.0
+# github.com/hashicorp/go-rootcerts => github.com/hashicorp/go-rootcerts v1.0.0
+# github.com/hashicorp/go-sockaddr => github.com/hashicorp/go-sockaddr v1.0.0
 # github.com/hashicorp/go-syslog => github.com/hashicorp/go-syslog v1.0.0
+# github.com/hashicorp/go-uuid => github.com/hashicorp/go-uuid v1.0.1
+# github.com/hashicorp/go.net => github.com/hashicorp/go.net v0.0.1
 # github.com/hashicorp/golang-lru v0.5.1 => github.com/hashicorp/golang-lru v0.5.1
 ## explicit
 github.com/hashicorp/golang-lru
@@ -667,6 +681,10 @@ github.com/hashicorp/hcl/hcl/token
 github.com/hashicorp/hcl/json/parser
 github.com/hashicorp/hcl/json/scanner
 github.com/hashicorp/hcl/json/token
+# github.com/hashicorp/logutils => github.com/hashicorp/logutils v1.0.0
+# github.com/hashicorp/mdns => github.com/hashicorp/mdns v1.0.0
+# github.com/hashicorp/memberlist => github.com/hashicorp/memberlist v0.1.3
+# github.com/hashicorp/serf => github.com/hashicorp/serf v0.8.2
 # github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible => github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible
 ## explicit
 # github.com/heketi/heketi => github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible
@@ -749,7 +767,6 @@ github.com/lithammer/dedent
 # github.com/lucas-clemente/quic-go => github.com/lucas-clemente/quic-go v0.10.2
 # github.com/lucas-clemente/quic-go-certificates => github.com/lucas-clemente/quic-go-certificates v0.0.0-20160823095156-d2f86524cced
 # github.com/magiconair/properties v1.8.1 => github.com/magiconair/properties v1.8.1
-## explicit
 github.com/magiconair/properties
 # github.com/magiconair/properties => github.com/magiconair/properties v1.8.1
 # github.com/mailru/easyjson v0.7.0 => github.com/mailru/easyjson v0.7.0
@@ -775,10 +792,14 @@ github.com/mindprince/gonvml
 # github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible => github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible
 github.com/mistifyio/go-zfs
 # github.com/mistifyio/go-zfs => github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible
+# github.com/mitchellh/cli => github.com/mitchellh/cli v1.0.0
 # github.com/mitchellh/go-homedir => github.com/mitchellh/go-homedir v1.1.0
+# github.com/mitchellh/go-testing-interface => github.com/mitchellh/go-testing-interface v1.0.0
 # github.com/mitchellh/go-wordwrap v1.0.0 => github.com/mitchellh/go-wordwrap v1.0.0
 github.com/mitchellh/go-wordwrap
 # github.com/mitchellh/go-wordwrap => github.com/mitchellh/go-wordwrap v1.0.0
+# github.com/mitchellh/gox => github.com/mitchellh/gox v0.4.0
+# github.com/mitchellh/iochan => github.com/mitchellh/iochan v1.0.0
 # github.com/mitchellh/mapstructure v1.1.2 => github.com/mitchellh/mapstructure v1.1.2
 github.com/mitchellh/mapstructure
 # github.com/mitchellh/mapstructure => github.com/mitchellh/mapstructure v1.1.2
@@ -911,6 +932,7 @@ github.com/opencontainers/runtime-spec/specs-go
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalk
+# github.com/pascaldekloe/goe => github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c
 # github.com/pelletier/go-toml v1.2.0 => github.com/pelletier/go-toml v1.2.0
 github.com/pelletier/go-toml
 # github.com/pelletier/go-toml => github.com/pelletier/go-toml v1.2.0
@@ -925,6 +947,7 @@ github.com/pkg/errors
 ## explicit
 # github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
+# github.com/posener/complete => github.com/posener/complete v1.1.1
 # github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
 github.com/pquerna/cachecontrol
 # github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
@@ -972,9 +995,11 @@ github.com/russross/blackfriday
 # github.com/russross/blackfriday/v2 v2.0.1 => github.com/russross/blackfriday/v2 v2.0.1
 github.com/russross/blackfriday/v2
 # github.com/russross/blackfriday/v2 => github.com/russross/blackfriday/v2 v2.0.1
+# github.com/ryanuber/columnize => github.com/ryanuber/columnize v0.0.0-20160712163229-9b3edd62028f
 # github.com/satori/go.uuid v1.2.0 => github.com/satori/go.uuid v1.2.0
 github.com/satori/go.uuid
 # github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
+# github.com/sean-/seed => github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529
 # github.com/seccomp/libseccomp-golang v0.9.1 => github.com/seccomp/libseccomp-golang v0.9.1
 github.com/seccomp/libseccomp-golang
 # github.com/seccomp/libseccomp-golang => github.com/seccomp/libseccomp-golang v0.9.1
@@ -998,10 +1023,10 @@ github.com/spf13/afero/mem
 # github.com/spf13/cast v1.3.0 => github.com/spf13/cast v1.3.0
 github.com/spf13/cast
 # github.com/spf13/cast => github.com/spf13/cast v1.3.0
-# github.com/spf13/cobra v1.0.0 => github.com/spf13/cobra v1.0.0
+# github.com/spf13/cobra v1.1.1 => github.com/spf13/cobra v1.1.1
 ## explicit
 github.com/spf13/cobra
-# github.com/spf13/cobra => github.com/spf13/cobra v1.0.0
+# github.com/spf13/cobra => github.com/spf13/cobra v1.1.1
 github.com/spf13/cobra/doc
 # github.com/spf13/jwalterweatherman v1.1.0 => github.com/spf13/jwalterweatherman v1.1.0
 ## explicit
@@ -1011,10 +1036,10 @@ github.com/spf13/jwalterweatherman
 ## explicit
 github.com/spf13/pflag
 # github.com/spf13/pflag => github.com/spf13/pflag v1.0.5
-# github.com/spf13/viper v1.4.0 => github.com/spf13/viper v1.4.0
+# github.com/spf13/viper v1.7.0 => github.com/spf13/viper v1.7.0
 ## explicit
 github.com/spf13/viper
-# github.com/spf13/viper => github.com/spf13/viper v1.4.0
+# github.com/spf13/viper => github.com/spf13/viper v1.7.0
 # github.com/storageos/go-api v2.2.0+incompatible => github.com/storageos/go-api v2.2.0+incompatible
 ## explicit
 github.com/storageos/go-api
@@ -1031,6 +1056,9 @@ github.com/stretchr/objx
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/mock
 github.com/stretchr/testify/require
+# github.com/subosito/gotenv v1.2.0 => github.com/subosito/gotenv v1.2.0
+github.com/subosito/gotenv
+# github.com/subosito/gotenv => github.com/subosito/gotenv v1.2.0
 # github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 => github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
 # github.com/syndtr/gocapability => github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
 github.com/syndtr/gocapability/capability
@@ -1043,7 +1071,6 @@ github.com/thecodeteam/goscaleio/types/v1
 # github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5 => github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5
 # github.com/tmc/grpc-websocket-proxy => github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5
 github.com/tmc/grpc-websocket-proxy/wsproxy
-# github.com/ugorji/go => github.com/ugorji/go v1.1.4
 # github.com/urfave/cli => github.com/urfave/cli v1.22.2
 # github.com/urfave/negroni v1.0.0 => github.com/urfave/negroni v1.0.0
 ## explicit
@@ -1096,7 +1123,6 @@ github.com/vmware/govmomi/vim25/xml
 # github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
 github.com/xiang90/probing
 # github.com/xiang90/probing => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
-# github.com/xordataexchange/crypt => github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77
 # github.com/yuin/goldmark => github.com/yuin/goldmark v1.1.27
 # go.etcd.io/bbolt v1.3.5 => go.etcd.io/bbolt v1.3.5
 go.etcd.io/bbolt
@@ -1521,6 +1547,9 @@ gopkg.in/gcfg.v1/types
 # gopkg.in/inf.v0 v0.9.1 => gopkg.in/inf.v0 v0.9.1
 gopkg.in/inf.v0
 # gopkg.in/inf.v0 => gopkg.in/inf.v0 v0.9.1
+# gopkg.in/ini.v1 v1.51.0 => gopkg.in/ini.v1 v1.51.0
+gopkg.in/ini.v1
+# gopkg.in/ini.v1 => gopkg.in/ini.v1 v1.51.0
 # gopkg.in/mcuadros/go-syslog.v2 => gopkg.in/mcuadros/go-syslog.v2 v2.2.1
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0 => gopkg.in/natefinch/lumberjack.v2 v2.0.0
 gopkg.in/natefinch/lumberjack.v2
