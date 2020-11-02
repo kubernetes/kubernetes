@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/distroless/base
+ARG BASEIMAGE
+FROM $BASEIMAGE
 
 ADD regression-issue-74839 /regression-issue-74839
 
