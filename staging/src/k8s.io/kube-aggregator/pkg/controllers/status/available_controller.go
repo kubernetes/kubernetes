@@ -125,7 +125,7 @@ func (c *tlsTransportCache) get(config *rest.Config) (http.RoundTripper, error) 
 
 type tlsCacheKey struct {
 	certData string
-	keyData  string
+	keyData  string `datapolicy:"secret-key"`
 }
 
 func tlsConfigKey(c *rest.Config) tlsCacheKey {
