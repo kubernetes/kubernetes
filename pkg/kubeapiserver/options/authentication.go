@@ -27,6 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -104,6 +105,11 @@ type WebHookAuthenticationOptions struct {
 	ConfigFile string
 	Version    string
 	CacheTTL   time.Duration
+
+	// RetryBackoff specifies the backoff parameters for the authentication webhook retry logic.
+	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
+	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
+	RetryBackoff *wait.Backoff
 }
 
 // NewBuiltInAuthenticationOptions create a new BuiltInAuthenticationOptions, just set default token cache TTL
@@ -172,8 +178,9 @@ func (o *BuiltInAuthenticationOptions) WithTokenFile() *BuiltInAuthenticationOpt
 // WithWebHook set default value for web hook authentication
 func (o *BuiltInAuthenticationOptions) WithWebHook() *BuiltInAuthenticationOptions {
 	o.WebHook = &WebHookAuthenticationOptions{
-		Version:  "v1beta1",
-		CacheTTL: 2 * time.Minute,
+		Version:      "v1beta1",
+		CacheTTL:     2 * time.Minute,
+		RetryBackoff: genericoptions.DefaultAuthWebhookRetryBackoff(),
 	}
 	return o
 }
@@ -213,6 +220,13 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 			}
 		} else if len(o.ServiceAccounts.JWKSURI) > 0 {
 			allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri may only be set when the ServiceAccountIssuerDiscovery feature gate is enabled"))
+		}
+	}
+
+	if o.WebHook != nil {
+		retryBackoff := o.WebHook.RetryBackoff
+		if retryBackoff != nil && retryBackoff.Steps <= 0 {
+			allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 1, but is: %d", retryBackoff.Steps))
 		}
 	}
 
@@ -415,6 +429,7 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		ret.WebhookTokenAuthnConfigFile = o.WebHook.ConfigFile
 		ret.WebhookTokenAuthnVersion = o.WebHook.Version
 		ret.WebhookTokenAuthnCacheTTL = o.WebHook.CacheTTL
+		ret.WebhookRetryBackoff = o.WebHook.RetryBackoff
 
 		if len(o.WebHook.ConfigFile) > 0 && o.WebHook.CacheTTL > 0 {
 			if o.TokenSuccessCacheTTL > 0 && o.WebHook.CacheTTL < o.TokenSuccessCacheTTL {
