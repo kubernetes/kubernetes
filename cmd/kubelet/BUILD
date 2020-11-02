@@ -10,6 +10,7 @@ load("//staging/src/k8s.io/component-base/version:def.bzl", "version_x_defs")
 go_binary(
     name = "kubelet",
     embed = [":go_default_library"],
+    linkmode = "pie",
     x_defs = version_x_defs(),
 )
 
