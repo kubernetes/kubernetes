@@ -30,7 +30,8 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: csi-provisioner
-          image: xyang105/csi-provisioner:apiv1 #gcr.io/gke-release/csi-provisioner:v1.6.0-gke.0
+          #image: docker.io/xyang105/csi-provisioner:apiv1
+          image: gcr.io/gke-release/csi-provisioner:v1.6.0-gke.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
