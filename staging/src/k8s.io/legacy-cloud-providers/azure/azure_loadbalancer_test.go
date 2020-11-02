@@ -37,10 +37,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/loadbalancerclient/mockloadbalancerclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/publicipclient/mockpublicipclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/securitygroupclient/mocksecuritygroupclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/subnetclient/mocksubnetclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/vmclient/mockvmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
@@ -1168,14 +1170,6 @@ func TestGetServiceLoadBalancer(t *testing.T) {
 			expectedStatus: &v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{{IP: "1.2.3.4", Hostname: ""}}},
 			expectedExists: true,
 			expectedError:  false,
-		},
-		{
-			desc:           "getServiceLoadBalancer shall report error if there are loadbalancer mode annotations on a standard lb",
-			service:        getTestService("service1", v1.ProtocolTCP, nil, false, 80),
-			annotations:    map[string]string{ServiceAnnotationLoadBalancerMode: "__auto__"},
-			sku:            "standard",
-			expectedExists: false,
-			expectedError:  true,
 		},
 		{
 			desc: "getServiceLoadBalancer shall select the lb with minimum lb rules if wantLb is true, the sku is " +
@@ -3310,7 +3304,7 @@ func TestIsFrontendIPConfigIsUnsafeToDelete(t *testing.T) {
 		unsafe     bool
 	}{
 		{
-			desc: "isFrontendIPConfigIsUnsafeToDelete should return true if there is a " +
+			desc: "isFrontendIPConfigUnsafeToDelete should return true if there is a " +
 				"loadBalancing rule from other service referencing the frontend IP config",
 			existingLB: &network.LoadBalancer{
 				Name: to.StringPtr("lb"),
@@ -3328,7 +3322,7 @@ func TestIsFrontendIPConfigIsUnsafeToDelete(t *testing.T) {
 			unsafe: true,
 		},
 		{
-			desc: "isFrontendIPConfigIsUnsafeToDelete should return false if there is a " +
+			desc: "isFrontendIPConfigUnsafeToDelete should return false if there is a " +
 				"loadBalancing rule from this service referencing the frontend IP config",
 			existingLB: &network.LoadBalancer{
 				Name: to.StringPtr("lb"),
@@ -3348,7 +3342,7 @@ func TestIsFrontendIPConfigIsUnsafeToDelete(t *testing.T) {
 			unsafe: true,
 		},
 		{
-			desc: "isFrontendIPConfigIsUnsafeToDelete should return false if there is a " +
+			desc: "isFrontendIPConfigUnsafeToDelete should return false if there is a " +
 				"outbound rule referencing the frontend IP config",
 			existingLB: &network.LoadBalancer{
 				Name: to.StringPtr("lb"),
@@ -3365,7 +3359,7 @@ func TestIsFrontendIPConfigIsUnsafeToDelete(t *testing.T) {
 			},
 		},
 		{
-			desc: "isFrontendIPConfigIsUnsafeToDelete should return true if there is a " +
+			desc: "isFrontendIPConfigUnsafeToDelete should return true if there is a " +
 				"inbound NAT rule referencing the frontend IP config",
 			existingLB: &network.LoadBalancer{
 				Name: to.StringPtr("lb"),
@@ -3383,7 +3377,7 @@ func TestIsFrontendIPConfigIsUnsafeToDelete(t *testing.T) {
 			unsafe: true,
 		},
 		{
-			desc: "isFrontendIPConfigIsUnsafeToDelete should return true if there is a " +
+			desc: "isFrontendIPConfigUnsafeToDelete should return true if there is a " +
 				"inbound NAT pool referencing the frontend IP config",
 			existingLB: &network.LoadBalancer{
 				Name: to.StringPtr("lb"),
@@ -3403,7 +3397,7 @@ func TestIsFrontendIPConfigIsUnsafeToDelete(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		unsafe, _ := az.isFrontendIPConfigIsUnsafeToDelete(testCase.existingLB, &service, fipID)
+		unsafe, _ := az.isFrontendIPConfigUnsafeToDelete(testCase.existingLB, &service, fipID)
 		assert.Equal(t, testCase.unsafe, unsafe, testCase.desc)
 	}
 }
@@ -3528,4 +3522,72 @@ func TestCheckLoadBalancerResourcesConflicted(t *testing.T) {
 		err := az.checkLoadBalancerResourcesConflicted(testCase.existingLB, fipID, &service)
 		assert.Equal(t, testCase.expectedErr, err != nil, testCase.desc)
 	}
+}
+
+func TestCleanBackendpoolForPrimarySLB(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cloud := GetTestCloud(ctrl)
+	cloud.LoadBalancerSku = loadBalancerSkuStandard
+	cloud.EnableMultipleStandardLoadBalancers = true
+	cloud.PrimaryAvailabilitySetName = "agentpool1-availabilitySet-00000000"
+	clusterName := "testCluster"
+	service := getTestService("test", v1.ProtocolTCP, nil, false, 80)
+	lb := buildDefaultTestLB("testCluster", []string{
+		"/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/k8s-agentpool1-00000000-nic-1/ipConfigurations/ipconfig1",
+		"/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/k8s-agentpool2-00000000-nic-1/ipConfigurations/ipconfig1",
+	})
+	existingVMForAS1 := buildDefaultTestVirtualMachine("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/availabilitySets/agentpool1-availabilitySet-00000000", []string{"/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/k8s-agentpool1-00000000-nic-1"})
+	existingVMForAS2 := buildDefaultTestVirtualMachine("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/availabilitySets/agentpool2-availabilitySet-00000000", []string{"/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/k8s-agentpool2-00000000-nic-1"})
+	existingNIC := buildDefaultTestInterface(true, []string{"/subscriptions/sub/resourceGroups/gh/providers/Microsoft.Network/loadBalancers/testCluster/backendAddressPools/testCluster"})
+	mockVMClient := mockvmclient.NewMockInterface(ctrl)
+	mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "k8s-agentpool1-00000000-1", gomock.Any()).Return(existingVMForAS1, nil)
+	mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "k8s-agentpool2-00000000-1", gomock.Any()).Return(existingVMForAS2, nil)
+	cloud.VirtualMachinesClient = mockVMClient
+	mockNICClient := mockinterfaceclient.NewMockInterface(ctrl)
+	mockNICClient.EXPECT().Get(gomock.Any(), "rg", "k8s-agentpool2-00000000-nic-1", gomock.Any()).Return(existingNIC, nil)
+	mockNICClient.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+	cloud.InterfacesClient = mockNICClient
+	cleanedLB, err := cloud.cleanBackendpoolForPrimarySLB(&lb, &service, clusterName)
+	assert.NoError(t, err)
+	expectedLB := network.LoadBalancer{
+		Name: to.StringPtr("testCluster"),
+		LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{
+			BackendAddressPools: &[]network.BackendAddressPool{
+				{
+					Name: to.StringPtr("testCluster"),
+					BackendAddressPoolPropertiesFormat: &network.BackendAddressPoolPropertiesFormat{
+						BackendIPConfigurations: &[]network.InterfaceIPConfiguration{
+							{
+								ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Network/networkInterfaces/k8s-agentpool1-00000000-nic-1/ipConfigurations/ipconfig1"),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	assert.Equal(t, expectedLB, *cleanedLB)
+}
+
+func buildDefaultTestLB(name string, backendIPConfigs []string) network.LoadBalancer {
+	expectedLB := network.LoadBalancer{
+		Name: to.StringPtr(name),
+		LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{
+			BackendAddressPools: &[]network.BackendAddressPool{
+				{
+					Name: to.StringPtr(name),
+					BackendAddressPoolPropertiesFormat: &network.BackendAddressPoolPropertiesFormat{
+						BackendIPConfigurations: &[]network.InterfaceIPConfiguration{},
+					},
+				},
+			},
+		},
+	}
+	backendIPConfigurations := make([]network.InterfaceIPConfiguration, 0)
+	for _, ipConfig := range backendIPConfigs {
+		backendIPConfigurations = append(backendIPConfigurations, network.InterfaceIPConfiguration{ID: to.StringPtr(ipConfig)})
+	}
+	(*expectedLB.BackendAddressPools)[0].BackendIPConfigurations = &backendIPConfigurations
+	return expectedLB
 }

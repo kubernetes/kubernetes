@@ -573,19 +573,21 @@ func TestGetNodeNameByIPConfigurationID(t *testing.T) {
 	ipConfigurationIDTemplate := "/subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/%s/virtualMachines/%s/networkInterfaces/%s/ipConfigurations/ipconfig1"
 
 	testCases := []struct {
-		description       string
-		scaleSet          string
-		vmList            []string
-		ipConfigurationID string
-		expected          string
-		expectError       bool
+		description          string
+		scaleSet             string
+		vmList               []string
+		ipConfigurationID    string
+		expectedNodeName     string
+		expectedScaleSetName string
+		expectError          bool
 	}{
 		{
-			description:       "GetNodeNameByIPConfigurationID should get node's Name when the node is existing",
-			scaleSet:          "scaleset1",
-			ipConfigurationID: fmt.Sprintf(ipConfigurationIDTemplate, "scaleset1", "0", "scaleset1"),
-			vmList:            []string{"vmssee6c2000000", "vmssee6c2000001"},
-			expected:          "vmssee6c2000000",
+			description:          "GetNodeNameByIPConfigurationID should get node's Name when the node is existing",
+			scaleSet:             "scaleset1",
+			ipConfigurationID:    fmt.Sprintf(ipConfigurationIDTemplate, "scaleset1", "0", "scaleset1"),
+			vmList:               []string{"vmssee6c2000000", "vmssee6c2000001"},
+			expectedNodeName:     "vmssee6c2000000",
+			expectedScaleSetName: "scaleset1",
 		},
 		{
 			description:       "GetNodeNameByIPConfigurationID should return error for non-exist nodes",
@@ -618,14 +620,15 @@ func TestGetNodeNameByIPConfigurationID(t *testing.T) {
 		expectedVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, test.scaleSet, "", 0, test.vmList, "", false)
 		mockVMSSVMClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(expectedVMs, nil).AnyTimes()
 
-		nodeName, err := ss.GetNodeNameByIPConfigurationID(test.ipConfigurationID)
+		nodeName, scalesetName, err := ss.GetNodeNameByIPConfigurationID(test.ipConfigurationID)
 		if test.expectError {
 			assert.Error(t, err, test.description)
 			continue
 		}
 
 		assert.NoError(t, err, test.description)
-		assert.Equal(t, test.expected, nodeName, test.description)
+		assert.Equal(t, test.expectedNodeName, nodeName, test.description)
+		assert.Equal(t, test.expectedScaleSetName, scalesetName, test.description)
 	}
 }
 
@@ -1415,12 +1418,21 @@ func TestGetVMSetNames(t *testing.T) {
 		description        string
 		service            *v1.Service
 		nodes              []*v1.Node
+		useSingleSLB       bool
 		expectedVMSetNames *[]string
 		expectedErr        error
 	}{
 		{
 			description:        "GetVMSetNames should return the primary vm set name if the service has no mode annotation",
 			service:            &v1.Service{},
+			expectedVMSetNames: &[]string{"vmss"},
+		},
+		{
+			description: "GetVMSetNames should return the primary vm set name when using the single SLB",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{ServiceAnnotationLoadBalancerMode: ServiceAnnotationLoadBalancerAutoModeValue}},
+			},
+			useSingleSLB:       true,
 			expectedVMSetNames: &[]string{"vmss"},
 		},
 		{
@@ -1469,6 +1481,11 @@ func TestGetVMSetNames(t *testing.T) {
 	for _, test := range testCases {
 		ss, err := newTestScaleSet(ctrl)
 		assert.NoError(t, err, "unexpected error when creating test VMSS")
+
+		if test.useSingleSLB {
+			ss.EnableMultipleStandardLoadBalancers = false
+			ss.LoadBalancerSku = loadBalancerSkuStandard
+		}
 
 		expectedVMSS := buildTestVMSS(testVMSSName, "vmss-vm-")
 		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
@@ -1663,6 +1680,7 @@ func TestEnsureHostInPool(t *testing.T) {
 		vmSetName                 string
 		isBasicLB                 bool
 		isNilVMNetworkConfigs     bool
+		useMultipleSLBs           bool
 		expectedNodeResourceGroup string
 		expectedVMSSName          string
 		expectedInstanceID        string
@@ -1674,6 +1692,12 @@ func TestEnsureHostInPool(t *testing.T) {
 			nodeName:    "vmss-vm-000000",
 			vmSetName:   "vmss-1",
 			isBasicLB:   true,
+		},
+		{
+			description:     "EnsureHostInPool should skip the current node if the vmSetName is not equal to the node's vmss name and multiple SLBs are used",
+			nodeName:        "vmss-vm-000000",
+			vmSetName:       "vmss-1",
+			useMultipleSLBs: true,
 		},
 		{
 			description:           "EnsureHostInPool should skip the current node if the network configs of the VMSS VM is nil",
@@ -1749,6 +1773,10 @@ func TestEnsureHostInPool(t *testing.T) {
 			ss.LoadBalancerSku = loadBalancerSkuStandard
 		}
 
+		if test.useMultipleSLBs {
+			ss.EnableMultipleStandardLoadBalancers = true
+		}
+
 		expectedVMSS := buildTestVMSS(testVMSSName, "vmss-vm-")
 		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
 		mockVMSSClient.EXPECT().List(gomock.Any(), ss.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
@@ -1798,6 +1826,7 @@ func TestEnsureVMSSInPool(t *testing.T) {
 		expectedPutVMSS    bool
 		setIPv6Config      bool
 		clusterIP          string
+		useMultipleSLBs    bool
 		expectedErr        error
 	}{
 		{
@@ -1905,6 +1934,34 @@ func TestEnsureVMSSInPool(t *testing.T) {
 			backendPoolID:   testLBBackendpoolID1,
 			setIPv6Config:   true,
 			clusterIP:       "fd00::e68b",
+			expectedPutVMSS: true,
+		},
+		{
+			description: "ensureVMSSInPool should work for the basic load balancer",
+			nodes: []*v1.Node{
+				{
+					Spec: v1.NodeSpec{
+						ProviderID: "azure:///subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss/virtualMachines/0",
+					},
+				},
+			},
+			vmSetName:       testVMSSName,
+			isBasicLB:       true,
+			backendPoolID:   testLBBackendpoolID1,
+			expectedPutVMSS: true,
+		},
+		{
+			description: "ensureVMSSInPool should work for multiple standard load balancers",
+			nodes: []*v1.Node{
+				{
+					Spec: v1.NodeSpec{
+						ProviderID: "azure:///subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmss/virtualMachines/0",
+					},
+				},
+			},
+			vmSetName:       testVMSSName,
+			backendPoolID:   testLBBackendpoolID1,
+			useMultipleSLBs: true,
 			expectedPutVMSS: true,
 		},
 	}
