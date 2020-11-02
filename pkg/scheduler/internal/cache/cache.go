@@ -297,25 +297,25 @@ func (cache *schedulerCache) updateNodeInfoSnapshotList(snapshot *Snapshot, upda
 			klog.Error(err)
 		}
 		for _, nodeName := range nodesList {
-			if n := snapshot.nodeInfoMap[nodeName]; n != nil {
-				snapshot.nodeInfoList = append(snapshot.nodeInfoList, n)
-				if len(n.PodsWithAffinity) > 0 {
-					snapshot.havePodsWithAffinityNodeInfoList = append(snapshot.havePodsWithAffinityNodeInfoList, n)
+			if nodeInfo := snapshot.nodeInfoMap[nodeName]; nodeInfo != nil {
+				snapshot.nodeInfoList = append(snapshot.nodeInfoList, nodeInfo)
+				if len(nodeInfo.PodsWithAffinity) > 0 {
+					snapshot.havePodsWithAffinityNodeInfoList = append(snapshot.havePodsWithAffinityNodeInfoList, nodeInfo)
 				}
-				if len(n.PodsWithRequiredAntiAffinity) > 0 {
-					snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, n)
+				if len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
+					snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
 				}
 			} else {
 				klog.Errorf("node %q exist in nodeTree but not in NodeInfoMap, this should not happen.", nodeName)
 			}
 		}
 	} else {
-		for _, n := range snapshot.nodeInfoList {
-			if len(n.PodsWithAffinity) > 0 {
-				snapshot.havePodsWithAffinityNodeInfoList = append(snapshot.havePodsWithAffinityNodeInfoList, n)
+		for _, nodeInfo := range snapshot.nodeInfoList {
+			if len(nodeInfo.PodsWithAffinity) > 0 {
+				snapshot.havePodsWithAffinityNodeInfoList = append(snapshot.havePodsWithAffinityNodeInfoList, nodeInfo)
 			}
-			if len(n.PodsWithRequiredAntiAffinity) > 0 {
-				snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, n)
+			if len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
+				snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
 			}
 		}
 	}
