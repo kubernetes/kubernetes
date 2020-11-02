@@ -568,7 +568,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			return obj, &ttl, nil
 		}
 		return obj, nil, nil
-	}, dryrun.IsDryRun(options.DryRun))
+	}, dryrun.IsDryRun(options.DryRun), nil)
 
 	if err != nil {
 		// delete the object
@@ -855,6 +855,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 			return existing, nil
 		}),
 		dryrun.IsDryRun(options.DryRun),
+		nil,
 	)
 	switch err {
 	case nil:
