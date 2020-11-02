@@ -46,15 +46,15 @@ import (
 const snapshotGroup = "snapshot.storage.k8s.io"
 
 // snapshot CRD api version
-const snapshotAPIVersion = "snapshot.storage.k8s.io/v1beta1"
+const snapshotAPIVersion = "snapshot.storage.k8s.io/v1"
 
 var (
 	// SnapshotGVR is GroupVersionResource for volumesnapshots
-	SnapshotGVR = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1beta1", Resource: "volumesnapshots"}
+	SnapshotGVR = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1", Resource: "volumesnapshots"}
 	// SnapshotClassGVR is GroupVersionResource for volumesnapshotclasses
-	SnapshotClassGVR = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1beta1", Resource: "volumesnapshotclasses"}
+	SnapshotClassGVR = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1", Resource: "volumesnapshotclasses"}
 	// SnapshotContentGVR is GroupVersionResource for volumesnapshotcontents
-	SnapshotContentGVR = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1beta1", Resource: "volumesnapshotcontents"}
+	SnapshotContentGVR = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1", Resource: "volumesnapshotcontents"}
 )
 
 type snapshottableTestSuite struct {
