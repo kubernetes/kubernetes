@@ -19,13 +19,17 @@ package noderesources
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime"
 	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -63,7 +67,7 @@ func makeAllocatableResources(milliCPU, memory, pods, extendedA, storage, hugePa
 }
 
 func newResourcePod(usage ...schedulernodeinfo.Resource) *v1.Pod {
-	containers := []v1.Container{}
+	var containers []v1.Container
 	for _, req := range usage {
 		containers = append(containers, v1.Container{
 			Resources: v1.ResourceRequirements{Requests: req.ResourceList()},
@@ -466,6 +470,7 @@ func TestStorageRequests(t *testing.T) {
 		pod        *v1.Pod
 		nodeInfo   *schedulernodeinfo.NodeInfo
 		name       string
+		features   map[featuregate.Feature]bool
 		wantStatus *framework.Status
 	}{
 		{
@@ -489,6 +494,15 @@ func TestStorageRequests(t *testing.T) {
 			wantStatus: framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceEphemeralStorage)),
 		},
 		{
+			pod: newResourceInitPod(newResourcePod(schedulernodeinfo.Resource{EphemeralStorage: 25}), schedulernodeinfo.Resource{EphemeralStorage: 25}),
+			nodeInfo: schedulernodeinfo.NewNodeInfo(
+				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 2, Memory: 2})),
+			name: "ephemeral local storage request is ignored due to disabled feature gate",
+			features: map[featuregate.Feature]bool{
+				features.LocalStorageCapacityIsolation: false,
+			},
+		},
+		{
 			pod: newResourcePod(schedulernodeinfo.Resource{EphemeralStorage: 10}),
 			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 2, Memory: 2})),
@@ -498,6 +512,9 @@ func TestStorageRequests(t *testing.T) {
 
 	for _, test := range storagePodsTests {
 		t.Run(test.name, func(t *testing.T) {
+			for k, v := range test.features {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
+			}
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
