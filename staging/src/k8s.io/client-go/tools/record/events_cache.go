@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 )
 
 const (
@@ -132,7 +133,6 @@ func (f *EventSourceObjectSpamFilter) Filter(event *v1.Event) bool {
 	if found {
 		record = value.(spamRecord)
 	}
-
 	// verify we have a rate limiter for this record
 	if record.rateLimiter == nil {
 		record.rateLimiter = flowcontrol.NewTokenBucketRateLimiterWithClock(f.qps, f.burst, f.clock)
@@ -144,7 +144,9 @@ func (f *EventSourceObjectSpamFilter) Filter(event *v1.Event) bool {
 	// update the cache
 	f.cache.Add(eventKey, record)
 
-	return filter
+	//if event reason is healthy and can get a token, return skip
+	return filter && event.Reason != events.ContainerHealthy
+
 }
 
 // EventAggregatorKeyFunc is responsible for grouping events for aggregation

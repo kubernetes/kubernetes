@@ -85,6 +85,7 @@ const (
 const (
 	ContainerUnhealthy    = "Unhealthy"
 	ContainerProbeWarning = "ProbeWarning"
+	ContainerHealthy      = "Healthy"
 )
 
 // Pod worker event reason list

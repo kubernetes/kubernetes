@@ -21,6 +21,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
+        "//pkg/kubelet/events:go_default_library",
     ],
 )
 
@@ -57,6 +58,7 @@ filegroup(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/registry/customresource:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/test/integration:all-srcs",
+        "//pkg/kubelet/events:go_default_library",
     ],
     tags = ["automanaged"],
 )
