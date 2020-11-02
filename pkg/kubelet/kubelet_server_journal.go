@@ -112,36 +112,6 @@ func newJournalArgsFromURL(query url.Values) (*journalArgs, error) {
 	}, nil
 }
 
-// Args returns the journalctl arguments for the given args.
-func (a *journalArgs) Args() []string {
-	args := []string{
-		"--utc",
-		"--no-pager",
-	}
-	if len(a.Since) > 0 {
-		args = append(args, "--since="+a.Since)
-	}
-	if len(a.Until) > 0 {
-		args = append(args, "--until="+a.Until)
-	}
-	if a.Tail > 0 {
-		args = append(args, "--pager-end", fmt.Sprintf("--lines=%d", a.Tail))
-	}
-	if len(a.Format) > 0 {
-		args = append(args, "--output="+a.Format)
-	}
-	for _, unit := range a.Units {
-		if len(unit) > 0 {
-			args = append(args, "--unit="+unit)
-		}
-	}
-	if len(a.Pattern) > 0 {
-		args = append(args, "--grep="+a.Pattern)
-		args = append(args, fmt.Sprintf("--case-sensitive=%t", a.CaseSensitive))
-	}
-	return args
-}
-
 // Copy streams the contents of the journalctl command executed with the current
 // args to the provided writer, timing out at a.Timeout. If an error occurs a line
 // is written to the output.
@@ -166,9 +136,8 @@ func (a *journalArgs) copyForBoot(ctx context.Context, w io.Writer, previousBoot
 		return
 	}
 
-	args := a.Args()
-	args = append(args, "--boot", fmt.Sprintf("%d", previousBoot))
-	cmd := exec.Command("journalctl", args...)
+	cmdStr, args := getLoggingCmd(a, previousBoot)
+	cmd := exec.Command(cmdStr, args...)
 	cmd.Stdout = w
 	cmd.Stderr = w
 
