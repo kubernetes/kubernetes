@@ -37,8 +37,3 @@ func DiskUsage(path string) (UsageInfo, error) {
 	var usage UsageInfo
 	return usage, fmt.Errorf("directory disk usage not supported for this build.")
 }
-
-func Find(path string) (int64, error) {
-	return 0, fmt.Errorf("Find not supported for this build.")
-
-
