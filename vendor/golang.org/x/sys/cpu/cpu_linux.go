@@ -6,7 +6,7 @@
 
 package cpu
 
-func archInit() {
+func init() {
 	if err := readHWCAP(); err != nil {
 		return
 	}

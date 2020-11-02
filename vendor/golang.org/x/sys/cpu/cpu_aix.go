@@ -6,6 +6,8 @@
 
 package cpu
 
+const cacheLineSize = 128
+
 const (
 	// getsystemcfg constants
 	_SC_IMPL     = 2
@@ -13,7 +15,7 @@ const (
 	_IMPL_POWER9 = 0x20000
 )
 
-func archInit() {
+func init() {
 	impl := getsystemcfg(_SC_IMPL)
 	if impl&_IMPL_POWER8 != 0 {
 		PPC64.IsPOWER8 = true
