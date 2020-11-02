@@ -201,6 +201,9 @@ var ValidateIngressName = apimachineryvalidation.NameIsDNSSubdomain
 type IngressValidationOptions struct {
 	// AllowInvalidSecretName indicates whether spec.tls[*].secretName values that are not valid Secret names should be allowed
 	AllowInvalidSecretName bool
+
+	// AllowInvalidWildcardHostRule indicates whether invalid rule values are allowed in rules with wildcard hostnames
+	AllowInvalidWildcardHostRule bool
 }
 
 // ValidateIngress validates Ingresses on create and update.
@@ -215,7 +218,8 @@ func ValidateIngressCreate(ingress *networking.Ingress, requestGV schema.GroupVe
 	allErrs := field.ErrorList{}
 	var opts IngressValidationOptions
 	opts = IngressValidationOptions{
-		AllowInvalidSecretName: allowInvalidSecretName(requestGV, nil),
+		AllowInvalidSecretName:       allowInvalidSecretName(requestGV, nil),
+		AllowInvalidWildcardHostRule: allowInvalidWildcardHostRule(requestGV, nil),
 	}
 	allErrs = append(allErrs, validateIngress(ingress, opts, requestGV)...)
 	annotationVal, annotationIsSet := ingress.Annotations[annotationIngressClass]
@@ -231,7 +235,8 @@ func ValidateIngressUpdate(ingress, oldIngress *networking.Ingress, requestGV sc
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta, field.NewPath("metadata"))
 	var opts IngressValidationOptions
 	opts = IngressValidationOptions{
-		AllowInvalidSecretName: allowInvalidSecretName(requestGV, oldIngress),
+		AllowInvalidSecretName:       allowInvalidSecretName(requestGV, oldIngress),
+		AllowInvalidWildcardHostRule: allowInvalidWildcardHostRule(requestGV, oldIngress),
 	}
 
 	allErrs = append(allErrs, validateIngress(ingress, opts, requestGV)...)
@@ -313,6 +318,7 @@ func validateIngressRules(ingressRules []networking.IngressRule, fldPath *field.
 		return append(allErrs, field.Required(fldPath, ""))
 	}
 	for i, ih := range ingressRules {
+		wildcardHost := false
 		if len(ih.Host) > 0 {
 			if isIP := (net.ParseIP(ih.Host) != nil); isIP {
 				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, "must be a DNS name, not an IP address"))
@@ -323,13 +329,17 @@ func validateIngressRules(ingressRules []networking.IngressRule, fldPath *field.
 				for _, msg := range validation.IsWildcardDNS1123Subdomain(ih.Host) {
 					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, msg))
 				}
-				continue
-			}
-			for _, msg := range validation.IsDNS1123Subdomain(ih.Host) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, msg))
+				wildcardHost = true
+			} else {
+				for _, msg := range validation.IsDNS1123Subdomain(ih.Host) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, msg))
+				}
 			}
 		}
-		allErrs = append(allErrs, validateIngressRuleValue(&ih.IngressRuleValue, fldPath.Index(0), opts, requestGV)...)
+
+		if !wildcardHost || !opts.AllowInvalidWildcardHostRule {
+			allErrs = append(allErrs, validateIngressRuleValue(&ih.IngressRuleValue, fldPath.Index(i), opts, requestGV)...)
+		}
 	}
 	return allErrs
 }
@@ -557,4 +567,20 @@ func validateTLSSecretName(name string) []string {
 		return nil
 	}
 	return apivalidation.ValidateSecretName(name, false)
+}
+
+func allowInvalidWildcardHostRule(gv schema.GroupVersion, oldIngress *networking.Ingress) bool {
+	if gv == networkingv1beta1.SchemeGroupVersion || gv == extensionsv1beta1.SchemeGroupVersion {
+		// backwards compatibility with released API versions that allowed invalid rules
+		return true
+	}
+	if oldIngress != nil {
+		for _, rule := range oldIngress.Spec.Rules {
+			if strings.Contains(rule.Host, "*") && len(validateIngressRuleValue(&rule.IngressRuleValue, nil, IngressValidationOptions{}, gv)) > 0 {
+				// backwards compatibility with existing invalid data
+				return true
+			}
+		}
+	}
+	return false
 }

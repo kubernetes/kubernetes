@@ -42,7 +42,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDetector]", func() {
+var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDetector] [Serial]", func() {
 	const (
 		pollInterval   = 1 * time.Second
 		pollConsistent = 5 * time.Second
@@ -171,7 +171,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 			ginkgo.By("Create the node problem detector")
 			hostPathType := new(v1.HostPathType)
 			*hostPathType = v1.HostPathType(string(v1.HostPathFileOrCreate))
-			f.PodClient().CreateSync(&v1.Pod{
+			pod := f.PodClient().CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 				},
@@ -237,8 +237,6 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 					},
 				},
 			})
-			pod, err := f.PodClient().Get(context.TODO(), name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
 			// TODO: remove hardcoded kubelet volume directory path
 			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
 			hostLogFile = "/var/lib/kubelet/pods/" + string(pod.UID) + "/volumes/kubernetes.io~empty-dir" + logFile

@@ -27,7 +27,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
-	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -206,14 +205,14 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 	if err := sched.SchedulingQueue.Delete(pod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
 	}
-	prof, err := sched.profileForPod(pod)
+	fwk, err := sched.frameworkForPod(pod)
 	if err != nil {
 		// This shouldn't happen, because we only accept for scheduling the pods
 		// which specify a scheduler name that matches one of the profiles.
 		klog.Error(err)
 		return
 	}
-	prof.Framework.RejectWaitingPod(pod.UID)
+	fwk.RejectWaitingPod(pod.UID)
 }
 
 func (sched *Scheduler) addPodToCache(obj interface{}) {
@@ -362,10 +361,9 @@ func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 func addAllEventHandlers(
 	sched *Scheduler,
 	informerFactory informers.SharedInformerFactory,
-	podInformer coreinformers.PodInformer,
 ) {
 	// scheduled pod cache
-	podInformer.Informer().AddEventHandler(
+	informerFactory.Core().V1().Pods().Informer().AddEventHandler(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
@@ -390,7 +388,7 @@ func addAllEventHandlers(
 		},
 	)
 	// unscheduled pod queue
-	podInformer.Informer().AddEventHandler(
+	informerFactory.Core().V1().Pods().Informer().AddEventHandler(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {

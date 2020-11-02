@@ -758,3 +758,118 @@ func TestExponentialBackoffManagerWithRealClock(t *testing.T) {
 		}
 	}
 }
+
+func TestExponentialBackoffWithContext(t *testing.T) {
+	defaultCtx := func() context.Context {
+		return context.Background()
+	}
+
+	defaultCallback := func(_ int) (bool, error) {
+		return false, nil
+	}
+
+	conditionErr := errors.New("condition failed")
+
+	tests := []struct {
+		name             string
+		steps            int
+		ctxGetter        func() context.Context
+		callback         func(calls int) (bool, error)
+		attemptsExpected int
+		errExpected      error
+	}{
+		{
+			name:             "no attempts expected with zero backoff steps",
+			steps:            0,
+			ctxGetter:        defaultCtx,
+			callback:         defaultCallback,
+			attemptsExpected: 0,
+			errExpected:      ErrWaitTimeout,
+		},
+		{
+			name:             "condition returns false with single backoff step",
+			steps:            1,
+			ctxGetter:        defaultCtx,
+			callback:         defaultCallback,
+			attemptsExpected: 1,
+			errExpected:      ErrWaitTimeout,
+		},
+		{
+			name:      "condition returns true with single backoff step",
+			steps:     1,
+			ctxGetter: defaultCtx,
+			callback: func(_ int) (bool, error) {
+				return true, nil
+			},
+			attemptsExpected: 1,
+			errExpected:      nil,
+		},
+		{
+			name:             "condition always returns false with multiple backoff steps",
+			steps:            5,
+			ctxGetter:        defaultCtx,
+			callback:         defaultCallback,
+			attemptsExpected: 5,
+			errExpected:      ErrWaitTimeout,
+		},
+		{
+			name:      "condition returns true after certain attempts with multiple backoff steps",
+			steps:     5,
+			ctxGetter: defaultCtx,
+			callback: func(attempts int) (bool, error) {
+				if attempts == 3 {
+					return true, nil
+				}
+				return false, nil
+			},
+			attemptsExpected: 3,
+			errExpected:      nil,
+		},
+		{
+			name:      "condition returns error no further attempts expected",
+			steps:     5,
+			ctxGetter: defaultCtx,
+			callback: func(_ int) (bool, error) {
+				return true, conditionErr
+			},
+			attemptsExpected: 1,
+			errExpected:      conditionErr,
+		},
+		{
+			name:  "context already canceled no attempts expected",
+			steps: 5,
+			ctxGetter: func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				return ctx
+			},
+			callback:         defaultCallback,
+			attemptsExpected: 0,
+			errExpected:      context.Canceled,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			backoff := Backoff{
+				Duration: 1 * time.Millisecond,
+				Factor:   1.0,
+				Steps:    test.steps,
+			}
+
+			attempts := 0
+			err := ExponentialBackoffWithContext(test.ctxGetter(), backoff, func() (bool, error) {
+				attempts++
+				return test.callback(attempts)
+			})
+
+			if test.errExpected != err {
+				t.Errorf("expected error: %v but got: %v", test.errExpected, err)
+			}
+
+			if test.attemptsExpected != attempts {
+				t.Errorf("expected attempts count: %d but got: %d", test.attemptsExpected, attempts)
+			}
+		})
+	}
+}

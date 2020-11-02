@@ -319,15 +319,6 @@ func (s *mockSerializer) Identifier() runtime.Identifier {
 	return runtime.Identifier("mock")
 }
 
-type mockCreater struct {
-	err error
-	obj runtime.Object
-}
-
-func (c *mockCreater) New(kind schema.GroupVersionKind) (runtime.Object, error) {
-	return c.obj, c.err
-}
-
 type mockTyper struct {
 	gvks        []schema.GroupVersionKind
 	unversioned bool

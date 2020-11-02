@@ -17,6 +17,7 @@ limitations under the License.
 package state
 
 import (
+	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -29,8 +30,6 @@ import (
 )
 
 const testingCheckpoint = "cpumanager_checkpoint_test"
-
-var testingDir = os.TempDir()
 
 func TestCheckpointStateRestore(t *testing.T) {
 	testCases := []struct {
@@ -200,6 +199,12 @@ func TestCheckpointStateRestore(t *testing.T) {
 		},
 	}
 
+	// create temp dir
+	testingDir, err := ioutil.TempDir("", "cpumanager_state_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(testingDir)
 	// create checkpoint manager for testing
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	if err != nil {
@@ -257,6 +262,13 @@ func TestCheckpointStateStore(t *testing.T) {
 			},
 		},
 	}
+
+	// create temp dir
+	testingDir, err := ioutil.TempDir("", "cpumanager_state_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(testingDir)
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	if err != nil {
@@ -324,6 +336,13 @@ func TestCheckpointStateHelpers(t *testing.T) {
 		},
 	}
 
+	// create temp dir
+	testingDir, err := ioutil.TempDir("", "cpumanager_state_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(testingDir)
+
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	if err != nil {
 		t.Fatalf("could not create testing checkpoint manager: %v", err)
@@ -376,6 +395,13 @@ func TestCheckpointStateClear(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			// create temp dir
+			testingDir, err := ioutil.TempDir("", "cpumanager_state_test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer os.RemoveAll(testingDir)
+
 			state, err := NewCheckpointState(testingDir, testingCheckpoint, "none", nil)
 			if err != nil {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)

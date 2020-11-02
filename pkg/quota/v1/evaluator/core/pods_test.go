@@ -25,9 +25,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/clock"
+	quota "k8s.io/apiserver/pkg/quota/v1"
+	"k8s.io/apiserver/pkg/quota/v1/generic"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	quota "k8s.io/kubernetes/pkg/quota/v1"
-	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	"k8s.io/kubernetes/pkg/util/node"
 )
 

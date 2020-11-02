@@ -708,8 +708,8 @@ honnef.co/go/tools v0.0.1-2020.1.4 h1:UoveltGrhghAA7ePc+e+QYDHXrBps2PqFZiHkGR/xK
 honnef.co/go/tools v0.0.1-2020.1.4/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9vFzvIQ3k=
 k8s.io/klog/v2 v2.3.0 h1:WmkrnW7fdrm0/DMClc+HIxtftvxVIPAhlVwMQo5yLco=
 k8s.io/klog/v2 v2.3.0/go.mod h1:Od+F08eJP+W3HUb4pSrPpgp9DGU4GzlpG/TmITuYh/Y=
-k8s.io/repo-infra v0.0.12 h1:i5NvQE7KU7Ky/YkJZPLZJKBDTNgf4ncNXz17XC8uZIE=
-k8s.io/repo-infra v0.0.12/go.mod h1:WfvjbUCy0f1fsyHq6sF825VYMfAh9pQdkYCa35OZRJc=
+k8s.io/repo-infra v0.1.1 h1:gGVxusj+TfqEQmLQGg3bzhpQlHrB0RSVM94HyU7Jg9I=
+k8s.io/repo-infra v0.1.1/go.mod h1:WfvjbUCy0f1fsyHq6sF825VYMfAh9pQdkYCa35OZRJc=
 mvdan.cc/gofumpt v0.0.0-20200709182408-4fd085cb6d5f/go.mod h1:9VQ397fNXEnF84t90W4r4TRCQK+pg9f8ugVfyj+S26w=
 mvdan.cc/interfacer v0.0.0-20180901003855-c20040233aed h1:WX1yoOaKQfddO/mLzdV4wptyWgoH/6hwLs7QHTixo0I=
 mvdan.cc/interfacer v0.0.0-20180901003855-c20040233aed/go.mod h1:Xkxe497xwlCKkIaQYRfC7CSLworTXY9RMqwhhCm+8Nc=

@@ -19,10 +19,13 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net"
 	"os"
+	"reflect"
+	"runtime"
 	"testing"
 	"time"
 
@@ -31,17 +34,98 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestGetAddressAndDialer(t *testing.T) {
+
+	// Compare dialer function by pointer
+	tcpDialPointer := reflect.ValueOf(tcpDial).Pointer()
+	npipeDialPointer := reflect.ValueOf(npipeDial).Pointer()
+	var nilDialPointer uintptr = 0x0
+
+	tests := []struct {
+		endpoint      string
+		expectedAddr  string
+		expectedDial  uintptr
+		expectedError bool
+	}{
+		{
+			endpoint:      "tcp://localhost:15880",
+			expectedAddr:  "localhost:15880",
+			expectedDial:  tcpDialPointer,
+			expectedError: false,
+		},
+		{
+			endpoint:      "npipe://./pipe/mypipe",
+			expectedAddr:  "//./pipe/mypipe",
+			expectedDial:  npipeDialPointer,
+			expectedError: false,
+		},
+		{
+			endpoint:      "npipe:\\\\.\\pipe\\mypipe",
+			expectedAddr:  "//./pipe/mypipe",
+			expectedDial:  npipeDialPointer,
+			expectedError: false,
+		},
+		{
+			endpoint:      "unix:///tmp/s1.sock",
+			expectedAddr:  "",
+			expectedDial:  nilDialPointer,
+			expectedError: true,
+		},
+		{
+			endpoint:      "tcp1://abc",
+			expectedAddr:  "",
+			expectedDial:  nilDialPointer,
+			expectedError: true,
+		},
+		{
+			endpoint:      "a b c",
+			expectedAddr:  "",
+			expectedDial:  nilDialPointer,
+			expectedError: true,
+		},
+	}
+
+	for _, test := range tests {
+		expectedDialerName := runtime.FuncForPC(test.expectedDial).Name()
+		if expectedDialerName == "" {
+			expectedDialerName = "nilDial"
+		}
+		t.Run(fmt.Sprintf("Endpoint is %s, addr is %s and dialer is %s",
+			test.endpoint, test.expectedAddr, expectedDialerName),
+			func(t *testing.T) {
+				address, dialer, err := GetAddressAndDialer(test.endpoint)
+
+				dialerPointer := reflect.ValueOf(dialer).Pointer()
+				actualDialerName := runtime.FuncForPC(dialerPointer).Name()
+				if actualDialerName == "" {
+					actualDialerName = "nilDial"
+				}
+
+				assert.Equalf(t, test.expectedDial, dialerPointer,
+					"Expected dialer %s, but get %s", expectedDialerName, actualDialerName)
+
+				assert.Equal(t, test.expectedAddr, address)
+
+				if test.expectedError {
+					assert.NotNil(t, err, "Expect error during parsing %q", test.endpoint)
+				} else {
+					assert.Nil(t, err, "Expect no error during parsing %q", test.endpoint)
+				}
+			})
+	}
+}
+
 func TestParseEndpoint(t *testing.T) {
 	tests := []struct {
 		endpoint         string
-		expectError      bool
+		expectedError    bool
 		expectedProtocol string
 		expectedAddr     string
 	}{
 		{
 			endpoint:         "unix:///tmp/s1.sock",
 			expectedProtocol: "unix",
-			expectError:      true,
+			expectedError:    true,
 		},
 		{
 			endpoint:         "tcp://localhost:15880",
@@ -76,18 +160,18 @@ func TestParseEndpoint(t *testing.T) {
 		{
 			endpoint:         "tcp1://abc",
 			expectedProtocol: "tcp1",
-			expectError:      true,
+			expectedError:    true,
 		},
 		{
-			endpoint:    "a b c",
-			expectError: true,
+			endpoint:      "a b c",
+			expectedError: true,
 		},
 	}
 
 	for _, test := range tests {
 		protocol, addr, err := parseEndpoint(test.endpoint)
 		assert.Equal(t, test.expectedProtocol, protocol)
-		if test.expectError {
+		if test.expectedError {
 			assert.NotNil(t, err, "Expect error during parsing %q", test.endpoint)
 			continue
 		}
@@ -98,10 +182,10 @@ func TestParseEndpoint(t *testing.T) {
 }
 
 func testPipe(t *testing.T, label string) {
-	generatePipeName := func(suffixlen int) string {
+	generatePipeName := func(suffixLen int) string {
 		rand.Seed(time.Now().UnixNano())
 		letter := []rune("abcdef0123456789")
-		b := make([]rune, suffixlen)
+		b := make([]rune, suffixLen)
 		for i := range b {
 			b[i] = letter[rand.Intn(len(letter))]
 		}

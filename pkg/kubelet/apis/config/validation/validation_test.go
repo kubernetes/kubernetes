@@ -52,7 +52,10 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		RegistryPullQPS:             5,
 		HairpinMode:                 kubeletconfig.PromiscuousBridge,
 		NodeLeaseDurationSeconds:    1,
-		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 100 * time.Millisecond},
+		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 25 * time.Millisecond},
+		FeatureGates: map[string]bool{
+			"CustomCPUCFSQuotaPeriod": true,
+		},
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase1); allErrors != nil {
 		t.Errorf("expect no errors, got %v", allErrors)
@@ -84,8 +87,11 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		RegistryPullQPS:             5,
 		HairpinMode:                 kubeletconfig.PromiscuousBridge,
 		NodeLeaseDurationSeconds:    1,
-		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 100 * time.Millisecond},
+		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 50 * time.Millisecond},
 		ReservedSystemCPUs:          "0-3",
+		FeatureGates: map[string]bool{
+			"CustomCPUCFSQuotaPeriod": true,
+		},
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase2); allErrors != nil {
 		t.Errorf("expect no errors, got %v", allErrors)
@@ -115,7 +121,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		RegistryPullQPS:             -10,
 		HairpinMode:                 "foo",
 		NodeLeaseDurationSeconds:    -1,
-		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 0},
+		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 100 * time.Millisecond},
 	}
 	const numErrsErrorCase1 = 25
 	if allErrors := ValidateKubeletConfiguration(errorCase1); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase1 {
@@ -148,8 +154,11 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		RegistryPullQPS:             5,
 		HairpinMode:                 kubeletconfig.PromiscuousBridge,
 		NodeLeaseDurationSeconds:    1,
-		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 100 * time.Millisecond},
+		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 50 * time.Millisecond},
 		ReservedSystemCPUs:          "0-3",
+		FeatureGates: map[string]bool{
+			"CustomCPUCFSQuotaPeriod": true,
+		},
 	}
 	const numErrsErrorCase2 = 1
 	if allErrors := ValidateKubeletConfiguration(errorCase2); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase2 {

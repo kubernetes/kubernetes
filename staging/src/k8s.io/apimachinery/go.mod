@@ -8,7 +8,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96
 	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
-	github.com/evanphx/json-patch v0.0.0-20200808040245-162e5629780b
+	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7
@@ -26,15 +26,13 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
-	golang.org/x/net v0.0.0-20200707034311-ab3426394381
-	golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4 // indirect
-	golang.org/x/text v0.3.3 // indirect
+	golang.org/x/net v0.0.0-20201022231255-08b38378de70
 	google.golang.org/protobuf v1.24.0 // indirect
 	gopkg.in/inf.v0 v0.9.1
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/klog/v2 v2.2.0
-	k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
-	sigs.k8s.io/structured-merge-diff/v4 v4.0.1
+	k8s.io/kube-openapi v0.0.0-20200923155610-8b5066479488
+	sigs.k8s.io/structured-merge-diff/v4 v4.0.2-0.20201001033253-b3cf1e8ff931
 	sigs.k8s.io/yaml v1.2.0
 )
 

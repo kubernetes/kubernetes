@@ -19,7 +19,7 @@ package pod
 import (
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -349,18 +349,6 @@ func dropDisabledFields(
 		podSpec = &api.PodSpec{}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) &&
-		!tokenRequestProjectionInUse(oldPodSpec) {
-		for i := range podSpec.Volumes {
-			if podSpec.Volumes[i].Projected != nil {
-				for j := range podSpec.Volumes[i].Projected.Sources {
-					podSpec.Volumes[i].Projected.Sources[j].ServiceAccountToken = nil
-				}
-			}
-
-		}
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) && !appArmorInUse(oldPodAnnotations) {
 		for k := range podAnnotations {
 			if strings.HasPrefix(k, v1.AppArmorBetaContainerAnnotationKeyPrefix) {
@@ -402,14 +390,6 @@ func dropDisabledFields(
 			for i := range c.VolumeMounts {
 				c.VolumeMounts[i].SubPathExpr = ""
 			}
-			return true
-		})
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StartupProbe) && !startupProbeInUse(oldPodSpec) {
-		// drop startupProbe from all containers if the feature is disabled
-		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-			c.StartupProbe = nil
 			return true
 		})
 	}
@@ -601,23 +581,6 @@ func appArmorInUse(podAnnotations map[string]string) bool {
 	return false
 }
 
-func tokenRequestProjectionInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	for _, v := range podSpec.Volumes {
-		if v.Projected == nil {
-			continue
-		}
-		for _, s := range v.Projected.Sources {
-			if s.ServiceAccountToken != nil {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // podPriorityInUse returns true if the pod spec is non-nil and has Priority or PriorityClassName set.
 func podPriorityInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
@@ -689,24 +652,6 @@ func subpathExprInUse(podSpec *api.PodSpec) bool {
 				inUse = true
 				return false
 			}
-		}
-		return true
-	})
-
-	return inUse
-}
-
-// startupProbeInUse returns true if the pod spec is non-nil and has a container that has a startupProbe defined
-func startupProbeInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-
-	var inUse bool
-	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-		if c.StartupProbe != nil {
-			inUse = true
-			return false
 		}
 		return true
 	})

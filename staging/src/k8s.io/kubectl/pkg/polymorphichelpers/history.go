@@ -183,6 +183,18 @@ func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision in
 	if err != nil {
 		return "", err
 	}
+	return printHistory(history, revision, func(history *appsv1.ControllerRevision) (*corev1.PodTemplateSpec, error) {
+		dsOfHistory, err := applyDaemonSetHistory(ds, history)
+		if err != nil {
+			return nil, err
+		}
+		return &dsOfHistory.Spec.Template, err
+	})
+}
+
+// printHistory returns the podTemplate of the given revision if it is non-zero
+// else returns the overall revisions
+func printHistory(history []*appsv1.ControllerRevision, revision int64, getPodTemplate func(history *appsv1.ControllerRevision) (*corev1.PodTemplateSpec, error)) (string, error) {
 	historyInfo := make(map[int64]*appsv1.ControllerRevision)
 	for _, history := range history {
 		// TODO: for now we assume revisions don't overlap, we may need to handle it
@@ -198,11 +210,11 @@ func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision in
 		if !ok {
 			return "", fmt.Errorf("unable to find the specified revision")
 		}
-		dsOfHistory, err := applyDaemonSetHistory(ds, history)
+		podTemplate, err := getPodTemplate(history)
 		if err != nil {
 			return "", fmt.Errorf("unable to parse history %s", history.Name)
 		}
-		return printTemplate(&dsOfHistory.Spec.Template)
+		return printTemplate(podTemplate)
 	}
 
 	// Print an overview of all Revisions
@@ -233,28 +245,17 @@ type StatefulSetHistoryViewer struct {
 
 // ViewHistory returns a list of the revision history of a statefulset
 // TODO: this should be a describer
-// TODO: needs to implement detailed revision view
 func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
-	_, history, err := statefulSetHistory(h.c.AppsV1(), namespace, name)
+	sts, history, err := statefulSetHistory(h.c.AppsV1(), namespace, name)
 	if err != nil {
 		return "", err
 	}
-
-	if len(history) <= 0 {
-		return "No rollout history found.", nil
-	}
-	revisions := make([]int64, 0, len(history))
-	for _, revision := range history {
-		revisions = append(revisions, revision.Revision)
-	}
-	sliceutil.SortInts64(revisions)
-
-	return tabbedString(func(out io.Writer) error {
-		fmt.Fprintf(out, "REVISION\n")
-		for _, r := range revisions {
-			fmt.Fprintf(out, "%d\n", r)
+	return printHistory(history, revision, func(history *appsv1.ControllerRevision) (*corev1.PodTemplateSpec, error) {
+		stsOfHistory, err := applyStatefulSetHistory(sts, history)
+		if err != nil {
+			return nil, err
 		}
-		return nil
+		return &stsOfHistory.Spec.Template, err
 	})
 }
 
@@ -358,6 +359,24 @@ func applyDaemonSetHistory(ds *appsv1.DaemonSet, history *appsv1.ControllerRevis
 		return nil, err
 	}
 	result := &appsv1.DaemonSet{}
+	err = json.Unmarshal(patched, result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// applyStatefulSetHistory returns a specific revision of StatefulSet by applying the given history to a copy of the given StatefulSet
+func applyStatefulSetHistory(sts *appsv1.StatefulSet, history *appsv1.ControllerRevision) (*appsv1.StatefulSet, error) {
+	stsBytes, err := json.Marshal(sts)
+	if err != nil {
+		return nil, err
+	}
+	patched, err := strategicpatch.StrategicMergePatch(stsBytes, history.Data.Raw, sts)
+	if err != nil {
+		return nil, err
+	}
+	result := &appsv1.StatefulSet{}
 	err = json.Unmarshal(patched, result)
 	if err != nil {
 		return nil, err

@@ -215,6 +215,36 @@ type ExecConfig struct {
 	// present. For example, `brew install foo-cli` might be a good InstallHint for
 	// foo-cli on Mac OS systems.
 	InstallHint string `json:"installHint,omitempty"`
+
+	// ProvideClusterInfo determines whether or not to provide cluster information,
+	// which could potentially contain very large CA data, to this exec plugin as a
+	// part of the KUBERNETES_EXEC_INFO environment variable. By default, it is set
+	// to false. Package k8s.io/client-go/tools/auth/exec provides helper methods for
+	// reading this environment variable.
+	ProvideClusterInfo bool `json:"provideClusterInfo"`
+
+	// Config holds additional config data that is specific to the exec
+	// plugin with regards to the cluster being authenticated to.
+	//
+	// This data is sourced from the clientcmd Cluster object's extensions[exec] field:
+	//
+	// clusters:
+	// - name: my-cluster
+	//   cluster:
+	//     ...
+	//     extensions:
+	//     - name: client.authentication.k8s.io/exec  # reserved extension name for per cluster exec config
+	//       extension:
+	//         audience: 06e3fbd18de8  # arbitrary config
+	//
+	// In some environments, the user config may be exactly the same across many clusters
+	// (i.e. call this exec plugin) minus some details that are specific to each cluster
+	// such as the audience.  This field allows the per cluster config to be directly
+	// specified with the cluster info.  Using this field to store secret data is not
+	// recommended as one of the prime benefits of exec plugins is that no secrets need
+	// to be stored directly in the kubeconfig.
+	// +k8s:conversion-gen=false
+	Config runtime.Object
 }
 
 var _ fmt.Stringer = new(ExecConfig)
@@ -237,7 +267,11 @@ func (c ExecConfig) String() string {
 	if len(c.Env) > 0 {
 		env = "[]ExecEnvVar{--- REDACTED ---}"
 	}
-	return fmt.Sprintf("api.AuthProviderConfig{Command: %q, Args: %#v, Env: %s, APIVersion: %q}", c.Command, args, env, c.APIVersion)
+	config := "runtime.Object(nil)"
+	if c.Config != nil {
+		config = "runtime.Object(--- REDACTED ---)"
+	}
+	return fmt.Sprintf("api.ExecConfig{Command: %q, Args: %#v, Env: %s, APIVersion: %q, ProvideClusterInfo: %t, Config: %s}", c.Command, args, env, c.APIVersion, c.ProvideClusterInfo, config)
 }
 
 // ExecEnvVar is used for setting environment variables when executing an exec-based

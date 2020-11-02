@@ -18,9 +18,8 @@ package helper
 
 import (
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/component-helpers/scheduling/corev1"
 )
 
 // PodMatchesNodeSelectorAndAffinityTerms checks whether the pod is schedulable onto nodes according to
@@ -61,8 +60,7 @@ func PodMatchesNodeSelectorAndAffinityTerms(pod *v1.Pod, node *v1.Node) bool {
 
 		// Match node selector for requiredDuringSchedulingIgnoredDuringExecution.
 		if nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-			nodeSelectorTerms := nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
-			nodeAffinityMatches = nodeAffinityMatches && nodeMatchesNodeSelectorTerms(node, nodeSelectorTerms)
+			nodeAffinityMatches = nodeAffinityMatches && nodeMatchesNodeSelectorTerms(node, nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution)
 		}
 
 	}
@@ -71,8 +69,8 @@ func PodMatchesNodeSelectorAndAffinityTerms(pod *v1.Pod, node *v1.Node) bool {
 
 // nodeMatchesNodeSelectorTerms checks if a node's labels satisfy a list of node selector terms,
 // terms are ORed, and an empty list of terms will match nothing.
-func nodeMatchesNodeSelectorTerms(node *v1.Node, nodeSelectorTerms []v1.NodeSelectorTerm) bool {
-	return v1helper.MatchNodeSelectorTerms(nodeSelectorTerms, node.Labels, fields.Set{
-		"metadata.name": node.Name,
-	})
+func nodeMatchesNodeSelectorTerms(node *v1.Node, nodeSelector *v1.NodeSelector) bool {
+	// TODO(@alculquicondor, #95738): parse this error earlier in the plugin so we only need to do it once per pod
+	matches, _ := corev1.MatchNodeSelectorTerms(node, nodeSelector)
+	return matches
 }

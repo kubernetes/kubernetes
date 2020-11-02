@@ -294,4 +294,15 @@ type InstanceMetadata struct {
 	// NodeAddress contains information for the instance's address.
 	// The node addresses returned here will be set on the node's status.addresses field.
 	NodeAddresses []v1.NodeAddress
+
+	// Zone is the zone that the instance is in.
+	// The value set here is applied as the following labels on the node:
+	//   * topology.kubernetes.io/zone=<zone>
+	//   * failure-domain.beta.kubernetes.io/zone=<zone> (DEPRECATED)
+	Zone string
+	// Region is the region that the instance is in.
+	// The value set here is applied as the following labels on the node:
+	//   * topology.kubernetes.io/region=<region>
+	//   * failure-domain.beta.kubernetes.io/region=<region> (DEPRECATED)
+	Region string
 }

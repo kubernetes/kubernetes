@@ -9,7 +9,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/client-go/deprecated:all-srcs",
         "//staging/src/k8s.io/client-go/discovery:all-srcs",
         "//staging/src/k8s.io/client-go/dynamic:all-srcs",
         "//staging/src/k8s.io/client-go/examples/create-update-delete-deployment:all-srcs",
@@ -24,6 +23,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/kubernetes_test:all-srcs",
         "//staging/src/k8s.io/client-go/listers/admissionregistration/v1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/admissionregistration/v1beta1:all-srcs",
+        "//staging/src/k8s.io/client-go/listers/apiserverinternal/v1alpha1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/apps/v1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/apps/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/apps/v1beta2:all-srcs",
@@ -60,7 +60,6 @@ filegroup(
         "//staging/src/k8s.io/client-go/listers/scheduling/v1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/scheduling/v1alpha1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/scheduling/v1beta1:all-srcs",
-        "//staging/src/k8s.io/client-go/listers/settings/v1alpha1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/storage/v1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/storage/v1alpha1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/storage/v1beta1:all-srcs",

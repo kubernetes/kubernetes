@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
@@ -139,4 +139,87 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 			volumeExists)
 	}
 
+}
+
+func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
+	fakeVolumePluginMgr, fakeVolumePlugin := volumetesting.GetTestVolumePluginMgr(t)
+	fakeClient := &fake.Clientset{}
+
+	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, controller.NoResyncPeriodFunc())
+	fakePodInformer := fakeInformerFactory.Core().V1().Pods()
+
+	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dswp-test-pod",
+			UID:       "dswp-test-pod-uid",
+			Namespace: "dswp-test",
+		},
+		Spec: v1.PodSpec{
+			NodeName: "dswp-test-host",
+			Volumes: []v1.Volume{
+				{
+					Name: "dswp-test-volume-name",
+					VolumeSource: v1.VolumeSource{
+						CSI: &v1.CSIVolumeSource{
+							Driver: "dswp-test-fake-csi-driver",
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodPhase("Running"),
+		},
+	}
+
+	fakePodInformer.Informer().GetStore().Add(pod)
+
+	generatedVolumeName := "fake-plugin/dswp-test-fake-csi-driver"
+	pvcLister := fakeInformerFactory.Core().V1().PersistentVolumeClaims().Lister()
+	pvLister := fakeInformerFactory.Core().V1().PersistentVolumes().Lister()
+
+	csiTranslator := csitrans.New()
+	dswp := &desiredStateOfWorldPopulator{
+		loopSleepDuration:        100 * time.Millisecond,
+		listPodsRetryDuration:    3 * time.Second,
+		desiredStateOfWorld:      fakesDSW,
+		volumePluginMgr:          fakeVolumePluginMgr,
+		podLister:                fakePodInformer.Lister(),
+		pvcLister:                pvcLister,
+		pvLister:                 pvLister,
+		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator),
+		intreeToCSITranslator:    csiTranslator,
+	}
+
+	//add the given node to the list of nodes managed by dsw
+	dswp.desiredStateOfWorld.AddNode(k8stypes.NodeName(pod.Spec.NodeName), false /*keepTerminatedPodVolumes*/)
+
+	dswp.findAndAddActivePods()
+
+	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
+
+	//check if the given volume referenced by the pod is added to dsw
+	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
+	if !volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+
+	// Change the CSI volume plugin attachability
+	fakeVolumePlugin.NonAttachable = true
+
+	dswp.findAndRemoveDeletedPods()
+
+	// The volume should not exist after it becomes non-attachable
+	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
+	if volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <false> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
 }

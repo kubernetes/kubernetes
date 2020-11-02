@@ -21,6 +21,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	unsafe "unsafe"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -105,12 +107,20 @@ func autoConvert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_confi
 	if err := Convert_v1alpha1_VolumeConfiguration_To_config_VolumeConfiguration(&in.VolumeConfiguration, &out.VolumeConfiguration, s); err != nil {
 		return err
 	}
+	out.VolumeHostCIDRDenylist = *(*[]string)(unsafe.Pointer(&in.VolumeHostCIDRDenylist))
+	if err := v1.Convert_Pointer_bool_To_bool(&in.VolumeHostAllowLocalLoopback, &out.VolumeHostAllowLocalLoopback, s); err != nil {
+		return err
+	}
 	return nil
 }
 
 func autoConvert_config_PersistentVolumeBinderControllerConfiguration_To_v1alpha1_PersistentVolumeBinderControllerConfiguration(in *config.PersistentVolumeBinderControllerConfiguration, out *v1alpha1.PersistentVolumeBinderControllerConfiguration, s conversion.Scope) error {
 	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
 	if err := Convert_config_VolumeConfiguration_To_v1alpha1_VolumeConfiguration(&in.VolumeConfiguration, &out.VolumeConfiguration, s); err != nil {
+		return err
+	}
+	out.VolumeHostCIDRDenylist = *(*[]string)(unsafe.Pointer(&in.VolumeHostCIDRDenylist))
+	if err := v1.Convert_bool_To_Pointer_bool(&in.VolumeHostAllowLocalLoopback, &out.VolumeHostAllowLocalLoopback, s); err != nil {
 		return err
 	}
 	return nil

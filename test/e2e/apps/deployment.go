@@ -560,7 +560,7 @@ func testIterativeDeployments(f *framework.Framework) {
 			// trigger a new deployment
 			framework.Logf("%02d: triggering a new rollout for deployment %q", i, deployment.Name)
 			deployment, err = e2edeployment.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *appsv1.Deployment) {
-				newEnv := v1.EnvVar{Name: "A", Value: fmt.Sprintf("%d", i)}
+				newEnv := v1.EnvVar{Name: fmt.Sprintf("A%d", i), Value: fmt.Sprintf("%d", i)}
 				update.Spec.Template.Spec.Containers[0].Env = append(update.Spec.Template.Spec.Containers[0].Env, newEnv)
 				randomScale(update, i)
 			})
@@ -755,7 +755,7 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	// Checking state of first rollout's replicaset.
-	maxUnavailable, err := intstr.GetValueFromIntOrPercent(deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, int(*(deployment.Spec.Replicas)), false)
+	maxUnavailable, err := intstr.GetScaledValueFromIntOrPercent(deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, int(*(deployment.Spec.Replicas)), false)
 	framework.ExpectNoError(err)
 
 	// First rollout's replicaset should have Deployment's (replicas - maxUnavailable) = 10 - 2 = 8 available replicas.
@@ -780,7 +780,7 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	secondRS, err := deploymentutil.GetNewReplicaSet(deployment, c.AppsV1())
 	framework.ExpectNoError(err)
 
-	maxSurge, err := intstr.GetValueFromIntOrPercent(deployment.Spec.Strategy.RollingUpdate.MaxSurge, int(*(deployment.Spec.Replicas)), false)
+	maxSurge, err := intstr.GetScaledValueFromIntOrPercent(deployment.Spec.Strategy.RollingUpdate.MaxSurge, int(*(deployment.Spec.Replicas)), false)
 	framework.ExpectNoError(err)
 
 	// Second rollout's replicaset should have 0 available replicas.

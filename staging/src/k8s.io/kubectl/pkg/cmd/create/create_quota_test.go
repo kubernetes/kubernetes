@@ -19,49 +19,116 @@ package create
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestCreateQuota(t *testing.T) {
-	resourceQuotaObject := &v1.ResourceQuota{}
-	resourceQuotaObject.Name = "my-quota"
+	hards := []string{"cpu=1", "cpu=1,pods=42"}
+	var resourceQuotaSpecLists []corev1.ResourceList
+	for _, hard := range hards {
+		resourceQuotaSpecList, err := populateResourceListV1(hard)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		resourceQuotaSpecLists = append(resourceQuotaSpecLists, resourceQuotaSpecList)
+	}
 
 	tests := map[string]struct {
-		flags          []string
-		expectedOutput string
+		options  *QuotaOpts
+		expected *corev1.ResourceQuota
 	}{
 		"single resource": {
-			flags:          []string{"--hard=cpu=1"},
-			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
+			options: &QuotaOpts{
+				Name:   "my-quota",
+				Hard:   hards[0],
+				Scopes: "",
+			},
+			expected: &corev1.ResourceQuota{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ResourceQuota",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-quota",
+				},
+				Spec: corev1.ResourceQuotaSpec{
+					Hard: resourceQuotaSpecLists[0],
+				},
+			},
 		},
 		"single resource with a scope": {
-			flags:          []string{"--hard=cpu=1", "--scopes=BestEffort"},
-			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
+			options: &QuotaOpts{
+				Name:   "my-quota",
+				Hard:   hards[0],
+				Scopes: "BestEffort",
+			},
+			expected: &corev1.ResourceQuota{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ResourceQuota",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-quota",
+				},
+				Spec: corev1.ResourceQuotaSpec{
+					Hard:   resourceQuotaSpecLists[0],
+					Scopes: []corev1.ResourceQuotaScope{"BestEffort"},
+				},
+			},
 		},
 		"multiple resources": {
-			flags:          []string{"--hard=cpu=1,pods=42", "--scopes=BestEffort"},
-			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
+			options: &QuotaOpts{
+				Name:   "my-quota",
+				Hard:   hards[1],
+				Scopes: "BestEffort",
+			},
+			expected: &corev1.ResourceQuota{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ResourceQuota",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-quota",
+				},
+				Spec: corev1.ResourceQuotaSpec{
+					Hard:   resourceQuotaSpecLists[1],
+					Scopes: []corev1.ResourceQuotaScope{"BestEffort"},
+				},
+			},
 		},
 		"single resource with multiple scopes": {
-			flags:          []string{"--hard=cpu=1", "--scopes=BestEffort,NotTerminating"},
-			expectedOutput: "resourcequota/" + resourceQuotaObject.Name + "\n",
+			options: &QuotaOpts{
+				Name:   "my-quota",
+				Hard:   hards[0],
+				Scopes: "BestEffort,NotTerminating",
+			},
+			expected: &corev1.ResourceQuota{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ResourceQuota",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-quota",
+				},
+				Spec: corev1.ResourceQuotaSpec{
+					Hard:   resourceQuotaSpecLists[0],
+					Scopes: []corev1.ResourceQuotaScope{"BestEffort", "NotTerminating"},
+				},
+			},
 		},
 	}
-	for name, test := range tests {
+
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			tf := cmdtesting.NewTestFactory().WithNamespace("test")
-			defer tf.Cleanup()
-
-			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
-			cmd := NewCmdCreateQuota(tf, ioStreams)
-			cmd.Flags().Parse(test.flags)
-			cmd.Flags().Set("output", "name")
-			cmd.Run(cmd, []string{resourceQuotaObject.Name})
-
-			if buf.String() != test.expectedOutput {
-				t.Errorf("%s: expected output: %s, but got: %s", name, test.expectedOutput, buf.String())
+			resourceQuota, err := tc.options.createQuota()
+			if err != nil {
+				t.Errorf("unexpected error:\n%#v\n", err)
+				return
+			}
+			if !apiequality.Semantic.DeepEqual(resourceQuota, tc.expected) {
+				t.Errorf("expected:\n%#v\ngot:\n%#v", tc.expected, resourceQuota)
 			}
 		})
 	}

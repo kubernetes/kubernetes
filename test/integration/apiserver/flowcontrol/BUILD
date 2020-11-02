@@ -8,7 +8,7 @@ go_test(
     ],
     tags = ["integration"],
     deps = [
-        "//pkg/master:go_default_library",
+        "//pkg/controlplane:go_default_library",
         "//staging/src/k8s.io/api/flowcontrol/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

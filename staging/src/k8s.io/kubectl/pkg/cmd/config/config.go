@@ -65,8 +65,10 @@ func NewCmdConfig(f cmdutil.Factory, pathOptions *clientcmd.PathOptions, streams
 	cmd.AddCommand(NewCmdConfigUseContext(streams.Out, pathOptions))
 	cmd.AddCommand(NewCmdConfigGetContexts(streams, pathOptions))
 	cmd.AddCommand(NewCmdConfigGetClusters(streams.Out, pathOptions))
+	cmd.AddCommand(NewCmdConfigGetUsers(streams, pathOptions))
 	cmd.AddCommand(NewCmdConfigDeleteCluster(streams.Out, pathOptions))
 	cmd.AddCommand(NewCmdConfigDeleteContext(streams.Out, streams.ErrOut, pathOptions))
+	cmd.AddCommand(NewCmdConfigDeleteUser(streams, pathOptions))
 	cmd.AddCommand(NewCmdConfigRenameContext(streams.Out, pathOptions))
 
 	return cmd

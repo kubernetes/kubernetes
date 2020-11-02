@@ -255,6 +255,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				csiDriverInformer.Informer().GetStore().Add(driverInfo)
 			}
 			factory.Start(wait.NeverStop)
+			factory.WaitForCacheSync(wait.NeverStop)
 
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
 				tmpDir,
@@ -304,19 +305,22 @@ func TestCSI_VolumeAll(t *testing.T) {
 				}
 
 				// creates VolumeAttachment and blocks until it is marked attached (done by external attacher)
-				go func(spec *volume.Spec, nodeName types.NodeName) {
-					attachID, err := volAttacher.Attach(spec, nodeName)
+				attachDone := make(chan struct{})
+				go func() {
+					defer close(attachDone)
+					attachID, err := volAttacher.Attach(volSpec, host.GetNodeName())
 					if err != nil {
 						t.Errorf("csiTest.VolumeAll attacher.Attach failed: %s", err)
 						return
 					}
 					t.Logf("csiTest.VolumeAll got attachID %s", attachID)
-
-				}(volSpec, host.GetNodeName())
+				}()
 
 				// Simulates external-attacher and marks VolumeAttachment.Status.Attached = true
 				markVolumeAttached(t, host.GetKubeClient(), fakeWatcher, attachName, storage.VolumeAttachmentStatus{Attached: true})
+				<-attachDone
 
+				// Observe attach on this node.
 				devicePath, err = volAttacher.WaitForAttach(volSpec, "", pod, 500*time.Millisecond)
 				if err != nil {
 					t.Fatal("csiTest.VolumeAll attacher.WaitForAttach failed:", err)

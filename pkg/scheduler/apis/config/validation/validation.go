@@ -38,6 +38,10 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) f
 	allErrs = append(allErrs, componentbasevalidation.ValidateLeaderElectionConfiguration(&cc.LeaderElection, field.NewPath("leaderElection"))...)
 
 	profilesPath := field.NewPath("profiles")
+	if cc.Parallelism <= 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("parallelism"), cc.Parallelism, "should be an integer value greater than zero"))
+	}
+
 	if len(cc.Profiles) == 0 {
 		allErrs = append(allErrs, field.Required(profilesPath, ""))
 	} else {

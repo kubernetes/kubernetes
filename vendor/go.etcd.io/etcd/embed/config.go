@@ -282,8 +282,9 @@ type Config struct {
 	// ExperimentalBackendFreelistType specifies the type of freelist that boltdb backend uses (array and map are supported types).
 	ExperimentalBackendFreelistType string `json:"experimental-backend-bbolt-freelist-type"`
 	// ExperimentalEnableLeaseCheckpoint enables primary lessor to persist lease remainingTTL to prevent indefinite auto-renewal of long lived leases.
-	ExperimentalEnableLeaseCheckpoint bool `json:"experimental-enable-lease-checkpoint"`
-	ExperimentalCompactionBatchLimit  int  `json:"experimental-compaction-batch-limit"`
+	ExperimentalEnableLeaseCheckpoint       bool          `json:"experimental-enable-lease-checkpoint"`
+	ExperimentalCompactionBatchLimit        int           `json:"experimental-compaction-batch-limit"`
+	ExperimentalWatchProgressNotifyInterval time.Duration `json:"experimental-watch-progress-notify-interval"`
 
 	// ForceNewCluster starts a new cluster even if previously started; unsafe.
 	ForceNewCluster bool `json:"force-new-cluster"`

@@ -75,6 +75,9 @@ func validateNoConflict(presentLabels []string, absentLabels []string) error {
 // with an additional check for .labelSelector to be nil.
 func ValidatePodTopologySpreadArgs(args *config.PodTopologySpreadArgs) error {
 	var allErrs field.ErrorList
+	if err := validateDefaultingType(field.NewPath("defaultingType"), args.DefaultingType, args.DefaultConstraints); err != nil {
+		allErrs = append(allErrs, err)
+	}
 	path := field.NewPath("defaultConstraints")
 
 	for i, c := range args.DefaultConstraints {
@@ -99,6 +102,16 @@ func ValidatePodTopologySpreadArgs(args *config.PodTopologySpreadArgs) error {
 		return nil
 	}
 	return allErrs.ToAggregate()
+}
+
+func validateDefaultingType(p *field.Path, v config.PodTopologySpreadConstraintsDefaulting, constraints []v1.TopologySpreadConstraint) *field.Error {
+	if v != config.SystemDefaulting && v != config.ListDefaulting {
+		return field.Invalid(p, v, fmt.Sprintf("must be one of {%q, %q}", config.SystemDefaulting, config.ListDefaulting))
+	}
+	if v == config.SystemDefaulting && len(constraints) > 0 {
+		return field.Invalid(p, v, "when .defaultConstraints are not empty")
+	}
+	return nil
 }
 
 func validateTopologyKey(p *field.Path, v string) field.ErrorList {

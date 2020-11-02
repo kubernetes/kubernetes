@@ -153,6 +153,74 @@ func TestGenerateDebugContainer(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "pod with init containers",
+			opts: &DebugOptions{
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+			},
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{
+							Name: "init-container-1",
+						},
+						{
+							Name: "init-container-2",
+						},
+					},
+					Containers: []corev1.Container{
+						{
+							Name: "debugger",
+						},
+					},
+				},
+			},
+			expected: &corev1.EphemeralContainer{
+				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+					Name:                     "debugger-1",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+		},
+		{
+			name: "pod with ephemeral containers",
+			opts: &DebugOptions{
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+			},
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger",
+						},
+					},
+					EphemeralContainers: []corev1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+								Name: "ephemeral-container-1",
+							},
+						},
+						{
+							EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+								Name: "ephemeral-container-2",
+							},
+						},
+					},
+				},
+			},
+			expected: &corev1.EphemeralContainer{
+				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+					Name:                     "debugger-1",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.opts.IOStreams = genericclioptions.NewTestIOStreamsDiscard()
@@ -567,6 +635,110 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 					Containers: []corev1.Container{
 						{
 							Name: "debugger-1",
+						},
+					},
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger-1",
+						},
+						{
+							Name:                     "debugger-2",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "pod with init containers",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{
+							Name: "init-container-1",
+						},
+						{
+							Name: "init-container-2",
+						},
+					},
+					Containers: []corev1.Container{
+						{
+							Name: "debugger-1",
+						},
+					},
+				},
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "debugger",
+				},
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{
+							Name: "init-container-1",
+						},
+						{
+							Name: "init-container-2",
+						},
+					},
+					Containers: []corev1.Container{
+						{
+							Name: "debugger-1",
+						},
+						{
+							Name:                     "debugger-2",
+							Image:                    "busybox",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "pod with ephemeral containers",
+			opts: &DebugOptions{
+				CopyTo:     "debugger",
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "target",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "debugger-1",
+						},
+					},
+					EphemeralContainers: []corev1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+								Name: "ephemeral-container-1",
+							},
+						},
+						{
+							EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+								Name: "ephemeral-container-2",
+							},
 						},
 					},
 				},

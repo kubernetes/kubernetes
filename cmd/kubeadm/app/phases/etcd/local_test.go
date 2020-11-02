@@ -96,7 +96,7 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 	for _, test := range tests {
 		// Execute createStaticPodFunction
 		manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-		err := CreateLocalEtcdStaticPodManifestFile(manifestPath, "", "", "", test.cfg, &kubeadmapi.APIEndpoint{})
+		err := CreateLocalEtcdStaticPodManifestFile(manifestPath, "", "", test.cfg, &kubeadmapi.APIEndpoint{})
 
 		if !test.expectedError {
 			if err != nil {
@@ -108,61 +108,6 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 		} else {
 			testutil.AssertError(t, err, "etcd static pod manifest cannot be generated for cluster using external etcd")
 		}
-	}
-}
-
-func TestCreateLocalEtcdStaticPodManifestFileKustomize(t *testing.T) {
-	// Create temp folder for the test case
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
-
-	// Creates a Cluster Configuration
-	cfg := &kubeadmapi.ClusterConfiguration{
-		KubernetesVersion: "v1.7.0",
-		Etcd: kubeadmapi.Etcd{
-			Local: &kubeadmapi.LocalEtcd{
-				DataDir: tmpdir + "/etcd",
-			},
-		},
-	}
-
-	kustomizePath := filepath.Join(tmpdir, "kustomize")
-	err := os.MkdirAll(kustomizePath, 0777)
-	if err != nil {
-		t.Fatalf("Couldn't create %s", kustomizePath)
-	}
-
-	patchString := dedent.Dedent(`
-    apiVersion: v1
-    kind: Pod
-    metadata:
-        name: etcd
-        namespace: kube-system
-        annotations:
-            kustomize: patch for etcd
-    `)
-
-	err = ioutil.WriteFile(filepath.Join(kustomizePath, "patch.yaml"), []byte(patchString), 0644)
-	if err != nil {
-		t.Fatalf("WriteFile returned unexpected error: %v", err)
-	}
-
-	// Execute createStaticPodFunction with kustomizations
-	manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-	err = CreateLocalEtcdStaticPodManifestFile(manifestPath, kustomizePath, "", "", cfg, &kubeadmapi.APIEndpoint{})
-	if err != nil {
-		t.Errorf("Error executing createStaticPodFunction: %v", err)
-		return
-	}
-
-	pod, err := staticpodutil.ReadStaticPodFromDisk(filepath.Join(manifestPath, fmt.Sprintf("%s.yaml", kubeadmconstants.Etcd)))
-	if err != nil {
-		t.Errorf("Error executing ReadStaticPodFromDisk: %v", err)
-		return
-	}
-
-	if _, ok := pod.ObjectMeta.Annotations["kustomize"]; !ok {
-		t.Error("Kustomize did not apply patches corresponding to the resource")
 	}
 }
 
@@ -199,7 +144,7 @@ func TestCreateLocalEtcdStaticPodManifestFileWithPatches(t *testing.T) {
 	}
 
 	manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-	err = CreateLocalEtcdStaticPodManifestFile(manifestPath, "", patchesPath, "", cfg, &kubeadmapi.APIEndpoint{})
+	err = CreateLocalEtcdStaticPodManifestFile(manifestPath, patchesPath, "", cfg, &kubeadmapi.APIEndpoint{})
 	if err != nil {
 		t.Errorf("Error executing createStaticPodFunction: %v", err)
 		return

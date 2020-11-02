@@ -24,7 +24,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	cloudvolume "k8s.io/cloud-provider/volume"
 )
 
 // InTreePlugin handles translations between CSI and in-tree sources in a PV
@@ -157,7 +156,7 @@ func translateTopology(pv *v1.PersistentVolume, topologyKey string) error {
 	}
 
 	if label, ok := pv.Labels[v1.LabelZoneFailureDomain]; ok {
-		zones = strings.Split(label, cloudvolume.LabelMultiZoneDelimiter)
+		zones = strings.Split(label, labelMultiZoneDelimiter)
 		if len(zones) > 0 {
 			return addTopology(pv, topologyKey, zones)
 		}

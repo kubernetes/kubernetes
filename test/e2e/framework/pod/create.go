@@ -48,6 +48,7 @@ type Config struct {
 	SeLinuxLabel        *v1.SELinuxOptions
 	FsGroup             *int64
 	NodeSelection       NodeSelection
+	ImageID             int
 }
 
 // CreateUnschedulablePod with given claims based on node selector
@@ -185,6 +186,10 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 			return &i
 		}(1000)
 	}
+	image := imageutils.BusyBox
+	if podConfig.ImageID != imageutils.None {
+		image = podConfig.ImageID
+	}
 	podSpec := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -203,7 +208,7 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 			Containers: []v1.Container{
 				{
 					Name:    "write-pod",
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Image:   imageutils.GetE2EImage(image),
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", podConfig.Command},
 					SecurityContext: &v1.SecurityContext{

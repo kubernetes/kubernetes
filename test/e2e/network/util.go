@@ -26,17 +26,15 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var (
-	// agnHostImage is the image URI of AgnHost
-	agnHostImage = imageutils.GetE2EImage(imageutils.Agnhost)
-)
+// secondNodePortSvcName is the name of the secondary node port service
+const secondNodePortSvcName = "second-node-port-service"
 
 // GetHTTPContent returns the content of the given url by HTTP.
 func GetHTTPContent(host string, port int, timeout time.Duration, url string) bytes.Buffer {
@@ -77,27 +75,6 @@ func DescribeSvc(ns string) {
 	desc, _ := framework.RunKubectl(
 		ns, "describe", "svc", fmt.Sprintf("--namespace=%v", ns))
 	framework.Logf(desc)
-}
-
-// newAgnhostPod returns a pod that uses the agnhost image. The image's binary supports various subcommands
-// that behave the same, no matter the underlying OS.
-func newAgnhostPod(name string, args ...string) *v1.Pod {
-	zero := int64(0)
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: v1.PodSpec{
-			TerminationGracePeriodSeconds: &zero,
-			Containers: []v1.Container{
-				{
-					Name:  "agnhost",
-					Image: agnHostImage,
-					Args:  args,
-				},
-			},
-		},
-	}
 }
 
 // CheckSCTPModuleLoadedOnNodes checks whether any node on the list has the
@@ -161,4 +138,42 @@ func execSourceIPTest(sourcePod v1.Pod, targetAddr string) (string, string) {
 		framework.Failf("exec pod returned unexpected stdout: [%v]\n", stdout)
 	}
 	return sourcePod.Status.PodIP, host
+}
+
+// createSecondNodePortService creates a service with the same selector as config.NodePortService and same HTTP Port
+func createSecondNodePortService(f *framework.Framework, config *e2enetwork.NetworkingTestConfig) (*v1.Service, int) {
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: secondNodePortSvcName,
+		},
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeNodePort,
+			Ports: []v1.ServicePort{
+				{
+					Port:       e2enetwork.ClusterHTTPPort,
+					Name:       "http",
+					Protocol:   v1.ProtocolTCP,
+					TargetPort: intstr.FromInt(e2enetwork.EndpointHTTPPort),
+				},
+			},
+			Selector: config.NodePortService.Spec.Selector,
+		},
+	}
+
+	createdService := config.CreateService(svc)
+
+	err := framework.WaitForServiceEndpointsNum(f.ClientSet, config.Namespace, secondNodePortSvcName, len(config.EndpointPods), time.Second, wait.ForeverTestTimeout)
+	framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", secondNodePortSvcName, config.Namespace)
+
+	var httpPort int
+	for _, p := range createdService.Spec.Ports {
+		switch p.Protocol {
+		case v1.ProtocolTCP:
+			httpPort = int(p.NodePort)
+		default:
+			continue
+		}
+	}
+
+	return createdService, httpPort
 }

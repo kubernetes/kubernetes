@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 func TestErrorTypes(t *testing.T) {

@@ -400,19 +400,19 @@ kube::golang::set_platform_envs() {
     case "${platform}" in
       "linux/arm")
         export CGO_ENABLED=1
-        export CC=arm-linux-gnueabihf-gcc
+        export CC=${KUBE_LINUX_ARM_CC:-arm-linux-gnueabihf-gcc}
         ;;
       "linux/arm64")
         export CGO_ENABLED=1
-        export CC=aarch64-linux-gnu-gcc
+        export CC=${KUBE_LINUX_ARM64_CC:-aarch64-linux-gnu-gcc}
         ;;
       "linux/ppc64le")
         export CGO_ENABLED=1
-        export CC=powerpc64le-linux-gnu-gcc
+        export CC=${KUBE_LINUX_PPC64LE_CC:-powerpc64le-linux-gnu-gcc}
         ;;
       "linux/s390x")
         export CGO_ENABLED=1
-        export CC=s390x-linux-gnu-gcc
+        export CC=${KUBE_LINUX_S390X_CC:-s390x-linux-gnu-gcc}
         ;;
     esac
   fi
@@ -465,9 +465,9 @@ EOF
   fi
 
   local go_version
-  IFS=" " read -ra go_version <<< "$(go version)"
+  IFS=" " read -ra go_version <<< "$(GOFLAGS='' go version)"
   local minimum_go_version
-  minimum_go_version=go1.14.4
+  minimum_go_version=go1.15.0
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
@@ -777,7 +777,7 @@ kube::golang::build_binaries() {
   (
     # Check for `go` binary and set ${GOPATH}.
     kube::golang::setup_env
-    V=2 kube::log::info "Go version: $(go version)"
+    V=2 kube::log::info "Go version: $(GOFLAGS='' go version)"
 
     local host_platform
     host_platform=$(kube::golang::host_platform)
@@ -793,7 +793,7 @@ kube::golang::build_binaries() {
 
     # extract tags if any specified in GOFLAGS
     # shellcheck disable=SC2001
-    gotags="selinux,$(echo "${GOFLAGS:-}" | sed -e 's|.*-tags=\([^-]*\).*|\1|')"
+    gotags="selinux,notest,$(echo "${GOFLAGS:-}" | sed -e 's|.*-tags=\([^-]*\).*|\1|')"
 
     local -a targets=()
     local arg

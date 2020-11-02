@@ -17,7 +17,6 @@ limitations under the License.
 package common
 
 import (
-	"context"
 	"fmt"
 	"path"
 
@@ -26,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -278,17 +276,8 @@ var _ = ginkgo.Describe("[sig-storage] EmptyDir volumes", func() {
 			},
 		}
 
-		var err error
 		ginkgo.By("Creating Pod")
 		pod = f.PodClient().CreateSync(pod)
-
-		ginkgo.By("Waiting for the pod running")
-		err = e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
-		framework.ExpectNoError(err, "failed to deploy pod %s", pod.Name)
-
-		ginkgo.By("Geting the pod")
-		pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get pod %s", pod.Name)
 
 		ginkgo.By("Reading file content from the nginx-container")
 		result := f.ExecShellInContainer(pod.Name, busyBoxMainContainerName, fmt.Sprintf("cat %s", busyBoxMainVolumeFilePath))

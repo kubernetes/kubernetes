@@ -10,6 +10,7 @@ go_library(
     srcs = ["controller.go"],
     importpath = "k8s.io/kubernetes/test/images/agnhost/resource-consumer-controller",
     deps = [
+        "//test/images/agnhost/dns:go_default_library",
         "//test/images/resource-consumer/common:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],

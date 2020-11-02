@@ -243,7 +243,7 @@ func TestList(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	mcList := []containerservice.ManagedCluster{getTestManagedCluster("cluster"), getTestManagedCluster("cluster1"), getTestManagedCluster("cluster2")}
 	responseBody, err := json.Marshal(containerservice.ManagedClusterListResult{Value: &mcList})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusOK,
@@ -299,7 +299,7 @@ func TestListNextResultsMultiPages(t *testing.T) {
 		mcClient := getTestManagedClusterClient(armClient)
 		result, err := mcClient.listNextResults(context.TODO(), lastResult)
 		if test.prepareErr != nil || test.sendErr != nil {
-			assert.NotNil(t, err)
+			assert.Error(t, err)
 		} else {
 			assert.NoError(t, err)
 		}
@@ -348,7 +348,7 @@ func TestListNextResultsMultiPagesWithListResponderError(t *testing.T) {
 	expected.Response = autorest.Response{Response: response}
 	mcClient := getTestManagedClusterClient(armClient)
 	result, err := mcClient.listNextResults(context.TODO(), lastResult)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 	assert.Equal(t, expected, result)
 }
 
@@ -360,7 +360,7 @@ func TestListWithListResponderError(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	mcList := []containerservice.ManagedCluster{getTestManagedCluster("cluster"), getTestManagedCluster("cluster1"), getTestManagedCluster("cluster2")}
 	responseBody, err := json.Marshal(containerservice.ManagedClusterListResult{Value: &mcList})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusNotFound,

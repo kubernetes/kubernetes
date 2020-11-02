@@ -564,12 +564,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	if a.group.OpenAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		reqScope.FieldManager, err = fieldmanager.NewDefaultFieldManager(
-			a.group.OpenAPIModels,
+			a.group.TypeConverter,
 			a.group.UnsafeConvertor,
 			a.group.Defaulter,
 			a.group.Creater,
 			fqKindToRegister,
 			reqScope.HubGroupVersion,
+			isSubresource,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create field manager: %v", err)
@@ -592,6 +593,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if strings.HasSuffix(action.Path, "/{path:*}") {
 			requestScope = "resource"
 			operationSuffix = operationSuffix + "WithPath"
+		}
+		if strings.Index(action.Path, "/{name}") != -1 || action.Verb == "POST" {
+			requestScope = "resource"
 		}
 		if action.AllNamespaces {
 			requestScope = "cluster"

@@ -506,7 +506,7 @@ func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
 		GracePeriodSeconds: &gp,
 	}
 
-	ginkgo.By("Delete SRIOV device plugin pod %s/%s")
+	ginkgo.By(fmt.Sprintf("Delete SRIOV device plugin pod %s/%s", sd.pod.Namespace, sd.pod.Name))
 	err = f.ClientSet.CoreV1().Pods(sd.pod.Namespace).Delete(context.TODO(), sd.pod.Name, deleteOptions)
 	framework.ExpectNoError(err)
 	waitForContainerRemoval(sd.pod.Spec.Containers[0].Name, sd.pod.Name, sd.pod.Namespace)
@@ -527,6 +527,8 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap
 	}
 
 	sd := setupSRIOVConfigOrFail(f, configMap)
+	defer teardownSRIOVConfigOrFail(f, sd)
+
 	envInfo := &testEnvInfo{
 		numaNodes:         numaNodes,
 		sriovResourceName: sd.resourceName,
@@ -695,7 +697,6 @@ func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, configMap
 		}
 		runTopologyManagerNegativeTest(f, 1, ctnAttrs, envInfo)
 	}
-	teardownSRIOVConfigOrFail(f, sd)
 }
 
 func runTopologyManagerTests(f *framework.Framework) {

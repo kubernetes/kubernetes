@@ -124,7 +124,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			BindAddress:        "10.10.12.11",
 			HealthzBindAddress: "0.0.0.0:12345",
 			MetricsBindAddress: "127.0.0.1:10249",
-			FeatureGates:       map[string]bool{"IPv6DualStack": true},
+			FeatureGates:       map[string]bool{"IPv6DualStack": true, "EndpointSlice": true},
 			ClusterCIDR:        "192.168.59.0/24",
 			UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
 			ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
@@ -290,7 +290,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				HealthzBindAddress: "0.0.0.0:12345",
 				MetricsBindAddress: "127.0.0.1:10249",
 				// DualStack ClusterCIDR without feature flag enabled
-				FeatureGates:     map[string]bool{"IPv6DualStack": false},
+				FeatureGates:     map[string]bool{"IPv6DualStack": false, "EndpointSlice": false},
 				ClusterCIDR:      "192.168.59.0/24,fd00:192:168::/64",
 				UDPIdleTimeout:   metav1.Duration{Duration: 1 * time.Second},
 				ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
@@ -313,8 +313,33 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				BindAddress:        "10.10.12.11",
 				HealthzBindAddress: "0.0.0.0:12345",
 				MetricsBindAddress: "127.0.0.1:10249",
+				// DualStack ClusterCIDR with feature flag enabled but EndpointSlice is not enabled
+				FeatureGates:     map[string]bool{"IPv6DualStack": true, "EndpointSlice": false},
+				ClusterCIDR:      "192.168.59.0/24,fd00:192:168::/64",
+				UDPIdleTimeout:   metav1.Duration{Duration: 1 * time.Second},
+				ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
+				IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+					MasqueradeAll: true,
+					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+				},
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            pointer.Int32Ptr(1),
+					Min:                   pointer.Int32Ptr(1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+				},
+			},
+			msg: "EndpointSlice feature flag must be turned on",
+		},
+
+		{
+			config: kubeproxyconfig.KubeProxyConfiguration{
+				BindAddress:        "10.10.12.11",
+				HealthzBindAddress: "0.0.0.0:12345",
+				MetricsBindAddress: "127.0.0.1:10249",
 				// DualStack with multiple CIDRs but only one IP family
-				FeatureGates:     map[string]bool{"IPv6DualStack": true},
+				FeatureGates:     map[string]bool{"IPv6DualStack": true, "EndpointSlice": true},
 				ClusterCIDR:      "192.168.59.0/24,10.0.0.0/16",
 				UDPIdleTimeout:   metav1.Duration{Duration: 1 * time.Second},
 				ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
@@ -338,7 +363,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				HealthzBindAddress: "0.0.0.0:12345",
 				MetricsBindAddress: "127.0.0.1:10249",
 				// DualStack with an invalid subnet
-				FeatureGates:     map[string]bool{"IPv6DualStack": true},
+				FeatureGates:     map[string]bool{"IPv6DualStack": true, "EndpointSlice": true},
 				ClusterCIDR:      "192.168.59.0/24,fd00:192:168::/64,a.b.c.d/f",
 				UDPIdleTimeout:   metav1.Duration{Duration: 1 * time.Second},
 				ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
@@ -361,7 +386,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				BindAddress:        "10.10.12.11",
 				HealthzBindAddress: "0.0.0.0:12345",
 				MetricsBindAddress: "127.0.0.1:10249",
-				FeatureGates:       map[string]bool{"IPv6DualStack": true},
+				FeatureGates:       map[string]bool{"IPv6DualStack": true, "EndpointSlice": true},
 				ClusterCIDR:        "192.168.59.0/24,fd00:192:168::/64,10.0.0.0/16",
 				UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
 				ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},

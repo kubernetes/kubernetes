@@ -126,14 +126,11 @@ func (tc *legacyReplicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clien
 					Timestamp:  metav1.Time{Time: tc.timestamp},
 					Containers: make([]metricsapi.ContainerMetrics, numContainersPerPod),
 				}
-
-				for i := 0; i < numContainersPerPod; i++ {
+				for i, m := range resValue {
 					podMetric.Containers[i] = metricsapi.ContainerMetrics{
 						Name: fmt.Sprintf("container%v", i),
 						Usage: v1.ResourceList{
-							v1.ResourceName(tc.resource.name): *resource.NewMilliQuantity(
-								int64(resValue),
-								resource.DecimalSI),
+							tc.resource.name: *resource.NewMilliQuantity(m, resource.DecimalSI),
 						},
 					}
 				}
@@ -209,7 +206,7 @@ func (tc *legacyReplicaCalcTestCase) runTest(t *testing.T) {
 	}
 
 	if tc.resource != nil {
-		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, testNamespace, selector)
+		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, testNamespace, selector, "")
 
 		if tc.expectedError != nil {
 			require.Error(t, err, "there should be an error calculating the replica count")
@@ -244,7 +241,7 @@ func TestLegacyReplicaCalcDisjointResourcesMetrics(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0")},
-			levels:   []int64{100},
+			levels:   makePodMetricLevels(100),
 			podNames: []string{"an-older-pod-name"},
 
 			targetUtilization: 100,
@@ -260,7 +257,7 @@ func TestLegacyReplicaCalcScaleUp(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-			levels:   []int64{300, 500, 700},
+			levels:   makePodMetricLevels(300, 500, 700),
 
 			targetUtilization:   30,
 			expectedUtilization: 50,
@@ -278,7 +275,7 @@ func TestLegacyReplicaCalcScaleUpUnreadyLessScale(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-			levels:   []int64{300, 500, 700},
+			levels:   makePodMetricLevels(300, 500, 700),
 
 			targetUtilization:   30,
 			expectedUtilization: 60,
@@ -296,7 +293,7 @@ func TestLegacyReplicaCalcScaleUpUnreadyNoScale(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-			levels:   []int64{400, 500, 700},
+			levels:   makePodMetricLevels(400, 500, 700),
 
 			targetUtilization:   30,
 			expectedUtilization: 40,
@@ -357,7 +354,7 @@ func TestLegacyReplicaCalcScaleDown(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-			levels:   []int64{100, 300, 500, 250, 250},
+			levels:   makePodMetricLevels(100, 300, 500, 250, 250),
 
 			targetUtilization:   50,
 			expectedUtilization: 28,
@@ -389,7 +386,7 @@ func TestLegacyReplicaCalcScaleDownIgnoresUnreadyPods(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-			levels:   []int64{100, 300, 500, 250, 250},
+			levels:   makePodMetricLevels(100, 300, 500, 250, 250),
 
 			targetUtilization:   50,
 			expectedUtilization: 30,
@@ -406,7 +403,7 @@ func TestLegacyReplicaCalcTolerance(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
-			levels:   []int64{1010, 1030, 1020},
+			levels:   makePodMetricLevels(1010, 1030, 1020),
 
 			targetUtilization:   100,
 			expectedUtilization: 102,
@@ -437,7 +434,7 @@ func TestLegacyReplicaCalcSuperfluousMetrics(t *testing.T) {
 		resource: &resourceInfo{
 			name:                v1.ResourceCPU,
 			requests:            []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-			levels:              []int64{4000, 9500, 3000, 7000, 3200, 2000},
+			levels:              makePodMetricLevels(4000, 9500, 3000, 7000, 3200, 2000),
 			targetUtilization:   100,
 			expectedUtilization: 587,
 			expectedValue:       numContainersPerPod * 5875,
@@ -453,7 +450,7 @@ func TestLegacyReplicaCalcMissingMetrics(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-			levels:   []int64{400, 95},
+			levels:   makePodMetricLevels(400, 95),
 
 			targetUtilization:   100,
 			expectedUtilization: 24,
@@ -470,7 +467,7 @@ func TestLegacyReplicaCalcEmptyMetrics(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-			levels:   []int64{},
+			levels:   makePodMetricLevels(),
 
 			targetUtilization: 100,
 		},
@@ -485,7 +482,7 @@ func TestLegacyReplicaCalcEmptyCPURequest(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{},
-			levels:   []int64{200},
+			levels:   makePodMetricLevels(200),
 
 			targetUtilization: 100,
 		},
@@ -500,7 +497,7 @@ func TestLegacyReplicaCalcMissingMetricsNoChangeEq(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0")},
-			levels:   []int64{1000},
+			levels:   makePodMetricLevels(1000),
 
 			targetUtilization:   100,
 			expectedUtilization: 100,
@@ -517,7 +514,7 @@ func TestLegacyReplicaCalcMissingMetricsNoChangeGt(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0")},
-			levels:   []int64{1900},
+			levels:   makePodMetricLevels(1900),
 
 			targetUtilization:   100,
 			expectedUtilization: 190,
@@ -534,7 +531,7 @@ func TestLegacyReplicaCalcMissingMetricsNoChangeLt(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0")},
-			levels:   []int64{600},
+			levels:   makePodMetricLevels(600),
 
 			targetUtilization:   100,
 			expectedUtilization: 60,
@@ -552,7 +549,7 @@ func TestLegacyReplicaCalcMissingMetricsUnreadyNoChange(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-			levels:   []int64{100, 450},
+			levels:   makePodMetricLevels(100, 450),
 
 			targetUtilization:   50,
 			expectedUtilization: 45,
@@ -570,7 +567,7 @@ func TestLegacyReplicaCalcMissingMetricsUnreadyScaleUp(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-			levels:   []int64{100, 2000},
+			levels:   makePodMetricLevels(100, 2000),
 
 			targetUtilization:   50,
 			expectedUtilization: 200,
@@ -588,7 +585,7 @@ func TestLegacyReplicaCalcMissingMetricsUnreadyScaleDown(t *testing.T) {
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-			levels:   []int64{100, 100, 100},
+			levels:   makePodMetricLevels(100, 100, 100),
 
 			targetUtilization:   50,
 			expectedUtilization: 10,
@@ -627,18 +624,18 @@ func TestLegacyReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 		expectedReplicas: finalPods,
 		resource: &resourceInfo{
 			name: v1.ResourceCPU,
-			levels: []int64{
-				totalUsedCPUOfAllPods / 10,
-				totalUsedCPUOfAllPods / 10,
-				totalUsedCPUOfAllPods / 10,
-				totalUsedCPUOfAllPods / 10,
-				totalUsedCPUOfAllPods / 10,
-				totalUsedCPUOfAllPods / 10,
-				totalUsedCPUOfAllPods / 10,
-				totalUsedCPUOfAllPods / 10,
-				totalUsedCPUOfAllPods / 10,
-				totalUsedCPUOfAllPods / 10,
-			},
+			levels: makePodMetricLevels(
+				totalUsedCPUOfAllPods/10,
+				totalUsedCPUOfAllPods/10,
+				totalUsedCPUOfAllPods/10,
+				totalUsedCPUOfAllPods/10,
+				totalUsedCPUOfAllPods/10,
+				totalUsedCPUOfAllPods/10,
+				totalUsedCPUOfAllPods/10,
+				totalUsedCPUOfAllPods/10,
+				totalUsedCPUOfAllPods/10,
+				totalUsedCPUOfAllPods/10,
+			),
 			requests: []resource.Quantity{
 				resource.MustParse(fmt.Sprint(perPodRequested+100) + "m"),
 				resource.MustParse(fmt.Sprint(perPodRequested-100) + "m"),

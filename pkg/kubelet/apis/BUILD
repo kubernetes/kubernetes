@@ -19,6 +19,7 @@ go_library(
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/features:go_default_library",
             "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+            "//vendor/k8s.io/klog/v2:go_default_library",
         ],
         "//conditions:default": [],
     }),
@@ -37,8 +38,6 @@ filegroup(
         ":package-srcs",
         "//pkg/kubelet/apis/config:all-srcs",
         "//pkg/kubelet/apis/podresources:all-srcs",
-        "//pkg/kubelet/apis/resourcemetrics/v1alpha1:all-srcs",
-        "//pkg/kubelet/apis/stats/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],
 )

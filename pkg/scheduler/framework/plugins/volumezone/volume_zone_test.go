@@ -24,8 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/fake"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 )
 
 func createPodWithVolume(pod, pv, pvc string) *v1.Pod {

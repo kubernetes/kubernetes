@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
@@ -35,19 +36,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
-	cputopology "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/util/selinux"
 )
 
@@ -124,11 +124,11 @@ func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
 // NewManagerImpl creates a new manager.
-func NewManagerImpl(numaNodeInfo cputopology.NUMANodeInfo, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
-	return newManagerImpl(pluginapi.KubeletSocket, numaNodeInfo, topologyAffinityStore)
+func NewManagerImpl(topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
+	return newManagerImpl(pluginapi.KubeletSocket, topology, topologyAffinityStore)
 }
 
-func newManagerImpl(socketPath string, numaNodeInfo cputopology.NUMANodeInfo, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
+func newManagerImpl(socketPath string, topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
 	klog.V(2).Infof("Creating Device Plugin manager at %s", socketPath)
 
 	if socketPath == "" || !filepath.IsAbs(socketPath) {
@@ -136,8 +136,8 @@ func newManagerImpl(socketPath string, numaNodeInfo cputopology.NUMANodeInfo, to
 	}
 
 	var numaNodes []int
-	for node := range numaNodeInfo {
-		numaNodes = append(numaNodes, node)
+	for _, node := range topology {
+		numaNodes = append(numaNodes, node.Id)
 	}
 
 	dir, file := filepath.Split(socketPath)
@@ -833,6 +833,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 	podUID := string(pod.UID)
 	contName := container.Name
 	allocatedDevicesUpdated := false
+	needsUpdateCheckpoint := false
 	// Extended resources are not allowed to be overcommitted.
 	// Since device plugin advertises extended resources,
 	// therefore Requests must be equal to Limits and iterating
@@ -857,6 +858,8 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		if allocDevices == nil || len(allocDevices) <= 0 {
 			continue
 		}
+
+		needsUpdateCheckpoint = true
 
 		startRPCTime := time.Now()
 		// Manager.Allocate involves RPC calls to device plugin, which
@@ -906,8 +909,11 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		m.mutex.Unlock()
 	}
 
-	// Checkpoints device to container allocation information.
-	return m.writeCheckpoint()
+	if needsUpdateCheckpoint {
+		return m.writeCheckpoint()
+	}
+
+	return nil
 }
 
 // GetDeviceRunContainerOptions checks whether we have cached containerDevices

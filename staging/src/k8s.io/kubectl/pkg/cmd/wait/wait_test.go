@@ -787,3 +787,30 @@ func TestWaitForCondition(t *testing.T) {
 		})
 	}
 }
+
+func TestWaitForDeletionIgnoreNotFound(t *testing.T) {
+	scheme := runtime.NewScheme()
+	infos := []*resource.Info{
+		{
+			Mapping: &meta.RESTMapping{
+				Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+			},
+			Name:      "name-foo",
+			Namespace: "ns-foo",
+		},
+	}
+	fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+
+	o := &WaitOptions{
+		ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(infos...),
+		DynamicClient:  fakeClient,
+		Printer:        printers.NewDiscardingPrinter(),
+		ConditionFn:    IsDeleted,
+		IOStreams:      genericclioptions.NewTestIOStreamsDiscard(),
+		ForCondition:   "delete",
+	}
+	err := o.RunWait()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

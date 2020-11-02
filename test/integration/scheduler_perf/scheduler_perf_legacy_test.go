@@ -448,7 +448,7 @@ func benchmarkScheduling(numExistingPods, minPods int,
 		clientset,
 		nodeStrategies,
 		"scheduler-perf-")
-	if err := nodePreparer.PrepareNodes(); err != nil {
+	if err := nodePreparer.PrepareNodes(0); err != nil {
 		klog.Fatalf("%v", err)
 	}
 	defer nodePreparer.CleanupNodes()

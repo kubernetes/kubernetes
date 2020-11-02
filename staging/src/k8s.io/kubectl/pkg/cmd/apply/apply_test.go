@@ -314,7 +314,7 @@ func TestRunApplyPrintsValidObjectList(t *testing.T) {
 	cmd := NewCmdApply("kubectl", tf, ioStreams)
 	cmd.Flags().Set("filename", filenameCM)
 	cmd.Flags().Set("output", "json")
-	cmd.Flags().Set("dry-run", "true")
+	cmd.Flags().Set("dry-run", "client")
 	cmd.Run(cmd, []string{})
 
 	// ensure that returned list can be unmarshaled back into a configmap list
@@ -504,7 +504,7 @@ func TestApplyObjectWithoutAnnotation(t *testing.T) {
 
 	// uses the name from the file, not the response
 	expectRC := "replicationcontroller/" + nameRC + "\n"
-	expectWarning := fmt.Sprintf(warningNoLastAppliedConfigAnnotation, "kubectl")
+	expectWarning := fmt.Sprintf(warningNoLastAppliedConfigAnnotation, "replicationcontrollers/test-rc", corev1.LastAppliedConfigAnnotation, "kubectl")
 	if errBuf.String() != expectWarning {
 		t.Fatalf("unexpected non-warning: %s\nexpected: %s", errBuf.String(), expectWarning)
 	}

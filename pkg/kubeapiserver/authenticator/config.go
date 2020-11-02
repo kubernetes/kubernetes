@@ -17,11 +17,13 @@ limitations under the License.
 package authenticator
 
 import (
+	"errors"
 	"time"
 
 	"github.com/go-openapi/spec"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/group"
@@ -35,14 +37,12 @@ import (
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	tokenunion "k8s.io/apiserver/pkg/authentication/token/union"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 
 	// Initialize all known client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/util/keyutil"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -68,6 +68,10 @@ type Config struct {
 	WebhookTokenAuthnConfigFile string
 	WebhookTokenAuthnVersion    string
 	WebhookTokenAuthnCacheTTL   time.Duration
+	// WebhookRetryBackoff specifies the backoff parameters for the authentication webhook retry logic.
+	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
+	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
+	WebhookRetryBackoff *wait.Backoff
 
 	TokenSuccessCacheTTL time.Duration
 	TokenFailureCacheTTL time.Duration
@@ -127,7 +131,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		}
 		tokenAuthenticators = append(tokenAuthenticators, serviceAccountAuth)
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) && config.ServiceAccountIssuer != "" {
+	if config.ServiceAccountIssuer != "" {
 		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountIssuer, config.ServiceAccountKeyFiles, config.APIAudiences, config.ServiceAccountTokenGetter)
 		if err != nil {
 			return nil, nil, err
@@ -282,7 +286,11 @@ func newServiceAccountAuthenticator(iss string, keyfiles []string, apiAudiences 
 }
 
 func newWebhookTokenAuthenticator(config Config) (authenticator.Token, error) {
-	webhookTokenAuthenticator, err := webhook.New(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnVersion, config.APIAudiences, config.CustomDial)
+	if config.WebhookRetryBackoff == nil {
+		return nil, errors.New("retry backoff parameters for authentication webhook has not been specified")
+	}
+
+	webhookTokenAuthenticator, err := webhook.New(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnVersion, config.APIAudiences, *config.WebhookRetryBackoff, config.CustomDial)
 	if err != nil {
 		return nil, err
 	}

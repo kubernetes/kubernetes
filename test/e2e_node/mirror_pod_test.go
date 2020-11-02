@@ -192,6 +192,11 @@ func checkMirrorPodRunning(cl clientset.Interface, name, namespace string) error
 	if pod.Status.Phase != v1.PodRunning {
 		return fmt.Errorf("expected the mirror pod %q to be running, got %q", name, pod.Status.Phase)
 	}
+	for i := range pod.Status.ContainerStatuses {
+		if pod.Status.ContainerStatuses[i].State.Running == nil {
+			return fmt.Errorf("expected the mirror pod %q with container %q to be running", name, pod.Status.ContainerStatuses[i].Name)
+		}
+	}
 	return validateMirrorPod(cl, pod)
 }
 

@@ -528,6 +528,40 @@ func TestSync(t *testing.T) {
 			newClaimArray("claim4-8", "uid4-8", "10Gi", "volume4-8-x", v1.ClaimBound, nil),
 			noevents, noerrors, testSyncVolume,
 		},
+		{
+			// syncVolume with volume bound to bound claim.
+			// Check that the volume is not deleted.
+			"4-9 - volume bound to bound claim, with PersistentVolumeReclaimDelete",
+			newVolumeArray("volume4-9", "10Gi", "uid4-9", "claim4-9", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty),
+			newVolumeArray("volume4-9", "10Gi", "uid4-9", "claim4-9", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty),
+			newClaimArray("claim4-9", "uid4-9", "10Gi", "volume4-9", v1.ClaimBound, nil),
+			newClaimArray("claim4-9", "uid4-9", "10Gi", "volume4-9", v1.ClaimBound, nil),
+			noevents, noerrors, testSyncVolume,
+		},
+		{
+			// syncVolume with volume bound to missing claim.
+			// Check that a volume deletion is attempted. It fails because there is no deleter.
+			"4-10 - volume bound to missing claim",
+			newVolumeArray("volume4-10", "10Gi", "uid4-10", "claim4-10", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty),
+			func() []*v1.PersistentVolume {
+				volumes := newVolumeArray("volume4-10", "10Gi", "uid4-10", "claim4-10", v1.VolumeFailed, v1.PersistentVolumeReclaimDelete, classEmpty)
+				volumes[0].Status.Message = `Error getting deleter volume plugin for volume "volume4-10": no volume plugin matched`
+				return volumes
+			}(),
+			noclaims,
+			noclaims,
+			noevents, noerrors, testSyncVolume,
+		},
+		{
+			// syncVolume with volume bound to claim which exists in etcd but not in the local cache.
+			// Check that nothing changes, in contrast to case 4-10 above.
+			"4-11 - volume bound to unknown claim",
+			newVolumeArray("volume4-11", "10Gi", "uid4-11", "claim4-11", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty),
+			newVolumeArray("volume4-11", "10Gi", "uid4-11", "claim4-11", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty),
+			newClaimArray("claim4-11", "uid4-11", "10Gi", "volume4-11", v1.ClaimBound, nil, annSkipLocalStore),
+			newClaimArray("claim4-11", "uid4-11", "10Gi", "volume4-11", v1.ClaimBound, nil, annSkipLocalStore),
+			noevents, noerrors, testSyncVolume,
+		},
 
 		// PVC with class
 		{

@@ -38,9 +38,9 @@ import (
 )
 
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
-func CreateInitStaticPodManifestFiles(manifestDir, kustomizeDir, patchesDir string, cfg *kubeadmapi.InitConfiguration) error {
+func CreateInitStaticPodManifestFiles(manifestDir, patchesDir string, cfg *kubeadmapi.InitConfiguration) error {
 	klog.V(1).Infoln("[control-plane] creating static Pod files")
-	return CreateStaticPodFiles(manifestDir, kustomizeDir, patchesDir, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
+	return CreateStaticPodFiles(manifestDir, patchesDir, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
 }
 
 // GetStaticPodSpecs returns all staticPodSpecs actualized to the context of the current configuration
@@ -91,7 +91,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 }
 
 // CreateStaticPodFiles creates all the requested static pod files.
-func CreateStaticPodFiles(manifestDir, kustomizeDir, patchesDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, componentNames ...string) error {
+func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, componentNames ...string) error {
 	// gets the StaticPodSpecs, actualized for the current ClusterConfiguration
 	klog.V(1).Infoln("[control-plane] getting StaticPodSpecs")
 	specs := GetStaticPodSpecs(cfg, endpoint)
@@ -107,15 +107,6 @@ func CreateStaticPodFiles(manifestDir, kustomizeDir, patchesDir string, cfg *kub
 		// print all volumes that are mounted
 		for _, v := range spec.Spec.Volumes {
 			klog.V(2).Infof("[control-plane] adding volume %q for component %q", v.Name, componentName)
-		}
-
-		// if kustomizeDir is defined, customize the static pod manifest
-		if kustomizeDir != "" {
-			kustomizedSpec, err := staticpodutil.KustomizeStaticPod(&spec, kustomizeDir)
-			if err != nil {
-				return errors.Wrapf(err, "failed to kustomize static pod manifest file for %q", componentName)
-			}
-			spec = *kustomizedSpec
 		}
 
 		// if patchesDir is defined, patch the static Pod manifest
@@ -141,20 +132,22 @@ func CreateStaticPodFiles(manifestDir, kustomizeDir, patchesDir string, cfg *kub
 // getAPIServerCommand builds the right API server command from the given config object and version
 func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint *kubeadmapi.APIEndpoint) []string {
 	defaultArguments := map[string]string{
-		"advertise-address":               localAPIEndpoint.AdvertiseAddress,
-		"insecure-port":                   "0",
-		"enable-admission-plugins":        "NodeRestriction",
-		"service-cluster-ip-range":        cfg.Networking.ServiceSubnet,
-		"service-account-key-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName),
-		"client-ca-file":                  filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
-		"tls-cert-file":                   filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerCertName),
-		"tls-private-key-file":            filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKeyName),
-		"kubelet-client-certificate":      filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientCertName),
-		"kubelet-client-key":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientKeyName),
-		"enable-bootstrap-token-auth":     "true",
-		"secure-port":                     fmt.Sprintf("%d", localAPIEndpoint.BindPort),
-		"allow-privileged":                "true",
-		"kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
+		"advertise-address":                localAPIEndpoint.AdvertiseAddress,
+		"insecure-port":                    "0",
+		"enable-admission-plugins":         "NodeRestriction",
+		"service-cluster-ip-range":         cfg.Networking.ServiceSubnet,
+		"service-account-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName),
+		"service-account-signing-key-file": filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPrivateKeyName),
+		"service-account-issuer":           fmt.Sprintf("https://kubernetes.default.svc.%s", cfg.Networking.DNSDomain),
+		"client-ca-file":                   filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
+		"tls-cert-file":                    filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerCertName),
+		"tls-private-key-file":             filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKeyName),
+		"kubelet-client-certificate":       filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientCertName),
+		"kubelet-client-key":               filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientKeyName),
+		"enable-bootstrap-token-auth":      "true",
+		"secure-port":                      fmt.Sprintf("%d", localAPIEndpoint.BindPort),
+		"allow-privileged":                 "true",
+		"kubelet-preferred-address-types":  "InternalIP,ExternalIP,Hostname",
 		// add options to configure the front proxy.  Without the generated client cert, this will never be useable
 		// so add it unconditionally with recommended values
 		"requestheader-username-headers":     "X-Remote-User",
@@ -279,52 +272,6 @@ func isValidAuthzMode(authzMode string) bool {
 	return false
 }
 
-// calcNodeCidrSize determines the size of the subnets used on each node, based
-// on the pod subnet provided.  For IPv4, we assume that the pod subnet will
-// be /16 and use /24. If the pod subnet cannot be parsed, the IPv4 value will
-// be used (/24).
-//
-// For IPv6, the algorithm will do two three. First, the node CIDR will be set
-// to a multiple of 8, using the available bits for easier readability by user.
-// Second, the number of nodes will be 512 to 64K to attempt to maximize the
-// number of nodes (see NOTE below). Third, pod networks of /113 and larger will
-// be rejected, as the amount of bits available is too small.
-//
-// A special case is when the pod network size is /112, where /120 will be used,
-// only allowing 256 nodes and 256 pods.
-//
-// If the pod network size is /113 or larger, the node CIDR will be set to the same
-// size and this will be rejected later in validation.
-//
-// NOTE: Currently, the design allows a maximum of 64K nodes. This algorithm splits
-// the available bits to maximize the number used for nodes, but still have the node
-// CIDR be a multiple of eight.
-//
-func calcNodeCidrSize(podSubnet string) (string, bool) {
-	maskSize := "24"
-	isIPv6 := false
-	if ip, podCidr, err := net.ParseCIDR(podSubnet); err == nil {
-		if utilsnet.IsIPv6(ip) {
-			var nodeCidrSize int
-			isIPv6 = true
-			podNetSize, totalBits := podCidr.Mask.Size()
-			switch {
-			case podNetSize == 112:
-				// Special case, allows 256 nodes, 256 pods/node
-				nodeCidrSize = 120
-			case podNetSize < 112:
-				// Use multiple of 8 for node CIDR, with 512 to 64K nodes
-				nodeCidrSize = totalBits - ((totalBits-podNetSize-1)/8-1)*8
-			default:
-				// Not enough bits, will fail later, when validate
-				nodeCidrSize = podNetSize
-			}
-			maskSize = strconv.Itoa(nodeCidrSize)
-		}
-	}
-	return maskSize, isIPv6
-}
-
 // getControllerManagerCommand builds the right controller manager command from the given config object and version
 func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string {
 
@@ -375,22 +322,6 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string 
 	enabled, present := cfg.FeatureGates[features.IPv6DualStack]
 	if present {
 		defaultArguments["feature-gates"] = fmt.Sprintf("%s=%t", features.IPv6DualStack, enabled)
-	}
-	if cfg.Networking.PodSubnet != "" {
-		if enabled {
-			// any errors will be caught during validation
-			subnets := strings.Split(cfg.Networking.PodSubnet, ",")
-			for _, podSubnet := range subnets {
-				if maskSize, isIPv6 := calcNodeCidrSize(podSubnet); isIPv6 {
-					defaultArguments["node-cidr-mask-size-ipv6"] = maskSize
-				} else {
-					defaultArguments["node-cidr-mask-size-ipv4"] = maskSize
-				}
-			}
-		} else {
-			maskSize, _ := calcNodeCidrSize(cfg.Networking.PodSubnet)
-			defaultArguments["node-cidr-mask-size"] = maskSize
-		}
 	}
 
 	command := []string{"kube-controller-manager"}

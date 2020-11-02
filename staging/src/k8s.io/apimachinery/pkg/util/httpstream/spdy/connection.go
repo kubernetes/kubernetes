@@ -34,38 +34,62 @@ type connection struct {
 	streams          []httpstream.Stream
 	streamLock       sync.Mutex
 	newStreamHandler httpstream.NewStreamHandler
+	ping             func() (time.Duration, error)
 }
 
 // NewClientConnection creates a new SPDY client connection.
 func NewClientConnection(conn net.Conn) (httpstream.Connection, error) {
+	return NewClientConnectionWithPings(conn, 0)
+}
+
+// NewClientConnectionWithPings creates a new SPDY client connection.
+//
+// If pingPeriod is non-zero, a background goroutine will send periodic Ping
+// frames to the server. Use this to keep idle connections through certain load
+// balancers alive longer.
+func NewClientConnectionWithPings(conn net.Conn, pingPeriod time.Duration) (httpstream.Connection, error) {
 	spdyConn, err := spdystream.NewConnection(conn, false)
 	if err != nil {
 		defer conn.Close()
 		return nil, err
 	}
 
-	return newConnection(spdyConn, httpstream.NoOpNewStreamHandler), nil
+	return newConnection(spdyConn, httpstream.NoOpNewStreamHandler, pingPeriod, spdyConn.Ping), nil
 }
 
 // NewServerConnection creates a new SPDY server connection. newStreamHandler
 // will be invoked when the server receives a newly created stream from the
 // client.
 func NewServerConnection(conn net.Conn, newStreamHandler httpstream.NewStreamHandler) (httpstream.Connection, error) {
+	return NewServerConnectionWithPings(conn, newStreamHandler, 0)
+}
+
+// NewServerConnectionWithPings creates a new SPDY server connection.
+// newStreamHandler will be invoked when the server receives a newly created
+// stream from the client.
+//
+// If pingPeriod is non-zero, a background goroutine will send periodic Ping
+// frames to the server. Use this to keep idle connections through certain load
+// balancers alive longer.
+func NewServerConnectionWithPings(conn net.Conn, newStreamHandler httpstream.NewStreamHandler, pingPeriod time.Duration) (httpstream.Connection, error) {
 	spdyConn, err := spdystream.NewConnection(conn, true)
 	if err != nil {
 		defer conn.Close()
 		return nil, err
 	}
 
-	return newConnection(spdyConn, newStreamHandler), nil
+	return newConnection(spdyConn, newStreamHandler, pingPeriod, spdyConn.Ping), nil
 }
 
 // newConnection returns a new connection wrapping conn. newStreamHandler
 // will be invoked when the server receives a newly created stream from the
 // client.
-func newConnection(conn *spdystream.Connection, newStreamHandler httpstream.NewStreamHandler) httpstream.Connection {
-	c := &connection{conn: conn, newStreamHandler: newStreamHandler}
+func newConnection(conn *spdystream.Connection, newStreamHandler httpstream.NewStreamHandler, pingPeriod time.Duration, pingFn func() (time.Duration, error)) httpstream.Connection {
+	c := &connection{conn: conn, newStreamHandler: newStreamHandler, ping: pingFn}
 	go conn.Serve(c.newSpdyStream)
+	if pingPeriod > 0 && pingFn != nil {
+		go c.sendPings(pingPeriod)
+	}
 	return c
 }
 
@@ -142,4 +166,22 @@ func (c *connection) newSpdyStream(stream *spdystream.Stream) {
 // it is automatically closed.
 func (c *connection) SetIdleTimeout(timeout time.Duration) {
 	c.conn.SetIdleTimeout(timeout)
+}
+
+func (c *connection) sendPings(period time.Duration) {
+	t := time.NewTicker(period)
+	defer t.Stop()
+	for {
+		select {
+		case <-c.conn.CloseChan():
+			return
+		case <-t.C:
+		}
+		if _, err := c.ping(); err != nil {
+			klog.V(3).Infof("SPDY Ping failed: %v", err)
+			// Continue, in case this is a transient failure.
+			// c.conn.CloseChan above will tell us when the connection is
+			// actually closed.
+		}
+	}
 }

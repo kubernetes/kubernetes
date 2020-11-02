@@ -58,6 +58,7 @@ go_library(
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
+        "//vendor/github.com/google/uuid:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

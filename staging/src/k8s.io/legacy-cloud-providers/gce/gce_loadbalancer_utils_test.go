@@ -94,6 +94,8 @@ func createAndInsertNodes(gce *Cloud, nodeNames []string, zoneName string) ([]*v
 					Tags: &compute.Tags{
 						Items: []string{name},
 					},
+					// add Instance.Zone, otherwise InstanceID() won't return a right instanceID.
+					Zone: zoneName,
 				},
 			)
 			if err != nil {

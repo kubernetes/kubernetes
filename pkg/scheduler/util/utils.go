@@ -28,9 +28,9 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 // GetPodFullName returns a name that uniquely identifies a pod.
@@ -60,15 +60,15 @@ func GetEarliestPodStartTime(victims *extenderv1.Victims) *metav1.Time {
 	}
 
 	earliestPodStartTime := GetPodStartTime(victims.Pods[0])
-	maxPriority := podutil.GetPodPriority(victims.Pods[0])
+	maxPriority := corev1helpers.PodPriority(victims.Pods[0])
 
 	for _, pod := range victims.Pods {
-		if podutil.GetPodPriority(pod) == maxPriority {
+		if corev1helpers.PodPriority(pod) == maxPriority {
 			if GetPodStartTime(pod).Before(earliestPodStartTime) {
 				earliestPodStartTime = GetPodStartTime(pod)
 			}
-		} else if podutil.GetPodPriority(pod) > maxPriority {
-			maxPriority = podutil.GetPodPriority(pod)
+		} else if corev1helpers.PodPriority(pod) > maxPriority {
+			maxPriority = corev1helpers.PodPriority(pod)
 			earliestPodStartTime = GetPodStartTime(pod)
 		}
 	}
@@ -81,8 +81,8 @@ func GetEarliestPodStartTime(victims *extenderv1.Victims) *metav1.Time {
 // It takes arguments of the type "interface{}" to be used with SortableList,
 // but expects those arguments to be *v1.Pod.
 func MoreImportantPod(pod1, pod2 *v1.Pod) bool {
-	p1 := podutil.GetPodPriority(pod1)
-	p2 := podutil.GetPodPriority(pod2)
+	p1 := corev1helpers.PodPriority(pod1)
+	p2 := corev1helpers.PodPriority(pod2)
 	if p1 != p2 {
 		return p1 > p2
 	}
@@ -133,13 +133,13 @@ func PatchPod(cs kubernetes.Interface, old *v1.Pod, new *v1.Pod) error {
 	if err != nil {
 		return fmt.Errorf("failed to create merge patch for pod %q/%q: %v", old.Namespace, old.Name, err)
 	}
+
+	if "{}" == string(patchBytes) {
+		return nil
+	}
+
 	_, err = cs.CoreV1().Pods(old.Namespace).Patch(context.TODO(), old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err
-}
-
-// GetUpdatedPod returns the latest version of <pod> from API server.
-func GetUpdatedPod(cs kubernetes.Interface, pod *v1.Pod) (*v1.Pod, error) {
-	return cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 }
 
 // DeletePod deletes the given <pod> from API server

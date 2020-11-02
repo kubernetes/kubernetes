@@ -213,14 +213,14 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", ns1))
 		// Delete the primary namespace but its okay to fail here because this namespace will
 		// also be deleted by framework.Aftereach hook
-		tryFunc(deleteNamespaceFunc(f.ClientSet, ns1, framework.DefaultNamespaceDeletionTimeout))
+		tryFunc(func() { f.DeleteNamespace(ns1) })
 
 		ginkgo.By("uninstalling csi mock driver")
 		tryFunc(cleanup)
 		tryFunc(cancelLogging)
 
 		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", ns2))
-		tryFunc(deleteNamespaceFunc(f.ClientSet, ns2, framework.DefaultNamespaceDeletionTimeout))
+		tryFunc(func() { f.DeleteNamespace(ns2) })
 		// cleanup function has already ran and hence we don't need to run it again.
 		// We do this as very last action because in-case defer(or AfterEach) races
 		// with AfterSuite and test routine gets killed then this block still
@@ -416,7 +416,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", ns1))
 		// Delete the primary namespace but its okay to fail here because this namespace will
 		// also be deleted by framework.Aftereach hook
-		tryFunc(deleteNamespaceFunc(f.ClientSet, ns1, framework.DefaultNamespaceDeletionTimeout))
+		tryFunc(func() { f.DeleteNamespace(ns1) })
 
 		ginkgo.By("uninstalling csi mock driver")
 		tryFunc(func() {
@@ -429,7 +429,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		tryFunc(cleanup)
 		tryFunc(cancelLogging)
 		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", ns2))
-		tryFunc(deleteNamespaceFunc(f.ClientSet, ns2, framework.DefaultNamespaceDeletionTimeout))
+		tryFunc(func() { f.DeleteNamespace(ns2) })
 		// cleanup function has already ran and hence we don't need to run it again.
 		// We do this as very last action because in-case defer(or AfterEach) races
 		// with AfterSuite and test routine gets killed then this block still
@@ -567,7 +567,7 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 		framework.Failf("deploying csi gce-pd driver: %v", err)
 	}
 
-	if err = waitForCSIDriverRegistrationOnAllNodes(GCEPDCSIDriverName, f.ClientSet); err != nil {
+	if err = WaitForCSIDriverRegistrationOnAllNodes(GCEPDCSIDriverName, f.ClientSet); err != nil {
 		framework.Failf("waiting for csi driver node registration on: %v", err)
 	}
 
@@ -577,14 +577,14 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", ns1))
 		// Delete the primary namespace but its okay to fail here because this namespace will
 		// also be deleted by framework.Aftereach hook
-		tryFunc(deleteNamespaceFunc(f.ClientSet, ns1, framework.DefaultNamespaceDeletionTimeout))
+		tryFunc(func() { f.DeleteNamespace(ns1) })
 
 		ginkgo.By("uninstalling csi mock driver")
 		tryFunc(cleanup)
 		tryFunc(cancelLogging)
 
 		ginkgo.By(fmt.Sprintf("deleting the driver namespace: %s", ns2))
-		tryFunc(deleteNamespaceFunc(f.ClientSet, ns2, framework.DefaultNamespaceDeletionTimeout))
+		tryFunc(func() { f.DeleteNamespace(ns2) })
 		// cleanup function has already ran and hence we don't need to run it again.
 		// We do this as very last action because in-case defer(or AfterEach) races
 		// with AfterSuite and test routine gets killed then this block still
@@ -602,7 +602,9 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 	}, cleanupFunc
 }
 
-func waitForCSIDriverRegistrationOnAllNodes(driverName string, cs clientset.Interface) error {
+// WaitForCSIDriverRegistrationOnAllNodes waits for the CSINode object to be updated
+// with the given driver on all schedulable nodes.
+func WaitForCSIDriverRegistrationOnAllNodes(driverName string, cs clientset.Interface) error {
 	nodes, err := e2enode.GetReadySchedulableNodes(cs)
 	if err != nil {
 		return err
@@ -642,19 +644,6 @@ func WaitForCSIDriverRegistrationOnNode(nodeName string, driverName string, cs c
 		return fmt.Errorf("error waiting for CSI driver %s registration on node %s: %v", driverName, nodeName, waitErr)
 	}
 	return nil
-}
-
-func deleteNamespaceFunc(cs clientset.Interface, ns string, timeout time.Duration) func() {
-	return func() {
-		err := cs.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			framework.Logf("error deleting namespace %s: %v", ns, err)
-		}
-		err = framework.WaitForNamespacesDeleted(cs, []string{ns}, timeout)
-		if err != nil {
-			framework.Logf("error deleting namespace %s: %v", ns, err)
-		}
-	}
 }
 
 func tryFunc(f func()) error {

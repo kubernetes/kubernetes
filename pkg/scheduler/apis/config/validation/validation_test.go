@@ -31,6 +31,7 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	podInitialBackoffSeconds := int64(1)
 	podMaxBackoffSeconds := int64(1)
 	validConfig := &config.KubeSchedulerConfiguration{
+		Parallelism:        8,
 		HealthzBindAddress: "0.0.0.0:10254",
 		MetricsBindAddress: "0.0.0.0:10254",
 		ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
@@ -90,6 +91,9 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 			},
 		},
 	}
+
+	invalidParallelismValue := validConfig.DeepCopy()
+	invalidParallelismValue.Parallelism = 0
 
 	resourceNameNotSet := validConfig.DeepCopy()
 	resourceNameNotSet.LeaderElection.ResourceName = ""
@@ -151,6 +155,10 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		"good": {
 			expectedToFail: false,
 			config:         validConfig,
+		},
+		"bad-parallelism-invalid-value": {
+			expectedToFail: true,
+			config:         invalidParallelismValue,
 		},
 		"bad-resource-name-not-set": {
 			expectedToFail: true,

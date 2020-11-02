@@ -13,22 +13,45 @@
 # limitations under the License.
 
 ARG BASEIMAGE
-from $BASEIMAGE as prep
+ARG REGISTRY
 
-ENV CURL_VERSION 7.57.0
-WORKDIR /curl
-ADD https://skanthak.homepage.t-online.de/download/curl-$CURL_VERSION.cab curl.cab
-RUN expand /R curl.cab /F:* .
+# We're using a Linux image to unpack the archive, then we're copying it over to Windows.
+FROM --platform=linux/amd64 alpine:3.6 as prep
 
+RUN mkdir /tmp-dir
+
+FROM e2eteam/busybox-helper:1.29.0 as busybox-helper
+FROM e2eteam/powershell-helper:6.2.7 as ps-helper
 FROM $BASEIMAGE
 
-COPY --from=prep /curl/AMD64 /curl
-COPY --from=prep /curl/CURL.LIC /curl
-ADD https://github.com/kubernetes-sigs/windows-testing/raw/master/images/busybox/busybox.exe /bin/busybox.exe
-ADD https://github.com/diegocr/netcat/raw/master/nc.exe /bin/nc.exe
+COPY --from=prep /tmp-dir /tmp
+COPY --from=busybox-helper /bin /bin
+
+# NOTE(claudiub): Unfortunately, docker buildx has some issues copying over Windows symlinks.
+# "Files/" is always prepended to the symlink target. The symlinks themselves are relative paths,
+# so, in order to make use of them, we can simply add a busybox binary to C:\bin\Files\busybox.exe.
+COPY --from=busybox-helper /bin/busybox.exe /bin/Files/
+COPY --from=busybox-helper /curl /curl
+COPY --from=busybox-helper /netcat/nc64.exe /bin/nc.exe
+
+# include powershell and its Module analysis cache.
+COPY --from=ps-helper ["/PowerShell", "/Program Files/PowerShell"]
+
+# NOTE(claudiub): For the same reason mentioned above, we have to copy pwsh.exe to Files/pwsh.exe
+COPY --from=ps-helper ["/PowerShell/pwsh.exe", "/Program Files/PowerShell/Files/"]
+COPY --from=ps-helper /Users/ContainerAdministrator/AppData/Local/Microsoft/Windows/PowerShell/docker/ModuleAnalysisCache /Users/ContainerAdministrator/AppData/Local/Microsoft/Windows/PowerShell/docker/ModuleAnalysisCache
+
 ADD hostname /bin/hostname.exe
+
 USER ContainerAdministrator
-RUN FOR /f "tokens=*" %i IN ('C:\bin\busybox --list') DO mklink C:\bin\%i.exe C:\bin\busybox.exe
-RUN setx /M PATH "C:\bin;C:\curl\;%PATH%" &\
-    mkdir C:\tmp
+
+# NOTE(claudiub): docker buildx sets the PATH env variable to a Linux-like PATH, which is not desirable.
+ENV PATH="C:\bin;C:\curl;C:\Windows\System32;C:\Windows;C:\Program Files\PowerShell;" \
+    ProgramFiles="C:\Program Files" \
+    # set a fixed location for the Module analysis cache
+    LOCALAPPDATA="C:\Users\ContainerAdministrator\AppData\Local" \
+    PSModuleAnalysisCachePath="C:\Users\ContainerAdministrator\AppData\Local\Microsoft\Windows\PowerShell\docker\ModuleAnalysisCache" \
+    # Persist %PSCORE% ENV variable for user convenience
+    PSCORE="C:\Program Files\PowerShell\pwsh.exe"
+
 ENTRYPOINT ["cmd.exe", "/s", "/c"]

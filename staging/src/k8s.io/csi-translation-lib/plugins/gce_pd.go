@@ -25,7 +25,6 @@ import (
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	cloudvolume "k8s.io/cloud-provider/volume"
 )
 
 const (
@@ -217,7 +216,7 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 	}
 
 	zonesLabel := pv.Labels[v1.LabelZoneFailureDomain]
-	zones := strings.Split(zonesLabel, cloudvolume.LabelMultiZoneDelimiter)
+	zones := strings.Split(zonesLabel, labelMultiZoneDelimiter)
 	if len(zones) == 1 && len(zones[0]) != 0 {
 		// Zonal
 		volID = fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, zones[0], pv.Spec.GCEPersistentDisk.PDName)

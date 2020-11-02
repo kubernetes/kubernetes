@@ -55,7 +55,6 @@ import (
 )
 
 var (
-	openapiSchemaPath  = filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json")
 	grace              = int64(30)
 	enableServiceLinks = corev1.DefaultEnableServiceLinks
 )
@@ -90,6 +89,7 @@ func testComponentStatusData() *corev1.ComponentStatusList {
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetUnknownSchemaObject(t *testing.T) {
 	t.Skip("This test is completely broken.  The first thing it does is add the object to the scheme!")
+	var openapiSchemaPath = filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json")
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	_, _, codec := cmdtesting.NewExternalScheme()

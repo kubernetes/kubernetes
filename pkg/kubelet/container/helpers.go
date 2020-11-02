@@ -191,10 +191,11 @@ type innerEventRecorder struct {
 }
 
 func (irecorder *innerEventRecorder) shouldRecordEvent(object runtime.Object) (*v1.ObjectReference, bool) {
-	if object == nil {
-		return nil, false
-	}
 	if ref, ok := object.(*v1.ObjectReference); ok {
+		// this check is needed AFTER the cast. See https://github.com/kubernetes/kubernetes/issues/95552
+		if ref == nil {
+			return nil, false
+		}
 		if !strings.HasPrefix(ref.FieldPath, ImplicitContainerPrefix) {
 			return ref, true
 		}
@@ -333,22 +334,18 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 			}
 		}
 
-		// We need to create some default port name if it's not specified, since
-		// this is necessary for the dockershim CNI driver.
-		// https://github.com/kubernetes/kubernetes/pull/82374#issuecomment-529496888
-		if p.Name == "" {
-			pm.Name = fmt.Sprintf("%s-%s-%s:%d", container.Name, family, p.Protocol, p.ContainerPort)
-		} else {
-			pm.Name = fmt.Sprintf("%s-%s", container.Name, p.Name)
+		var name string = p.Name
+		if name == "" {
+			name = fmt.Sprintf("%s-%s-%s:%d:%d", family, p.Protocol, p.HostIP, p.ContainerPort, p.HostPort)
 		}
 
 		// Protect against a port name being used more than once in a container.
-		if _, ok := names[pm.Name]; ok {
-			klog.Warningf("Port name conflicted, %q is defined more than once", pm.Name)
+		if _, ok := names[name]; ok {
+			klog.Warningf("Port name conflicted, %q is defined more than once", name)
 			continue
 		}
 		ports = append(ports, pm)
-		names[pm.Name] = struct{}{}
+		names[name] = struct{}{}
 	}
 	return
 }

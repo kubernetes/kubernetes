@@ -57,8 +57,8 @@ $GCE_METADATA_SERVER = "169.254.169.254"
 # exist until an initial HNS network has been created on the Windows node - see
 # Add_InitialHnsNetwork().
 $MGMT_ADAPTER_NAME = "vEthernet (Ethernet*"
-$CRICTL_VERSION = 'v1.18.0'
-$CRICTL_SHA256 = '5045bcc6d8b0e6004be123ab99ea06e5b1b2ae1e586c968fcdf85fccd4d67ae1'
+$CRICTL_VERSION = 'v1.19.0'
+$CRICTL_SHA256 = 'df60ff65ab71c5cf1d8c38f51db6f05e3d60a45d3a3293c3248c925c25375921'
 
 Import-Module -Force C:\common.psm1
 
@@ -263,6 +263,7 @@ function Set-EnvironmentVars {
     "WINDOWS_CNI_VERSION" = ${kube_env}['WINDOWS_CNI_VERSION']
     "CSI_PROXY_STORAGE_PATH" = ${kube_env}['CSI_PROXY_STORAGE_PATH']
     "CSI_PROXY_VERSION" = ${kube_env}['CSI_PROXY_VERSION']
+    "ENABLE_CSI_PROXY" = ${kube_env}['ENABLE_CSI_PROXY']
     "PKI_DIR" = ${kube_env}['PKI_DIR']
     "CA_FILE_PATH" = ${kube_env}['CA_FILE_PATH']
     "KUBELET_CONFIG" = ${kube_env}['KUBELET_CONFIG_FILE']
@@ -338,7 +339,7 @@ function Download-HelperScripts {
 #
 # Required ${kube_env} keys:
 #   EXEC_AUTH_PLUGIN_LICENSE_URL
-#   EXEC_AUTH_PLUGIN_SHA1
+#   EXEC_AUTH_PLUGIN_HASH
 #   EXEC_AUTH_PLUGIN_URL
 function DownloadAndInstall-AuthPlugin {
   if (-not (Test-NodeUsesAuthPlugin ${kube_env})) {
@@ -350,14 +351,14 @@ function DownloadAndInstall-AuthPlugin {
   }
 
   if (-not ($kube_env.ContainsKey('EXEC_AUTH_PLUGIN_LICENSE_URL') -and
-            $kube_env.ContainsKey('EXEC_AUTH_PLUGIN_SHA1') -and
+            $kube_env.ContainsKey('EXEC_AUTH_PLUGIN_HASH') -and
             $kube_env.ContainsKey('EXEC_AUTH_PLUGIN_URL'))) {
     Log-Output -Fatal ("Missing one or more kube-env keys needed for " +
                        "downloading auth plugin: $(Out-String $kube_env)")
   }
   MustDownload-File `
       -URLs ${kube_env}['EXEC_AUTH_PLUGIN_URL'] `
-      -Hash ${kube_env}['EXEC_AUTH_PLUGIN_SHA1'] `
+      -Hash ${kube_env}['EXEC_AUTH_PLUGIN_HASH'] `
       -OutFile "${env:NODE_DIR}\gke-exec-auth-plugin.exe"
   MustDownload-File `
       -URLs ${kube_env}['EXEC_AUTH_PLUGIN_LICENSE_URL'] `
@@ -397,13 +398,13 @@ function DownloadAndInstall-KubernetesBinaries {
 }
 
 # Downloads the csi-proxy binaries from kube-env's CSI_PROXY_STORAGE_PATH and
-# CSI_PROXY_VERSION, and then puts them in a subdirectory of $env:NODE_DIR. 
+# CSI_PROXY_VERSION, and then puts them in a subdirectory of $env:NODE_DIR.
 # Note: for now the installation is skipped for non-test clusters. Will be
 # installed for all cluster after tests pass.
 # Required ${kube_env} keys:
 #   CSI_PROXY_STORAGE_PATH and CSI_PROXY_VERSION
 function DownloadAndInstall-CSIProxyBinaries {
-  if (Test-IsTestCluster $kube_env) {
+  if ("${env:ENABLE_CSI_PROXY}" -eq "true") {
     if (ShouldWrite-File ${env:NODE_DIR}\csi-proxy.exe) {
       $tmp_dir = 'C:\k8s_tmp'
       New-Item -Force -ItemType 'directory' $tmp_dir | Out-Null
@@ -417,10 +418,15 @@ function DownloadAndInstall-CSIProxyBinaries {
   }
 }
 
-# TODO(jingxu97): Make csi-proxy.exe as a service similar to kubelet.exe
 function Start-CSIProxy {
-  Log-Output 'Starting CSI Proxy'
-  Start-Process "${env:NODE_DIR}\csi-proxy.exe"
+  if ("${env:ENABLE_CSI_PROXY}" -eq "true") {
+    Log-Output "Creating CSI Proxy Service"
+    $flags = "-windows-service -log_file=${env:LOGS_DIR}\csi-proxy.log -logtostderr=false"
+    & sc.exe create csiproxy binPath= "${env:NODE_DIR}\csi-proxy.exe $flags"
+    & sc.exe failure csiproxy reset= 0 actions= restart/10000
+    Log-Output "Starting CSI Proxy Service"
+    & sc.exe start csiproxy
+  }
 }
 
 # TODO(pjh): this is copied from
@@ -926,18 +932,9 @@ function Configure-GcePdTools {
   }
 
   Add-Content $PsHome\profile.ps1 `
-'$modulePath = "K8S_DIR\GetGcePdName.dll"
-Unblock-File $modulePath
-Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
-
-  if (Test-IsTestCluster $kube_env) {
-    if (ShouldWrite-File ${env:K8S_DIR}\diskutil.exe) {
-      # The source code of this executable file is https://github.com/kubernetes-sigs/sig-windows-tools/blob/master/cmd/diskutil/diskutil.c
-      MustDownload-File -OutFile ${env:K8S_DIR}\diskutil.exe `
-        -URLs "https://ddebroywin1.s3-us-west-2.amazonaws.com/diskutil.exe"
-    }
-    Copy-Item ${env:K8S_DIR}\diskutil.exe -Destination "C:\Windows\system32"
-  }
+  '$modulePath = "K8S_DIR\GetGcePdName.dll"
+  Unblock-File $modulePath
+  Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
 }
 
 # Setup cni network. This function supports both Docker and containerd.
@@ -965,13 +962,13 @@ function Install_Cni_Binaries {
   $release_url = "${env:WINDOWS_CNI_STORAGE_PATH}/${env:WINDOWS_CNI_VERSION}/"
   $tgz_url = ($release_url +
               "cni-plugins-windows-amd64-${env:WINDOWS_CNI_VERSION}.tgz")
-  $sha_url = ($tgz_url + ".sha1")
-  MustDownload-File -URLs $sha_url -OutFile $tmp_dir\cni-plugins.sha1
-  $sha1_val = ($(Get-Content $tmp_dir\cni-plugins.sha1) -split ' ',2)[0]
+  $sha_url = ($tgz_url + ".sha512")
+  MustDownload-File -URLs $sha_url -OutFile $tmp_dir\cni-plugins.sha512
+  $sha512_val = ($(Get-Content $tmp_dir\cni-plugins.sha512) -split ' ',2)[0]
   MustDownload-File `
       -URLs $tgz_url `
       -OutFile $tmp_dir\cni-plugins.tgz `
-      -Hash $sha1_val
+      -Hash $sha512_val
 
   tar xzvf $tmp_dir\cni-plugins.tgz -C $tmp_dir
   Move-Item -Force $tmp_dir\host-local.exe ${env:CNI_DIR}\
@@ -1142,9 +1139,20 @@ function Start-WorkerServices {
   $kubelet_args_str = ${kube_env}['KUBELET_ARGS']
   $kubelet_args = $kubelet_args_str.Split(" ")
   Log-Output "kubelet_args from metadata: ${kubelet_args}"
+
+  # To join GCE instances to AD, we need to shorten their names, as NetBIOS name
+  # must be <= 15 characters, and GKE generated names are longer than that.
+  # To perform the join in an automated way, it's preferable to apply the rename
+  # and domain join in the GCESysprep step. However, after sysprep is complete
+  # and the machine restarts, kubelet bootstrapping should not use the shortened
+  # computer name, and instead use the instance's name by using --hostname-override,
+  # otherwise kubelet and kube-proxy will not be able to run properly.
+  $instance_name = "$(Get-InstanceMetadata 'name' | Out-String)"
   $default_kubelet_args = @(`
-      "--pod-infra-container-image=${env:INFRA_CONTAINER}"
+      "--pod-infra-container-image=${env:INFRA_CONTAINER}",
+      "--hostname-override=${instance_name}"
   )
+
   $kubelet_args = ${default_kubelet_args} + ${kubelet_args}
   if (-not (Test-NodeUsesAuthPlugin ${kube_env})) {
     Log-Output 'Using bootstrap kubeconfig for authentication'
@@ -1169,8 +1177,10 @@ function Start-WorkerServices {
   # And also with various volumeMounts and "securityContext: privileged: true".
   $default_kubeproxy_args = @(`
       "--kubeconfig=${env:KUBEPROXY_KUBECONFIG}",
-      "--cluster-cidr=$(${kube_env}['CLUSTER_IP_RANGE'])"
+      "--cluster-cidr=$(${kube_env}['CLUSTER_IP_RANGE'])",
+      "--hostname-override=${instance_name}"
   )
+  
   $kubeproxy_args = ${default_kubeproxy_args} + ${kubeproxy_args}
   Log-Output "Final kubeproxy_args: ${kubeproxy_args}"
 
@@ -1519,10 +1529,449 @@ function Start_Containerd {
   Log-Output "Starting containerd service"
   Start-Service containerd
 }
-
-# TODO(pjh): move the Stackdriver logging agent code below into a separate
+# TODO(pjh): move the logging agent code below into a separate
 # module; it was put here temporarily to avoid disrupting the file layout in
 # the K8s release machinery.
+$LOGGINGAGENT_VERSION = '1.6.0'
+$LOGGINGAGENT_ROOT = 'C:\fluent-bit'
+$LOGGINGAGENT_SERVICE = 'fluent-bit'
+$LOGGINGAGENT_CMDLINE = '*fluent-bit.exe*'
+
+$LOGGINGEXPORTER_VERSION = 'v0.10.3'
+$LOGGINGEXPORTER_ROOT = 'C:\flb-exporter'
+$LOGGINGEXPORTER_SERVICE = 'flb-exporter'
+$LOGGINGEXPORTER_CMDLINE = '*flb-exporter.exe*'
+
+# Restart Logging agent or starts it if it is not currently running
+function Restart-LoggingAgent {
+  if (IsStackdriverAgentInstalled) {
+      Restart-StackdriverAgent
+      return
+  }
+
+   Restart-LogService $LOGGINGEXPORTER_SERVICE $LOGGINGEXPORTER_CMDLINE
+   Restart-LogService $LOGGINGAGENT_SERVICE $LOGGINGAGENT_CMDLINE
+}
+
+# Restarts the service, or starts it if it is not currently
+# running. A standard `Restart-Service` may fail because
+# the process is sometimes unstoppable, so this function works around it
+# by killing the processes.
+function Restart-LogService([string]$service, [string]$cmdline) {
+  Stop-Service -NoWait -ErrorAction Ignore $service
+
+  # Wait (if necessary) for service to stop.
+  $timeout = 10
+  $stopped = (Get-service $service).Status -eq 'Stopped'
+  for ($i = 0; $i -lt $timeout -and !($stopped); $i++) {
+      Start-Sleep 1
+      $stopped = (Get-service $service).Status -eq 'Stopped'
+  }
+
+  if ((Get-service $service).Status -ne 'Stopped') {
+    # Force kill the processes.
+    Stop-Process -Force -PassThru -Id (Get-WmiObject win32_process |
+      Where CommandLine -Like $cmdline).ProcessId
+
+    # Wait until process has stopped.
+    $waited = 0
+    $log_period = 10
+    $timeout = 60
+    while ((Get-service $service).Status -ne 'Stopped' -and $waited -lt $timeout) {
+      Start-Sleep 1
+      $waited++
+
+      if ($waited % $log_period -eq 0) {
+        Log-Output "Waiting for ${service} service to stop"
+      }
+    }
+
+    # Timeout occurred
+    if ($waited -ge $timeout) {
+      Throw ("Timeout while waiting for ${service} service to stop")
+    }
+  }
+
+  Start-Service $service
+}
+
+# Check whether the logging agent is installed by whether it's registered as service
+function IsLoggingAgentInstalled {
+  $logging_status = (Get-Service $LOGGINGAGENT_SERVICE -ErrorAction Ignore).Status
+  return -not [string]::IsNullOrEmpty($logging_status)
+}
+
+# Installs the logging agent according to https://docs.fluentbit.io/manual/installation/windows#
+# Also installs fluent bit stackdriver exporter
+function Install-LoggingAgent {
+  if (IsStackdriverAgentInstalled) {
+    # Remove the existing storage.json file if it exists. This is a workaround
+    # for the bug where the logging agent cannot start up if the file is
+    # corrupted.
+    Remove-Item `
+      -Force `
+      -ErrorAction Ignore `
+      ("$STACKDRIVER_ROOT\LoggingAgent\Main\pos\winevtlog.pos\worker0\" +
+       "storage.json")
+    Log-Output ("Skip: Stackdriver logging agent is already installed")
+    return
+  }
+
+  if (IsLoggingAgentInstalled) {
+    # Note: we should reinstall the agent if $REDO_STEPS is true
+    # here, but we don't know how to run the installer without it prompting
+    # when logging agent is already installed. We dumped the strings in the
+    # installer binary and searched for flags to do this but found nothing. Oh
+    # well.
+    Log-Output ("Skip: Fluentbit logging agent is already installed")
+    return
+  }
+  
+  DownloadAndInstall-LoggingAgents
+  Create-LoggingAgentServices
+}
+
+function DownloadAndInstall-LoggingAgents {
+  # Install Logging agent if not present
+  if (ShouldWrite-File $LOGGINGAGENT_ROOT\td-agent-bit-${LOGGINGAGENT_VERSION}-win64) {
+      $install_dir = 'C:\flb-installers'
+      $url = ("https://storage.googleapis.com/gke-release/winnode/fluentbit/td-agent-bit-${LOGGINGAGENT_VERSION}-win64.zip")
+
+      Log-Output 'Downloading Logging agent'
+      New-Item $install_dir -ItemType 'directory' -Force | Out-Null
+      MustDownload-File -OutFile $install_dir\td.zip -URLs $url
+
+      cd $install_dir
+      Log-Output 'Extracting Logging agent'
+      Expand-Archive td.zip
+      mv .\td\td-agent-bit-${LOGGINGAGENT_VERSION}-win64\ $LOGGINGAGENT_ROOT
+      cd C:\
+      Remove-Item -Force -Recurse $install_dir
+  }
+
+  # Download Logging exporter if needed
+  if (ShouldWrite-File $LOGGINGEXPORTER_ROOT\flb-exporter.exe) {
+      $url = ("https://storage.googleapis.com/gke-release/winnode/fluentbit-exporter/${LOGGINGEXPORTER_VERSION}/flb-exporter-${LOGGINGEXPORTER_VERSION}.exe")
+      Log-Output 'Downloading logging exporter'
+      New-Item $LOGGINGEXPORTER_ROOT -ItemType 'directory' -Force | Out-Null
+      MustDownload-File `
+          -OutFile $LOGGINGEXPORTER_ROOT\flb-exporter.exe -URLs $url
+  }
+}
+
+function Create-LoggingAgentServices {
+  cd $LOGGINGAGENT_ROOT
+
+  Log-Output 'Creating service: ${LOGGINGAGENT_SERVICE}'
+  sc.exe create $LOGGINGAGENT_SERVICE binpath= "${LOGGINGAGENT_ROOT}\bin\fluent-bit.exe -c \fluent-bit\conf\fluent-bit.conf"
+  sc.exe failure $LOGGINGAGENT_SERVICE reset= 30 actions= restart/5000
+  sc.exe query $LOGGINGAGENT_SERVICE
+
+  Log-Output 'Creating service: ${LOGGINGEXPORTER_SERVICE}'
+  sc.exe create  $LOGGINGEXPORTER_SERVICE  binpath= "${LOGGINGEXPORTER_ROOT}\flb-exporter.exe --kubernetes-separator=_ --stackdriver-resource-model=k8s --enable-pod-label-discovery --logtostderr --winsvc  --pod-label-dot-replacement=_"
+  sc.exe failure $LOGGINGEXPORTER_SERVICE reset= 30 actions= restart/5000
+  sc.exe query $LOGGINGEXPORTER_SERVICE
+}
+
+# Writes the logging configuration file for Logging agent. Restart-LoggingAgent
+# should then be called to pick up the new configuration.
+function Configure-LoggingAgent {
+  if (IsStackdriverAgentInstalled) {
+      Configure-StackdriverAgent
+      return
+  }
+
+  $fluentbit_config_file = "$LOGGINGAGENT_ROOT\conf\fluent-bit.conf"
+  $FLUENTBIT_CONFIG | Out-File -FilePath $fluentbit_config_file -Encoding ASCII
+  Log-Output "Wrote logging config to $fluentbit_config_file"
+
+  $fluentbit_parser_file = "$LOGGINGAGENT_ROOT\conf\parsers.conf"
+  $PARSERS_CONFIG | Out-File -FilePath $fluentbit_parser_file -Encoding ASCII
+  Log-Output "Wrote logging config to $fluentbit_parser_file"
+}
+
+# Fluentbit main config file
+$FLUENTBIT_CONFIG = @'
+[SERVICE]
+    Flush         5
+    Grace         120
+    Log_Level     debug
+    Log_File      /var/log/fluentbit.log
+    Daemon        off
+    Parsers_File  parsers.conf
+    HTTP_Server   off 
+    HTTP_Listen   0.0.0.0
+    HTTP_PORT     2020
+    plugins_file plugins.conf
+
+    # Storage
+    # =======
+    # Fluent Bit can use memory and filesystem buffering based mechanisms
+    #
+    # - https://docs.fluentbit.io/manual/administration/buffering-and-storage
+    #
+    # storage metrics
+    # ---------------
+    # publish storage pipeline metrics in '/api/v1/storage'. The metrics are
+    # exported only if the 'http_server' option is enabled.
+    #
+    # storage.metrics on
+
+    # storage.path
+    # ------------
+    # absolute file system path to store filesystem data buffers (chunks).
+    #
+    # storage.path /tmp/storage
+
+    # storage.sync
+    # ------------
+    # configure the synchronization mode used to store the data into the
+    # filesystem. It can take the values normal or full.
+    #
+    # storage.sync normal
+
+    # storage.checksum
+    # ----------------
+    # enable the data integrity check when writing and reading data from the
+    # filesystem. The storage layer uses the CRC32 algorithm.
+    #
+    # storage.checksum off
+
+    # storage.backlog.mem_limit
+    # -------------------------
+    # if storage.path is set, Fluent Bit will look for data chunks that were
+    # not delivered and are still in the storage layer, these are called
+    # backlog data. This option configure a hint of maximum value of memory
+    # to use when processing these records.
+    #
+    # storage.backlog.mem_limit 5M
+
+
+[INPUT]
+    Name         winlog
+    Interval_Sec 2
+    # Channels Setup,Windows PowerShell
+    Channels     application,system,security
+    Tag          winevent.raw
+    DB           winlog.sqlite   # 
+
+
+# Json Log Example:
+# {"log":"[info:2016-02-16T16:04:05.930-08:00] Some log text here\n","stream":"stdout","time":"2016-02-17T00:04:05.931087621Z"}
+[INPUT]
+    Name             tail
+    Alias            kube_containers
+    Tag              kube_<namespace_name>_<pod_name>_<container_name>
+    Tag_Regex        (?<pod_name>[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)_(?<namespace_name>[^_]+)_(?<container_name>.+)-
+    Path             /var/log/containers/*.log
+    Mem_Buf_Limit    5MB
+    Skip_Long_Lines  On
+    Refresh_Interval 5
+    DB               flb_kube.db  
+
+    # Settings from fluentd missing here.  
+    # tag reform.*
+    # format json
+    # time_key time
+    # time_format %Y-%m-%dT%H:%M:%S.%NZ
+
+
+# Example:
+# I0204 07:32:30.020537    3368 server.go:1048] POST /stats/container/: (13.972191ms) 200 [[Go-http-client/1.1] 10.244.1.3:40537]
+[INPUT]
+    Name             tail
+    Alias            kubelet
+    Tag              kubelet
+    #Multiline        on
+    #Multiline_Flush  5
+    Mem_Buf_Limit    5MB
+    Skip_Long_Lines  On
+    Refresh_Interval 5
+    Path /etc/kubernetes/logs/kubelet.log
+    DB               /etc/kubernetes/logs/gcp-kubelet.db
+
+    # Copied from fluentbit config. How is this used ? In match stages ?
+    Parser_Firstline /^\w\d{4}/
+    Parser_1         ^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+
+    # missing from fluentbit
+    #   time_format %m%d %H:%M:%S.%N
+
+
+# Example:
+# I0928 03:15:50.440223    4880 main.go:51] Starting CSI-Proxy Server ...
+[INPUT]
+    Name             tail
+    Alias            csi-proxy
+    Tag              csi-proxy
+    #Multiline        on
+    #Multiline_Flush  5
+    Mem_Buf_Limit    5MB
+    Skip_Long_Lines  On
+    Refresh_Interval 5
+    Path             /etc/kubernetes/logs/csi-proxy.log
+    DB               /etc/kubernetes/logs/gcp-csi-proxy.db
+
+    # Copied from fluentbit config. How is this used ? In match stages ?
+    Parser_Firstline /^\w\d{4}/
+    Parser_1         ^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+
+    # missing from fluentbit
+    #   time_format %m%d %H:%M:%S.%N
+
+# Example:
+# time="2019-12-10T21:27:59.836946700Z" level=info msg="loading plugin \"io.containerd.grpc.v1.cri\"..." type=io.containerd.grpc.v1
+[INPUT]
+    Name             tail
+    Alias            container-runtime
+    Tag container-runtime
+    #Multiline        on
+    #Multiline_Flush  5
+    Mem_Buf_Limit    5MB
+    Skip_Long_Lines  On
+    Refresh_Interval 5
+    Path             /etc/kubernetes/logs/containerd.log
+    DB               /etc/kubernetes/logs/gcp-containerd.log.pos
+
+    # Copied from fluentbit config. How is this used ? In match stages ?
+    Parser_Firstline /^\w\d{4}/
+    Parser_1         ^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+
+    # missing from fluentbit
+    #   time_format %m%d %H:%M:%S.%N
+
+
+# I1118 21:26:53.975789       6 proxier.go:1096] Port "nodePort for kube-system/default-http-backend:http" (:31429/tcp) was open before and is still needed
+[INPUT]
+    Name             tail
+    Alias            kube-proxy
+    Tag              kube-proxy
+    #Multiline        on
+    #Multiline_Flush  5
+    Mem_Buf_Limit    5MB
+    Skip_Long_Lines  On
+    Refresh_Interval 5
+    Path             /etc/kubernetes/logs/kube-proxy.log
+    DB               /etc/kubernetes/logs/gcp-kubeproxy.db
+
+    # Copied from fluentbit config. How is this used ? In match stages ?
+    Parser_Firstline /^\w\d{4}/
+    Parser_1         ^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+
+    # missing from fluentbit
+    #   time_format %m%d %H:%M:%S.%N
+
+[FILTER]
+    Name        modify
+    Match       *
+    Hard_rename log message
+
+# [OUTPUT]
+#    Name        http
+#    Match       *
+#    Host        127.0.0.1
+#    Port        2021
+#    URI         /logs
+#    header_tag  FLUENT-TAG
+#    Format      msgpack
+#    Retry_Limit 2
+
+[OUTPUT]
+    name  stackdriver
+    match *
+'@
+
+# Fluentbit parsers config file
+$PARSERS_CONFIG = @'
+
+[PARSER]
+    Name        docker
+    Format      json
+    Time_Key    time
+    Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+
+[PARSER]
+    Name        containerd
+    Format      regex
+    Regex       ^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$
+    Time_Key    time
+    Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+
+[PARSER]
+    Name        json
+    Format      json
+
+[PARSER]
+    Name        syslog
+    Format      regex
+    Regex       ^\<(?<pri>[0-9]+)\>(?<time>[^ ]* {1,2}[^ ]* [^ ]*) (?<host>[^ ]*) (?<ident>[a-zA-Z0-9_\/\.\-]*)(?:\[(?<pid>[0-9]+)\])?(?:[^\:]*\:)? *(?<message>.*)$
+    Time_Key    time
+    Time_Format %b %d %H:%M:%S
+
+[PARSER]
+    Name        glog
+    Format      regex
+    Regex       ^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source_file>[^ \]]+)\:(?<source_line>\d+)\]\s(?<message>.*)$
+    Time_Key    time
+    Time_Format %m%d %H:%M:%S.%L
+
+[PARSER]
+    Name        network-log
+    Format      json
+    Time_Key    timestamp
+    Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+
+# ----------
+
+[PARSER]
+    Name   json
+    Format json
+    Time_Key time
+    Time_Format %d/%b/%Y:%H:%M:%S %z
+
+[PARSER]
+    Name         docker
+    Format       json
+    Time_Key     time
+    Time_Format  %Y-%m-%dT%H:%M:%S.%L
+    Time_Keep    On
+
+
+[PARSER]
+    Name        syslog-rfc5424
+    Format      regex
+    Regex       ^\<(?<pri>[0-9]{1,5})\>1 (?<time>[^ ]+) (?<host>[^ ]+) (?<ident>[^ ]+) (?<pid>[-0-9]+) (?<msgid>[^ ]+) (?<extradata>(\[(.*?)\]|-)) (?<message>.+)$
+    Time_Key    time
+    Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+    Time_Keep   On
+
+[PARSER]
+    Name        syslog-rfc3164-local
+    Format      regex
+    Regex       ^\<(?<pri>[0-9]+)\>(?<time>[^ ]* {1,2}[^ ]* [^ ]*) (?<ident>[a-zA-Z0-9_\/\.\-]*)(?:\[(?<pid>[0-9]+)\])?(?:[^\:]*\:)? *(?<message>.*)$
+    Time_Key    time
+    Time_Format %b %d %H:%M:%S
+    Time_Keep   On
+
+[PARSER]
+    Name        syslog-rfc3164
+    Format      regex
+    Regex       /^\<(?<pri>[0-9]+)\>(?<time>[^ ]* {1,2}[^ ]* [^ ]*) (?<host>[^ ]*) (?<ident>[a-zA-Z0-9_\/\.\-]*)(?:\[(?<pid>[0-9]+)\])?(?:[^\:]*\:)? *(?<message>.*)$/
+    Time_Key    time
+    Time_Format %b %d %H:%M:%S
+    Time_Keep   On
+
+[PARSER]
+    Name    kube-custom
+    Format  regex
+    Regex   (?<tag>[^.]+)?\.?(?<pod_name>[a-z0-9](?:[-a-z0-9]*[a-z0-9])?(?:\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)_(?<namespace_name>[^_]+)_(?<container_name>.+)-(?<docker_id>[a-z0-9]{64})\.log$
+'@
+
+
+# ----------- Stackdriver logging setup --------------------------
+# This section would be deprecated soon
+#
+
 $STACKDRIVER_VERSION = 'v1-11'
 $STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
 
@@ -1530,7 +1979,7 @@ $STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
 # running. A standard `Restart-Service StackdriverLogging` may fail because
 # StackdriverLogging sometimes is unstoppable, so this function works around it
 # by killing the processes.
-function Restart-LoggingAgent {
+function Restart-StackdriverAgent {
   Stop-Service -NoWait -ErrorAction Ignore StackdriverLogging
 
   # Wait (if necessary) for service to stop.
@@ -1569,94 +2018,14 @@ function Restart-LoggingAgent {
 }
 
 # Check whether the logging agent is installed by whether it's registered as service
-function IsLoggingAgentInstalled {
+function IsStackdriverAgentInstalled {
   $stackdriver_status = (Get-Service StackdriverLogging -ErrorAction Ignore).Status
   return -not [string]::IsNullOrEmpty($stackdriver_status)
 }
 
-# Clean up the logging agent's registry key and root folder if they exist from a prior installation.
-# Try to uninstall it first, if it failed, remove the registry key at least, 
-# as the registry key will block the silent installation later on.
-function Cleanup-LoggingAgent {
-  # For 64 bits app, the registry path is 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'
-  # for 32 bits app, it's 'HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
-  # StackdriverLogging is installed as 32 bits app
-  $x32_app_reg = 'HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
-  $uninstall_string = (Get-ChildItem $x32_app_reg | Get-ItemProperty | Where-Object {$_.DisplayName -match "Stackdriver"}).UninstallString
-  if (-not [string]::IsNullOrEmpty($uninstall_string)) {
-    try {
-      Start-Process -FilePath "$uninstall_string" -ArgumentList "/S" -Wait
-    } catch {
-      Log-Output "Exception happens during uninstall logging agent, so remove the registry key at least"
-      Remove-Item -Path "$x32_app_reg\GoogleStackdriverLoggingAgent\"
-    }
-  }
-
-  #  If we chose reboot after uninstallation, the root folder would be clean.
-  #  But since we couldn't reboot, so some files & folders would be left there, 
-  #  which could block the re-installation later on, so clean it up
-  if(Test-Path $STACKDRIVER_ROOT){
-    Remove-Item -Force -Recurse $STACKDRIVER_ROOT
-  }
-}
-
-# Installs the Stackdriver logging agent according to
-# https://cloud.google.com/logging/docs/agent/installation.
-# TODO(yujuhong): Update to a newer Stackdriver agent once it is released to
-# support kubernetes metadata properly. The current version does not recognizes
-# the local resource key "logging.googleapis.com/local_resource_id", and fails
-# to label namespace, pod and container names on the logs.
-function Install-LoggingAgent {
-  # Remove the existing storage.json file if it exists. This is a workaround
-  # for the bug where the logging agent cannot start up if the file is
-  # corrupted.
-  Remove-Item `
-      -Force `
-      -ErrorAction Ignore `
-      ("$STACKDRIVER_ROOT\LoggingAgent\Main\pos\winevtlog.pos\worker0\" +
-       "storage.json")
-
-  if (IsLoggingAgentInstalled) {
-    # Note: we should reinstall the Stackdriver agent if $REDO_STEPS is true
-    # here, but we don't know how to run the installer without it prompting
-    # when Stackdriver is already installed. We dumped the strings in the
-    # installer binary and searched for flags to do this but found nothing. Oh
-    # well.
-    Log-Output ("Skip: Stackdriver logging agent is already installed")
-    return
-  }
-  
-  # After a crash, the StackdriverLogging service could be missing, but its files will still be present
-  Cleanup-LoggingAgent
-
-  $url = ("https://storage.googleapis.com/gke-release/winnode/stackdriver/" +
-          "StackdriverLogging-${STACKDRIVER_VERSION}.exe")
-  $tmp_dir = 'C:\stackdriver_tmp'
-  New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
-  $installer_file = "${tmp_dir}\StackdriverLogging-${STACKDRIVER_VERSION}.exe"
-  MustDownload-File -OutFile $installer_file -URLs $url
-
-  # Start the installer silently. This automatically starts the
-  # "StackdriverLogging" service.
-  Log-Output 'Invoking Stackdriver installer'
-  Start-Process $installer_file -ArgumentList "/S" -Wait
-
-  # Install the record-reformer plugin.
-  Start-Process "$STACKDRIVER_ROOT\LoggingAgent\Main\bin\fluent-gem" `
-      -ArgumentList "install","fluent-plugin-record-reformer" `
-      -Wait
-
-  # Install the multi-format-parser plugin.
-  Start-Process "$STACKDRIVER_ROOT\LoggingAgent\Main\bin\fluent-gem" `
-      -ArgumentList "install","fluent-plugin-multi-format-parser" `
-      -Wait
-
-  Remove-Item -Force -Recurse $tmp_dir
-}
-
 # Writes the logging configuration file for Stackdriver. Restart-LoggingAgent
 # should then be called to pick up the new configuration.
-function Configure-LoggingAgent {
+function Configure-StackdriverAgent {
   $fluentd_config_dir = "$STACKDRIVER_ROOT\LoggingAgent\config.d"
   $fluentd_config_file = "$fluentd_config_dir\k8s_containers.conf"
 
@@ -1712,7 +2081,6 @@ $FLUENTD_CONFIG = @'
 # value of 'stream'.
 # local_resource_id is later used by google_cloud plugin to determine the
 # monitored resource to ingest logs against.
-
 # Json Log Example:
 # {"log":"[info:2016-02-16T16:04:05.930-08:00] Some log text here\n","stream":"stdout","time":"2016-02-17T00:04:05.931087621Z"}
 # CRI Log Example:
@@ -1738,7 +2106,6 @@ $FLUENTD_CONFIG = @'
     </pattern>
   </parse>
 </source>
-
 # Example:
 # I0204 07:32:30.020537    3368 server.go:1048] POST /stats/container/: (13.972191ms) 200 [[Go-http-client/1.1] 10.244.1.3:40537]
 <source>
@@ -1752,7 +2119,6 @@ $FLUENTD_CONFIG = @'
   pos_file /etc/kubernetes/logs/gcp-kubelet.log.pos
   tag kubelet
 </source>
-
 # Example:
 # I1118 21:26:53.975789       6 proxier.go:1096] Port "nodePort for kube-system/default-http-backend:http" (:31429/tcp) was open before and is still needed
 <source>
@@ -1766,7 +2132,19 @@ $FLUENTD_CONFIG = @'
   pos_file /etc/kubernetes/logs/gcp-kube-proxy.log.pos
   tag kube-proxy
 </source>
-
+# Example:
+# I0928 03:15:50.440223    4880 main.go:51] Starting CSI-Proxy Server ...
+<source>
+  @type tail
+  format multiline
+  multiline_flush_interval 5s
+  format_firstline /^\w\d{4}/
+  format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+  time_format %m%d %H:%M:%S.%N
+  path /etc/kubernetes/logs/csi-proxy.log
+  pos_file /etc/kubernetes/logs/gcp-csi-proxy.log.pos
+  tag csi-proxy
+</source>
 # Example:
 # time="2019-12-10T21:27:59.836946700Z" level=info msg="loading plugin \"io.containerd.grpc.v1.cri\"..." type=io.containerd.grpc.v1
 <source>
@@ -1780,7 +2158,6 @@ $FLUENTD_CONFIG = @'
   pos_file /etc/kubernetes/logs/gcp-containerd.log.pos
   tag container-runtime
 </source>
-
 <match reform.**>
   @type record_reformer
   enable_ruby true
@@ -1800,10 +2177,8 @@ $FLUENTD_CONFIG = @'
   tag ${if record['stream'] == 'stderr' then 'raw.stderr' else 'raw.stdout' end}
   remove_keys stream,log
 </match>
-
 # TODO: detect exceptions and forward them as one log entry using the
 # detect_exceptions plugin
-
 # This section is exclusive for k8s_container logs. These logs come with
 # 'raw.stderr' or 'raw.stdout' tags.
 <match {raw.stderr,raw.stdout}>
@@ -1837,7 +2212,6 @@ $FLUENTD_CONFIG = @'
   # known timestamp format. This helps with CPU usage.
   adjust_invalid_timestamps false
 </match>
-
 # Attach local_resource_id for 'k8s_node' monitored resource.
 <filter **>
   @type record_transformer
@@ -1847,7 +2221,6 @@ $FLUENTD_CONFIG = @'
   </record>
 </filter>
 '@
-
 
 # Export all public functions:
 Export-ModuleMember -Function *-*

@@ -26,7 +26,7 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -222,10 +222,11 @@ func TestPlugin(t *testing.T) {
 	r, _ = getNodeSelectorRequirementWithKey(v1.LabelZoneFailureDomain, term)
 	if r == nil {
 		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", v1.LabelZoneFailureDomain, zones)
-	}
-	sort.Strings(r.Values)
-	if !reflect.DeepEqual(r.Values, zones.List()) {
-		t.Errorf("ZoneFailureDomain elements %v does not match zone labels %v", r.Values, zones)
+	} else {
+		sort.Strings(r.Values)
+		if !reflect.DeepEqual(r.Values, zones.List()) {
+			t.Errorf("ZoneFailureDomain elements %v does not match zone labels %v", r.Values, zones)
+		}
 	}
 
 	// Test Deleter

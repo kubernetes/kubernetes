@@ -90,8 +90,8 @@ var (
 `)
 )
 
-// newCmdCertsUtility returns main command for certs phase
-func newCmdCertsUtility(out io.Writer) *cobra.Command {
+// NewCmdCertsUtility returns main command for certs phase
+func NewCmdCertsUtility(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "certs",
 		Aliases: []string{"certificates"},
@@ -100,8 +100,8 @@ func newCmdCertsUtility(out io.Writer) *cobra.Command {
 
 	cmd.AddCommand(newCmdCertsRenewal(out))
 	cmd.AddCommand(newCmdCertsExpiration(out, constants.KubernetesDir))
-	cmd.AddCommand(NewCmdCertificateKey())
-	cmd.AddCommand(newCmdGenCSR())
+	cmd.AddCommand(newCmdCertificateKey())
+	cmd.AddCommand(newCmdGenCSR(out))
 	return cmd
 }
 
@@ -147,7 +147,7 @@ func (o *genCSRConfig) load() (err error) {
 }
 
 // newCmdGenCSR returns cobra.Command for generating keys and CSRs
-func newCmdGenCSR() *cobra.Command {
+func newCmdGenCSR(out io.Writer) *cobra.Command {
 	config := newGenCSRConfig()
 
 	cmd := &cobra.Command{
@@ -160,7 +160,7 @@ func newCmdGenCSR() *cobra.Command {
 			if err := config.load(); err != nil {
 				return err
 			}
-			return runGenCSR(config)
+			return runGenCSR(out, config)
 		},
 	}
 	config.addFlagSet(cmd.Flags())
@@ -168,18 +168,18 @@ func newCmdGenCSR() *cobra.Command {
 }
 
 // runGenCSR contains the logic of the generate-csr sub-command.
-func runGenCSR(config *genCSRConfig) error {
-	if err := certsphase.CreateDefaultKeysAndCSRFiles(config.kubeadmConfig); err != nil {
+func runGenCSR(out io.Writer, config *genCSRConfig) error {
+	if err := certsphase.CreateDefaultKeysAndCSRFiles(out, config.kubeadmConfig); err != nil {
 		return err
 	}
-	if err := kubeconfigphase.CreateDefaultKubeConfigsAndCSRFiles(config.kubeConfigDir, config.kubeadmConfig); err != nil {
+	if err := kubeconfigphase.CreateDefaultKubeConfigsAndCSRFiles(out, config.kubeConfigDir, config.kubeadmConfig); err != nil {
 		return err
 	}
 	return nil
 }
 
-// NewCmdCertificateKey returns cobra.Command for certificate key generate
-func NewCmdCertificateKey() *cobra.Command {
+// newCmdCertificateKey returns cobra.Command for certificate key generate
+func newCmdCertificateKey() *cobra.Command {
 	return &cobra.Command{
 		Use:   "certificate-key",
 		Short: "Generate certificate keys",
@@ -286,6 +286,7 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 					return err
 				}
 			}
+			fmt.Printf("\nDone renewing certificates. You must restart the kube-apiserver, kube-controller-manager, kube-scheduler and etcd, so that they can use the new certificates.\n")
 			return nil
 		},
 		Args: cobra.NoArgs,

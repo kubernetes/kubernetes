@@ -245,6 +245,7 @@ package_group(
         "//staging/src/k8s.io/kubectl/pkg/cmd/attach",
         "//staging/src/k8s.io/kubectl/pkg/cmd/certificates",
         "//staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/config",
         "//staging/src/k8s.io/kubectl/pkg/cmd/cp",
         "//staging/src/k8s.io/kubectl/pkg/cmd/create",
         "//staging/src/k8s.io/kubectl/pkg/cmd/delete",
@@ -435,6 +436,7 @@ package_group(
         "//staging/src/k8s.io/component-base/metrics/...",
         "//test/e2e_node",
         "//test/integration/apiserver/flowcontrol",
+        "//test/integration/metrics",
         "//vendor/...",
     ],
 )

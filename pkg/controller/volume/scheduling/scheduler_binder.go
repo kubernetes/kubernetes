@@ -443,7 +443,7 @@ func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod, podVolumes *PodVolumes
 		return b, err
 	})
 	if err != nil {
-		return fmt.Errorf("Failed to bind volumes: %v", err)
+		return fmt.Errorf("binding volumes: %w", err)
 	}
 	return nil
 }
@@ -543,7 +543,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 
 	node, err := b.nodeLister.Get(pod.Spec.NodeName)
 	if err != nil {
-		return false, fmt.Errorf("failed to get node %q: %v", pod.Spec.NodeName, err)
+		return false, fmt.Errorf("failed to get node %q: %w", pod.Spec.NodeName, err)
 	}
 
 	csiNode, err := b.csiNodeLister.Get(node.Name)
@@ -559,7 +559,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 	_, err = b.podLister.Pods(pod.Namespace).Get(pod.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return false, fmt.Errorf("pod %q does not exist any more", podName)
+			return false, fmt.Errorf("pod does not exist any more: %w", err)
 		}
 		klog.Errorf("failed to get pod %s/%s from the lister: %v", pod.Namespace, pod.Name, err)
 	}
@@ -567,12 +567,12 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 	for _, binding := range bindings {
 		pv, err := b.pvCache.GetAPIPV(binding.pv.Name)
 		if err != nil {
-			return false, fmt.Errorf("failed to check binding: %v", err)
+			return false, fmt.Errorf("failed to check binding: %w", err)
 		}
 
 		pvc, err := b.pvcCache.GetAPIPVC(getPVCName(binding.pvc))
 		if err != nil {
-			return false, fmt.Errorf("failed to check binding: %v", err)
+			return false, fmt.Errorf("failed to check binding: %w", err)
 		}
 
 		// Because we updated PV in apiserver, skip if API object is older
@@ -583,12 +583,12 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 
 		pv, err = b.tryTranslatePVToCSI(pv, csiNode)
 		if err != nil {
-			return false, fmt.Errorf("failed to translate pv to csi: %v", err)
+			return false, fmt.Errorf("failed to translate pv to csi: %w", err)
 		}
 
 		// Check PV's node affinity (the node might not have the proper label)
 		if err := volumeutil.CheckNodeAffinity(pv, node.Labels); err != nil {
-			return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %v", pv.Name, node.Name, err)
+			return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %w", pv.Name, node.Name, err)
 		}
 
 		// Check if pv.ClaimRef got dropped by unbindVolume()
@@ -605,7 +605,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 	for _, claim := range claimsToProvision {
 		pvc, err := b.pvcCache.GetAPIPVC(getPVCName(claim))
 		if err != nil {
-			return false, fmt.Errorf("failed to check provisioning pvc: %v", err)
+			return false, fmt.Errorf("failed to check provisioning pvc: %w", err)
 		}
 
 		// Because we updated PVC in apiserver, skip if API object is older
@@ -637,7 +637,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 					// be unbound eventually.
 					return false, nil
 				}
-				return false, fmt.Errorf("failed to get pv %q from cache: %v", pvc.Spec.VolumeName, err)
+				return false, fmt.Errorf("failed to get pv %q from cache: %w", pvc.Spec.VolumeName, err)
 			}
 
 			pv, err = b.tryTranslatePVToCSI(pv, csiNode)
@@ -646,7 +646,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 			}
 
 			if err := volumeutil.CheckNodeAffinity(pv, node.Labels); err != nil {
-				return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %v", pv.Name, node.Name, err)
+				return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %w", pv.Name, node.Name, err)
 			}
 		}
 

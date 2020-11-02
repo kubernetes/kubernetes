@@ -36,9 +36,9 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/metrics"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/master/reconcilers"
 )
 
 func TestAddFlags(t *testing.T) {
@@ -177,10 +177,6 @@ func TestAddFlags(t *testing.T) {
 			HTTP2MaxStreamsPerConnection: 42,
 			Required:                     true,
 		}).WithLoopback(),
-		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
-			BindAddress: net.ParseIP("127.0.0.1"),
-			BindPort:    8080,
-		}).WithLoopback(),
 		EventTTL: 1 * time.Hour,
 		KubeletConfig: kubeletclient.KubeletClientConfig{
 			Port:         10250,
@@ -264,9 +260,10 @@ func TestAddFlags(t *testing.T) {
 				ClientCA: "/client-ca",
 			},
 			WebHook: &kubeoptions.WebHookAuthenticationOptions{
-				CacheTTL:   180000000000,
-				ConfigFile: "/token-webhook-config",
-				Version:    "v1beta1",
+				CacheTTL:     180000000000,
+				ConfigFile:   "/token-webhook-config",
+				Version:      "v1beta1",
+				RetryBackoff: apiserveroptions.DefaultAuthWebhookRetryBackoff(),
 			},
 			BootstrapToken: &kubeoptions.BootstrapTokenAuthenticationOptions{},
 			OIDC: &kubeoptions.OIDCAuthenticationOptions{
@@ -288,6 +285,7 @@ func TestAddFlags(t *testing.T) {
 			WebhookCacheAuthorizedTTL:   180000000000,
 			WebhookCacheUnauthorizedTTL: 60000000000,
 			WebhookVersion:              "v1beta1",
+			WebhookRetryBackoff:         apiserveroptions.DefaultAuthWebhookRetryBackoff(),
 		},
 		CloudProvider: &kubeoptions.CloudProviderOptions{
 			CloudConfigFile: "/cloud-config",

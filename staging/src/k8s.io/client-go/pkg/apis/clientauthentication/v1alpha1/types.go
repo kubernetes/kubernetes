@@ -37,7 +37,7 @@ type ExecCredential struct {
 	Status *ExecCredentialStatus `json:"status,omitempty"`
 }
 
-// ExecCredenitalSpec holds request and runtime specific information provided by
+// ExecCredentialSpec holds request and runtime specific information provided by
 // the transport.
 type ExecCredentialSpec struct {
 	// Response is populated when the transport encounters HTTP status codes, such as 401,

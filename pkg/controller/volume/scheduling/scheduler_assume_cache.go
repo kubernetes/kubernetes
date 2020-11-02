@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/tools/cache"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 // AssumeCache is a cache on top of the informer that allows for updating
@@ -357,7 +358,7 @@ type pvAssumeCache struct {
 
 func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
 	if pv, ok := obj.(*v1.PersistentVolume); ok {
-		return []string{pv.Spec.StorageClassName}, nil
+		return []string{v1helper.GetPersistentVolumeClass(pv)}, nil
 	}
 	return []string{""}, fmt.Errorf("object is not a v1.PersistentVolume: %v", obj)
 }

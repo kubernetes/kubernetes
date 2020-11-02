@@ -66,6 +66,8 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/testutil:go_default_library",
         "//test/e2e/framework:go_default_library",

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"runtime"
 	"sort"
 
 	v1 "k8s.io/api/core/v1"
@@ -143,6 +144,9 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 }
 
 // generatePodSandboxLinuxConfig generates LinuxPodSandboxConfig from v1.Pod.
+// We've to call PodSandboxLinuxConfig always irrespective of the underlying OS as securityContext is not part of
+// podSandboxConfig. It is currently part of LinuxPodSandboxConfig. In future, if we have securityContext pulled out
+// in podSandboxConfig we should be able to use it.
 func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (*runtimeapi.LinuxPodSandboxConfig, error) {
 	cgroupParent := m.runtimeHelper.GetPodCgroupParent(pod)
 	lc := &runtimeapi.LinuxPodSandboxConfig{
@@ -169,15 +173,15 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 
 	if pod.Spec.SecurityContext != nil {
 		sc := pod.Spec.SecurityContext
-		if sc.RunAsUser != nil {
+		if sc.RunAsUser != nil && runtime.GOOS != "windows" {
 			lc.SecurityContext.RunAsUser = &runtimeapi.Int64Value{Value: int64(*sc.RunAsUser)}
 		}
-		if sc.RunAsGroup != nil {
+		if sc.RunAsGroup != nil && runtime.GOOS != "windows" {
 			lc.SecurityContext.RunAsGroup = &runtimeapi.Int64Value{Value: int64(*sc.RunAsGroup)}
 		}
 		lc.SecurityContext.NamespaceOptions = namespacesForPod(pod)
 
-		if sc.FSGroup != nil {
+		if sc.FSGroup != nil && runtime.GOOS != "windows" {
 			lc.SecurityContext.SupplementalGroups = append(lc.SecurityContext.SupplementalGroups, int64(*sc.FSGroup))
 		}
 		if groups := m.runtimeHelper.GetExtraSupplementalGroupsForPod(pod); len(groups) > 0 {
@@ -188,7 +192,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 				lc.SecurityContext.SupplementalGroups = append(lc.SecurityContext.SupplementalGroups, int64(sg))
 			}
 		}
-		if sc.SELinuxOptions != nil {
+		if sc.SELinuxOptions != nil && runtime.GOOS != "windows" {
 			lc.SecurityContext.SelinuxOptions = &runtimeapi.SELinuxOption{
 				User:  sc.SELinuxOptions.User,
 				Role:  sc.SELinuxOptions.Role,
@@ -303,4 +307,16 @@ func (m *kubeGenericRuntimeManager) GetPortForward(podName, podNamespace string,
 		return nil, err
 	}
 	return url.Parse(resp.Url)
+}
+
+// DeleteSandbox removes the sandbox by sandboxID.
+func (m *kubeGenericRuntimeManager) DeleteSandbox(sandboxID string) error {
+	klog.V(4).Infof("Removing sandbox %q", sandboxID)
+	// stop sandbox is called as part of kill pod function but the error is ignored. So,
+	// we have to call stop sandbox again to make sure that all the resources like network
+	// are cleaned by runtime.
+	if err := m.runtimeService.StopPodSandbox(sandboxID); err != nil {
+		return err
+	}
+	return m.runtimeService.RemovePodSandbox(sandboxID)
 }

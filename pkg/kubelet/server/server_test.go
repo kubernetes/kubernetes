@@ -50,8 +50,8 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	utiltesting "k8s.io/client-go/util/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/utils/pointer"
 
 	// Do some initialization to decode the query parameters correctly.
@@ -1507,7 +1507,6 @@ func TestMetricBuckets(t *testing.T) {
 		"metrics":                         {url: "/metrics", bucket: "metrics"},
 		"metrics cadvisor sub":            {url: "/metrics/cadvisor", bucket: "metrics/cadvisor"},
 		"metrics probes sub":              {url: "/metrics/probes", bucket: "metrics/probes"},
-		"metrics resource v1alpha1":       {url: "/metrics/resource/v1alpha1", bucket: "metrics/resource"},
 		"metrics resource sub":            {url: "/metrics/resource", bucket: "metrics/resource"},
 		"pods":                            {url: "/pods/", bucket: "pods"},
 		"portForward":                     {url: "/portForward/podNamespace/podID", bucket: "portForward"},

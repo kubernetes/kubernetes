@@ -135,7 +135,7 @@ func WithPriorityAndFairness(
 			w.Header().Set(responseHeaderMatchedFlowSchemaUID, string(classification.FlowSchemaUID))
 			handler.ServeHTTP(w, innerReq)
 		}
-		digest := utilflowcontrol.RequestDigest{requestInfo, user}
+		digest := utilflowcontrol.RequestDigest{RequestInfo: requestInfo, User: user}
 		fcIfc.Handle(ctx, digest, note, func(inQueue bool) {
 			if inQueue {
 				noteWaitingDelta(1)

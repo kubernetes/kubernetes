@@ -211,6 +211,7 @@ func TestAttacherAttach(t *testing.T) {
 
 			csiAttacher := attacher.(*csiAttacher)
 
+			// FIXME: We need to ensure this goroutine exits in the test.
 			go func(spec *volume.Spec, nodename string, fail bool) {
 				attachID, err := csiAttacher.Attach(spec, types.NodeName(nodename))
 				if !fail && err != nil {
@@ -294,6 +295,7 @@ func TestAttacherAttachWithInline(t *testing.T) {
 			}
 			csiAttacher := attacher.(*csiAttacher)
 
+			// FIXME: We need to ensure this goroutine exits in the test.
 			go func(spec *volume.Spec, nodename string, fail bool) {
 				attachID, err := csiAttacher.Attach(spec, types.NodeName(nodename))
 				if fail != (err != nil) {
@@ -356,6 +358,22 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 			plug, _, tmpDir, _ := newTestWatchPlugin(t, fakeClient, true)
 			defer os.RemoveAll(tmpDir)
 
+			attachmentWatchCreated := make(chan core.Action)
+			// Make sure this is the first reactor
+			fakeClient.Fake.PrependWatchReactor("volumeattachments", func(action core.Action) (bool, watch.Interface, error) {
+				select {
+				case <-attachmentWatchCreated:
+					// already closed
+				default:
+					// The attacher is already watching the attachment, notify the test goroutine to
+					// update the status of attachment.
+					// TODO: In theory this still has a race condition, because the actual watch is created by
+					// the next reactor in the chain and we unblock the test goroutine before returning here.
+					close(attachmentWatchCreated)
+				}
+				return false, nil, nil
+			})
+
 			attacher, err := plug.NewAttacher()
 			if err != nil {
 				t.Fatalf("failed to create new attacher: %v", err)
@@ -377,8 +395,8 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 			}
 			var wg sync.WaitGroup
 			wg.Add(1)
-			go func(volSpec *volume.Spec, expectAttach bool) {
-				attachID, err := csiAttacher.Attach(volSpec, types.NodeName("fakeNode"))
+			go func(volSpec *volume.Spec) {
+				attachID, err := csiAttacher.Attach(volSpec, "fakeNode")
 				defer wg.Done()
 
 				if err != nil {
@@ -387,13 +405,16 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 				if attachID != "" {
 					t.Errorf("Expected empty attachID, got %q", attachID)
 				}
-			}(spec, test.expectVolumeAttachment)
+			}(spec)
 
 			if test.expectVolumeAttachment {
 				expectedAttachID := getAttachmentName("test-vol", test.driver, "fakeNode")
 				status := storage.VolumeAttachmentStatus{
 					Attached: true,
 				}
+				// We want to ensure the watcher, which is created in csiAttacher,
+				// has been started before updating the status of attachment.
+				<-attachmentWatchCreated
 				markVolumeAttached(t, csiAttacher.k8s, nil, expectedAttachID, status)
 			}
 			wg.Wait()
@@ -1568,6 +1589,13 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset, setupInf
 	}
 
 	factory.Start(wait.NeverStop)
+	ctx, cancel := context.WithTimeout(context.Background(), TestInformerSyncTimeout)
+	defer cancel()
+	for ty, ok := range factory.WaitForCacheSync(ctx.Done()) {
+		if !ok {
+			t.Fatalf("failed to sync: %#v", ty)
+		}
+	}
 
 	host := volumetest.NewFakeVolumeHostWithCSINodeName(t,
 		tmpDir,
@@ -1589,15 +1617,5 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset, setupInf
 		t.Fatalf("cannot assert plugin to be type csiPlugin")
 	}
 
-	// Wait until the informer in CSI volume plugin has all CSIDrivers.
-	wait.PollImmediate(TestInformerSyncPeriod, TestInformerSyncTimeout, func() (bool, error) {
-		return csiDriverInformer.Informer().HasSynced(), nil
-	})
-
-	if volumeAttachmentInformer != nil {
-		wait.PollImmediate(TestInformerSyncPeriod, TestInformerSyncTimeout, func() (bool, error) {
-			return volumeAttachmentInformer.Informer().HasSynced(), nil
-		})
-	}
 	return csiPlug, fakeWatcher, tmpDir, fakeClient
 }

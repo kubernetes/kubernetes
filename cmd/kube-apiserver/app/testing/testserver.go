@@ -122,7 +122,6 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	for _, f := range s.Flags().FlagSets {
 		fs.AddFlagSet(f)
 	}
-	s.InsecureServing.BindPort = 0
 
 	s.SecureServing.Listener, s.SecureServing.BindPort, err = createLocalhostListenerOnFreePort()
 	if err != nil {

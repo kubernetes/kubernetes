@@ -21,16 +21,15 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // NodeAffinity is a plugin that checks if a pod node selector matches the node label.
 type NodeAffinity struct {
-	handle framework.FrameworkHandle
+	handle framework.Handle
 }
 
 var _ framework.FilterPlugin = &NodeAffinity{}
@@ -65,12 +64,12 @@ func (pl *NodeAffinity) Filter(ctx context.Context, state *framework.CycleState,
 func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
 	if err != nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
+		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
 	node := nodeInfo.Node()
 	if node == nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
+		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
 	affinity := pod.Spec.Affinity
@@ -88,12 +87,12 @@ func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, 
 			}
 
 			// TODO: Avoid computing it for all nodes if this becomes a performance problem.
-			nodeSelector, err := v1helper.NodeSelectorRequirementsAsSelector(preferredSchedulingTerm.Preference.MatchExpressions)
+			matches, err := corev1.MatchNodeSelectorTerms(node, &v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{preferredSchedulingTerm.Preference}})
 			if err != nil {
-				return 0, framework.NewStatus(framework.Error, err.Error())
+				return 0, framework.AsStatus(err)
 			}
 
-			if nodeSelector.Matches(labels.Set(node.Labels)) {
+			if matches {
 				count += int64(preferredSchedulingTerm.Weight)
 			}
 		}
@@ -113,6 +112,6 @@ func (pl *NodeAffinity) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, h framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, h framework.Handle) (framework.Plugin, error) {
 	return &NodeAffinity{handle: h}, nil
 }

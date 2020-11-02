@@ -60,7 +60,7 @@ const (
 // - when a service goes from no endpoints to new endpoint
 
 // Ref: https://api.semanticscholar.org/CorpusID:198903401
-// Boye, Magnus. “Netfilter Connection Tracking and NAT Implementation.” (2012).
+// Boye, Magnus. "Netfilter Connection Tracking and NAT Implementation." (2012).
 
 var _ = SIGDescribe("Conntrack", func() {
 
@@ -134,7 +134,7 @@ var _ = SIGDescribe("Conntrack", func() {
 
 		// Create a pod in one node to create the UDP traffic against the NodePort service every 5 seconds
 		ginkgo.By("creating a client pod for probing the service " + serviceName)
-		clientPod := newAgnhostPod(podClient, "")
+		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
 		clientPod.Spec.NodeName = clientNodeInfo.name
 		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, serverNodeInfo.nodeIP, udpService.Spec.Ports[0].NodePort)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
@@ -148,7 +148,7 @@ var _ = SIGDescribe("Conntrack", func() {
 
 		// Add a backend pod to the service in the other node
 		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
-		serverPod1 := newAgnhostPod(podBackend1, "netexec", fmt.Sprintf("--udp-port=%d", 80))
+		serverPod1 := e2epod.NewAgnhostPod(ns, podBackend1, nil, nil, nil, "netexec", fmt.Sprintf("--udp-port=%d", 80))
 		serverPod1.Labels = udpJig.Labels
 		serverPod1.Spec.NodeName = serverNodeInfo.name
 		fr.PodClient().CreateSync(serverPod1)
@@ -172,7 +172,7 @@ var _ = SIGDescribe("Conntrack", func() {
 
 		// Create a second pod
 		ginkgo.By("creating a second backend pod " + podBackend2 + " for the service " + serviceName)
-		serverPod2 := newAgnhostPod(podBackend2, "netexec", fmt.Sprintf("--udp-port=%d", 80))
+		serverPod2 := e2epod.NewAgnhostPod(ns, podBackend2, nil, nil, nil, "netexec", fmt.Sprintf("--udp-port=%d", 80))
 		serverPod2.Labels = udpJig.Labels
 		serverPod2.Spec.NodeName = serverNodeInfo.name
 		fr.PodClient().CreateSync(serverPod2)
@@ -214,7 +214,7 @@ var _ = SIGDescribe("Conntrack", func() {
 
 		// Create a pod in one node to create the UDP traffic against the ClusterIP service every 5 seconds
 		ginkgo.By("creating a client pod for probing the service " + serviceName)
-		clientPod := newAgnhostPod(podClient, "")
+		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
 		clientPod.Spec.NodeName = clientNodeInfo.name
 		cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do echo "$(date) Try: ${i}"; echo hostname | nc -u -w 5 -p %d %s %d; echo; done`, srcPort, udpService.Spec.ClusterIP, udpService.Spec.Ports[0].Port)
 		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
@@ -228,7 +228,7 @@ var _ = SIGDescribe("Conntrack", func() {
 
 		// Add a backend pod to the service in the other node
 		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
-		serverPod1 := newAgnhostPod(podBackend1, "netexec", fmt.Sprintf("--udp-port=%d", 80))
+		serverPod1 := e2epod.NewAgnhostPod(ns, podBackend1, nil, nil, nil, "netexec", fmt.Sprintf("--udp-port=%d", 80))
 		serverPod1.Labels = udpJig.Labels
 		serverPod1.Spec.NodeName = serverNodeInfo.name
 		fr.PodClient().CreateSync(serverPod1)
@@ -252,7 +252,7 @@ var _ = SIGDescribe("Conntrack", func() {
 
 		// Create a second pod
 		ginkgo.By("creating a second backend pod " + podBackend2 + " for the service " + serviceName)
-		serverPod2 := newAgnhostPod(podBackend2, "netexec", fmt.Sprintf("--udp-port=%d", 80))
+		serverPod2 := e2epod.NewAgnhostPod(ns, podBackend2, nil, nil, nil, "netexec", fmt.Sprintf("--udp-port=%d", 80))
 		serverPod2.Labels = udpJig.Labels
 		serverPod2.Spec.NodeName = serverNodeInfo.name
 		fr.PodClient().CreateSync(serverPod2)

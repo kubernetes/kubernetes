@@ -50,7 +50,7 @@ import (
 	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers/autoregister"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/master/controller/crdregistration"
+	"k8s.io/kubernetes/pkg/controlplane/controller/crdregistration"
 )
 
 func createAggregatorConfig(
@@ -234,9 +234,6 @@ type priority struct {
 // That ripples out every bit as far as you'd expect, so for 1.7 we'll include the list here instead of being built up during storage.
 var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "", Version: "v1"}: {group: 18000, version: 1},
-	// extensions is above the rest for CLI compatibility, though the level of unqualified resource compatibility we
-	// can reasonably expect seems questionable.
-	{Group: "extensions", Version: "v1beta1"}: {group: 17900, version: 1},
 	// to my knowledge, nothing below here collides
 	{Group: "apps", Version: "v1"}:                               {group: 17800, version: 15},
 	{Group: "events.k8s.io", Version: "v1"}:                      {group: 17750, version: 15},
@@ -255,11 +252,11 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "certificates.k8s.io", Version: "v1beta1"}:           {group: 17300, version: 9},
 	{Group: "networking.k8s.io", Version: "v1"}:                  {group: 17200, version: 15},
 	{Group: "networking.k8s.io", Version: "v1beta1"}:             {group: 17200, version: 9},
+	{Group: "extensions", Version: "v1beta1"}:                    {group: 17150, version: 1}, // prioritize below networking.k8s.io, which contains the GA version of Ingress, the only resource remaining in extensions/v1beta1
 	{Group: "policy", Version: "v1beta1"}:                        {group: 17100, version: 9},
 	{Group: "rbac.authorization.k8s.io", Version: "v1"}:          {group: 17000, version: 15},
 	{Group: "rbac.authorization.k8s.io", Version: "v1beta1"}:     {group: 17000, version: 12},
 	{Group: "rbac.authorization.k8s.io", Version: "v1alpha1"}:    {group: 17000, version: 9},
-	{Group: "settings.k8s.io", Version: "v1alpha1"}:              {group: 16900, version: 9},
 	{Group: "storage.k8s.io", Version: "v1"}:                     {group: 16800, version: 15},
 	{Group: "storage.k8s.io", Version: "v1beta1"}:                {group: 16800, version: 9},
 	{Group: "storage.k8s.io", Version: "v1alpha1"}:               {group: 16800, version: 1},
@@ -277,6 +274,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "discovery.k8s.io", Version: "v1beta1"}:              {group: 16200, version: 12},
 	{Group: "discovery.k8s.io", Version: "v1alpha1"}:             {group: 16200, version: 9},
 	{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1"}: {group: 16100, version: 9},
+	{Group: "internal.apiserver.k8s.io", Version: "v1alpha1"}:    {group: 16000, version: 9},
 	// Append a new group to the end of the list if unsure.
 	// You can use min(existing group)-100 as the initial value for a group.
 	// Version can be set to 9 (to have space around) for a new group.

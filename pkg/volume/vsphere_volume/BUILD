@@ -33,9 +33,9 @@ go_library(
         "//staging/src/k8s.io/cloud-provider/volume/helpers:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/vsphere:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/vsphere/vclib:go_default_library",
+        "//staging/src/k8s.io/mount-utils:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/keymutex:go_default_library",
-        "//vendor/k8s.io/utils/mount:go_default_library",
         "//vendor/k8s.io/utils/strings:go_default_library",
     ],
 )
@@ -59,8 +59,8 @@ go_test(
         "//staging/src/k8s.io/cloud-provider/fake:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/vsphere:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/vsphere/vclib:go_default_library",
+        "//staging/src/k8s.io/mount-utils:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
-        "//vendor/k8s.io/utils/mount:go_default_library",
     ],
 )
 

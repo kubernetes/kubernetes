@@ -100,7 +100,7 @@ func InitNFSDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/nfs",
 			MaxFileSize:      testpatterns.FileSizeLarge,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -242,7 +242,7 @@ func InitGlusterFSDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/glusterfs",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -378,9 +378,6 @@ func InitISCSIDriver() testsuites.TestDriver {
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
-				"ext2",
-				// TODO: fix iSCSI driver can work with ext3
-				//"ext3",
 				"ext4",
 			),
 			TopologyKeys: []string{v1.LabelHostname},
@@ -556,13 +553,10 @@ func InitRbdDriver() testsuites.TestDriver {
 			FeatureTag:       "[Feature:Volumes][Serial]",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
-				"ext2",
-				// TODO: fix rbd driver can work with ext3
-				//"ext3",
 				"ext4",
 			),
 			Capabilities: map[testsuites.Capability]bool{
@@ -684,7 +678,7 @@ func InitCephFSDriver() testsuites.TestDriver {
 			FeatureTag:       "[Feature:Volumes][Serial]",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -1072,11 +1066,10 @@ func InitCinderDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/cinder",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
-				"ext3",
 			),
 			TopologyKeys: []string{v1.LabelZoneFailureDomain},
 			Capabilities: map[testsuites.Capability]bool{
@@ -1191,6 +1184,7 @@ func (c *cinderDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 }
 
 func (v *cinderVolume) DeleteVolume() {
+	id := v.volumeID
 	name := v.volumeName
 
 	// Try to delete the volume for several seconds - it takes
@@ -1199,16 +1193,23 @@ func (v *cinderVolume) DeleteVolume() {
 	var err error
 	timeout := time.Second * 120
 
-	framework.Logf("Waiting up to %v for removal of cinder volume %s", timeout, name)
+	framework.Logf("Waiting up to %v for removal of cinder volume %s / %s", timeout, id, name)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
-		output, err = exec.Command("cinder", "delete", name).CombinedOutput()
+		output, err = exec.Command("cinder", "delete", id).CombinedOutput()
 		if err == nil {
-			framework.Logf("Cinder volume %s deleted", name)
+			framework.Logf("Cinder volume %s deleted", id)
 			return
 		}
-		framework.Logf("Failed to delete volume %s: %v", name, err)
+		framework.Logf("Failed to delete volume %s / %s: %v\n%s", id, name, err, string(output))
 	}
-	framework.Logf("Giving up deleting volume %s: %v\n%s", name, err, string(output[:]))
+	// Timed out, try to get "cinder show <volume>" output for easier debugging
+	showOutput, showErr := exec.Command("cinder", "show", id).CombinedOutput()
+	if showErr != nil {
+		framework.Logf("Failed to show volume %s / %s: %v\n%s", id, name, showErr, string(showOutput))
+	} else {
+		framework.Logf("Volume %s / %s:\n%s", id, name, string(showOutput))
+	}
+	framework.Failf("Failed to delete pre-provisioned volume %s / %s: %v\n%s", id, name, err, string(output[:]))
 }
 
 // GCE
@@ -1246,7 +1247,7 @@ func InitGcePdDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/gce-pd",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType:      supportedTypes,
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
@@ -1387,7 +1388,7 @@ func InitVSphereDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/vsphere-volume",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -1511,11 +1512,10 @@ func InitAzureDiskDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/azure-disk",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
-				"ext3",
 				"ext4",
 				"xfs",
 			),
@@ -1652,12 +1652,10 @@ func InitAwsDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/aws-ebs",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
-				"ext2",
-				"ext3",
 				"ext4",
 				"xfs",
 				"ntfs",
@@ -1813,8 +1811,6 @@ var (
 	localVolumeSupportedFsTypes        = map[utils.LocalVolumeType]sets.String{
 		utils.LocalVolumeBlock: sets.NewString(
 			"", // Default fsType
-			"ext2",
-			"ext3",
 			"ext4",
 			//"xfs", disabled see issue https://github.com/kubernetes/kubernetes/issues/74095
 		),

@@ -222,7 +222,7 @@ func (tc *testCase) runTest(t *testing.T) {
 	metricsClient := NewHeapsterMetricsClient(testClient, DefaultHeapsterNamespace, DefaultHeapsterScheme, DefaultHeapsterService, DefaultHeapsterPort)
 	isResource := len(tc.resourceName) > 0
 	if isResource {
-		info, timestamp, err := metricsClient.GetResourceMetric(tc.resourceName, tc.namespace, tc.selector)
+		info, timestamp, err := metricsClient.GetResourceMetric(tc.resourceName, tc.namespace, tc.selector, "")
 		tc.verifyResults(t, info, timestamp, err)
 	} else {
 		info, timestamp, err := metricsClient.GetRawMetric(tc.metricName, tc.namespace, tc.selector, tc.metricSelector)

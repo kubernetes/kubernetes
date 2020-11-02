@@ -128,12 +128,12 @@ function Validate-SHA {
 # It will loop through the URLs list forever until it has a success. If
 # successful, it will write the file to OutFile. You can optionally provide a
 # Hash argument with an optional Algorithm, in which case it will attempt to
-# validate the downloaded file against the hash. SHA1 will be used if Algorithm
+# validate the downloaded file against the hash. SHA512 will be used if Algorithm
 # is not provided.
 function MustDownload-File {
   param (
     [parameter(Mandatory=$false)] [string]$Hash,
-    [parameter(Mandatory=$false)] [string]$Algorithm = 'SHA1',
+    [parameter(Mandatory=$false)] [string]$Algorithm = 'SHA512',
     [parameter(Mandatory=$true)] [string]$OutFile,
     [parameter(Mandatory=$true)] [System.Collections.Generic.List[String]]$URLs,
     [parameter(Mandatory=$false)] [System.Collections.IDictionary]$Headers = @{}

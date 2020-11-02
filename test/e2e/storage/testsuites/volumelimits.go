@@ -349,9 +349,9 @@ func getCSINodeLimits(cs clientset.Interface, config *PerTestConfig, nodeName st
 			return false, nil
 		}
 		var csiDriver *storagev1.CSINodeDriver
-		for _, c := range csiNode.Spec.Drivers {
+		for i, c := range csiNode.Spec.Drivers {
 			if c.Name == driverInfo.Name || c.Name == config.GetUniqueDriverName() {
-				csiDriver = &c
+				csiDriver = &csiNode.Spec.Drivers[i]
 				break
 			}
 		}

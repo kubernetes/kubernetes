@@ -18,6 +18,7 @@ package common
 
 import (
 	"github.com/onsi/ginkgo"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
@@ -27,6 +28,45 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 	f := framework.NewDefaultFramework("pod-network-test")
 
 	ginkgo.Describe("Granular Checks: Pods", func() {
+
+		checkNodeConnectivity := func(config *e2enetwork.NetworkingTestConfig, protocol string, port int) {
+			// breadth first poll to quickly estimate failure.
+			failedPodsByHost := map[string][]*v1.Pod{}
+			// First time, we'll quickly try all pods, breadth first.
+			for _, endpointPod := range config.EndpointPods {
+				framework.Logf("Breadth first check of %v on host %v...", endpointPod.Status.PodIP, endpointPod.Status.HostIP)
+				if err := config.DialFromTestContainer(protocol, endpointPod.Status.PodIP, port, 1, 0, sets.NewString(endpointPod.Name)); err != nil {
+					if _, ok := failedPodsByHost[endpointPod.Status.HostIP]; !ok {
+						failedPodsByHost[endpointPod.Status.HostIP] = []*v1.Pod{}
+					}
+					failedPodsByHost[endpointPod.Status.HostIP] = append(failedPodsByHost[endpointPod.Status.HostIP], endpointPod)
+					framework.Logf("...failed...will try again in next pass")
+				}
+			}
+			errors := []error{}
+			// Second time, we pass through pods more carefully...
+			framework.Logf("Going to retry %v out of %v pods....", len(failedPodsByHost), len(config.EndpointPods))
+			for host, failedPods := range failedPodsByHost {
+				framework.Logf("Doublechecking %v pods in host %v which werent seen the first time.", len(failedPods), host)
+				for _, endpointPod := range failedPods {
+					framework.Logf("Now attempting to probe pod [[[ %v ]]]", endpointPod.Status.PodIP)
+					if err := config.DialFromTestContainer(protocol, endpointPod.Status.PodIP, port, config.MaxTries, 0, sets.NewString(endpointPod.Name)); err != nil {
+						errors = append(errors, err)
+					} else {
+						framework.Logf("Was able to reach %v on %v ", endpointPod.Status.PodIP, endpointPod.Status.HostIP)
+					}
+					framework.Logf("... Done probing pod [[[ %v ]]]", endpointPod.Status.PodIP)
+				}
+				framework.Logf("succeeded at polling %v out of %v connections", len(config.EndpointPods)-len(errors), len(config.EndpointPods))
+			}
+			if len(errors) > 0 {
+				framework.Logf("pod polling failure summary:")
+				for _, e := range errors {
+					framework.Logf("Collected error: %v", e)
+				}
+				framework.Failf("failed,  %v out of %v connections failed", len(errors), len(config.EndpointPods))
+			}
+		}
 
 		// Try to hit all endpoints through a test container, retry 5 times,
 		// expect exactly one unique hostname. Each of these endpoints reports
@@ -39,9 +79,7 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 		*/
 		framework.ConformanceIt("should function for intra-pod communication: http [NodeConformance]", func() {
 			config := e2enetwork.NewCoreNetworkingTestConfig(f, false)
-			for _, endpointPod := range config.EndpointPods {
-				config.DialFromTestContainer("http", endpointPod.Status.PodIP, e2enetwork.EndpointHTTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
-			}
+			checkNodeConnectivity(config, "http", e2enetwork.EndpointHTTPPort)
 		})
 
 		/*
@@ -52,9 +90,7 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 		*/
 		framework.ConformanceIt("should function for intra-pod communication: udp [NodeConformance]", func() {
 			config := e2enetwork.NewCoreNetworkingTestConfig(f, false)
-			for _, endpointPod := range config.EndpointPods {
-				config.DialFromTestContainer("udp", endpointPod.Status.PodIP, e2enetwork.EndpointUDPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
-			}
+			checkNodeConnectivity(config, "udp", e2enetwork.EndpointUDPPort)
 		})
 
 		/*
@@ -67,7 +103,10 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 		framework.ConformanceIt("should function for node-pod communication: http [LinuxOnly] [NodeConformance]", func() {
 			config := e2enetwork.NewCoreNetworkingTestConfig(f, true)
 			for _, endpointPod := range config.EndpointPods {
-				config.DialFromNode("http", endpointPod.Status.PodIP, e2enetwork.EndpointHTTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				err := config.DialFromNode("http", endpointPod.Status.PodIP, e2enetwork.EndpointHTTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				if err != nil {
+					framework.Failf("Error dialing HTTP node to pod %v", err)
+				}
 			}
 		})
 
@@ -81,7 +120,10 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 		framework.ConformanceIt("should function for node-pod communication: udp [LinuxOnly] [NodeConformance]", func() {
 			config := e2enetwork.NewCoreNetworkingTestConfig(f, true)
 			for _, endpointPod := range config.EndpointPods {
-				config.DialFromNode("udp", endpointPod.Status.PodIP, e2enetwork.EndpointUDPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				err := config.DialFromNode("udp", endpointPod.Status.PodIP, e2enetwork.EndpointUDPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				if err != nil {
+					framework.Failf("Error dialing UDP from node to pod: %v", err)
+				}
 			}
 		})
 	})

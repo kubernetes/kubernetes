@@ -39,8 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
+	cachetools "k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
@@ -56,6 +60,7 @@ const (
 	csiNodeLimitUpdateTimeout  = 5 * time.Minute
 	csiPodUnschedulableTimeout = 5 * time.Minute
 	csiResizeWaitPeriod        = 5 * time.Minute
+	csiVolumeAttachmentTimeout = 7 * time.Minute
 	// how long to wait for Resizing Condition on PVC to appear
 	csiResizingConditionWait = 2 * time.Minute
 
@@ -69,6 +74,8 @@ const (
 	driverPodName = "csi-mockplugin-0"
 	// Name of CSI driver container name
 	driverContainerName = "mock"
+	// Prefix of the mock driver grpc log
+	grpcCallPrefix = "gRPCCall:"
 )
 
 // csiCall represents an expected call from Kubernetes to CSI mock driver and
@@ -301,6 +308,77 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			})
 
 		}
+	})
+
+	ginkgo.Context("CSI CSIDriver deployment after pod creation using non-attachable mock driver", func() {
+		ginkgo.It("should bringup pod after deploying CSIDriver attach=false [Slow]", func() {
+			var err error
+			init(testParameters{registerDriver: false, disableAttach: true})
+			defer cleanup()
+
+			_, claim, pod := createPod(false /* persistent volume, late binding as specified above */)
+			if pod == nil {
+				return
+			}
+
+			ginkgo.By("Checking if attaching failed and pod cannot start")
+			eventSelector := fields.Set{
+				"involvedObject.kind":      "Pod",
+				"involvedObject.name":      pod.Name,
+				"involvedObject.namespace": pod.Namespace,
+				"reason":                   events.FailedAttachVolume,
+			}.AsSelector().String()
+			msg := "AttachVolume.Attach failed for volume"
+
+			err = e2eevents.WaitTimeoutForEvent(m.cs, pod.Namespace, eventSelector, msg, framework.PodStartTimeout)
+			if err != nil {
+				podErr := e2epod.WaitTimeoutForPodRunningInNamespace(m.cs, pod.Name, pod.Namespace, 10*time.Second)
+				framework.ExpectError(podErr, "Pod should not be in running status because attaching should failed")
+				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
+				framework.Logf("Attach should fail and the corresponding event should show up, error: %v", err)
+			}
+
+			// VolumeAttachment should be created because the default value for CSI attachable is true
+			ginkgo.By("Checking if VolumeAttachment was created for the pod")
+			handle := getVolumeHandle(m.cs, claim)
+			attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, m.provisioner, m.config.ClientNodeSelection.Name)))
+			attachmentName := fmt.Sprintf("csi-%x", attachmentHash)
+			_, err = m.cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					framework.ExpectNoError(err, "Expected VolumeAttachment but none was found")
+				} else {
+					framework.ExpectNoError(err, "Failed to find VolumeAttachment")
+				}
+			}
+
+			ginkgo.By("Deploy CSIDriver object with attachRequired=false")
+			driverNamespace := m.config.DriverNamespace
+
+			canAttach := false
+			o := utils.PatchCSIOptions{
+				OldDriverName: "csi-mock",
+				NewDriverName: "csi-mock-" + f.UniqueName,
+				CanAttach:     &canAttach,
+			}
+			cleanupCSIDriver, err := utils.CreateFromManifests(f, driverNamespace, func(item interface{}) error {
+				return utils.PatchCSIDeployment(f, o, item)
+			}, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driverinfo.yaml")
+			if err != nil {
+				framework.Failf("fail to deploy CSIDriver object: %v", err)
+			}
+			m.testCleanups = append(m.testCleanups, cleanupCSIDriver)
+
+			ginkgo.By("Wait for the pod in running status")
+			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+			framework.ExpectNoError(err, "Failed to start pod: %v", err)
+
+			ginkgo.By(fmt.Sprintf("Wait for the volumeattachment to be deleted up to %v", csiVolumeAttachmentTimeout))
+			// This step can be slow because we have to wait either a NodeUpdate event happens or
+			// the detachment for this volume timeout so that we can do a force detach.
+			err = waitForVolumeAttachmentTerminated(attachmentName, m.cs)
+			framework.ExpectNoError(err, "Failed to delete VolumeAttachment: %v", err)
+		})
 	})
 
 	ginkgo.Context("CSI workload information using mock driver", func() {
@@ -826,7 +904,20 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ctx, cancel := context.WithTimeout(context.Background(), csiPodRunningTimeout)
 				defer cancel()
-				pvcWatch, err := f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Watch(ctx, metav1.ListOptions{})
+
+				// In contrast to the raw watch, RetryWatcher is expected to deliver all events even
+				// when the underlying raw watch gets closed prematurely
+				// (https://github.com/kubernetes/kubernetes/pull/93777#discussion_r467932080).
+				// This is important because below the test is going to make assertions about the
+				// PVC state changes.
+				initResource, err := f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+				framework.ExpectNoError(err, "Failed to fetch initial PVC resource")
+				listWatcher := &cachetools.ListWatch{
+					WatchFunc: func(listOptions metav1.ListOptions) (watch.Interface, error) {
+						return f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Watch(ctx, listOptions)
+					},
+				}
+				pvcWatch, err := watchtools.NewRetryWatcher(initResource.GetResourceVersion(), listWatcher)
 				framework.ExpectNoError(err, "create PVC watch")
 				defer pvcWatch.Stop()
 
@@ -894,12 +985,14 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				ginkgo.By("Checking PVC events")
 				nodeAnnotationSet := false
 				nodeAnnotationReset := false
+				watchFailed := false
 			loop:
 				for {
 					select {
 					case event, ok := <-pvcWatch.ResultChan():
 						if !ok {
-							framework.Failf("PVC watch ended prematurely")
+							watchFailed = true
+							break loop
 						}
 
 						framework.Logf("PVC event %s: %#v", event.Type, event.Object)
@@ -918,10 +1011,8 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 						case watch.Deleted:
 							break loop
 						case watch.Error:
-							// Can this occur when the apiserver is under heavy load?
-							// If yes, then we should bail out of the test here early and
-							// skip further checks instead of treating it as a test failure.
-							framework.Failf("PVC watch failed prematurely: %v", event.Object)
+							watchFailed = true
+							break
 						}
 					case <-ctx.Done():
 						framework.Failf("Timeout while waiting to observe PVC list")
@@ -937,7 +1028,13 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 						}
 					}
 
-					if test.lateBinding {
+					switch {
+					case watchFailed:
+						// If the watch failed or stopped prematurely (which can happen at any time), then we cannot
+						// verify whether the annotation was set as expected. This is still considered a successful
+						// test.
+						framework.Logf("PVC watch delivered incomplete data, cannot check annotation")
+					case test.lateBinding:
 						gomega.Expect(nodeAnnotationSet).To(gomega.BeTrue(), "selected-node should have been set")
 						// Whether it gets reset depends on whether we have topology enabled. Without
 						// it, rescheduling is unnecessary.
@@ -946,7 +1043,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 						} else {
 							gomega.Expect(nodeAnnotationReset).To(gomega.BeFalse(), "selected-node should not have been reset")
 						}
-					} else {
+					default:
 						gomega.Expect(nodeAnnotationSet).To(gomega.BeFalse(), "selected-node should not have been set")
 						gomega.Expect(nodeAnnotationReset).To(gomega.BeFalse(), "selected-node should not have been reset")
 					}
@@ -1163,6 +1260,24 @@ func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
 	return nil
 }
 
+func waitForVolumeAttachmentTerminated(attachmentName string, cs clientset.Interface) error {
+	waitErr := wait.PollImmediate(10*time.Second, csiVolumeAttachmentTimeout, func() (bool, error) {
+		_, err := cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
+		if err != nil {
+			// if the volumeattachment object is not found, it means it has been terminated.
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}
+		return false, nil
+	})
+	if waitErr != nil {
+		return fmt.Errorf("error waiting volume attachment %v to terminate: %v", attachmentName, waitErr)
+	}
+	return nil
+}
+
 func checkCSINodeForLimits(nodeName string, driverName string, cs clientset.Interface) (int32, error) {
 	var attachLimit int32
 
@@ -1192,7 +1307,7 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e
 	_, err = cs.StorageV1().StorageClasses().Get(context.TODO(), class.Name, metav1.GetOptions{})
 	if err != nil {
 		class, err = cs.StorageV1().StorageClasses().Create(context.TODO(), class, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "Failed to create class : %v", err)
+		framework.ExpectNoError(err, "Failed to create class: %v", err)
 	}
 
 	claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
@@ -1206,7 +1321,7 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e
 	if !t.DelayBinding {
 		pvcClaims := []*v1.PersistentVolumeClaim{claim}
 		_, err = e2epv.WaitForPVClaimBoundPhase(cs, pvcClaims, framework.ClaimProvisionTimeout)
-		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
+		framework.ExpectNoError(err, "Failed waiting for PVC to be bound: %v", err)
 	}
 
 	pod, err := startPausePodWithClaim(cs, claim, node, ns)
@@ -1360,10 +1475,11 @@ func parseMockLogs(cs clientset.Interface, namespace, driverPodName, driverConta
 	logLines := strings.Split(log, "\n")
 	var calls []mockCSICall
 	for _, line := range logLines {
-		if !strings.HasPrefix(line, "gRPCCall:") {
+		index := strings.Index(line, grpcCallPrefix)
+		if index == -1 {
 			continue
 		}
-		line = strings.TrimPrefix(line, "gRPCCall:")
+		line = line[index+len(grpcCallPrefix):]
 		call := mockCSICall{
 			json: string(line),
 		}

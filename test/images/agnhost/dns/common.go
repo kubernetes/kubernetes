@@ -52,7 +52,7 @@ var CmdEtcHosts = &cobra.Command{
 }
 
 func printDNSSuffixList(cmd *cobra.Command, args []string) {
-	dnsSuffixList := getDNSSuffixList()
+	dnsSuffixList := GetDNSSuffixList()
 	fmt.Println(strings.Join(dnsSuffixList, ","))
 }
 

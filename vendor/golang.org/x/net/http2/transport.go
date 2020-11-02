@@ -154,12 +154,21 @@ func (t *Transport) pingTimeout() time.Duration {
 
 // ConfigureTransport configures a net/http HTTP/1 Transport to use HTTP/2.
 // It returns an error if t1 has already been HTTP/2-enabled.
+//
+// Use ConfigureTransports instead to configure the HTTP/2 Transport.
 func ConfigureTransport(t1 *http.Transport) error {
-	_, err := configureTransport(t1)
+	_, err := ConfigureTransports(t1)
 	return err
 }
 
-func configureTransport(t1 *http.Transport) (*Transport, error) {
+// ConfigureTransports configures a net/http HTTP/1 Transport to use HTTP/2.
+// It returns a new HTTP/2 Transport for further configuration.
+// It returns an error if t1 has already been HTTP/2-enabled.
+func ConfigureTransports(t1 *http.Transport) (*Transport, error) {
+	return configureTransports(t1)
+}
+
+func configureTransports(t1 *http.Transport) (*Transport, error) {
 	connPool := new(clientConnPool)
 	t2 := &Transport{
 		ConnPool: noDialClientConnPool{connPool},
@@ -689,6 +698,7 @@ func (t *Transport) newClientConn(c net.Conn, singleUse bool) (*ClientConn, erro
 	cc.inflow.add(transportDefaultConnFlow + initialWindowSize)
 	cc.bw.Flush()
 	if cc.werr != nil {
+		cc.Close()
 		return nil, cc.werr
 	}
 
@@ -1079,6 +1089,15 @@ func (cc *ClientConn) roundTrip(req *http.Request) (res *http.Response, gotErrAf
 	cs.requestedGzip = requestedGzip
 	bodyWriter := cc.t.getBodyWriterState(cs, body)
 	cs.on100 = bodyWriter.on100
+
+	defer func() {
+		cc.wmu.Lock()
+		werr := cc.werr
+		cc.wmu.Unlock()
+		if werr != nil {
+			cc.Close()
+		}
+	}()
 
 	cc.wmu.Lock()
 	endStream := !hasBody && !hasTrailers
@@ -2006,8 +2025,8 @@ func (rl *clientConnReadLoop) handleResponse(cs *clientStream, f *MetaHeadersFra
 	if !streamEnded || isHead {
 		res.ContentLength = -1
 		if clens := res.Header["Content-Length"]; len(clens) == 1 {
-			if clen64, err := strconv.ParseInt(clens[0], 10, 64); err == nil {
-				res.ContentLength = clen64
+			if cl, err := strconv.ParseUint(clens[0], 10, 63); err == nil {
+				res.ContentLength = int64(cl)
 			} else {
 				// TODO: care? unlike http/1, it won't mess up our framing, so it's
 				// more safe smuggling-wise to ignore.
@@ -2525,6 +2544,7 @@ func strSliceContains(ss []string, s string) bool {
 
 type erringRoundTripper struct{ err error }
 
+func (rt erringRoundTripper) RoundTripErr() error                             { return rt.err }
 func (rt erringRoundTripper) RoundTrip(*http.Request) (*http.Response, error) { return nil, rt.err }
 
 // gzipReader wraps a response body so it can lazily

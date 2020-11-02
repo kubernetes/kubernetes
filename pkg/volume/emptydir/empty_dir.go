@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -227,7 +227,7 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
 	}
 
-	volume.SetVolumeOwnership(ed, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/)
+	volume.SetVolumeOwnership(ed, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(ed.plugin.GetPluginName()))
 
 	// If setting up the quota fails, just log a message but don't actually error out.
 	// We'll use the old du mechanism in this case, at least until we support
@@ -272,7 +272,7 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 	}
 
 	klog.V(3).Infof("pod %v: mounting tmpfs for volume %v", ed.pod.UID, ed.volName)
-	return ed.mounter.Mount("tmpfs", dir, "tmpfs", nil /* options */)
+	return ed.mounter.MountSensitiveWithoutSystemd("tmpfs", dir, "tmpfs", nil /* options */, nil)
 }
 
 // setupHugepages creates a hugepage mount at the specified directory.
@@ -317,7 +317,7 @@ func (ed *emptyDir) setupHugepages(dir string) error {
 	}
 
 	klog.V(3).Infof("pod %v: mounting hugepages for volume %v", ed.pod.UID, ed.volName)
-	return ed.mounter.Mount("nodev", dir, "hugetlbfs", []string{pageSizeMountOption})
+	return ed.mounter.MountSensitiveWithoutSystemd("nodev", dir, "hugetlbfs", []string{pageSizeMountOption}, nil)
 }
 
 // getPageSizeMountOption retrieves pageSize mount option from Pod's resources

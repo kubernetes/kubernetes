@@ -129,7 +129,8 @@ type Cloud struct {
 	unsafeIsLegacyNetwork bool
 	// unsafeSubnetworkURL should be used only via SubnetworkURL() accessor,
 	// to ensure it was properly initialized.
-	unsafeSubnetworkURL      string
+	unsafeSubnetworkURL string
+	// DEPRECATED: Do not rely on this value as it may be incorrect.
 	secondaryRangeName       string
 	networkProjectID         string
 	onXPN                    bool
@@ -179,6 +180,7 @@ type ConfigGlobal struct {
 	NetworkProjectID string `gcfg:"network-project-id"`
 	NetworkName      string `gcfg:"network-name"`
 	SubnetworkName   string `gcfg:"subnetwork-name"`
+	// DEPRECATED: Do not rely on this value as it may be incorrect.
 	// SecondaryRangeName is the name of the secondary range to allocate IP
 	// aliases. The secondary range must be present on the subnetwork the
 	// cluster is attached to.
@@ -226,12 +228,13 @@ type CloudConfig struct {
 	NetworkURL           string
 	SubnetworkName       string
 	SubnetworkURL        string
-	SecondaryRangeName   string
-	NodeTags             []string
-	NodeInstancePrefix   string
-	TokenSource          oauth2.TokenSource
-	UseMetadataServer    bool
-	AlphaFeatureGate     *AlphaFeatureGate
+	// DEPRECATED: Do not rely on this value as it may be incorrect.
+	SecondaryRangeName string
+	NodeTags           []string
+	NodeInstancePrefix string
+	TokenSource        oauth2.TokenSource
+	UseMetadataServer  bool
+	AlphaFeatureGate   *AlphaFeatureGate
 }
 
 func init() {
@@ -660,9 +663,9 @@ func (g *Cloud) Instances() (cloudprovider.Instances, bool) {
 }
 
 // InstancesV2 returns an implementation of InstancesV2 for Google Compute Engine.
-// TODO: implement ONLY for external cloud provider
+// Implement ONLY for external cloud provider
 func (g *Cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
-	return nil, false
+	return g, true
 }
 
 // Zones returns an implementation of Zones for Google Compute Engine.
