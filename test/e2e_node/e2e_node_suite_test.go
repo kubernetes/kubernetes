@@ -197,7 +197,6 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		// If the services are expected to keep running after test, they should not monitor the test process.
 		e2es = services.NewE2EServices(*stopServices)
 		gomega.Expect(e2es.Start()).To(gomega.Succeed(), "should be able to start node services.")
-		klog.Infof("Node services started.  Running tests...")
 	} else {
 		klog.Infof("Running tests without starting services.")
 	}
