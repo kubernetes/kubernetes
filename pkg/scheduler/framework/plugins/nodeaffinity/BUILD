@@ -10,7 +10,7 @@ go_library(
         "//pkg/scheduler/framework/plugins/helper:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/component-helpers/scheduling/corev1:go_default_library",
+        "//staging/src/k8s.io/component-helpers/scheduling/corev1/nodeaffinity:go_default_library",
     ],
 )
 

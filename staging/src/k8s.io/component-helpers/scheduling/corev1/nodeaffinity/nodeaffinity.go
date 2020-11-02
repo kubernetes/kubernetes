@@ -58,20 +58,10 @@ func NewLazyErrorNodeSelector(ns *v1.NodeSelector) *LazyErrorNodeSelector {
 	parsedTerms := make([]nodeSelectorTerm, 0, len(ns.NodeSelectorTerms))
 	for _, term := range ns.NodeSelectorTerms {
 		// nil or empty term selects no objects
-		if len(term.MatchExpressions) == 0 && len(term.MatchFields) == 0 {
+		if isEmptyNodeSelectorTerm(&term) {
 			continue
 		}
-		parsedTerms = append(parsedTerms, nodeSelectorTerm{})
-		parsedTerm := &parsedTerms[len(parsedTerms)-1]
-		if len(term.MatchExpressions) != 0 {
-			parsedTerm.matchLabels, parsedTerm.parseErr = nodeSelectorRequirementsAsSelector(term.MatchExpressions)
-			if parsedTerm.parseErr != nil {
-				continue
-			}
-		}
-		if len(term.MatchFields) != 0 {
-			parsedTerm.matchFields, parsedTerm.parseErr = nodeSelectorRequirementsAsFieldSelector(term.MatchFields)
-		}
+		parsedTerms = append(parsedTerms, newNodeSelectorTerm(&term))
 	}
 	return &LazyErrorNodeSelector{
 		terms: parsedTerms,
@@ -94,10 +84,7 @@ func (ns *LazyErrorNodeSelector) Match(node *v1.Node) (bool, error) {
 		return false, nil
 	}
 	nodeLabels := labels.Set(node.Labels)
-	nodeFields := make(fields.Set)
-	if len(node.Name) > 0 {
-		nodeFields["metadata.name"] = node.Name
-	}
+	nodeFields := extractNodeFields(node)
 
 	var errs []error
 	for _, term := range ns.terms {
@@ -113,10 +100,81 @@ func (ns *LazyErrorNodeSelector) Match(node *v1.Node) (bool, error) {
 	return false, errors.NewAggregate(errs)
 }
 
+// PreferredSchedulingTerms is a runtime representation of []v1.PreferredSchedulingTerms.
+type PreferredSchedulingTerms struct {
+	terms []preferredSchedulingTerm
+}
+
+// NewPreferredSchedulingTerms returns a PreferredSchedulingTerms or all the parsing errors found.
+// If a v1.PreferredSchedulingTerm has a 0 weight, its parsing is skipped.
+func NewPreferredSchedulingTerms(terms []v1.PreferredSchedulingTerm) (*PreferredSchedulingTerms, error) {
+	var errs []error
+	parsedTerms := make([]preferredSchedulingTerm, 0, len(terms))
+	for _, term := range terms {
+		if term.Weight == 0 || isEmptyNodeSelectorTerm(&term.Preference) {
+			continue
+		}
+		parsedTerm := preferredSchedulingTerm{
+			nodeSelectorTerm: newNodeSelectorTerm(&term.Preference),
+			weight:           int(term.Weight),
+		}
+		if parsedTerm.parseErr != nil {
+			errs = append(errs, parsedTerm.parseErr)
+		} else {
+			parsedTerms = append(parsedTerms, parsedTerm)
+		}
+	}
+	if len(errs) != 0 {
+		return nil, errors.NewAggregate(errs)
+	}
+	return &PreferredSchedulingTerms{terms: parsedTerms}, nil
+}
+
+// Score returns a score for a Node: the sum of the weights of the terms that
+// match the Node.
+func (t *PreferredSchedulingTerms) Score(node *v1.Node) int64 {
+	var score int64
+	nodeLabels := labels.Set(node.Labels)
+	nodeFields := extractNodeFields(node)
+	for _, term := range t.terms {
+		// parse errors are reported in NewPreferredSchedulingTerms.
+		if ok, _ := term.match(nodeLabels, nodeFields); ok {
+			score += int64(term.weight)
+		}
+	}
+	return score
+}
+
+func isEmptyNodeSelectorTerm(term *v1.NodeSelectorTerm) bool {
+	return len(term.MatchExpressions) == 0 && len(term.MatchFields) == 0
+}
+
+func extractNodeFields(n *v1.Node) fields.Set {
+	f := make(fields.Set)
+	if len(n.Name) > 0 {
+		f["metadata.name"] = n.Name
+	}
+	return f
+}
+
 type nodeSelectorTerm struct {
 	matchLabels labels.Selector
 	matchFields fields.Selector
 	parseErr    error
+}
+
+func newNodeSelectorTerm(term *v1.NodeSelectorTerm) nodeSelectorTerm {
+	var parsedTerm nodeSelectorTerm
+	if len(term.MatchExpressions) != 0 {
+		parsedTerm.matchLabels, parsedTerm.parseErr = nodeSelectorRequirementsAsSelector(term.MatchExpressions)
+		if parsedTerm.parseErr != nil {
+			return parsedTerm
+		}
+	}
+	if len(term.MatchFields) != 0 {
+		parsedTerm.matchFields, parsedTerm.parseErr = nodeSelectorRequirementsAsFieldSelector(term.MatchFields)
+	}
+	return parsedTerm
 }
 
 func (t *nodeSelectorTerm) match(nodeLabels labels.Set, nodeFields fields.Set) (bool, error) {
@@ -196,4 +254,9 @@ func nodeSelectorRequirementsAsFieldSelector(nsr []v1.NodeSelectorRequirement) (
 	}
 
 	return fields.AndSelectors(selectors...), nil
+}
+
+type preferredSchedulingTerm struct {
+	nodeSelectorTerm
+	weight int
 }

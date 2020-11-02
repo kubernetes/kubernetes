@@ -22,7 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 )
@@ -79,23 +79,12 @@ func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, 
 	// An element of PreferredDuringSchedulingIgnoredDuringExecution that refers to an
 	// empty PreferredSchedulingTerm matches all objects.
 	if affinity != nil && affinity.NodeAffinity != nil && affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
-		// Match PreferredDuringSchedulingIgnoredDuringExecution term by term.
-		for i := range affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
-			preferredSchedulingTerm := &affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution[i]
-			if preferredSchedulingTerm.Weight == 0 {
-				continue
-			}
-
-			// TODO: Avoid computing it for all nodes if this becomes a performance problem.
-			matches, err := corev1.MatchNodeSelectorTerms(node, &v1.NodeSelector{NodeSelectorTerms: []v1.NodeSelectorTerm{preferredSchedulingTerm.Preference}})
-			if err != nil {
-				return 0, framework.AsStatus(err)
-			}
-
-			if matches {
-				count += int64(preferredSchedulingTerm.Weight)
-			}
+		// TODO(#96164): Do this in PreScore to avoid computing it for all nodes.
+		preferredNodeAffinity, err := nodeaffinity.NewPreferredSchedulingTerms(affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+		if err != nil {
+			return 0, framework.AsStatus(err)
 		}
+		count += preferredNodeAffinity.Score(node)
 	}
 
 	return count, nil

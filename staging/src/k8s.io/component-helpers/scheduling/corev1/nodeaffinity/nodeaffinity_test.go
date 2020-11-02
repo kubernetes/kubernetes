@@ -150,6 +150,129 @@ func TestNodeSelectorMatch(t *testing.T) {
 	}
 }
 
+func TestPreferredSchedulingTermsScore(t *testing.T) {
+	tests := []struct {
+		name           string
+		prefSchedTerms []v1.PreferredSchedulingTerm
+		node           *v1.Node
+		wantErr        error
+		wantScore      int64
+	}{
+		{
+			name: "invalid field selector and label selector",
+			prefSchedTerms: []v1.PreferredSchedulingTerm{
+				{
+					Weight: 1,
+					Preference: v1.NodeSelectorTerm{
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"host_1", "host_2"},
+						}},
+					},
+				},
+				{
+					Weight: 1,
+					Preference: v1.NodeSelectorTerm{
+						MatchExpressions: []v1.NodeSelectorRequirement{{
+							Key:      "label_1",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"label_1_val"},
+						}},
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"host_1"},
+						}},
+					},
+				},
+				{
+					Weight: 1,
+					Preference: v1.NodeSelectorTerm{
+						MatchExpressions: []v1.NodeSelectorRequirement{{
+							Key:      "invalid key",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"label_value"},
+						}},
+					},
+				},
+			},
+			wantErr: apierrors.NewAggregate([]error{
+				errors.New(`unexpected number of value (2) for node field selector operator "In"`),
+				errors.New(`invalid label key "invalid key": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`),
+			}),
+		},
+		{
+			name: "invalid field selector but no weight, error not reported",
+			prefSchedTerms: []v1.PreferredSchedulingTerm{
+				{
+					Weight: 0,
+					Preference: v1.NodeSelectorTerm{
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"host_1", "host_2"},
+						}},
+					},
+				},
+			},
+			node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "host_1"}},
+		},
+		{
+			name: "first and third term match",
+			prefSchedTerms: []v1.PreferredSchedulingTerm{
+				{
+					Weight: 5,
+					Preference: v1.NodeSelectorTerm{
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"host_1"},
+						}},
+					},
+				},
+				{
+					Weight: 7,
+					Preference: v1.NodeSelectorTerm{
+						MatchExpressions: []v1.NodeSelectorRequirement{{
+							Key:      "unknown_label",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"unknown_label_val"},
+						}},
+					},
+				},
+				{
+					Weight: 11,
+					Preference: v1.NodeSelectorTerm{
+						MatchExpressions: []v1.NodeSelectorRequirement{{
+							Key:      "label_1",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"label_1_val"},
+						}},
+					},
+				},
+			},
+			node:      &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "host_1", Labels: map[string]string{"label_1": "label_1_val"}}},
+			wantScore: 16,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prefSchedTerms, err := NewPreferredSchedulingTerms(tt.prefSchedTerms)
+			if !reflect.DeepEqual(err, tt.wantErr) {
+				t.Fatalf("NewPreferredSchedulingTerms returned error %q, want %q", err, tt.wantErr)
+			}
+			if tt.wantErr != nil {
+				return
+			}
+			score := prefSchedTerms.Score(tt.node)
+			if score != tt.wantScore {
+				t.Errorf("PreferredSchedulingTerms.Score returned %d, want %d", score, tt.wantScore)
+			}
+		})
+	}
+}
+
 func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 	matchExpressions := []v1.NodeSelectorRequirement{{
 		Key:      "foo",
