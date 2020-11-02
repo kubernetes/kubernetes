@@ -9,8 +9,13 @@ import (
 	"unsafe"
 )
 
-// NativeEndian is the machine native endian implementation of ByteOrder.
-var NativeEndian binary.ByteOrder
+var (
+	// NativeEndian is the machine native endian implementation of
+	// ByteOrder.
+	NativeEndian binary.ByteOrder
+
+	kernelAlign int
+)
 
 func init() {
 	i := uint32(1)
@@ -20,4 +25,9 @@ func init() {
 	} else {
 		NativeEndian = binary.BigEndian
 	}
+	kernelAlign = probeProtocolStack()
+}
+
+func roundup(l int) int {
+	return (l + kernelAlign - 1) &^ (kernelAlign - 1)
 }

@@ -348,5 +348,4 @@ const (
 	SYS_CLONE3                 = 5435
 	SYS_OPENAT2                = 5437
 	SYS_PIDFD_GETFD            = 5438
-	SYS_FACCESSAT2             = 5439
 )
