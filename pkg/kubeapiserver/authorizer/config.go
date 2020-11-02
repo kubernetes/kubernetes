@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
+	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/gkeautopilot"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/node"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
@@ -134,6 +135,15 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			)
 			authorizers = append(authorizers, rbacAuthorizer)
 			ruleResolvers = append(ruleResolvers, rbacAuthorizer)
+		case modes.ModeGKEAutopilot:
+			gkeautopilotAuthorizer, err := gkeautopilot.New(
+				config.VersionedInformerFactory.Admissionregistration().V1().ValidatingWebhookConfigurations().Informer(),
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+			authorizers = append(authorizers, gkeautopilotAuthorizer)
+			ruleResolvers = append(ruleResolvers, gkeautopilotAuthorizer)
 		default:
 			return nil, nil, fmt.Errorf("unknown authorization mode %s specified", authorizationMode)
 		}

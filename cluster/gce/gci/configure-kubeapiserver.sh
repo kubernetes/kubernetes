@@ -300,6 +300,19 @@ function start-kube-apiserver {
   local authorization_mode="RBAC"
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
 
+  # Enable GKEAutopilot authz plugin if its config file is set as an env variable
+  if [ -n "${GKEAUTOPILOT_AUTHZ_CONFIG_YAML:-}" ]; then
+    echo "Enabling GKEAutopilot authz plugin"
+
+    #Add GKEAutopilot mode to the list apiserver auth plugins
+    authorization_mode="GKEAutopilot,${authorization_mode}"
+
+    # Create GKEAutopilot config file off of GKEAUTOPILOT_AUTHZ_CONFIG_YAML env var
+    cat > "/etc/srv/kubernetes/gkeautopilot-authz-config.yaml" <<EOF
+$GKEAUTOPILOT_AUTHZ_CONFIG_YAML
+EOF
+  fi
+
   # Enable ABAC mode unless the user explicitly opts out with ENABLE_LEGACY_ABAC=false
   if [[ "${ENABLE_LEGACY_ABAC:-}" != "false" ]]; then
     echo "Warning: Enabling legacy ABAC policy. All service accounts will have superuser API access. Set ENABLE_LEGACY_ABAC=false to disable this."
