@@ -27,6 +27,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/net v0.0.0-20201022231255-08b38378de70
+	golang.org/x/sys v0.0.0-20201013081832-0aaa2718063a // indirect
 	google.golang.org/protobuf v1.24.0 // indirect
 	gopkg.in/inf.v0 v0.9.1
 	gopkg.in/yaml.v2 v2.2.8
@@ -36,4 +37,7 @@ require (
 	sigs.k8s.io/yaml v1.2.0
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f
+	k8s.io/apimachinery => ../apimachinery
+)

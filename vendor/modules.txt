@@ -72,7 +72,7 @@ github.com/JeffAshton/win_pdh
 # github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd => github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
 github.com/MakeNowJust/heredoc
 # github.com/MakeNowJust/heredoc => github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
-# github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5 => github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5
+# github.com/Microsoft/go-winio v0.4.15-0.20200908182639-5b44b70ab3ab => github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5
 ## explicit
 github.com/Microsoft/go-winio
 # github.com/Microsoft/go-winio => github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5
@@ -235,8 +235,8 @@ github.com/containerd/cgroups/stats/v1
 # github.com/containerd/console v1.0.0 => github.com/containerd/console v1.0.0
 github.com/containerd/console
 # github.com/containerd/console => github.com/containerd/console v1.0.0
-# github.com/containerd/containerd v1.3.3 => github.com/containerd/containerd v1.3.3
-# github.com/containerd/containerd => github.com/containerd/containerd v1.3.3
+# github.com/containerd/containerd v1.4.1 => github.com/containerd/containerd v1.4.1
+# github.com/containerd/containerd => github.com/containerd/containerd v1.4.1
 github.com/containerd/containerd/api/services/containers/v1
 github.com/containerd/containerd/api/services/tasks/v1
 github.com/containerd/containerd/api/services/version/v1
@@ -244,12 +244,13 @@ github.com/containerd/containerd/api/types
 github.com/containerd/containerd/api/types/task
 github.com/containerd/containerd/containers
 github.com/containerd/containerd/errdefs
+github.com/containerd/containerd/identifiers
 github.com/containerd/containerd/namespaces
 github.com/containerd/containerd/pkg/dialer
 # github.com/containerd/continuity => github.com/containerd/continuity v0.0.0-20190426062206-aaeac12a7ffc
 # github.com/containerd/fifo => github.com/containerd/fifo v0.0.0-20190226154929-a9fb20d87448
 # github.com/containerd/go-runc => github.com/containerd/go-runc v0.0.0-20180907222934-5a6d9f37cfa3
-# github.com/containerd/ttrpc v1.0.0 => github.com/containerd/ttrpc v1.0.0
+# github.com/containerd/ttrpc v1.0.2 => github.com/containerd/ttrpc v1.0.0
 github.com/containerd/ttrpc
 # github.com/containerd/ttrpc => github.com/containerd/ttrpc v1.0.0
 # github.com/containerd/typeurl => github.com/containerd/typeurl v1.0.0
@@ -284,6 +285,7 @@ github.com/coreos/go-systemd/daemon
 github.com/coreos/go-systemd/journal
 github.com/coreos/go-systemd/util
 # github.com/coreos/go-systemd/v22 v22.1.0 => github.com/coreos/go-systemd/v22 v22.1.0
+## explicit
 # github.com/coreos/go-systemd/v22 => github.com/coreos/go-systemd/v22 v22.1.0
 github.com/coreos/go-systemd/v22/dbus
 # github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f => github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
@@ -316,9 +318,9 @@ github.com/dgrijalva/jwt-go
 github.com/docker/distribution/digestset
 github.com/docker/distribution/reference
 github.com/docker/distribution/registry/api/errcode
-# github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c => github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c
+# github.com/docker/docker v17.12.0-ce-rc1.0.20200916142827-bd33bbf0497b+incompatible => github.com/docker/docker v17.12.0-ce-rc1.0.20200916142827-bd33bbf0497b+incompatible
 ## explicit
-# github.com/docker/docker => github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c
+# github.com/docker/docker => github.com/docker/docker v17.12.0-ce-rc1.0.20200916142827-bd33bbf0497b+incompatible
 github.com/docker/docker/api
 github.com/docker/docker/api/types
 github.com/docker/docker/api/types/blkiodev
@@ -347,6 +349,7 @@ github.com/docker/docker/pkg/term/windows
 github.com/docker/go-connections/nat
 github.com/docker/go-connections/sockets
 github.com/docker/go-connections/tlsconfig
+# github.com/docker/go-events => github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c
 # github.com/docker/go-units v0.4.0 => github.com/docker/go-units v0.4.0
 ## explicit
 github.com/docker/go-units
@@ -458,6 +461,7 @@ github.com/go-stack/stack
 # github.com/godbus/dbus/v5 v5.0.3 => github.com/godbus/dbus/v5 v5.0.3
 github.com/godbus/dbus/v5
 # github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.3
+# github.com/gogo/googleapis => github.com/gogo/googleapis v1.4.0
 # github.com/gogo/protobuf v1.3.1 => github.com/gogo/protobuf v1.3.1
 ## explicit
 # github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.1
@@ -517,9 +521,9 @@ github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.0 => github.com/google/btree v1.0.0
 github.com/google/btree
 # github.com/google/btree => github.com/google/btree v1.0.0
-# github.com/google/cadvisor v0.37.0 => github.com/google/cadvisor v0.37.0
+# github.com/google/cadvisor v0.37.1-0.20201030032920-b31c0ce7a97f => github.com/google/cadvisor v0.37.1-0.20201030032920-b31c0ce7a97f
 ## explicit
-# github.com/google/cadvisor => github.com/google/cadvisor v0.37.0
+# github.com/google/cadvisor => github.com/google/cadvisor v0.37.1-0.20201030032920-b31c0ce7a97f
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
 github.com/google/cadvisor/client/v2
@@ -878,7 +882,7 @@ github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb => github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb
+# github.com/opencontainers/runc v1.0.0-rc92 => github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb
 ## explicit
 # github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb
 github.com/opencontainers/runc/libcontainer
@@ -902,7 +906,7 @@ github.com/opencontainers/runc/libcontainer/system
 github.com/opencontainers/runc/libcontainer/user
 github.com/opencontainers/runc/libcontainer/utils
 github.com/opencontainers/runc/types
-# github.com/opencontainers/runtime-spec v1.0.3-0.20200520003142-237cc4f519e2 => github.com/opencontainers/runtime-spec v1.0.3-0.20200520003142-237cc4f519e2
+# github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6 => github.com/opencontainers/runtime-spec v1.0.3-0.20200520003142-237cc4f519e2
 # github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20200520003142-237cc4f519e2
 github.com/opencontainers/runtime-spec/specs-go
 # github.com/opencontainers/selinux v1.5.2 => github.com/opencontainers/selinux v1.5.2
@@ -986,6 +990,8 @@ github.com/shurcooL/sanitized_anchor_name
 github.com/sirupsen/logrus
 # github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.6.0
 # github.com/smartystreets/assertions => github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d
+# github.com/smartystreets/goconvey v1.6.4 => github.com/smartystreets/goconvey v1.6.4
+## explicit
 # github.com/smartystreets/goconvey => github.com/smartystreets/goconvey v1.6.4
 # github.com/soheilhy/cmux v0.1.4 => github.com/soheilhy/cmux v0.1.4
 github.com/soheilhy/cmux
@@ -1289,7 +1295,7 @@ golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e => golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 # golang.org/x/sync => golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f => golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f
+# golang.org/x/sys v0.0.0-20201013081832-0aaa2718063a => golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f
 ## explicit
 # golang.org/x/sys => golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f
 golang.org/x/sys/cpu
@@ -1422,7 +1428,7 @@ google.golang.org/appengine/urlfetch
 google.golang.org/genproto/googleapis/api/httpbody
 google.golang.org/genproto/googleapis/rpc/status
 google.golang.org/genproto/protobuf/field_mask
-# google.golang.org/grpc v1.27.0 => google.golang.org/grpc v1.27.0
+# google.golang.org/grpc v1.27.1 => google.golang.org/grpc v1.27.0
 ## explicit
 google.golang.org/grpc
 # google.golang.org/grpc => google.golang.org/grpc v1.27.0
@@ -2458,10 +2464,10 @@ k8s.io/metrics/pkg/client/custom_metrics/fake
 k8s.io/metrics/pkg/client/custom_metrics/scheme
 k8s.io/metrics/pkg/client/external_metrics
 k8s.io/metrics/pkg/client/external_metrics/fake
-# k8s.io/mount-utils v0.0.0 => ./staging/src/k8s.io/mount-utils
+# k8s.io/mount-utils v0.20.0-alpha.3 => k8s.io/mount-utils v0.20.0-alpha.3
 ## explicit
 k8s.io/mount-utils
-# k8s.io/mount-utils => ./staging/src/k8s.io/mount-utils
+# k8s.io/mount-utils => k8s.io/mount-utils v0.20.0-alpha.3
 # k8s.io/sample-apiserver v0.0.0 => ./staging/src/k8s.io/sample-apiserver
 ## explicit
 # k8s.io/sample-apiserver => ./staging/src/k8s.io/sample-apiserver
