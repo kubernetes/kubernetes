@@ -204,7 +204,7 @@ func TestGet(t *testing.T) {
 		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
 			ttl := uint64(1)
 			return updateObj, &ttl, nil
-		})
+		}, nil)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
@@ -592,7 +592,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 				}
 				pod.Name = name
 				return &pod, nil
-			}))
+			}), nil)
 		store.transformer = originalTransformer
 
 		if tt.expectNotFoundErr {
@@ -645,7 +645,7 @@ func TestGuaranteedUpdateWithTTL(t *testing.T) {
 		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
 			ttl := uint64(1)
 			return input, &ttl, nil
-		})
+		}, nil)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -742,7 +742,7 @@ func TestGuaranteedUpdateWithConflict(t *testing.T) {
 				pod.Name = "foo-1"
 				secondToEnter.Wait()
 				return pod, nil
-			}))
+			}), nil)
 		firstToFinish.Done()
 		errChan <- err
 	}()
@@ -758,7 +758,7 @@ func TestGuaranteedUpdateWithConflict(t *testing.T) {
 			pod := obj.(*example.Pod)
 			pod.Name = "foo-2"
 			return pod, nil
-		}))
+		}), nil)
 	if err != nil {
 		t.Fatalf("Second GuaranteedUpdate error %#v", err)
 	}
@@ -784,6 +784,7 @@ func TestGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
 			pod.Name = "foo-2"
 			return pod, nil
 		}),
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -875,7 +876,7 @@ func TestTransformationFailure(t *testing.T) {
 	// GuaranteedUpdate without suggestion should return an error
 	if err := store.GuaranteedUpdate(ctx, preset[1].key, &example.Pod{}, false, nil, func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
 		return input, nil, nil
-	}); !storage.IsInternalError(err) {
+	}, nil); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	// GuaranteedUpdate with suggestion should return an error if we don't change the object
