@@ -204,7 +204,6 @@ func (o *QuotaOpts) createQuota() (*corev1.ResourceQuota, error) {
 	if o.EnforceNamespace {
 		namespace = o.Namespace
 	}
-	fmt.Println(corev1.SchemeGroupVersion.String())
 	resourceQuota := &corev1.ResourceQuota{
 		TypeMeta: metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: "ResourceQuota"},
 		ObjectMeta: metav1.ObjectMeta{
