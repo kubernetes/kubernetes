@@ -433,8 +433,19 @@ func (c *Cacher) Create(ctx context.Context, key string, obj, out runtime.Object
 // Delete implements storage.Interface.
 func (c *Cacher) Delete(
 	ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions,
-	validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object) error {
-	return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, cachedExistingObject)
+	validateDeletion storage.ValidateObjectFunc, _ runtime.Object) error {
+	// Ignore the suggestion and try to pass down the current version of the object
+	// read from cache.
+	if elem, exists, err := c.watchCache.GetByKey(key); err != nil {
+		klog.Errorf("GetByKey returned error: %v", err)
+	} else if exists {
+		// DeepCopy the object since we modify resource version when serializing the
+		// current object.
+		currObj := elem.(*storeElement).Object.DeepCopyObject()
+		return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, currObj)
+	}
+	// If we couldn't get the object, fallback to no-suggestion.
+	return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, nil)
 }
 
 // Watch implements storage.Interface.
