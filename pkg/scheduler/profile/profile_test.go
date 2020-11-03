@@ -246,7 +246,7 @@ func TestNewMap(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			m, err := NewMap(tc.cfgs, fakeFrameworkFactory, nilRecorderFactory)
+			m, err := NewMap(tc.cfgs, fakeRegistry, nilRecorderFactory)
 			if err := checkErr(err, tc.wantErr); err != nil {
 				t.Fatal(err)
 			}
@@ -276,10 +276,6 @@ func (p *fakePlugin) Bind(context.Context, *framework.CycleState, *v1.Pod, strin
 
 func newFakePlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &fakePlugin{}, nil
-}
-
-func fakeFrameworkFactory(cfg config.KubeSchedulerProfile, opts ...frameworkruntime.Option) (framework.Framework, error) {
-	return frameworkruntime.NewFramework(fakeRegistry, cfg.Plugins, cfg.PluginConfig, opts...)
 }
 
 func nilRecorderFactory(_ string) events.EventRecorder {
