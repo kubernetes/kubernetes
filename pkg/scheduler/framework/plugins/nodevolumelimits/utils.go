@@ -19,12 +19,11 @@ package nodevolumelimits
 import (
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -86,7 +85,8 @@ func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
 func volumeLimits(n *framework.NodeInfo) map[v1.ResourceName]int64 {
 	volumeLimits := map[v1.ResourceName]int64{}
 	for k, v := range n.Allocatable.ScalarResources {
-		if v1helper.IsAttachableVolumeResourceName(k) {
+		// storage resource limits are prefixed with v1.ResourceAttachableVolumesPrefix
+		if strings.HasPrefix(string(k), v1.ResourceAttachableVolumesPrefix) {
 			volumeLimits[k] = v
 		}
 	}

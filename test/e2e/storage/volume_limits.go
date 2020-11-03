@@ -17,10 +17,11 @@ limitations under the License.
 package storage
 
 import (
+	"strings"
+
 	"github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -54,7 +55,8 @@ func getVolumeLimit(node *v1.Node) map[v1.ResourceName]int64 {
 	volumeLimits := map[v1.ResourceName]int64{}
 	nodeAllocatables := node.Status.Allocatable
 	for k, v := range nodeAllocatables {
-		if v1helper.IsAttachableVolumeResourceName(k) {
+		// storage resource limits are prefixed with v1.ResourceAttachableVolumesPrefix
+		if strings.HasPrefix(string(k), v1.ResourceAttachableVolumesPrefix) {
 			volumeLimits[k] = v.Value()
 		}
 	}

@@ -130,11 +130,6 @@ func IsOvercommitAllowed(name v1.ResourceName) bool {
 		!IsHugePageResourceName(name)
 }
 
-// IsAttachableVolumeResourceName returns true when the resource name is prefixed in attachable volume
-func IsAttachableVolumeResourceName(name v1.ResourceName) bool {
-	return strings.HasPrefix(string(name), v1.ResourceAttachableVolumesPrefix)
-}
-
 // IsServiceIPSet aims to check if the service's ClusterIP is set or not
 // the objective is not to perform validation here
 func IsServiceIPSet(service *v1.Service) bool {
