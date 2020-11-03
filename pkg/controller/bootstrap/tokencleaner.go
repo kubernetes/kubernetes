@@ -54,6 +54,7 @@ type TokenCleanerOptions struct {
 func DefaultTokenCleanerOptions() TokenCleanerOptions {
 	return TokenCleanerOptions{
 		TokenSecretNamespace: api.NamespaceSystem,
+		SecretResync:         10 * time.Minute,
 	}
 }
 
