@@ -88,6 +88,16 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod0, "busybox-container"): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 				}),
+
+				"pod_cpu_usage_seconds_total": gstruct.MatchElements(containerID, gstruct.IgnoreExtras, gstruct.Elements{
+					fmt.Sprintf("%s::%s", f.Namespace.Name, pod0): boundedSample(0, 100),
+					fmt.Sprintf("%s::%s", f.Namespace.Name, pod1): boundedSample(0, 100),
+				}),
+
+				"pod_memory_working_set_bytes": gstruct.MatchAllElements(containerID, gstruct.Elements{
+					fmt.Sprintf("%s::%s", f.Namespace.Name, pod0): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
+					fmt.Sprintf("%s::%s", f.Namespace.Name, pod1): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
+				}),
 			})
 			ginkgo.By("Giving pods a minute to start up and produce metrics")
 			gomega.Eventually(getV1alpha1ResourceMetrics, 1*time.Minute, 15*time.Second).Should(matchV1alpha1Expectations)
