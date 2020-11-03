@@ -725,7 +725,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigrationOpenStack:          {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires OpenStack Cinder CSI driver)
 	CSIMigrationOpenStackComplete:  {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSubpath:                  {Default: true, PreRelease: featuregate.GA},
-	ConfigurableFSGroupPolicy:      {Default: false, PreRelease: featuregate.Alpha},
+	ConfigurableFSGroupPolicy:      {Default: true, PreRelease: featuregate.Beta},
 	BalanceAttachedNodeVolumes:     {Default: false, PreRelease: featuregate.Alpha},
 	CSIBlockVolume:                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	CSIInlineVolume:                {Default: true, PreRelease: featuregate.Beta},
