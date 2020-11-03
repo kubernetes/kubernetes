@@ -200,6 +200,8 @@ func (c *Publisher) syncNamespace(ns string) error {
 		return nil
 	}
 
+	// copy so we don't modify the cache's instance of the configmap
+	cm = cm.DeepCopy()
 	cm.Data = data
 
 	_, err = c.client.CoreV1().ConfigMaps(ns).Update(context.TODO(), cm, metav1.UpdateOptions{})

@@ -206,8 +206,8 @@ run_kubectl_get_tests() {
   kubectl delete pods redis-master valid-pod "${kube_flags[@]}"
 
   ### Test 'kubectl get -k <dir>' prints all the items built from a kustomization directory
-  # Pre-condition: no ConfigMap, Deployment, Service exist
-  kube::test::get_object_assert configmaps "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Pre-Condition: No configmaps with name=test-the-map, no Deployment, Service exist
+  kube::test::get_object_assert 'configmaps --field-selector=metadata.name=test-the-map' "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
@@ -224,7 +224,7 @@ run_kubectl_get_tests() {
   kubectl delete -k hack/testdata/kustomize
 
   # Check that all items in the list are deleted
-  kube::test::get_object_assert configmaps "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert 'configmaps --field-selector=metadata.name=test-the-map' "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" ''
 
