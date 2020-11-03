@@ -11,12 +11,16 @@ require (
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381 // indirect
-	golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4 // indirect
+	golang.org/x/sys v0.0.0-20201013081832-0aaa2718063a // indirect
 	golang.org/x/text v0.3.3 // indirect
-	google.golang.org/grpc v1.27.0
+	google.golang.org/grpc v1.27.1
 	google.golang.org/protobuf v1.24.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 )
 
-replace k8s.io/cri-api => ../cri-api
+replace (
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4
+	google.golang.org/grpc => google.golang.org/grpc v1.27.0
+	k8s.io/cri-api => ../cri-api
+)

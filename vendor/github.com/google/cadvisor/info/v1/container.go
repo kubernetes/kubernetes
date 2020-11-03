@@ -399,9 +399,16 @@ type MemoryStats struct {
 	HierarchicalData MemoryStatsMemoryData `json:"hierarchical_data,omitempty"`
 }
 
+type MemoryNumaStats struct {
+	File        map[uint8]uint64 `json:"file,omitempty"`
+	Anon        map[uint8]uint64 `json:"anon,omitempty"`
+	Unevictable map[uint8]uint64 `json:"unevictable,omitempty"`
+}
+
 type MemoryStatsMemoryData struct {
-	Pgfault    uint64 `json:"pgfault"`
-	Pgmajfault uint64 `json:"pgmajfault"`
+	Pgfault    uint64          `json:"pgfault"`
+	Pgmajfault uint64          `json:"pgmajfault"`
+	NumaStats  MemoryNumaStats `json:"numa_stats,omitempty"`
 }
 
 type InterfaceStats struct {
@@ -827,6 +834,13 @@ type AcceleratorStats struct {
 
 // PerfStat represents value of a single monitored perf event.
 type PerfStat struct {
+	PerfValue
+
+	// CPU that perf event was measured on.
+	Cpu int `json:"cpu"`
+}
+
+type PerfValue struct {
 	// Indicates scaling ratio for an event: time_running/time_enabled
 	// (amount of time that event was being measured divided by
 	// amount of time that event was enabled for).
@@ -843,9 +857,6 @@ type PerfStat struct {
 
 	// Name is human readable name of an event.
 	Name string `json:"name"`
-
-	// CPU that perf event was measured on.
-	Cpu int `json:"cpu"`
 }
 
 // MemoryBandwidthStats corresponds to MBM (Memory Bandwidth Monitoring).
@@ -876,22 +887,7 @@ type ResctrlStats struct {
 
 // PerfUncoreStat represents value of a single monitored perf uncore event.
 type PerfUncoreStat struct {
-	// Indicates scaling ratio for an event: time_running/time_enabled
-	// (amount of time that event was being measured divided by
-	// amount of time that event was enabled for).
-	// value 1.0 indicates that no multiplexing occurred. Value close
-	// to 0 indicates that event was measured for short time and event's
-	// value might be inaccurate.
-	// See: https://lwn.net/Articles/324756/
-	ScalingRatio float64 `json:"scaling_ratio"`
-
-	// Value represents value of perf event retrieved from OS. It is
-	// normalized against ScalingRatio and takes multiplexing into
-	// consideration.
-	Value uint64 `json:"value"`
-
-	// Name is human readable name of an event.
-	Name string `json:"name"`
+	PerfValue
 
 	// Socket that perf event was measured on.
 	Socket int `json:"socket"`

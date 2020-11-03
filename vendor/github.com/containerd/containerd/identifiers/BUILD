@@ -2,21 +2,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "context.go",
-        "grpc.go",
-        "store.go",
-        "ttrpc.go",
-    ],
-    importmap = "k8s.io/kubernetes/vendor/github.com/containerd/containerd/namespaces",
-    importpath = "github.com/containerd/containerd/namespaces",
+    srcs = ["validate.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/containerd/containerd/identifiers",
+    importpath = "github.com/containerd/containerd/identifiers",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/containerd/containerd/errdefs:go_default_library",
-        "//vendor/github.com/containerd/containerd/identifiers:go_default_library",
-        "//vendor/github.com/containerd/ttrpc:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
-        "//vendor/google.golang.org/grpc/metadata:go_default_library",
     ],
 )
 

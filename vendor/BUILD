@@ -66,6 +66,7 @@ filegroup(
         "//vendor/github.com/containerd/containerd/api/types:all-srcs",
         "//vendor/github.com/containerd/containerd/containers:all-srcs",
         "//vendor/github.com/containerd/containerd/errdefs:all-srcs",
+        "//vendor/github.com/containerd/containerd/identifiers:all-srcs",
         "//vendor/github.com/containerd/containerd/namespaces:all-srcs",
         "//vendor/github.com/containerd/containerd/pkg/dialer:all-srcs",
         "//vendor/github.com/containerd/ttrpc:all-srcs",

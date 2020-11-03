@@ -23,4 +23,7 @@ require (
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
-replace k8s.io/code-generator => ../code-generator
+replace (
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4
+	k8s.io/code-generator => ../code-generator
+)

@@ -57,6 +57,11 @@ func getAvgPowerBudget() (uint, error) {
 		return uint(0), fmt.Errorf("Unable to get number of NVM devices. Status code: %d", err)
 	}
 
+	if count == 0 {
+		klog.Warningf("There are no NVM devices!")
+		return uint(0), nil
+	}
+
 	// Load basic device information for all the devices
 	// to obtain UID of the first one.
 	devices := make([]C.struct_device_discovery, count)
@@ -97,7 +102,7 @@ func GetInfo() (info.NVMInfo, error) {
 
 	nvmInfo := info.NVMInfo{}
 	if !isNVMLibInitialized {
-		klog.V(1).Info("libimpctl has not been initialized. NVM information will not be available")
+		klog.V(1).Info("libipmctl has not been initialized. NVM information will not be available")
 		return nvmInfo, nil
 	}
 
