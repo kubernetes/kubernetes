@@ -287,11 +287,9 @@ var (
 	}
 	// BlockVolModeDynamicPV is TestPattern for "Dynamic PV (block)"
 	BlockVolModeDynamicPV = TestPattern{
-		Name:                   "Dynamic PV (block volmode)",
-		VolType:                DynamicPV,
-		VolMode:                v1.PersistentVolumeBlock,
-		SnapshotType:           DynamicCreatedSnapshot,
-		SnapshotDeletionPolicy: DeleteSnapshot,
+		Name:    "Dynamic PV (block volmode)",
+		VolType: DynamicPV,
+		VolMode: v1.PersistentVolumeBlock,
 	}
 
 	// Definitions for snapshot case
