@@ -22,14 +22,18 @@ import (
 	"net/http"
 	"net/url"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
@@ -103,7 +107,21 @@ func (r *AttachREST) Connect(ctx context.Context, name string, opts runtime.Obje
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder), nil
+	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder)
+
+	ns, ok := genericapirequest.NamespaceFrom(ctx)
+	if !ok {
+		return nil, errors.NewBadRequest("missing namespace")
+	}
+	backendRequest := *attachOpts
+	backendRequest.Pod = &api.ObjectReference{
+		Name:      name,
+		Namespace: ns,
+	}
+	if err := setBackendRequest(handler, &backendRequest); err != nil {
+		return nil, errors.NewInternalError(err)
+	}
+	return handler, nil
 }
 
 // NewConnectOptions returns the versioned object that represents exec parameters
@@ -140,7 +158,21 @@ func (r *ExecREST) Connect(ctx context.Context, name string, opts runtime.Object
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder), nil
+	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder)
+
+	ns, ok := genericapirequest.NamespaceFrom(ctx)
+	if !ok {
+		return nil, errors.NewBadRequest("missing namespace")
+	}
+	backendRequest := *execOpts
+	backendRequest.Pod = &api.ObjectReference{
+		Name:      name,
+		Namespace: ns,
+	}
+	if err := setBackendRequest(handler, &backendRequest); err != nil {
+		return nil, errors.NewInternalError(err)
+	}
+	return handler, nil
 }
 
 // NewConnectOptions returns the versioned object that represents exec parameters
@@ -188,7 +220,21 @@ func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime
 	if err != nil {
 		return nil, err
 	}
-	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder), nil
+	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder)
+
+	ns, ok := genericapirequest.NamespaceFrom(ctx)
+	if !ok {
+		return nil, errors.NewBadRequest("missing namespace")
+	}
+	backendRequest := *portForwardOpts
+	backendRequest.Pod = &api.ObjectReference{
+		Name:      name,
+		Namespace: ns,
+	}
+	if err := setBackendRequest(handler, &backendRequest); err != nil {
+		return nil, errors.NewInternalError(err)
+	}
+	return handler, nil
 }
 
 func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired, interceptRedirects bool, responder rest.Responder) *proxy.UpgradeAwareHandler {
@@ -197,4 +243,28 @@ func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.Roun
 	handler.RequireSameHostRedirects = utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidateProxyRedirects)
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec
 	return handler
+}
+
+func setBackendRequest(handler *proxy.UpgradeAwareHandler, requestObj runtime.Object) error {
+	json, err := marshalToJSON(requestObj)
+	if err != nil {
+		return err
+	}
+	// Technically the websocket protocol doesn't accept POST requests, but the Kubelet requires it.
+	// TODO: Ideally, the connection to the Kubelet would only support a single protocol, and the proxy handler
+	// would proxy the individual streams to support websocket connections.
+	handler.RequestConfigurer.Method = "POST"
+	handler.RequestConfigurer.Body = json
+	return nil
+}
+
+func marshalToJSON(obj runtime.Object) ([]byte, error) {
+	gv := v1.SchemeGroupVersion
+	codecs := clientsetscheme.Codecs
+	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	if !ok {
+		return []byte{}, fmt.Errorf("failed to get json serializer")
+	}
+	encoder := codecs.EncoderForVersion(info.Serializer, gv)
+	return runtime.Encode(encoder, obj)
 }

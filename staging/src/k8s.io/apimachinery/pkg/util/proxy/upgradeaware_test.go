@@ -88,6 +88,7 @@ type SimpleBackendHandler struct {
 	requestHeader  http.Header
 	requestBody    []byte
 	requestMethod  string
+	responseCode   int
 	responseBody   string
 	responseHeader map[string]string
 	t              *testing.T
@@ -108,6 +109,9 @@ func (s *SimpleBackendHandler) ServeHTTP(w http.ResponseWriter, req *http.Reques
 		for k, v := range s.responseHeader {
 			w.Header().Add(k, v)
 		}
+	}
+	if s.responseCode != 0 {
+		w.WriteHeader(s.responseCode)
 	}
 	w.Write([]byte(s.responseBody))
 }
@@ -331,6 +335,41 @@ func TestServeHTTP(t *testing.T) {
 	}
 }
 
+func TestOverrideRequest(t *testing.T) {
+	body := []byte("test request override")
+
+	backendHandler := &SimpleBackendHandler{
+		responseCode:   http.StatusSwitchingProtocols,
+		responseBody:   "<html><head></head><body><a href=\"/test/path\">Hello</a></body></html>",
+		responseHeader: map[string]string{"Content-Type": "text/html"},
+	}
+	backendServer := httptest.NewServer(backendHandler)
+	defer backendServer.Close()
+
+	responder := &fakeResponder{t: t}
+	backendURL, _ := url.Parse(backendServer.URL)
+	proxyHandler := NewUpgradeAwareHandler(backendURL, nil, false, true, responder)
+	proxyHandler.RequestConfigurer.Method = "POST"
+	proxyHandler.RequestConfigurer.Body = body
+	proxyServer := httptest.NewServer(proxyHandler)
+	defer proxyServer.Close()
+	proxyURL, _ := url.Parse(proxyServer.URL)
+
+	req, err := http.NewRequest("GET", proxyURL.String(), nil)
+	req.Header.Set(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
+	require.NoError(t, err, "creating client request")
+
+	client := &http.Client{}
+	res, err := client.Do(req)
+	require.NoError(t, err, "from proxy request")
+
+	assert.Equal(t, http.StatusSwitchingProtocols, res.StatusCode)
+
+	// Validate backend request
+	assert.Equal(t, "POST", backendHandler.requestMethod)
+	assert.Equal(t, body, backendHandler.requestBody)
+}
+
 type RoundTripperFunc func(req *http.Request) (*http.Response, error)
 
 func (fn RoundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -453,7 +492,7 @@ func TestProxyUpgrade(t *testing.T) {
 				tcName += " with redirect"
 				backendPath = "/redirect"
 			}
-			func() { // Cleanup after each test case.
+			t.Run(tcName, func(t *testing.T) { // Cleanup after each test case.
 				backend := http.NewServeMux()
 				backend.Handle("/hello", websocket.Handler(func(ws *websocket.Conn) {
 					if ws.Request().Header.Get("Authorization") != tc.ExpectedAuth {
@@ -483,23 +522,23 @@ func TestProxyUpgrade(t *testing.T) {
 
 				ws, err := websocket.Dial("ws://"+proxy.Listener.Addr().String()+"/some/path", "", "http://127.0.0.1/")
 				if err != nil {
-					t.Fatalf("%s: websocket dial err: %s", tcName, err)
+					t.Fatalf("websocket dial err: %s", err)
 				}
 				defer ws.Close()
 
 				if _, err := ws.Write([]byte("world")); err != nil {
-					t.Fatalf("%s: write err: %s", tcName, err)
+					t.Fatalf("write err: %s", err)
 				}
 
 				response := make([]byte, 20)
 				n, err := ws.Read(response)
 				if err != nil {
-					t.Fatalf("%s: read err: %s", tcName, err)
+					t.Fatalf("read err: %s", err)
 				}
 				if e, a := "hello world", string(response[0:n]); e != a {
-					t.Fatalf("%s: expected '%#v', got '%#v'", tcName, e, a)
+					t.Fatalf("expected '%#v', got '%#v'", e, a)
 				}
-			}()
+			})
 		}
 	}
 }

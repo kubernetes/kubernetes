@@ -80,6 +80,42 @@ type UpgradeAwareHandler struct {
 	MaxBytesPerSec int64
 	// Responder is passed errors that occur while setting up proxying.
 	Responder ErrorResponder
+	// RequestConfigurer configures the request that is sent to the backend.
+	RequestConfigurer RequestConfigurer
+}
+
+// RequestConfigurer configures a proxied request.
+type RequestConfigurer struct {
+	// The request method to use
+	Method string
+	// Headers to mix in. If a header is already set, it's value is replaced.
+	Headers map[string]string
+	// Bytes to use as the request body.
+	Body []byte
+}
+
+func (r *RequestConfigurer) NewRequest(incoming *http.Request, location *url.URL) *http.Request {
+	outgoing := utilnet.CloneRequest(incoming)
+	outgoing.URL = location
+	outgoing.Host = location.Host
+
+	if r.Method != "" {
+		outgoing.Method = r.Method
+	}
+
+	if r.Body != nil {
+		outgoing.ContentLength = int64(len(r.Body))
+		outgoing.GetBody = func() (io.ReadCloser, error) {
+			return ioutil.NopCloser(bytes.NewReader(r.Body)), nil
+		}
+		outgoing.Body, _ = outgoing.GetBody()
+	}
+
+	for k, v := range r.Headers {
+		outgoing.Header.Set(k, v)
+	}
+
+	return outgoing
 }
 
 const defaultFlushInterval = 200 * time.Millisecond
@@ -174,8 +210,9 @@ func normalizeLocation(location *url.URL) *url.URL {
 // NewUpgradeAwareHandler creates a new proxy handler with a default flush interval. Responder is required for returning
 // errors to the caller.
 func NewUpgradeAwareHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder ErrorResponder) *UpgradeAwareHandler {
+	loc := normalizeLocation(location)
 	return &UpgradeAwareHandler{
-		Location:        normalizeLocation(location),
+		Location:        loc,
 		Transport:       transport,
 		WrapTransport:   wrapTransport,
 		UpgradeRequired: upgradeRequired,
@@ -221,12 +258,12 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 		h.Transport = h.defaultProxyTransport(req.URL, h.Transport)
 	}
 
-	// WithContext creates a shallow clone of the request with the same context.
-	newReq := req.WithContext(req.Context())
-	newReq.Header = utilnet.CloneHeader(req.Header)
-	if !h.UseRequestLocation {
-		newReq.URL = &loc
+	if h.UseRequestLocation {
+		loc = *req.URL
 	}
+
+	// WithContext creates a shallow outgoing of the request with the same context.
+	newReq := h.RequestConfigurer.NewRequest(req, &loc)
 
 	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: h.Location.Scheme, Host: h.Location.Host})
 	proxy.Transport = h.Transport
@@ -273,17 +310,16 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		location.Host = h.Location.Host
 	}
 
-	clone := utilnet.CloneRequest(req)
+	outgoing := h.RequestConfigurer.NewRequest(req, &location)
 	// Only append X-Forwarded-For in the upgrade path, since httputil.NewSingleHostReverseProxy
 	// handles this in the non-upgrade path.
-	utilnet.AppendForwardedForHeader(clone)
+	utilnet.AppendForwardedForHeader(outgoing)
 	if h.InterceptRedirects {
-		klog.V(6).Infof("Connecting to backend proxy (intercepting redirects) %s\n  Headers: %v", &location, clone.Header)
-		backendConn, rawResponse, err = utilnet.ConnectWithRedirects(req.Method, &location, clone.Header, req.Body, utilnet.DialerFunc(h.DialForUpgrade), h.RequireSameHostRedirects)
+		klog.V(6).Infof("Connecting to backend proxy (intercepting redirects) %s\n  Headers: %v", &location, outgoing.Header)
+		backendConn, rawResponse, err = utilnet.ConnectWithRedirects(outgoing.Method, &location, outgoing.Header, outgoing.Body, utilnet.DialerFunc(h.DialForUpgrade), h.RequireSameHostRedirects)
 	} else {
-		klog.V(6).Infof("Connecting to backend proxy (direct dial) %s\n  Headers: %v", &location, clone.Header)
-		clone.URL = &location
-		backendConn, err = h.DialForUpgrade(clone)
+		klog.V(6).Infof("Connecting to backend proxy (direct dial) %s\n  Headers: %v", &location, outgoing.Header)
+		backendConn, err = h.DialForUpgrade(outgoing)
 	}
 	if err != nil {
 		klog.V(6).Infof("Proxy connection error: %v", err)
@@ -395,7 +431,7 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	case <-writerComplete:
 	case <-readerComplete:
 	}
-	klog.V(6).Infof("Disconnecting from backend proxy %s\n  Headers: %v", &location, clone.Header)
+	klog.V(6).Infof("Disconnecting from backend proxy %s\n  Headers: %v", &location, outgoing.Header)
 
 	return true
 }
