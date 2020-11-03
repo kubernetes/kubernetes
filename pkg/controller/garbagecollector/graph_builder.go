@@ -633,6 +633,21 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		// 2. this allows things tracking virtual nodes' existence to stop polling and rely on informer events
 		observedIdentity := identityFromEvent(event, accessor)
 		if observedIdentity != existingNode.identity {
+			// find dependents that don't match the identity we observed
+			_, potentiallyInvalidDependents := partitionDependents(existingNode.getDependents(), observedIdentity)
+			// add those potentially invalid dependents to the attemptToDelete queue.
+			// if their owners are still solid the attemptToDelete will be a no-op.
+			// this covers the bad child -> good parent observation sequence.
+			// the good parent -> bad child observation sequence is handled in addDependentToOwners
+			for _, dep := range potentiallyInvalidDependents {
+				if len(observedIdentity.Namespace) > 0 && dep.identity.Namespace != observedIdentity.Namespace {
+					// Namespace mismatch, this is definitely wrong
+					klog.V(2).Infof("node %s references an owner %s but does not match namespaces", dep.identity, observedIdentity)
+					gb.reportInvalidNamespaceOwnerRef(dep, observedIdentity.UID)
+				}
+				gb.attemptToDelete.Add(dep)
+			}
+
 			// make a copy (so we don't modify the existing node in place), store the observed identity, and replace the virtual node
 			klog.V(2).Infof("replacing virtual node %s with observed node %s", existingNode.identity, observedIdentity)
 			existingNode = existingNode.clone()
