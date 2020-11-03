@@ -413,6 +413,7 @@ func init() {
 	logging.skipHeaders = false
 	logging.addDirHeader = false
 	logging.skipLogHeaders = false
+	logging.oneOutput = false
 	go logging.flushDaemon()
 }
 
@@ -432,6 +433,7 @@ func InitFlags(flagset *flag.FlagSet) {
 	flagset.Var(&logging.verbosity, "v", "number for the log level verbosity")
 	flagset.BoolVar(&logging.addDirHeader, "add_dir_header", logging.addDirHeader, "If true, adds the file directory to the header of the log messages")
 	flagset.BoolVar(&logging.skipHeaders, "skip_headers", logging.skipHeaders, "If true, avoid header prefixes in the log messages")
+	flagset.BoolVar(&logging.oneOutput, "one_output", logging.oneOutput, "If true, only write logs to their native severity level (vs also writing to each lower severity level")
 	flagset.BoolVar(&logging.skipLogHeaders, "skip_log_headers", logging.skipLogHeaders, "If true, avoid headers when opening log files")
 	flagset.Var(&logging.stderrThreshold, "stderrthreshold", "logs at or above this threshold go to stderr")
 	flagset.Var(&logging.vmodule, "vmodule", "comma-separated list of pattern=N settings for file-filtered logging")
@@ -505,6 +507,12 @@ type loggingT struct {
 
 	// If set, all output will be redirected unconditionally to the provided logr.Logger
 	logr logr.Logger
+
+	// If true, messages will not be propagated to lower severity log levels
+	oneOutput bool
+
+	// If set, all output will be filtered through the filter.
+	filter LogFilter
 }
 
 // buffer holds a byte Buffer for reuse. The zero value is ready for use.
@@ -687,7 +695,7 @@ func (buf *buffer) someDigits(i, d int) int {
 	return copy(buf.tmp[i:], buf.tmp[j:])
 }
 
-func (l *loggingT) println(s severity, logr logr.Logger, args ...interface{}) {
+func (l *loggingT) println(s severity, logr logr.Logger, filter LogFilter, args ...interface{}) {
 	buf, file, line := l.header(s, 0)
 	// if logr is set, we clear the generated header as we rely on the backing
 	// logr implementation to print headers
@@ -695,21 +703,27 @@ func (l *loggingT) println(s severity, logr logr.Logger, args ...interface{}) {
 		l.putBuffer(buf)
 		buf = l.getBuffer()
 	}
+	if filter != nil {
+		args = filter.Filter(args)
+	}
 	fmt.Fprintln(buf, args...)
 	l.output(s, logr, buf, file, line, false)
 }
 
-func (l *loggingT) print(s severity, logr logr.Logger, args ...interface{}) {
-	l.printDepth(s, logr, 1, args...)
+func (l *loggingT) print(s severity, logr logr.Logger, filter LogFilter, args ...interface{}) {
+	l.printDepth(s, logr, filter, 1, args...)
 }
 
-func (l *loggingT) printDepth(s severity, logr logr.Logger, depth int, args ...interface{}) {
+func (l *loggingT) printDepth(s severity, logr logr.Logger, filter LogFilter, depth int, args ...interface{}) {
 	buf, file, line := l.header(s, depth)
 	// if logr is set, we clear the generated header as we rely on the backing
 	// logr implementation to print headers
 	if logr != nil {
 		l.putBuffer(buf)
 		buf = l.getBuffer()
+	}
+	if filter != nil {
+		args = filter.Filter(args)
 	}
 	fmt.Fprint(buf, args...)
 	if buf.Bytes()[buf.Len()-1] != '\n' {
@@ -718,13 +732,16 @@ func (l *loggingT) printDepth(s severity, logr logr.Logger, depth int, args ...i
 	l.output(s, logr, buf, file, line, false)
 }
 
-func (l *loggingT) printf(s severity, logr logr.Logger, format string, args ...interface{}) {
+func (l *loggingT) printf(s severity, logr logr.Logger, filter LogFilter, format string, args ...interface{}) {
 	buf, file, line := l.header(s, 0)
 	// if logr is set, we clear the generated header as we rely on the backing
 	// logr implementation to print headers
 	if logr != nil {
 		l.putBuffer(buf)
 		buf = l.getBuffer()
+	}
+	if filter != nil {
+		format, args = filter.FilterF(format, args)
 	}
 	fmt.Fprintf(buf, format, args...)
 	if buf.Bytes()[buf.Len()-1] != '\n' {
@@ -736,13 +753,16 @@ func (l *loggingT) printf(s severity, logr logr.Logger, format string, args ...i
 // printWithFileLine behaves like print but uses the provided file and line number.  If
 // alsoLogToStderr is true, the log message always appears on standard error; it
 // will also appear in the log file unless --logtostderr is set.
-func (l *loggingT) printWithFileLine(s severity, logr logr.Logger, file string, line int, alsoToStderr bool, args ...interface{}) {
+func (l *loggingT) printWithFileLine(s severity, logr logr.Logger, filter LogFilter, file string, line int, alsoToStderr bool, args ...interface{}) {
 	buf := l.formatHeader(s, file, line)
 	// if logr is set, we clear the generated header as we rely on the backing
 	// logr implementation to print headers
 	if logr != nil {
 		l.putBuffer(buf)
 		buf = l.getBuffer()
+	}
+	if filter != nil {
+		args = filter.Filter(args)
 	}
 	fmt.Fprint(buf, args...)
 	if buf.Bytes()[buf.Len()-1] != '\n' {
@@ -752,18 +772,24 @@ func (l *loggingT) printWithFileLine(s severity, logr logr.Logger, file string, 
 }
 
 // if loggr is specified, will call loggr.Error, otherwise output with logging module.
-func (l *loggingT) errorS(err error, loggr logr.Logger, msg string, keysAndValues ...interface{}) {
+func (l *loggingT) errorS(err error, loggr logr.Logger, filter LogFilter, msg string, keysAndValues ...interface{}) {
+	if filter != nil {
+		msg, keysAndValues = filter.FilterS(msg, keysAndValues)
+	}
 	if loggr != nil {
-		loggr.Error(err, msg, keysAndValues)
+		loggr.Error(err, msg, keysAndValues...)
 		return
 	}
 	l.printS(err, msg, keysAndValues...)
 }
 
 // if loggr is specified, will call loggr.Info, otherwise output with logging module.
-func (l *loggingT) infoS(loggr logr.Logger, msg string, keysAndValues ...interface{}) {
+func (l *loggingT) infoS(loggr logr.Logger, filter LogFilter, msg string, keysAndValues ...interface{}) {
+	if filter != nil {
+		msg, keysAndValues = filter.FilterS(msg, keysAndValues)
+	}
 	if loggr != nil {
-		loggr.Info(msg, keysAndValues)
+		loggr.Info(msg, keysAndValues...)
 		return
 	}
 	l.printS(nil, msg, keysAndValues...)
@@ -785,7 +811,7 @@ func (l *loggingT) printS(err error, msg string, keysAndValues ...interface{}) {
 	} else {
 		s = errorLog
 	}
-	l.printDepth(s, logging.logr, 2, b)
+	l.printDepth(s, logging.logr, nil, 2, b)
 }
 
 const missingValue = "(MISSING)"
@@ -919,18 +945,22 @@ func (l *loggingT) output(s severity, log logr.Logger, buf *buffer, file string,
 				}
 			}
 
-			switch s {
-			case fatalLog:
-				l.file[fatalLog].Write(data)
-				fallthrough
-			case errorLog:
-				l.file[errorLog].Write(data)
-				fallthrough
-			case warningLog:
-				l.file[warningLog].Write(data)
-				fallthrough
-			case infoLog:
-				l.file[infoLog].Write(data)
+			if l.oneOutput {
+				l.file[s].Write(data)
+			} else {
+				switch s {
+				case fatalLog:
+					l.file[fatalLog].Write(data)
+					fallthrough
+				case errorLog:
+					l.file[errorLog].Write(data)
+					fallthrough
+				case warningLog:
+					l.file[warningLog].Write(data)
+					fallthrough
+				case infoLog:
+					l.file[infoLog].Write(data)
+				}
 			}
 		}
 	}
@@ -1077,11 +1107,19 @@ func (sb *syncBuffer) rotateFile(now time.Time, startup bool) error {
 	}
 	var err error
 	sb.file, _, err = create(severityName[sb.sev], now, startup)
-	sb.nbytes = 0
 	if err != nil {
 		return err
 	}
-
+	if startup {
+		fileInfo, err := sb.file.Stat()
+		if err != nil {
+			return fmt.Errorf("file stat could not get fileinfo: %v", err)
+		}
+		// init file size
+		sb.nbytes = uint64(fileInfo.Size())
+	} else {
+		sb.nbytes = 0
+	}
 	sb.Writer = bufio.NewWriterSize(sb.file, bufferSize)
 
 	if sb.logger.skipLogHeaders {
@@ -1197,7 +1235,7 @@ func (lb logBridge) Write(b []byte) (n int, err error) {
 	}
 	// printWithFileLine with alsoToStderr=true, so standard log messages
 	// always appear on standard error.
-	logging.printWithFileLine(severity(lb), logging.logr, file, line, true, text)
+	logging.printWithFileLine(severity(lb), logging.logr, logging.filter, file, line, true, text)
 	return len(b), nil
 }
 
@@ -1232,13 +1270,14 @@ func (l *loggingT) setV(pc uintptr) Level {
 type Verbose struct {
 	enabled bool
 	logr    logr.Logger
+	filter  LogFilter
 }
 
 func newVerbose(level Level, b bool) Verbose {
 	if logging.logr == nil {
-		return Verbose{b, nil}
+		return Verbose{b, nil, logging.filter}
 	}
-	return Verbose{b, logging.logr.V(int(level))}
+	return Verbose{b, logging.logr.V(int(level)), logging.filter}
 }
 
 // V reports whether verbosity at the call site is at least the requested level.
@@ -1265,7 +1304,7 @@ func V(level Level) Verbose {
 		return newVerbose(level, true)
 	}
 
-	// It's off globally but it vmodule may still be set.
+	// It's off globally but vmodule may still be set.
 	// Here is another cheap but safe test to see if vmodule is enabled.
 	if atomic.LoadInt32(&logging.filterLength) > 0 {
 		// Now we need a proper lock to use the logging structure. The pcs field
@@ -1296,7 +1335,7 @@ func (v Verbose) Enabled() bool {
 // See the documentation of V for usage.
 func (v Verbose) Info(args ...interface{}) {
 	if v.enabled {
-		logging.print(infoLog, v.logr, args...)
+		logging.print(infoLog, v.logr, v.filter, args...)
 	}
 }
 
@@ -1304,7 +1343,7 @@ func (v Verbose) Info(args ...interface{}) {
 // See the documentation of V for usage.
 func (v Verbose) Infoln(args ...interface{}) {
 	if v.enabled {
-		logging.println(infoLog, v.logr, args...)
+		logging.println(infoLog, v.logr, v.filter, args...)
 	}
 }
 
@@ -1312,7 +1351,7 @@ func (v Verbose) Infoln(args ...interface{}) {
 // See the documentation of V for usage.
 func (v Verbose) Infof(format string, args ...interface{}) {
 	if v.enabled {
-		logging.printf(infoLog, v.logr, format, args...)
+		logging.printf(infoLog, v.logr, v.filter, format, args...)
 	}
 }
 
@@ -1320,40 +1359,47 @@ func (v Verbose) Infof(format string, args ...interface{}) {
 // See the documentation of V for usage.
 func (v Verbose) InfoS(msg string, keysAndValues ...interface{}) {
 	if v.enabled {
-		logging.infoS(v.logr, msg, keysAndValues...)
+		logging.infoS(v.logr, v.filter, msg, keysAndValues...)
 	}
 }
 
-// Error is equivalent to the global Error function, guarded by the value of v.
-// See the documentation of V for usage.
+// Deprecated: Use ErrorS instead.
 func (v Verbose) Error(err error, msg string, args ...interface{}) {
 	if v.enabled {
-		logging.errorS(err, v.logr, msg, args...)
+		logging.errorS(err, v.logr, v.filter, msg, args...)
+	}
+}
+
+// ErrorS is equivalent to the global Error function, guarded by the value of v.
+// See the documentation of V for usage.
+func (v Verbose) ErrorS(err error, msg string, keysAndValues ...interface{}) {
+	if v.enabled {
+		logging.errorS(err, v.logr, v.filter, msg, keysAndValues...)
 	}
 }
 
 // Info logs to the INFO log.
 // Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
 func Info(args ...interface{}) {
-	logging.print(infoLog, logging.logr, args...)
+	logging.print(infoLog, logging.logr, logging.filter, args...)
 }
 
 // InfoDepth acts as Info but uses depth to determine which call frame to log.
 // InfoDepth(0, "msg") is the same as Info("msg").
 func InfoDepth(depth int, args ...interface{}) {
-	logging.printDepth(infoLog, logging.logr, depth, args...)
+	logging.printDepth(infoLog, logging.logr, logging.filter, depth, args...)
 }
 
 // Infoln logs to the INFO log.
 // Arguments are handled in the manner of fmt.Println; a newline is always appended.
 func Infoln(args ...interface{}) {
-	logging.println(infoLog, logging.logr, args...)
+	logging.println(infoLog, logging.logr, logging.filter, args...)
 }
 
 // Infof logs to the INFO log.
 // Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
 func Infof(format string, args ...interface{}) {
-	logging.printf(infoLog, logging.logr, format, args...)
+	logging.printf(infoLog, logging.logr, logging.filter, format, args...)
 }
 
 // InfoS structured logs to the INFO log.
@@ -1365,55 +1411,55 @@ func Infof(format string, args ...interface{}) {
 // output:
 // >> I1025 00:15:15.525108       1 controller_utils.go:116] "Pod status updated" pod="kubedns" status="ready"
 func InfoS(msg string, keysAndValues ...interface{}) {
-	logging.infoS(logging.logr, msg, keysAndValues...)
+	logging.infoS(logging.logr, logging.filter, msg, keysAndValues...)
 }
 
 // Warning logs to the WARNING and INFO logs.
 // Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
 func Warning(args ...interface{}) {
-	logging.print(warningLog, logging.logr, args...)
+	logging.print(warningLog, logging.logr, logging.filter, args...)
 }
 
 // WarningDepth acts as Warning but uses depth to determine which call frame to log.
 // WarningDepth(0, "msg") is the same as Warning("msg").
 func WarningDepth(depth int, args ...interface{}) {
-	logging.printDepth(warningLog, logging.logr, depth, args...)
+	logging.printDepth(warningLog, logging.logr, logging.filter, depth, args...)
 }
 
 // Warningln logs to the WARNING and INFO logs.
 // Arguments are handled in the manner of fmt.Println; a newline is always appended.
 func Warningln(args ...interface{}) {
-	logging.println(warningLog, logging.logr, args...)
+	logging.println(warningLog, logging.logr, logging.filter, args...)
 }
 
 // Warningf logs to the WARNING and INFO logs.
 // Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
 func Warningf(format string, args ...interface{}) {
-	logging.printf(warningLog, logging.logr, format, args...)
+	logging.printf(warningLog, logging.logr, logging.filter, format, args...)
 }
 
 // Error logs to the ERROR, WARNING, and INFO logs.
 // Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
 func Error(args ...interface{}) {
-	logging.print(errorLog, logging.logr, args...)
+	logging.print(errorLog, logging.logr, logging.filter, args...)
 }
 
 // ErrorDepth acts as Error but uses depth to determine which call frame to log.
 // ErrorDepth(0, "msg") is the same as Error("msg").
 func ErrorDepth(depth int, args ...interface{}) {
-	logging.printDepth(errorLog, logging.logr, depth, args...)
+	logging.printDepth(errorLog, logging.logr, logging.filter, depth, args...)
 }
 
 // Errorln logs to the ERROR, WARNING, and INFO logs.
 // Arguments are handled in the manner of fmt.Println; a newline is always appended.
 func Errorln(args ...interface{}) {
-	logging.println(errorLog, logging.logr, args...)
+	logging.println(errorLog, logging.logr, logging.filter, args...)
 }
 
 // Errorf logs to the ERROR, WARNING, and INFO logs.
 // Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
 func Errorf(format string, args ...interface{}) {
-	logging.printf(errorLog, logging.logr, format, args...)
+	logging.printf(errorLog, logging.logr, logging.filter, format, args...)
 }
 
 // ErrorS structured logs to the ERROR, WARNING, and INFO logs.
@@ -1426,34 +1472,34 @@ func Errorf(format string, args ...interface{}) {
 // output:
 // >> E1025 00:15:15.525108       1 controller_utils.go:114] "Failed to update pod status" err="timeout"
 func ErrorS(err error, msg string, keysAndValues ...interface{}) {
-	logging.errorS(err, logging.logr, msg, keysAndValues...)
+	logging.errorS(err, logging.logr, logging.filter, msg, keysAndValues...)
 }
 
 // Fatal logs to the FATAL, ERROR, WARNING, and INFO logs,
 // including a stack trace of all running goroutines, then calls os.Exit(255).
 // Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
 func Fatal(args ...interface{}) {
-	logging.print(fatalLog, logging.logr, args...)
+	logging.print(fatalLog, logging.logr, logging.filter, args...)
 }
 
 // FatalDepth acts as Fatal but uses depth to determine which call frame to log.
 // FatalDepth(0, "msg") is the same as Fatal("msg").
 func FatalDepth(depth int, args ...interface{}) {
-	logging.printDepth(fatalLog, logging.logr, depth, args...)
+	logging.printDepth(fatalLog, logging.logr, logging.filter, depth, args...)
 }
 
 // Fatalln logs to the FATAL, ERROR, WARNING, and INFO logs,
 // including a stack trace of all running goroutines, then calls os.Exit(255).
 // Arguments are handled in the manner of fmt.Println; a newline is always appended.
 func Fatalln(args ...interface{}) {
-	logging.println(fatalLog, logging.logr, args...)
+	logging.println(fatalLog, logging.logr, logging.filter, args...)
 }
 
 // Fatalf logs to the FATAL, ERROR, WARNING, and INFO logs,
 // including a stack trace of all running goroutines, then calls os.Exit(255).
 // Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
 func Fatalf(format string, args ...interface{}) {
-	logging.printf(fatalLog, logging.logr, format, args...)
+	logging.printf(fatalLog, logging.logr, logging.filter, format, args...)
 }
 
 // fatalNoStacks is non-zero if we are to exit without dumping goroutine stacks.
@@ -1464,27 +1510,42 @@ var fatalNoStacks uint32
 // Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
 func Exit(args ...interface{}) {
 	atomic.StoreUint32(&fatalNoStacks, 1)
-	logging.print(fatalLog, logging.logr, args...)
+	logging.print(fatalLog, logging.logr, logging.filter, args...)
 }
 
 // ExitDepth acts as Exit but uses depth to determine which call frame to log.
 // ExitDepth(0, "msg") is the same as Exit("msg").
 func ExitDepth(depth int, args ...interface{}) {
 	atomic.StoreUint32(&fatalNoStacks, 1)
-	logging.printDepth(fatalLog, logging.logr, depth, args...)
+	logging.printDepth(fatalLog, logging.logr, logging.filter, depth, args...)
 }
 
 // Exitln logs to the FATAL, ERROR, WARNING, and INFO logs, then calls os.Exit(1).
 func Exitln(args ...interface{}) {
 	atomic.StoreUint32(&fatalNoStacks, 1)
-	logging.println(fatalLog, logging.logr, args...)
+	logging.println(fatalLog, logging.logr, logging.filter, args...)
 }
 
 // Exitf logs to the FATAL, ERROR, WARNING, and INFO logs, then calls os.Exit(1).
 // Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
 func Exitf(format string, args ...interface{}) {
 	atomic.StoreUint32(&fatalNoStacks, 1)
-	logging.printf(fatalLog, logging.logr, format, args...)
+	logging.printf(fatalLog, logging.logr, logging.filter, format, args...)
+}
+
+// LogFilter is a collection of functions that can filter all logging calls,
+// e.g. for sanitization of arguments and prevent accidental leaking of secrets.
+type LogFilter interface {
+	Filter(args []interface{}) []interface{}
+	FilterF(format string, args []interface{}) (string, []interface{})
+	FilterS(msg string, keysAndValues []interface{}) (string, []interface{})
+}
+
+func SetLogFilter(filter LogFilter) {
+	logging.mu.Lock()
+	defer logging.mu.Unlock()
+
+	logging.filter = filter
 }
 
 // ObjectRef references a kubernetes object
