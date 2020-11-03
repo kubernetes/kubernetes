@@ -350,7 +350,11 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 			}
 
 			// On failure, return error. Caller will log and retry.
-			return volumeToAttach.GenerateError("AttachVolume.Attach failed", attachErr)
+			eventErr, detailedErr := volumeToAttach.GenerateError("AttachVolume.Attach failed", attachErr)
+			for _, pod := range volumeToAttach.ScheduledPods {
+				og.recorder.Eventf(pod, v1.EventTypeWarning, "ProvisioningAttachFailed", eventErr.Error())
+			}
+			return eventErr, detailedErr
 		}
 
 		// Successful attach event is useful for user debugging
