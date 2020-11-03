@@ -801,10 +801,27 @@ func getPodsToDelete(filteredPods, relatedPods []*v1.Pod, diff int) []*v1.Pod {
 	// No need to sort pods if we are about to delete all of them.
 	// diff will always be <= len(filteredPods), so not need to handle > case.
 	if diff < len(filteredPods) {
+		var cnt int
+		filteredPods, cnt = sortPriordeletion(filteredPods, cnt)
+		sort.Sort(controller.ActivePods(filteredPods[cnt:]))
 		podsWithRanks := getPodsRankedByRelatedPodsOnSameNode(filteredPods, relatedPods)
 		sort.Sort(podsWithRanks)
 	}
 	return filteredPods[:diff]
+}
+
+// sortPriordeletion When shrinking a pod, put the pod with label priordeletion
+// is true in front of the filteredPods
+func sortPriordeletion(filteredPods []*v1.Pod, cnt int) ([]*v1.Pod, int) {
+	for i := range filteredPods {
+		if filteredPods[i].Labels["priordeletion"] == "true" {
+			tpod := filteredPods[cnt]
+			filteredPods[cnt] = filteredPods[i]
+			filteredPods[i] = tpod
+			cnt++
+		}
+	}
+	return filteredPods, cnt
 }
 
 // getPodsRankedByRelatedPodsOnSameNode returns an ActivePodsWithRanks value
