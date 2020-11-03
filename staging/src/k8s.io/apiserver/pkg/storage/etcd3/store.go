@@ -185,16 +185,20 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 }
 
 // Delete implements storage.Interface.Delete.
-func (s *store) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) error {
+func (s *store) Delete(
+	ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions,
+	validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object) error {
 	v, err := conversion.EnforcePtr(out)
 	if err != nil {
 		return fmt.Errorf("unable to convert output object to pointer: %v", err)
 	}
 	key = path.Join(s.pathPrefix, key)
-	return s.conditionalDelete(ctx, key, out, v, preconditions, validateDeletion)
+	return s.conditionalDelete(ctx, key, out, v, preconditions, validateDeletion, cachedExistingObject)
 }
 
-func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.Object, v reflect.Value, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) error {
+func (s *store) conditionalDelete(
+	ctx context.Context, key string, out runtime.Object, v reflect.Value, preconditions *storage.Preconditions,
+	validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object) error {
 	startTime := time.Now()
 	getResp, err := s.client.KV.Get(ctx, key)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)

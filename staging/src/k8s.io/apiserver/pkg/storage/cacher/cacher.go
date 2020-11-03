@@ -431,8 +431,10 @@ func (c *Cacher) Create(ctx context.Context, key string, obj, out runtime.Object
 }
 
 // Delete implements storage.Interface.
-func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) error {
-	return c.storage.Delete(ctx, key, out, preconditions, validateDeletion)
+func (c *Cacher) Delete(
+	ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions,
+	validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object) error {
+	return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, cachedExistingObject)
 }
 
 // Watch implements storage.Interface.

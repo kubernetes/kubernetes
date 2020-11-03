@@ -323,7 +323,7 @@ func TestUnconditionalDelete(t *testing.T) {
 
 	for i, tt := range tests {
 		out := &example.Pod{} // reset
-		err := store.Delete(ctx, tt.key, out, nil, storage.ValidateAllObjectFunc)
+		err := store.Delete(ctx, tt.key, out, nil, storage.ValidateAllObjectFunc, nil)
 		if tt.expectNotFoundErr {
 			if err == nil || !storage.IsNotFound(err) {
 				t.Errorf("#%d: expecting not found error, but get: %s", i, err)
@@ -357,7 +357,7 @@ func TestConditionalDelete(t *testing.T) {
 
 	for i, tt := range tests {
 		out := &example.Pod{}
-		err := store.Delete(ctx, key, out, tt.precondition, storage.ValidateAllObjectFunc)
+		err := store.Delete(ctx, key, out, tt.precondition, storage.ValidateAllObjectFunc, nil)
 		if tt.expectInvalidObjErr {
 			if err == nil || !storage.IsInvalidObj(err) {
 				t.Errorf("#%d: expecting invalid UID error, but get: %s", i, err)
@@ -887,7 +887,7 @@ func TestTransformationFailure(t *testing.T) {
 	}
 
 	// Delete fails with internal error.
-	if err := store.Delete(ctx, preset[1].key, &example.Pod{}, nil, storage.ValidateAllObjectFunc); !storage.IsInternalError(err) {
+	if err := store.Delete(ctx, preset[1].key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if err := store.Get(ctx, preset[1].key, storage.GetOptions{}, &example.Pod{}); !storage.IsInternalError(err) {
@@ -1833,7 +1833,7 @@ func testPropogateStoreWithKey(ctx context.Context, t *testing.T, store *store, 
 	if err != nil {
 		panic("unable to convert output object to pointer")
 	}
-	err = store.conditionalDelete(ctx, key, &example.Pod{}, v, nil, storage.ValidateAllObjectFunc)
+	err = store.conditionalDelete(ctx, key, &example.Pod{}, v, nil, storage.ValidateAllObjectFunc, nil)
 	if err != nil && !storage.IsNotFound(err) {
 		t.Fatalf("Cleanup failed: %v", err)
 	}
