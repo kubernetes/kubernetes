@@ -47,6 +47,7 @@ const (
 	flagKeyFile          = "client-key"
 	flagCAFile           = "certificate-authority"
 	flagBearerToken      = "token"
+	flagBearerTokenFile  = "token-file"
 	flagImpersonate      = "as"
 	flagImpersonateGroup = "as-group"
 	flagUsername         = "username"
@@ -93,6 +94,7 @@ type ConfigFlags struct {
 	KeyFile          *string
 	CAFile           *string
 	BearerToken      *string
+	BearerTokenFile  *string
 	Impersonate      *string
 	ImpersonateGroup *[]string
 	Username         *string
@@ -146,6 +148,9 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	}
 	if f.BearerToken != nil {
 		overrides.AuthInfo.Token = *f.BearerToken
+	}
+	if f.BearerTokenFile != nil {
+		overrides.AuthInfo.TokenFile = *f.BearerTokenFile
 	}
 	if f.Impersonate != nil {
 		overrides.AuthInfo.Impersonate = *f.Impersonate
@@ -270,6 +275,9 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.BearerToken != nil {
 		flags.StringVar(f.BearerToken, flagBearerToken, *f.BearerToken, "Bearer token for authentication to the API server")
 	}
+	if f.BearerTokenFile != nil {
+		flags.StringVar(f.BearerTokenFile, flagBearerTokenFile, *f.BearerTokenFile, "Bearer token file for authentication to the API server")
+	}
 	if f.Impersonate != nil {
 		flags.StringVar(f.Impersonate, flagImpersonate, *f.Impersonate, "Username to impersonate for the operation")
 	}
@@ -341,6 +349,7 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 		KeyFile:          stringptr(""),
 		CAFile:           stringptr(""),
 		BearerToken:      stringptr(""),
+		BearerTokenFile:  stringptr(""),
 		Impersonate:      stringptr(""),
 		ImpersonateGroup: &impersonateGroup,
 

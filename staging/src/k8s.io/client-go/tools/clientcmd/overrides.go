@@ -52,6 +52,7 @@ type AuthOverrideFlags struct {
 	ClientCertificate FlagInfo
 	ClientKey         FlagInfo
 	Token             FlagInfo
+	TokenFile         FlagInfo
 	Impersonate       FlagInfo
 	ImpersonateGroups FlagInfo
 	Username          FlagInfo
@@ -153,6 +154,7 @@ const (
 	FlagCAFile           = "certificate-authority"
 	FlagEmbedCerts       = "embed-certs"
 	FlagBearerToken      = "token"
+	FlagBearerTokenFile  = "token-file"
 	FlagImpersonate      = "as"
 	FlagImpersonateGroup = "as-group"
 	FlagUsername         = "username"
@@ -178,6 +180,7 @@ func RecommendedAuthOverrideFlags(prefix string) AuthOverrideFlags {
 		ClientCertificate: FlagInfo{prefix + FlagCertFile, "", "", "Path to a client certificate file for TLS"},
 		ClientKey:         FlagInfo{prefix + FlagKeyFile, "", "", "Path to a client key file for TLS"},
 		Token:             FlagInfo{prefix + FlagBearerToken, "", "", "Bearer token for authentication to the API server"},
+		TokenFile:         FlagInfo{prefix + FlagBearerTokenFile, "", "", "Bearer token file for authentication to the API server"},
 		Impersonate:       FlagInfo{prefix + FlagImpersonate, "", "", "Username to impersonate for the operation"},
 		ImpersonateGroups: FlagInfo{prefix + FlagImpersonateGroup, "", "", "Group to impersonate for the operation, this flag can be repeated to specify multiple groups."},
 		Username:          FlagInfo{prefix + FlagUsername, "", "", "Username for basic authentication to the API server"},
