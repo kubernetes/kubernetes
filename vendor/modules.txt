@@ -2312,6 +2312,7 @@ k8s.io/kubectl/pkg/cmd/annotate
 k8s.io/kubectl/pkg/cmd/apiresources
 k8s.io/kubectl/pkg/cmd/apply
 k8s.io/kubectl/pkg/cmd/attach
+k8s.io/kubectl/pkg/cmd/auth
 k8s.io/kubectl/pkg/cmd/autoscale
 k8s.io/kubectl/pkg/cmd/certificates
 k8s.io/kubectl/pkg/cmd/clusterinfo
