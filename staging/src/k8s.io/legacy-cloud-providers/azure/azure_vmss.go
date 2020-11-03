@@ -1406,16 +1406,15 @@ func (ss *scaleSet) ensureBackendPoolDeletedFromVMSS(service *v1.Service, backen
 
 	for vmssName := range vmssNamesMap {
 		vmss, err := ss.getVMSS(vmssName, azcache.CacheReadTypeDefault)
+		if err != nil {
+			return err
+		}
 
 		// When vmss is being deleted, CreateOrUpdate API would report "the vmss is being deleted" error.
 		// Since it is being deleted, we shouldn't send more CreateOrUpdate requests for it.
 		if vmss.ProvisioningState != nil && strings.EqualFold(*vmss.ProvisioningState, virtualMachineScaleSetsDeallocating) {
 			klog.V(3).Infof("ensureVMSSInPool: found vmss %s being deleted, skipping", vmssName)
 			continue
-		}
-
-		if err != nil {
-			return err
 		}
 		if vmss.VirtualMachineProfile.NetworkProfile.NetworkInterfaceConfigurations == nil {
 			klog.V(4).Infof("EnsureHostInPool: cannot obtain the primary network interface configuration, of vmss %s", vmssName)

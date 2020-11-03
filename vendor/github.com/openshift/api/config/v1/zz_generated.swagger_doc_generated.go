@@ -443,7 +443,7 @@ var map_ClusterOperatorStatusCondition = map[string]string{
 	"status":             "status of the condition, one of True, False, Unknown.",
 	"lastTransitionTime": "lastTransitionTime is the time of the last update to the current status property.",
 	"reason":             "reason is the CamelCase reason for the condition's current status.",
-	"message":            "message provides additional information about the current condition. This is only to be consumed by humans.",
+	"message":            "message provides additional information about the current condition. This is only to be consumed by humans.  It may contain Line Feed characters (U+000A), which should be rendered as new lines.",
 }
 
 func (ClusterOperatorStatusCondition) SwaggerDoc() map[string]string {
@@ -857,6 +857,24 @@ func (InfrastructureStatus) SwaggerDoc() map[string]string {
 	return map_InfrastructureStatus
 }
 
+var map_KubevirtPlatformSpec = map[string]string{
+	"": "KubevirtPlatformSpec holds the desired state of the kubevirt infrastructure provider. This only includes fields that can be modified in the cluster.",
+}
+
+func (KubevirtPlatformSpec) SwaggerDoc() map[string]string {
+	return map_KubevirtPlatformSpec
+}
+
+var map_KubevirtPlatformStatus = map[string]string{
+	"":                    "KubevirtPlatformStatus holds the current status of the kubevirt infrastructure provider.",
+	"apiServerInternalIP": "apiServerInternalIP is an IP address to contact the Kubernetes API server that can be used by components inside the cluster, like kubelets using the infrastructure rather than Kubernetes networking. It is the IP that the Infrastructure.status.apiServerInternalURI points to. It is the IP for a self-hosted load balancer in front of the API servers.",
+	"ingressIP":           "ingressIP is an external IP which routes to the default ingress controller. The IP is a suitable target of a wildcard DNS record used to resolve default route host names.",
+}
+
+func (KubevirtPlatformStatus) SwaggerDoc() map[string]string {
+	return map_KubevirtPlatformStatus
+}
+
 var map_OpenStackPlatformSpec = map[string]string{
 	"": "OpenStackPlatformSpec holds the desired state of the OpenStack infrastructure provider. This only includes fields that can be modified in the cluster.",
 }
@@ -898,7 +916,7 @@ func (OvirtPlatformStatus) SwaggerDoc() map[string]string {
 
 var map_PlatformSpec = map[string]string{
 	"":          "PlatformSpec holds the desired state specific to the underlying infrastructure provider of the current cluster. Since these are used at spec-level for the underlying cluster, it is supposed that only one of the spec structs is set.",
-	"type":      "type is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Libvirt\", \"OpenStack\", \"VSphere\", \"oVirt\", and \"None\". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform.",
+	"type":      "type is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Libvirt\", \"OpenStack\", \"VSphere\", \"oVirt\", \"KubeVirt\" and \"None\". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform.",
 	"aws":       "AWS contains settings specific to the Amazon Web Services infrastructure provider.",
 	"azure":     "Azure contains settings specific to the Azure infrastructure provider.",
 	"gcp":       "GCP contains settings specific to the Google Cloud Platform infrastructure provider.",
@@ -907,6 +925,7 @@ var map_PlatformSpec = map[string]string{
 	"ovirt":     "Ovirt contains settings specific to the oVirt infrastructure provider.",
 	"vsphere":   "VSphere contains settings specific to the VSphere infrastructure provider.",
 	"ibmcloud":  "IBMCloud contains settings specific to the IBMCloud infrastructure provider.",
+	"kubevirt":  "Kubevirt contains settings specific to the kubevirt infrastructure provider.",
 }
 
 func (PlatformSpec) SwaggerDoc() map[string]string {
@@ -924,6 +943,7 @@ var map_PlatformStatus = map[string]string{
 	"ovirt":     "Ovirt contains settings specific to the oVirt infrastructure provider.",
 	"vsphere":   "VSphere contains settings specific to the VSphere infrastructure provider.",
 	"ibmcloud":  "IBMCloud contains settings specific to the IBMCloud infrastructure provider.",
+	"kubevirt":  "Kubevirt contains settings specific to the kubevirt infrastructure provider.",
 }
 
 func (PlatformStatus) SwaggerDoc() map[string]string {

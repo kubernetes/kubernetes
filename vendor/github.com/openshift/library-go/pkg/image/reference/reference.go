@@ -39,13 +39,25 @@ func Parse(spec string) (DockerImageReference, error) {
 
 	name := namedRef.Name()
 	i := strings.IndexRune(name, '/')
-	if i == -1 || (!strings.ContainsAny(name[:i], ":.") && name[:i] != "localhost") {
+
+	// if there are no path components, and it looks like a url (contains a .) or localhost, it's a registry
+	isRegistryOnly := i == -1 && (strings.ContainsAny(spec, ".") || strings.HasPrefix(spec, "localhost"))
+
+	// if there are no path components, and it's not a registry, it's a name
+	isNameOnly := i == -1 && !isRegistryOnly
+
+	// if there are path components, and the first component doesn't look like a url, it's a name
+	isNameOnly = isNameOnly || (i > -1 && (!strings.ContainsAny(name[:i], ":.") && name[:i] != "localhost"))
+
+	if isRegistryOnly {
+		ref.Registry = namedRef.String()
+	} else if isNameOnly {
 		ref.Name = name
 	} else {
 		ref.Registry, ref.Name = name[:i], name[i+1:]
 	}
 
-	if named, ok := namedRef.(reference.NamedTagged); ok {
+	if named, ok := namedRef.(reference.NamedTagged); !isRegistryOnly && ok {
 		ref.Tag = named.Tag()
 	}
 

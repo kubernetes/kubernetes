@@ -362,32 +362,37 @@ func ValidateKubeconfigsForExternalCA(outDir string, cfg *kubeadmapi.InitConfigu
 }
 
 func getKubeConfigSpecsBase(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConfigSpec, error) {
-	apiServer, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
+	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
 	if err != nil {
 		return nil, err
 	}
+	localAPIEndpoint, err := kubeadmutil.GetLocalAPIEndpoint(&cfg.LocalAPIEndpoint)
+	if err != nil {
+		return nil, err
+	}
+
 	return map[string]*kubeConfigSpec{
 		kubeadmconstants.AdminKubeConfigFileName: {
-			APIServer:  apiServer,
+			APIServer:  controlPlaneEndpoint,
 			ClientName: "kubernetes-admin",
 			ClientCertAuth: &clientCertAuth{
 				Organizations: []string{kubeadmconstants.SystemPrivilegedGroup},
 			},
 		},
 		kubeadmconstants.KubeletKubeConfigFileName: {
-			APIServer:  apiServer,
+			APIServer:  controlPlaneEndpoint,
 			ClientName: fmt.Sprintf("%s%s", kubeadmconstants.NodesUserPrefix, cfg.NodeRegistration.Name),
 			ClientCertAuth: &clientCertAuth{
 				Organizations: []string{kubeadmconstants.NodesGroup},
 			},
 		},
 		kubeadmconstants.ControllerManagerKubeConfigFileName: {
-			APIServer:      apiServer,
+			APIServer:      localAPIEndpoint,
 			ClientName:     kubeadmconstants.ControllerManagerUser,
 			ClientCertAuth: &clientCertAuth{},
 		},
 		kubeadmconstants.SchedulerKubeConfigFileName: {
-			APIServer:      apiServer,
+			APIServer:      localAPIEndpoint,
 			ClientName:     kubeadmconstants.SchedulerUser,
 			ClientCertAuth: &clientCertAuth{},
 		},

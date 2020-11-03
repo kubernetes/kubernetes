@@ -26,7 +26,7 @@ dependencies:
 
   # CNI plugins
   - name: "cni"
-    version: 0.8.6
+    version: 0.8.7
     refPaths:
     - path: build/workspace.bzl
       match: CNI_VERSION =
@@ -74,7 +74,7 @@ dependencies:
 
   # etcd
   - name: "etcd"
-    version: 3.4.9
+    version: 3.4.13
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
@@ -118,8 +118,6 @@ dependencies:
   - name: "k8s.gcr.io/debian-base: dependents"
     version: 2.1.3
     refPaths:
-    - path: build/common.sh
-      match: debian_base_version=
     - path: build/workspace.bzl
       match: tag =
     - path: cluster/images/etcd/Makefile

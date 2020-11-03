@@ -3,25 +3,22 @@
 filters:
   ".*":
     reviewers:
-    - bparees
     - deads2k
-    - sjenning
-    - smarterclayton
-    - soltysh
-    - tbielawa
-    approvers:
-    - bparees
-    - deads2k
-    - derekwaynecarr
-    - eparis
-    - knobunc  # Network, Multi-cluster, Storage
-    - mfojtik
-    - pweil-
-    - sjenning
-    - soltysh
     - sttts
-    - smarterclayton
-    - tbielawa # also for build and automated release tooling changes
+    - soltysh
+    - mfojtik
+    - marun
+    - tnozicka
+
+    # approvers are limited to the team that manages rebases and pays the price for carries that are introduced
+    approvers:
+    - deads2k
+    - sttts
+    - soltysh
+    - mfojtik
+    - marun
+    - tnozicka
+
   "^\\.go.(mod|sum)$":
     labels:
     - "vendor-update"

@@ -11,11 +11,11 @@ require (
 	github.com/google/gofuzz v1.1.0
 	github.com/spf13/cobra v1.0.0
 	go.etcd.io/bbolt v1.3.5 // indirect
-	k8s.io/apimachinery v0.19.0
-	k8s.io/apiserver v0.19.0
-	k8s.io/client-go v0.19.0
-	k8s.io/code-generator v0.19.0
-	k8s.io/component-base v0.19.0
+	k8s.io/apimachinery v0.19.2
+	k8s.io/apiserver v0.19.2
+	k8s.io/client-go v0.19.2
+	k8s.io/code-generator v0.19.2
+	k8s.io/component-base v0.19.2
 	k8s.io/klog/v2 v2.3.0
 	k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
 )

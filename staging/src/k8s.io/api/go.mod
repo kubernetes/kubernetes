@@ -7,13 +7,14 @@ go 1.15
 require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/stretchr/testify v1.4.0
-	k8s.io/apimachinery v0.19.0
+	k8s.io/apimachinery v0.19.2
 )
 
 replace (
 	github.com/containerd/continuity => github.com/containerd/continuity v0.0.0-20190426062206-aaeac12a7ffc
 	github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
+	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
 	github.com/onsi/ginkgo => github.com/openshift/ginkgo v4.5.0-origin.1+incompatible
 	github.com/robfig/cron => github.com/robfig/cron v1.1.0
 	go.uber.org/multierr => go.uber.org/multierr v1.1.0

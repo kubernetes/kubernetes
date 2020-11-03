@@ -79,7 +79,7 @@ type InfrastructureStatus struct {
 }
 
 // PlatformType is a specific supported infrastructure provider.
-// +kubebuilder:validation:Enum="";AWS;Azure;BareMetal;GCP;Libvirt;OpenStack;None;VSphere;oVirt;IBMCloud
+// +kubebuilder:validation:Enum="";AWS;Azure;BareMetal;GCP;Libvirt;OpenStack;None;VSphere;oVirt;IBMCloud;KubeVirt
 type PlatformType string
 
 const (
@@ -112,6 +112,9 @@ const (
 
 	// IBMCloudPlatformType represents IBM Cloud infrastructure.
 	IBMCloudPlatformType PlatformType = "IBMCloud"
+
+	// KubevirtPlatformType represents KubeVirt/Openshift Virtualization infrastructure.
+	KubevirtPlatformType PlatformType = "KubeVirt"
 )
 
 // IBMCloudProviderType is a specific supported IBM Cloud provider cluster type
@@ -134,7 +137,7 @@ type PlatformSpec struct {
 	// balancers, dynamic volume provisioning, machine creation and deletion, and
 	// other integrations are enabled. If None, no infrastructure automation is
 	// enabled. Allowed values are "AWS", "Azure", "BareMetal", "GCP", "Libvirt",
-	// "OpenStack", "VSphere", "oVirt", and "None". Individual components may not support
+	// "OpenStack", "VSphere", "oVirt", "KubeVirt" and "None". Individual components may not support
 	// all platforms, and must handle unrecognized platforms as None if they do
 	// not support that platform.
 	//
@@ -172,6 +175,10 @@ type PlatformSpec struct {
 	// IBMCloud contains settings specific to the IBMCloud infrastructure provider.
 	// +optional
 	IBMCloud *IBMCloudPlatformSpec `json:"ibmcloud,omitempty"`
+
+	// Kubevirt contains settings specific to the kubevirt infrastructure provider.
+	// +optional
+	Kubevirt *KubevirtPlatformSpec `json:"kubevirt,omitempty"`
 }
 
 // PlatformStatus holds the current status specific to the underlying infrastructure provider
@@ -222,6 +229,10 @@ type PlatformStatus struct {
 	// IBMCloud contains settings specific to the IBMCloud infrastructure provider.
 	// +optional
 	IBMCloud *IBMCloudPlatformStatus `json:"ibmcloud,omitempty"`
+
+	// Kubevirt contains settings specific to the kubevirt infrastructure provider.
+	// +optional
+	Kubevirt *KubevirtPlatformStatus `json:"kubevirt,omitempty"`
 }
 
 // AWSServiceEndpoint store the configuration of a custom url to
@@ -431,6 +442,23 @@ type IBMCloudPlatformStatus struct {
 
 	// ProviderType indicates the type of cluster that was created
 	ProviderType IBMCloudProviderType `json:"providerType,omitempty"`
+}
+
+// KubevirtPlatformSpec holds the desired state of the kubevirt infrastructure provider.
+// This only includes fields that can be modified in the cluster.
+type KubevirtPlatformSpec struct{}
+
+// KubevirtPlatformStatus holds the current status of the kubevirt infrastructure provider.
+type KubevirtPlatformStatus struct {
+	// apiServerInternalIP is an IP address to contact the Kubernetes API server that can be used
+	// by components inside the cluster, like kubelets using the infrastructure rather
+	// than Kubernetes networking. It is the IP that the Infrastructure.status.apiServerInternalURI
+	// points to. It is the IP for a self-hosted load balancer in front of the API servers.
+	APIServerInternalIP string `json:"apiServerInternalIP,omitempty"`
+
+	// ingressIP is an external IP which routes to the default ingress controller.
+	// The IP is a suitable target of a wildcard DNS record used to resolve default route host names.
+	IngressIP string `json:"ingressIP,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

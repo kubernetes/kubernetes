@@ -3665,6 +3665,27 @@ func buildListener(port v1.ServicePort, annotations map[string]string, sslPorts 
 	return listener, nil
 }
 
+func (c *Cloud) getSubnetCidrs(subnetIDs []string) ([]string, error) {
+	request := &ec2.DescribeSubnetsInput{}
+	for _, subnetID := range subnetIDs {
+		request.SubnetIds = append(request.SubnetIds, aws.String(subnetID))
+	}
+
+	subnets, err := c.ec2.DescribeSubnets(request)
+	if err != nil {
+		return nil, fmt.Errorf("error querying Subnet for ELB: %q", err)
+	}
+	if len(subnets) != len(subnetIDs) {
+		return nil, fmt.Errorf("error querying Subnet for ELB, got %d subnets for %v", len(subnets), subnetIDs)
+	}
+
+	cidrs := make([]string, 0, len(subnets))
+	for _, subnet := range subnets {
+		cidrs = append(cidrs, aws.StringValue(subnet.CidrBlock))
+	}
+	return cidrs, nil
+}
+
 // EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
 func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	annotations := apiService.Annotations
@@ -3794,6 +3815,12 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 			return nil, err
 		}
 
+		subnetCidrs, err := c.getSubnetCidrs(subnetIDs)
+		if err != nil {
+			klog.Errorf("Error getting subnet cidrs: %q", err)
+			return nil, err
+		}
+
 		sourceRangeCidrs := []string{}
 		for cidr := range sourceRanges {
 			sourceRangeCidrs = append(sourceRangeCidrs, cidr)
@@ -3802,7 +3829,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 			sourceRangeCidrs = append(sourceRangeCidrs, "0.0.0.0/0")
 		}
 
-		err = c.updateInstanceSecurityGroupsForNLB(loadBalancerName, instances, sourceRangeCidrs, v2Mappings)
+		err = c.updateInstanceSecurityGroupsForNLB(loadBalancerName, instances, subnetCidrs, sourceRangeCidrs, v2Mappings)
 		if err != nil {
 			klog.Warningf("Error opening ingress rules for the load balancer to the instances: %q", err)
 			return nil, err
@@ -4373,7 +4400,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 			}
 		}
 
-		return c.updateInstanceSecurityGroupsForNLB(loadBalancerName, nil, nil, nil)
+		return c.updateInstanceSecurityGroupsForNLB(loadBalancerName, nil, nil, nil, nil)
 	}
 
 	lb, err := c.describeLoadBalancer(loadBalancerName)

@@ -212,6 +212,10 @@ type RouterShard struct {
 // TLSConfig defines config used to secure a route and provide termination
 type TLSConfig struct {
 	// termination indicates termination type.
+	//
+	// * edge - TLS termination is done by the router and http is used to communicate with the backend (default)
+	// * passthrough - Traffic is sent straight to the destination without the router providing TLS termination
+	// * reencrypt - TLS termination is done by the router and https is used to communicate with the backend
 	Termination TLSTerminationType `json:"termination" protobuf:"bytes,1,opt,name=termination,casttype=TLSTerminationType"`
 
 	// certificate provides certificate contents

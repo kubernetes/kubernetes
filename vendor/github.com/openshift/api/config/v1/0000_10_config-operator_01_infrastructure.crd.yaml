@@ -112,6 +112,10 @@ spec:
                   description: IBMCloud contains settings specific to the IBMCloud
                     infrastructure provider.
                   type: object
+                kubevirt:
+                  description: Kubevirt contains settings specific to the kubevirt
+                    infrastructure provider.
+                  type: object
                 openstack:
                   description: OpenStack contains settings specific to the OpenStack
                     infrastructure provider.
@@ -127,8 +131,8 @@ spec:
                     creation and deletion, and other integrations are enabled. If
                     None, no infrastructure automation is enabled. Allowed values
                     are "AWS", "Azure", "BareMetal", "GCP", "Libvirt", "OpenStack",
-                    "VSphere", "oVirt", and "None". Individual components may not
-                    support all platforms, and must handle unrecognized platforms
+                    "VSphere", "oVirt", "KubeVirt" and "None". Individual components
+                    may not support all platforms, and must handle unrecognized platforms
                     as None if they do not support that platform.
                   type: string
                   enum:
@@ -143,6 +147,7 @@ spec:
                   - VSphere
                   - oVirt
                   - IBMCloud
+                  - KubeVirt
                 vsphere:
                   description: VSphere contains settings specific to the VSphere infrastructure
                     provider.
@@ -190,6 +195,7 @@ spec:
               - VSphere
               - oVirt
               - IBMCloud
+              - KubeVirt
             platformStatus:
               description: platformStatus holds status information specific to the
                 underlying infrastructure provider.
@@ -307,6 +313,24 @@ spec:
                       description: ResourceGroupName is the Resource Group for new
                         IBMCloud resources created for the cluster.
                       type: string
+                kubevirt:
+                  description: Kubevirt contains settings specific to the kubevirt
+                    infrastructure provider.
+                  type: object
+                  properties:
+                    apiServerInternalIP:
+                      description: apiServerInternalIP is an IP address to contact
+                        the Kubernetes API server that can be used by components inside
+                        the cluster, like kubelets using the infrastructure rather
+                        than Kubernetes networking. It is the IP that the Infrastructure.status.apiServerInternalURI
+                        points to. It is the IP for a self-hosted load balancer in
+                        front of the API servers.
+                      type: string
+                    ingressIP:
+                      description: ingressIP is an external IP which routes to the
+                        default ingress controller. The IP is a suitable target of
+                        a wildcard DNS record used to resolve default route host names.
+                      type: string
                 openstack:
                   description: OpenStack contains settings specific to the OpenStack
                     infrastructure provider.
@@ -385,6 +409,7 @@ spec:
                   - VSphere
                   - oVirt
                   - IBMCloud
+                  - KubeVirt
                 vsphere:
                   description: VSphere contains settings specific to the VSphere infrastructure
                     provider.

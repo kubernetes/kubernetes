@@ -105,6 +105,4 @@ spec:
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
-      nodeSelector:
-        kubernetes.io/os: linux
       serviceAccountName: kube-dns-autoscaler

@@ -2,7 +2,7 @@
 
 # Disable inheritance as this is owned by sig-node (should mirror same contents as pkg/kubelet/OWNERS)
 options:
-  no_parent_owners: true
+  no_parent_owners: false
 approvers:
 - Random-Liu
 - dchen1107

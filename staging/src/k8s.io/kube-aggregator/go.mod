@@ -17,12 +17,12 @@ require (
 	github.com/stretchr/testify v1.4.0
 	go.etcd.io/bbolt v1.3.5 // indirect
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381
-	k8s.io/api v0.19.0
-	k8s.io/apimachinery v0.19.0
-	k8s.io/apiserver v0.19.0
-	k8s.io/client-go v0.19.0
-	k8s.io/code-generator v0.19.0
-	k8s.io/component-base v0.19.0
+	k8s.io/api v0.19.2
+	k8s.io/apimachinery v0.19.2
+	k8s.io/apiserver v0.19.2
+	k8s.io/client-go v0.19.2
+	k8s.io/code-generator v0.19.2
+	k8s.io/component-base v0.19.2
 	k8s.io/klog/v2 v2.3.0
 	k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
 	k8s.io/utils v0.0.0-20200729134348-d5654de09c73

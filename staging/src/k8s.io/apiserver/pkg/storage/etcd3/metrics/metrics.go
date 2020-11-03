@@ -61,14 +61,6 @@ var (
 		},
 		[]string{"endpoint"},
 	)
-	etcdRequestRetry = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:           "etcd_request_retry_total",
-			Help:           "Etcd request retry total",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"error"},
-	)
 )
 
 var registerMetrics sync.Once
@@ -80,7 +72,6 @@ func Register() {
 		legacyregistry.MustRegister(etcdRequestLatency)
 		legacyregistry.MustRegister(objectCounts)
 		legacyregistry.MustRegister(dbTotalSize)
-		legacyregistry.MustRegister(etcdRequestRetry)
 	})
 }
 
@@ -107,9 +98,4 @@ func sinceInSeconds(start time.Time) float64 {
 // UpdateEtcdDbSize sets the etcd_db_total_size_in_bytes metric.
 func UpdateEtcdDbSize(ep string, size int64) {
 	dbTotalSize.WithLabelValues(ep).Set(float64(size))
-}
-
-// UpdateEtcdRequestRetry sets the etcd_request_retry_total metric.
-func UpdateEtcdRequestRetry(errorCode string) {
-	etcdRequestRetry.WithLabelValues(errorCode).Inc()
 }

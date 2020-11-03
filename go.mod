@@ -73,10 +73,10 @@ require (
 	github.com/opencontainers/go-digest v1.0.0-rc1
 	github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb
 	github.com/opencontainers/selinux v1.5.2
-	github.com/openshift/api v0.0.0-20200829102639-8a3a835f1acf
-	github.com/openshift/apiserver-library-go v0.0.0-20200901140731-1236dc23c728
-	github.com/openshift/client-go v0.0.0-20200827190008-3062137373b5
-	github.com/openshift/library-go v0.0.0-20200902112127-a4e32e339219
+	github.com/openshift/api v0.0.0-20201019163320-c6a5ec25f267
+	github.com/openshift/apiserver-library-go v0.0.0-20201020095023-fe92bc0abdc3
+	github.com/openshift/client-go v0.0.0-20201020082437-7737f16e53fc
+	github.com/openshift/library-go v0.0.0-20201020083322-646ad9742a1e
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.7.1
@@ -109,22 +109,22 @@ require (
 	gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/warnings.v0 v0.1.1 // indirect
 	gopkg.in/yaml.v2 v2.3.0
-	k8s.io/api v0.19.0
-	k8s.io/apiextensions-apiserver v0.19.0
-	k8s.io/apimachinery v0.19.0
-	k8s.io/apiserver v0.19.0
+	k8s.io/api v0.19.2
+	k8s.io/apiextensions-apiserver v0.19.2
+	k8s.io/apimachinery v0.19.2
+	k8s.io/apiserver v0.19.2
 	k8s.io/cli-runtime v0.0.0
-	k8s.io/client-go v0.19.0
+	k8s.io/client-go v0.19.2
 	k8s.io/cloud-provider v0.0.0
 	k8s.io/cluster-bootstrap v0.0.0
-	k8s.io/code-generator v0.19.0
-	k8s.io/component-base v0.19.0
+	k8s.io/code-generator v0.19.2
+	k8s.io/component-base v0.19.2
 	k8s.io/cri-api v0.0.0
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/gengo v0.0.0-20200428234225-8167cfdcfc14
 	k8s.io/heapster v1.2.0-beta.1
 	k8s.io/klog/v2 v2.3.0
-	k8s.io/kube-aggregator v0.19.0
+	k8s.io/kube-aggregator v0.19.2
 	k8s.io/kube-controller-manager v0.0.0
 	k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
 	k8s.io/kube-proxy v0.0.0
@@ -267,6 +267,7 @@ replace (
 	github.com/go-openapi/validate => github.com/go-openapi/validate v0.19.5
 	github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 	github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
+	github.com/gobuffalo/flect => github.com/gobuffalo/flect v0.2.0
 	github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.3
 	github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.1
 	github.com/golang/freetype => github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
@@ -329,7 +330,6 @@ replace (
 	github.com/kr/pretty => github.com/kr/pretty v0.2.0
 	github.com/kr/pty => github.com/kr/pty v1.1.5
 	github.com/kr/text => github.com/kr/text v0.1.0
-	github.com/kubernetes-sigs/kube-storage-version-migrator => github.com/kubernetes-sigs/kube-storage-version-migrator v0.0.0-20191127225502-51849bc15f17
 	github.com/kylelemons/godebug => github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348
 	github.com/libopenstorage/openstorage => github.com/libopenstorage/openstorage v1.0.0
 	github.com/liggitt/tabwriter => github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
@@ -375,11 +375,11 @@ replace (
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb
 	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20200520003142-237cc4f519e2
 	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.5.2
-	github.com/openshift/api => github.com/openshift/api v0.0.0-20200829102639-8a3a835f1acf
-	github.com/openshift/apiserver-library-go => github.com/openshift/apiserver-library-go v0.0.0-20200901140731-1236dc23c728
-	github.com/openshift/build-machinery-go => github.com/openshift/build-machinery-go v0.0.0-20200819073603-48aa266c95f7
-	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20200827190008-3062137373b5
-	github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20200902112127-a4e32e339219
+	github.com/openshift/api => github.com/openshift/api v0.0.0-20201019163320-c6a5ec25f267
+	github.com/openshift/apiserver-library-go => github.com/openshift/apiserver-library-go v0.0.0-20201020095023-fe92bc0abdc3
+	github.com/openshift/build-machinery-go => github.com/openshift/build-machinery-go v0.0.0-20200917070002-f171684f77ab
+	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20201020082437-7737f16e53fc
+	github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20201020083322-646ad9742a1e
 	github.com/pelletier/go-toml => github.com/pelletier/go-toml v1.2.0
 	github.com/peterbourgon/diskv => github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/pkg/errors => github.com/pkg/errors v0.9.1
@@ -475,26 +475,28 @@ replace (
 	gopkg.in/tomb.v1 => gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
 	gopkg.in/warnings.v0 => gopkg.in/warnings.v0 v0.1.1
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.8
+	gopkg.in/yaml.v3 => gopkg.in/yaml.v3 v3.0.0-20190905181640-827449938966
 	gotest.tools => gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 => gotest.tools/v3 v3.0.2
 	honnef.co/go/tools => honnef.co/go/tools v0.0.1-2019.2.3
-	k8s.io/api => k8s.io/api v0.19.0
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.0
-	k8s.io/apimachinery => k8s.io/apimachinery v0.19.0
-	k8s.io/apiserver => k8s.io/apiserver v0.19.0
+	k8s.io/api => k8s.io/api v0.19.2
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.19.2
+	k8s.io/apimachinery => k8s.io/apimachinery v0.19.2
+	k8s.io/apiserver => k8s.io/apiserver v0.19.2
 	k8s.io/cli-runtime => ./staging/src/k8s.io/cli-runtime
-	k8s.io/client-go => k8s.io/client-go v0.19.0
+	k8s.io/client-go => k8s.io/client-go v0.19.2
 	k8s.io/cloud-provider => ./staging/src/k8s.io/cloud-provider
 	k8s.io/cluster-bootstrap => ./staging/src/k8s.io/cluster-bootstrap
-	k8s.io/code-generator => k8s.io/code-generator v0.19.0
-	k8s.io/component-base => k8s.io/component-base v0.19.0
+	k8s.io/code-generator => k8s.io/code-generator v0.19.2
+	k8s.io/component-base => k8s.io/component-base v0.19.2
 	k8s.io/controller-manager => ./staging/src/k8s.io/controller-manager
 	k8s.io/cri-api => ./staging/src/k8s.io/cri-api
 	k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
 	k8s.io/gengo => k8s.io/gengo v0.0.0-20200428234225-8167cfdcfc14
 	k8s.io/heapster => k8s.io/heapster v1.2.0-beta.1
+	k8s.io/klog => k8s.io/klog v1.0.0
 	k8s.io/klog/v2 => k8s.io/klog/v2 v2.2.0
-	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.19.0
+	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.19.2
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
 	k8s.io/kube-proxy => ./staging/src/k8s.io/kube-proxy
@@ -515,6 +517,8 @@ replace (
 	modernc.org/xc => modernc.org/xc v1.0.0
 	rsc.io/pdf => rsc.io/pdf v0.1.1
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.9
+	sigs.k8s.io/controller-tools => sigs.k8s.io/controller-tools v0.2.8
+	sigs.k8s.io/kube-storage-version-migrator => sigs.k8s.io/kube-storage-version-migrator v0.0.3
 	sigs.k8s.io/kustomize => sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.0.1
 	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0

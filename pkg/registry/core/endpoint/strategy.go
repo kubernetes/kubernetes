@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
+	endptspkg "k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -59,6 +60,8 @@ func (endpointsStrategy) Validate(ctx context.Context, obj runtime.Object) field
 
 // Canonicalize normalizes the object after validation.
 func (endpointsStrategy) Canonicalize(obj runtime.Object) {
+	endpoints := obj.(*api.Endpoints)
+	endpoints.Subsets = endptspkg.RepackSubsets(endpoints.Subsets)
 }
 
 // AllowCreateOnUpdate is true for endpoints.

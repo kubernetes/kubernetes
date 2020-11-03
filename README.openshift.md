@@ -11,7 +11,7 @@ any code you have in upstream Kubernetes will land in Openshift via
 this mechanism.
 
 2. Cherry-picked patches for important *bug fixes*.  We really try to
-limit feature back-porting entirely.
+limit feature back-porting entirely. Unless there are exceptional circumstances, your backport should at least be merged in kubernetes master branch. With every carry patch (not included in upstream) you are introducing a maintenance burden for the team managing rebases.
 
 ### For Openshift newcomers: Pick my Kubernetes fix into Openshift vs. wait for the next rebase?
 

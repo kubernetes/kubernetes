@@ -21,12 +21,12 @@ require (
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20200819165624-17cef6e3e9d5
 	google.golang.org/grpc v1.27.0
 	gopkg.in/yaml.v2 v2.3.0
-	k8s.io/api v0.19.0
-	k8s.io/apimachinery v0.19.0
-	k8s.io/apiserver v0.19.0
-	k8s.io/client-go v0.19.0
-	k8s.io/code-generator v0.19.0
-	k8s.io/component-base v0.19.0
+	k8s.io/api v0.19.2
+	k8s.io/apimachinery v0.19.2
+	k8s.io/apiserver v0.19.2
+	k8s.io/client-go v0.19.2
+	k8s.io/code-generator v0.19.2
+	k8s.io/component-base v0.19.2
 	k8s.io/klog/v2 v2.3.0
 	k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
 	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
@@ -37,6 +37,7 @@ replace (
 	github.com/containerd/continuity => github.com/containerd/continuity v0.0.0-20190426062206-aaeac12a7ffc
 	github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
+	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
 	github.com/onsi/ginkgo => github.com/openshift/ginkgo v4.5.0-origin.1+incompatible
 	github.com/robfig/cron => github.com/robfig/cron v1.1.0
 	go.uber.org/multierr => go.uber.org/multierr v1.1.0

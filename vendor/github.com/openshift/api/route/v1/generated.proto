@@ -212,6 +212,10 @@ message RouterShard {
 // TLSConfig defines config used to secure a route and provide termination
 message TLSConfig {
   // termination indicates termination type.
+  //
+  // * edge - TLS termination is done by the router and http is used to communicate with the backend (default)
+  // * passthrough - Traffic is sent straight to the destination without the router providing TLS termination
+  // * reencrypt - TLS termination is done by the router and https is used to communicate with the backend
   optional string termination = 1;
 
   // certificate provides certificate contents
