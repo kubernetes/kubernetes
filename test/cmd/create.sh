@@ -134,8 +134,8 @@ run_kubectl_create_kustomization_directory_tests() {
   set -o errexit
 
   ## kubectl create -k <dir> for kustomization directory
-  # Pre-condition: no ConfigMap, Deployment, Service exist
-  kube::test::get_object_assert configmaps "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Pre-Condition: No configmaps with name=test-the-map, no Deployment, Service exist
+  kube::test::get_object_assert 'configmaps --field-selector=metadata.name=test-the-map' "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command

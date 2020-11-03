@@ -582,20 +582,6 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	})
 
 	ginkgo.It("should support InClusterConfig with token rotation [Slow]", func() {
-		cfg, err := framework.LoadConfig()
-		framework.ExpectNoError(err)
-
-		if _, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), &v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "kube-root-ca.crt",
-			},
-			Data: map[string]string{
-				"ca.crt": string(cfg.TLSClientConfig.CAData),
-			},
-		}, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
-			framework.Failf("Unexpected err creating kube-ca-crt: %v", err)
-		}
-
 		tenMin := int64(10 * 60)
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "inclusterclient"},
@@ -655,7 +641,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				}},
 			},
 		}
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		framework.Logf("created pod")
@@ -869,6 +855,69 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			}
 		}
 		framework.ExpectEqual(eventFound, true, "failed to find %v event", watch.Deleted)
+	})
+
+	ginkgo.It("should guarantee kube-root-ca.crt exist in any namespace", func() {
+		const rootCAConfigMapName = "kube-root-ca.crt"
+
+		framework.ExpectNoError(wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+			_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), rootCAConfigMapName, metav1.GetOptions{})
+			if err == nil {
+				return true, nil
+			}
+			if apierrors.IsNotFound(err) {
+				ginkgo.By("root ca configmap not found, retrying")
+				return false, nil
+			}
+			return false, err
+		}))
+		framework.Logf("Got root ca configmap in namespace %q", f.Namespace.Name)
+
+		framework.ExpectNoError(f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), rootCAConfigMapName, metav1.DeleteOptions{GracePeriodSeconds: utilptr.Int64Ptr(0)}))
+		framework.Logf("Deleted root ca configmap in namespace %q", f.Namespace.Name)
+
+		framework.ExpectNoError(wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+			ginkgo.By("waiting for a new root ca configmap created")
+			_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), rootCAConfigMapName, metav1.GetOptions{})
+			if err == nil {
+				return true, nil
+			}
+			if apierrors.IsNotFound(err) {
+				ginkgo.By("root ca configmap not found, retrying")
+				return false, nil
+			}
+			return false, err
+		}))
+		framework.Logf("Recreated root ca configmap in namespace %q", f.Namespace.Name)
+
+		_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: rootCAConfigMapName,
+			},
+			Data: map[string]string{
+				"ca.crt": "",
+			},
+		}, metav1.UpdateOptions{})
+		framework.ExpectNoError(err)
+		framework.Logf("Updated root ca configmap in namespace %q", f.Namespace.Name)
+
+		framework.ExpectNoError(wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+			ginkgo.By("waiting for the root ca configmap reconciled")
+			cm, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), rootCAConfigMapName, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					ginkgo.By("root ca configmap not found, retrying")
+					return false, nil
+				}
+				return false, err
+			}
+			if value, ok := cm.Data["ca.crt"]; !ok || value == "" {
+				ginkgo.By("root ca configmap is not reconciled yet, retrying")
+				return false, nil
+			}
+			return true, nil
+		}))
+		framework.Logf("Reconciled root ca configmap in namespace %q", f.Namespace.Name)
 	})
 })
 
