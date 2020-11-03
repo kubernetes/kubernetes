@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/apiresources"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	"k8s.io/kubectl/pkg/cmd/attach"
+	"k8s.io/kubectl/pkg/cmd/auth"
 	"k8s.io/kubectl/pkg/cmd/autoscale"
 	"k8s.io/kubectl/pkg/cmd/certificates"
 	"k8s.io/kubectl/pkg/cmd/clusterinfo"
@@ -72,7 +73,6 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/util/term"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/convert"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"

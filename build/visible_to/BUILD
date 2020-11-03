@@ -243,6 +243,7 @@ package_group(
         "//staging/src/k8s.io/kubectl/pkg/cmd/annotate",
         "//staging/src/k8s.io/kubectl/pkg/cmd/apply",
         "//staging/src/k8s.io/kubectl/pkg/cmd/attach",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/auth",
         "//staging/src/k8s.io/kubectl/pkg/cmd/certificates",
         "//staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo",
         "//staging/src/k8s.io/kubectl/pkg/cmd/config",
