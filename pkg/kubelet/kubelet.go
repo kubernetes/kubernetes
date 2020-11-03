@@ -270,13 +270,9 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 		config.NewSourceURL(kubeCfg.StaticPodURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource))
 	}
 
-	var updatechannel chan<- interface{}
 	if kubeDeps.KubeClient != nil {
 		klog.Infof("Watching apiserver")
-		if updatechannel == nil {
-			updatechannel = cfg.Channel(kubetypes.ApiserverSource)
-		}
-		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, updatechannel)
+		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, cfg.Channel(kubetypes.ApiserverSource))
 	}
 	return cfg, nil
 }
