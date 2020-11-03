@@ -1,0 +1,45 @@
+---
+apiVersion: topology.node.k8s.io/v1alpha1
+kind: NodeResourceTopology
+metadata:
+  name: node1
+topologyPolicies:
+  - single-numa-node
+  - isolate-thread-policy
+zones:
+  node-0:
+    type: Node
+    resources:
+      cpu:
+        capacity: 20
+        allocatable: 10
+      vendor/nic1:
+        capacity: 3
+        allocatable: 3
+  node-1:
+    type: Node
+    resources:
+      cpu:
+        capacity: 30
+        allocatable: 15
+      vendor/nic2:
+        capacity: 6
+        allocatable: 6
+  node-2:
+    type: Node
+    resources:
+      cpu:
+        capacity: 30
+        allocatable: 15
+      vendor/nic1:
+        capacity: 3
+        allocatable: 3
+  node-3:
+    type: Node
+    resources:
+      cpu:
+        capacity: 30
+        allocatable: 15
+      vendor/nic1:
+        capacity: 3
+        allocatable: 3

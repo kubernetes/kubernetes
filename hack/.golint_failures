@@ -467,6 +467,7 @@ staging/src/k8s.io/metrics/pkg/client/custom_metrics/scheme
 staging/src/k8s.io/metrics/pkg/client/external_metrics
 staging/src/k8s.io/metrics/pkg/client/external_metrics/fake
 staging/src/k8s.io/mount-utils
+staging/src/k8s.io/noderesourcetopology-api
 staging/src/k8s.io/sample-apiserver/pkg/admission/wardleinitializer
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer

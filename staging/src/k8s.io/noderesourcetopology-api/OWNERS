@@ -1,0 +1,16 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- dims
+- derekwaynecarr
+- dchen1107
+- Huang-Wei
+- sig-node-api-approvers
+- api-approvers
+reviewers:
+- sig-node-reviewers
+- dims
+- swatisehgal
+- AlexeyPerevalov
+labels:
+- sig/node

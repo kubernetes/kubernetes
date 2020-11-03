@@ -1,0 +1,55 @@
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    "api-approved.kubernetes.io": "https://github.com/kubernetes/enhancements/pull/1870"
+  name: noderesourcetopologies.topology.node.k8s.io
+spec:
+  group: topology.node.k8s.io
+  version: v1alpha1
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+  scope: Namespaced
+  validation:
+    openAPIV3Schema:
+      type: object
+      properties:
+        topologyPolicies:
+          type: array
+          items:
+            type: string
+        zones:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              type:
+                type: string
+              parent:
+                type: string
+              resources:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    capacity:
+                      x-kubernetes-int-or-string: true
+                    allocatable:
+                      x-kubernetes-int-or-string: true
+              costs:
+                type: object
+                additionalProperties:
+                  type: integer
+              attributes:
+                type: object
+                additionalProperties:
+                  type: string
+  names:
+    plural: noderesourcetopologies
+    singular: noderesourcetopology
+    kind: NodeResourceTopology
+    shortNames:
+      - node-res-topo

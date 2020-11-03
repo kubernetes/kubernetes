@@ -1696,3 +1696,10 @@ rules:
       branch: release-1.20
       dir: staging/src/k8s.io/mount-utils
     name: release-1.20
+- destination: noderesourcetopology-api
+  library: true
+  branches:
+  - source:
+      branch: master
+      dir: staging/src/k8s.io/noderesourcetopology-api
+    name: master
