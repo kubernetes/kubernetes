@@ -270,7 +270,7 @@ __kubectl_custom_func() {
             __kubectl_get_resource_node
             return
             ;;
-        kubectl_config_use-context | kubectl_config_rename-context)
+        kubectl_config_use-context | kubectl_config_rename-context | kubectl_config_delete-context)
             __kubectl_config_get_contexts
             return
             ;;
