@@ -63,6 +63,8 @@ const (
 	ErrReasonNodeConflict ConflictReason = "node(s) had volume node affinity conflict"
 	// ErrUnboundImmediatePVC is used when the pod has an unbound PVC in immedate binding mode.
 	ErrUnboundImmediatePVC ConflictReason = "pod has unbound immediate PersistentVolumeClaims"
+	// ErrReasonPVNotExist is used when a PVC can't find the bound persistent volumes"
+	ErrReasonPVNotExist = "pvc(s) bound to non-existent pv(s)"
 )
 
 // InTreeToCSITranslator contains methods required to check migratable status
@@ -208,6 +210,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (reasons Confl
 	// returns without an error.
 	unboundVolumesSatisfied := true
 	boundVolumesSatisfied := true
+	boundPVsFound := true
 	defer func() {
 		if err != nil {
 			return
@@ -217,6 +220,9 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (reasons Confl
 		}
 		if !unboundVolumesSatisfied {
 			reasons = append(reasons, ErrReasonBindConflict)
+		}
+		if !boundPVsFound {
+			reasons = append(reasons, ErrReasonPVNotExist)
 		}
 	}()
 
@@ -265,7 +271,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (reasons Confl
 
 	// Check PV node affinity on bound volumes
 	if len(boundClaims) > 0 {
-		boundVolumesSatisfied, err = b.checkBoundClaims(boundClaims, node, podName)
+		boundVolumesSatisfied, boundPVsFound, err = b.checkBoundClaims(boundClaims, node, podName)
 		if err != nil {
 			return nil, err
 		}
@@ -725,7 +731,7 @@ func (b *volumeBinder) getPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentV
 	return boundClaims, unboundClaimsDelayBinding, unboundClaimsImmediate, nil
 }
 
-func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node *v1.Node, podName string) (bool, error) {
+func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node *v1.Node, podName string) (bool, bool, error) {
 	csiNode, err := b.csiNodeInformer.Lister().Get(node.Name)
 	if err != nil {
 		// TODO: return the error once CSINode is created by default
@@ -736,24 +742,27 @@ func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node
 		pvName := pvc.Spec.VolumeName
 		pv, err := b.pvCache.GetPV(pvName)
 		if err != nil {
-			return false, err
+			if _, ok := err.(*errNotFound); ok {
+				err = nil
+			}
+			return true, false, err
 		}
 
 		pv, err = b.tryTranslatePVToCSI(pv, csiNode)
 		if err != nil {
-			return false, err
+			return false, true, err
 		}
 
 		err = volumeutil.CheckNodeAffinity(pv, node.Labels)
 		if err != nil {
 			klog.V(4).Infof("PersistentVolume %q, Node %q mismatch for Pod %q: %v", pvName, node.Name, podName, err)
-			return false, nil
+			return false, true, nil
 		}
 		klog.V(5).Infof("PersistentVolume %q, Node %q matches for Pod %q", pvName, node.Name, podName)
 	}
 
 	klog.V(4).Infof("All bound volumes for Pod %q match with Node %q", podName, node.Name)
-	return true, nil
+	return true, true, nil
 }
 
 // findMatchingVolumes tries to find matching volumes for given claims,
