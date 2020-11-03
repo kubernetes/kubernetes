@@ -1,0 +1,8 @@
+# This is identical to louhi_prod.yaml, except we don't push any artifacts,
+# because we're just testing the build process itself (and not actually trying
+# to build new GKE versions).
+push:
+  gcs:
+    to: []
+  gcr:
+    repos: []

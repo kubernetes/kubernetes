@@ -1,0 +1,299 @@
+# All inputs to the build are defined here.
+#
+# If you want to overwrite these settings at runtime, you can have a new set of
+# values in a separate YAML (e.g., "my-overrides.yaml"):
+#
+#  make.sh GKE_BUILD_CONFIG=base.yaml,my-overrides.yaml GKE_BUILD_ACTIONS=build,validate,push-gcs
+#
+# It's highly encouraged to use written settings over ad-hoc runtime options, so
+# that build configuration options can be recorded and shared in a more
+# reproducible manner.
+
+# These settings are used for the build-env-image, when it is created for the
+# first time. If it is pulled down from a cache, the versions of the
+# dependencies in here are checked against it for validity.
+build-env:
+  # Supported platforms are `linux/amd64`, `linux/arm64` and `windows/amd64`. These platforms
+  # are not set here, but are set in the downstream, more specific YAMLs such as
+  # louhi_prod.yaml and others.
+  #
+  # To *only* build `linux/amd64`, just do
+  #
+  #   target-platforms:
+  #   - linux/amd64
+  #
+  # or specify `TARGET_PLATFORMS=linux/amd64` in the command line.
+  target-platforms: []
+  # This is the build environment to use for compiling the binaries.
+  compiler-image:
+    # The image name must include the GCR repo in it, as it will be used to save
+    # it back up in case this build image is not found remotely. Also, note that
+    # this is only the name prefix *without* the tag. A unique tag is generated
+    # based on the compiler-image dependencies to tag the resulting
+    # kube-cross-image (to disambiguate it against others that have previously
+    # been built).
+    name: "gcr.io/gke-release-staging/kube-cross-gke"
+    deps:
+      # The golang image to use. Just in case upstream decides to include a "v"
+      # prefix or some other suffix to throw us off, we define the entire image
+      # name here.
+      #
+      # The image should be the human-friendly full path that includes any
+      # leading gcr.io or other such registry prefixes, if applicable.
+      #
+      # If you want to test building with older golang versions, you have to
+      # override the OSS build script at hack/lib/golang.sh by modifying
+      #
+      #   minimum_go_version=<VALUE> # set to a low value to allow a wide range
+      #
+      # under function
+      #
+      #   `kube::golang::verify_go_version()'.
+      #
+      # Set the <VALUE> to something low like `go1.13.0' to allow
+      # experimentation with a wide range of go compilers.
+      golang-image: "golang:1.15.3"
+      # Determines whether we use the "BoringCrypto" flavor of the Golang
+      # compiler. If the string is non-empty, it will take precedence over the
+      # "golang-image" field, and will be used instead as the build environment.
+      golang-boringcrypto-image: "goboring/golang:1.15.6b5"
+      protobuf: "3.0.2"
+      etcd: "v3.4.13"
+    fips:
+      go-boringcrypto:
+        # golang-boringcrypto-image was last updated for
+        # /build/build-image/cross/VERSION:
+        last-updated-for-oss-kubecross-version: v1.15.6-1
+
+  # This is a separate image that is used for the package-tarballs.sh step,
+  # which requires Docker.
+  docker-image:
+    name: "gcr.io/cloud-builders/docker"
+
+compile:
+  # This is the VERSION field that is supplied at Golang compilation time. This
+  # propagates everywhere else (to each binary's "--version" flag, to the GCR
+  # image tags, and also the folder name of the GCS path).
+  #
+  # For determining the "version" ultimately used in the build, the precedence
+  # order is as follows:
+  #
+  #   1) Use user-supplied "VERSION=..." argument to make_*.sh.
+  #   2) Use the "compile.version" key in the config yaml, if it is non-empty.
+  #   3) Finally, use the default "version" generation from lib_gke.sh.
+  #
+  # Note that the setting here gives you the least flexibility, as the setting
+  # is static. The version string must follow SemVer syntax and have a major,
+  # minor, and patch version part. An example of a valid version string is
+  # "v1.2.3".
+  #
+  # Note that if the version is too long (>128 characters), it will get
+  # truncated when it is passed along to set the Docker image tags, as Docker
+  # does not allow tags to be longer than 128 characters.
+  version: ""
+
+  # This is the location where the $KUBE_ROOT folder is mounted.
+  kube-root-mount-path: "/go/src/k8s.io/kubernetes"
+
+  # This is the path where the Kubernetes build artifacts are stored. It is
+  # unerneath the root of the source code tree, which is denoted by ${KUBE_ROOT}.
+  output-subpath: "${KUBE_ROOT}/_output/dockerized"
+
+package:
+  tars-subpath: "${KUBE_ROOT}/_output/release-tars"
+  gcr:
+    # This is used as $KUBE_DOCKER_REGISTRY. The build process first uses
+    # 'k8s.gcr.io' as the registry, but then if $KUBE_DOCKER_REGISTRY is present,
+    # also additionally tags the image as $KUBE_DOCKER_REGISTRY.
+    #
+    # This makes it so that when the docker images are saved out to a tarball
+    # format with 'docker save', the resulting manifest.json embedded inside the
+    # tarball has both 'k8s.gcr.io' and $KUBE_DOCKER_REGISTRY tags of the image in
+    # the 'RepoTags' field (also visible with a 'docker inspect'). In other words,
+    # the Docker tags are saved into the tarball. These same tags are reloaded
+    # when the tarballs are 'docker load'-ed back into the local Docker daemon.
+    #
+    # In terms of saving images, this field is actually not necessary, because
+    # we already save the images as tarballs in GCS. The tarballs are always
+    # 'docker load'-able and we can 'docker tag', etc. to our whim before
+    # pushing it up into GCR.
+    repo: "gke.gcr.io"
+    # Images which we must guarantee are built and generated as an output of the
+    # build. These images are then possibly modified with source/license
+    # injection. Each image starts out as a tarball, from which we `docker load`
+    # it and tag it as a particular gcr-repo + image + tag combination.
+    images:
+    - name: kube-proxy
+      build-steps:
+        # Load image from tarball.
+        #
+        # NOTE: The initial tags that this container will use, once loaded up
+        # with 'docker load', is discoverable by inspecting the 'RepoTags' field
+        # inside the toplevel 'manifest.json' in the tarball.
+      - from: "${KUBE_ROOT}/_output/release-images/amd64/kube-proxy.tar"
+        # These outputs (as part of the very first build step) only come into
+        # play if there are *NO* other build steps for this image. This can be
+        # the case if we pass in both SKIP_DOCKER_LICENSE_INJECTION=1 and
+        # SKIP_DOCKER_SOURCE_INJECTION=1 when running one of the make_*.sh
+        # files.
+        outputs:
+        - gcr.io/gke-release-staging/kube-proxy-amd64
+        - "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-proxy.tar"
+      - action: inject-licenses
+        # Save as this "local/with-licenses/kube-proxy:local". Image names
+        # without a tag will just use the underlying tag used in the build
+        # (discoverable from the tarfile at the very first step).
+      - action: inject-source-code
+        params:
+          # Paths to ignore when using `git archive` to pack up the source
+          # code for injection. The regex here is used in the BASH regex
+          # flavor.
+          #
+          # kube-proxy is a node image, and does not need master-only code
+          # bundled up with it, so exclude such paths from git-archive.
+          # See b/126790958.
+          git-archive-ignore-paths:
+          # Exclude everything under "gke", including the "gke/build" folder.
+          - "**/gke"
+
+          # "pkg/master" was renamed to "pkg/controlplane" in
+          # https://github.com/kubernetes/kubernetes/pull/94407
+          - "**/pkg/master"
+          - "**/pkg/controlplane"
+
+          - "**/k8s.io/apiserver"
+          archive-name: source.tar.xz
+        outputs:
+        # Pepare for gke-release-staging.
+        - gcr.io/gke-release-staging/kube-proxy-amd64
+
+        # Prepare for pushing to on-prem as well.
+        - gcr.io/gke-on-prem-staging/kube-proxy-amd64
+
+        # Finally, save it back out into another Docker tarball. We can't use
+        # the same path as the original
+        # "${KUBE_ROOT}/_output/release-images/amd64/kube-proxy.tar" line above
+        # because it is *not* used by arrange_for_gcs() function in lib_gke.sh
+        # for final GCS upload preparation. So instead we use a different path
+        # that *will* be used by it for final GCS upload.
+        - "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-proxy.tar"
+
+    # Generate images that run only on master nodes.
+    # For GKE, these images are public but not distributed, so they shouldn't include source.
+    # For GKE On-prem, they are not public but ARE distributed, so they SHOULD include source.
+    # This won't matter once private releases are ready.
+    # See b/117953899.
+    - name: kube-apiserver
+      build-steps:
+      - from: "${KUBE_ROOT}/_output/release-images/amd64/kube-apiserver.tar"
+        outputs:
+        - gcr.io/gke-release-staging/kube-apiserver-amd64
+        - "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-apiserver.tar"
+      - action: inject-licenses
+        outputs:
+        - gcr.io/gke-release-staging/kube-apiserver-amd64
+        - "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-apiserver.tar"
+      - action: inject-source-code
+        params:
+          archive-name: source.tar.xz
+        outputs:
+        - gcr.io/gke-on-prem-staging/kube-apiserver-amd64
+    - name: kube-controller-manager
+      build-steps:
+      - from: "${KUBE_ROOT}/_output/release-images/amd64/kube-controller-manager.tar"
+        outputs:
+        - gcr.io/gke-release-staging/kube-controller-manager-amd64
+        - "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-controller-manager.tar"
+      - action: inject-licenses
+        outputs:
+        - gcr.io/gke-release-staging/kube-controller-manager-amd64
+        - "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-controller-manager.tar"
+      - action: inject-source-code
+        params:
+          archive-name: source.tar.xz
+        outputs:
+        - gcr.io/gke-on-prem-staging/kube-controller-manager-amd64
+    - name: kube-scheduler
+      build-steps:
+      - from: "${KUBE_ROOT}/_output/release-images/amd64/kube-scheduler.tar"
+        outputs:
+        - gcr.io/gke-release-staging/kube-scheduler-amd64
+        - "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-scheduler.tar"
+      - action: inject-licenses
+        outputs:
+        - gcr.io/gke-release-staging/kube-scheduler-amd64
+        - "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-scheduler.tar"
+      - action: inject-source-code
+        params:
+          archive-name: source.tar.xz
+        outputs:
+        - gcr.io/gke-on-prem-staging/kube-scheduler-amd64
+  gcs:
+    # Directory where to place all of the GCS artifacts for upload into GCS.
+    to: "${KUBE_ROOT}/_output/for-gcs"
+
+validate:
+  boringcrypto:
+    # Image used for validating binaries for compilation with
+    # golang-boringcrypto-image. It's only used if golang-boringcrypto-image is
+    # non-empty.
+    bcheck-image: "gcr.io/gke-release-staging/bcheck:20200903-767c968"
+    binaries:
+    - kubectl
+    - kubelet
+    - kube-proxy
+    - kube-apiserver
+    assertions:
+    - linkedWithBoringCrypto
+    - linkedDynamically
+
+push:
+  # For GCS, we push all directories under 'dirs' to each bucket.
+  gcs:
+    # Directory to upload to GCS. This should match the 'package.gcs.to' value
+    # from above. We choose the first folder name here and use that for
+    # uploading. E.g., if there is a foler "${KUBE_ROOT}/_output/for-gcs/foo",
+    # then everything in the "foo" subfolder is uploaded into the buckets listed
+    # below.
+    from: "${KUBE_ROOT}/_output/for-gcs"
+    # NOTE: For developers and CI systems, we don't need to replicate across
+    # multiple buckets like this. In such cases, they can just pass in a bucket
+    # path manually, or define a "TO_GCS_BUCKET" variable.
+    to:
+    # For testing. We don't specify production buckets here, in case the user
+    # accidentally pushes to GCS by mistake.
+    - gs://kubernetes-release-gke-internal/devel
+
+  # GCR repos to push Docker images. For devs and CI, there is no need to
+  # perform a GCR push, because the images stored in GCS alone are sufficient.
+  # Only the production Louhi build needs to push to GCR.
+  #
+  # The two fields are "repos" and "images". The permutation of <REPO>/<IMAGE>
+  # is used to first determine where to push images. For example, if we have "a"
+  # and "b" as "repos", and "x" and "y" as "images", then we end up pushing all
+  # images that have the prefix of: "a/x", "a/y", "b/x", and "b/y" (we need to
+  # search by image prefix because the image tags are not known until at build
+  # time). The image tags are also used to further filter the search to only
+  # those images that correspond to the unique VERSION we want to push.
+  #
+  # Under the hood, the images actually generated by the build are named
+  # "...-amd64", and the pushing step is twofold. First, we push
+  # <REPO>/<IMAGE>-<ARCH> (where ARCH is "amd64") and all other images that
+  # match that string when viewed as a regex against the local Docker daemon.
+  # Second, we create a Docker manifest list by using the just-pushed "-amd64"
+  # images as the set of child images. Even though we only have 1 child image
+  # (we don't build for any other architecture), we still create the manifest
+  # list because we don't want downstream consumers to have to refer to images
+  # by the "-amd64" suffix.
+  gcr:
+    # This field is empty by default because normally for devs and CI, there is
+    # no need to push to GCR. For prod (used by Louhi), see
+    # ./production_louhi.yaml.
+    repos: []
+    images:
+    - kube-proxy
+    - kube-apiserver
+    - kube-controller-manager
+    - kube-scheduler
+    architectures:
+    - amd64

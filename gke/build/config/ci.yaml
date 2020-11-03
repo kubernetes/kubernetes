@@ -1,0 +1,12 @@
+# This is used for the `pull-gob-kubernetes-build` job.
+build-env:
+  target-platforms:
+  # Skip windows.
+  - "linux/amd64"
+push:
+  gcs:
+    to:
+    - gs://gob-prow/ci
+  gcr:
+    # Don't push any images.
+    repos: []

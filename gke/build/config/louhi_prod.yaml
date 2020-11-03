@@ -1,0 +1,26 @@
+build-env:
+  target-platforms:
+  - "linux/amd64"
+  - "windows/amd64"
+push:
+  gcs:
+    to:
+    # These are production buckets that are used by Louhi.
+    # TODO (linusa) b/182405548: Create a separate sync job that syncs
+    # everything from gs://gke-release-staging into the other buckets.
+    #
+    # NOTE: Historically, there was once a GCS mirroring job called the
+    # release_copier but it was removed after the Reliability Reset (circa
+    # 2019). At that time it was determined that having a separate replication
+    # job was unsafe, although it did not go into details about how to make the
+    # replication smarter/safer. See http://go/reliability-reset-gke-gcr.
+    - gs://gke-release-staging/kubernetes/release
+    - gs://gke-release-staging-asia/kubernetes/release
+    - gs://gke-release-staging-eu/kubernetes/release
+    - gs://gke-multi-cloud-staging/kubernetes/release
+    - gs://gke-multi-cloud-api-staging/kubernetes/release
+  gcr:
+    repos:
+    # Production repos!
+    - gcr.io/gke-release-staging
+    - gcr.io/gke-on-prem-staging

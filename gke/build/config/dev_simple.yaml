@@ -1,0 +1,29 @@
+# This is used for the developer workflow (when writing code/compiling from the
+# workstation with Docker). As such, some things are not done (such as source
+# code injection, or building for windows).
+#
+# Compare against louhi_prod.yaml to see where the differences lie against what
+# Louhi does for production.
+
+# Uncomment and replace <placeholder> with a repo you have push access if you
+# want to test building different versions of kube-cross-gke.
+build-env:
+  target-platforms:
+  # Skip windows.
+  - "linux/amd64"
+push:
+  gcs:
+    to:
+    - gs://kubernetes-release-gke-internal/devel
+  gcr:
+    # Don't push any images.
+    repos: []
+    # The official GKE policy is to *not* have any generic GCR for testing only,
+    # but instead to have developers have their own. In order to push to your
+    # own GCR, create a GCP project with your username and use that instead.
+    #
+    # NOTE: If you want to create and push GCR images to your own GCP project,
+    # you have to (1) modify the configs to have images named after your own GCR
+    # (and not gcr.io/gke-release-staging), and (2) uncomment the below
+    # 'gcr.io/placeholder' string to match.
+    # - gcr.io/placeholder
