@@ -25,11 +25,10 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/protobuf/proto"
 	fuzz "github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
 
-	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
+	"k8s.io/apimachinery/pkg/api/apitesting"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -432,7 +431,6 @@ func dataAsString(data []byte) string {
 	dataString := string(data)
 	if !strings.HasPrefix(dataString, "{") {
 		dataString = "\n" + hex.Dump(data)
-		proto.NewBuffer(make([]byte, 0, 1024)).DebugPrint("decoded object", data)
 	}
 	return dataString
 }
