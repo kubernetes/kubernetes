@@ -28,6 +28,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -41,7 +42,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -423,8 +424,12 @@ func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	return nil
 }
 
+// checkPermissions confirms that, on linux, the UID of the kubelet process is 0.  For windows, it will return an error automatically.  For other systems, the behaviour is unspecified.
 func checkPermissions() error {
 	if uid := os.Getuid(); uid != 0 {
+		if runtime.GOOS == "windows" {
+			return fmt.Errorf("not checking UID permissions because we're on windows")
+		}
 		return fmt.Errorf("kubelet needs to run as uid `0`. It is being run as %d", uid)
 	}
 	// TODO: Check if kubelet is running in the `initial` user namespace.
@@ -1061,8 +1066,8 @@ func setContentTypeForClient(cfg *restclient.Config, contentType string) {
 	}
 	cfg.ContentType = contentType
 	switch contentType {
-	case runtime.ContentTypeProtobuf:
-		cfg.AcceptContentTypes = strings.Join([]string{runtime.ContentTypeProtobuf, runtime.ContentTypeJSON}, ",")
+	case apiruntime.ContentTypeProtobuf:
+		cfg.AcceptContentTypes = strings.Join([]string{apiruntime.ContentTypeProtobuf, apiruntime.ContentTypeJSON}, ",")
 	default:
 		// otherwise let the rest client perform defaulting
 	}
