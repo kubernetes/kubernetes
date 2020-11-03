@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"k8s.io/klog/v2"
 )
 
 // FieldImmutableErrorMsg is a error message for field is immutable.
@@ -101,6 +103,7 @@ func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *f
 			seen[ref.UID] = struct{}{}
 		} else {
 			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i).Child("uid"), ref.UID))
+			klog.Errorf(">>> duplicate owner references: %v", ownerReferences)
 		}
 	}
 	return allErrs
