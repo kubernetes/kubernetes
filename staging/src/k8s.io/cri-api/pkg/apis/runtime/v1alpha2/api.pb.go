@@ -22,17 +22,18 @@ package v1alpha2
 import (
 	context "context"
 	fmt "fmt"
+	io "io"
+	math "math"
+	math_bits "math/bits"
+	reflect "reflect"
+	strings "strings"
+
 	_ "github.com/gogo/protobuf/gogoproto"
 	proto "github.com/gogo/protobuf/proto"
 	github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	io "io"
-	math "math"
-	math_bits "math/bits"
-	reflect "reflect"
-	strings "strings"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -828,6 +829,16 @@ type LinuxPodSandboxConfig struct {
 	XXX_sizecache        int32             `json:"-"`
 }
 
+// WindowsSandboxConfig holds platform-specific configurations for Windows
+type WindowsSandboxConfig struct {
+	// WindowsSandboxConfig holds sandbox security attributes.
+	SecurityContext *LinuxSandboxSecurityContext `protobuf:"bytes,2,opt,name=security_context,json=securityContext,proto3" json:"security_context,omitempty"`
+	// Sysctls holds linux sysctls config for the sandbox.
+	Sysctls              map[string]string `protobuf:"bytes,3,rep,name=sysctls,proto3" json:"sysctls,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
+	XXX_sizecache        int32             `json:"-"`
+}
+
 func (m *LinuxPodSandboxConfig) Reset()      { *m = LinuxPodSandboxConfig{} }
 func (*LinuxPodSandboxConfig) ProtoMessage() {}
 func (*LinuxPodSandboxConfig) Descriptor() ([]byte, []int) {
@@ -1010,8 +1021,10 @@ type PodSandboxConfig struct {
 	Annotations map[string]string `protobuf:"bytes,7,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// Optional configurations specific to Linux hosts.
 	Linux                *LinuxPodSandboxConfig `protobuf:"bytes,8,opt,name=linux,proto3" json:"linux,omitempty"`
+
 	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
 	XXX_sizecache        int32                  `json:"-"`
+
 }
 
 func (m *PodSandboxConfig) Reset()      { *m = PodSandboxConfig{} }

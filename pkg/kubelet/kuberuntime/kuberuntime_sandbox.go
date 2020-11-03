@@ -134,13 +134,53 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 		podSandboxConfig.PortMappings = portMappings
 	}
 
-	lc, err := m.generatePodSandboxLinuxConfig(pod)
-	if err != nil {
-		return nil, err
+	// use the linux data structure to store windows info for now
+	// incremental change that decouples the windows codepath which
+	// can await the runtime api being updated to support windows
+	if runtime.GOOS == "windows" {
+		win, err := m.generatePodSandboxWindowsConfig(pod)
+		if err != nil {
+			return nil, err
+		}
+		podSandboxConfig.Linux = win
+	} else {
+		lc, err := m.generatePodSandboxLinuxConfig(pod)
+		if err != nil {
+			return nil, err
+		}
+		podSandboxConfig.Linux = lc
 	}
-	podSandboxConfig.Linux = lc
-
 	return podSandboxConfig, nil
+}
+
+// generatePodSandboxLinuxConfig is a minimal copy of generatePodSandboxWindowsConfig
+func (m *kubeGenericRuntimeManager) generatePodSandboxWindowsConfig(pod *v1.Pod) (*runtimeapi.LinuxPodSandboxConfig, error) {
+	sysctls := make(map[string]string)
+	lc := &runtimeapi.LinuxPodSandboxConfig{
+		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
+			Privileged:         false,
+			SeccompProfilePath: v1.SeccompProfileRuntimeDefault,
+		},
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) {
+		if pod.Spec.SecurityContext != nil {
+			for _, c := range pod.Spec.SecurityContext.Sysctls {
+				sysctls[c.Name] = c.Value
+			}
+		}
+	}
+	if pod.Spec.SecurityContext != nil {
+		sc := pod.Spec.SecurityContext
+		if groups := m.runtimeHelper.GetExtraSupplementalGroupsForPod(pod); len(groups) > 0 {
+			lc.SecurityContext.SupplementalGroups = append(lc.SecurityContext.SupplementalGroups, groups...)
+		}
+		if sc.SupplementalGroups != nil {
+			for _, sg := range sc.SupplementalGroups {
+				lc.SecurityContext.SupplementalGroups = append(lc.SecurityContext.SupplementalGroups, int64(sg))
+			}
+		}
+	}
+	return lc, nil
 }
 
 // generatePodSandboxLinuxConfig generates LinuxPodSandboxConfig from v1.Pod.
@@ -159,7 +199,6 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 			SeccompProfilePath: v1.SeccompProfileRuntimeDefault,
 		},
 	}
-
 	sysctls := make(map[string]string)
 	if utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) {
 		if pod.Spec.SecurityContext != nil {
@@ -168,9 +207,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 			}
 		}
 	}
-
 	lc.Sysctls = sysctls
-
 	if pod.Spec.SecurityContext != nil {
 		sc := pod.Spec.SecurityContext
 		if sc.RunAsUser != nil && runtime.GOOS != "windows" {
@@ -201,7 +238,6 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 			}
 		}
 	}
-
 	return lc, nil
 }
 
