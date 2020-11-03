@@ -63,7 +63,7 @@ func testPod() *v1.Pod {
 	return pod
 }
 
-var _ = SIGDescribe("Hostname of Pod [Feature:SetHostnameAsFQDN][NodeAlphaFeature:SetHostnameAsFQDN]", func() {
+var _ = SIGDescribe("Hostname of Pod [Feature:SetHostnameAsFQDN][NodeFeature:SetHostnameAsFQDN]", func() {
 	f := framework.NewDefaultFramework("hostfqdn")
 
 	/*
