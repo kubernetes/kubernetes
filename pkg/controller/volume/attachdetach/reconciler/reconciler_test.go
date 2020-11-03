@@ -681,7 +681,7 @@ func Test_ReportMultiAttachError(t *testing.T) {
 			[]nodeWithPods{
 				{"node1", []string{"ns1/pod1"}},
 			},
-			[]string{"Warning FailedAttachVolume Multi-Attach error for volume \"volume-name\" Volume is already exclusively attached to one node and can't be attached to another"},
+			[]string{"Warning VolumeAlreadyAttachedOnAnotherNode Multi-Attach error for volume \"volume-name\" Volume is already exclusively attached to one node and can't be attached to another"},
 		},
 		{
 			"pods in the same namespace use the volume",

@@ -73,6 +73,7 @@ const (
 	FailedCreatePodSandBox               = "FailedCreatePodSandBox"
 	FailedStatusPodSandBox               = "FailedPodSandBoxStatus"
 	FailedMountOnFilesystemMismatch      = "FailedMountOnFilesystemMismatch"
+	WarnAlreadyAttachedVolume            = "VolumeAlreadyAttachedOnAnotherNode"
 )
 
 // Image manager event reason list

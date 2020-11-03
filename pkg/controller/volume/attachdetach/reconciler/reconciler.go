@@ -307,7 +307,7 @@ func (rc *reconciler) reportMultiAttachError(volumeToAttach cache.VolumeToAttach
 		// We did not find any pods that requests the volume. The pod must have been deleted already.
 		simpleMsg, _ := volumeToAttach.GenerateMsg("Multi-Attach error", "Volume is already exclusively attached to one node and can't be attached to another")
 		for _, pod := range volumeToAttach.ScheduledPods {
-			rc.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedAttachVolume, simpleMsg)
+			rc.recorder.Eventf(pod, v1.EventTypeWarning, kevents.WarnAlreadyAttachedVolume, simpleMsg)
 		}
 		// Log detailed message to system admin
 		nodeList := strings.Join(otherNodesStr, ", ")
