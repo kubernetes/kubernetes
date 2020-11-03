@@ -184,6 +184,21 @@ rules:
     - repository: client-go
       branch: release-1.19
 
+- destination: component-helpers
+  library: true
+  branches:
+  - source:
+      branch: master
+      dir: staging/src/k8s.io/component-helpers
+    name: master
+    dependencies:
+    - repository: apimachinery
+      branch: master
+    - repository: api
+      branch: master
+    - repository: client-go
+      branch: master
+
 - destination: apiserver
   library: true
   branches:
@@ -1285,6 +1300,8 @@ rules:
       branch: master
     - repository: component-base
       branch: master
+    - repository: component-helpers
+      branch: master
     - repository: metrics
       branch: master
   - source:
@@ -1355,18 +1372,3 @@ rules:
       branch: master
       dir: staging/src/k8s.io/mount-utils
     name: master
-
-- destination: component-helpers
-  library: true
-  branches:
-  - source:
-      branch: master
-      dir: staging/src/k8s.io/component-helpers
-    name: master
-    dependencies:
-    - repository: apimachinery
-      branch: master
-    - repository: api
-      branch: master
-    - repository: client-go
-      branch: master
