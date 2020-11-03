@@ -31,7 +31,7 @@ metadata:
   uid: "7"
 spec:
   concurrencyPolicy: Hr鯹)晿<o,c鮽ort昍řČ扷5Ɨ
-  failedJobsHistoryLimit: -1565042829
+  failedJobsHistoryLimit: 677356220
   jobTemplate:
     metadata:
       annotations:
@@ -548,6 +548,10 @@ spec:
               subPath: "355"
               subPathExpr: "356"
             workingDir: "337"
+          exposedNodeLabels:
+            "480": "481"
+          exposedNodeLabelsSelectors:
+          - "479"
           hostAliases:
           - hostnames:
             - "465"
@@ -1043,17 +1047,17 @@ spec:
               storagePolicyID: "122"
               storagePolicyName: "121"
               volumePath: "119"
-      ttlSecondsAfterFinished: -339602975
+      ttlSecondsAfterFinished: 1190981111
   schedule: "19"
   startingDeadlineSeconds: -2555947251840004808
-  successfulJobsHistoryLimit: 305459364
+  successfulJobsHistoryLimit: -1438954365
   suspend: true
 status:
   active:
-  - apiVersion: "482"
-    fieldPath: "484"
-    kind: "479"
-    name: "481"
-    namespace: "480"
-    resourceVersion: "483"
-    uid: vÐ仆ǆdĄ跞肞=ɴ
+  - apiVersion: "485"
+    fieldPath: "487"
+    kind: "482"
+    name: "484"
+    namespace: "483"
+    resourceVersion: "486"
+    uid: Ð仆

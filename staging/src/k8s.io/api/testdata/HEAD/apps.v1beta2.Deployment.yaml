@@ -30,10 +30,10 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  minReadySeconds: -1934555365
-  progressDeadlineSeconds: -1510243221
+  minReadySeconds: 305459364
+  progressDeadlineSeconds: -2135680132
   replicas: 896585016
-  revisionHistoryLimit: -1189243539
+  revisionHistoryLimit: -1565042829
   selector:
     matchExpressions:
     - key: 50-u--25cu87--r7p-w1e67-8pj5t-kl-v0q6b68--nu5oii38fn-8.629b-jd-8c45-0-8--6n--w0--w---196g8d--iv1-5--5ht-a-29--0qso796/3___47._49pIB_o61ISU4--A_.XK_._M99
@@ -44,7 +44,6 @@ spec:
     rollingUpdate:
       maxSurge: 3
       maxUnavailable: 2
-    type: xʚ=5谠vÐ仆ǆdĄ跞肞
   template:
     metadata:
       annotations:
@@ -516,6 +515,10 @@ spec:
           subPath: "335"
           subPathExpr: "336"
         workingDir: "317"
+      exposedNodeLabels:
+        "460": "461"
+      exposedNodeLabelsSelectors:
+      - "459"
       hostAliases:
       - hostnames:
         - "445"
@@ -1012,17 +1015,17 @@ spec:
           storagePolicyName: "103"
           volumePath: "101"
 status:
-  availableReplicas: -1172851921
-  collisionCount: -73034396
+  availableReplicas: -1754414099
+  collisionCount: 948201693
   conditions:
-  - lastTransitionTime: "2151-08-19T18:24:00Z"
-    lastUpdateTime: "2792-08-11T23:40:18Z"
-    message: "460"
-    reason: "459"
-    status: íEd楗鱶镖喗vȥ倉螆ȨX>
-    type: ʤY囙邵鄨o鷺ɷ裝TG奟cõ乨
-  observedGeneration: 8090469215987662586
-  readyReplicas: 877113289
-  replicas: 782219862
-  unavailableReplicas: -763028101
-  updatedReplicas: 1380163777
+  - lastTransitionTime: "2089-11-18T19:15:35Z"
+    lastUpdateTime: "2759-07-13T14:49:56Z"
+    message: "463"
+    reason: "462"
+    status: U詨ǌ1ý
+    type: =ɴC}怢兴ɥ撤Ů%{LʤY囙邵
+  observedGeneration: -8193185984027364943
+  readyReplicas: 454323788
+  replicas: -1409586854
+  unavailableReplicas: -1901173132
+  updatedReplicas: -148240715

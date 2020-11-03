@@ -205,6 +205,7 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmd.Flags().StringVar(&opt.Schedule, "schedule", opt.Schedule, i18n.T("A schedule in the Cron format the job should be run with."))
 	cmd.Flags().MarkDeprecated("schedule", "has no effect and will be removed in the future.")
 	cmd.Flags().BoolVar(&opt.Privileged, "privileged", opt.Privileged, i18n.T("If true, run the container in privileged mode."))
+	cmd.Flags().StringArray("exposed-node-labels-selectors", []string{}, "Fetch and store, under the Pod Spec, a subset of the labels of the Node on which the pod is scheduled. This subset contains only those labels which match at least one of these provided selectors.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &opt.fieldManager, "kubectl-run")
 }
 
@@ -326,6 +327,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 	params["annotations"] = cmdutil.GetFlagStringArray(cmd, "annotations")
 	params["env"] = cmdutil.GetFlagStringArray(cmd, "env")
+	params["exposed-node-labels-selectors"] = cmdutil.GetFlagStringArray(cmd, "exposed-node-labels-selectors")
 
 	var createdObjects = []*RunObject{}
 	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"))

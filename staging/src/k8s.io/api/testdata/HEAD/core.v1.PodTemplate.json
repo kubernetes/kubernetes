@@ -1455,7 +1455,13 @@
           }
         }
       ],
-      "setHostnameAsFQDN": false
+      "setHostnameAsFQDN": false,
+      "exposedNodeLabelsSelectors": [
+        "453"
+      ],
+      "exposedNodeLabels": {
+        "454": "455"
+      }
     }
   }
 }

@@ -505,6 +505,10 @@ template:
         subPath: "331"
         subPathExpr: "332"
       workingDir: "313"
+    exposedNodeLabels:
+      "454": "455"
+    exposedNodeLabelsSelectors:
+    - "453"
     hostAliases:
     - hostnames:
       - "439"

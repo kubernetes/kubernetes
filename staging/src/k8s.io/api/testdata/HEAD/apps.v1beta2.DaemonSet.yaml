@@ -30,8 +30,8 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  minReadySeconds: -985724127
-  revisionHistoryLimit: 2137111260
+  minReadySeconds: -357359630
+  revisionHistoryLimit: 1948859756
   selector:
     matchExpressions:
     - key: p503---477-49p---o61---4fy--9---7--9-9s-0-u5lj2--10pq-0-7-9-2-0/fP81.-.9Vdx.TB_M-H_5_.t..bG0
@@ -509,6 +509,10 @@ spec:
           subPath: "336"
           subPathExpr: "337"
         workingDir: "318"
+      exposedNodeLabels:
+        "461": "462"
+      exposedNodeLabelsSelectors:
+      - "460"
       hostAliases:
       - hostnames:
         - "446"
@@ -1005,20 +1009,20 @@ spec:
   updateStrategy:
     rollingUpdate:
       maxUnavailable: 2
-    type: 翘ǼZ熝Ʊ宷泐ɻvŰ`Ǧɝ憑ǖ菐u
+    type: ǼZ
 status:
-  collisionCount: 223996911
+  collisionCount: -1754414099
   conditions:
-  - lastTransitionTime: "2480-06-05T07:37:49Z"
-    message: "461"
-    reason: "460"
-    status: 楗鱶镖喗vȥ倉螆ȨX>,«ɒó
-    type: Y囙邵鄨o鷺ɷ裝TG奟cõ乨厰ʚ±
-  currentNumberScheduled: 408491268
-  desiredNumberScheduled: 1883709155
-  numberAvailable: -406189540
-  numberMisscheduled: -1833348558
-  numberReady: 484752614
-  numberUnavailable: -2095625968
-  observedGeneration: 3359608726763190142
-  updatedNumberScheduled: 1401559245
+  - lastTransitionTime: "2896-04-23T17:36:41Z"
+    message: "464"
+    reason: "463"
+    status: 髬.ʂmD
+    type: 肞=
+  currentNumberScheduled: 305459364
+  desiredNumberScheduled: -1356152843
+  numberAvailable: 2045645564
+  numberMisscheduled: -1438954365
+  numberReady: 1930897201
+  numberUnavailable: 173817967
+  observedGeneration: -9172676319269620543
+  updatedNumberScheduled: 1511270686

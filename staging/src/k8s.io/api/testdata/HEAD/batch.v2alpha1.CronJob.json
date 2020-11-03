@@ -1519,25 +1519,31 @@
                 }
               }
             ],
-            "setHostnameAsFQDN": false
+            "setHostnameAsFQDN": false,
+            "exposedNodeLabelsSelectors": [
+              "479"
+            ],
+            "exposedNodeLabels": {
+              "480": "481"
+            }
           }
         },
-        "ttlSecondsAfterFinished": -339602975
+        "ttlSecondsAfterFinished": 1190981111
       }
     },
-    "successfulJobsHistoryLimit": 305459364,
-    "failedJobsHistoryLimit": -1565042829
+    "successfulJobsHistoryLimit": -1438954365,
+    "failedJobsHistoryLimit": 677356220
   },
   "status": {
     "active": [
       {
-        "kind": "479",
-        "namespace": "480",
-        "name": "481",
-        "uid": "vÐ仆ǆdĄ跞肞=ɴ",
-        "apiVersion": "482",
-        "resourceVersion": "483",
-        "fieldPath": "484"
+        "kind": "482",
+        "namespace": "483",
+        "name": "484",
+        "uid": "Ð仆",
+        "apiVersion": "485",
+        "resourceVersion": "486",
+        "fieldPath": "487"
       }
     ]
   }

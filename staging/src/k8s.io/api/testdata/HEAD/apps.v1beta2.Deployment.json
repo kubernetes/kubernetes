@@ -1464,37 +1464,42 @@
             }
           }
         ],
-        "setHostnameAsFQDN": false
+        "setHostnameAsFQDN": false,
+        "exposedNodeLabelsSelectors": [
+          "459"
+        ],
+        "exposedNodeLabels": {
+          "460": "461"
+        }
       }
     },
     "strategy": {
-      "type": "xʚ=5谠vÐ仆ǆdĄ跞肞",
       "rollingUpdate": {
         "maxUnavailable": 2,
         "maxSurge": 3
       }
     },
-    "minReadySeconds": -1934555365,
-    "revisionHistoryLimit": -1189243539,
-    "progressDeadlineSeconds": -1510243221
+    "minReadySeconds": 305459364,
+    "revisionHistoryLimit": -1565042829,
+    "progressDeadlineSeconds": -2135680132
   },
   "status": {
-    "observedGeneration": 8090469215987662586,
-    "replicas": 782219862,
-    "updatedReplicas": 1380163777,
-    "readyReplicas": 877113289,
-    "availableReplicas": -1172851921,
-    "unavailableReplicas": -763028101,
+    "observedGeneration": -8193185984027364943,
+    "replicas": -1409586854,
+    "updatedReplicas": -148240715,
+    "readyReplicas": 454323788,
+    "availableReplicas": -1754414099,
+    "unavailableReplicas": -1901173132,
     "conditions": [
       {
-        "type": "ʤY囙邵鄨o鷺ɷ裝TG奟cõ乨",
-        "status": "íEd楗鱶镖喗vȥ倉螆ȨX\u003e",
-        "lastUpdateTime": "2792-08-11T23:40:18Z",
-        "lastTransitionTime": "2151-08-19T18:24:00Z",
-        "reason": "459",
-        "message": "460"
+        "type": "=ɴC}怢兴ɥ撤Ů%{LʤY囙邵",
+        "status": "U詨ǌ1ý",
+        "lastUpdateTime": "2759-07-13T14:49:56Z",
+        "lastTransitionTime": "2089-11-18T19:15:35Z",
+        "reason": "462",
+        "message": "463"
       }
     ],
-    "collisionCount": -73034396
+    "collisionCount": 948201693
   }
 }

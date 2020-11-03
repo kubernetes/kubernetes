@@ -547,6 +547,10 @@ template:
             subPath: "352"
             subPathExpr: "353"
           workingDir: "334"
+        exposedNodeLabels:
+          "478": "479"
+        exposedNodeLabelsSelectors:
+        - "477"
         hostAliases:
         - hostnames:
           - "463"
@@ -1042,4 +1046,4 @@ template:
             storagePolicyID: "121"
             storagePolicyName: "120"
             volumePath: "118"
-    ttlSecondsAfterFinished: -1766935785
+    ttlSecondsAfterFinished: -618526527

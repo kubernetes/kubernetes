@@ -128,6 +128,21 @@ func getEnvs(genericParams map[string]interface{}) ([]v1.EnvVar, error) {
 	return envs, nil
 }
 
+// getExposedNodeLabelsSelectors returns the array of selectors which will help in fetching out the rightful set of labels of the node on which the pod is going to be scheduled.
+func getExposedNodeLabelsSelectors(genericParams map[string]interface{}) ([]string, error) {
+	var exposedNodeLabelsSelectors []string
+	exposedNodeLabelsSelectorsStrings, found := genericParams["exposed-node-labels-selectors"]
+	if found {
+		if exposedNodeLabelsSelectors, isArray := exposedNodeLabelsSelectorsStrings.([]string); isArray {
+			delete(genericParams, "exposed-node-labels-selectors")
+			return exposedNodeLabelsSelectors, nil
+		}
+		return nil, fmt.Errorf("expected []string, found: %v", exposedNodeLabelsSelectorsStrings)
+	}
+	return exposedNodeLabelsSelectors, nil
+
+}
+
 // populateResourceListV1 takes strings of form <resourceName1>=<value1>,<resourceName1>=<value2>
 // and returns ResourceList.
 func populateResourceListV1(spec string) (v1.ResourceList, error) {
@@ -253,6 +268,7 @@ func (BasicPod) ParamNames() []generate.GeneratorParam {
 		{Name: "limits", Required: false},
 		{Name: "serviceaccount", Required: false},
 		{Name: "privileged", Required: false},
+		{Name: "exposed-node-labels-selectors", Required: false},
 	}
 }
 
@@ -268,6 +284,11 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 	}
 
 	annotations, err := getAnnotations(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	exposedNodeLabelsSelectors, err := getExposedNodeLabelsSelectors(genericParams)
 	if err != nil {
 		return nil, err
 	}
@@ -341,8 +362,9 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 					SecurityContext: securityContext,
 				},
 			},
-			DNSPolicy:     v1.DNSClusterFirst,
-			RestartPolicy: restartPolicy,
+			DNSPolicy:                  v1.DNSClusterFirst,
+			RestartPolicy:              restartPolicy,
+			ExposedNodeLabelsSelectors: exposedNodeLabelsSelectors,
 		},
 	}
 	imagePullPolicy := v1.PullPolicy(params["image-pull-policy"])

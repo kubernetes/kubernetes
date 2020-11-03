@@ -1462,35 +1462,41 @@
             }
           }
         ],
-        "setHostnameAsFQDN": true
+        "setHostnameAsFQDN": true,
+        "exposedNodeLabelsSelectors": [
+          "460"
+        ],
+        "exposedNodeLabels": {
+          "461": "462"
+        }
       }
     },
     "updateStrategy": {
-      "type": "翘ǼZ熝Ʊ宷泐ɻvŰ`Ǧɝ憑ǖ菐u",
+      "type": "ǼZ",
       "rollingUpdate": {
         "maxUnavailable": 2
       }
     },
-    "minReadySeconds": -985724127,
-    "revisionHistoryLimit": 2137111260
+    "minReadySeconds": -357359630,
+    "revisionHistoryLimit": 1948859756
   },
   "status": {
-    "currentNumberScheduled": 408491268,
-    "numberMisscheduled": -1833348558,
-    "desiredNumberScheduled": 1883709155,
-    "numberReady": 484752614,
-    "observedGeneration": 3359608726763190142,
-    "updatedNumberScheduled": 1401559245,
-    "numberAvailable": -406189540,
-    "numberUnavailable": -2095625968,
-    "collisionCount": 223996911,
+    "currentNumberScheduled": 305459364,
+    "numberMisscheduled": -1438954365,
+    "desiredNumberScheduled": -1356152843,
+    "numberReady": 1930897201,
+    "observedGeneration": -9172676319269620543,
+    "updatedNumberScheduled": 1511270686,
+    "numberAvailable": 2045645564,
+    "numberUnavailable": 173817967,
+    "collisionCount": -1754414099,
     "conditions": [
       {
-        "type": "Y囙邵鄨o鷺ɷ裝TG奟cõ乨厰ʚ±",
-        "status": "楗鱶镖喗vȥ倉螆ȨX\u003e,«ɒó",
-        "lastTransitionTime": "2480-06-05T07:37:49Z",
-        "reason": "460",
-        "message": "461"
+        "type": "肞=",
+        "status": "髬.ʂmD",
+        "lastTransitionTime": "2896-04-23T17:36:41Z",
+        "reason": "463",
+        "message": "464"
       }
     ]
   }

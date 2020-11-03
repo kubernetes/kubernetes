@@ -511,6 +511,10 @@ spec:
           subPath: "332"
           subPathExpr: "333"
         workingDir: "314"
+      exposedNodeLabels:
+        "457": "458"
+      exposedNodeLabelsSelectors:
+      - "456"
       hostAliases:
       - hostnames:
         - "442"
@@ -1004,14 +1008,14 @@ spec:
           storagePolicyName: "103"
           volumePath: "101"
 status:
-  availableReplicas: 1308809900
+  availableReplicas: 1879717160
   conditions:
-  - lastTransitionTime: "2125-04-24T12:13:40Z"
-    message: "457"
-    reason: "456"
-    status: ?Ď筌ʨ:ÿ1諘蚿[ĵ皥袨\k%橳
-    type: 议ĪS
-  fullyLabeledReplicas: 31486357
-  observedGeneration: -5594148640067537624
-  readyReplicas: -1983654895
-  replicas: 337922430
+  - lastTransitionTime: "2637-03-31T10:06:33Z"
+    message: "460"
+    reason: "459"
+    status: k%橳逫ƗǨƶ皗蒸
+    type: ĪS幻/饑Ȉ@|{t亪鸑躓1Ǐ詁
+  fullyLabeledReplicas: -1983654895
+  observedGeneration: 1641055767545748247
+  readyReplicas: 1308809900
+  replicas: 31486357

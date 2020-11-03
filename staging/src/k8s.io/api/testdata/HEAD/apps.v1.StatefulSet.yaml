@@ -30,16 +30,16 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  podManagementPolicy: '`ŇaƬȿŬ捕|'
+  podManagementPolicy: 镮ȺPÈɥ
   replicas: 896585016
-  revisionHistoryLimit: -1872519086
+  revisionHistoryLimit: -487001726
   selector:
     matchExpressions:
     - key: 50-u--25cu87--r7p-w1e67-8pj5t-kl-v0q6b68--nu5oii38fn-8.629b-jd-8c45-0-8--6n--w0--w---196g8d--iv1-5--5ht-a-29--0qso796/3___47._49pIB_o61ISU4--A_.XK_._M99
       operator: Exists
     matchLabels:
       74404d5---g8c2-k-91e.y5-g--58----0683-b-w7ld-6cs06xj-x5yv0wm-k18/M_-Nx.N_6-___._-.-W._AAn---v_-5-_8LXj: 6-4_WE-_JTrcd-2.-__E_Sv__26KX_R_.-.Nth._--S_4DA_-5_-4lQ42M--1
-  serviceName: "489"
+  serviceName: "492"
   template:
     metadata:
       annotations:
@@ -511,6 +511,10 @@ spec:
           subPath: "335"
           subPathExpr: "336"
         workingDir: "317"
+      exposedNodeLabels:
+        "460": "461"
+      exposedNodeLabelsSelectors:
+      - "459"
       hostAliases:
       - hostnames:
         - "445"
@@ -1008,87 +1012,85 @@ spec:
           volumePath: "101"
   updateStrategy:
     rollingUpdate:
-      partition: -83826225
-    type: șa汸<ƋlɋN磋镮ȺPÈ
+      partition: -54679211
+    type: XÄdƦ;ƣ
   volumeClaimTemplates:
   - metadata:
       annotations:
-        "466": "467"
-      clusterName: "472"
+        "469": "470"
+      clusterName: "475"
       creationTimestamp: null
-      deletionGracePeriodSeconds: -6486445241316991261
+      deletionGracePeriodSeconds: 3767172895030774300
       finalizers:
-      - "471"
-      generateName: "460"
-      generation: -5107762106575809276
+      - "474"
+      generateName: "463"
+      generation: 3359608726763190142
       labels:
-        "464": "465"
+        "467": "468"
       managedFields:
-      - apiVersion: "474"
-        fieldsType: "475"
-        manager: "473"
-        operation: 壛ĐíEd楗鱶镖喗vȥ
-      name: "459"
-      namespace: "461"
+      - apiVersion: "477"
+        fieldsType: "478"
+        manager: "476"
+        operation: ł!U詨ǌ1ýǝ宭Ʀȉ壛ĐíEd
+      name: "462"
+      namespace: "464"
       ownerReferences:
-      - apiVersion: "468"
-        blockOwnerDeletion: false
-        controller: true
-        kind: "469"
-        name: "470"
-        uid: /nēɅĀ埰ʀł!U詨ǌ1ýǝ
-      resourceVersion: "8285629342346774721"
-      selfLink: "462"
-      uid: S誖Śs垦Ȋ髴T唼=`朇c
+      - apiVersion: "471"
+        blockOwnerDeletion: true
+        controller: false
+        kind: "472"
+        name: "473"
+        uid: ""
+      resourceVersion: "17066022342826364285"
+      selfLink: "465"
+      uid: č鰰棝=0tS
     spec:
       accessModes:
-      - Y斩I儑瓔¯
+      - 垦Ȋ髴T唼=`朇c齆
       dataSource:
-        apiGroup: "484"
-        kind: "485"
-        name: "486"
+        apiGroup: "487"
+        kind: "488"
+        name: "489"
       resources:
         limits:
-          涟雒驭堣Qwn:Ʋå譥a超: "19"
-        requests:
           ª韷v简3VǢɾ纤ą¨?ɣ蔫椁Ȕ: "368"
+        requests:
+          '''降\4)ȳɍǟm{煰œ憼': "232"
       selector:
         matchExpressions:
-        - key: vUK_-.j21---__y.9O.L-.m.3--4
+        - key: 9-62o787-7lkv---a9j21zvy--y69-5/Q6_-U..u8gwb.-R6_pQ_mgi.U.-e7z-t0-pQ-.-.g-_Z_-nSL.--4P--_q8
           operator: In
           values:
-          - 37u-h---dY7_M_-._M52
+          - 6m.3--.4_-8U.2617.W74-R_Z_Tz.a3_HWo4__.__.-b
         matchLabels:
-          ? k--13lk5-e4-u-5kvp-----887j72qz6-7d84-1f396h82----23-6b77f.mgi7-2je7zjt0pp-x0r2gd---yn1/7_._qN__A_f_-B3_U__L.KH6K.RwsfI_2-_20_9.5
-          : 8_B-ks7dx
-      storageClassName: "483"
-      volumeMode: '''降\4)ȳɍǟm{煰œ憼'
-      volumeName: "482"
+          i7_._qN__A_f_-B3_U__L.KH6K.RwsfI_2-_20_9._5-..Bi_..aQ: 9_Yn.-.4t.U.U
+      storageClassName: "486"
+      volumeMode: 輞0ɹmŎOŤ%"嵣簇Į
+      volumeName: "485"
     status:
       accessModes:
-      - èƾ竒决瘛Ǫǵ
+      - ɘ哶ɓŖybÑW紋旣Ü
       capacity:
-        Ǧ澵貛香"砻B鷋: "578"
+        ɳ涟Ðq:ȷQ|nET¬%ȎǆĤɂR: "954"
       conditions:
-      - lastProbeTime: "2230-04-25T02:33:53Z"
-        lastTransitionTime: "2843-07-14T02:23:26Z"
-        message: "488"
-        reason: "487"
-        status: WU=ȑ-A敲ʉ2腠梊
-        type: '|nET¬%ȎǆĤɂR湛'
-      phase: ʌ槧ą°Z拕獘:pȚ\猫ï卒ú
+      - lastProbeTime: "2560-08-23T03:17:54Z"
+        lastTransitionTime: "2792-01-30T15:57:40Z"
+        message: "491"
+        reason: "490"
+        status: 鰌`ŇaƬȿŬ捕|ðÊʉiUȡɭĮ
+        type: WU=ȑ-A敲ʉ2腠梊
 status:
-  collisionCount: -1556190810
+  collisionCount: -1232724924
   conditions:
-  - lastTransitionTime: "2446-08-01T12:34:13Z"
-    message: "493"
-    reason: "492"
-    status: 闬輙怀¹bCũw¼ ǫđ槴Ċį軠>
-    type: ȩ硘(ǒ[
-  currentReplicas: -463159422
-  currentRevision: "490"
-  observedGeneration: -3866306318826551410
-  readyReplicas: -1993494670
-  replicas: 1852870468
-  updateRevision: "491"
-  updatedReplicas: 463674701
+  - lastTransitionTime: "1994-08-11T17:15:35Z"
+    message: "496"
+    reason: "495"
+    status: ""
+    type: 怀¹bCũw¼ ǫđ槴Ċį軠>桼劑躮ǿ
+  currentReplicas: -1612961101
+  currentRevision: "493"
+  observedGeneration: -430213889424572931
+  readyReplicas: -36544080
+  replicas: -1728725476
+  updateRevision: "494"
+  updatedReplicas: 1731921624

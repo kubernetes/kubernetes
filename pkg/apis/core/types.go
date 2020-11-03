@@ -2847,6 +2847,16 @@ type PodSpec struct {
 	// All topologySpreadConstraints are ANDed.
 	// +optional
 	TopologySpreadConstraints []TopologySpreadConstraint
+	// ExposedNodeLabelsSelectors determine which specific set of labels to pick from the node on which the pod is scheduled.
+	// So that, this subset of labels can be stored further under ExposedNodeLabels
+	// +optional
+	ExposedNodeLabelsSelectors []string
+	// ExposedNodeLabels are a subset of the labels of the node on which the pod is scheduled. It can be non-empty.
+	// This subset is determined on the basis of ExposedNodeLabelsSelectors variable provided.
+	// Whichever labels (of the node) match at least one of these selectors become a part of this subset.
+	// For more details, refer to issue #94790
+	// +optional
+	ExposedNodeLabels map[string]string
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the

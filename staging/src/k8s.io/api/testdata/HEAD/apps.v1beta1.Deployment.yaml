@@ -30,12 +30,12 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  minReadySeconds: -1934555365
-  progressDeadlineSeconds: 484752614
+  minReadySeconds: 305459364
+  progressDeadlineSeconds: 1511270686
   replicas: 896585016
-  revisionHistoryLimit: -1189243539
+  revisionHistoryLimit: -1565042829
   rollbackTo:
-    revision: -7874172095994035093
+    revision: 8293140332392225660
   selector:
     matchExpressions:
     - key: 50-u--25cu87--r7p-w1e67-8pj5t-kl-v0q6b68--nu5oii38fn-8.629b-jd-8c45-0-8--6n--w0--w---196g8d--iv1-5--5ht-a-29--0qso796/3___47._49pIB_o61ISU4--A_.XK_._M99
@@ -46,7 +46,6 @@ spec:
     rollingUpdate:
       maxSurge: 3
       maxUnavailable: 2
-    type: xʚ=5谠vÐ仆ǆdĄ跞肞
   template:
     metadata:
       annotations:
@@ -518,6 +517,10 @@ spec:
           subPath: "335"
           subPathExpr: "336"
         workingDir: "317"
+      exposedNodeLabels:
+        "460": "461"
+      exposedNodeLabelsSelectors:
+      - "459"
       hostAliases:
       - hostnames:
         - "445"
@@ -1014,17 +1017,17 @@ spec:
           storagePolicyName: "103"
           volumePath: "101"
 status:
-  availableReplicas: -303330375
-  collisionCount: 2099542463
+  availableReplicas: 1321077958
+  collisionCount: -292773936
   conditions:
-  - lastTransitionTime: "2035-01-21T08:11:33Z"
-    lastUpdateTime: "2096-03-01T11:48:47Z"
-    message: "460"
-    reason: "459"
-    status: o鷺ɷ裝TG奟cõ乨厰ʚ±r珹ȟ6
-    type: ʀł!
-  observedGeneration: 3359608726763190142
-  readyReplicas: -2095625968
-  replicas: 1401559245
-  unavailableReplicas: 584721644
-  updatedReplicas: -406189540
+  - lastTransitionTime: "2592-12-20T10:37:56Z"
+    lastUpdateTime: "2590-01-13T07:09:17Z"
+    message: "463"
+    reason: "462"
+    status: 撤Ů%{LʤY囙邵鄨o
+    type: 髬.ʂmD
+  observedGeneration: -6054129436755881220
+  readyReplicas: -1318573085
+  replicas: 173817967
+  unavailableReplicas: 684948150
+  updatedReplicas: -33756301

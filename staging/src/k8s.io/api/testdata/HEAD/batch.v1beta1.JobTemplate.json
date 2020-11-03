@@ -1515,10 +1515,16 @@
               }
             }
           ],
-          "setHostnameAsFQDN": true
+          "setHostnameAsFQDN": true,
+          "exposedNodeLabelsSelectors": [
+            "477"
+          ],
+          "exposedNodeLabels": {
+            "478": "479"
+          }
         }
       },
-      "ttlSecondsAfterFinished": -1766935785
+      "ttlSecondsAfterFinished": -618526527
     }
   }
 }

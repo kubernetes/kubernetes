@@ -1464,40 +1464,45 @@
             }
           }
         ],
-        "setHostnameAsFQDN": false
+        "setHostnameAsFQDN": false,
+        "exposedNodeLabelsSelectors": [
+          "459"
+        ],
+        "exposedNodeLabels": {
+          "460": "461"
+        }
       }
     },
     "strategy": {
-      "type": "xʚ=5谠vÐ仆ǆdĄ跞肞",
       "rollingUpdate": {
         "maxUnavailable": 2,
         "maxSurge": 3
       }
     },
-    "minReadySeconds": -1934555365,
-    "revisionHistoryLimit": -1189243539,
+    "minReadySeconds": 305459364,
+    "revisionHistoryLimit": -1565042829,
     "rollbackTo": {
-      "revision": -7874172095994035093
+      "revision": 8293140332392225660
     },
-    "progressDeadlineSeconds": 484752614
+    "progressDeadlineSeconds": 1511270686
   },
   "status": {
-    "observedGeneration": 3359608726763190142,
-    "replicas": 1401559245,
-    "updatedReplicas": -406189540,
-    "readyReplicas": -2095625968,
-    "availableReplicas": -303330375,
-    "unavailableReplicas": 584721644,
+    "observedGeneration": -6054129436755881220,
+    "replicas": 173817967,
+    "updatedReplicas": -33756301,
+    "readyReplicas": -1318573085,
+    "availableReplicas": 1321077958,
+    "unavailableReplicas": 684948150,
     "conditions": [
       {
-        "type": "ʀł!",
-        "status": "o鷺ɷ裝TG奟cõ乨厰ʚ±r珹ȟ6",
-        "lastUpdateTime": "2096-03-01T11:48:47Z",
-        "lastTransitionTime": "2035-01-21T08:11:33Z",
-        "reason": "459",
-        "message": "460"
+        "type": "髬.ʂmD",
+        "status": "撤Ů%{LʤY囙邵鄨o",
+        "lastUpdateTime": "2590-01-13T07:09:17Z",
+        "lastTransitionTime": "2592-12-20T10:37:56Z",
+        "reason": "462",
+        "message": "463"
       }
     ],
-    "collisionCount": 2099542463
+    "collisionCount": -292773936
   }
 }

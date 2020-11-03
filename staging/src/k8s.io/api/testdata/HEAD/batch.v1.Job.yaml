@@ -516,6 +516,10 @@ spec:
           subPath: "338"
           subPathExpr: "339"
         workingDir: "320"
+      exposedNodeLabels:
+        "465": "466"
+      exposedNodeLabelsSelectors:
+      - "464"
       hostAliases:
       - hostnames:
         - "450"
@@ -1007,15 +1011,15 @@ spec:
           storagePolicyID: "104"
           storagePolicyName: "103"
           volumePath: "101"
-  ttlSecondsAfterFinished: 1192652907
+  ttlSecondsAfterFinished: -1220419895
 status:
-  active: -1983720493
+  active: -900432200
   conditions:
-  - lastProbeTime: "2813-03-11T20:08:42Z"
-    lastTransitionTime: "2793-11-20T00:30:11Z"
-    message: "465"
-    reason: "464"
-    status: 簏ì淵歔ųd,4
-    type: ""
-  failed: 1049326966
-  succeeded: -2026748262
+  - lastProbeTime: "2954-06-15T06:37:52Z"
+    lastTransitionTime: "2725-01-22T07:32:58Z"
+    message: "468"
+    reason: "467"
+    status: U曰n夬Ǉ:BŐ埑Ô*ɾWȖ韝Ɖş
+    type: ő:ĳɲí_夦ŔßȊ
+  failed: -493346089
+  succeeded: 1526893271

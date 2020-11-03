@@ -1450,23 +1450,29 @@
             }
           }
         ],
-        "setHostnameAsFQDN": false
+        "setHostnameAsFQDN": false,
+        "exposedNodeLabelsSelectors": [
+          "458"
+        ],
+        "exposedNodeLabels": {
+          "459": "460"
+        }
       }
     }
   },
   "status": {
-    "replicas": -1576773969,
-    "fullyLabeledReplicas": -1993578228,
-    "readyReplicas": 1971731732,
-    "availableReplicas": 165851549,
-    "observedGeneration": 4460932436309061502,
+    "replicas": -1993578228,
+    "fullyLabeledReplicas": 1971731732,
+    "readyReplicas": 165851549,
+    "availableReplicas": 1899507582,
+    "observedGeneration": -6107175728579256959,
     "conditions": [
       {
-        "type": "鎊t潑嫉悔柅ȵ.",
-        "status": "PRɄɝ熔ķ´ʑ潞Ĵ3",
-        "lastTransitionTime": "2204-01-10T03:47:41Z",
-        "reason": "458",
-        "message": "459"
+        "type": "t潑嫉悔柅ȵ.Ȁ鎧Y冒ƖƦɼ橈\"Ĩ媻ʪ",
+        "status": "蠯0ƍ\\溮Ŀ傜NZ",
+        "lastTransitionTime": "2196-12-31T01:13:31Z",
+        "reason": "461",
+        "message": "462"
       }
     ]
   }

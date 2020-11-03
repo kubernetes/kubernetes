@@ -3910,6 +3910,18 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.ExposedNodeLabelsSelectors != nil {
+		in, out := &in.ExposedNodeLabelsSelectors, &out.ExposedNodeLabelsSelectors
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.ExposedNodeLabels != nil {
+		in, out := &in.ExposedNodeLabels, &out.ExposedNodeLabels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 

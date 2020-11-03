@@ -1471,24 +1471,30 @@
             }
           }
         ],
-        "setHostnameAsFQDN": false
+        "setHostnameAsFQDN": false,
+        "exposedNodeLabelsSelectors": [
+          "464"
+        ],
+        "exposedNodeLabels": {
+          "465": "466"
+        }
       }
     },
-    "ttlSecondsAfterFinished": 1192652907
+    "ttlSecondsAfterFinished": -1220419895
   },
   "status": {
     "conditions": [
       {
-        "type": "",
-        "status": "簏ì淵歔ųd,4",
-        "lastProbeTime": "2813-03-11T20:08:42Z",
-        "lastTransitionTime": "2793-11-20T00:30:11Z",
-        "reason": "464",
-        "message": "465"
+        "type": "ő:ĳɲí_夦ŔßȊ",
+        "status": "U曰n夬Ǉ:BŐ埑Ô*ɾWȖ韝Ɖş",
+        "lastProbeTime": "2954-06-15T06:37:52Z",
+        "lastTransitionTime": "2725-01-22T07:32:58Z",
+        "reason": "467",
+        "message": "468"
       }
     ],
-    "active": -1983720493,
-    "succeeded": -2026748262,
-    "failed": 1049326966
+    "active": -900432200,
+    "succeeded": 1526893271,
+    "failed": -493346089
   }
 }

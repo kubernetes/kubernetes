@@ -2986,7 +2986,6 @@ type PodSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
-
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod.
 	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
 	// +optional
@@ -3137,6 +3136,16 @@ type PodSpec struct {
 	// Default to false.
 	// +optional
 	SetHostnameAsFQDN *bool `json:"setHostnameAsFQDN,omitempty" protobuf:"varint,35,opt,name=setHostnameAsFQDN"`
+	// ExposedNodeLabelsSelectors determine which specific set of labels to pick from the node on which the pod is scheduled.
+	// So that, this subset of labels can be stored further under ExposedNodeLabels
+	// +optional
+	ExposedNodeLabelsSelectors []string `json:"exposedNodeLabelsSelectors,omitempty" protobuf:"bytes,36,rep,name=exposedNodeLabelsSelectors"`
+	// ExposedNodeLabels are a subset of the labels of the node on which the pod is scheduled. It can be non-empty
+	// This subset is determined on the basis of ExposedNodeLabelsSelectors variable provided.
+	// Whichever labels (of the node) match at least one of these selectors become a part of this subset.
+	// For more details, refer to issue #94790
+	// +optional
+	ExposedNodeLabels map[string]string `json:"exposedNodeLabels,omitempty" protobuf:"bytes,37,rep,name=exposedNodeLabels"`
 }
 
 type UnsatisfiableConstraintAction string

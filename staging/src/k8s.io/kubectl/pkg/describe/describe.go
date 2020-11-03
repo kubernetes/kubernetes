@@ -711,8 +711,12 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 		}
 		if pod.Spec.NodeName == "" {
 			w.Write(LEVEL_0, "Node:\t<none>\n")
+			printExposedNodeLabelsSelectorsMultiline(w, "Exposed-Node-Labels Selectors", []string{})
+			printLabelsMultiline(w, "Exposed-Node-Labels", map[string]string{})
 		} else {
 			w.Write(LEVEL_0, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
+			printExposedNodeLabelsSelectorsMultiline(w, "Exposed-Node-Labels Selectors", pod.Spec.ExposedNodeLabelsSelectors)
+			printLabelsMultiline(w, "Exposed-Node-Labels", pod.Spec.ExposedNodeLabels)
 		}
 		if pod.Status.StartTime != nil {
 			w.Write(LEVEL_0, "Start Time:\t%s\n", pod.Status.StartTime.Time.Format(time.RFC1123Z))
@@ -4704,6 +4708,29 @@ func (fn typeFunc) Describe(exact interface{}, extra ...interface{}) (string, er
 		err = out[1].Interface().(error)
 	}
 	return s, err
+}
+
+// printPodsMultiline prints exposed-node-labels-selectors multiple pods with a proper alignment.
+func printExposedNodeLabelsSelectorsMultiline(w PrefixWriter, title string, exposedNodeLabelsSelectors []string) {
+	printExposedNodeLabelsSelectorsMultilineWithIndent(w, "", title, "\t", exposedNodeLabelsSelectors)
+}
+
+// printExposedNodeLabelsMultilineWithIndent prints exposed-node-labels-selectors with a user-defined alignment.
+func printExposedNodeLabelsSelectorsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, exposedNodeLabelsSelectors []string) {
+	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
+
+	if len(exposedNodeLabelsSelectors) == 0 {
+		w.WriteLine("<none>")
+		return
+	}
+
+	for i, selector := range exposedNodeLabelsSelectors {
+		if i != 0 {
+			w.Write(LEVEL_0, "%s", initialIndent)
+			w.Write(LEVEL_0, "%s", innerIndent)
+		}
+		w.Write(LEVEL_0, "%s\n", selector)
+	}
 }
 
 // printLabelsMultiline prints multiple labels with a proper alignment.

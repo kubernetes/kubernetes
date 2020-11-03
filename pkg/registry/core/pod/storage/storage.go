@@ -202,6 +202,10 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podID, oldMa
 			return nil, fmt.Errorf("pod %v is already assigned to node %q", pod.Name, pod.Spec.NodeName)
 		}
 		pod.Spec.NodeName = machine
+		pod.Spec.ExposedNodeLabels = map[string]string{
+			"sample-node-label-1": "val1",
+			"sample-node-label-2": "val2",
+		}
 		if pod.Annotations == nil {
 			pod.Annotations = make(map[string]string)
 		}
