@@ -123,8 +123,8 @@ func fakeServer(t *testing.T, requestReceived chan struct{}, testName string, ex
 			exec:         exec,
 		}
 
-		opts, err := remotecommand.NewOptions(req)
-		require.NoError(t, err)
+		opts := remotecommand.NewOptions(req)
+		require.NoError(t, remotecommand.ValidateOptions(opts))
 		if exec {
 			cmd := req.URL.Query()[api.ExecCommandParam]
 			remotecommand.ServeExec(w, req, executor, "pod", "uid", "container", cmd, opts, 0, 10*time.Second, serverProtocols)

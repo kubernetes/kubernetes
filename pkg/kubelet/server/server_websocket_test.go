@@ -29,6 +29,9 @@ import (
 	"golang.org/x/net/websocket"
 
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
 )
 
@@ -38,6 +41,8 @@ const (
 )
 
 func TestServeWSPortForward(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeprecatedKubeletStreamingAPI, true)()
+
 	tests := map[string]struct {
 		port          string
 		uid           bool
@@ -150,6 +155,8 @@ func TestServeWSPortForward(t *testing.T) {
 }
 
 func TestServeWSMultiplePortForward(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeprecatedKubeletStreamingAPI, true)()
+
 	portsText := []string{"7000,8000", "9000"}
 	ports := []uint16{7000, 8000, 9000}
 	podNamespace := "other"

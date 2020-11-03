@@ -1036,7 +1036,7 @@ func makeReq(t *testing.T, method, url, clientProtocol string) *http.Request {
 	if err != nil {
 		t.Fatalf("error creating request: %v", err)
 	}
-	req.Header.Set("Content-Type", "")
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Add("X-Stream-Protocol-Version", clientProtocol)
 	return req
 }
@@ -1054,10 +1054,25 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/exec/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?c=ls&c=-a&" + api.ExecStdinParam + "=1"
 
+	opts := &v1.PodExecOptions{
+		Pod: &v1.ObjectReference{
+			Name:      podName,
+			Namespace: podNamespace,
+		},
+		Container: expectedContainerName,
+		Stdin:     true,
+		Command:   []string{"ls", "-a"},
+	}
+	body := &bytes.Buffer{}
+	err = json.NewEncoder(body).Encode(opts)
+	require.NoError(t, err, "marshal request")
+
 	upgradeRoundTripper := spdy.NewRoundTripper(nil, true, true)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
-	resp, err := c.Do(makeReq(t, "POST", url, "v4.channel.k8s.io"))
+	req := makeReq(t, "POST", url, "v4.channel.k8s.io")
+	req.Body = ioutil.NopCloser(body)
+	resp, err := c.Do(req)
 	if err != nil {
 		t.Fatalf("Got error POSTing: %v", err)
 	}
@@ -1096,193 +1111,243 @@ func testExecAttach(t *testing.T, verb string) {
 		"stdout with redirect":    {stdout: true, responseStatusCode: http.StatusFound, redirect: true},
 	}
 
-	for desc := range tests {
-		test := tests[desc]
-		t.Run(desc, func(t *testing.T) {
-			ss, err := newTestStreamingServer(0)
-			require.NoError(t, err)
-			defer ss.testHTTPServer.Close()
-			fw := newServerTestWithDebug(true, test.redirect, ss)
-			defer fw.testHTTPServer.Close()
-			fmt.Println(desc)
-
-			podNamespace := "other"
-			podName := "foo"
-			expectedPodName := getPodName(podName, podNamespace)
-			expectedContainerName := "baz"
-			expectedCommand := "ls -a"
-			expectedStdin := "stdin"
-			expectedStdout := "stdout"
-			expectedStderr := "stderr"
-			done := make(chan struct{})
-			clientStdoutReadDone := make(chan struct{})
-			clientStderrReadDone := make(chan struct{})
-			execInvoked := false
-			attachInvoked := false
-
-			checkStream := func(podFullName string, uid types.UID, containerName string, streamOpts remotecommandserver.Options) {
-				assert.Equal(t, expectedPodName, podFullName, "podFullName")
-				assert.Equal(t, expectedContainerName, containerName, "containerName")
-				assert.Equal(t, test.stdin, streamOpts.Stdin, "stdin")
-				assert.Equal(t, test.stdout, streamOpts.Stdout, "stdout")
-				assert.Equal(t, test.tty, streamOpts.TTY, "tty")
-				assert.Equal(t, !test.tty && test.stderr, streamOpts.Stderr, "stderr")
+	for _, useDeprecatedAPIs := range []bool{true, false} {
+		for desc := range tests {
+			test := tests[desc]
+			name := desc
+			if useDeprecatedAPIs {
+				name += "_deprecatedAPIs"
 			}
+			t.Run(name, func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeprecatedKubeletStreamingAPI, useDeprecatedAPIs)()
 
-			fw.fakeKubelet.getExecCheck = func(podFullName string, uid types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) {
-				execInvoked = true
-				assert.Equal(t, expectedCommand, strings.Join(cmd, " "), "cmd")
-				checkStream(podFullName, uid, containerName, streamOpts)
-			}
+				ss, err := newTestStreamingServer(0)
+				require.NoError(t, err)
+				defer ss.testHTTPServer.Close()
+				fw := newServerTestWithDebug(true, test.redirect, ss)
+				defer fw.testHTTPServer.Close()
+				fmt.Println(desc)
 
-			fw.fakeKubelet.getAttachCheck = func(podFullName string, uid types.UID, containerName string, streamOpts remotecommandserver.Options) {
-				attachInvoked = true
-				checkStream(podFullName, uid, containerName, streamOpts)
-			}
+				podNamespace := "other"
+				podName := "foo"
+				expectedPodName := getPodName(podName, podNamespace)
+				expectedContainerName := "baz"
+				expectedCommand := "ls -a"
+				expectedStdin := "stdin"
+				expectedStdout := "stdout"
+				expectedStderr := "stderr"
+				done := make(chan struct{})
+				clientStdoutReadDone := make(chan struct{})
+				clientStderrReadDone := make(chan struct{})
+				execInvoked := false
+				attachInvoked := false
 
-			testStream := func(containerID string, in io.Reader, out, stderr io.WriteCloser, tty bool, done chan struct{}) error {
-				close(done)
-				assert.Equal(t, testContainerID, containerID, "containerID")
-				assert.Equal(t, test.tty, tty, "tty")
-				require.Equal(t, test.stdin, in != nil, "in")
-				require.Equal(t, test.stdout, out != nil, "out")
-				require.Equal(t, !test.tty && test.stderr, stderr != nil, "err")
+				checkStream := func(podFullName string, uid types.UID, containerName string, streamOpts remotecommandserver.Options) {
+					assert.Equal(t, expectedPodName, podFullName, "podFullName")
+					assert.Equal(t, expectedContainerName, containerName, "containerName")
+					assert.Equal(t, test.stdin, streamOpts.Stdin, "stdin")
+					assert.Equal(t, test.stdout, streamOpts.Stdout, "stdout")
+					assert.Equal(t, test.tty, streamOpts.TTY, "tty")
+					assert.Equal(t, !test.tty && test.stderr, streamOpts.Stderr, "stderr")
+				}
+
+				fw.fakeKubelet.getExecCheck = func(podFullName string, uid types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) {
+					execInvoked = true
+					assert.Equal(t, expectedCommand, strings.Join(cmd, " "), "cmd")
+					checkStream(podFullName, uid, containerName, streamOpts)
+				}
+
+				fw.fakeKubelet.getAttachCheck = func(podFullName string, uid types.UID, containerName string, streamOpts remotecommandserver.Options) {
+					attachInvoked = true
+					checkStream(podFullName, uid, containerName, streamOpts)
+				}
+
+				testStream := func(containerID string, in io.Reader, out, stderr io.WriteCloser, tty bool, done chan struct{}) error {
+					close(done)
+					assert.Equal(t, testContainerID, containerID, "containerID")
+					assert.Equal(t, test.tty, tty, "tty")
+					require.Equal(t, test.stdin, in != nil, "in")
+					require.Equal(t, test.stdout, out != nil, "out")
+					require.Equal(t, !test.tty && test.stderr, stderr != nil, "err")
+
+					if test.stdin {
+						b := make([]byte, 10)
+						n, err := in.Read(b)
+						assert.NoError(t, err, "reading from stdin")
+						assert.Equal(t, expectedStdin, string(b[0:n]), "content from stdin")
+					}
+
+					if test.stdout {
+						_, err := out.Write([]byte(expectedStdout))
+						assert.NoError(t, err, "writing to stdout")
+						out.Close()
+						<-clientStdoutReadDone
+					}
+
+					if !test.tty && test.stderr {
+						_, err := stderr.Write([]byte(expectedStderr))
+						assert.NoError(t, err, "writing to stderr")
+						stderr.Close()
+						<-clientStderrReadDone
+					}
+					return nil
+				}
+
+				ss.fakeRuntime.execFunc = func(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+					assert.Equal(t, expectedCommand, strings.Join(cmd, " "), "cmd")
+					return testStream(containerID, stdin, stdout, stderr, tty, done)
+				}
+
+				ss.fakeRuntime.attachFunc = func(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+					return testStream(containerID, stdin, stdout, stderr, tty, done)
+				}
+
+				url := fw.testHTTPServer.URL + "/" + verb + "/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?ignore=1"
+				if verb == "exec" {
+					url += "&command=ls&command=-a"
+				}
+				if test.stdin {
+					url += "&" + api.ExecStdinParam + "=1"
+				}
+				if test.stdout {
+					url += "&" + api.ExecStdoutParam + "=1"
+				}
+				if test.stderr && !test.tty {
+					url += "&" + api.ExecStderrParam + "=1"
+				}
+				if test.tty {
+					url += "&" + api.ExecTTYParam + "=1"
+				}
+
+				var (
+					resp                *http.Response
+					upgradeRoundTripper httpstream.UpgradeRoundTripper
+					c                   *http.Client
+				)
+				if test.redirect {
+					c = &http.Client{}
+					// Don't follow redirects, since we want to inspect the redirect response.
+					c.CheckRedirect = func(*http.Request, []*http.Request) error {
+						return http.ErrUseLastResponse
+					}
+				} else {
+					upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
+					c = &http.Client{Transport: upgradeRoundTripper}
+				}
+
+				req := makeReq(t, "POST", url, "v4.channel.k8s.io")
+				req.Header.Set("Content-Type", "application/json")
+				resp, err = c.Do(req)
+				require.NoError(t, err, "POSTing")
+
+				if !useDeprecatedAPIs {
+					// Requests without POST params should fail.
+					assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "response status")
+
+					// Redo request with correct format
+					body := &bytes.Buffer{}
+					if verb == "exec" {
+						opts := &v1.PodExecOptions{
+							Pod: &v1.ObjectReference{
+								Name:      podName,
+								Namespace: podNamespace,
+							},
+							Container: expectedContainerName,
+							Stdin:     test.stdin,
+							Stdout:    test.stdout,
+							Stderr:    test.stderr,
+							TTY:       test.tty,
+							Command:   []string{"ls", "-a"},
+						}
+						err := json.NewEncoder(body).Encode(opts)
+						require.NoError(t, err, "marshal request")
+					} else if verb == "attach" {
+						opts := &v1.PodExecOptions{
+							Pod: &v1.ObjectReference{
+								Name:      podName,
+								Namespace: podNamespace,
+							},
+							Container: expectedContainerName,
+							Stdin:     test.stdin,
+							Stdout:    test.stdout,
+							Stderr:    test.stderr,
+							TTY:       test.tty,
+							Command:   []string{"ls", "-a"},
+						}
+						err := json.NewEncoder(body).Encode(opts)
+						require.NoError(t, err, "marshal request")
+					}
+
+					req := makeReq(t, "POST", url, "v4.channel.k8s.io")
+					req.Body = ioutil.NopCloser(body)
+					resp, err = c.Do(req)
+					require.NoError(t, err, "POSTing")
+				}
+
+				require.Equal(t, test.responseStatusCode, resp.StatusCode, "response status")
+				if test.responseStatusCode != http.StatusSwitchingProtocols {
+					return
+				}
+
+				conn, err := upgradeRoundTripper.NewConnection(resp)
+				require.NoError(t, err, "creating streaming connection")
+				defer conn.Close()
+
+				h := http.Header{}
+				h.Set(api.StreamType, api.StreamTypeError)
+				_, err = conn.CreateStream(h)
+				require.NoError(t, err, "creating error stream")
 
 				if test.stdin {
-					b := make([]byte, 10)
-					n, err := in.Read(b)
-					assert.NoError(t, err, "reading from stdin")
-					assert.Equal(t, expectedStdin, string(b[0:n]), "content from stdin")
+					h.Set(api.StreamType, api.StreamTypeStdin)
+					stream, err := conn.CreateStream(h)
+					require.NoError(t, err, "creating stdin stream")
+					_, err = stream.Write([]byte(expectedStdin))
+					require.NoError(t, err, "writing to stdin stream")
+				}
+
+				var stdoutStream httpstream.Stream
+				if test.stdout {
+					h.Set(api.StreamType, api.StreamTypeStdout)
+					stdoutStream, err = conn.CreateStream(h)
+					require.NoError(t, err, "creating stdout stream")
+				}
+
+				var stderrStream httpstream.Stream
+				if test.stderr && !test.tty {
+					h.Set(api.StreamType, api.StreamTypeStderr)
+					stderrStream, err = conn.CreateStream(h)
+					require.NoError(t, err, "creating stderr stream")
 				}
 
 				if test.stdout {
-					_, err := out.Write([]byte(expectedStdout))
-					assert.NoError(t, err, "writing to stdout")
-					out.Close()
-					<-clientStdoutReadDone
+					output := make([]byte, 10)
+					n, err := stdoutStream.Read(output)
+					close(clientStdoutReadDone)
+					assert.NoError(t, err, "reading from stdout stream")
+					assert.Equal(t, expectedStdout, string(output[0:n]), "stdout")
 				}
 
-				if !test.tty && test.stderr {
-					_, err := stderr.Write([]byte(expectedStderr))
-					assert.NoError(t, err, "writing to stderr")
-					stderr.Close()
-					<-clientStderrReadDone
+				if test.stderr && !test.tty {
+					output := make([]byte, 10)
+					n, err := stderrStream.Read(output)
+					close(clientStderrReadDone)
+					assert.NoError(t, err, "reading from stderr stream")
+					assert.Equal(t, expectedStderr, string(output[0:n]), "stderr")
 				}
-				return nil
-			}
 
-			ss.fakeRuntime.execFunc = func(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
-				assert.Equal(t, expectedCommand, strings.Join(cmd, " "), "cmd")
-				return testStream(containerID, stdin, stdout, stderr, tty, done)
-			}
+				// wait for the server to finish before checking if the attach/exec funcs were invoked
+				<-done
 
-			ss.fakeRuntime.attachFunc = func(containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
-				return testStream(containerID, stdin, stdout, stderr, tty, done)
-			}
-
-			url := fw.testHTTPServer.URL + "/" + verb + "/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?ignore=1"
-			if verb == "exec" {
-				url += "&command=ls&command=-a"
-			}
-			if test.stdin {
-				url += "&" + api.ExecStdinParam + "=1"
-			}
-			if test.stdout {
-				url += "&" + api.ExecStdoutParam + "=1"
-			}
-			if test.stderr && !test.tty {
-				url += "&" + api.ExecStderrParam + "=1"
-			}
-			if test.tty {
-				url += "&" + api.ExecTTYParam + "=1"
-			}
-
-			var (
-				resp                *http.Response
-				upgradeRoundTripper httpstream.UpgradeRoundTripper
-				c                   *http.Client
-			)
-			if test.redirect {
-				c = &http.Client{}
-				// Don't follow redirects, since we want to inspect the redirect response.
-				c.CheckRedirect = func(*http.Request, []*http.Request) error {
-					return http.ErrUseLastResponse
+				if verb == "exec" {
+					assert.True(t, execInvoked, "exec should be invoked")
+					assert.False(t, attachInvoked, "attach should not be invoked")
+				} else {
+					assert.True(t, attachInvoked, "attach should be invoked")
+					assert.False(t, execInvoked, "exec should not be invoked")
 				}
-			} else {
-				upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
-				c = &http.Client{Transport: upgradeRoundTripper}
-			}
-
-			resp, err = c.Do(makeReq(t, "POST", url, "v4.channel.k8s.io"))
-			require.NoError(t, err, "POSTing")
-			defer resp.Body.Close()
-
-			_, err = ioutil.ReadAll(resp.Body)
-			assert.NoError(t, err, "reading response body")
-
-			require.Equal(t, test.responseStatusCode, resp.StatusCode, "response status")
-			if test.responseStatusCode != http.StatusSwitchingProtocols {
-				return
-			}
-
-			conn, err := upgradeRoundTripper.NewConnection(resp)
-			require.NoError(t, err, "creating streaming connection")
-			defer conn.Close()
-
-			h := http.Header{}
-			h.Set(api.StreamType, api.StreamTypeError)
-			_, err = conn.CreateStream(h)
-			require.NoError(t, err, "creating error stream")
-
-			if test.stdin {
-				h.Set(api.StreamType, api.StreamTypeStdin)
-				stream, err := conn.CreateStream(h)
-				require.NoError(t, err, "creating stdin stream")
-				_, err = stream.Write([]byte(expectedStdin))
-				require.NoError(t, err, "writing to stdin stream")
-			}
-
-			var stdoutStream httpstream.Stream
-			if test.stdout {
-				h.Set(api.StreamType, api.StreamTypeStdout)
-				stdoutStream, err = conn.CreateStream(h)
-				require.NoError(t, err, "creating stdout stream")
-			}
-
-			var stderrStream httpstream.Stream
-			if test.stderr && !test.tty {
-				h.Set(api.StreamType, api.StreamTypeStderr)
-				stderrStream, err = conn.CreateStream(h)
-				require.NoError(t, err, "creating stderr stream")
-			}
-
-			if test.stdout {
-				output := make([]byte, 10)
-				n, err := stdoutStream.Read(output)
-				close(clientStdoutReadDone)
-				assert.NoError(t, err, "reading from stdout stream")
-				assert.Equal(t, expectedStdout, string(output[0:n]), "stdout")
-			}
-
-			if test.stderr && !test.tty {
-				output := make([]byte, 10)
-				n, err := stderrStream.Read(output)
-				close(clientStderrReadDone)
-				assert.NoError(t, err, "reading from stderr stream")
-				assert.Equal(t, expectedStderr, string(output[0:n]), "stderr")
-			}
-
-			// wait for the server to finish before checking if the attach/exec funcs were invoked
-			<-done
-
-			if verb == "exec" {
-				assert.True(t, execInvoked, "exec should be invoked")
-				assert.False(t, attachInvoked, "attach should not be invoked")
-			} else {
-				assert.True(t, attachInvoked, "attach should be invoked")
-				assert.False(t, execInvoked, "exec should not be invoked")
-			}
-		})
+			})
+		}
 	}
 }
 
@@ -1309,12 +1374,20 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 	upgradeRoundTripper := spdy.NewRoundTripper(nil, true, true)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
-	req := makeReq(t, "POST", url, "portforward.k8s.io")
-	resp, err := c.Do(req)
-	if err != nil {
-		t.Fatalf("Got error POSTing: %v", err)
+	opts := &v1.PodPortForwardOptions{
+		Pod: &v1.ObjectReference{
+			Name:      podName,
+			Namespace: podNamespace,
+		},
 	}
-	defer resp.Body.Close()
+	body := &bytes.Buffer{}
+	err = json.NewEncoder(body).Encode(opts)
+	require.NoError(t, err, "marshal request")
+
+	req := makeReq(t, "POST", url, "portforward.k8s.io")
+	req.Body = ioutil.NopCloser(body)
+	resp, err := c.Do(req)
+	require.NoError(t, err, "POSTing")
 
 	conn, err := upgradeRoundTripper.NewConnection(resp)
 	if err != nil {
@@ -1351,107 +1424,135 @@ func TestServePortForward(t *testing.T) {
 	podNamespace := "other"
 	podName := "foo"
 
-	for desc := range tests {
-		test := tests[desc]
-		t.Run(desc, func(t *testing.T) {
-			ss, err := newTestStreamingServer(0)
-			require.NoError(t, err)
-			defer ss.testHTTPServer.Close()
-			fw := newServerTestWithDebug(true, test.redirect, ss)
-			defer fw.testHTTPServer.Close()
-
-			portForwardFuncDone := make(chan struct{})
-
-			fw.fakeKubelet.getPortForwardCheck = func(name, namespace string, uid types.UID, opts portforward.V4Options) {
-				assert.Equal(t, podName, name, "pod name")
-				assert.Equal(t, podNamespace, namespace, "pod namespace")
+	for _, useDeprecatedAPIs := range []bool{true, false} {
+		for desc := range tests {
+			test := tests[desc]
+			name := desc
+			if useDeprecatedAPIs {
+				name += "_deprecatedAPIs"
 			}
+			t.Run(name, func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeprecatedKubeletStreamingAPI, useDeprecatedAPIs)()
 
-			ss.fakeRuntime.portForwardFunc = func(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
-				defer close(portForwardFuncDone)
-				assert.Equal(t, testPodSandboxID, podSandboxID, "pod sandbox id")
-				// The port should be valid if it reaches here.
-				testPort, err := strconv.ParseInt(test.port, 10, 32)
-				require.NoError(t, err, "parse port")
-				assert.Equal(t, int32(testPort), port, "port")
+				ss, err := newTestStreamingServer(0)
+				require.NoError(t, err)
+				defer ss.testHTTPServer.Close()
+				fw := newServerTestWithDebug(true, test.redirect, ss)
+				defer fw.testHTTPServer.Close()
+
+				portForwardFuncDone := make(chan struct{})
+
+				fw.fakeKubelet.getPortForwardCheck = func(name, namespace string, uid types.UID, opts portforward.V4Options) {
+					assert.Equal(t, podName, name, "pod name")
+					assert.Equal(t, podNamespace, namespace, "pod namespace")
+				}
+
+				ss.fakeRuntime.portForwardFunc = func(podSandboxID string, port int32, stream io.ReadWriteCloser) error {
+					defer close(portForwardFuncDone)
+					assert.Equal(t, testPodSandboxID, podSandboxID, "pod sandbox id")
+					// The port should be valid if it reaches here.
+					testPort, err := strconv.ParseInt(test.port, 10, 32)
+					require.NoError(t, err, "parse port")
+					assert.Equal(t, int32(testPort), port, "port")
+
+					if test.clientData != "" {
+						fromClient := make([]byte, 32)
+						n, err := stream.Read(fromClient)
+						assert.NoError(t, err, "reading client data")
+						assert.Equal(t, test.clientData, string(fromClient[0:n]), "client data")
+					}
+
+					if test.containerData != "" {
+						_, err := stream.Write([]byte(test.containerData))
+						assert.NoError(t, err, "writing container data")
+					}
+
+					return nil
+				}
+
+				url := fmt.Sprintf("%s/portForward/%s/%s", fw.testHTTPServer.URL, podNamespace, podName)
+
+				var (
+					upgradeRoundTripper httpstream.UpgradeRoundTripper
+					c                   *http.Client
+				)
+
+				if test.redirect {
+					c = &http.Client{}
+					// Don't follow redirects, since we want to inspect the redirect response.
+					c.CheckRedirect = func(*http.Request, []*http.Request) error {
+						return http.ErrUseLastResponse
+					}
+				} else {
+					upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
+					c = &http.Client{Transport: upgradeRoundTripper}
+				}
+
+				req := makeReq(t, "POST", url, "portforward.k8s.io")
+				resp, err := c.Do(req)
+				require.NoError(t, err, "POSTing")
+
+				if !useDeprecatedAPIs {
+					// Requests without POST params should fail.
+					assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "response status")
+
+					// Redo request with correct format
+					opts := &v1.PodPortForwardOptions{
+						Pod: &v1.ObjectReference{
+							Name:      podName,
+							Namespace: podNamespace,
+						},
+					}
+					body := &bytes.Buffer{}
+					err := json.NewEncoder(body).Encode(opts)
+					require.NoError(t, err, "marshal request")
+
+					req := makeReq(t, "POST", url, "portforward.k8s.io")
+					req.Body = ioutil.NopCloser(body)
+					resp, err = c.Do(req)
+					require.NoError(t, err, "POSTing")
+				}
+
+				if test.redirect {
+					assert.Equal(t, http.StatusFound, resp.StatusCode, "status code")
+					return
+				}
+				assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode, "status code")
+
+				conn, err := upgradeRoundTripper.NewConnection(resp)
+				require.NoError(t, err, "creating streaming connection")
+				defer conn.Close()
+
+				headers := http.Header{}
+				headers.Set("streamType", "error")
+				headers.Set("port", test.port)
+				_, err = conn.CreateStream(headers)
+				assert.Equal(t, test.shouldError, err != nil, "expect error")
+
+				if test.shouldError {
+					return
+				}
+
+				headers.Set("streamType", "data")
+				headers.Set("port", test.port)
+				dataStream, err := conn.CreateStream(headers)
+				require.NoError(t, err, "create stream")
 
 				if test.clientData != "" {
-					fromClient := make([]byte, 32)
-					n, err := stream.Read(fromClient)
-					assert.NoError(t, err, "reading client data")
-					assert.Equal(t, test.clientData, string(fromClient[0:n]), "client data")
+					_, err := dataStream.Write([]byte(test.clientData))
+					assert.NoError(t, err, "writing client data")
 				}
 
 				if test.containerData != "" {
-					_, err := stream.Write([]byte(test.containerData))
-					assert.NoError(t, err, "writing container data")
+					fromContainer := make([]byte, 32)
+					n, err := dataStream.Read(fromContainer)
+					assert.NoError(t, err, "reading container data")
+					assert.Equal(t, test.containerData, string(fromContainer[0:n]), "container data")
 				}
 
-				return nil
-			}
-
-			url := fmt.Sprintf("%s/portForward/%s/%s", fw.testHTTPServer.URL, podNamespace, podName)
-
-			var (
-				upgradeRoundTripper httpstream.UpgradeRoundTripper
-				c                   *http.Client
-			)
-
-			if test.redirect {
-				c = &http.Client{}
-				// Don't follow redirects, since we want to inspect the redirect response.
-				c.CheckRedirect = func(*http.Request, []*http.Request) error {
-					return http.ErrUseLastResponse
-				}
-			} else {
-				upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
-				c = &http.Client{Transport: upgradeRoundTripper}
-			}
-
-			req := makeReq(t, "POST", url, "portforward.k8s.io")
-			resp, err := c.Do(req)
-			require.NoError(t, err, "POSTing")
-			defer resp.Body.Close()
-
-			if test.redirect {
-				assert.Equal(t, http.StatusFound, resp.StatusCode, "status code")
-				return
-			}
-			assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode, "status code")
-
-			conn, err := upgradeRoundTripper.NewConnection(resp)
-			require.NoError(t, err, "creating streaming connection")
-			defer conn.Close()
-
-			headers := http.Header{}
-			headers.Set("streamType", "error")
-			headers.Set("port", test.port)
-			_, err = conn.CreateStream(headers)
-			assert.Equal(t, test.shouldError, err != nil, "expect error")
-
-			if test.shouldError {
-				return
-			}
-
-			headers.Set("streamType", "data")
-			headers.Set("port", test.port)
-			dataStream, err := conn.CreateStream(headers)
-			require.NoError(t, err, "create stream")
-
-			if test.clientData != "" {
-				_, err := dataStream.Write([]byte(test.clientData))
-				assert.NoError(t, err, "writing client data")
-			}
-
-			if test.containerData != "" {
-				fromContainer := make([]byte, 32)
-				n, err := dataStream.Read(fromContainer)
-				assert.NoError(t, err, "reading container data")
-				assert.Equal(t, test.containerData, string(fromContainer[0:n]), "container data")
-			}
-
-			<-portForwardFuncDone
-		})
+				<-portForwardFuncDone
+			})
+		}
 	}
 }
 

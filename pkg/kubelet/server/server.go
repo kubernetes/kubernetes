@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -85,6 +86,10 @@ const (
 	specPath            = "/spec/"
 	statsPath           = "/stats/"
 	logsPath            = "/logs/"
+)
+
+const (
+	maxRequestBytes = 1 << 20 // 1 MB
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
@@ -430,6 +435,9 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 	s.addMetricsBucketMatcher("exec")
 	ws = new(restful.WebService)
 	ws.Path("/exec")
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DeprecatedKubeletStreamingAPI) {
+		ws.Consumes(restful.MIME_JSON)
+	}
 	ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
 		To(s.getExec).
 		Operation("getExec"))
@@ -741,18 +749,69 @@ func getExecRequestParams(req *restful.Request) execRequestParams {
 	}
 }
 
-type portForwardRequestParams struct {
-	podNamespace string
-	podName      string
-	podUID       types.UID
+// Parse the JSON encoded request options into the options struct.
+func parseRequestOptions(options interface{}, req *restful.Request, response *restful.Response) error {
+	body := http.MaxBytesReader(response.ResponseWriter, req.Request.Body, maxRequestBytes)
+	err := json.NewDecoder(body).Decode(options)
+
+	if err == nil || !utilfeature.DefaultFeatureGate.Enabled(features.DeprecatedKubeletStreamingAPI) {
+		// If the deprecated streaming APIs are not enabled, just return the error.
+		return err
+	}
+	// Deprecated APIs enabled, fall back to parsing query options
+	var (
+		podNamespace  = req.PathParameter("podNamespace")
+		podName       = req.PathParameter("podID")
+		podUID        = types.UID(req.PathParameter("uid"))
+		containerName = req.PathParameter("containerName")
+		cmd           = req.Request.URL.Query()[v1.ExecCommandParam]
+	)
+
+	pod := &v1.ObjectReference{
+		Name:      podName,
+		Namespace: podNamespace,
+		UID:       podUID,
+	}
+	streamOpts := remotecommandserver.NewOptions(req.Request)
+
+	switch opts := options.(type) {
+	case *v1.PodExecOptions:
+		opts.Pod = pod
+		opts.Container = containerName
+		opts.Stdin = streamOpts.Stdin
+		opts.Stdout = streamOpts.Stdout
+		opts.Stderr = streamOpts.Stderr
+		opts.TTY = streamOpts.TTY
+		opts.Command = cmd
+	case *v1.PodAttachOptions:
+		opts.Pod = pod
+		opts.Container = containerName
+		opts.Stdin = streamOpts.Stdin
+		opts.Stdout = streamOpts.Stdout
+		opts.Stderr = streamOpts.Stderr
+		opts.TTY = streamOpts.TTY
+	case *v1.PodPortForwardOptions:
+		pf, err := portforward.NewV4Options(req.Request)
+		if err != nil {
+			return err
+		}
+		opts.Pod = pod
+		opts.Ports = pf.Ports
+	}
+
+	return nil
 }
 
-func getPortForwardRequestParams(req *restful.Request) portForwardRequestParams {
-	return portForwardRequestParams{
-		podNamespace: req.PathParameter("podNamespace"),
-		podName:      req.PathParameter("podID"),
-		podUID:       types.UID(req.PathParameter("uid")),
+func verifyPodPath(pod *v1.ObjectReference, req *restful.Request) error {
+	pathNamespace := req.PathParameter("podNamespace")
+	pathName := req.PathParameter("podID")
+	if pod.Name != pathName {
+		return fmt.Errorf("pod name mismatch: %q != %q", pod.Name, pathName)
 	}
+	if pod.Namespace != pathNamespace {
+		return fmt.Errorf("pod namespace mismatch: %q != %q", pod.Namespace, pathNamespace)
+	}
+	return nil
 }
 
 type responder struct{}
@@ -771,22 +830,41 @@ func proxyStream(w http.ResponseWriter, r *http.Request, url *url.URL) {
 
 // getAttach handles requests to attach to a container.
 func (s *Server) getAttach(request *restful.Request, response *restful.Response) {
-	params := getExecRequestParams(request)
-	streamOpts, err := remotecommandserver.NewOptions(request.Request)
+	opts := &v1.PodAttachOptions{}
+	err := parseRequestOptions(opts, request, response)
 	if err != nil {
 		utilruntime.HandleError(err)
 		response.WriteError(http.StatusBadRequest, err)
 		return
 	}
-	pod, ok := s.host.GetPodByName(params.podNamespace, params.podName)
+	if err := verifyPodPath(opts.Pod, request); err != nil {
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	pod, ok := s.host.GetPodByName(opts.Pod.Namespace, opts.Pod.Name)
 	if !ok {
 		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
 		return
 	}
 
+	streamOpts := remotecommandserver.Options{
+		Stdin:  opts.Stdin,
+		Stdout: opts.Stdout,
+		Stderr: opts.Stderr,
+		TTY:    opts.TTY,
+	}
+	if err := remotecommandserver.ValidateOptions(&streamOpts); err != nil {
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
 	podFullName := kubecontainer.GetPodFullName(pod)
-	url, err := s.host.GetAttach(podFullName, params.podUID, params.containerName, *streamOpts)
+	url, err := s.host.GetAttach(podFullName, pod.UID, opts.Container, streamOpts)
 	if err != nil {
+		utilruntime.HandleError(err)
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}
@@ -800,22 +878,41 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 
 // getExec handles requests to run a command inside a container.
 func (s *Server) getExec(request *restful.Request, response *restful.Response) {
-	params := getExecRequestParams(request)
-	streamOpts, err := remotecommandserver.NewOptions(request.Request)
+	opts := &v1.PodExecOptions{}
+	err := parseRequestOptions(opts, request, response)
 	if err != nil {
 		utilruntime.HandleError(err)
 		response.WriteError(http.StatusBadRequest, err)
 		return
 	}
-	pod, ok := s.host.GetPodByName(params.podNamespace, params.podName)
+	if err := verifyPodPath(opts.Pod, request); err != nil {
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	pod, ok := s.host.GetPodByName(opts.Pod.Namespace, opts.Pod.Name)
 	if !ok {
 		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
 		return
 	}
 
+	streamOpts := remotecommandserver.Options{
+		Stdin:  opts.Stdin,
+		Stdout: opts.Stdout,
+		Stderr: opts.Stderr,
+		TTY:    opts.TTY,
+	}
+	if err := remotecommandserver.ValidateOptions(&streamOpts); err != nil {
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
 	podFullName := kubecontainer.GetPodFullName(pod)
-	url, err := s.host.GetExec(podFullName, params.podUID, params.containerName, params.cmd, *streamOpts)
+	url, err := s.host.GetExec(podFullName, pod.UID, opts.Container, opts.Command, streamOpts)
 	if err != nil {
+		utilruntime.HandleError(err)
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}
@@ -862,7 +959,24 @@ func writeJSONResponse(response *restful.Response, data []byte) {
 // getPortForward handles a new restful port forward request. It determines the
 // pod name and uid and then calls ServePortForward.
 func (s *Server) getPortForward(request *restful.Request, response *restful.Response) {
-	params := getPortForwardRequestParams(request)
+	opts := &v1.PodPortForwardOptions{}
+	err := parseRequestOptions(opts, request, response)
+	if err != nil {
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+	if err := verifyPodPath(opts.Pod, request); err != nil {
+		utilruntime.HandleError(err)
+		response.WriteError(http.StatusBadRequest, err)
+		return
+	}
+
+	pod, ok := s.host.GetPodByName(opts.Pod.Namespace, opts.Pod.Name)
+	if !ok {
+		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
+		return
+	}
 
 	portForwardOptions, err := portforward.NewV4Options(request.Request)
 	if err != nil {
@@ -870,18 +984,10 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 		response.WriteError(http.StatusBadRequest, err)
 		return
 	}
-	pod, ok := s.host.GetPodByName(params.podNamespace, params.podName)
-	if !ok {
-		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
-		return
-	}
-	if len(params.podUID) > 0 && pod.UID != params.podUID {
-		response.WriteError(http.StatusNotFound, fmt.Errorf("pod not found"))
-		return
-	}
 
 	url, err := s.host.GetPortForward(pod.Name, pod.Namespace, pod.UID, *portForwardOptions)
 	if err != nil {
+		utilruntime.HandleError(err)
 		streaming.WriteError(err, response.ResponseWriter)
 		return
 	}

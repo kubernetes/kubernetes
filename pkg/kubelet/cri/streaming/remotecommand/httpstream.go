@@ -47,27 +47,31 @@ type Options struct {
 }
 
 // NewOptions creates a new Options from the Request.
-func NewOptions(req *http.Request) (*Options, error) {
+func NewOptions(req *http.Request) *Options {
 	tty := req.FormValue(api.ExecTTYParam) == "1"
 	stdin := req.FormValue(api.ExecStdinParam) == "1"
 	stdout := req.FormValue(api.ExecStdoutParam) == "1"
 	stderr := req.FormValue(api.ExecStderrParam) == "1"
-	if tty && stderr {
-		// TODO: make this an error before we reach this method
-		klog.V(4).Infof("Access to exec with tty and stderr is not supported, bypassing stderr")
-		stderr = false
-	}
-
-	if !stdin && !stdout && !stderr {
-		return nil, fmt.Errorf("you must specify at least 1 of stdin, stdout, stderr")
-	}
 
 	return &Options{
 		Stdin:  stdin,
 		Stdout: stdout,
 		Stderr: stderr,
 		TTY:    tty,
-	}, nil
+	}
+}
+
+func ValidateOptions(opts *Options) error {
+	if opts.TTY && opts.Stderr {
+		// TODO: make this an error before we reach this method
+		klog.V(4).Infof("Access to exec with tty and stderr is not supported, bypassing stderr")
+		opts.Stderr = false
+	}
+
+	if !opts.Stdin && !opts.Stdout && !opts.Stderr {
+		return fmt.Errorf("you must specify at least 1 of stdin, stdout, stderr")
+	}
+	return nil
 }
 
 // context contains the connection and streams used when

@@ -73,6 +73,7 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/install:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/cri/streaming:go_default_library",
@@ -88,8 +89,10 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//staging/src/k8s.io/kubelet/pkg/apis/stats/v1alpha1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
