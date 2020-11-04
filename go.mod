@@ -32,7 +32,6 @@ require (
 	github.com/coredns/corefile-migration v1.0.10
 	github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
-	github.com/coreos/go-systemd/v22 v22.1.0 // indirect
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 	github.com/cpuguy83/go-md2man/v2 v2.0.0
 	github.com/davecgh/go-spew v1.1.1
@@ -78,7 +77,7 @@ require (
 	github.com/onsi/gomega v1.7.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/runc v1.0.0-rc92
-	github.com/opencontainers/selinux v1.5.2
+	github.com/opencontainers/selinux v1.6.0
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.7.1
@@ -169,7 +168,7 @@ replace (
 	github.com/GoogleCloudPlatform/k8s-cloud-provider => github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20200415212048-7901bc822317
 	github.com/JeffAshton/win_pdh => github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
 	github.com/MakeNowJust/heredoc => github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
-	github.com/Microsoft/go-winio => github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5
+	github.com/Microsoft/go-winio => github.com/Microsoft/go-winio v0.4.15-0.20200908182639-5b44b70ab3ab
 	github.com/Microsoft/hcsshim => github.com/Microsoft/hcsshim v0.8.10-0.20200715222032-5eafd1556990
 	github.com/NYTimes/gziphandler => github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46
 	github.com/PuerkitoBio/purell => github.com/PuerkitoBio/purell v1.1.1
@@ -194,7 +193,7 @@ replace (
 	github.com/census-instrumentation/opencensus-proto => github.com/census-instrumentation/opencensus-proto v0.2.1
 	github.com/cespare/xxhash/v2 => github.com/cespare/xxhash/v2 v2.1.1
 	github.com/chai2010/gettext-go => github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
-	github.com/checkpoint-restore/go-criu/v4 => github.com/checkpoint-restore/go-criu/v4 v4.0.2
+	github.com/checkpoint-restore/go-criu/v4 => github.com/checkpoint-restore/go-criu/v4 v4.1.0
 	github.com/cheekybits/genny => github.com/cheekybits/genny v0.0.0-20170328200008-9127e812e1e9
 	github.com/chzyer/logex => github.com/chzyer/logex v1.1.10
 	github.com/chzyer/readline => github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
@@ -210,8 +209,8 @@ replace (
 	github.com/containerd/continuity => github.com/containerd/continuity v0.0.0-20190426062206-aaeac12a7ffc
 	github.com/containerd/fifo => github.com/containerd/fifo v0.0.0-20190226154929-a9fb20d87448
 	github.com/containerd/go-runc => github.com/containerd/go-runc v0.0.0-20180907222934-5a6d9f37cfa3
-	github.com/containerd/ttrpc => github.com/containerd/ttrpc v1.0.0
-	github.com/containerd/typeurl => github.com/containerd/typeurl v1.0.0
+	github.com/containerd/ttrpc => github.com/containerd/ttrpc v1.0.2
+	github.com/containerd/typeurl => github.com/containerd/typeurl v1.0.1
 	github.com/containernetworking/cni => github.com/containernetworking/cni v0.8.0
 	github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.10
 	github.com/coreos/bbolt => github.com/coreos/bbolt v1.3.2
@@ -367,9 +366,9 @@ replace (
 	github.com/onsi/gomega => github.com/onsi/gomega v1.7.0
 	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
-	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb
-	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20200520003142-237cc4f519e2
-	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.5.2
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc92
+	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6
+	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.6.0
 	github.com/pelletier/go-toml => github.com/pelletier/go-toml v1.2.0
 	github.com/peterbourgon/diskv => github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/pkg/errors => github.com/pkg/errors v0.9.1
@@ -415,6 +414,7 @@ replace (
 	github.com/vishvananda/netlink => github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns => github.com/vishvananda/netns v0.0.0-20200520041808-52d707b772fe
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.20.3
+	github.com/willf/bitset => github.com/willf/bitset v1.1.11-0.20200630133818-d5bec3311243
 	github.com/xiang90/probing => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
 	github.com/xordataexchange/crypt => github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77
 	github.com/yuin/goldmark => github.com/yuin/goldmark v1.1.27
@@ -434,7 +434,7 @@ replace (
 	golang.org/x/net => golang.org/x/net v0.0.0-20200707034311-ab3426394381
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20201013081832-0aaa2718063a
 	golang.org/x/text => golang.org/x/text v0.3.3
 	golang.org/x/time => golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20200616133436-c1934b75d054
@@ -445,7 +445,7 @@ replace (
 	google.golang.org/api => google.golang.org/api v0.15.1
 	google.golang.org/appengine => google.golang.org/appengine v1.6.5
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
-	google.golang.org/grpc => google.golang.org/grpc v1.27.0
+	google.golang.org/grpc => google.golang.org/grpc v1.27.1
 	google.golang.org/protobuf => google.golang.org/protobuf v1.24.0
 	gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15

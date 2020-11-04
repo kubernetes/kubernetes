@@ -72,10 +72,10 @@ github.com/JeffAshton/win_pdh
 # github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd => github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
 github.com/MakeNowJust/heredoc
 # github.com/MakeNowJust/heredoc => github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
-# github.com/Microsoft/go-winio v0.4.15-0.20200908182639-5b44b70ab3ab => github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5
+# github.com/Microsoft/go-winio v0.4.15-0.20200908182639-5b44b70ab3ab => github.com/Microsoft/go-winio v0.4.15-0.20200908182639-5b44b70ab3ab
 ## explicit
 github.com/Microsoft/go-winio
-# github.com/Microsoft/go-winio => github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5
+# github.com/Microsoft/go-winio => github.com/Microsoft/go-winio v0.4.15-0.20200908182639-5b44b70ab3ab
 github.com/Microsoft/go-winio/pkg/guid
 github.com/Microsoft/go-winio/vhd
 # github.com/Microsoft/hcsshim v0.8.10-0.20200715222032-5eafd1556990 => github.com/Microsoft/hcsshim v0.8.10-0.20200715222032-5eafd1556990
@@ -202,9 +202,9 @@ github.com/chai2010/gettext-go/gettext
 github.com/chai2010/gettext-go/gettext/mo
 github.com/chai2010/gettext-go/gettext/plural
 github.com/chai2010/gettext-go/gettext/po
-# github.com/checkpoint-restore/go-criu/v4 v4.0.2 => github.com/checkpoint-restore/go-criu/v4 v4.0.2
+# github.com/checkpoint-restore/go-criu/v4 v4.1.0 => github.com/checkpoint-restore/go-criu/v4 v4.1.0
 github.com/checkpoint-restore/go-criu/v4
-# github.com/checkpoint-restore/go-criu/v4 => github.com/checkpoint-restore/go-criu/v4 v4.0.2
+# github.com/checkpoint-restore/go-criu/v4 => github.com/checkpoint-restore/go-criu/v4 v4.1.0
 github.com/checkpoint-restore/go-criu/v4/rpc
 # github.com/cheekybits/genny => github.com/cheekybits/genny v0.0.0-20170328200008-9127e812e1e9
 # github.com/chzyer/logex => github.com/chzyer/logex v1.1.10
@@ -250,10 +250,10 @@ github.com/containerd/containerd/pkg/dialer
 # github.com/containerd/continuity => github.com/containerd/continuity v0.0.0-20190426062206-aaeac12a7ffc
 # github.com/containerd/fifo => github.com/containerd/fifo v0.0.0-20190226154929-a9fb20d87448
 # github.com/containerd/go-runc => github.com/containerd/go-runc v0.0.0-20180907222934-5a6d9f37cfa3
-# github.com/containerd/ttrpc v1.0.2 => github.com/containerd/ttrpc v1.0.0
+# github.com/containerd/ttrpc v1.0.2 => github.com/containerd/ttrpc v1.0.2
 github.com/containerd/ttrpc
-# github.com/containerd/ttrpc => github.com/containerd/ttrpc v1.0.0
-# github.com/containerd/typeurl => github.com/containerd/typeurl v1.0.0
+# github.com/containerd/ttrpc => github.com/containerd/ttrpc v1.0.2
+# github.com/containerd/typeurl => github.com/containerd/typeurl v1.0.1
 # github.com/containernetworking/cni v0.8.0 => github.com/containernetworking/cni v0.8.0
 ## explicit
 # github.com/containernetworking/cni => github.com/containernetworking/cni v0.8.0
@@ -285,7 +285,6 @@ github.com/coreos/go-systemd/daemon
 github.com/coreos/go-systemd/journal
 github.com/coreos/go-systemd/util
 # github.com/coreos/go-systemd/v22 v22.1.0 => github.com/coreos/go-systemd/v22 v22.1.0
-## explicit
 # github.com/coreos/go-systemd/v22 => github.com/coreos/go-systemd/v22 v22.1.0
 github.com/coreos/go-systemd/v22/dbus
 # github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f => github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
@@ -349,7 +348,6 @@ github.com/docker/docker/pkg/term/windows
 github.com/docker/go-connections/nat
 github.com/docker/go-connections/sockets
 github.com/docker/go-connections/tlsconfig
-# github.com/docker/go-events => github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c
 # github.com/docker/go-units v0.4.0 => github.com/docker/go-units v0.4.0
 ## explicit
 github.com/docker/go-units
@@ -409,7 +407,6 @@ github.com/go-bindata/go-bindata
 # github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
 github.com/go-bindata/go-bindata/go-bindata
 # github.com/go-gl/glfw/v3.3/glfw => github.com/go-gl/glfw/v3.3/glfw v0.0.0-20191125211704-12ad95a8df72
-# github.com/go-ini/ini => github.com/go-ini/ini v1.9.0
 # github.com/go-kit/kit => github.com/go-kit/kit v0.9.0
 # github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.4.0
 # github.com/go-logr/logr v0.2.0 => github.com/go-logr/logr v0.2.0
@@ -461,7 +458,6 @@ github.com/go-stack/stack
 # github.com/godbus/dbus/v5 v5.0.3 => github.com/godbus/dbus/v5 v5.0.3
 github.com/godbus/dbus/v5
 # github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.3
-# github.com/gogo/googleapis => github.com/gogo/googleapis v1.4.0
 # github.com/gogo/protobuf v1.3.1 => github.com/gogo/protobuf v1.3.1
 ## explicit
 # github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.1
@@ -882,9 +878,9 @@ github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/opencontainers/runc v1.0.0-rc92 => github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb
+# github.com/opencontainers/runc v1.0.0-rc92 => github.com/opencontainers/runc v1.0.0-rc92
 ## explicit
-# github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc91.0.20200707015106-819fcc687efb
+# github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc92
 github.com/opencontainers/runc/libcontainer
 github.com/opencontainers/runc/libcontainer/apparmor
 github.com/opencontainers/runc/libcontainer/cgroups
@@ -906,12 +902,12 @@ github.com/opencontainers/runc/libcontainer/system
 github.com/opencontainers/runc/libcontainer/user
 github.com/opencontainers/runc/libcontainer/utils
 github.com/opencontainers/runc/types
-# github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6 => github.com/opencontainers/runtime-spec v1.0.3-0.20200520003142-237cc4f519e2
-# github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20200520003142-237cc4f519e2
+# github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6 => github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6
+# github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20200728170252-4d89ac9fbff6
 github.com/opencontainers/runtime-spec/specs-go
-# github.com/opencontainers/selinux v1.5.2 => github.com/opencontainers/selinux v1.5.2
+# github.com/opencontainers/selinux v1.6.0 => github.com/opencontainers/selinux v1.6.0
 ## explicit
-# github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.5.2
+# github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.6.0
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalk
@@ -1099,6 +1095,9 @@ github.com/vmware/govmomi/vim25/progress
 github.com/vmware/govmomi/vim25/soap
 github.com/vmware/govmomi/vim25/types
 github.com/vmware/govmomi/vim25/xml
+# github.com/willf/bitset v1.1.11-0.20200630133818-d5bec3311243 => github.com/willf/bitset v1.1.11-0.20200630133818-d5bec3311243
+github.com/willf/bitset
+# github.com/willf/bitset => github.com/willf/bitset v1.1.11-0.20200630133818-d5bec3311243
 # github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
 github.com/xiang90/probing
 # github.com/xiang90/probing => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
@@ -1295,9 +1294,9 @@ golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e => golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 # golang.org/x/sync => golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.0.0-20201013081832-0aaa2718063a => golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4
+# golang.org/x/sys v0.0.0-20201013081832-0aaa2718063a => golang.org/x/sys v0.0.0-20201013081832-0aaa2718063a
 ## explicit
-# golang.org/x/sys => golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4
+# golang.org/x/sys => golang.org/x/sys v0.0.0-20201013081832-0aaa2718063a
 golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
@@ -1428,10 +1427,10 @@ google.golang.org/appengine/urlfetch
 google.golang.org/genproto/googleapis/api/httpbody
 google.golang.org/genproto/googleapis/rpc/status
 google.golang.org/genproto/protobuf/field_mask
-# google.golang.org/grpc v1.27.1 => google.golang.org/grpc v1.27.0
+# google.golang.org/grpc v1.27.1 => google.golang.org/grpc v1.27.1
 ## explicit
 google.golang.org/grpc
-# google.golang.org/grpc => google.golang.org/grpc v1.27.0
+# google.golang.org/grpc => google.golang.org/grpc v1.27.1
 google.golang.org/grpc/attributes
 google.golang.org/grpc/backoff
 google.golang.org/grpc/balancer

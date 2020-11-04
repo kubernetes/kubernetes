@@ -34,7 +34,6 @@ require (
 )
 
 replace (
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go

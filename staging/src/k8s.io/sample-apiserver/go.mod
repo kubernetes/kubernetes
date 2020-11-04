@@ -18,8 +18,6 @@ require (
 )
 
 replace (
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4
-	google.golang.org/grpc => google.golang.org/grpc v1.27.0
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

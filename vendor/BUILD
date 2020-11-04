@@ -288,6 +288,7 @@ filegroup(
         "//vendor/github.com/vishvananda/netlink:all-srcs",
         "//vendor/github.com/vishvananda/netns:all-srcs",
         "//vendor/github.com/vmware/govmomi:all-srcs",
+        "//vendor/github.com/willf/bitset:all-srcs",
         "//vendor/github.com/xiang90/probing:all-srcs",
         "//vendor/go.etcd.io/bbolt:all-srcs",
         "//vendor/go.etcd.io/etcd/auth:all-srcs",
