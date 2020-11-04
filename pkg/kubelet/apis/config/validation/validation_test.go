@@ -54,6 +54,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		NodeLeaseDurationSeconds:    1,
 		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 25 * time.Millisecond},
 		TopologyManagerScope:        kubeletconfig.PodTopologyManagerScope,
+		TopologyManagerPolicy:       kubeletconfig.SingleNumaNodeTopologyManagerPolicy,
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 		},
@@ -91,6 +92,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 50 * time.Millisecond},
 		ReservedSystemCPUs:          "0-3",
 		TopologyManagerScope:        kubeletconfig.ContainerTopologyManagerScope,
+		TopologyManagerPolicy:       kubeletconfig.NoneTopologyManagerPolicy,
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 		},
@@ -125,7 +127,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		NodeLeaseDurationSeconds:    -1,
 		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 100 * time.Millisecond},
 	}
-	const numErrsErrorCase1 = 26
+	const numErrsErrorCase1 = 27
 	if allErrors := ValidateKubeletConfiguration(errorCase1); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase1 {
 		t.Errorf("expect %d errors, got %v", numErrsErrorCase1, len(allErrors.(utilerrors.Aggregate).Errors()))
 	}
@@ -159,11 +161,12 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		CPUCFSQuotaPeriod:           metav1.Duration{Duration: 50 * time.Millisecond},
 		ReservedSystemCPUs:          "0-3",
 		TopologyManagerScope:        "invalid",
+		TopologyManagerPolicy:       "invalid",
 		FeatureGates: map[string]bool{
 			"CustomCPUCFSQuotaPeriod": true,
 		},
 	}
-	const numErrsErrorCase2 = 2
+	const numErrsErrorCase2 = 3
 	if allErrors := ValidateKubeletConfiguration(errorCase2); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase2 {
 		t.Errorf("expect %d errors, got %v", numErrsErrorCase2, len(allErrors.(utilerrors.Aggregate).Errors()))
 	}
