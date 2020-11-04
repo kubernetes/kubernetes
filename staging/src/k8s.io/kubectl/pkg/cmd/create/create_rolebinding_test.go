@@ -17,6 +17,7 @@ limitations under the License.
 package create
 
 import (
+	"fmt"
 	"testing"
 
 	rbac "k8s.io/api/rbac/v1"
@@ -72,7 +73,7 @@ func TestCreateRoleBinding(t *testing.T) {
 	}
 
 	for i, tc := range tests {
-		t.Run(string(i), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			roleBinding, err := tc.options.createRoleBinding()
 			if err != nil {
 				t.Errorf("unexpected error:\n%#v\n", err)
