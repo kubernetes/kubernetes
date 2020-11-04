@@ -45,7 +45,7 @@ const (
 	sharedConcurrencyMetricsName      = "apiserver_flowcontrol_request_concurrency_limit"
 	dispatchedRequestCountMetricsName = "apiserver_flowcontrol_dispatched_requests_total"
 	rejectedRequestCountMetricsName   = "apiserver_flowcontrol_rejected_requests_total"
-	labelPriorityLevel                = "priorityLevel"
+	labelPriorityLevel                = "priority_level"
 	timeout                           = time.Second * 10
 )
 

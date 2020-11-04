@@ -167,7 +167,7 @@ func (uss *uniformScenarioState) exercise() {
 	for i, uc := range uss.clients {
 		uss.integrators[i] = fq.NewIntegrator(uss.clk)
 		fsName := fmt.Sprintf("client%d", i)
-		uss.expectedInqueue = uss.expectedInqueue + fmt.Sprintf(`				apiserver_flowcontrol_current_inqueue_requests{flowSchema=%q,priorityLevel=%q} 0%s`, fsName, uss.name, "\n")
+		uss.expectedInqueue = uss.expectedInqueue + fmt.Sprintf(`				apiserver_flowcontrol_current_inqueue_requests{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
 		for j := 0; j < uc.nThreads; j++ {
 			ust := uniformScenarioThread{
 				uss:    uss,
@@ -309,10 +309,10 @@ func (uss *uniformScenarioState) finalReview() {
 	for i := range uss.clients {
 		fsName := fmt.Sprintf("client%d", i)
 		if atomic.AddInt32(&uss.executions[i], 0) > 0 {
-			uss.expectedExecuting = uss.expectedExecuting + fmt.Sprintf(`				apiserver_flowcontrol_current_executing_requests{flowSchema=%q,priorityLevel=%q} 0%s`, fsName, uss.name, "\n")
+			uss.expectedExecuting = uss.expectedExecuting + fmt.Sprintf(`				apiserver_flowcontrol_current_executing_requests{flow_schema=%q,priority_level=%q} 0%s`, fsName, uss.name, "\n")
 		}
 		if atomic.AddInt32(&uss.rejects[i], 0) > 0 {
-			expectedRejects = expectedRejects + fmt.Sprintf(`				apiserver_flowcontrol_rejected_requests_total{flowSchema=%q,priorityLevel=%q,reason=%q} %d%s`, fsName, uss.name, uss.rejectReason, uss.rejects[i], "\n")
+			expectedRejects = expectedRejects + fmt.Sprintf(`				apiserver_flowcontrol_rejected_requests_total{flow_schema=%q,priority_level=%q,reason=%q} %d%s`, fsName, uss.name, uss.rejectReason, uss.rejects[i], "\n")
 		}
 	}
 	if uss.evalExecutingMetrics && len(uss.expectedExecuting) > 0 {
