@@ -25,6 +25,8 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/component-base/version"
+
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
@@ -522,6 +524,12 @@ type RESTStorageProvider interface {
 func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) error {
 	apiGroupsInfo := []*genericapiserver.APIGroupInfo{}
 
+	// used later in the loop to filter the served resource by those that have expired.
+	resourceExpirationEvaluator, err := newResourceExpirationEvaluator(version.Get())
+	if err != nil {
+		return err
+	}
+
 	for _, restStorageBuilder := range restStorageProviders {
 		groupName := restStorageBuilder.GroupName()
 		if !apiResourceConfigSource.AnyVersionForGroupEnabled(groupName) {
@@ -536,6 +544,16 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 			klog.Warningf("API group %q is not enabled, skipping.", groupName)
 			continue
 		}
+
+		// Remove resources that serving kinds that are removed.
+		// We do this here so that we don't accidentally serve versions without resources or openapi information that for kinds we don't serve.
+		// This is a spot above the construction of individual storage handlers so that no sig accidentally forgets to check.
+		resourceExpirationEvaluator.removeDeletedKinds(groupName, apiGroupInfo.VersionedResourcesStorageMap)
+		if len(apiGroupInfo.VersionedResourcesStorageMap) == 0 {
+			klog.V(1).Infof("Removing API group %v because it is time to stop serving it because it has no versions per APILifecycle.", groupName)
+			continue
+		}
+
 		klog.V(1).Infof("Enabling API group %q.", groupName)
 
 		if postHookProvider, ok := restStorageBuilder.(genericapiserver.PostStartHookProvider); ok {
