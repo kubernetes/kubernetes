@@ -211,6 +211,11 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		init()
 		defer cleanup()
 
+		if pattern.Name == testpatterns.BlockVolModeDynamicPV.Name || pattern.Name == testpatterns.DefaultFsDynamicPV.Name {
+			pattern.SnapshotType = testpatterns.DynamicCreatedSnapshot
+			pattern.SnapshotDeletionPolicy = testpatterns.DeleteSnapshot
+		}
+
 		dc := l.config.Framework.DynamicClient
 		testConfig := convertTestConfig(l.config)
 		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)

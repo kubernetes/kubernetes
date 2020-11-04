@@ -112,10 +112,8 @@ var (
 	}
 	// DefaultFsDynamicPV is TestPattern for "Dynamic PV (default fs)"
 	DefaultFsDynamicPV = TestPattern{
-		Name:                   "Dynamic PV (default fs)",
-		VolType:                DynamicPV,
-		SnapshotType:           DynamicCreatedSnapshot,
-		SnapshotDeletionPolicy: DeleteSnapshot,
+		Name:    "Dynamic PV (default fs)",
+		VolType: DynamicPV,
 	}
 
 	// Definitions for ext3
