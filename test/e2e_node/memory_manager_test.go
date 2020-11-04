@@ -60,12 +60,11 @@ type memoryManagerCtnAttributes struct {
 	hugepages2Mi string
 }
 
-// makeCPUMangerPod returns a pod with the provided ctnAttributes.
-func makeMemoryManagerPod(podName string, ctnAttributes []memoryManagerCtnAttributes) *v1.Pod {
+//  makeMemoryManagerContainers returns slice of containers with provided attributes and indicator of hugepages mount needed for those.
+func makeMemoryManagerContainers(ctnCmd string, ctnAttributes []memoryManagerCtnAttributes) ([]v1.Container, bool) {
 	hugepagesMount := false
 	var containers []v1.Container
 	for _, ctnAttr := range ctnAttributes {
-		memsetCmd := fmt.Sprintf("grep Mems_allowed_list /proc/self/status | cut -f2 && sleep 1d")
 		ctn := v1.Container{
 			Name:  ctnAttr.ctnName,
 			Image: busyboxImage,
@@ -75,7 +74,7 @@ func makeMemoryManagerPod(podName string, ctnAttributes []memoryManagerCtnAttrib
 					v1.ResourceMemory: resource.MustParse(ctnAttr.memory),
 				},
 			},
-			Command: []string{"sh", "-c", memsetCmd},
+			Command: []string{"sh", "-c", ctnCmd},
 		}
 		if ctnAttr.hugepages2Mi != "" {
 			hugepagesMount = true
@@ -92,13 +91,28 @@ func makeMemoryManagerPod(podName string, ctnAttributes []memoryManagerCtnAttrib
 		containers = append(containers, ctn)
 	}
 
+	return containers, hugepagesMount
+}
+
+// makeMemoryMangerPod returns a pod with the provided ctnAttributes.
+func makeMemoryManagerPod(podName string, initCtnAttributes, ctnAttributes []memoryManagerCtnAttributes) *v1.Pod {
+	hugepagesMount := false
+	memsetCmd := fmt.Sprintf("grep Mems_allowed_list /proc/self/status | cut -f2")
+	memsetSleepCmd := memsetCmd + "&& sleep 1d"
+	var containers, initContainers []v1.Container
+	if len(initCtnAttributes) > 0 {
+		initContainers, _ = makeMemoryManagerContainers(memsetCmd, initCtnAttributes)
+	}
+	containers, hugepagesMount = makeMemoryManagerContainers(memsetSleepCmd, ctnAttributes)
+
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
-			RestartPolicy: v1.RestartPolicyNever,
-			Containers:    containers,
+			RestartPolicy:  v1.RestartPolicyNever,
+			Containers:     containers,
+			InitContainers: initContainers,
 		},
 	}
 
@@ -216,13 +230,13 @@ func getAllNUMANodes() []int {
 var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFeature:MemoryManager]", func() {
 	// TODO: add more complex tests that will include interaction between CPUManager, MemoryManager and TopologyManager
 	var (
-		allNUMANodes            []int
-		ctnParams               []memoryManagerCtnAttributes
-		is2MiHugepagesSupported *bool
-		isMultiNUMASupported    *bool
-		kubeParams              *kubeletParams
-		oldCfg                  *kubeletconfig.KubeletConfiguration
-		testPod                 *v1.Pod
+		allNUMANodes             []int
+		ctnParams, initCtnParams []memoryManagerCtnAttributes
+		is2MiHugepagesSupported  *bool
+		isMultiNUMASupported     *bool
+		kubeParams               *kubeletParams
+		oldCfg                   *kubeletconfig.KubeletConfiguration
+		testPod                  *v1.Pod
 	)
 
 	f := framework.NewDefaultFramework("memory-manager-test")
@@ -287,7 +301,7 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 			}
 		}
 
-		testPod = makeMemoryManagerPod(ctnParams[0].ctnName, ctnParams)
+		testPod = makeMemoryManagerPod(ctnParams[0].ctnName, initCtnParams, ctnParams)
 	})
 
 	ginkgo.JustAfterEach(func() {
@@ -309,27 +323,71 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 			tmpParams := *defaultKubeParams
 			tmpParams.memoryManagerPolicy = staticPolicy
 			kubeParams = &tmpParams
-
-			// override pod parameters
-			ctnParams = []memoryManagerCtnAttributes{
-				{
-					ctnName: "memory-manager-static",
-					cpus:    "100m",
-					memory:  "128Mi",
-				},
-			}
 		})
 
-		ginkgo.It("should succeed to start the pod", func() {
-			ginkgo.By("Running the test pod")
-			testPod = f.PodClient().CreateSync(testPod)
+		ginkgo.JustAfterEach(func() {
+			// reset containers attributes
+			ctnParams = []memoryManagerCtnAttributes{}
+			initCtnParams = []memoryManagerCtnAttributes{}
+		})
 
-			// it no taste to verify NUMA pinning when the node has only one NUMA node
-			if !*isMultiNUMASupported {
-				return
-			}
+		ginkgo.When("pod has init and app containers", func() {
+			ginkgo.BeforeEach(func() {
+				// override containers parameters
+				ctnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "memory-manager-static",
+						cpus:    "100m",
+						memory:  "128Mi",
+					},
+				}
+				// override init container parameters
+				initCtnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "init-memory-manager-static",
+						cpus:    "100m",
+						memory:  "128Mi",
+					},
+				}
+			})
 
-			verifyMemoryPinning([]int{0})
+			ginkgo.It("should succeed to start the pod", func() {
+				ginkgo.By("Running the test pod")
+				testPod = f.PodClient().CreateSync(testPod)
+
+				// it no taste to verify NUMA pinning when the node has only one NUMA node
+				if !*isMultiNUMASupported {
+					return
+				}
+
+				verifyMemoryPinning([]int{0})
+			})
+		})
+
+		ginkgo.When("pod has only app containers", func() {
+
+			ginkgo.BeforeEach(func() {
+				// override containers parameters
+				ctnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "memory-manager-static",
+						cpus:    "100m",
+						memory:  "128Mi",
+					},
+				}
+			})
+
+			ginkgo.It("should succeed to start the pod", func() {
+				ginkgo.By("Running the test pod")
+				testPod = f.PodClient().CreateSync(testPod)
+
+				// it no taste to verify NUMA pinning when the node has only one NUMA node
+				if !*isMultiNUMASupported {
+					return
+				}
+
+				verifyMemoryPinning([]int{0})
+			})
 		})
 	})
 
