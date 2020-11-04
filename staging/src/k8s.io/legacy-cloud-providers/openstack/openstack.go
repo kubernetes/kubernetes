@@ -876,6 +876,10 @@ func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 }
 
 func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
+	if err := os.ensureCloudProviderWasInitialized(); err != nil {
+		return nil, err
+	}
+
 	bsVersion := ""
 	if forceVersion == "" {
 		bsVersion = os.bsOpts.BSVersion
