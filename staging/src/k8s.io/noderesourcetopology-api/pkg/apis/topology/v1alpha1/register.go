@@ -6,7 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	topology "github.com/swatisehgal/topologyapi/pkg/apis/topology"
+	topology "k8s.io/noderesourcetopology-api/pkg/apis/topology"
 )
 
 // SchemeGroupVersion is group version used to register these objects

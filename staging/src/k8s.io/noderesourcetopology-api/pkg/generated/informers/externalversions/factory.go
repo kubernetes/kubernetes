@@ -1,5 +1,5 @@
 /*
-Copyright The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,13 +25,13 @@ import (
 	sync "sync"
 	time "time"
 
-	versioned "github.com/swatisehgal/topologyapi/pkg/generated/clientset/versioned"
-	internalinterfaces "github.com/swatisehgal/topologyapi/pkg/generated/informers/externalversions/internalinterfaces"
-	topology "github.com/swatisehgal/topologyapi/pkg/generated/informers/externalversions/topology"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
+	versioned "k8s.io/noderesourcetopology-api/pkg/generated/clientset/versioned"
+	internalinterfaces "k8s.io/noderesourcetopology-api/pkg/generated/informers/externalversions/internalinterfaces"
+	topology "k8s.io/noderesourcetopology-api/pkg/generated/informers/externalversions/topology"
 )
 
 // SharedInformerOption defines the functional option type for SharedInformerFactory.

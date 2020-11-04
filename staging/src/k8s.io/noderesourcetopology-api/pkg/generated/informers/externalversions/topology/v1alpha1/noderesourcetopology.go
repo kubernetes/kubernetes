@@ -1,5 +1,5 @@
 /*
-Copyright The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,14 +24,14 @@ import (
 	"context"
 	time "time"
 
-	topologyv1alpha1 "github.com/swatisehgal/topologyapi/pkg/apis/topology/v1alpha1"
-	versioned "github.com/swatisehgal/topologyapi/pkg/generated/clientset/versioned"
-	internalinterfaces "github.com/swatisehgal/topologyapi/pkg/generated/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/swatisehgal/topologyapi/pkg/generated/listers/topology/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
+	topologyv1alpha1 "k8s.io/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	versioned "k8s.io/noderesourcetopology-api/pkg/generated/clientset/versioned"
+	internalinterfaces "k8s.io/noderesourcetopology-api/pkg/generated/informers/externalversions/internalinterfaces"
+	v1alpha1 "k8s.io/noderesourcetopology-api/pkg/generated/listers/topology/v1alpha1"
 )
 
 // NodeResourceTopologyInformer provides access to a shared informer and lister for

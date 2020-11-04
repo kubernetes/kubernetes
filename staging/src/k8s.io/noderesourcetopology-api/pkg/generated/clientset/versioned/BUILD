@@ -13,7 +13,7 @@ go_library(
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
-        "//vendor/github.com/swatisehgal/topologyapi/pkg/generated/clientset/versioned/typed/topology/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/noderesourcetopology-api/pkg/generated/clientset/versioned/typed/topology/v1alpha1:go_default_library",
     ],
 )
 

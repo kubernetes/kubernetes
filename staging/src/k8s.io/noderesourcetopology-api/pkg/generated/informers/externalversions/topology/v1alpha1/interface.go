@@ -1,5 +1,5 @@
 /*
-Copyright The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	internalinterfaces "github.com/swatisehgal/topologyapi/pkg/generated/informers/externalversions/internalinterfaces"
+	internalinterfaces "k8s.io/noderesourcetopology-api/pkg/generated/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to all the informers in this group version.

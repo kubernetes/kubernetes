@@ -1,5 +1,5 @@
 /*
-Copyright The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,12 +24,12 @@ import (
 	"context"
 	"time"
 
-	v1alpha1 "github.com/swatisehgal/topologyapi/pkg/apis/topology/v1alpha1"
-	scheme "github.com/swatisehgal/topologyapi/pkg/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
+	v1alpha1 "k8s.io/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	scheme "k8s.io/noderesourcetopology-api/pkg/generated/clientset/versioned/scheme"
 )
 
 // NodeResourceTopologiesGetter has a method to return a NodeResourceTopologyInterface.

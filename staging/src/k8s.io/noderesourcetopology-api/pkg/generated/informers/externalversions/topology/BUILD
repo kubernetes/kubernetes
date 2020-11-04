@@ -7,8 +7,8 @@ go_library(
     importpath = "k8s.io/noderesourcetopology-api/pkg/generated/informers/externalversions/topology",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/swatisehgal/topologyapi/pkg/generated/informers/externalversions/internalinterfaces:go_default_library",
-        "//vendor/github.com/swatisehgal/topologyapi/pkg/generated/informers/externalversions/topology/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/noderesourcetopology-api/pkg/generated/informers/externalversions/internalinterfaces:go_default_library",
+        "//staging/src/k8s.io/noderesourcetopology-api/pkg/generated/informers/externalversions/topology/v1alpha1:go_default_library",
     ],
 )
 

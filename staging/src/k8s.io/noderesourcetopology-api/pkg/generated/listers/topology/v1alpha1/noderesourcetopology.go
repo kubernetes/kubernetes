@@ -1,5 +1,5 @@
 /*
-Copyright The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,15 +21,17 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/swatisehgal/topologyapi/pkg/apis/topology/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
+	v1alpha1 "k8s.io/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 )
 
 // NodeResourceTopologyLister helps list NodeResourceTopologies.
+// All objects returned here must be treated as read-only.
 type NodeResourceTopologyLister interface {
 	// List lists all NodeResourceTopologies in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.NodeResourceTopology, err error)
 	// NodeResourceTopologies returns an object that can list and get NodeResourceTopologies.
 	NodeResourceTopologies(namespace string) NodeResourceTopologyNamespaceLister
@@ -60,10 +62,13 @@ func (s *nodeResourceTopologyLister) NodeResourceTopologies(namespace string) No
 }
 
 // NodeResourceTopologyNamespaceLister helps list and get NodeResourceTopologies.
+// All objects returned here must be treated as read-only.
 type NodeResourceTopologyNamespaceLister interface {
 	// List lists all NodeResourceTopologies in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.NodeResourceTopology, err error)
 	// Get retrieves the NodeResourceTopology from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.NodeResourceTopology, error)
 	NodeResourceTopologyNamespaceListerExpansion
 }

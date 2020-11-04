@@ -16,8 +16,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
-        "//vendor/github.com/swatisehgal/topologyapi/pkg/apis/topology/v1alpha1:go_default_library",
-        "//vendor/github.com/swatisehgal/topologyapi/pkg/generated/clientset/versioned/scheme:go_default_library",
+        "//staging/src/k8s.io/noderesourcetopology-api/pkg/apis/topology/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/noderesourcetopology-api/pkg/generated/clientset/versioned/scheme:go_default_library",
     ],
 )
 

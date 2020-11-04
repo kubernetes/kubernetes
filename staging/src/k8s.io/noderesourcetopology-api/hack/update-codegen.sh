@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright 2017 The Kubernetes Authors.
+# Copyright 2020 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,8 +29,5 @@ CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-
 bash "${CODEGEN_PKG}"/generate-groups.sh "deepcopy,client,informer,lister" \
   k8s.io/noderesourcetopology-api/pkg/generated k8s.io/noderesourcetopology-api/pkg/apis \
   topology:v1alpha1 \
-  --output-base "$(dirname "${BASH_SOURCE[0]}")/../../../../" \
+  --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
   --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt
-
-# To use your own boilerplate text append:
-#   --go-header-file "${SCRIPT_ROOT}"/hack/custom-boilerplate.go.txt

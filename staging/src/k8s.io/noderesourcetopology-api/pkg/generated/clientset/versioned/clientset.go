@@ -1,5 +1,5 @@
 /*
-Copyright The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,10 +23,10 @@ package versioned
 import (
 	"fmt"
 
-	topologyv1alpha1 "github.com/swatisehgal/topologyapi/pkg/generated/clientset/versioned/typed/topology/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	topologyv1alpha1 "k8s.io/noderesourcetopology-api/pkg/generated/clientset/versioned/typed/topology/v1alpha1"
 )
 
 type Interface interface {

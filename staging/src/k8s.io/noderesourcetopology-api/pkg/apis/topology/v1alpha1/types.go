@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -13,8 +14,8 @@ type NodeResourceTopology struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	TopologyPolicy []string `json:"topologyPolicies"`
-	Zones          ZoneMap  `json:"zones"`
+	TopologyPolicies []string `json:"topologyPolicies"`
+	Zones            ZoneMap  `json:"zones"`
 }
 
 // Zone is the spec for a NodeResourceTopology resource
@@ -27,7 +28,7 @@ type Zone struct {
 }
 
 type ZoneMap map[string]Zone
-type ResourceInfoMap map[string]ResourceInfo
+type ResourceInfoMap map[v1.ResourceName]ResourceInfo
 
 type ResourceInfo struct {
 	Allocatable intstr.IntOrString `json:"allocatable"`

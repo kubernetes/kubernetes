@@ -15,7 +15,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//vendor/github.com/swatisehgal/topologyapi/pkg/apis/topology/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/noderesourcetopology-api/pkg/apis/topology/v1alpha1:go_default_library",
     ],
 )
 
