@@ -182,10 +182,6 @@ type GenericAPIServer struct {
 	// and the kind associated with a given resource. As resources are installed, they are registered here.
 	EquivalentResourceRegistry runtime.EquivalentResourceRegistry
 
-	// enableAPIResponseCompression indicates whether API Responses should support compression
-	// if the client requests it via Accept-Encoding
-	enableAPIResponseCompression bool
-
 	// delegationTarget is the next delegate in the chain. This is never nil.
 	delegationTarget DelegationTarget
 
