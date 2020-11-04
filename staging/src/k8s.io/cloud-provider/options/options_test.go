@@ -104,6 +104,7 @@ func TestDefaultFlags(t *testing.T) {
 		}).WithLoopback(),
 		Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
 			CacheTTL:            10 * time.Second,
+			ClientTimeout:       10 * time.Second,
 			WebhookRetryBackoff: apiserveroptions.DefaultAuthWebhookRetryBackoff(),
 			ClientCert:          apiserveroptions.ClientCertAuthenticationOptions{},
 			RequestHeader: apiserveroptions.RequestHeaderAuthenticationOptions{
@@ -239,6 +240,7 @@ func TestAddFlags(t *testing.T) {
 		}).WithLoopback(),
 		Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
 			CacheTTL:            10 * time.Second,
+			ClientTimeout:       10 * time.Second,
 			WebhookRetryBackoff: apiserveroptions.DefaultAuthWebhookRetryBackoff(),
 			ClientCert:          apiserveroptions.ClientCertAuthenticationOptions{},
 			RequestHeader: apiserveroptions.RequestHeaderAuthenticationOptions{
