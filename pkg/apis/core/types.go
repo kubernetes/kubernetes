@@ -3692,6 +3692,15 @@ type ServiceSpec struct {
 	// This field is alpha-level and is only honored by servers that enable the ServiceTopology feature.
 	// +optional
 	TopologyKeys []string
+
+	// allocateLoadBalancerNodePorts defines if NodePorts will be automatically
+	// allocated for services with type LoadBalancer.  Default is "true". It may be
+	// set to "false" if the cluster load-balancer does not rely on NodePorts.
+	// allocateLoadBalancerNodePorts may only be set for services with type LoadBalancer
+	// and will be cleared if the type is changed to any other type.
+	// This field is alpha-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
+	// +optional
+	AllocateLoadBalancerNodePorts *bool
 }
 
 // ServicePort represents the port on which the service is exposed

@@ -4220,6 +4220,15 @@ type ServiceSpec struct {
 	// wiped when updating a service to type ExternalName.
 	// +optional
 	IPFamilyPolicy *IPFamilyPolicyType `json:"ipFamilyPolicy,omitempty" protobuf:"bytes,17,opt,name=ipFamilyPolicy,casttype=IPFamilyPolicyType"`
+
+	// allocateLoadBalancerNodePorts defines if NodePorts will be automatically
+	// allocated for services with type LoadBalancer.  Default is "true". It may be
+	// set to "false" if the cluster load-balancer does not rely on NodePorts.
+	// allocateLoadBalancerNodePorts may only be set for services with type LoadBalancer
+	// and will be cleared if the type is changed to any other type.
+	// This field is alpha-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
+	// +optional
+	AllocateLoadBalancerNodePorts *bool `json:"allocateLoadBalancerNodePorts,omitempty" protobuf:"bytes,20,opt,name=allocateLoadBalancerNodePorts"`
 }
 
 // ServicePort contains information on service's port.

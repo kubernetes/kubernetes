@@ -708,6 +708,12 @@ const (
 	// alpha: v1.20
 	// Adds support for kubelet to detect node shutdown and gracefully terminate pods prior to the node being shutdown.
 	GracefulNodeShutdown featuregate.Feature = "GracefulNodeShutdown"
+
+	// owner: @andrewsykim @uablrek
+	// alpha: v1.20
+	//
+	// Allows control if NodePorts shall be created for services with "type: LoadBalancer" by defining the spec.AllocateLoadBalancerNodePorts field (bool)
+	ServiceLBNodePortControl featuregate.Feature = "ServiceLBNodePortControl"
 )
 
 func init() {
@@ -814,6 +820,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExecProbeTimeout:                               {Default: true, PreRelease: featuregate.GA}, // lock to default in v1.21 and remove in v1.22
 	KubeletCredentialProviders:                     {Default: false, PreRelease: featuregate.Alpha},
 	GracefulNodeShutdown:                           {Default: false, PreRelease: featuregate.Alpha},
+	ServiceLBNodePortControl:                       {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

@@ -4357,6 +4357,16 @@ func ValidateService(service *core.Service) field.ErrorList {
 		}
 	}
 
+	if service.Spec.AllocateLoadBalancerNodePorts != nil && service.Spec.Type != core.ServiceTypeLoadBalancer {
+		allErrs = append(allErrs, field.Forbidden(specPath.Child("allocateLoadBalancerNodePorts"), "may only be used when `type` is 'LoadBalancer'"))
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
+		if service.Spec.Type == core.ServiceTypeLoadBalancer && service.Spec.AllocateLoadBalancerNodePorts == nil {
+			allErrs = append(allErrs, field.Required(field.NewPath("allocateLoadBalancerNodePorts"), ""))
+		}
+	}
+
 	// external traffic fields
 	allErrs = append(allErrs, validateServiceExternalTrafficFieldsValue(service)...)
 	return allErrs
