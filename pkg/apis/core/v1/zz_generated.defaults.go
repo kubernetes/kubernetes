@@ -21,6 +21,9 @@ limitations under the License.
 package v1
 
 import (
+	"encoding/json"
+	"reflect"
+
 	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -31,6 +34,7 @@ import (
 func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1.ConfigMap{}, func(obj interface{}) { SetObjectDefaults_ConfigMap(obj.(*v1.ConfigMap)) })
 	scheme.AddTypeDefaultingFunc(&v1.ConfigMapList{}, func(obj interface{}) { SetObjectDefaults_ConfigMapList(obj.(*v1.ConfigMapList)) })
+	scheme.AddTypeDefaultingFunc(&v1.Defaulted{}, func(obj interface{}) { SetObjectDefaults_Defaulted(obj.(*v1.Defaulted)) })
 	scheme.AddTypeDefaultingFunc(&v1.Endpoints{}, func(obj interface{}) { SetObjectDefaults_Endpoints(obj.(*v1.Endpoints)) })
 	scheme.AddTypeDefaultingFunc(&v1.EndpointsList{}, func(obj interface{}) { SetObjectDefaults_EndpointsList(obj.(*v1.EndpointsList)) })
 	scheme.AddTypeDefaultingFunc(&v1.EphemeralContainers{}, func(obj interface{}) { SetObjectDefaults_EphemeralContainers(obj.(*v1.EphemeralContainers)) })
@@ -60,6 +64,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1.SecretList{}, func(obj interface{}) { SetObjectDefaults_SecretList(obj.(*v1.SecretList)) })
 	scheme.AddTypeDefaultingFunc(&v1.Service{}, func(obj interface{}) { SetObjectDefaults_Service(obj.(*v1.Service)) })
 	scheme.AddTypeDefaultingFunc(&v1.ServiceList{}, func(obj interface{}) { SetObjectDefaults_ServiceList(obj.(*v1.ServiceList)) })
+	scheme.AddTypeDefaultingFunc(&v1.SubStruct{}, func(obj interface{}) { SetObjectDefaults_SubStruct(obj.(*v1.SubStruct)) })
 	return nil
 }
 
@@ -71,6 +76,33 @@ func SetObjectDefaults_ConfigMapList(in *v1.ConfigMapList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ConfigMap(a)
+	}
+}
+
+func SetObjectDefaults_Defaulted(in *v1.Defaulted) {
+	if reflect.ValueOf(in.Field).IsNil() {
+		if err := json.Unmarshal([]byte(`"bar"`), &in.Field); err != nil {
+			panic(err)
+		}
+	}
+	if reflect.ValueOf(in.OtherField).IsNil() {
+		if err := json.Unmarshal([]byte(`0`), &in.OtherField); err != nil {
+			panic(err)
+		}
+	}
+	if reflect.ValueOf(in.List).IsNil() {
+		if err := json.Unmarshal([]byte(`["foo", "bar"]`), &in.List); err != nil {
+			panic(err)
+		}
+	}
+	if in.Sub != nil {
+		SetObjectDefaults_SubStruct(in.Sub)
+	}
+	SetObjectDefaults_SubStruct(&in.OtherSub)
+	if reflect.ValueOf(in.Map).IsNil() {
+		if err := json.Unmarshal([]byte(`{"foo": "bar"}`), &in.Map); err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -899,5 +931,13 @@ func SetObjectDefaults_ServiceList(in *v1.ServiceList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_Service(a)
+	}
+}
+
+func SetObjectDefaults_SubStruct(in *v1.SubStruct) {
+	if reflect.ValueOf(in.I).IsNil() {
+		if err := json.Unmarshal([]byte(`1`), &in.I); err != nil {
+			panic(err)
+		}
 	}
 }

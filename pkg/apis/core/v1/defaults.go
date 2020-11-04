@@ -70,6 +70,13 @@ func SetDefaults_Volume(obj *v1.Volume) {
 		}
 	}
 }
+
+func SetDefaults_ContainerPort(obj *v1.ContainerPort) {
+	if obj.Protocol == "" {
+		obj.Protocol = v1.ProtocolTCP
+	}
+}
+
 func SetDefaults_Container(obj *v1.Container) {
 	if obj.ImagePullPolicy == "" {
 		// Ignore error and assume it has been validated elsewhere

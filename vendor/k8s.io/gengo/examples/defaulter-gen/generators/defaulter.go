@@ -18,6 +18,7 @@ package generators
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -40,14 +41,19 @@ type CustomArgs struct {
 
 // These are the comment tags that carry parameters for defaulter generation.
 const tagName = "k8s:defaulter-gen"
-const intputTagName = "k8s:defaulter-gen-input"
+const inputTagName = "k8s:defaulter-gen-input"
+const defaultTagName = "default"
+
+func extractDefaultTag(comments []string) []string {
+	return types.ExtractCommentTags("+", comments)[defaultTagName]
+}
 
 func extractTag(comments []string) []string {
 	return types.ExtractCommentTags("+", comments)[tagName]
 }
 
 func extractInputTag(comments []string) []string {
-	return types.ExtractCommentTags("+", comments)[intputTagName]
+	return types.ExtractCommentTags("+", comments)[inputTagName]
 }
 
 func checkTag(comments []string, require ...string) bool {
@@ -270,6 +276,11 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			// usually those with TypeMeta).
 			if t.Kind == types.Struct && len(typesWith) > 0 {
 				for _, field := range t.Members {
+					defaultTags := extractDefaultTag(field.CommentLines)
+					if len(defaultTags) > 0 {
+						return true
+					}
+
 					for _, s := range typesWith {
 						if field.Name == s {
 							return true
@@ -401,6 +412,54 @@ func newCallTreeForType(existingDefaulters, newDefaulters defaulterFuncMap) *cal
 	}
 }
 
+func resolveAliasType(t *types.Type) *types.Type {
+	var prev *types.Type
+	for prev != t {
+		prev = t
+		if t.Kind == types.Alias {
+			t = t.Underlying
+		}
+	}
+	return t
+}
+
+func canEnforceDefault(t *types.Type, omitEmpty bool) error {
+	switch t.Kind {
+	case types.Pointer, types.Map, types.Slice, types.Array, types.Interface:
+		return nil
+	case types.Builtin:
+		if omitEmpty {
+			return nil
+		}
+		return fmt.Errorf("omitEmpty must be true to set default for %v", t.Kind)
+	default:
+		return fmt.Errorf("not sure how to enforce default for %v", t.Kind)
+	}
+}
+func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLines []string) *callNode {
+	t = resolveAliasType(t)
+	defaultMap := extractDefaultTag(commentLines)
+	if len(defaultMap) == 1 {
+		omitEmpty := strings.Contains(reflect.StructTag(tags).Get("json"), "omitempty")
+		if err := canEnforceDefault(t, omitEmpty); err != nil {
+			panic(err)
+		}
+		if node == nil {
+			node = &callNode{}
+		}
+
+		var i interface{}
+		if err := json.Unmarshal([]byte(defaultMap[0]), &i); err != nil {
+			panic(fmt.Errorf("failed to unmarshal default: %v", err))
+		}
+
+		node.defaultValue = defaultMap[0]
+	} else if len(defaultMap) > 1 {
+		panic(fmt.Errorf("Found more than one default tag for %v", t.Kind))
+	}
+	return node
+}
+
 // build creates a tree of paths to fields (based on how they would be accessed in Go - pointer, elem,
 // slice, or key) and the functions that should be invoked on each field. An in-order traversal of the resulting tree
 // can be used to generate a Go function that invokes each nested function on the appropriate type. The return
@@ -489,10 +548,19 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 					name = field.Type.Name.Name
 				}
 			}
+
 			if child := c.build(field.Type, false); child != nil {
 				child.field = name
 				parent.children = append(parent.children, *child)
+				populateDefaultValue(child, field.Type, field.Tags, field.CommentLines)
+			} else {
+				if member := populateDefaultValue(nil, field.Type, field.Tags, field.CommentLines); member != nil {
+					member.field = name
+					parent.children = append(parent.children, *member)
+				}
+
 			}
+
 		}
 	case types.Alias:
 		if child := c.build(t.Underlying, false); child != nil {
@@ -676,6 +744,10 @@ type callNode struct {
 	call []*types.Type
 	// children is the child call nodes that must also be traversed
 	children []callNode
+
+	// defaultValue is the defaultValue of a callNode struct
+	// Only primitive types and pointer types are eligible to have a default value
+	defaultValue string
 }
 
 // CallNodeVisitorFunc is a function for visiting a call tree. ancestors is the list of all parents
@@ -731,6 +803,26 @@ func (n *callNode) writeCalls(varName string, isVarPointer bool, sw *generator.S
 	}
 }
 
+func (n *callNode) writeDefaulter(varName string, isVarPointer bool, sw *generator.SnippetWriter) {
+	accessor := varName
+	if !isVarPointer {
+		accessor = "&" + accessor
+	}
+	if n.defaultValue != "" {
+		sw.Do("if reflect.ValueOf($.var$).IsNil() {\n", generator.Args{
+			"var": varName,
+		})
+		sw.Do("if err := json.Unmarshal([]byte(`$.defaultValue$`), $.var$); err != nil {\n", generator.Args{
+			"defaultValue": n.defaultValue,
+			"var":          accessor,
+		})
+		sw.Do("panic(err)\n", nil)
+		sw.Do("}\n", nil)
+		sw.Do("}\n", nil)
+	}
+
+}
+
 // WriteMethod performs an in-order traversal of the calltree, generating loops and if blocks as necessary
 // to correctly turn the call tree into a method body that invokes all calls on all child nodes of the call tree.
 // Depth is used to generate local variables at the proper depth.
@@ -754,6 +846,8 @@ func (n *callNode) WriteMethod(varName string, depth int, ancestors []*callNode,
 	if isPointer && len(ancestors) > 0 {
 		sw.Do("if $.var$ != nil {\n", vars)
 	}
+
+	n.writeDefaulter(varName, isPointer, sw)
 
 	switch {
 	case n.index:
