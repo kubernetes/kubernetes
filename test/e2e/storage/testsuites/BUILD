@@ -7,6 +7,7 @@ go_library(
         "disruptive.go",
         "driveroperations.go",
         "ephemeral.go",
+        "fsgroupchangepolicy.go",
         "multivolume.go",
         "provisioning.go",
         "snapshottable.go",
@@ -63,6 +64,7 @@ go_library(
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 
