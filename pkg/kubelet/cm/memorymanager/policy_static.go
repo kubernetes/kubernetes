@@ -37,7 +37,7 @@ const policyTypeStatic policyType = "static"
 
 type systemReservedMemory map[int]map[v1.ResourceName]uint64
 
-// SingleNUMAPolicy is implementation of the policy interface for the single NUMA policy
+// staticPolicy is implementation of the policy interface for the static policy
 type staticPolicy struct {
 	// machineInfo contains machine memory related information
 	machineInfo *cadvisorapi.MachineInfo
@@ -49,7 +49,7 @@ type staticPolicy struct {
 
 var _ Policy = &staticPolicy{}
 
-// NewPolicyStatic returns new single NUMA policy instance
+// NewPolicyStatic returns new static policy instance
 func NewPolicyStatic(machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
 	var totalSystemReserved uint64
 	for _, node := range reserved {
@@ -149,7 +149,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		// Update nodes memory state
 		for _, nodeID := range maskBits {
 			machineState[nodeID].NumberOfAssignments++
-			machineState[nodeID].Nodes = maskBits
+			machineState[nodeID].Cells = maskBits
 
 			// we need to continue to update all affinity mask nodes
 			if requestedSize == 0 {
@@ -202,7 +202,7 @@ func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerNa
 
 			// once we do not have any memory allocations on this node, clear node groups
 			if machineState[nodeID].NumberOfAssignments == 0 {
-				machineState[nodeID].Nodes = []int{nodeID}
+				machineState[nodeID].Cells = []int{nodeID}
 			}
 
 			// we still need to pass over all NUMA node under the affinity mask to update them
@@ -390,7 +390,7 @@ func (p *staticPolicy) calculateHints(s state.State, requestedResources map[v1.R
 	}
 	sort.Ints(numaNodes)
 
-	// Initialize minAffinitySize to include all NUMA Nodes.
+	// Initialize minAffinitySize to include all NUMA Cells.
 	minAffinitySize := len(numaNodes)
 
 	hints := map[string][]topologymanager.TopologyHint{}
@@ -399,7 +399,7 @@ func (p *staticPolicy) calculateHints(s state.State, requestedResources map[v1.R
 		singleNUMAHint := len(maskBits) == 1
 
 		// the node already in group with another node, it can not be used for the single NUMA node allocation
-		if singleNUMAHint && len(machineState[maskBits[0]].Nodes) > 1 {
+		if singleNUMAHint && len(machineState[maskBits[0]].Cells) > 1 {
 			return
 		}
 
@@ -410,12 +410,12 @@ func (p *staticPolicy) calculateHints(s state.State, requestedResources map[v1.R
 			// the node already used for the memory allocation
 			if !singleNUMAHint && machineState[nodeID].NumberOfAssignments > 0 {
 				// the node used for the single NUMA memory allocation, it can not be used for the multi NUMA node allocation
-				if len(machineState[nodeID].Nodes) == 1 {
+				if len(machineState[nodeID].Cells) == 1 {
 					return
 				}
 
 				// the node already used with different group of nodes, it can not be use with in the current hint
-				if !areGroupsEqual(machineState[nodeID].Nodes, maskBits) {
+				if !areGroupsEqual(machineState[nodeID].Cells, maskBits) {
 					return
 				}
 			}
@@ -524,7 +524,7 @@ func (p *staticPolicy) validateState(s state.State) error {
 					}
 
 					nodeState.NumberOfAssignments++
-					nodeState.Nodes = b.NUMAAffinity
+					nodeState.Cells = b.NUMAAffinity
 
 					memoryState, ok := nodeState.MemoryMap[b.Type]
 					if !ok {
@@ -568,7 +568,7 @@ func (p *staticPolicy) validateState(s state.State) error {
 	return nil
 }
 
-func areMachineStatesEqual(ms1, ms2 state.NodeMap) bool {
+func areMachineStatesEqual(ms1, ms2 state.NUMANodeMap) bool {
 	if len(ms1) != len(ms2) {
 		klog.Errorf("[memorymanager] node states are different len(ms1) != len(ms2): %d != %d", len(ms1), len(ms2))
 		return false
@@ -586,8 +586,8 @@ func areMachineStatesEqual(ms1, ms2 state.NodeMap) bool {
 			return false
 		}
 
-		if !areGroupsEqual(nodeState1.Nodes, nodeState2.Nodes) {
-			klog.Errorf("[memorymanager] node states groups are different: %v != %v", nodeState1.Nodes, nodeState2.Nodes)
+		if !areGroupsEqual(nodeState1.Cells, nodeState2.Cells) {
+			klog.Errorf("[memorymanager] node states groups are different: %v != %v", nodeState1.Cells, nodeState2.Cells)
 			return false
 		}
 
@@ -612,14 +612,14 @@ func areMachineStatesEqual(ms1, ms2 state.NodeMap) bool {
 	return true
 }
 
-func (p *staticPolicy) getDefaultMachineState() state.NodeMap {
-	defaultMachineState := state.NodeMap{}
+func (p *staticPolicy) getDefaultMachineState() state.NUMANodeMap {
+	defaultMachineState := state.NUMANodeMap{}
 	nodeHugepages := map[int]uint64{}
 	for _, node := range p.machineInfo.Topology {
-		defaultMachineState[node.Id] = &state.NodeState{
+		defaultMachineState[node.Id] = &state.NUMANodeState{
 			NumberOfAssignments: 0,
 			MemoryMap:           map[v1.ResourceName]*state.MemoryTable{},
-			Nodes:               []int{node.Id},
+			Cells:               []int{node.Id},
 		}
 
 		// fill memory table with huge pages values
@@ -681,7 +681,7 @@ func (p *staticPolicy) getDefaultHint(s state.State, requestedResources map[v1.R
 	return findBestHint(hints[string(v1.ResourceMemory)]), nil
 }
 
-func isAffinitySatisfyRequest(machineState state.NodeMap, mask bitmask.BitMask, requestedResources map[v1.ResourceName]uint64) bool {
+func isAffinitySatisfyRequest(machineState state.NUMANodeMap, mask bitmask.BitMask, requestedResources map[v1.ResourceName]uint64) bool {
 	totalFreeSize := map[v1.ResourceName]uint64{}
 	for _, nodeID := range mask.GetBits() {
 		for resourceName := range requestedResources {

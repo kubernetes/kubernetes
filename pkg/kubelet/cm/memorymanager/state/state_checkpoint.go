@@ -103,7 +103,7 @@ func (sc *stateCheckpoint) storeState() error {
 }
 
 // GetMemoryState returns Memory Map stored in the State
-func (sc *stateCheckpoint) GetMachineState() NodeMap {
+func (sc *stateCheckpoint) GetMachineState() NUMANodeMap {
 	sc.RLock()
 	defer sc.RUnlock()
 
@@ -126,8 +126,8 @@ func (sc *stateCheckpoint) GetMemoryAssignments() ContainerMemoryAssignments {
 	return sc.cache.GetMemoryAssignments()
 }
 
-// SetMachineState stores NodeMap in State
-func (sc *stateCheckpoint) SetMachineState(memoryMap NodeMap) {
+// SetMachineState stores NUMANodeMap in State
+func (sc *stateCheckpoint) SetMachineState(memoryMap NUMANodeMap) {
 	sc.Lock()
 	defer sc.Unlock()
 

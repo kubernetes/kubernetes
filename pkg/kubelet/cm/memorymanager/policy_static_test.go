@@ -119,8 +119,8 @@ type testStaticPolicy struct {
 	description           string
 	assignments           state.ContainerMemoryAssignments
 	expectedAssignments   state.ContainerMemoryAssignments
-	machineState          state.NodeMap
-	expectedMachineState  state.NodeMap
+	machineState          state.NUMANodeMap
+	expectedMachineState  state.NUMANodeMap
 	systemReserved        systemReservedMemory
 	expectedError         error
 	machineInfo           *cadvisorapi.MachineInfo
@@ -229,8 +229,8 @@ func TestStaticPolicyStart(t *testing.T) {
 		{
 			description:         "should fill the state with default values, when the state is empty",
 			expectedAssignments: state.ContainerMemoryAssignments{},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -248,7 +248,7 @@ func TestStaticPolicyStart(t *testing.T) {
 						},
 					},
 					NumberOfAssignments: 0,
-					Nodes:               []int{0},
+					Cells:               []int{0},
 				},
 			},
 			systemReserved: systemReservedMemory{
@@ -274,8 +274,8 @@ func TestStaticPolicyStart(t *testing.T) {
 		},
 		{
 			description: "should fail when machine state does not have all NUMA nodes",
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -292,7 +292,7 @@ func TestStaticPolicyStart(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 				},
 			},
@@ -331,8 +331,8 @@ func TestStaticPolicyStart(t *testing.T) {
 		},
 		{
 			description: "should fail when machine state does not have memory resource",
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						hugepages1Gi: {
 							Allocatable:    gb,
@@ -342,7 +342,7 @@ func TestStaticPolicyStart(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 				},
 			},
@@ -370,8 +370,8 @@ func TestStaticPolicyStart(t *testing.T) {
 		},
 		{
 			description: "should fail when machine state has wrong size of total memory",
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -381,7 +381,7 @@ func TestStaticPolicyStart(t *testing.T) {
 							TotalMemSize:   1536 * mb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 				},
 			},
@@ -409,8 +409,8 @@ func TestStaticPolicyStart(t *testing.T) {
 		},
 		{
 			description: "should fail when machine state has wrong size of system reserved memory",
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -420,7 +420,7 @@ func TestStaticPolicyStart(t *testing.T) {
 							TotalMemSize:   2 * gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 				},
 			},
@@ -459,8 +459,8 @@ func TestStaticPolicyStart(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -470,7 +470,7 @@ func TestStaticPolicyStart(t *testing.T) {
 							TotalMemSize:   2 * gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 1,
 				},
 			},
@@ -498,8 +498,8 @@ func TestStaticPolicyStart(t *testing.T) {
 		},
 		{
 			description: "should fail when machine state has wrong size of hugepages",
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -516,7 +516,7 @@ func TestStaticPolicyStart(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 				},
 			},
@@ -544,8 +544,8 @@ func TestStaticPolicyStart(t *testing.T) {
 		},
 		{
 			description: "should fail when machine state has wrong size of system reserved hugepages",
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -562,7 +562,7 @@ func TestStaticPolicyStart(t *testing.T) {
 							TotalMemSize:   2 * gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 				},
 			},
@@ -610,8 +610,8 @@ func TestStaticPolicyStart(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -628,7 +628,7 @@ func TestStaticPolicyStart(t *testing.T) {
 							TotalMemSize:   4 * gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 2,
 				},
 			},
@@ -667,8 +667,8 @@ func TestStaticPolicyStart(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -685,7 +685,7 @@ func TestStaticPolicyStart(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 				},
 			},
@@ -729,8 +729,8 @@ func TestStaticPolicyStart(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -747,7 +747,7 @@ func TestStaticPolicyStart(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 2,
 				},
 			},
@@ -791,8 +791,8 @@ func TestStaticPolicyStart(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -809,7 +809,7 @@ func TestStaticPolicyStart(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 1,
 				},
 			},
@@ -897,8 +897,8 @@ func TestStaticPolicyStart(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    640 * mb,
@@ -915,10 +915,10 @@ func TestStaticPolicyStart(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0, 1},
+					Cells:               []int{0, 1},
 					NumberOfAssignments: 4,
 				},
-				1: &state.NodeState{
+				1: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    640 * mb,
@@ -935,12 +935,12 @@ func TestStaticPolicyStart(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0, 1},
+					Cells:               []int{0, 1},
 					NumberOfAssignments: 4,
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    640 * mb,
@@ -957,10 +957,10 @@ func TestStaticPolicyStart(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0, 1},
+					Cells:               []int{0, 1},
 					NumberOfAssignments: 4,
 				},
-				1: &state.NodeState{
+				1: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    640 * mb,
@@ -977,7 +977,7 @@ func TestStaticPolicyStart(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0, 1},
+					Cells:               []int{0, 1},
 					NumberOfAssignments: 4,
 				},
 			},
@@ -1053,8 +1053,8 @@ func TestStaticPolicyAllocate(t *testing.T) {
 		{
 			description:         "should do nothing for non-guaranteed pods",
 			expectedAssignments: state.ContainerMemoryAssignments{},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -1071,11 +1071,11 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes: []int{},
+					Cells: []int{},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -1092,7 +1092,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes: []int{},
+					Cells: []int{},
 				},
 			},
 			systemReserved: systemReservedMemory{
@@ -1128,8 +1128,8 @@ func TestStaticPolicyAllocate(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -1146,11 +1146,11 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes: []int{},
+					Cells: []int{},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -1167,7 +1167,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes: []int{},
+					Cells: []int{},
 				},
 			},
 			systemReserved: systemReservedMemory{
@@ -1198,8 +1198,8 @@ func TestStaticPolicyAllocate(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -1216,11 +1216,11 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes: []int{0},
+					Cells: []int{0},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -1237,7 +1237,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 2,
 				},
 			},
@@ -1267,8 +1267,8 @@ func TestStaticPolicyAllocate(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -1285,7 +1285,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 2,
 				},
 			},
@@ -1311,8 +1311,8 @@ func TestStaticPolicyAllocate(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    gb,
@@ -1329,10 +1329,10 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 1,
 				},
-				1: &state.NodeState{
+				1: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -1349,10 +1349,10 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{1},
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 				},
-				2: &state.NodeState{
+				2: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -1369,7 +1369,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{2},
+					Cells:               []int{2},
 					NumberOfAssignments: 0,
 				},
 			},
@@ -1390,8 +1390,8 @@ func TestStaticPolicyAllocate(t *testing.T) {
 		},
 		{
 			description: "should fail when NUMA affinity provided under the topology manager hint did not satisfy container requirements and extended hint generation failed",
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -1408,10 +1408,10 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 				},
-				1: &state.NodeState{
+				1: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -1428,10 +1428,10 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{1, 2},
+					Cells:               []int{1, 2},
 					NumberOfAssignments: 1,
 				},
-				2: &state.NodeState{
+				2: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -1448,7 +1448,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{1, 2},
+					Cells:               []int{1, 2},
 					NumberOfAssignments: 1,
 				},
 			},
@@ -1480,8 +1480,8 @@ func TestStaticPolicyAllocate(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    gb,
@@ -1498,10 +1498,10 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 1,
 				},
-				1: &state.NodeState{
+				1: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -1518,10 +1518,10 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{1},
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 				},
-				2: &state.NodeState{
+				2: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -1538,7 +1538,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{2},
+					Cells:               []int{2},
 					NumberOfAssignments: 0,
 				},
 			},
@@ -1576,8 +1576,8 @@ func TestStaticPolicyAllocate(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -1594,10 +1594,10 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 				},
-				1: &state.NodeState{
+				1: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -1614,10 +1614,10 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{1},
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 				},
-				2: &state.NodeState{
+				2: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -1634,10 +1634,10 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{2},
+					Cells:               []int{2},
 					NumberOfAssignments: 0,
 				},
-				3: &state.NodeState{
+				3: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -1654,12 +1654,12 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{3},
+					Cells:               []int{3},
 					NumberOfAssignments: 0,
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -1676,10 +1676,10 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0, 1},
+					Cells:               []int{0, 1},
 					NumberOfAssignments: 2,
 				},
-				1: &state.NodeState{
+				1: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -1696,10 +1696,10 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0, 1},
+					Cells:               []int{0, 1},
 					NumberOfAssignments: 2,
 				},
-				2: &state.NodeState{
+				2: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -1716,10 +1716,10 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{2},
+					Cells:               []int{2},
 					NumberOfAssignments: 0,
 				},
-				3: &state.NodeState{
+				3: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -1736,7 +1736,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{3},
+					Cells:               []int{3},
 					NumberOfAssignments: 0,
 				},
 			},
@@ -1794,8 +1794,8 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 		{
 			description:         "should do nothing when the container does not exist under the state",
 			expectedAssignments: state.ContainerMemoryAssignments{},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -1812,11 +1812,11 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes: []int{},
+					Cells: []int{},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -1833,7 +1833,7 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes: []int{},
+					Cells: []int{},
 				},
 			},
 			systemReserved: systemReservedMemory{
@@ -1861,8 +1861,8 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 				},
 			},
 			expectedAssignments: state.ContainerMemoryAssignments{},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -1880,11 +1880,11 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 						},
 					},
 					NumberOfAssignments: 2,
-					Nodes:               []int{0},
+					Cells:               []int{0},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -1901,7 +1901,7 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0},
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 				},
 			},
@@ -1930,8 +1930,8 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 				},
 			},
 			expectedAssignments: state.ContainerMemoryAssignments{},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -1949,9 +1949,9 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 						},
 					},
 					NumberOfAssignments: 2,
-					Nodes:               []int{0, 1},
+					Cells:               []int{0, 1},
 				},
-				1: &state.NodeState{
+				1: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -1969,11 +1969,11 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 						},
 					},
 					NumberOfAssignments: 2,
-					Nodes:               []int{0, 1},
+					Cells:               []int{0, 1},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -1991,9 +1991,9 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 						},
 					},
 					NumberOfAssignments: 0,
-					Nodes:               []int{0},
+					Cells:               []int{0},
 				},
-				1: &state.NodeState{
+				1: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    512 * mb,
@@ -2011,7 +2011,7 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 						},
 					},
 					NumberOfAssignments: 0,
-					Nodes:               []int{1},
+					Cells:               []int{1},
 				},
 			},
 			systemReserved: systemReservedMemory{
@@ -2123,8 +2123,8 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -2141,10 +2141,10 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0, 1},
+					Cells:               []int{0, 1},
 					NumberOfAssignments: 2,
 				},
-				1: &state.NodeState{
+				1: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -2161,10 +2161,10 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{0, 1},
+					Cells:               []int{0, 1},
 					NumberOfAssignments: 2,
 				},
-				2: &state.NodeState{
+				2: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -2181,10 +2181,10 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{2},
+					Cells:               []int{2},
 					NumberOfAssignments: 0,
 				},
-				3: &state.NodeState{
+				3: &state.NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536 * mb,
@@ -2201,7 +2201,7 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 							TotalMemSize:   gb,
 						},
 					},
-					Nodes:               []int{3},
+					Cells:               []int{3},
 					NumberOfAssignments: 0,
 				},
 			},

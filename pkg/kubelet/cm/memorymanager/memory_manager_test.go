@@ -48,8 +48,8 @@ type testMemoryManager struct {
 	machineInfo                cadvisorapi.MachineInfo
 	assignments                state.ContainerMemoryAssignments
 	expectedAssignments        state.ContainerMemoryAssignments
-	machineState               state.NodeMap
-	expectedMachineState       state.NodeMap
+	machineState               state.NUMANodeMap
+	expectedMachineState       state.NUMANodeMap
 	expectedError              error
 	expectedAllocateError      error
 	expectedAddContainerError  error
@@ -461,9 +461,9 @@ func TestRemoveStaleState(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 4,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -482,8 +482,8 @@ func TestRemoveStaleState(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -503,9 +503,9 @@ func TestRemoveStaleState(t *testing.T) {
 					},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 4,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -524,8 +524,8 @@ func TestRemoveStaleState(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -587,9 +587,9 @@ func TestRemoveStaleState(t *testing.T) {
 				},
 			},
 			expectedAssignments: state.ContainerMemoryAssignments{},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 4,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -608,8 +608,8 @@ func TestRemoveStaleState(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -629,9 +629,9 @@ func TestRemoveStaleState(t *testing.T) {
 					},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -650,8 +650,8 @@ func TestRemoveStaleState(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -713,9 +713,9 @@ func TestRemoveStaleState(t *testing.T) {
 				},
 			},
 			expectedAssignments: state.ContainerMemoryAssignments{},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0, 1},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0, 1},
 					NumberOfAssignments: 4,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -734,8 +734,8 @@ func TestRemoveStaleState(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{0, 1},
+				1: &state.NUMANodeState{
+					Cells:               []int{0, 1},
 					NumberOfAssignments: 4,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -755,9 +755,9 @@ func TestRemoveStaleState(t *testing.T) {
 					},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -776,8 +776,8 @@ func TestRemoveStaleState(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -846,9 +846,9 @@ func TestAddContainer(t *testing.T) {
 			policyName:  policyTypeStatic,
 			machineInfo: machineInfo,
 			reserved:    reserved,
-			machineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -867,8 +867,8 @@ func TestAddContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -888,9 +888,9 @@ func TestAddContainer(t *testing.T) {
 					},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 2,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -909,8 +909,8 @@ func TestAddContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -943,8 +943,8 @@ func TestAddContainer(t *testing.T) {
 			policyName:                policyTypeNone,
 			machineInfo:               machineInfo,
 			reserved:                  reserved,
-			machineState:              state.NodeMap{},
-			expectedMachineState:      state.NodeMap{},
+			machineState:              state.NUMANodeMap{},
+			expectedMachineState:      state.NUMANodeMap{},
 			expectedAllocateError:     nil,
 			expectedAddContainerError: nil,
 			podAllocate:               pod,
@@ -957,9 +957,9 @@ func TestAddContainer(t *testing.T) {
 			policyName:  policyTypeMock,
 			machineInfo: machineInfo,
 			reserved:    reserved,
-			machineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -978,8 +978,8 @@ func TestAddContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -999,9 +999,9 @@ func TestAddContainer(t *testing.T) {
 					},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1020,8 +1020,8 @@ func TestAddContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1053,9 +1053,9 @@ func TestAddContainer(t *testing.T) {
 			policyName:  policyTypeStatic,
 			machineInfo: machineInfo,
 			reserved:    reserved,
-			machineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1074,8 +1074,8 @@ func TestAddContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1095,9 +1095,9 @@ func TestAddContainer(t *testing.T) {
 					},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1116,8 +1116,8 @@ func TestAddContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1148,9 +1148,9 @@ func TestAddContainer(t *testing.T) {
 			policyName:  policyTypeStatic,
 			machineInfo: machineInfo,
 			reserved:    reserved,
-			machineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1169,8 +1169,8 @@ func TestAddContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1190,9 +1190,9 @@ func TestAddContainer(t *testing.T) {
 					},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0, 1},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0, 1},
 					NumberOfAssignments: 2,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1211,8 +1211,8 @@ func TestAddContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{0, 1},
+				1: &state.NUMANodeState{
+					Cells:               []int{0, 1},
 					NumberOfAssignments: 2,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1255,9 +1255,9 @@ func TestAddContainer(t *testing.T) {
 			machineInfo: machineInfo,
 			firstPod:    pod,
 			reserved:    reserved,
-			machineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 2,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1276,8 +1276,8 @@ func TestAddContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1313,9 +1313,9 @@ func TestAddContainer(t *testing.T) {
 					},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 2,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1334,8 +1334,8 @@ func TestAddContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1488,9 +1488,9 @@ func TestRemoveContainer(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 4,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1509,8 +1509,8 @@ func TestRemoveContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1530,9 +1530,9 @@ func TestRemoveContainer(t *testing.T) {
 					},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 2,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1551,8 +1551,8 @@ func TestRemoveContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1624,9 +1624,9 @@ func TestRemoveContainer(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0, 1},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0, 1},
 					NumberOfAssignments: 4,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1645,8 +1645,8 @@ func TestRemoveContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{0, 1},
+				1: &state.NUMANodeState{
+					Cells:               []int{0, 1},
 					NumberOfAssignments: 4,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1666,9 +1666,9 @@ func TestRemoveContainer(t *testing.T) {
 					},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0, 1},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0, 1},
 					NumberOfAssignments: 2,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1687,8 +1687,8 @@ func TestRemoveContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{0, 1},
+				1: &state.NUMANodeState{
+					Cells:               []int{0, 1},
 					NumberOfAssignments: 2,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1772,9 +1772,9 @@ func TestRemoveContainer(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 4,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1793,8 +1793,8 @@ func TestRemoveContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1814,9 +1814,9 @@ func TestRemoveContainer(t *testing.T) {
 					},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 4,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1835,8 +1835,8 @@ func TestRemoveContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1920,9 +1920,9 @@ func TestRemoveContainer(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 4,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1941,8 +1941,8 @@ func TestRemoveContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1962,9 +1962,9 @@ func TestRemoveContainer(t *testing.T) {
 					},
 				},
 			},
-			expectedMachineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 4,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -1983,8 +1983,8 @@ func TestRemoveContainer(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -2193,9 +2193,9 @@ func TestGetTopologyHints(t *testing.T) {
 					},
 				},
 			},
-			machineState: state.NodeMap{
-				0: &state.NodeState{
-					Nodes:               []int{0},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					Cells:               []int{0},
 					NumberOfAssignments: 4,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {
@@ -2214,8 +2214,8 @@ func TestGetTopologyHints(t *testing.T) {
 						},
 					},
 				},
-				1: &state.NodeState{
-					Nodes:               []int{1},
+				1: &state.NUMANodeState{
+					Cells:               []int{1},
 					NumberOfAssignments: 0,
 					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
 						v1.ResourceMemory: {

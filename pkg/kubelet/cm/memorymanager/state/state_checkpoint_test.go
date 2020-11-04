@@ -62,9 +62,9 @@ func TestCheckpointStateRestore(t *testing.T) {
 			"Restore valid checkpoint",
 			`{
 				"policyName":"static",
-				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"nodes":[]}},
+				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
 				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
-				"checksum": 163710462
+				"checksum": 4215593881
 			}`,
 			containermap.ContainerMap{},
 			"",
@@ -80,8 +80,8 @@ func TestCheckpointStateRestore(t *testing.T) {
 						},
 					},
 				},
-				machineState: NodeMap{
-					0: &NodeState{
+				machineState: NUMANodeMap{
+					0: &NUMANodeState{
 						MemoryMap: map[v1.ResourceName]*MemoryTable{
 							v1.ResourceMemory: {
 								Allocatable:    1536,
@@ -99,7 +99,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			"Restore checkpoint with invalid checksum",
 			`{
 				"policyName":"static",
-				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"nodes":[]}},
+				"machineState":{"0":{"numberOfAssignments":0,"memoryMap":{"memory":{"total":2048,"systemReserved":512,"allocatable":1536,"reserved":512,"free":1024}},"cells":[]}},
 				"entries":{"pod":{"container1":[{"affinity":[0],"type":"memory","size":512}]}},
 				"checksum": 101010
 			}`,
@@ -164,8 +164,8 @@ func TestCheckpointStateStore(t *testing.T) {
 				},
 			},
 		},
-		machineState: NodeMap{
-			0: &NodeState{
+		machineState: NUMANodeMap{
+			0: &NUMANodeState{
 				MemoryMap: map[v1.ResourceName]*MemoryTable{
 					v1.ResourceMemory: {
 						Allocatable:    1536,
@@ -208,7 +208,7 @@ func TestCheckpointStateStore(t *testing.T) {
 func TestCheckpointStateHelpers(t *testing.T) {
 	testCases := []struct {
 		description  string
-		machineState NodeMap
+		machineState NUMANodeMap
 		assignments  ContainerMemoryAssignments
 	}{
 		{
@@ -224,8 +224,8 @@ func TestCheckpointStateHelpers(t *testing.T) {
 					},
 				},
 			},
-			machineState: NodeMap{
-				0: &NodeState{
+			machineState: NUMANodeMap{
+				0: &NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536,
@@ -235,7 +235,7 @@ func TestCheckpointStateHelpers(t *testing.T) {
 							TotalMemSize:   2048,
 						},
 					},
-					Nodes: []int{},
+					Cells: []int{},
 				},
 			},
 		},
@@ -259,8 +259,8 @@ func TestCheckpointStateHelpers(t *testing.T) {
 					},
 				},
 			},
-			machineState: NodeMap{
-				0: &NodeState{
+			machineState: NUMANodeMap{
+				0: &NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536,
@@ -270,7 +270,7 @@ func TestCheckpointStateHelpers(t *testing.T) {
 							TotalMemSize:   2048,
 						},
 					},
-					Nodes: []int{},
+					Cells: []int{},
 				},
 			},
 		},
@@ -281,8 +281,8 @@ func TestCheckpointStateHelpers(t *testing.T) {
 					"container1": {},
 				},
 			},
-			machineState: NodeMap{
-				0: &NodeState{
+			machineState: NUMANodeMap{
+				0: &NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536,
@@ -292,7 +292,7 @@ func TestCheckpointStateHelpers(t *testing.T) {
 							TotalMemSize:   2048,
 						},
 					},
-					Nodes: []int{},
+					Cells: []int{},
 				},
 			},
 		},
@@ -335,7 +335,7 @@ func TestCheckpointStateHelpers(t *testing.T) {
 func TestCheckpointStateClear(t *testing.T) {
 	testCases := []struct {
 		description  string
-		machineState NodeMap
+		machineState NUMANodeMap
 		assignments  ContainerMemoryAssignments
 	}{
 		{
@@ -351,8 +351,8 @@ func TestCheckpointStateClear(t *testing.T) {
 					},
 				},
 			},
-			machineState: NodeMap{
-				0: &NodeState{
+			machineState: NUMANodeMap{
+				0: &NUMANodeState{
 					MemoryMap: map[v1.ResourceName]*MemoryTable{
 						v1.ResourceMemory: {
 							Allocatable:    1536,
@@ -383,7 +383,7 @@ func TestCheckpointStateClear(t *testing.T) {
 			state.SetMemoryAssignments(tc.assignments)
 
 			state.ClearState()
-			assert.Equal(t, NodeMap{}, state.GetMachineState(), "cleared state with non-empty machine state")
+			assert.Equal(t, NUMANodeMap{}, state.GetMachineState(), "cleared state with non-empty machine state")
 			assert.Equal(t, ContainerMemoryAssignments{}, state.GetMemoryAssignments(), "cleared state with non-empty memory assignments")
 		})
 	}
