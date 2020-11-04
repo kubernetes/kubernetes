@@ -34,8 +34,8 @@ const (
 
 const (
 	requestKind   = "request_kind"
-	priorityLevel = "priorityLevel"
-	flowSchema    = "flowSchema"
+	priorityLevel = "priority_level"
+	flowSchema    = "flow_schema"
 	phase         = "phase"
 	mark          = "mark"
 )
