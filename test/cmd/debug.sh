@@ -31,7 +31,7 @@ run_kubectl_debug_pod_tests() {
   kubectl run target "--image=${IMAGE_NGINX:?}" "${kube_flags[@]:?}"
   kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
   # Command: create a copy of target with a new debug container
-  kubectl alpha debug target -it --copy-to=target-copy --image=busybox --container=debug-container --attach=false "${kube_flags[@]:?}"
+  kubectl debug target -it --copy-to=target-copy --image=busybox --container=debug-container --attach=false "${kube_flags[@]:?}"
   # Post-Conditions
   kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:target-copy:'
   kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.name}}:{{end}}' 'target:debug-container:'
@@ -43,7 +43,7 @@ run_kubectl_debug_pod_tests() {
   kubectl run target "--image=${IMAGE_NGINX:?}" "${kube_flags[@]:?}"
   kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
   # Command: create a copy of target with a new debug container replacing the previous pod
-  kubectl alpha debug target -it --copy-to=target-copy --image=busybox --container=debug-container --attach=false --replace "${kube_flags[@]:?}"
+  kubectl debug target -it --copy-to=target-copy --image=busybox --container=debug-container --attach=false --replace "${kube_flags[@]:?}"
   # Post-Conditions
   kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target-copy:'
   kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.name}}:{{end}}' 'target:debug-container:'
@@ -56,7 +56,7 @@ run_kubectl_debug_pod_tests() {
   kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
   kube::test::get_object_assert pod/target '{{(index .spec.containers 0).name}}' 'target'
   # Command: copy the pod and replace the image of an existing container
-  kubectl alpha debug target --image=busybox --container=target --copy-to=target-copy "${kube_flags[@]:?}" -- sleep 1m
+  kubectl debug target --image=busybox --container=target --copy-to=target-copy "${kube_flags[@]:?}" -- sleep 1m
   # Post-Conditions
   kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:target-copy:'
   kube::test::get_object_assert pod/target-copy "{{(len .spec.containers)}}:{{${image_field:?}}}" '1:busybox'
@@ -79,7 +79,7 @@ run_kubectl_debug_node_tests() {
   # Pre-Condition: Pod "nginx" is created
   kube::test::get_object_assert nodes "{{range.items}}{{${id_field:?}}}:{{end}}" '127.0.0.1:'
   # Command: create a new node debugger pod
-  output_message=$(kubectl alpha debug node/127.0.0.1 --image=busybox --attach=false "${kube_flags[@]:?}" -- true)
+  output_message=$(kubectl debug node/127.0.0.1 --image=busybox --attach=false "${kube_flags[@]:?}" -- true)
   # Post-Conditions
   kube::test::get_object_assert pod "{{(len .items)}}" '1'
   debugger=$(kubectl get pod -o go-template="{{(index .items 0)${id_field:?}}}")
