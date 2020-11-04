@@ -97,7 +97,7 @@ fi
 
 kube::log::status "Updating " "${OPENAPI_ROOT_DIR}"
 
-curl -w "\n" -kfs --oauth2-bearer dummy_token "https://${API_HOST}:${API_PORT}/openapi/v2" | jq -S '.info.version="unversioned"' > "${OPENAPI_ROOT_DIR}/swagger.json"
+curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' "https://${API_HOST}:${API_PORT}/openapi/v2" | jq -S '.info.version="unversioned"' > "${OPENAPI_ROOT_DIR}/swagger.json"
 
 kube::log::status "SUCCESS"
 
