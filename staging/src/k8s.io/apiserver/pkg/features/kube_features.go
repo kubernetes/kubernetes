@@ -61,6 +61,7 @@ const (
 
 	// owner: @ilackams
 	// alpha: v1.7
+	// beta: v1.16
 	//
 	// Enables compression of REST responses (GET and LIST only)
 	APIResponseCompression featuregate.Feature = "APIResponseCompression"
@@ -85,6 +86,7 @@ const (
 
 	// owner: @caesarxuchao
 	// alpha: v1.15
+	// beta: v1.16
 	//
 	// Allow apiservers to show a count of remaining items in the response
 	// to a chunking list request.
