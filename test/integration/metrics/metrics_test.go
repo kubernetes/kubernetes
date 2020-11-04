@@ -266,12 +266,12 @@ func TestApiserverMetricsPods(t *testing.T) {
 		}
 	}
 
-	_, s, closeFn := framework.RunAMaster(framework.NewMasterConfig())
+	_, server, closeFn := framework.RunAMaster(framework.NewMasterConfig())
 	defer closeFn()
 
-	client, err := clientset.NewForConfig(&restclient.Config{Host: s.URL, QPS: -1})
+	client, err := clientset.NewForConfig(&restclient.Config{Host: server.URL, QPS: -1})
 	if err != nil {
-		t.Fatalf("apiserver_request_total metric not exposed")
+		t.Fatalf("Error in create clientset: %v", err)
 	}
 
 	c := client.CoreV1().Pods(metav1.NamespaceDefault)
@@ -327,14 +327,14 @@ func TestApiserverMetricsPods(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 
-			baseSamples, err := getSamples(s)
+			baseSamples, err := getSamples(server)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			tc.executor()
 
-			updatedSamples, err := getSamples(s)
+			updatedSamples, err := getSamples(server)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -342,15 +342,15 @@ func TestApiserverMetricsPods(t *testing.T) {
 			newSamples := diffMetrics(updatedSamples, baseSamples)
 			found := false
 
-			for _, s := range newSamples {
-				if s.String() == tc.want {
-					found = true;
+			for _, sample := range newSamples {
+				if sample.String() == tc.want {
+					found = true
 					break
 				}
 			}
 
 			if !found {
-				t.Fatalf("could not find metric for API call >%s<", tc.name)
+				t.Fatalf("could not find metric for API call >%s< among samples >%+v<", tc.name, newSamples)
 			}
 		})
 	}
@@ -372,12 +372,12 @@ func TestApiserverMetricsNamespaces(t *testing.T) {
 		}
 	}
 
-	_, s, closeFn := framework.RunAMaster(framework.NewMasterConfig())
+	_, server, closeFn := framework.RunAMaster(framework.NewMasterConfig())
 	defer closeFn()
 
-	client, err := clientset.NewForConfig(&restclient.Config{Host: s.URL, QPS: -1})
+	client, err := clientset.NewForConfig(&restclient.Config{Host: server.URL, QPS: -1})
 	if err != nil {
-		t.Fatalf("apiserver_request_total metric not exposed")
+		t.Fatalf("Error in create clientset: %v", err)
 	}
 
 	c := client.CoreV1().Namespaces()
@@ -433,14 +433,14 @@ func TestApiserverMetricsNamespaces(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 
-			baseSamples, err := getSamples(s)
+			baseSamples, err := getSamples(server)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			tc.executor()
 
-			updatedSamples, err := getSamples(s)
+			updatedSamples, err := getSamples(server)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -448,15 +448,15 @@ func TestApiserverMetricsNamespaces(t *testing.T) {
 			newSamples := diffMetrics(updatedSamples, baseSamples)
 			found := false
 
-			for _, s := range newSamples {
-				if s.String() == tc.want {
-					found = true;
+			for _, sample := range newSamples {
+				if sample.String() == tc.want {
+					found = true
 					break
 				}
 			}
 
 			if !found {
-				t.Fatalf("could not find metric for API call >%s<", tc.name)
+				t.Fatalf("could not find metric for API call >%s< among samples >%+v<", tc.name, newSamples)
 			}
 		})
 	}
