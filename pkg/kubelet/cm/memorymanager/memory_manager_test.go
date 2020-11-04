@@ -146,54 +146,77 @@ func getPod(podUID string, containerName string, requirements *v1.ResourceRequir
 }
 
 func TestValidateReservedMemory(t *testing.T) {
+	machineInfo := &cadvisorapi.MachineInfo{
+		Topology: []cadvisorapi.Node{
+			{Id: 0},
+			{Id: 1},
+		},
+	}
 	const msgNotEqual = "the total amount of memory of type \"%s\" is not equal to the value determined by Node Allocatable feature"
 	testCases := []struct {
 		description                string
 		nodeAllocatableReservation v1.ResourceList
+		machineInfo                *cadvisorapi.MachineInfo
 		systemReservedMemory       map[int]map[v1.ResourceName]resource.Quantity
 		expectedError              string
 	}{
 		{
-			"Node Allocatable not set, pre-reserved not set",
+			"Node Allocatable not set, reserved not set",
 			v1.ResourceList{},
+			machineInfo,
 			map[int]map[v1.ResourceName]resource.Quantity{},
 			"",
 		},
 		{
-			"Node Allocatable set to zero, pre-reserved set to zero",
+			"Node Allocatable set to zero, reserved set to zero",
 			v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(0, resource.DecimalSI)},
+			machineInfo,
 			map[int]map[v1.ResourceName]resource.Quantity{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(0, resource.DecimalSI)},
 			},
 			"",
 		},
 		{
-			"Node Allocatable not set (equal zero), pre-reserved set",
+			"Node Allocatable not set (equal zero), reserved set",
 			v1.ResourceList{},
+			machineInfo,
 			map[int]map[v1.ResourceName]resource.Quantity{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(12, resource.DecimalSI)},
 			},
 			fmt.Sprintf(msgNotEqual, v1.ResourceMemory),
 		},
 		{
-			"Node Allocatable set, pre-reserved not set",
+			"Node Allocatable set, reserved not set",
 			v1.ResourceList{hugepages2M: *resource.NewQuantity(5, resource.DecimalSI)},
+			machineInfo,
 			map[int]map[v1.ResourceName]resource.Quantity{},
 			fmt.Sprintf(msgNotEqual, hugepages2M),
 		},
 		{
-			"Pre-reserved not equal to Node Allocatable",
+			"Reserved not equal to Node Allocatable",
 			v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(5, resource.DecimalSI)},
+			machineInfo,
 			map[int]map[v1.ResourceName]resource.Quantity{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(12, resource.DecimalSI)},
 			},
 			fmt.Sprintf(msgNotEqual, v1.ResourceMemory),
 		},
 		{
-			"Pre-reserved total equal to Node Allocatable",
+			"Reserved contains the NUMA node that does not exist under the machine",
+			v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(17, resource.DecimalSI)},
+			machineInfo,
+			map[int]map[v1.ResourceName]resource.Quantity{
+				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(12, resource.DecimalSI)},
+				2: nodeResources{v1.ResourceMemory: *resource.NewQuantity(5, resource.DecimalSI)},
+			},
+			fmt.Sprintf(msgNotEqual, v1.ResourceMemory),
+		},
+		{
+			"Reserved total equal to Node Allocatable",
 			v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(17, resource.DecimalSI),
 				hugepages2M: *resource.NewQuantity(77, resource.DecimalSI),
 				hugepages1G: *resource.NewQuantity(13, resource.DecimalSI)},
+			machineInfo,
 			map[int]map[v1.ResourceName]resource.Quantity{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(12, resource.DecimalSI),
 					hugepages2M: *resource.NewQuantity(70, resource.DecimalSI),
@@ -204,10 +227,11 @@ func TestValidateReservedMemory(t *testing.T) {
 			"",
 		},
 		{
-			"Pre-reserved total hugapages-2M not equal to Node Allocatable",
+			"Reserved total hugapages-2M not equal to Node Allocatable",
 			v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(17, resource.DecimalSI),
 				hugepages2M: *resource.NewQuantity(14, resource.DecimalSI),
 				hugepages1G: *resource.NewQuantity(13, resource.DecimalSI)},
+			machineInfo,
 			map[int]map[v1.ResourceName]resource.Quantity{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(12, resource.DecimalSI),
 					hugepages2M: *resource.NewQuantity(70, resource.DecimalSI),
@@ -215,13 +239,14 @@ func TestValidateReservedMemory(t *testing.T) {
 				1: nodeResources{v1.ResourceMemory: *resource.NewQuantity(5, resource.DecimalSI),
 					hugepages2M: *resource.NewQuantity(7, resource.DecimalSI)},
 			},
+
 			fmt.Sprintf(msgNotEqual, hugepages2M),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			err := validateReservedMemory(tc.nodeAllocatableReservation, tc.systemReservedMemory)
+			err := validateReservedMemory(tc.machineInfo, tc.nodeAllocatableReservation, tc.systemReservedMemory)
 			if strings.TrimSpace(tc.expectedError) != "" {
 				assert.Error(t, err)
 				assert.Equal(t, err.Error(), tc.expectedError)
@@ -254,7 +279,7 @@ func TestConvertPreReserved(t *testing.T) {
 			"",
 		},
 		{
-			"Single NUMA node is pre-reserved",
+			"Single NUMA node is reserved",
 			map[int]map[v1.ResourceName]resource.Quantity{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(12, resource.DecimalSI),
 					hugepages2M: *resource.NewQuantity(70, resource.DecimalSI),
@@ -271,7 +296,7 @@ func TestConvertPreReserved(t *testing.T) {
 			"",
 		},
 		{
-			"Both NUMA nodes are pre-reserved",
+			"Both NUMA nodes are reserved",
 			map[int]map[v1.ResourceName]resource.Quantity{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(12, resource.DecimalSI),
 					hugepages2M: *resource.NewQuantity(70, resource.DecimalSI),

@@ -267,6 +267,7 @@ func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[str
 	return m.policy.GetTopologyHints(m.state, pod, container)
 }
 
+// TODO: move the method to the upper level, to re-use it under the CPU and memory managers
 func (m *manager) removeStaleState() {
 	// Only once all sources are ready do we attempt to remove any stale state.
 	// This ensures that the call to `m.activePods()` below will succeed with
@@ -319,10 +320,20 @@ func (m *manager) policyRemoveContainerByRef(podUID string, containerName string
 	return err
 }
 
-func getTotalMemoryTypeReserved(preReservedMemory map[int]map[v1.ResourceName]resource.Quantity) map[v1.ResourceName]resource.Quantity {
+func getTotalMemoryTypeReserved(machineInfo *cadvisorapi.MachineInfo, reservedMemory map[int]map[v1.ResourceName]resource.Quantity) map[v1.ResourceName]resource.Quantity {
 	totalMemoryType := map[v1.ResourceName]resource.Quantity{}
 
-	for _, node := range preReservedMemory {
+	numaNodes := map[int]bool{}
+	for _, numaNode := range machineInfo.Topology {
+		numaNodes[numaNode.Id] = true
+	}
+
+	for nodeID, node := range reservedMemory {
+		if !numaNodes[nodeID] {
+			klog.Warningf("The NUMA node %d specified under --reserved- memory does not exist on the machine", nodeID)
+			continue
+		}
+
 		for memType, memVal := range node {
 			if totalMem, exists := totalMemoryType[memType]; exists {
 				memVal.Add(totalMem)
@@ -334,8 +345,8 @@ func getTotalMemoryTypeReserved(preReservedMemory map[int]map[v1.ResourceName]re
 	return totalMemoryType
 }
 
-func validateReservedMemory(nodeAllocatableReservation v1.ResourceList, reservedMemory map[int]map[v1.ResourceName]resource.Quantity) error {
-	totalMemoryType := getTotalMemoryTypeReserved(reservedMemory)
+func validateReservedMemory(machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory map[int]map[v1.ResourceName]resource.Quantity) error {
+	totalMemoryType := getTotalMemoryTypeReserved(machineInfo, reservedMemory)
 
 	commonMemoryTypeSet := make(map[v1.ResourceName]bool)
 	for resourceType := range totalMemoryType {
@@ -391,7 +402,7 @@ func convertReserved(machineInfo *cadvisorapi.MachineInfo, reservedMemory map[in
 }
 
 func getSystemReservedMemory(machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, preReservedMemory map[int]map[v1.ResourceName]resource.Quantity) (systemReservedMemory, error) {
-	if err := validateReservedMemory(nodeAllocatableReservation, preReservedMemory); err != nil {
+	if err := validateReservedMemory(machineInfo, nodeAllocatableReservation, preReservedMemory); err != nil {
 		return nil, err
 	}
 
