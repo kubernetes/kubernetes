@@ -124,7 +124,7 @@ var (
 // supported by this api will be exposed as a flag.
 type joinOptions struct {
 	cfgPath               string
-	token                 string
+	token                 string `datapolicy:"token"`
 	controlPlane          bool
 	ignorePreflightErrors []string
 	externalcfg           *kubeadmapiv1beta2.JoinConfiguration

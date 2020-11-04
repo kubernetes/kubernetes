@@ -53,7 +53,7 @@ type clientCertAuth struct {
 
 // tokenAuth struct holds info required to use a token to provide authentication info in a kubeconfig object
 type tokenAuth struct {
-	Token string
+	Token string `datapolicy:"token"`
 }
 
 // kubeConfigSpec struct holds info required to build a KubeConfig object
@@ -61,8 +61,8 @@ type kubeConfigSpec struct {
 	CACert         *x509.Certificate
 	APIServer      string
 	ClientName     string
-	TokenAuth      *tokenAuth
-	ClientCertAuth *clientCertAuth
+	TokenAuth      *tokenAuth      `datapolicy:"token"`
+	ClientCertAuth *clientCertAuth `datapolicy:"security-key"`
 }
 
 // CreateJoinControlPlaneKubeConfigFiles will create and write to disk the kubeconfig files required by kubeadm
