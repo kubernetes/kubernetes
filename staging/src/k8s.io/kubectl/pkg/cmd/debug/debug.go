@@ -71,28 +71,31 @@ var (
 	debugExample = templates.Examples(i18n.T(`
 		# Create an interactive debugging session in pod mypod and immediately attach to it.
 		# (requires the EphemeralContainers feature to be enabled in the cluster)
-		kubectl alpha debug mypod -it --image=busybox
+		kubectl debug mypod -it --image=busybox
 
 		# Create a debug container named debugger using a custom automated debugging image.
 		# (requires the EphemeralContainers feature to be enabled in the cluster)
-		kubectl alpha debug --image=myproj/debug-tools -c debugger mypod
+		kubectl debug --image=myproj/debug-tools -c debugger mypod
 
 		# Create a copy of mypod adding a debug container and attach to it
-		kubectl alpha debug mypod -it --image=busybox --copy-to=my-debugger
+		kubectl debug mypod -it --image=busybox --copy-to=my-debugger
 
 		# Create a copy of mypod changing the command of mycontainer
-		kubectl alpha debug mypod -it --copy-to=my-debugger --container=mycontainer -- sh
+		kubectl debug mypod -it --copy-to=my-debugger --container=mycontainer -- sh
 
 		# Create a copy of mypod changing all container images to busybox
-		kubectl alpha debug mypod --copy-to=my-debugger --set-image=*=busybox
+		kubectl debug mypod --copy-to=my-debugger --set-image=*=busybox
 
 		# Create a copy of mypod adding a debug container and changing container images
-		kubectl alpha debug mypod -it --copy-to=my-debugger --image=debian --set-image=app=app:debug,sidecar=sidecar:debug
+		kubectl debug mypod -it --copy-to=my-debugger --image=debian --set-image=app=app:debug,sidecar=sidecar:debug
 
 		# Create an interactive debugging session on a node and immediately attach to it.
 		# The container will run in the host namespaces and the host's filesystem will be mounted at /host
-		kubectl alpha debug node/mynode -it --image=busybox
+		kubectl debug node/mynode -it --image=busybox
 `))
+
+	// TODO(verb): Remove deprecated alpha invocation in 1.21
+	deprecationNotice = i18n.T(`NOTE: "kubectl alpha debug" is deprecated and will be removed in release 1.21. Please use "kubectl debug" instead.`)
 )
 
 var nameSuffixFunc = utilrand.String
@@ -118,6 +121,7 @@ type DebugOptions struct {
 	TargetContainer string
 	TTY             bool
 
+	deprecatedInvocation  bool
 	shareProcessedChanged bool
 
 	podClient corev1client.PodsGetter
@@ -136,7 +140,7 @@ func NewDebugOptions(streams genericclioptions.IOStreams) *DebugOptions {
 }
 
 // NewCmdDebug returns a cobra command that runs kubectl debug.
-func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams, deprecatedInvocation bool) *cobra.Command {
 	o := NewDebugOptions(streams)
 
 	cmd := &cobra.Command{
@@ -150,6 +154,12 @@ func NewCmdDebug(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 			cmdutil.CheckErr(o.Validate(cmd))
 			cmdutil.CheckErr(o.Run(f, cmd))
 		},
+		Hidden: deprecatedInvocation,
+	}
+
+	o.deprecatedInvocation = deprecatedInvocation
+	if deprecatedInvocation {
+		cmd.Long = fmt.Sprintf("%s\n\n%s", deprecationNotice, debugLong)
 	}
 
 	addDebugFlags(cmd, o)
@@ -177,6 +187,10 @@ func addDebugFlags(cmd *cobra.Command, opt *DebugOptions) {
 // Complete finishes run-time initialization of debug.DebugOptions.
 func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
+
+	if o.deprecatedInvocation {
+		cmd.Printf("%s\n\n", deprecationNotice)
+	}
 
 	o.PullPolicy = corev1.PullPolicy(cmdutil.GetFlagString(cmd, "image-pull-policy"))
 
