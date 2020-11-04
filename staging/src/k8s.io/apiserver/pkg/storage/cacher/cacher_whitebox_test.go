@@ -729,6 +729,8 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 	}
 
 	errorCh := make(chan error, 1)
+	defer close(errorCh)
+
 	resourceVersion := uint64(1000)
 	go func() {
 		deadline := time.Now().Add(time.Second)
@@ -741,6 +743,7 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 				}})
 			if err != nil {
 				errorCh <- fmt.Errorf("failed to add a pod: %v", err)
+				return
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
@@ -986,29 +989,23 @@ func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
 	expectedRV := 2000
 
 	wg := sync.WaitGroup{}
-	done := make(chan struct{})
 	errorCh := make(chan error, 1)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for {
-			select {
-			case <-done:
+			event, ok := <-w.ResultChan()
+			if !ok {
+				errorCh <- fmt.Errorf("Unexpected closed channel")
 				return
-			default:
-				event, ok := <-w.ResultChan()
-				if !ok {
-					errorCh <- fmt.Errorf("Unexpected closed channel")
-					return
-				}
-				rv, err := cacher.versioner.ObjectResourceVersion(event.Object)
-				if err != nil {
-					errorCh <- fmt.Errorf("failed to parse resource version from %#v: %v", event.Object, err)
-					return
-				}
-				if event.Type == watch.Bookmark && rv == uint64(expectedRV) {
-					return
-				}
+			}
+			rv, err := cacher.versioner.ObjectResourceVersion(event.Object)
+			if err != nil {
+				errorCh <- fmt.Errorf("failed to parse resource version from %#v: %v", event.Object, err)
+				return
+			}
+			if event.Type == watch.Bookmark && rv == uint64(expectedRV) {
+				return
 			}
 		}
 	}()
@@ -1022,7 +1019,6 @@ func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
 	}()
 
 	if err = <-errorCh; err != nil {
-		close(done)
 		t.Fatal(err)
 	}
 }
