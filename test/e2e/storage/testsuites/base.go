@@ -85,6 +85,7 @@ var BaseSuites = []func() TestSuite{
 	InitVolumeLimitsTestSuite,
 	InitTopologyTestSuite,
 	InitVolumeStressTestSuite,
+	InitFsGroupChangePolicyTestSuite,
 }
 
 // CSISuites is a list of storage test suites that work only for CSI drivers
