@@ -67,7 +67,8 @@ func (s *OpenIDMetadataServer) Install(c *restful.Container) {
 	cfg.Path(serviceaccount.OpenIDConfigPath).Route(
 		cfg.GET("").
 			To(fromStandard(s.serveConfiguration)).
-			Doc("get service account issuer OpenID configuration, also known as the 'OIDC discovery doc'").
+			Doc("get service account issuer OpenID configuration, also known as the 'OIDC discovery doc'. "+
+				"This is a beta endpoint that requires the feature gate ServiceAccountIssuerDiscovery to be enabled.").
 			Operation("getServiceAccountIssuerOpenIDConfiguration").
 			// Just include the OK, doesn't look like we include Internal Error in our openapi-spec.
 			Returns(http.StatusOK, "OK", ""))
@@ -80,7 +81,8 @@ func (s *OpenIDMetadataServer) Install(c *restful.Container) {
 	jwks.Path(serviceaccount.JWKSPath).Route(
 		jwks.GET("").
 			To(fromStandard(s.serveKeys)).
-			Doc("get service account issuer OpenID JSON Web Key Set (contains public token verification keys)").
+			Doc("get service account issuer OpenID JSON Web Key Set (contains public token verification keys). "+
+				"This is a beta endpoint that requires the feature gate ServiceAccountIssuerDiscovery to be enabled.").
 			Operation("getServiceAccountIssuerOpenIDKeyset").
 			// Just include the OK, doesn't look like we include Internal Error in our openapi-spec.
 			Returns(http.StatusOK, "OK", ""))

@@ -687,7 +687,13 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 	})
 
-	ginkgo.It("should support OIDC discovery of service account issuer [Feature:ServiceAccountIssuerDiscovery]", func() {
+	/*
+	  Release : v1.20
+	  Testname: ServiceAccountIssuerDiscovery endpoints
+	  Description: Ensure endpoints for OIDC discovery of service account
+	               issuers are functioning correctly.
+	*/
+	ginkgo.It("should support OIDC discovery of service account issuer", func() {
 		// Allow the test pod access to the OIDC discovery non-resource URLs.
 		// The role should have already been automatically created as part of the
 		// bootstrap policy, but not the role binding.
