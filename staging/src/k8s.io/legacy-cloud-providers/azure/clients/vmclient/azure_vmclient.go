@@ -194,8 +194,14 @@ func (c *Client) listVM(ctx context.Context, resourceGroupName string) ([]comput
 		return result, retry.GetError(resp, err)
 	}
 
-	for page.NotDone() {
-		result = append(result, *page.Response().Value...)
+	for {
+		result = append(result, page.Values()...)
+
+		// Abort the loop when there's no nextLink in the response.
+		if to.String(page.Response().NextLink) == "" {
+			break
+		}
+
 		if err = page.NextWithContext(ctx); err != nil {
 			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vm.list.next", resourceID, err)
 			return result, retry.GetError(page.Response().Response.Response, err)
