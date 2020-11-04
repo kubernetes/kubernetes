@@ -18,21 +18,21 @@ package rest
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	"github.com/stretchr/testify/require"
+	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/client-go/kubernetes/fake"
-	flowcontrolapisv1alpha1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1alpha1"
+	flowcontrolapisv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
 )
 
 func TestShouldEnsurePredefinedSettings(t *testing.T) {
 	testCases := []struct {
 		name                  string
-		existingPriorityLevel *flowcontrolv1alpha1.PriorityLevelConfiguration
+		existingPriorityLevel *flowcontrolv1beta1.PriorityLevelConfiguration
 		expected              bool
 	}{
 		{
@@ -51,9 +51,9 @@ func TestShouldEnsurePredefinedSettings(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			c := fake.NewSimpleClientset()
 			if testCase.existingPriorityLevel != nil {
-				c.FlowcontrolV1alpha1().PriorityLevelConfigurations().Create(context.TODO(), testCase.existingPriorityLevel, metav1.CreateOptions{})
+				c.FlowcontrolV1beta1().PriorityLevelConfigurations().Create(context.TODO(), testCase.existingPriorityLevel, metav1.CreateOptions{})
 			}
-			should, err := lastMandatoryExists(c.FlowcontrolV1alpha1())
+			should, err := shouldEnsureSuggested(c.FlowcontrolV1beta1())
 			assert.NoError(t, err)
 			assert.Equal(t, testCase.expected, should)
 		})
@@ -61,23 +61,23 @@ func TestShouldEnsurePredefinedSettings(t *testing.T) {
 }
 
 func TestFlowSchemaHasWrongSpec(t *testing.T) {
-	fs1 := &flowcontrolv1alpha1.FlowSchema{
-		Spec: flowcontrolv1alpha1.FlowSchemaSpec{},
+	fs1 := &flowcontrolv1beta1.FlowSchema{
+		Spec: flowcontrolv1beta1.FlowSchemaSpec{},
 	}
-	fs2 := &flowcontrolv1alpha1.FlowSchema{
-		Spec: flowcontrolv1alpha1.FlowSchemaSpec{
+	fs2 := &flowcontrolv1beta1.FlowSchema{
+		Spec: flowcontrolv1beta1.FlowSchemaSpec{
 			MatchingPrecedence: 1,
 		},
 	}
-	fs1Defaulted := &flowcontrolv1alpha1.FlowSchema{
-		Spec: flowcontrolv1alpha1.FlowSchemaSpec{
-			MatchingPrecedence: flowcontrolapisv1alpha1.FlowSchemaDefaultMatchingPrecedence,
+	fs1Defaulted := &flowcontrolv1beta1.FlowSchema{
+		Spec: flowcontrolv1beta1.FlowSchemaSpec{
+			MatchingPrecedence: flowcontrolapisv1beta1.FlowSchemaDefaultMatchingPrecedence,
 		},
 	}
 	testCases := []struct {
 		name         string
-		expected     *flowcontrolv1alpha1.FlowSchema
-		actual       *flowcontrolv1alpha1.FlowSchema
+		expected     *flowcontrolv1beta1.FlowSchema
+		actual       *flowcontrolv1beta1.FlowSchema
 		hasWrongSpec bool
 	}{
 		{
@@ -109,39 +109,39 @@ func TestFlowSchemaHasWrongSpec(t *testing.T) {
 }
 
 func TestPriorityLevelHasWrongSpec(t *testing.T) {
-	pl1 := &flowcontrolv1alpha1.PriorityLevelConfiguration{
-		Spec: flowcontrolv1alpha1.PriorityLevelConfigurationSpec{
-			Type: flowcontrolv1alpha1.PriorityLevelEnablementLimited,
-			Limited: &flowcontrolv1alpha1.LimitedPriorityLevelConfiguration{
-				LimitResponse: flowcontrolv1alpha1.LimitResponse{
-					Type: flowcontrolv1alpha1.LimitResponseTypeReject,
+	pl1 := &flowcontrolv1beta1.PriorityLevelConfiguration{
+		Spec: flowcontrolv1beta1.PriorityLevelConfigurationSpec{
+			Type: flowcontrolv1beta1.PriorityLevelEnablementLimited,
+			Limited: &flowcontrolv1beta1.LimitedPriorityLevelConfiguration{
+				LimitResponse: flowcontrolv1beta1.LimitResponse{
+					Type: flowcontrolv1beta1.LimitResponseTypeReject,
 				},
 			},
 		},
 	}
-	pl2 := &flowcontrolv1alpha1.PriorityLevelConfiguration{
-		Spec: flowcontrolv1alpha1.PriorityLevelConfigurationSpec{
-			Type: flowcontrolv1alpha1.PriorityLevelEnablementLimited,
-			Limited: &flowcontrolv1alpha1.LimitedPriorityLevelConfiguration{
+	pl2 := &flowcontrolv1beta1.PriorityLevelConfiguration{
+		Spec: flowcontrolv1beta1.PriorityLevelConfigurationSpec{
+			Type: flowcontrolv1beta1.PriorityLevelEnablementLimited,
+			Limited: &flowcontrolv1beta1.LimitedPriorityLevelConfiguration{
 				AssuredConcurrencyShares: 1,
 			},
 		},
 	}
-	pl1Defaulted := &flowcontrolv1alpha1.PriorityLevelConfiguration{
-		Spec: flowcontrolv1alpha1.PriorityLevelConfigurationSpec{
-			Type: flowcontrolv1alpha1.PriorityLevelEnablementLimited,
-			Limited: &flowcontrolv1alpha1.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: flowcontrolapisv1alpha1.PriorityLevelConfigurationDefaultAssuredConcurrencyShares,
-				LimitResponse: flowcontrolv1alpha1.LimitResponse{
-					Type: flowcontrolv1alpha1.LimitResponseTypeReject,
+	pl1Defaulted := &flowcontrolv1beta1.PriorityLevelConfiguration{
+		Spec: flowcontrolv1beta1.PriorityLevelConfigurationSpec{
+			Type: flowcontrolv1beta1.PriorityLevelEnablementLimited,
+			Limited: &flowcontrolv1beta1.LimitedPriorityLevelConfiguration{
+				AssuredConcurrencyShares: flowcontrolapisv1beta1.PriorityLevelConfigurationDefaultAssuredConcurrencyShares,
+				LimitResponse: flowcontrolv1beta1.LimitResponse{
+					Type: flowcontrolv1beta1.LimitResponseTypeReject,
 				},
 			},
 		},
 	}
 	testCases := []struct {
 		name         string
-		expected     *flowcontrolv1alpha1.PriorityLevelConfiguration
-		actual       *flowcontrolv1alpha1.PriorityLevelConfiguration
+		expected     *flowcontrolv1beta1.PriorityLevelConfiguration
+		actual       *flowcontrolv1beta1.PriorityLevelConfiguration
 		hasWrongSpec bool
 	}{
 		{

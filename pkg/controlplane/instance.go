@@ -84,6 +84,7 @@ import (
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
 	"k8s.io/component-helpers/apimachinery/lease"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	flowcontrolv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -686,6 +687,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		storageapiv1beta1.SchemeGroupVersion,
 		schedulingapiv1beta1.SchemeGroupVersion,
 		schedulingapiv1.SchemeGroupVersion,
+		flowcontrolv1beta1.SchemeGroupVersion,
 	)
 	// enable non-deprecated beta resources in extensions/v1beta1 explicitly so we have a full list of what's possible to serve
 	ret.EnableResources(

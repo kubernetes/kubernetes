@@ -133,17 +133,17 @@ func validateTokenRequest(options *ServerRunOptions) []error {
 
 func validateAPIPriorityAndFairness(options *ServerRunOptions) []error {
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && options.GenericServerRunOptions.EnablePriorityAndFairness {
-		// We need the alpha API enabled.  There are only a few ways to turn it on
+		// If none of the following runtime config options are specified, APF is
+		// assumed to be turned on.
 		enabledAPIString := options.APIEnablement.RuntimeConfig.String()
-		switch {
-		case strings.Contains(enabledAPIString, "api/all=true"):
-			return nil
-		case strings.Contains(enabledAPIString, "api/alpha=true"):
-			return nil
-		case strings.Contains(enabledAPIString, "flowcontrol.apiserver.k8s.io/v1alpha1=true"):
-			return nil
-		default:
-			return []error{fmt.Errorf("enabling APIPriorityAndFairness requires --runtime-confg=flowcontrol.apiserver.k8s.io/v1alpha1=true to enable the required API")}
+		testConfigs := []string{"flowcontrol.apiserver.k8s.io/v1beta1", "api/beta", "api/all"} // in the order of precedence
+		for _, testConfig := range testConfigs {
+			if strings.Contains(enabledAPIString, fmt.Sprintf("%s=false", testConfig)) {
+				return []error{fmt.Errorf("%s=false conflicts with APIPriorityAndFairness feature gate", testConfig)}
+			}
+			if strings.Contains(enabledAPIString, fmt.Sprintf("%s=true", testConfig)) {
+				return nil
+			}
 		}
 	}
 

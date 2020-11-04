@@ -49,6 +49,7 @@ import (
 	eventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
+	flowcontrolv1beta1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	networkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
 	nodev1 "k8s.io/client-go/kubernetes/typed/node/v1"
@@ -97,6 +98,7 @@ type Interface interface {
 	EventsV1beta1() eventsv1beta1.EventsV1beta1Interface
 	ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface
 	FlowcontrolV1alpha1() flowcontrolv1alpha1.FlowcontrolV1alpha1Interface
+	FlowcontrolV1beta1() flowcontrolv1beta1.FlowcontrolV1beta1Interface
 	NetworkingV1() networkingv1.NetworkingV1Interface
 	NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface
 	NodeV1() nodev1.NodeV1Interface
@@ -145,6 +147,7 @@ type Clientset struct {
 	eventsV1beta1                *eventsv1beta1.EventsV1beta1Client
 	extensionsV1beta1            *extensionsv1beta1.ExtensionsV1beta1Client
 	flowcontrolV1alpha1          *flowcontrolv1alpha1.FlowcontrolV1alpha1Client
+	flowcontrolV1beta1           *flowcontrolv1beta1.FlowcontrolV1beta1Client
 	networkingV1                 *networkingv1.NetworkingV1Client
 	networkingV1beta1            *networkingv1beta1.NetworkingV1beta1Client
 	nodeV1                       *nodev1.NodeV1Client
@@ -295,6 +298,11 @@ func (c *Clientset) ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Inter
 // FlowcontrolV1alpha1 retrieves the FlowcontrolV1alpha1Client
 func (c *Clientset) FlowcontrolV1alpha1() flowcontrolv1alpha1.FlowcontrolV1alpha1Interface {
 	return c.flowcontrolV1alpha1
+}
+
+// FlowcontrolV1beta1 retrieves the FlowcontrolV1beta1Client
+func (c *Clientset) FlowcontrolV1beta1() flowcontrolv1beta1.FlowcontrolV1beta1Interface {
+	return c.flowcontrolV1beta1
 }
 
 // NetworkingV1 retrieves the NetworkingV1Client
@@ -501,6 +509,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.flowcontrolV1beta1, err = flowcontrolv1beta1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.networkingV1, err = networkingv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -600,6 +612,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.eventsV1beta1 = eventsv1beta1.NewForConfigOrDie(c)
 	cs.extensionsV1beta1 = extensionsv1beta1.NewForConfigOrDie(c)
 	cs.flowcontrolV1alpha1 = flowcontrolv1alpha1.NewForConfigOrDie(c)
+	cs.flowcontrolV1beta1 = flowcontrolv1beta1.NewForConfigOrDie(c)
 	cs.networkingV1 = networkingv1.NewForConfigOrDie(c)
 	cs.networkingV1beta1 = networkingv1beta1.NewForConfigOrDie(c)
 	cs.nodeV1 = nodev1.NewForConfigOrDie(c)
@@ -650,6 +663,7 @@ func New(c rest.Interface) *Clientset {
 	cs.eventsV1beta1 = eventsv1beta1.New(c)
 	cs.extensionsV1beta1 = extensionsv1beta1.New(c)
 	cs.flowcontrolV1alpha1 = flowcontrolv1alpha1.New(c)
+	cs.flowcontrolV1beta1 = flowcontrolv1beta1.New(c)
 	cs.networkingV1 = networkingv1.New(c)
 	cs.networkingV1beta1 = networkingv1beta1.New(c)
 	cs.nodeV1 = nodev1.New(c)

@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -92,7 +92,7 @@ func WithPriorityAndFairness(
 		}
 
 		var classification *PriorityAndFairnessClassification
-		note := func(fs *fcv1a1.FlowSchema, pl *fcv1a1.PriorityLevelConfiguration) {
+		note := func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration) {
 			classification = &PriorityAndFairnessClassification{
 				FlowSchemaName:    fs.Name,
 				FlowSchemaUID:     fs.UID,
@@ -122,8 +122,8 @@ func WithPriorityAndFairness(
 			served = true
 			innerCtx := context.WithValue(ctx, priorityAndFairnessKey, classification)
 			innerReq := r.Clone(innerCtx)
-			w.Header().Set(fcv1a1.ResponseHeaderMatchedPriorityLevelConfigurationUID, string(classification.PriorityLevelUID))
-			w.Header().Set(fcv1a1.ResponseHeaderMatchedFlowSchemaUID, string(classification.FlowSchemaUID))
+			w.Header().Set(flowcontrol.ResponseHeaderMatchedPriorityLevelConfigurationUID, string(classification.PriorityLevelUID))
+			w.Header().Set(flowcontrol.ResponseHeaderMatchedFlowSchemaUID, string(classification.FlowSchemaUID))
 			handler.ServeHTTP(w, innerReq)
 		}
 		digest := utilflowcontrol.RequestDigest{RequestInfo: requestInfo, User: user}
