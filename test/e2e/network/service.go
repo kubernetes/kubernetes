@@ -1179,6 +1179,37 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 	})
 
+	/*
+		Create a ClusterIP service with an External IP that is not assigned to an interface.
+		The IP ranges here are reserved for documentation according to
+		[RFC 5737](https://tools.ietf.org/html/rfc5737) Section 3 and should not be used by any host.
+	*/
+	ginkgo.It("should be possible to connect to a service via ExternalIP when the external IP is not assigned to a node", func() {
+		serviceName := "externalip-test"
+		ns := f.Namespace.Name
+		externalIP := "203.0.113.250"
+		if framework.TestContext.ClusterIsIPv6() {
+			externalIP = "2001:DB8::cb00:71fa"
+		}
+
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+
+		ginkgo.By("creating service " + serviceName + " with type=clusterIP in namespace " + ns)
+		clusterIPService, err := jig.CreateTCPService(func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.ExternalIPs = []string{externalIP}
+			svc.Spec.Ports = []v1.ServicePort{
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(9376)},
+			}
+		})
+		framework.ExpectNoError(err)
+		err = jig.CreateServicePods(2)
+		framework.ExpectNoError(err)
+		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
+		err = jig.CheckServiceReachability(clusterIPService, execPod)
+		framework.ExpectNoError(err)
+	})
+
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 	ginkgo.It("should be able to change the type and ports of a service [Slow] [DisabledForLargeClusters]", func() {
 		// requires cloud load-balancer support
