@@ -27,6 +27,7 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/cmd/config:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/cp:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/create:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/debug:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/delete:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/describe:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/diff:go_default_library",

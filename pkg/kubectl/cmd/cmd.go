@@ -44,6 +44,7 @@ import (
 	cmdconfig "k8s.io/kubectl/pkg/cmd/config"
 	"k8s.io/kubectl/pkg/cmd/cp"
 	"k8s.io/kubectl/pkg/cmd/create"
+	"k8s.io/kubectl/pkg/cmd/debug"
 	"k8s.io/kubectl/pkg/cmd/delete"
 	"k8s.io/kubectl/pkg/cmd/describe"
 	"k8s.io/kubectl/pkg/cmd/diff"
@@ -555,6 +556,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 				proxy.NewCmdProxy(f, ioStreams),
 				cp.NewCmdCp(f, ioStreams),
 				auth.NewCmdAuth(f, ioStreams),
+				debug.NewCmdDebug(f, ioStreams, false),
 			},
 		},
 		{
