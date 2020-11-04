@@ -586,7 +586,7 @@ func BuildAuthorizer(s *options.ServerRunOptions, EgressSelector *egressselector
 func BuildPriorityAndFairness(s *options.ServerRunOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) utilflowcontrol.Interface {
 	return utilflowcontrol.New(
 		versionedInformer,
-		extclient.FlowcontrolV1alpha1(),
+		extclient.FlowcontrolV1beta1(),
 		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
 		s.GenericServerRunOptions.RequestTimeout/4,
 	)

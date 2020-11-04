@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,11 +31,12 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
+	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	flowcontrolapisv1alpha1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1alpha1"
+	flowcontrolapisv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
 	flowschemastore "k8s.io/kubernetes/pkg/registry/flowcontrol/flowschema/storage"
 	prioritylevelconfigurationstore "k8s.io/kubernetes/pkg/registry/flowcontrol/prioritylevelconfiguration/storage"
 )
@@ -52,17 +53,18 @@ const PostStartHookName = "priority-and-fairness-config-producer"
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(flowcontrol.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 
-	if apiResourceConfigSource.VersionEnabled(flowcontrolv1alpha1.SchemeGroupVersion) {
-		flowControlStorage, err := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter)
-		if err != nil {
-			return genericapiserver.APIGroupInfo{}, false, err
-		}
-		apiGroupInfo.VersionedResourcesStorageMap[flowcontrolv1alpha1.SchemeGroupVersion.Version] = flowControlStorage
+	v1beta1FlowControlStorage, err := p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
+	if err != nil {
+		return genericapiserver.APIGroupInfo{}, false, err
+	}
+	apiGroupInfo.VersionedResourcesStorageMap[flowcontrolapisv1beta1.SchemeGroupVersion.Version] = v1beta1FlowControlStorage
+	if apiResourceConfigSource.VersionEnabled(flowcontrolapisv1alpha1.SchemeGroupVersion) {
+		apiGroupInfo.VersionedResourcesStorageMap[flowcontrolapisv1alpha1.SchemeGroupVersion.Version] = v1beta1FlowControlStorage
 	}
 	return apiGroupInfo, true, nil
 }
 
-func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
 
 	// flow-schema
@@ -143,7 +145,7 @@ func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStart
 
 // Returns false if there's a "exempt" priority-level existing in the cluster, otherwise returns a true
 // if the "exempt" priority-level is not found.
-func lastMandatoryExists(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface) (bool, error) {
+func lastMandatoryExists(flowcontrolClientSet flowcontrolclient.FlowcontrolV1beta1Interface) (bool, error) {
 	if _, err := flowcontrolClientSet.PriorityLevelConfigurations().Get(context.TODO(), flowcontrol.PriorityLevelConfigurationNameExempt, metav1.GetOptions{}); err != nil {
 		if apierrors.IsNotFound(err) {
 			return true, nil
@@ -155,7 +157,7 @@ func lastMandatoryExists(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alp
 
 const thisFieldManager = "api-priority-and-fairness-config-producer-v1"
 
-func ensure(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface, flowSchemas []*flowcontrolv1alpha1.FlowSchema, priorityLevels []*flowcontrolv1alpha1.PriorityLevelConfiguration) error {
+func ensure(flowcontrolClientSet flowcontrolclient.FlowcontrolV1beta1Interface, flowSchemas []*flowcontrolv1beta1.FlowSchema, priorityLevels []*flowcontrolv1beta1.PriorityLevelConfiguration) error {
 	for _, flowSchema := range flowSchemas {
 		_, err := flowcontrolClientSet.FlowSchemas().Create(context.TODO(), flowSchema, metav1.CreateOptions{FieldManager: thisFieldManager})
 		if apierrors.IsAlreadyExists(err) {
@@ -181,7 +183,7 @@ func ensure(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface,
 	return nil
 }
 
-func upgrade(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface, flowSchemas []*flowcontrolv1alpha1.FlowSchema, priorityLevels []*flowcontrolv1alpha1.PriorityLevelConfiguration) error {
+func upgrade(flowcontrolClientSet flowcontrolclient.FlowcontrolV1beta1Interface, flowSchemas []*flowcontrolv1beta1.FlowSchema, priorityLevels []*flowcontrolv1beta1.PriorityLevelConfiguration) error {
 	for _, expectedFlowSchema := range flowSchemas {
 		actualFlowSchema, err := flowcontrolClientSet.FlowSchemas().Get(context.TODO(), expectedFlowSchema.Name, metav1.GetOptions{})
 		if err == nil {
@@ -245,14 +247,14 @@ func upgrade(flowcontrolClientSet flowcontrolclient.FlowcontrolV1alpha1Interface
 	return nil
 }
 
-func flowSchemaHasWrongSpec(expected, actual *flowcontrolv1alpha1.FlowSchema) (bool, error) {
+func flowSchemaHasWrongSpec(expected, actual *flowcontrolv1beta1.FlowSchema) (bool, error) {
 	copiedExpectedFlowSchema := expected.DeepCopy()
-	flowcontrolapisv1alpha1.SetObjectDefaults_FlowSchema(copiedExpectedFlowSchema)
+	flowcontrolapisv1beta1.SetObjectDefaults_FlowSchema(copiedExpectedFlowSchema)
 	return !equality.Semantic.DeepEqual(copiedExpectedFlowSchema.Spec, actual.Spec), nil
 }
 
-func priorityLevelHasWrongSpec(expected, actual *flowcontrolv1alpha1.PriorityLevelConfiguration) (bool, error) {
+func priorityLevelHasWrongSpec(expected, actual *flowcontrolv1beta1.PriorityLevelConfiguration) (bool, error) {
 	copiedExpectedPriorityLevel := expected.DeepCopy()
-	flowcontrolapisv1alpha1.SetObjectDefaults_PriorityLevelConfiguration(copiedExpectedPriorityLevel)
+	flowcontrolapisv1beta1.SetObjectDefaults_PriorityLevelConfiguration(copiedExpectedPriorityLevel)
 	return !equality.Semantic.DeepEqual(copiedExpectedPriorityLevel.Spec, actual.Spec), nil
 }
