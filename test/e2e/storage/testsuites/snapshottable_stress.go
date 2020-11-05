@@ -91,8 +91,10 @@ func (t *snapshottableStressTestSuite) DefineTests(driver TestDriver, pattern te
 		stressTest          *snapshottableStressTest
 	)
 
-	// Check preconditions before setting up namespace via framework below.
+	// Testsuite level preconditions for driver, pattern compatibility with the test suites
+	// This will be executed first to prevent any unnecessary resource allocation
 	ginkgo.BeforeEach(func() {
+		SkipUnsupportedDriverPatternCombination(driver, pattern)
 		driverInfo = driver.GetDriverInfo()
 		if driverInfo.VolumeSnapshotStressTestOptions == nil {
 			e2eskipper.Skipf("Driver %s doesn't specify snapshot stress test options -- skipping", driverInfo.Name)

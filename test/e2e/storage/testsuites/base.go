@@ -101,6 +101,7 @@ type TestSuite interface {
 	// DefineTests defines tests of the testpattern for the driver.
 	// Called inside a Ginkgo context that reflects the current driver and test pattern,
 	// so the test suite can define tests directly with ginkgo.It.
+	// Each testsuite should check if the pattern and driver works for its own.
 	DefineTests(TestDriver, testpatterns.TestPattern)
 	// SkipRedundantSuite will skip the test suite based on the given TestPattern and TestDriver
 	SkipRedundantSuite(TestDriver, testpatterns.TestPattern)
@@ -129,7 +130,6 @@ func DefineTestSuite(driver TestDriver, tsInits []func() TestSuite) {
 				ginkgo.BeforeEach(func() {
 					// Skip unsupported tests to avoid unnecessary resource initialization
 					suite.SkipRedundantSuite(driver, p)
-					skipUnsupportedTest(driver, p)
 				})
 				suite.DefineTests(driver, p)
 			})
@@ -137,17 +137,19 @@ func DefineTestSuite(driver TestDriver, tsInits []func() TestSuite) {
 	}
 }
 
-// skipUnsupportedTest will skip tests if the combination of driver,  and testpattern
-// is not suitable to be tested.
+// SkipUnsupportedDriverPatternCombination will skip tests if the combination of driver, and testpattern
+// is not compatible to be tested. This function should be called in the DefineTests function for each
+// Testsuite in the top level BeforeEach() call to make sure we skip the invalid combination.
+//
 // Whether it needs to be skipped is checked by following steps:
-// 1. Check if Whether SnapshotType is supported by driver from its interface
-// 2. Check if Whether volType is supported by driver from its interface
-// 3. Check if fsType is supported
-// 4. Check with driver specific logic
+// 0. Check with driver specific logic
+// 1. Check if Whether volType is supported by driver from its interface
+// 2. Check if fsType is supported
+// 3. Check if volMode is supported by driver from its capability
 //
 // Test suites can also skip tests inside their own DefineTests function or in
 // individual tests.
-func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
+func SkipUnsupportedDriverPatternCombination(driver TestDriver, pattern testpatterns.TestPattern) {
 	dInfo := driver.GetDriverInfo()
 	var isSupported bool
 
@@ -181,6 +183,11 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	}
 	if pattern.FsType == "ntfs" && !framework.NodeOSDistroIs("windows") {
 		e2eskipper.Skipf("Distro %s doesn't support ntfs -- skipping", framework.TestContext.NodeOSDistro)
+	}
+
+	// 3. Check if volMode is supported by driver from its capability
+	if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[CapBlock] {
+		e2eskipper.Skipf("Driver %q doesn't support raw block - skipping", driver.GetDriverInfo().Name)
 	}
 }
 

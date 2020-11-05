@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -75,7 +74,11 @@ func (s *disruptiveTestSuite) DefineTests(driver TestDriver, pattern testpattern
 	}
 	var l local
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
+	// Testsuite level preconditions for driver, pattern compatibility with the test suites
+	// This will be executed first to prevent any unnecessary resource allocation
+	ginkgo.BeforeEach(func() {
+		SkipUnsupportedDriverPatternCombination(driver, pattern)
+	})
 
 	// This intentionally comes after checking the preconditions because it
 	// registers its own BeforeEach which creates the namespace. Beware that it
@@ -90,10 +93,6 @@ func (s *disruptiveTestSuite) DefineTests(driver TestDriver, pattern testpattern
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-
-		if pattern.VolMode == v1.PersistentVolumeBlock && !driver.GetDriverInfo().Capabilities[CapBlock] {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", driver.GetDriverInfo().Name, pattern.VolMode)
-		}
 
 		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
 		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)

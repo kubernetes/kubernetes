@@ -99,11 +99,11 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 	}
 	var l local
 
+	// Testsuite level preconditions for driver, pattern compatibility with the test suites
+	// This will be executed first to prevent any unnecessary resource allocation
 	ginkgo.BeforeEach(func() {
-		// Check preconditions.
-		if !driver.GetDriverInfo().Capabilities[CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
-			e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", driver.GetDriverInfo().Name)
-		}
+		SkipUnsupportedDriverPatternCombination(driver, pattern)
+
 		if !driver.GetDriverInfo().Capabilities[CapControllerExpansion] {
 			e2eskipper.Skipf("Driver %q does not support volume expansion - skipping", driver.GetDriverInfo().Name)
 		}

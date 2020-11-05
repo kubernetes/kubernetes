@@ -99,7 +99,16 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		l local
 	)
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
+	// Testsuite level preconditions for driver, pattern compatibility with the test suites
+	// This will be executed first to prevent any unnecessary resource allocation
+	ginkgo.BeforeEach(func() {
+		SkipUnsupportedDriverPatternCombination(driver, pattern)
+	})
+
+	// This intentionally comes after checking the preconditions because it
+	// registers its own BeforeEach which creates the namespace. Beware that it
+	// also registers an AfterEach which renders f unusable. Any code using
+	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("volumelimits")
 
 	// This checks that CSIMaxVolumeLimitChecker works as expected.

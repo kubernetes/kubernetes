@@ -84,8 +84,11 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		err     error
 	)
 
+	// Testsuite level preconditions for driver, pattern compatibility with the test suites
+	// This will be executed first to prevent any unnecessary resource allocation
 	ginkgo.BeforeEach(func() {
-		// Check preconditions.
+		SkipUnsupportedDriverPatternCombination(driver, pattern)
+
 		ok := false
 		dDriver, ok = driver.(DynamicPVTestDriver)
 		if !ok {

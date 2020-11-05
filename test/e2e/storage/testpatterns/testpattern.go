@@ -112,10 +112,8 @@ var (
 	}
 	// DefaultFsDynamicPV is TestPattern for "Dynamic PV (default fs)"
 	DefaultFsDynamicPV = TestPattern{
-		Name:                   "Dynamic PV (default fs)",
-		VolType:                DynamicPV,
-		SnapshotType:           DynamicCreatedSnapshot,
-		SnapshotDeletionPolicy: DeleteSnapshot,
+		Name:    "Dynamic PV (default fs)",
+		VolType: DynamicPV,
 	}
 
 	// Definitions for ext3
@@ -287,11 +285,9 @@ var (
 	}
 	// BlockVolModeDynamicPV is TestPattern for "Dynamic PV (block)"
 	BlockVolModeDynamicPV = TestPattern{
-		Name:                   "Dynamic PV (block volmode)",
-		VolType:                DynamicPV,
-		VolMode:                v1.PersistentVolumeBlock,
-		SnapshotType:           DynamicCreatedSnapshot,
-		SnapshotDeletionPolicy: DeleteSnapshot,
+		Name:    "Dynamic PV (block volmode)",
+		VolType: DynamicPV,
+		VolMode: v1.PersistentVolumeBlock,
 	}
 
 	// Definitions for snapshot case
@@ -323,6 +319,14 @@ var (
 		SnapshotType:           PreprovisionedCreatedSnapshot,
 		SnapshotDeletionPolicy: RetainSnapshot,
 		VolType:                DynamicPV,
+	}
+	// DynamicBlockSnapshotDelete is TestPattern for "Dynamic snapshot (block)"
+	DynamicBlockSnapshotDelete = TestPattern{
+		Name:                   "Dynamic Snapshot (block volmode)(delete policy)",
+		VolType:                DynamicPV,
+		VolMode:                v1.PersistentVolumeBlock,
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
 	}
 
 	// Definitions for volume expansion case

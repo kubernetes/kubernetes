@@ -84,8 +84,11 @@ func (t *volumeStressTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		l     *volumeStressTest
 	)
 
-	// Check preconditions before setting up namespace via framework below.
+	// Testsuite level preconditions for driver, pattern compatibility with the test suites
+	// This will be executed first to prevent any unnecessary resource allocation
 	ginkgo.BeforeEach(func() {
+		SkipUnsupportedDriverPatternCombination(driver, pattern)
+
 		if dInfo.StressTestOptions == nil {
 			e2eskipper.Skipf("Driver %s doesn't specify stress test options -- skipping", dInfo.Name)
 		}
@@ -98,10 +101,6 @@ func (t *volumeStressTestSuite) DefineTests(driver TestDriver, pattern testpatte
 
 		if _, ok := driver.(DynamicPVTestDriver); !ok {
 			e2eskipper.Skipf("Driver %s doesn't implement DynamicPVTestDriver -- skipping", dInfo.Name)
-		}
-
-		if !driver.GetDriverInfo().Capabilities[CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
-			e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", dInfo.Name)
 		}
 	})
 

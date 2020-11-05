@@ -78,6 +78,7 @@ func InitSnapshottableTestSuite() TestSuite {
 				testpatterns.DynamicSnapshotRetain,
 				testpatterns.PreprovisionedSnapshotDelete,
 				testpatterns.PreprovisionedSnapshotRetain,
+				testpatterns.DynamicBlockSnapshotDelete,
 			},
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
@@ -95,7 +96,11 @@ func (s *snapshottableTestSuite) SkipRedundantSuite(driver TestDriver, pattern t
 }
 
 func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+
+	// Testsuite level preconditions for driver, pattern compatibility with the test suites
+	// This will be executed first to prevent any unnecessary resource allocation
 	ginkgo.BeforeEach(func() {
+		SkipUnsupportedDriverPatternCombination(driver, pattern)
 		// Check preconditions.
 		dInfo := driver.GetDriverInfo()
 		ok := false

@@ -114,7 +114,11 @@ func (t *volumesTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 	var dInfo = driver.GetDriverInfo()
 	var l local
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
+	// Testsuite level preconditions for driver, pattern compatibility with the test suites
+	// This will be executed first to prevent any unnecessary resource allocation
+	ginkgo.BeforeEach(func() {
+		SkipUnsupportedDriverPatternCombination(driver, pattern)
+	})
 
 	// This intentionally comes after checking the preconditions because it
 	// registers its own BeforeEach which creates the namespace. Beware that it

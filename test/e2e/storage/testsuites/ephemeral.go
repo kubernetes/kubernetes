@@ -84,22 +84,14 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 		resource *VolumeResource
 	}
 	var (
-		dInfo   = driver.GetDriverInfo()
 		eDriver EphemeralTestDriver
 		l       local
 	)
 
+	// Testsuite level preconditions for driver, pattern compatibility with the test suites
+	// This will be executed first to prevent any unnecessary resource allocation
 	ginkgo.BeforeEach(func() {
-		ok := false
-		switch pattern.VolType {
-		case testpatterns.CSIInlineVolume:
-			eDriver, ok = driver.(EphemeralTestDriver)
-		case testpatterns.GenericEphemeralVolume:
-			_, ok = driver.(DynamicPVTestDriver)
-		}
-		if !ok {
-			e2eskipper.Skipf("Driver %s doesn't support %q volumes -- skipping", dInfo.Name, pattern.VolType)
-		}
+		SkipUnsupportedDriverPatternCombination(driver, pattern)
 	})
 
 	// This intentionally comes after checking the preconditions because it
@@ -109,6 +101,10 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 	f := framework.NewDefaultFramework("ephemeral")
 
 	init := func() {
+		if pattern.VolType == testpatterns.CSIInlineVolume {
+			// This should always success since we have checked the driver, pattern compability in SkipUnsupportedTest
+			eDriver, _ = driver.(EphemeralTestDriver)
+		}
 		if pattern.VolType == testpatterns.GenericEphemeralVolume {
 			enabled, err := GenericEphemeralVolumesEnabled(f.ClientSet, f.Namespace.Name)
 			framework.ExpectNoError(err, "check GenericEphemeralVolume feature")
