@@ -3972,8 +3972,12 @@ type LoadBalancerIngress struct {
 	// +optional
 	Hostname string `json:"hostname,omitempty" protobuf:"bytes,2,opt,name=hostname"`
 
-	// IPMode specifies the IP mode to use for this ingress
-	// Defaults to `VIP` if IP is set, null otherwise
+	// IPMode specifies how the load-balancer's IP behaves.
+	// Setting this to "VIP" indicates that the traffic passing through
+	// this load-balancer is delivered with the destination IP and port set to the load-balancer's IP and port.
+	// Setting this to "Proxy" indicates that the load-balancer acts like a proxy,
+	// delivering traffic with the destination IP and port set to the node's IP and nodePort or to the pod's IP and targetPort.
+	// This field can only be set when the ip field is also set, and defaults to "VIP" if not specified.
 	// +optional
 	IPMode *LoadBalancerIPMode `json:"ipMode,omitempty" protobuf:"bytes,3,opt,name=ipMode"`
 }
@@ -3991,7 +3995,7 @@ const (
 	// is delivered with the destination IP set to the specified LoadBalancer IP
 	LoadBalancerIPModeVIP LoadBalancerIPMode = "VIP"
 	// LoadBalancerIPModeProxy indicates that the specified LoadBalancer acts like a proxy,
-	// changing the destination IP to the node IP and the source IP to the LoadBalaner (mostly private) IP
+	// changing the destination IP to the node IP and the source IP to the LoadBalancer (mostly private) IP
 	LoadBalancerIPModeProxy LoadBalancerIPMode = "Proxy"
 )
 

@@ -5989,17 +5989,21 @@ func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) {
-			if len(ingress.IP) > 0 && ingress.IPMode != nil {
-				switch *ingress.IPMode {
-				case core.LoadBalancerIPModeVIP, core.LoadBalancerIPModeProxy:
-					break
-				default:
-					allErrs = append(allErrs, field.NotSupported(idxPath.Child("ipMode"), ingress.IPMode, supportedLoadBalancerIPMode.List()))
-				}
-			} else if len(ingress.IP) > 0 && ingress.IPMode == nil {
+			if len(ingress.IP) > 0 && ingress.IPMode == nil {
 				allErrs = append(allErrs, field.Required(idxPath.Child("ipMode"), "must be specified when `ip` is set"))
-			} else if len(ingress.IP) == 0 && ingress.IPMode != nil {
+			}
+		}
+
+		if ingress.IPMode != nil {
+			if len(ingress.IP) == 0 {
 				allErrs = append(allErrs, field.Forbidden(idxPath.Child("ipMode"), "may not be used when `ip` is not set"))
+			}
+
+			switch *ingress.IPMode {
+			case core.LoadBalancerIPModeVIP, core.LoadBalancerIPModeProxy:
+				break
+			default:
+				allErrs = append(allErrs, field.NotSupported(idxPath.Child("ipMode"), ingress.IPMode, supportedLoadBalancerIPMode.List()))
 			}
 		}
 

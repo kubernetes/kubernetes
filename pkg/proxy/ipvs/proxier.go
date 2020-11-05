@@ -1333,7 +1333,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Capture load-balancer ingress.
 		for _, ingress := range svcInfo.LoadBalancerIngress() {
-			if ingress.IP != "" && (!utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) || ingress.IPMode == nil || *ingress.IPMode == v1.LoadBalancerIPModeVIP) {
+			if ingress.IP != "" && (!utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) || *ingress.IPMode == v1.LoadBalancerIPModeVIP) {
 				// ipset call
 				entry = &utilipset.Entry{
 					IP:       ingress.IP,
