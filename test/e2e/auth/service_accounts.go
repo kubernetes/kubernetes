@@ -858,9 +858,12 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	})
 
 	ginkgo.It("should guarantee kube-root-ca.crt exist in any namespace", func() {
-		const rootCAConfigMapName = "kube-root-ca.crt"
+		const (
+			rootCAConfigMapName = "kube-root-ca.crt"
+			timeout             = time.Minute
+		)
 
-		framework.ExpectNoError(wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		framework.ExpectNoError(wait.PollImmediate(500*time.Millisecond, timeout, func() (bool, error) {
 			_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), rootCAConfigMapName, metav1.GetOptions{})
 			if err == nil {
 				return true, nil
@@ -876,8 +879,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.ExpectNoError(f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), rootCAConfigMapName, metav1.DeleteOptions{GracePeriodSeconds: utilptr.Int64Ptr(0)}))
 		framework.Logf("Deleted root ca configmap in namespace %q", f.Namespace.Name)
 
-		framework.ExpectNoError(wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-			ginkgo.By("waiting for a new root ca configmap created")
+		framework.ExpectNoError(wait.Poll(500*time.Millisecond, timeout, func() (bool, error) {
 			_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), rootCAConfigMapName, metav1.GetOptions{})
 			if err == nil {
 				return true, nil
@@ -901,7 +903,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.ExpectNoError(err)
 		framework.Logf("Updated root ca configmap in namespace %q", f.Namespace.Name)
 
-		framework.ExpectNoError(wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		framework.ExpectNoError(wait.Poll(500*time.Millisecond, timeout, func() (bool, error) {
 			ginkgo.By("waiting for the root ca configmap reconciled")
 			cm, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), rootCAConfigMapName, metav1.GetOptions{})
 			if err != nil {
