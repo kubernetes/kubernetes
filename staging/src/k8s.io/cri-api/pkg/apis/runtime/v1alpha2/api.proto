@@ -279,13 +279,37 @@ message LinuxSandboxSecurityContext {
     // This allows a sandbox to take additional security precautions if no
     // privileged containers are expected to be run.
     bool privileged = 6;
+    // Seccomp profile for the sandbox.
+    SecurityProfile seccomp = 9;
+    // AppArmor profile for the sandbox.
+    SecurityProfile apparmor = 10;
     // Seccomp profile for the sandbox, candidate values are:
     // * runtime/default: the default profile for the container runtime
     // * unconfined: unconfined profile, ie, no seccomp sandboxing
     // * localhost/<full-path-to-profile>: the profile installed on the node.
     //   <full-path-to-profile> is the full path of the profile.
     // Default: "", which is identical with unconfined.
-    string seccomp_profile_path = 7;
+    string seccomp_profile_path = 7 [deprecated=true];
+}
+
+// A security profile which can be used for sandboxes and containers.
+message SecurityProfile {
+    // Available profile types.
+    enum ProfileType {
+        // The container runtime default profile should be used.
+        RuntimeDefault = 0;
+        // Disable the feature for the sandbox or the container.
+        Unconfined = 1;
+        // A pre-defined profile on the node should be used.
+        Localhost = 2;
+    }
+    // Indicator which `ProfileType` should be applied.
+    ProfileType profile_type = 1;
+    // Indicates that a pre-defined profile on the node should be used.
+    // Must only be set if `ProfileType` is `Localhost`.
+    // For seccomp, it must be an absolute path to the seccomp profile.
+    // For AppArmor, this field is the AppArmor `<profile name>/`
+    string localhost_ref = 2;
 }
 
 // LinuxPodSandboxConfig holds platform-specific configurations for Linux
@@ -604,7 +628,7 @@ message LinuxContainerSecurityContext {
     // 1. All capabilities are added.
     // 2. Sensitive paths, such as kernel module paths within sysfs, are not masked.
     // 3. Any sysfs and procfs mounts are mounted RW.
-    // 4. Apparmor confinement is not applied.
+    // 4. AppArmor confinement is not applied.
     // 5. Seccomp restrictions are not applied.
     // 6. The device cgroup does not restrict access to any devices.
     // 7. All devices from the host's /dev are available within the container.
@@ -631,20 +655,6 @@ message LinuxContainerSecurityContext {
     // List of groups applied to the first process run in the container, in
     // addition to the container's primary GID.
     repeated int64 supplemental_groups = 8;
-    // AppArmor profile for the container, candidate values are:
-    // * runtime/default: equivalent to not specifying a profile.
-    // * unconfined: no profiles are loaded
-    // * localhost/<profile_name>: profile loaded on the node
-    //    (localhost) by name. The possible profile names are detailed at
-    //    http://wiki.apparmor.net/index.php/AppArmor_Core_Policy_Reference
-    string apparmor_profile = 9;
-    // Seccomp profile for the container, candidate values are:
-    // * runtime/default: the default profile for the container runtime
-    // * unconfined: unconfined profile, ie, no seccomp sandboxing
-    // * localhost/<full-path-to-profile>: the profile installed on the node.
-    //   <full-path-to-profile> is the full path of the profile.
-    // Default: "", which is identical with unconfined.
-    string seccomp_profile_path = 10;
     // no_new_privs defines if the flag for no_new_privs should be set on the
     // container.
     bool no_new_privs = 11;
@@ -654,6 +664,24 @@ message LinuxContainerSecurityContext {
     // readonly_paths is a slice of paths that should be set as readonly by the
     // container runtime, this can be passed directly to the OCI spec.
     repeated string readonly_paths = 14;
+    // Seccomp profile for the container.
+    SecurityProfile seccomp = 15;
+    // AppArmor profile for the container.
+    SecurityProfile apparmor = 16;
+    // AppArmor profile for the container, candidate values are:
+    // * runtime/default: equivalent to not specifying a profile.
+    // * unconfined: no profiles are loaded
+    // * localhost/<profile_name>: profile loaded on the node
+    //    (localhost) by name. The possible profile names are detailed at
+    //    https://gitlab.com/apparmor/apparmor/-/wikis/AppArmor_Core_Policy_Reference
+    string apparmor_profile = 9 [deprecated=true];
+    // Seccomp profile for the container, candidate values are:
+    // * runtime/default: the default profile for the container runtime
+    // * unconfined: unconfined profile, ie, no seccomp sandboxing
+    // * localhost/<full-path-to-profile>: the profile installed on the node.
+    //   <full-path-to-profile> is the full path of the profile.
+    // Default: "", which is identical with unconfined.
+    string seccomp_profile_path = 10 [deprecated=true];
 }
 
 // LinuxContainerConfig contains platform-specific configuration for
