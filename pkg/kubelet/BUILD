@@ -140,7 +140,7 @@ go_library(
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/api:go_default_library",
-        "//staging/src/k8s.io/component-helpers/lease:go_default_library",
+        "//staging/src/k8s.io/component-helpers/apimachinery/lease:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//staging/src/k8s.io/kubelet/pkg/apis/pluginregistration/v1:go_default_library",
