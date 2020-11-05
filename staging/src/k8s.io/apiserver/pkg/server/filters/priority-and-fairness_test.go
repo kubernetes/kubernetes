@@ -294,15 +294,17 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 	defer cancel()
 	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
+	var wg sync.WaitGroup
+	wg.Add(concurrentRequests)
 	for i := 0; i < concurrentRequests; i++ {
-		var err error
 		go func() {
-			err = expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusOK)
+			defer wg.Done()
+			if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusOK); err != nil {
+				t.Error(err)
+			}
 		}()
-		if err != nil {
-			t.Error(err)
-		}
 	}
+	wg.Wait()
 
 	checkForExpectedMetricsWithRetry(t, []string{
 		"apiserver_current_inflight_requests",
