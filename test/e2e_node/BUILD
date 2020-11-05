@@ -161,6 +161,7 @@ go_test(
         "//pkg/kubelet/cm/cpumanager:go_default_library",
         "//pkg/kubelet/cm/cpumanager/state:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",
+        "//pkg/kubelet/cm/memorymanager/state:go_default_library",
         "//pkg/kubelet/cm/topologymanager:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/events:go_default_library",

@@ -17,7 +17,10 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"sort"
@@ -25,13 +28,12 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -97,7 +99,7 @@ func makeMemoryManagerContainers(ctnCmd string, ctnAttributes []memoryManagerCtn
 // makeMemoryMangerPod returns a pod with the provided ctnAttributes.
 func makeMemoryManagerPod(podName string, initCtnAttributes, ctnAttributes []memoryManagerCtnAttributes) *v1.Pod {
 	hugepagesMount := false
-	memsetCmd := fmt.Sprintf("grep Mems_allowed_list /proc/self/status | cut -f2")
+	memsetCmd := "grep Mems_allowed_list /proc/self/status | cut -f2"
 	memsetSleepCmd := memsetCmd + "&& sleep 1d"
 	var containers, initContainers []v1.Container
 	if len(initCtnAttributes) > 0 {
@@ -107,7 +109,7 @@ func makeMemoryManagerPod(podName string, initCtnAttributes, ctnAttributes []mem
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: podName,
+			GenerateName: podName,
 		},
 		Spec: v1.PodSpec{
 			RestartPolicy:  v1.RestartPolicyNever,
@@ -135,6 +137,23 @@ func makeMemoryManagerPod(podName string, initCtnAttributes, ctnAttributes []mem
 func deleteMemoryManagerStateFile() {
 	err := exec.Command("/bin/sh", "-c", fmt.Sprintf("rm -f %s", memoryManagerStateFile)).Run()
 	framework.ExpectNoError(err, "failed to delete the state file")
+}
+
+func getMemoryManagerState() (*state.MemoryManagerCheckpoint, error) {
+	if _, err := os.Stat(memoryManagerStateFile); os.IsNotExist(err) {
+		return nil, fmt.Errorf("the memory manager state file %s does not exist", memoryManagerStateFile)
+	}
+
+	out, err := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat %s", memoryManagerStateFile)).Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to run command 'cat %s': out: %s, err: %v", memoryManagerStateFile, out, err)
+	}
+
+	memoryManagerCheckpoint := &state.MemoryManagerCheckpoint{}
+	if err := json.Unmarshal(out, memoryManagerCheckpoint); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal memory manager state file: %v", err)
+	}
+	return memoryManagerCheckpoint, nil
 }
 
 type kubeletParams struct {
@@ -250,10 +269,10 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 		evictionHard:   map[string]string{evictionHardMemory: "100Mi"},
 	}
 
-	verifyMemoryPinning := func(numaNodeIDs []int) {
+	verifyMemoryPinning := func(pod *v1.Pod, numaNodeIDs []int) {
 		ginkgo.By("Verifying the NUMA pinning")
 
-		output, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, testPod.Name, testPod.Spec.Containers[0].Name)
+		output, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		framework.ExpectNoError(err)
 
 		currentNUMANodeIDs, err := cpuset.Parse(strings.Trim(output, "\n"))
@@ -306,12 +325,14 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 
 	ginkgo.JustAfterEach(func() {
 		// delete the test pod
-		f.PodClient().DeleteSync(testPod.Name, metav1.DeleteOptions{}, time.Minute)
+		if testPod.Name != "" {
+			f.PodClient().DeleteSync(testPod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+		}
 
 		// release hugepages
-		if err := configureHugePages(hugepagesSize2M, 0); err != nil {
-			klog.Errorf("failed to release hugepages: %v", err)
-		}
+		gomega.Eventually(func() error {
+			return configureHugePages(hugepagesSize2M, 0)
+		}, 90*time.Second, 15*time.Second).ShouldNot(gomega.HaveOccurred(), "failed to release hugepages")
 
 		// update the kubelet config with old values
 		updateKubeletConfig(f, oldCfg)
@@ -331,7 +352,7 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 			initCtnParams = []memoryManagerCtnAttributes{}
 		})
 
-		ginkgo.When("pod has init and app containers", func() {
+		ginkgo.When("guaranteed pod has init and app containers", func() {
 			ginkgo.BeforeEach(func() {
 				// override containers parameters
 				ctnParams = []memoryManagerCtnAttributes{
@@ -360,12 +381,11 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 					return
 				}
 
-				verifyMemoryPinning([]int{0})
+				verifyMemoryPinning(testPod, []int{0})
 			})
 		})
 
-		ginkgo.When("pod has only app containers", func() {
-
+		ginkgo.When("guaranteed pod has only app containers", func() {
 			ginkgo.BeforeEach(func() {
 				// override containers parameters
 				ctnParams = []memoryManagerCtnAttributes{
@@ -386,7 +406,129 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 					return
 				}
 
-				verifyMemoryPinning([]int{0})
+				verifyMemoryPinning(testPod, []int{0})
+			})
+		})
+
+		ginkgo.When("multiple guaranteed pods started", func() {
+			var testPod2 *v1.Pod
+
+			ginkgo.BeforeEach(func() {
+				// override containers parameters
+				ctnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "memory-manager-static",
+						cpus:    "100m",
+						memory:  "128Mi",
+					},
+				}
+			})
+
+			ginkgo.JustBeforeEach(func() {
+				testPod2 = makeMemoryManagerPod("memory-manager-static", initCtnParams, ctnParams)
+			})
+
+			ginkgo.It("should succeed to start all pods", func() {
+				ginkgo.By("Running the test pod and the test pod 2")
+				testPod = f.PodClient().CreateSync(testPod)
+
+				ginkgo.By("Running the test pod 2")
+				testPod2 = f.PodClient().CreateSync(testPod2)
+
+				// it no taste to verify NUMA pinning when the node has only one NUMA node
+				if !*isMultiNUMASupported {
+					return
+				}
+
+				verifyMemoryPinning(testPod, []int{0})
+				verifyMemoryPinning(testPod2, []int{0})
+			})
+
+			ginkgo.JustAfterEach(func() {
+				// delete the test pod 2
+				if testPod2.Name != "" {
+					f.PodClient().DeleteSync(testPod2.Name, metav1.DeleteOptions{}, 2*time.Minute)
+				}
+			})
+		})
+
+		// the test requires at least two NUMA nodes
+		// test on each NUMA node will start the pod that will consume almost all memory of the NUMA node except 256Mi
+		// after it will start an additional pod with the memory request that can not be satisfied by the single NUMA node
+		// free memory
+		ginkgo.When("guaranteed pod memory request is bigger than free memory on each NUMA node", func() {
+			var workloadPods []*v1.Pod
+
+			ginkgo.BeforeEach(func() {
+				if !*isMultiNUMASupported {
+					ginkgo.Skip("The machines has less than two NUMA nodes")
+				}
+
+				ctnParams = []memoryManagerCtnAttributes{
+					{
+						ctnName: "memory-manager-static",
+						cpus:    "100m",
+						memory:  "384Mi",
+					},
+				}
+			})
+
+			ginkgo.JustBeforeEach(func() {
+				stateData, err := getMemoryManagerState()
+				framework.ExpectNoError(err)
+
+				for _, memoryState := range stateData.MachineState {
+					// consume all memory except of 256Mi on each NUMA node via workload pods
+					workloadPodMemory := memoryState.MemoryMap[v1.ResourceMemory].Free - 256*1024*1024
+					memoryQuantity := resource.NewQuantity(int64(workloadPodMemory), resource.BinarySI)
+					workloadCtnAttrs := []memoryManagerCtnAttributes{
+						{
+							ctnName: "workload-pod",
+							cpus:    "100m",
+							memory:  memoryQuantity.String(),
+						},
+					}
+					workloadPod := makeMemoryManagerPod(workloadCtnAttrs[0].ctnName, initCtnParams, workloadCtnAttrs)
+
+					workloadPod = f.PodClient().CreateSync(workloadPod)
+					workloadPods = append(workloadPods, workloadPod)
+				}
+			})
+
+			ginkgo.It("should be rejected", func() {
+				ginkgo.By("Creating the pod")
+				testPod = f.PodClient().Create(testPod)
+
+				ginkgo.By("Checking that pod failed to start because of admission error")
+				gomega.Eventually(func() bool {
+					tmpPod, err := f.PodClient().Get(context.TODO(), testPod.Name, metav1.GetOptions{})
+					framework.ExpectNoError(err)
+
+					if tmpPod.Status.Phase != v1.PodFailed {
+						return false
+					}
+
+					if tmpPod.Status.Reason != "UnexpectedAdmissionError" {
+						return false
+					}
+
+					if !strings.Contains(tmpPod.Status.Message, "Pod Allocate failed due to [memorymanager]") {
+						return false
+					}
+
+					return true
+				}, time.Minute, 5*time.Second).Should(
+					gomega.Equal(true),
+					"the pod succeeded to start, when it should fail with the admission error",
+				)
+			})
+
+			ginkgo.JustAfterEach(func() {
+				for _, workloadPod := range workloadPods {
+					if workloadPod.Name != "" {
+						f.PodClient().DeleteSync(workloadPod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+					}
+				}
 			})
 		})
 	})
@@ -415,7 +557,7 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 				return
 			}
 
-			verifyMemoryPinning(allNUMANodes)
+			verifyMemoryPinning(testPod, allNUMANodes)
 		})
 	})
 })
