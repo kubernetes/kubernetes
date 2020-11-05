@@ -998,15 +998,17 @@ func calculateScaleUpLimitWithScalingRules(currentReplicas int32, scaleEvents []
 	if *scalingRules.SelectPolicy == autoscalingv2.DisabledPolicySelect {
 		return currentReplicas // Scaling is disabled
 	} else if *scalingRules.SelectPolicy == autoscalingv2.MinPolicySelect {
+		result = math.MaxInt32
 		selectPolicyFn = min // For scaling up, the lowest change ('min' policy) produces a minimum value
 	} else {
+		result = math.MinInt32
 		selectPolicyFn = max // Use the default policy otherwise to produce a highest possible change
 	}
 	for _, policy := range scalingRules.Policies {
 		replicasAddedInCurrentPeriod := getReplicasChangePerPeriod(policy.PeriodSeconds, scaleEvents)
 		periodStartReplicas := currentReplicas - replicasAddedInCurrentPeriod
 		if policy.Type == autoscalingv2.PodsScalingPolicy {
-			proposed = int32(periodStartReplicas + policy.Value)
+			proposed = periodStartReplicas + policy.Value
 		} else if policy.Type == autoscalingv2.PercentScalingPolicy {
 			// the proposal has to be rounded up because the proposed change might not increase the replica count causing the target to never scale up
 			proposed = int32(math.Ceil(float64(periodStartReplicas) * (1 + float64(policy.Value)/100)))
@@ -1018,14 +1020,16 @@ func calculateScaleUpLimitWithScalingRules(currentReplicas int32, scaleEvents []
 
 // calculateScaleDownLimitWithBehavior returns the maximum number of pods that could be deleted for the given HPAScalingRules
 func calculateScaleDownLimitWithBehaviors(currentReplicas int32, scaleEvents []timestampedScaleEvent, scalingRules *autoscalingv2.HPAScalingRules) int32 {
-	var result int32 = math.MaxInt32
+	var result int32
 	var proposed int32
 	var selectPolicyFn func(int32, int32) int32
 	if *scalingRules.SelectPolicy == autoscalingv2.DisabledPolicySelect {
 		return currentReplicas // Scaling is disabled
 	} else if *scalingRules.SelectPolicy == autoscalingv2.MinPolicySelect {
+		result = math.MinInt32
 		selectPolicyFn = max // For scaling down, the lowest change ('min' policy) produces a maximum value
 	} else {
+		result = math.MaxInt32
 		selectPolicyFn = min // Use the default policy otherwise to produce a highest possible change
 	}
 	for _, policy := range scalingRules.Policies {
