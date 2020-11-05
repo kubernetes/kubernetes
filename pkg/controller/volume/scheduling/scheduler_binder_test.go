@@ -880,7 +880,8 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		},
 		"bound-pvc,pv-not-exists": {
 			podPVCs:    []*v1.PersistentVolumeClaim{boundPVC},
-			shouldFail: true,
+			shouldFail: false,
+			reasons:    ConflictReasons{ErrReasonPVNotExist},
 		},
 		"prebound-pvc": {
 			podPVCs:    []*v1.PersistentVolumeClaim{preboundPVC},
