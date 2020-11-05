@@ -69,7 +69,7 @@ func testPod(podnamebase string) *v1.Pod {
 	return pod
 }
 
-var _ = SIGDescribe("Hostname of Pod [Feature:SetHostnameAsFQDN][NodeAlphaFeature:SetHostnameAsFQDN]", func() {
+var _ = SIGDescribe("Hostname of Pod [Feature:SetHostnameAsFQDN][NodeFeature:SetHostnameAsFQDN]", func() {
 	f := framework.NewDefaultFramework("hostfqdn")
 	dnsDomain := "cluster.local"
 	if cdn := framework.TestContext.ClusterDNSDomain; cdn != "" {
