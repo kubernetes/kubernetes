@@ -2709,12 +2709,6 @@ func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
 			ipMode:       &ipModeVIP,
 			expectedRule: true,
 		},
-		{
-			svcIP:        "10.20.30.43",
-			svcLBIP:      "1.2.3.6",
-			ipMode:       nil,
-			expectedRule: true,
-		},
 	}
 
 	svcPort := 80
