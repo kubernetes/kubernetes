@@ -19,7 +19,11 @@ go_test(
         "externaltypes_test.go",
     ],
     embed = [":go_default_library"],
-    deps = ["//vendor/github.com/stretchr/testify/assert:go_default_library"],
+    deps = [
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/golang.org/x/oauth2:go_default_library",
+        "//vendor/gopkg.in/square/go-jose.v2/jwt:go_default_library",
+    ],
 )
 
 filegroup(

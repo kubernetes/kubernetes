@@ -22,9 +22,14 @@ import (
 )
 
 const (
-	httpHeader      = "net/http.Header"
-	httpCookie      = "net/http.Cookie"
-	x509Certificate = "crypto/x509.Certificate"
+	vendorPrefix = "k8s.io/kubernetes/vendor/"
+
+	httpHeader            = "net/http.Header"
+	httpCookie            = "net/http.Cookie"
+	x509Certificate       = "crypto/x509.Certificate"
+	oauth2Token           = "golang.org/x/oauth2.Token"
+	jwtJSONWebToken       = "gopkg.in/square/go-jose.v2/jwt.JSONWebToken"
+	jwtNestedJSONWebToken = "gopkg.in/square/go-jose.v2/jwt.NestedJSONWebToken"
 )
 
 // GlobalDatapolicyMapping returns the list of sensitive datatypes are embedded
@@ -42,6 +47,12 @@ func byType(t reflect.Type) []string {
 		return []string{"token"}
 	case x509Certificate:
 		return []string{"security-key"}
+	case oauth2Token, vendorPrefix + oauth2Token:
+		return []string{"token"}
+	case jwtJSONWebToken, vendorPrefix + jwtJSONWebToken:
+		return []string{"token"}
+	case jwtNestedJSONWebToken, vendorPrefix + jwtNestedJSONWebToken:
+		return []string{"token"}
 	default:
 		return nil
 	}

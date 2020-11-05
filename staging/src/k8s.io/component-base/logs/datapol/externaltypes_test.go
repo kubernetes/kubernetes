@@ -22,6 +22,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/oauth2"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 func TestTypes(t *testing.T) {
@@ -37,6 +39,15 @@ func TestTypes(t *testing.T) {
 	}, {
 		value:  x509.Certificate{},
 		expect: []string{"security-key"},
+	}, {
+		value:  oauth2.Token{},
+		expect: []string{"token"},
+	}, {
+		value:  jwt.JSONWebToken{},
+		expect: []string{"token"},
+	}, {
+		value:  jwt.NestedJSONWebToken{},
+		expect: []string{"token"},
 	}}
 	for _, tc := range testcases {
 		types := GlobalDatapolicyMapping(tc.value)
