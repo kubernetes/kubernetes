@@ -121,6 +121,7 @@ type DebugOptions struct {
 	TargetContainer string
 	TTY             bool
 
+	attachChanged         bool
 	deprecatedInvocation  bool
 	shareProcessedChanged bool
 
@@ -223,7 +224,8 @@ func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		return err
 	}
 
-	// Share processes
+	// Record flags that the user explicitly changed from their defaults
+	o.attachChanged = cmd.Flags().Changed("attach")
 	o.shareProcessedChanged = cmd.Flags().Changed("share-processes")
 
 	return nil
@@ -231,6 +233,11 @@ func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 // Validate checks that the provided debug options are specified.
 func (o *DebugOptions) Validate(cmd *cobra.Command) error {
+	// Attach
+	if o.Attach && o.attachChanged && len(o.Image) == 0 && len(o.Container) == 0 {
+		return fmt.Errorf("you must specify --container or create a new container using --image in order to attach.")
+	}
+
 	// CopyTo
 	if len(o.CopyTo) > 0 {
 		if len(o.Image) == 0 && len(o.SetImages) == 0 && len(o.Args) == 0 {
@@ -332,7 +339,7 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 			return visitErr
 		}
 
-		if o.Attach {
+		if o.Attach && len(containerName) > 0 {
 			opts := &attach.AttachOptions{
 				StreamOptions: exec.StreamOptions{
 					IOStreams: o.IOStreams,
@@ -552,17 +559,21 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 		}
 	}
 
-	containerByName := containerNameToRef(copied)
-	name := o.Container
-	if len(name) == 0 {
-		name = o.computeDebugContainerName(copied)
-	}
+	name, containerByName := o.Container, containerNameToRef(copied)
 
 	c, ok := containerByName[name]
 	if !ok {
 		// Adding a new debug container
 		if len(o.Image) == 0 {
+			if len(o.SetImages) > 0 {
+				// This was a --set-image only invocation
+				return copied, "", nil
+			}
 			return nil, "", fmt.Errorf("you must specify image when creating new container")
+		}
+
+		if len(name) == 0 {
+			name = o.computeDebugContainerName(copied)
 		}
 		c = &corev1.Container{
 			Name:                     name,
