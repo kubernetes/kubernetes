@@ -335,6 +335,14 @@ func (cache *schedulerCache) removeDeletedNodesFromSnapshot(snapshot *Snapshot) 
 	}
 }
 
+// NodeCount returns the number of nodes in the cache.
+// DO NOT use outside of tests.
+func (cache *schedulerCache) NodeCount() int {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+	return len(cache.nodes)
+}
+
 // PodCount returns the number of pods in the cache (including those from deleted nodes).
 // DO NOT use outside of tests.
 func (cache *schedulerCache) PodCount() (int, error) {
@@ -343,10 +351,6 @@ func (cache *schedulerCache) PodCount() (int, error) {
 	// podFilter is expected to return true for most or all of the pods. We
 	// can avoid expensive array growth without wasting too much memory by
 	// pre-allocating capacity.
-	maxSize := 0
-	for _, n := range cache.nodes {
-		maxSize += len(n.info.Pods)
-	}
 	count := 0
 	for _, n := range cache.nodes {
 		count += len(n.info.Pods)

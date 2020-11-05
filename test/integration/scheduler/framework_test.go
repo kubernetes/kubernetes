@@ -1181,9 +1181,9 @@ func TestBindPlugin(t *testing.T) {
 	defer testutils.CleanupTest(t, testCtx)
 
 	// Add a few nodes.
-	_, err := createNodes(testCtx.ClientSet, "test-node", st.MakeNode(), 2)
+	_, err := createAndWaitForNodesInCache(testCtx, "test-node", st.MakeNode(), 2)
 	if err != nil {
-		t.Fatalf("Cannot create nodes: %v", err)
+		t.Fatal(err)
 	}
 
 	tests := []struct {
@@ -1840,9 +1840,9 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 		v1.ResourceCPU:    "500m",
 		v1.ResourceMemory: "500",
 	}
-	_, err := createNodes(testCtx.ClientSet, "test-node", st.MakeNode().Capacity(nodeRes), 1)
+	_, err := createAndWaitForNodesInCache(testCtx, "test-node", st.MakeNode().Capacity(nodeRes), 1)
 	if err != nil {
-		t.Fatalf("Cannot create nodes: %v", err)
+		t.Fatal(err)
 	}
 
 	permitPlugin.failPermit = false
@@ -1900,9 +1900,8 @@ func initTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestCont
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 
 	if nodeCount > 0 {
-		_, err := createNodes(testCtx.ClientSet, "test-node", st.MakeNode(), nodeCount)
-		if err != nil {
-			t.Fatalf("Cannot create nodes: %v", err)
+		if _, err := createAndWaitForNodesInCache(testCtx, "test-node", st.MakeNode(), nodeCount); err != nil {
+			t.Fatal(err)
 		}
 	}
 	return testCtx
