@@ -2528,9 +2528,9 @@ k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 ## explicit
 # k8s.io/system-validators => k8s.io/system-validators v1.2.0
 k8s.io/system-validators/validators
-# k8s.io/utils v0.0.0-20200729134348-d5654de09c73 => k8s.io/utils v0.0.0-20200729134348-d5654de09c73
+# k8s.io/utils v0.0.0-20201104234853-8146046b121e => k8s.io/utils v0.0.0-20201104234853-8146046b121e
 ## explicit
-# k8s.io/utils => k8s.io/utils v0.0.0-20200729134348-d5654de09c73
+# k8s.io/utils => k8s.io/utils v0.0.0-20201104234853-8146046b121e
 k8s.io/utils/buffer
 k8s.io/utils/clock
 k8s.io/utils/exec

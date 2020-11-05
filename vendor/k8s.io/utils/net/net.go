@@ -137,6 +137,30 @@ func IsIPv6CIDR(cidr *net.IPNet) bool {
 	return IsIPv6(ip)
 }
 
+// IsIPv4 returns if netIP is IPv4.
+func IsIPv4(netIP net.IP) bool {
+	return netIP != nil && netIP.To4() != nil
+}
+
+// IsIPv4String returns if ip is IPv4.
+func IsIPv4String(ip string) bool {
+	netIP := net.ParseIP(ip)
+	return IsIPv4(netIP)
+}
+
+// IsIPv4CIDR returns if a cidr is ipv4
+func IsIPv4CIDR(cidr *net.IPNet) bool {
+	ip := cidr.IP
+	return IsIPv4(ip)
+}
+
+// IsIPv4CIDRString returns if cidr is IPv4.
+// This assumes cidr is a valid CIDR.
+func IsIPv4CIDRString(cidr string) bool {
+	ip, _, _ := net.ParseCIDR(cidr)
+	return IsIPv4(ip)
+}
+
 // ParsePort parses a string representing an IP port.  If the string is not a
 // valid port number, this returns an error.
 func ParsePort(port string, allowZero bool) (int, error) {
