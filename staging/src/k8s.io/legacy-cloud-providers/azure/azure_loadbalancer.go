@@ -99,11 +99,6 @@ const (
 	// to create both TCP and UDP protocols when creating load balancer rules.
 	ServiceAnnotationLoadBalancerMixedProtocols = "service.beta.kubernetes.io/azure-load-balancer-mixed-protocols"
 
-	// ServiceAnnotationLoadBalancerDisableTCPReset is the annotation used on the service
-	// to set enableTcpReset to false in load balancer rule. This only works for Azure standard load balancer backed service.
-	// TODO(feiskyer): disable-tcp-reset annotations has been depracated since v1.18, it would removed on v1.20.
-	ServiceAnnotationLoadBalancerDisableTCPReset = "service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset"
-
 	// serviceTagKey is the service key applied for public IP tags.
 	serviceTagKey = "service"
 	// clusterNameKey is the cluster name key applied for public IP tags.
@@ -1498,14 +1493,6 @@ func (az *Cloud) reconcileLoadBalancerRule(
 		ports = service.Spec.Ports
 	} else {
 		ports = []v1.ServicePort{}
-	}
-
-	var enableTCPReset *bool
-	if az.useStandardLoadBalancer() {
-		enableTCPReset = to.BoolPtr(true)
-		if _, ok := service.Annotations[ServiceAnnotationLoadBalancerDisableTCPReset]; ok {
-			klog.Warning("annotation service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset has been removed as of Kubernetes 1.20. TCP Resets are always enabled on Standard SKU load balancers.")
-		}
 	}
 
 	var expectedProbes []network.Probe
