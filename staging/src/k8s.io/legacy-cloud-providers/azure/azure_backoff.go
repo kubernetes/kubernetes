@@ -21,6 +21,7 @@ package azure
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
@@ -41,6 +42,12 @@ const (
 
 	// operationCancledErrorMessage means the operation is canceled by another new operation.
 	operationCancledErrorMessage = "canceledandsupersededduetoanotheroperation"
+
+	referencedResourceNotProvisionedMessageCode = "ReferencedResourceNotProvisioned"
+)
+
+var (
+	pipErrorMessageRE = regexp.MustCompile(`(?:.*)/subscriptions/(?:.*)/resourceGroups/(.*)/providers/Microsoft.Network/publicIPAddresses/([^\s]+)(?:.*)`)
 )
 
 // RequestBackoff if backoff is disabled in cloud provider it
@@ -268,6 +275,30 @@ func (az *Cloud) CreateOrUpdateLB(service *v1.Service, lb network.LoadBalancer) 
 		}
 		// Invalidate the cache because another new operation has canceled the current request.
 		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+			az.lbCache.Delete(*lb.Name)
+		}
+		// The LB update may fail because the referenced PIP is not in the Succeeded provisioning state
+		if strings.Contains(strings.ToLower(err.Error()), strings.ToLower(referencedResourceNotProvisionedMessageCode)) {
+			matches := pipErrorMessageRE.FindStringSubmatch(err.Error())
+			if len(matches) != 3 {
+				klog.Warningf("Failed to parse the retry error message %s", err.Error())
+				return err
+			}
+			pipRG, pipName := matches[1], matches[2]
+			klog.V(3).Infof("The public IP %s referenced by load balancer %s is not in Succeeded provisioning state, will try to update it", pipName, to.String(lb.Name))
+			pip, _, err := az.getPublicIPAddress(pipRG, pipName)
+			if err != nil {
+				klog.Warningf("Failed to get the public IP %s in resource group %s: %v", pipName, pipRG, err)
+				return err
+			}
+			// Perform a dummy update to fix the provisioning state
+			err = az.CreateOrUpdatePIP(service, pipRG, pip)
+			if err != nil {
+				klog.Warningf("Failed to update the public IP %s in resource group %s: %v", pipName, pipRG, err)
+				return err
+			}
+			// Invalidate the LB cache, return the error, and the controller manager
+			// would retry the LB update in the next reconcile loop
 			az.lbCache.Delete(*lb.Name)
 		}
 		return err
