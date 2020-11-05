@@ -505,6 +505,7 @@ func LoadClientset() (*clientset.Clientset, error) {
 
 // RandomSuffix provides a random sequence to append to pods,services,rcs.
 func RandomSuffix() string {
+	rand.Seed(time.Now().UnixNano())
 	return strconv.Itoa(rand.Intn(10000))
 }
 
