@@ -110,6 +110,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/e2e/network/netpol:all-srcs",
         "//test/e2e/network/scale:all-srcs",
     ],
     tags = ["automanaged"],
