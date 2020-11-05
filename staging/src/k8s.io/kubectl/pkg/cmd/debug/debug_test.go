@@ -868,7 +868,6 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 			name: "Change image for all containers with set-image",
 			opts: &DebugOptions{
 				CopyTo:    "myapp-copy",
-				Container: "app",
 				SetImages: map[string]string{"*": "busybox"},
 			},
 			havePod: &corev1.Pod{
@@ -898,7 +897,6 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 			name: "Change image for multiple containers with set-image",
 			opts: &DebugOptions{
 				CopyTo:    "myapp-copy",
-				Container: "app",
 				SetImages: map[string]string{"*": "busybox", "app": "app-debugger"},
 			},
 			havePod: &corev1.Pod{
@@ -1362,6 +1360,19 @@ func TestCompleteAndValidate(t *testing.T) {
 			},
 		},
 		{
+			name: "Pod copy: explicit attach",
+			args: "mypod --image=busybox --copy-to=my-debugger --attach -- sleep 1d",
+			wantOpts: &DebugOptions{
+				Args:           []string{"sleep", "1d"},
+				Attach:         true,
+				CopyTo:         "my-debugger",
+				Image:          "busybox",
+				Namespace:      "default",
+				ShareProcesses: true,
+				TargetNames:    []string{"mypod"},
+			},
+		},
+		{
 			name: "Pod copy: replace single image of existing container",
 			args: "mypod --image=busybox --container=my-container --copy-to=my-debugger",
 			wantOpts: &DebugOptions{
@@ -1441,6 +1452,11 @@ func TestCompleteAndValidate(t *testing.T) {
 		{
 			name:      "Pod copy: invalid --set-image",
 			args:      "mypod --set-image=*=SUPERGOODIMAGE#1!!!! --copy-to=my-debugger",
+			wantError: true,
+		},
+		{
+			name:      "Pod copy: specifying attach without existing or newly created container",
+			args:      "mypod --set-image=*=busybox --copy-to=my-debugger --attach",
 			wantError: true,
 		},
 		{
