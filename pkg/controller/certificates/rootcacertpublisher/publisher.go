@@ -187,6 +187,10 @@ func (c *Publisher) syncNamespace(ns string) error {
 				"ca.crt": string(c.rootCA),
 			},
 		}, metav1.CreateOptions{})
+		// don't retry a create if the namespace doesn't exist or is terminating
+		if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+			return nil
+		}
 		return err
 	case err != nil:
 		return err
