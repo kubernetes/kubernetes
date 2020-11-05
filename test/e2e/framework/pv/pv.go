@@ -19,6 +19,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -128,6 +129,8 @@ type PersistentVolumeConfig struct {
 // PersistentVolumeClaimConfig is consumed by MakePersistentVolumeClaim() to
 // generate a PVC object.
 type PersistentVolumeClaimConfig struct {
+	// Name of the PVC. If set, overrides NamePrefix
+	Name string
 	// NamePrefix defaults to "pvc-" if unspecified
 	NamePrefix string
 	// ClaimSize must be specified in the Quantity format. Defaults to 2Gi if
@@ -621,6 +624,7 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 
 	return &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
+			Name:         cfg.Name,
 			GenerateName: cfg.NamePrefix,
 			Namespace:    ns,
 			Annotations:  cfg.Annotations,
@@ -843,4 +847,32 @@ func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, poll, 
 		framework.Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, poll, err)
 	}
 	return fmt.Errorf("PersistentVolume %s still exists within %v", pvName, timeout)
+}
+
+// WaitForPVCFinalizer waits for a finalizer to be added to a PVC in a given namespace.
+func WaitForPVCFinalizer(ctx context.Context, cs clientset.Interface, name, namespace, finalizer string, poll, timeout time.Duration) error {
+	var (
+		err error
+		pvc *v1.PersistentVolumeClaim
+	)
+	framework.Logf("Waiting up to %v for PersistentVolumeClaim %s/%s to contain finalizer %s", timeout, namespace, name, finalizer)
+	if successful := utils.WaitUntil(poll, timeout, func() bool {
+		pvc, err = cs.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			framework.Logf("Failed to get PersistentVolumeClaim %s/%s with err: %v. Will retry in %v", name, namespace, err, timeout)
+			return false
+		}
+		for _, f := range pvc.Finalizers {
+			if f == finalizer {
+				return true
+			}
+		}
+		return false
+	}); successful {
+		return nil
+	}
+	if err == nil {
+		err = fmt.Errorf("finalizer %s not added to pvc %s/%s", finalizer, namespace, name)
+	}
+	return err
 }
