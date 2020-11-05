@@ -873,16 +873,19 @@ func getZonesForRegion(svc *compute.Service, projectID, region string) ([]string
 	// (tested in https://cloud.google.com/compute/docs/reference/latest/zones/list)
 	// listCall = listCall.Filter("region eq " + region)
 
-	res, err := listCall.Do()
+	var zones []string
+	var accumulator = func(response *compute.ZoneList) error {
+		for _, zone := range response.Items {
+			regionName := lastComponent(zone.Region)
+			if regionName == region {
+				zones = append(zones, zone.Name)
+			}
+		}
+		return nil
+	}
+	err := listCall.Pages(context.TODO(), accumulator)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected response listing zones: %v", err)
-	}
-	zones := []string{}
-	for _, zone := range res.Items {
-		regionName := lastComponent(zone.Region)
-		if regionName == region {
-			zones = append(zones, zone.Name)
-		}
 	}
 	return zones, nil
 }
