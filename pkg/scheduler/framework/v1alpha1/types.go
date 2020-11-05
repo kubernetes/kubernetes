@@ -391,8 +391,10 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 				r.MilliCPU = cpu
 			}
 		case v1.ResourceEphemeralStorage:
-			if ephemeralStorage := rQuantity.Value(); ephemeralStorage > r.EphemeralStorage {
-				r.EphemeralStorage = ephemeralStorage
+			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+				if ephemeralStorage := rQuantity.Value(); ephemeralStorage > r.EphemeralStorage {
+					r.EphemeralStorage = ephemeralStorage
+				}
 			}
 		default:
 			if v1helper.IsScalarResourceName(rName) {
