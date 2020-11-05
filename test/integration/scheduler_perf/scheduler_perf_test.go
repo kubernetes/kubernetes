@@ -71,11 +71,17 @@ const (
 
 var (
 	defaultMetricsCollectorConfig = metricsCollectorConfig{
-		Metrics: []string{
-			"scheduler_scheduling_algorithm_predicate_evaluation_seconds",
-			"scheduler_scheduling_algorithm_priority_evaluation_seconds",
-			"scheduler_e2e_scheduling_duration_seconds",
-			"scheduler_pod_scheduling_duration_seconds",
+		// Specify the filter as {"label": "value"} to filter out the specific metrics
+		// Specify "*" as {"label": "*"} denotes that all the metrics with the label should be collected.
+
+		// AggregatedMetric defines the metrics that will aggregate all the Histogram data within the same metricFamily.
+		AggregatedMetric: map[string]map[string]string{
+			"scheduler_e2e_scheduling_duration_seconds": nil,
+			"scheduler_pod_scheduling_duration_seconds": nil,
+		},
+		// HistogramMetric defines the metrics that will collect each of Histogram from the metricFamily one by one.
+		HistogramMetric: map[string]map[string]string{
+			"scheduler_framework_extension_point_duration_seconds": {"extension_point": "*"},
 		},
 	}
 )

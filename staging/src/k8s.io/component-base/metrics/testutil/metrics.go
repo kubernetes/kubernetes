@@ -249,10 +249,7 @@ func (vec HistogramVec) Validate() error {
 	return nil
 }
 
-// GetHistogramVecFromGatherer collects a metric, that matches the input labelValue map,
-// from a gatherer implementing k8s.io/component-base/metrics.Gatherer interface.
-// Used only for testing purposes where we need to gather metrics directly from a running binary (without metrics endpoint).
-func GetHistogramVecFromGatherer(gatherer metrics.Gatherer, metricName string, lvMap map[string]string) (HistogramVec, error) {
+func validateMetricFamily(gatherer metrics.Gatherer, metricName string) (*dto.MetricFamily, error) {
 	var metricFamily *dto.MetricFamily
 	m, err := gatherer.Gather()
 	if err != nil {
@@ -276,6 +273,19 @@ func GetHistogramVecFromGatherer(gatherer metrics.Gatherer, metricName string, l
 	if len(metricFamily.GetMetric()) == 0 {
 		return nil, fmt.Errorf("metric %q is empty", metricName)
 	}
+	return metricFamily, nil
+}
+
+// GetHistogramVecFromGatherer collects a metric, that matches the input labelValue map
+// from a gatherer implementing k8s.io/component-base/metrics.Gatherer interface.
+// All metrics within the metricFamily will be assembled as a single HistogramVec. Quantle, Average etc. are caculated based on
+// the accumulated data from the HistogramVec.
+// Used only for testing purposes where we need to gather metrics directly from a running binary (without metrics endpoint).
+func GetHistogramVecFromGatherer(gatherer metrics.Gatherer, metricName string, lvMap map[string]string) (HistogramVec, error) {
+	metricFamily, err := validateMetricFamily(gatherer, metricName)
+	if err != nil {
+		return nil, err
+	}
 
 	vec := make(HistogramVec, 0)
 	for _, metric := range metricFamily.GetMetric() {
@@ -286,6 +296,40 @@ func GetHistogramVecFromGatherer(gatherer metrics.Gatherer, metricName string, l
 		}
 	}
 	return vec, nil
+}
+
+type LabeledHistogram struct {
+	Labels    map[string]string
+	Histogram Histogram
+}
+
+// GetHistogramFromGatherer collects a metric from a gatherer implementing k8s.io/component-base/metrics.Gatherer interface.
+// If the metric is a HistogramVec, each metric from the HistogramVec will be collected with a label map one by one.
+// Used only for testing purposes where we need to gather metrics directly from a running binary (without metrics endpoint).
+func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string, lvMap map[string]string) ([]LabeledHistogram, error) {
+	metricFamily, err := validateMetricFamily(gatherer, metricName)
+	if err != nil {
+		return nil, err
+	}
+
+	var histogramList []LabeledHistogram
+	for _, metric := range metricFamily.GetMetric() {
+		metricLabels := map[string]string{}
+		labelPairs := map[string]string{}
+		if LabelsMatch(metric, lvMap) {
+			for _, labelPair := range metric.Label {
+				metricLabels[labelPair.GetName()] = labelPair.GetValue()
+			}
+			for label := range lvMap {
+				labelPairs[label] = metricLabels[label]
+			}
+			histogramList = append(histogramList, LabeledHistogram{
+				Labels:    labelPairs,
+				Histogram: Histogram{metric.GetHistogram()},
+			})
+		}
+	}
+	return histogramList, nil
 }
 
 func uint64Ptr(u uint64) *uint64 {
@@ -430,7 +474,7 @@ func LabelsMatch(metric *dto.Metric, labelFilter map[string]string) bool {
 	}
 
 	for labelName, labelValue := range labelFilter {
-		if value, ok := metricLabels[labelName]; !ok || value != labelValue {
+		if value, ok := metricLabels[labelName]; !ok || (value != labelValue && labelValue != "*") {
 			return false
 		}
 	}

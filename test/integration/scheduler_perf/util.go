@@ -179,7 +179,8 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 
 // metricsCollectorConfig is the config to be marshalled to YAML config file.
 type metricsCollectorConfig struct {
-	Metrics []string
+	AggregatedMetric map[string]map[string]string
+	HistogramMetric  map[string]map[string]string
 }
 
 // metricsCollector collects metrics from legacyregistry.DefaultGatherer.Gather() endpoint.
@@ -202,17 +203,21 @@ func (*metricsCollector) run(ctx context.Context) {
 
 func (pc *metricsCollector) collect() []DataItem {
 	var dataItems []DataItem
-	for _, metric := range pc.Metrics {
-		dataItem := collectHistogramVec(metric, pc.labels)
+	for metric, lvMap := range pc.AggregatedMetric {
+		dataItem := collectHistogramVec(metric, pc.labels, lvMap)
 		if dataItem != nil {
 			dataItems = append(dataItems, *dataItem)
 		}
 	}
+	for metric, lvMap := range pc.HistogramMetric {
+		itemCollection := collectHistogram(metric, pc.labels, lvMap)
+		dataItems = append(dataItems, itemCollection...)
+	}
 	return dataItems
 }
 
-func collectHistogramVec(metric string, labels map[string]string) *DataItem {
-	vec, err := testutil.GetHistogramVecFromGatherer(legacyregistry.DefaultGatherer, metric, nil)
+func collectHistogramVec(metric string, labels map[string]string, lvMap map[string]string) *DataItem {
+	vec, err := testutil.GetHistogramVecFromGatherer(legacyregistry.DefaultGatherer, metric, lvMap)
 	if err != nil {
 		klog.Error(err)
 		return nil
@@ -247,6 +252,50 @@ func collectHistogramVec(metric string, labels map[string]string) *DataItem {
 		},
 		Unit: "ms",
 	}
+}
+
+func collectHistogram(metric string, labels map[string]string, lvMap map[string]string) []DataItem {
+	var dataItems []DataItem
+	vec, err := testutil.GetHistogramFromGatherer(legacyregistry.DefaultGatherer, metric, lvMap)
+	if err != nil {
+		klog.Error(err)
+		return nil
+	}
+	for _, val := range vec {
+		// Copy labels and add "Metric" label for this metric.
+		labelMap := map[string]string{"Metric": metric}
+		for k, v := range labels {
+			labelMap[k] = v
+		}
+		for label, value := range testutil.LabeledHistogram(val).Labels {
+			labelMap[label] = value
+		}
+		hist := testutil.LabeledHistogram(val).Histogram
+		if err := hist.Validate(); err != nil {
+			klog.Error(err)
+			return nil
+		}
+		q50 := hist.Quantile(0.50)
+		q90 := hist.Quantile(0.90)
+		q99 := hist.Quantile(0.95)
+		avg := hist.Average()
+
+		msFactor := float64(time.Second) / float64(time.Millisecond)
+
+		dataItem := DataItem{
+			Labels: labelMap,
+			Data: map[string]float64{
+				"Perc50":  q50 * msFactor,
+				"Perc90":  q90 * msFactor,
+				"Perc99":  q99 * msFactor,
+				"Average": avg * msFactor,
+			},
+			Unit: "ms",
+		}
+		dataItems = append(dataItems, dataItem)
+	}
+
+	return dataItems
 }
 
 type throughputCollector struct {
