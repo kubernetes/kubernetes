@@ -232,9 +232,10 @@ github.com/container-storage-interface/spec/lib/go/csi
 # github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59 => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 # github.com/containerd/cgroups => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 github.com/containerd/cgroups/stats/v1
-# github.com/containerd/console v1.0.0 => github.com/containerd/console v1.0.0
+# github.com/containerd/console v1.0.1-0.20200918083944-f1b333f2c505 => github.com/containerd/console v1.0.1-0.20200918083944-f1b333f2c505
+## explicit
 github.com/containerd/console
-# github.com/containerd/console => github.com/containerd/console v1.0.0
+# github.com/containerd/console => github.com/containerd/console v1.0.1-0.20200918083944-f1b333f2c505
 # github.com/containerd/containerd v1.4.1 => github.com/containerd/containerd v1.4.1
 # github.com/containerd/containerd => github.com/containerd/containerd v1.4.1
 github.com/containerd/containerd/api/services/containers/v1
