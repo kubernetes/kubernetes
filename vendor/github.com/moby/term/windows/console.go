@@ -1,11 +1,11 @@
 // +build windows
 
-package windowsconsole // import "github.com/moby/term/windows"
+package windowsconsole
 
 import (
 	"os"
 
-	"github.com/Azure/go-ansiterm/winterm"
+	"golang.org/x/sys/windows"
 )
 
 // GetHandleInfo returns file descriptor and bool indicating whether the file is a console.
@@ -22,14 +22,18 @@ func GetHandleInfo(in interface{}) (uintptr, bool) {
 
 	if file, ok := in.(*os.File); ok {
 		inFd = file.Fd()
-		isTerminal = IsConsole(inFd)
+		isTerminal = isConsole(inFd)
 	}
 	return inFd, isTerminal
 }
 
 // IsConsole returns true if the given file descriptor is a Windows Console.
 // The code assumes that GetConsoleMode will return an error for file descriptors that are not a console.
-func IsConsole(fd uintptr) bool {
-	_, e := winterm.GetConsoleMode(fd)
-	return e == nil
+// Deprecated: use golang.org/x/sys/windows.GetConsoleMode() or golang.org/x/crypto/ssh/terminal.IsTerminal()
+var IsConsole = isConsole
+
+func isConsole(fd uintptr) bool {
+	var mode uint32
+	err := windows.GetConsoleMode(windows.Handle(fd), &mode)
+	return err == nil
 }

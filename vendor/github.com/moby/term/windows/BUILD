@@ -6,7 +6,7 @@ go_library(
         "ansi_reader.go",
         "ansi_writer.go",
         "console.go",
-        "windows.go",
+        "doc.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/moby/term/windows",
     importpath = "github.com/moby/term/windows",
@@ -15,7 +15,7 @@ go_library(
         "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/github.com/Azure/go-ansiterm:go_default_library",
             "//vendor/github.com/Azure/go-ansiterm/winterm:go_default_library",
-            "//vendor/github.com/sirupsen/logrus:go_default_library",
+            "//vendor/golang.org/x/sys/windows:go_default_library",
         ],
         "//conditions:default": [],
     }),
