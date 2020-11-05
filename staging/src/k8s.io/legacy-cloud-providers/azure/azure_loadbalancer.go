@@ -274,6 +274,65 @@ func (az *Cloud) getLoadBalancerResourceGroup() string {
 	return az.ResourceGroup
 }
 
+// cleanBackendpoolForPrimarySLB decouples the unwanted nodes from the standard load balancer.
+// This is needed because when migrating from single SLB to multiple SLBs, The existing
+// SLB's backend pool contains nodes from different agent pools, while we only want the
+// nodes from the primary agent pool to join the backend pool.
+func (az *Cloud) cleanBackendpoolForPrimarySLB(primarySLB *network.LoadBalancer, service *v1.Service, clusterName string) (*network.LoadBalancer, error) {
+	lbBackendPoolName := getBackendPoolName(clusterName, service)
+	lbResourceGroup := az.getLoadBalancerResourceGroup()
+	lbBackendPoolID := az.getBackendPoolID(to.String(primarySLB.Name), lbResourceGroup, lbBackendPoolName)
+	newBackendPools := make([]network.BackendAddressPool, 0)
+	if primarySLB.LoadBalancerPropertiesFormat != nil && primarySLB.BackendAddressPools != nil {
+		newBackendPools = *primarySLB.BackendAddressPools
+	}
+	vmSetNameToBackendIPConfigurationsToBeDeleted := make(map[string][]network.InterfaceIPConfiguration)
+	for j, bp := range newBackendPools {
+		if strings.EqualFold(to.String(bp.Name), lbBackendPoolName) {
+			klog.V(2).Infof("cleanBackendpoolForPrimarySLB: checking the backend pool %s from standard load balancer %s", to.String(bp.Name), to.String(primarySLB.Name))
+			if bp.BackendAddressPoolPropertiesFormat != nil && bp.BackendIPConfigurations != nil {
+				for i := len(*bp.BackendIPConfigurations) - 1; i >= 0; i-- {
+					ipConf := (*bp.BackendIPConfigurations)[i]
+					ipConfigID := to.String(ipConf.ID)
+					_, vmSetName, err := az.VMSet.GetNodeNameByIPConfigurationID(ipConfigID)
+					if err != nil {
+						return nil, err
+					}
+					primaryVMSetName := az.VMSet.GetPrimaryVMSetName()
+					if !strings.EqualFold(primaryVMSetName, vmSetName) {
+						klog.V(2).Infof("cleanBackendpoolForPrimarySLB: found unwanted vmSet %s, decouple it from the LB", vmSetName)
+						// construct a backendPool that only contains the IP config of the node to be deleted
+						interfaceIPConfigToBeDeleted := network.InterfaceIPConfiguration{
+							ID: to.StringPtr(ipConfigID),
+						}
+						vmSetNameToBackendIPConfigurationsToBeDeleted[vmSetName] = append(vmSetNameToBackendIPConfigurationsToBeDeleted[vmSetName], interfaceIPConfigToBeDeleted)
+						*bp.BackendIPConfigurations = append((*bp.BackendIPConfigurations)[:i], (*bp.BackendIPConfigurations)[i+1:]...)
+					}
+				}
+			}
+			newBackendPools[j] = bp
+			break
+		}
+	}
+	for vmSetName, backendIPConfigurationsToBeDeleted := range vmSetNameToBackendIPConfigurationsToBeDeleted {
+		backendpoolToBeDeleted := &[]network.BackendAddressPool{
+			{
+				ID: to.StringPtr(lbBackendPoolID),
+				BackendAddressPoolPropertiesFormat: &network.BackendAddressPoolPropertiesFormat{
+					BackendIPConfigurations: &backendIPConfigurationsToBeDeleted,
+				},
+			},
+		}
+		// decouple the backendPool from the node
+		err := az.VMSet.EnsureBackendPoolDeleted(service, lbBackendPoolID, vmSetName, backendpoolToBeDeleted)
+		if err != nil {
+			return nil, err
+		}
+		primarySLB.BackendAddressPools = &newBackendPools
+	}
+	return primarySLB, nil
+}
+
 // getServiceLoadBalancer gets the loadbalancer for the service if it already exists.
 // If wantLb is TRUE then -it selects a new load balancer.
 // In case the selected load balancer does not exist it returns network.LoadBalancer struct
@@ -284,6 +343,7 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 	var defaultLB *network.LoadBalancer
 	primaryVMSetName := az.VMSet.GetPrimaryVMSetName()
 	defaultLBName := az.getAzureLoadBalancerName(clusterName, primaryVMSetName, isInternal)
+	useMultipleSLBs := az.useStandardLoadBalancer() && az.EnableMultipleStandardLoadBalancers
 
 	existingLBs, err := az.ListLB(service)
 	if err != nil {
@@ -293,6 +353,13 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 	// check if the service already has a load balancer
 	for i := range existingLBs {
 		existingLB := existingLBs[i]
+		if strings.EqualFold(to.String(existingLB.Name), clusterName) && useMultipleSLBs {
+			cleanedLB, err := az.cleanBackendpoolForPrimarySLB(&existingLB, service, clusterName)
+			if err != nil {
+				return nil, nil, false, err
+			}
+			existingLB = *cleanedLB
+		}
 		if strings.EqualFold(*existingLB.Name, defaultLBName) {
 			defaultLB = &existingLB
 		}
@@ -312,13 +379,15 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 	}
 
 	hasMode, _, _ := getServiceLoadBalancerMode(service)
-	if az.useStandardLoadBalancer() && hasMode {
-		return nil, nil, false, fmt.Errorf("standard load balancer doesn't work with annotation %q", ServiceAnnotationLoadBalancerMode)
+	useSingleSLB := az.useStandardLoadBalancer() && !az.EnableMultipleStandardLoadBalancers
+	if useSingleSLB && hasMode {
+		klog.Warningf("single standard load balancer doesn't work with annotation %q, would ignore it", ServiceAnnotationLoadBalancerMode)
 	}
 
-	// service does not have a basic load balancer, select one.
-	// Standard load balancer doesn't need this because all backends nodes should be added to same LB.
-	if wantLb && !az.useStandardLoadBalancer() {
+	// Service does not have a load balancer, select one.
+	// Single standard load balancer doesn't need this because
+	// all backends nodes should be added to same LB.
+	if wantLb && !useSingleSLB {
 		// select new load balancer for service
 		selectedLB, exists, err := az.selectLoadBalancer(clusterName, service, &existingLBs, nodes)
 		if err != nil {
@@ -358,7 +427,7 @@ func (az *Cloud) selectLoadBalancer(clusterName string, service *v1.Service, exi
 		klog.Errorf("az.selectLoadBalancer: cluster(%s) service(%s) isInternal(%t) - az.GetVMSetNames failed, err=(%v)", clusterName, serviceName, isInternal, err)
 		return nil, false, err
 	}
-	klog.Infof("selectLoadBalancer: cluster(%s) service(%s) isInternal(%t) - vmSetNames %v", clusterName, serviceName, isInternal, *vmSetNames)
+	klog.V(2).Infof("selectLoadBalancer: cluster(%s) service(%s) isInternal(%t) - vmSetNames %v", clusterName, serviceName, isInternal, *vmSetNames)
 
 	mapExistingLBs := map[string]network.LoadBalancer{}
 	for _, lb := range *existingLBs {
@@ -371,9 +440,16 @@ func (az *Cloud) selectLoadBalancer(clusterName string, service *v1.Service, exi
 		if !exists {
 			// select this LB as this is a new LB and will have minimum rules
 			// create tmp lb struct to hold metadata for the new load-balancer
+			var loadBalancerSKU network.LoadBalancerSkuName
+			if az.useStandardLoadBalancer() {
+				loadBalancerSKU = network.LoadBalancerSkuNameStandard
+			} else {
+				loadBalancerSKU = network.LoadBalancerSkuNameBasic
+			}
 			selectedLB = &network.LoadBalancer{
 				Name:                         &currLBName,
 				Location:                     &az.Location,
+				Sku:                          &network.LoadBalancerSku{Name: loadBalancerSKU},
 				LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{},
 			}
 
@@ -852,17 +928,17 @@ func (az *Cloud) isFrontendIPChanged(clusterName string, config network.Frontend
 	return config.PublicIPAddress != nil && !strings.EqualFold(to.String(pip.ID), to.String(config.PublicIPAddress.ID)), nil
 }
 
-// isFrontendIPConfigIsUnsafeToDelete checks if a frontend IP config is safe to be deleted.
+// isFrontendIPConfigUnsafeToDelete checks if a frontend IP config is safe to be deleted.
 // It is safe to be deleted if and only if there is no reference from other
 // loadBalancing resources, including loadBalancing rules, outbound rules, inbound NAT rules
 // and inbound NAT pools.
-func (az *Cloud) isFrontendIPConfigIsUnsafeToDelete(
+func (az *Cloud) isFrontendIPConfigUnsafeToDelete(
 	lb *network.LoadBalancer,
 	service *v1.Service,
 	fipConfigID *string,
 ) (bool, error) {
 	if lb == nil || fipConfigID == nil || *fipConfigID == "" {
-		return false, fmt.Errorf("isFrontendIPConfigIsUnsafeToDelete: incorrect parameters")
+		return false, fmt.Errorf("isFrontendIPConfigUnsafeToDelete: incorrect parameters")
 	}
 
 	var (
@@ -896,7 +972,7 @@ func (az *Cloud) isFrontendIPConfigIsUnsafeToDelete(
 			lbRule.FrontendIPConfiguration.ID != nil &&
 			strings.EqualFold(*lbRule.FrontendIPConfiguration.ID, *fipConfigID) {
 			if !az.serviceOwnsRule(service, *lbRule.Name) {
-				warningMsg := fmt.Sprintf("isFrontendIPConfigIsUnsafeToDelete: frontend IP configuration with ID %s on LB %s cannot be deleted because it is being referenced by load balancing rules of other services", *fipConfigID, *lb.Name)
+				warningMsg := fmt.Sprintf("isFrontendIPConfigUnsafeToDelete: frontend IP configuration with ID %s on LB %s cannot be deleted because it is being referenced by load balancing rules of other services", *fipConfigID, *lb.Name)
 				klog.Warning(warningMsg)
 				az.Event(service, v1.EventTypeWarning, "DeletingFrontendIPConfiguration", warningMsg)
 				unsafe = true
@@ -911,7 +987,7 @@ func (az *Cloud) isFrontendIPConfigIsUnsafeToDelete(
 		if outboundRule.OutboundRulePropertiesFormat != nil && outboundRule.FrontendIPConfigurations != nil {
 			outboundRuleFIPConfigs := *outboundRule.FrontendIPConfigurations
 			if found := findMatchedOutboundRuleFIPConfig(fipConfigID, outboundRuleFIPConfigs); found {
-				warningMsg := fmt.Sprintf("isFrontendIPConfigIsUnsafeToDelete: frontend IP configuration with ID %s on LB %s cannot be deleted because it is being referenced by the outbound rule %s", *fipConfigID, *lb.Name, *outboundRule.Name)
+				warningMsg := fmt.Sprintf("isFrontendIPConfigUnsafeToDelete: frontend IP configuration with ID %s on LB %s cannot be deleted because it is being referenced by the outbound rule %s", *fipConfigID, *lb.Name, *outboundRule.Name)
 				klog.Warning(warningMsg)
 				az.Event(service, v1.EventTypeWarning, "DeletingFrontendIPConfiguration", warningMsg)
 				unsafe = true
@@ -927,7 +1003,7 @@ func (az *Cloud) isFrontendIPConfigIsUnsafeToDelete(
 			inboundNatRule.FrontendIPConfiguration != nil &&
 			inboundNatRule.FrontendIPConfiguration.ID != nil &&
 			strings.EqualFold(*inboundNatRule.FrontendIPConfiguration.ID, *fipConfigID) {
-			warningMsg := fmt.Sprintf("isFrontendIPConfigIsUnsafeToDelete: frontend IP configuration with ID %s on LB %s cannot be deleted because it is being referenced by the inbound NAT rule %s", *fipConfigID, *lb.Name, *inboundNatRule.Name)
+			warningMsg := fmt.Sprintf("isFrontendIPConfigUnsafeToDelete: frontend IP configuration with ID %s on LB %s cannot be deleted because it is being referenced by the inbound NAT rule %s", *fipConfigID, *lb.Name, *inboundNatRule.Name)
 			klog.Warning(warningMsg)
 			az.Event(service, v1.EventTypeWarning, "DeletingFrontendIPConfiguration", warningMsg)
 			unsafe = true
@@ -942,7 +1018,7 @@ func (az *Cloud) isFrontendIPConfigIsUnsafeToDelete(
 			inboundNatPool.FrontendIPConfiguration != nil &&
 			inboundNatPool.FrontendIPConfiguration.ID != nil &&
 			strings.EqualFold(*inboundNatPool.FrontendIPConfiguration.ID, *fipConfigID) {
-			warningMsg := fmt.Sprintf("isFrontendIPConfigIsUnsafeToDelete: frontend IP configuration with ID %s on LB %s cannot be deleted because it is being referenced by the inbound NAT pool %s", *fipConfigID, *lb.Name, *inboundNatPool.Name)
+			warningMsg := fmt.Sprintf("isFrontendIPConfigUnsafeToDelete: frontend IP configuration with ID %s on LB %s cannot be deleted because it is being referenced by the inbound NAT pool %s", *fipConfigID, *lb.Name, *inboundNatPool.Name)
 			klog.Warning(warningMsg)
 			az.Event(service, v1.EventTypeWarning, "DeletingFrontendIPConfiguration", warningMsg)
 			unsafe = true
@@ -989,7 +1065,7 @@ func nodeNameInNodes(nodeName string, nodes []*v1.Node) bool {
 	return false
 }
 
-// This ensures load balancer exists and the frontend ip config is setup.
+// reconcileLoadBalancer ensures load balancer exists and the frontend ip config is setup.
 // This also reconciles the Service's Ports  with the LoadBalancer config.
 // This entails adding rules/probes for expected Ports and removing stale rules/ports.
 // nodes only used if wantLb is true
@@ -1035,7 +1111,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 				if bp.BackendAddressPoolPropertiesFormat != nil && bp.BackendIPConfigurations != nil {
 					for _, ipConf := range *bp.BackendIPConfigurations {
 						ipConfID := to.String(ipConf.ID)
-						nodeName, err := az.VMSet.GetNodeNameByIPConfigurationID(ipConfID)
+						nodeName, _, err := az.VMSet.GetNodeNameByIPConfigurationID(ipConfID)
 						if err != nil {
 							return nil, err
 						}
@@ -1106,7 +1182,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 				return nil, err
 			}
 			if isServiceOwnsFrontendIP {
-				unsafe, err := az.isFrontendIPConfigIsUnsafeToDelete(lb, service, config.ID)
+				unsafe, err := az.isFrontendIPConfigUnsafeToDelete(lb, service, config.ID)
 				if err != nil {
 					return nil, err
 				}
