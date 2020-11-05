@@ -81,7 +81,7 @@ type TestContextType struct {
 	KubeVolumeDir      string
 	CertDir            string
 	Host               string
-	BearerToken        string
+	BearerToken        string `datapolicy:"token"`
 	// TODO: Deprecating this over time... instead just use gobindata_util.go , see #23987.
 	RepoRoot                string
 	DockershimCheckpointDir string

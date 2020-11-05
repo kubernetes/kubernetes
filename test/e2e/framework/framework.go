@@ -569,8 +569,8 @@ type KubeUser struct {
 	Name string `yaml:"name"`
 	User struct {
 		Username string `yaml:"username"`
-		Password string `yaml:"password"`
-		Token    string `yaml:"token"`
+		Password string `yaml:"password" datapolicy:"password"`
+		Token    string `yaml:"token" datapolicy:"token"`
 	} `yaml:"user"`
 }
 
