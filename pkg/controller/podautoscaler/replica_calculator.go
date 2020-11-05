@@ -74,8 +74,9 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 		return 0, 0, 0, time.Time{}, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 
-	readyPodCount, ignoredPods, missingPods := groupPods(podList, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
+	readyPodCount, unreadyPods, missingPods, ignoredPods := groupPods(podList, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
 	removeMetricsForPods(metrics, ignoredPods)
+	removeMetricsForPods(metrics, unreadyPods)
 	requests, err := calculatePodRequests(podList, resource)
 	if err != nil {
 		return 0, 0, 0, time.Time{}, err
@@ -90,7 +91,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 		return 0, 0, 0, time.Time{}, err
 	}
 
-	rebalanceIgnored := len(ignoredPods) > 0 && usageRatio > 1.0
+	rebalanceIgnored := len(unreadyPods) > 0 && usageRatio > 1.0
 	if !rebalanceIgnored && len(missingPods) == 0 {
 		if math.Abs(1.0-usageRatio) <= c.tolerance {
 			// return the current replicas if the change would be too small
@@ -117,7 +118,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 
 	if rebalanceIgnored {
 		// on a scale-up, treat unready pods as using 0% of the resource request
-		for podName := range ignoredPods {
+		for podName := range unreadyPods {
 			metrics[podName] = metricsclient.PodMetric{Value: 0}
 		}
 	}
@@ -182,8 +183,9 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 		return 0, 0, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 
-	readyPodCount, ignoredPods, missingPods := groupPods(podList, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
+	readyPodCount, unreadyPods, missingPods, ignoredPods := groupPods(podList, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
 	removeMetricsForPods(metrics, ignoredPods)
+	removeMetricsForPods(metrics, unreadyPods)
 
 	if len(metrics) == 0 {
 		return 0, 0, fmt.Errorf("did not receive metrics for any ready pods")
@@ -191,7 +193,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 
 	usageRatio, utilization := metricsclient.GetMetricUtilizationRatio(metrics, targetUtilization)
 
-	rebalanceIgnored := len(ignoredPods) > 0 && usageRatio > 1.0
+	rebalanceIgnored := len(unreadyPods) > 0 && usageRatio > 1.0
 
 	if !rebalanceIgnored && len(missingPods) == 0 {
 		if math.Abs(1.0-usageRatio) <= c.tolerance {
@@ -219,7 +221,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 
 	if rebalanceIgnored {
 		// on a scale-up, treat unready pods as using 0% of the resource request
-		for podName := range ignoredPods {
+		for podName := range unreadyPods {
 			metrics[podName] = metricsclient.PodMetric{Value: 0}
 		}
 	}
@@ -364,16 +366,18 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 	return replicaCount, utilization, timestamp, nil
 }
 
-func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1.ResourceName, cpuInitializationPeriod, delayOfInitialReadinessStatus time.Duration) (readyPodCount int, ignoredPods sets.String, missingPods sets.String) {
+func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1.ResourceName, cpuInitializationPeriod, delayOfInitialReadinessStatus time.Duration) (readyPodCount int, unreadyPods, missingPods, ignoredPods sets.String) {
 	missingPods = sets.NewString()
+	unreadyPods = sets.NewString()
 	ignoredPods = sets.NewString()
 	for _, pod := range pods {
 		if pod.DeletionTimestamp != nil || pod.Status.Phase == v1.PodFailed {
+			ignoredPods.Insert(pod.Name)
 			continue
 		}
 		// Pending pods are ignored.
 		if pod.Status.Phase == v1.PodPending {
-			ignoredPods.Insert(pod.Name)
+			unreadyPods.Insert(pod.Name)
 			continue
 		}
 		// Pods missing metrics.
@@ -384,22 +388,22 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 		}
 		// Unready pods are ignored.
 		if resource == v1.ResourceCPU {
-			var ignorePod bool
+			var unready bool
 			_, condition := podutil.GetPodCondition(&pod.Status, v1.PodReady)
 			if condition == nil || pod.Status.StartTime == nil {
-				ignorePod = true
+				unready = true
 			} else {
 				// Pod still within possible initialisation period.
 				if pod.Status.StartTime.Add(cpuInitializationPeriod).After(time.Now()) {
 					// Ignore sample if pod is unready or one window of metric wasn't collected since last state transition.
-					ignorePod = condition.Status == v1.ConditionFalse || metric.Timestamp.Before(condition.LastTransitionTime.Time.Add(metric.Window))
+					unready = condition.Status == v1.ConditionFalse || metric.Timestamp.Before(condition.LastTransitionTime.Time.Add(metric.Window))
 				} else {
 					// Ignore metric if pod is unready and it has never been ready.
-					ignorePod = condition.Status == v1.ConditionFalse && pod.Status.StartTime.Add(delayOfInitialReadinessStatus).After(condition.LastTransitionTime.Time)
+					unready = condition.Status == v1.ConditionFalse && pod.Status.StartTime.Add(delayOfInitialReadinessStatus).After(condition.LastTransitionTime.Time)
 				}
 			}
-			if ignorePod {
-				ignoredPods.Insert(pod.Name)
+			if unready {
+				unreadyPods.Insert(pod.Name)
 				continue
 			}
 		}
