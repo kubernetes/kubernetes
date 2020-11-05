@@ -453,7 +453,7 @@ func NewProxier(ipt utiliptables.Interface,
 	var incorrectAddresses []string
 	nodePortAddresses, incorrectAddresses = utilproxy.FilterIncorrectCIDRVersion(nodePortAddresses, ipFamily)
 	if len(incorrectAddresses) > 0 {
-		klog.Warning("NodePortAddresses of wrong family; ", incorrectAddresses)
+		klog.Warningf("NodePortAddresses of wrong family; %s", incorrectAddresses)
 	}
 	proxier := &Proxier{
 		ipFamily:              ipFamily,
