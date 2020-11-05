@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"net/http"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -35,7 +37,7 @@ import (
 // 2. read requests,
 // 3. write requests to the storageversion API,
 // 4. resources whose StorageVersion is not pending update, including non-persisted resources.
-func WithStorageVersionPrecondition(handler http.Handler, svm storageversion.Manager) http.Handler {
+func WithStorageVersionPrecondition(handler http.Handler, svm storageversion.Manager, s runtime.NegotiatedSerializer) http.Handler {
 	if svm == nil {
 		// TODO(roycaihw): switch to warning after the feature graduate to beta/GA
 		klog.V(2).Infof("Storage Version barrier is disabled")
@@ -75,6 +77,7 @@ func WithStorageVersionPrecondition(handler http.Handler, svm storageversion.Man
 			return
 		}
 
-		responsewriters.ServiceUnavailabeError(w, req, errors.New(fmt.Sprintf("wait for storage version registration to complete for resource: %v, last seen error: %v", gr, svm.LastUpdateError(gr))))
+		gv := schema.GroupVersion{requestInfo.APIGroup, requestInfo.APIVersion}
+		responsewriters.ErrorNegotiated(apierrors.NewServiceUnavailable(fmt.Sprintf("wait for storage version registration to complete for resource: %v, last seen error: %v", gr, svm.LastUpdateError(gr))), s, gv, w, req)
 	})
 }
