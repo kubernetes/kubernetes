@@ -61,7 +61,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 
 			framework.ExpectEqual(len(internalIPs), 2)
 			// assert 2 ips belong to different families
-			framework.ExpectEqual(isIPv4(internalIPs[0]) != isIPv4(internalIPs[1]), true)
+			framework.ExpectEqual(netutils.IsIPv4String(internalIPs[0]) != netutils.IsIPv4String(internalIPs[1]), true)
 		}
 	})
 
@@ -75,7 +75,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			// assert podCIDR is same as podCIDRs[0]
 			framework.ExpectEqual(node.Spec.PodCIDR, node.Spec.PodCIDRs[0])
 			// assert one is ipv4 and other is ipv6
-			framework.ExpectEqual(isIPv4CIDR(node.Spec.PodCIDRs[0]) != isIPv4CIDR(node.Spec.PodCIDRs[1]), true)
+			framework.ExpectEqual(netutils.IsIPv4CIDRString(node.Spec.PodCIDRs[0]) != netutils.IsIPv4CIDRString(node.Spec.PodCIDRs[1]), true)
 		}
 	})
 
@@ -108,7 +108,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		// validate first ip in PodIPs is same as PodIP
 		framework.ExpectEqual(p.Status.PodIP, p.Status.PodIPs[0].IP)
 		// assert 2 pod ips belong to different families
-		framework.ExpectEqual(isIPv4(p.Status.PodIPs[0].IP) != isIPv4(p.Status.PodIPs[1].IP), true)
+		framework.ExpectEqual(netutils.IsIPv4String(p.Status.PodIPs[0].IP) != netutils.IsIPv4String(p.Status.PodIPs[1].IP), true)
 
 		ginkgo.By("deleting the pod")
 		err := podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(30))
@@ -501,7 +501,7 @@ func assertNetworkConnectivity(f *framework.Framework, serverPods v1.PodList, cl
 		if pod.Status.PodIPs == nil || len(pod.Status.PodIPs) != 2 {
 			framework.Failf("PodIPs list not expected value, got %v", pod.Status.PodIPs)
 		}
-		if isIPv4(pod.Status.PodIPs[0].IP) == isIPv4(pod.Status.PodIPs[1].IP) {
+		if netutils.IsIPv4String(pod.Status.PodIPs[0].IP) == netutils.IsIPv4String(pod.Status.PodIPs[1].IP) {
 			framework.Failf("PodIPs should belong to different families, got %v", pod.Status.PodIPs)
 		}
 		serverIPs = append(serverIPs, pod.Status.PodIPs[0].IP, pod.Status.PodIPs[1].IP)
@@ -523,22 +523,6 @@ func checkNetworkConnectivity(ip, port string, timeout int) []string {
 	curl := fmt.Sprintf("curl -g --connect-timeout %v http://%s", timeout, net.JoinHostPort(ip, port))
 	cmd := []string{"/bin/sh", "-c", curl}
 	return cmd
-}
-
-// isIPv4 checks if the provided ip belongs to ipv4 family.
-// If ip belongs to ipv4 family, return true else it returns false
-// TODO (aramase) move this to https://github.com/kubernetes/utils/blob/master/net/net.go
-func isIPv4(ip string) bool {
-	return net.ParseIP(ip).To4() != nil
-}
-
-// isIPv4CIDR checks if the provided cidr block belongs to ipv4 family.
-// If cidr belongs to ipv4 family, return true else it returns false
-// TODO (aramase) move this to https://github.com/kubernetes/utils/blob/master/net/net.go
-func isIPv4CIDR(cidr string) bool {
-	ip, _, err := net.ParseCIDR(cidr)
-	framework.ExpectNoError(err)
-	return isIPv4(ip.String())
 }
 
 // createService returns a service spec with defined arguments
