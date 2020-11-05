@@ -199,6 +199,9 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 		}
 	}
 	if o.ServiceAccounts != nil && utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.RootCAConfigMap) {
+			allErrors = append(allErrors, errors.New("BoundServiceAccountTokenVolume feature depends on RootCAConfigMap feature, but RootCAConfigMap features is not enabled"))
+		}
 		if len(o.ServiceAccounts.Issuer) == 0 {
 			allErrors = append(allErrors, errors.New("service-account-issuer is a required flag when BoundServiceAccountTokenVolume is enabled"))
 		}
