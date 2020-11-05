@@ -34,6 +34,7 @@ import (
 type fakeOutput struct {
 	args   []string
 	output string
+	stderr string
 }
 
 var (
@@ -87,6 +88,10 @@ var (
   "token_expiry": "sometime soon, idk"
   ------
 `},
+		"reauth": {
+			args: []string{},
+			stderr: "Reauthentication required.",
+		},
 	}
 )
 
@@ -114,6 +119,10 @@ func TestHelperProcess(t *testing.T) {
 		os.Exit(1)
 	}
 	fmt.Fprintf(os.Stdout, output.output)
+	if output.stderr != "" {
+		fmt.Fprintf(os.Stderr, output.stderr)
+		os.Exit(1)
+	}
 	os.Exit(0)
 }
 
@@ -342,6 +351,19 @@ func TestCmdTokenSource(t *testing.T) {
 			nil,
 			nil,
 			fmt.Errorf("invalid character '-' after object key:value pair"),
+		},
+		{
+			"reauth",
+			map[string]string{
+				"cmd-path": "reauth",
+			},
+			nil,
+			nil,
+			fmt.Errorf(`Reauthentication required. Please run:
+
+  gcloud auth login
+
+to obtain new credentials.`),
 		},
 	}
 

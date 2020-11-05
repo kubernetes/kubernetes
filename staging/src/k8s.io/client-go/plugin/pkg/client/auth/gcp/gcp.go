@@ -300,6 +300,9 @@ func (c *commandTokenSource) Token() (*oauth2.Token, error) {
 	cmd.Stderr = &stderr
 	output, err := cmd.Output()
 	if err != nil {
+		if bytes.Contains(stderr.Bytes(), []byte("Reauthentication required")) {
+			return nil, fmt.Errorf("Reauthentication required. Please run:\n\n  gcloud auth login\n\nto obtain new credentials.")
+		}
 		return nil, fmt.Errorf("error executing access token command %q: err=%v output=%s stderr=%s", fullCmd, err, output, string(stderr.Bytes()))
 	}
 	token, err := c.parseTokenCmdOutput(output)
