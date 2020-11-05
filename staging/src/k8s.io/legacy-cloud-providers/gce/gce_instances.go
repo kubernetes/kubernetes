@@ -498,7 +498,11 @@ func (g *Cloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
 		return nil, err
 	}
 	if len(foundInstances) != len(names) {
-		return nil, cloudprovider.InstanceNotFound
+		if len(foundInstances) == 0 {
+			// return error so the TargetPool nodecount does not drop to 0 unexpectedly.
+			return nil, cloudprovider.InstanceNotFound
+		}
+		klog.Warningf("getFoundInstanceByNames - input instances %d, found %d. Continuing LoadBalancer Update", len(names), len(foundInstances))
 	}
 	return foundInstances, nil
 }
