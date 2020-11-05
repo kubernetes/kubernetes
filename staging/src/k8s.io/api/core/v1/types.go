@@ -3298,7 +3298,7 @@ type PodSecurityContext struct {
 	// volume types which support fsGroup based ownership(and permissions).
 	// It will have no effect on ephemeral volume types such as: secret, configmaps
 	// and emptydir.
-	// Valid values are "OnRootMismatch" and "Always". If not specified defaults to "Always".
+	// Valid values are "OnRootMismatch" and "Always". If not specified, "Always" is used.
 	// +optional
 	FSGroupChangePolicy *PodFSGroupChangePolicy `json:"fsGroupChangePolicy,omitempty" protobuf:"bytes,9,opt,name=fsGroupChangePolicy"`
 	// The seccomp options to use by the containers in this pod.
