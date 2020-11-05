@@ -83,14 +83,7 @@ func (o *PathOptions) GetEnvVarFiles() []string {
 }
 
 func (o *PathOptions) GetLoadingPrecedence() []string {
-	if o.IsExplicitFile() {
-		return []string{o.GetExplicitFile()}
-	}
-
-	if envVarFiles := o.GetEnvVarFiles(); len(envVarFiles) > 0 {
-		return envVarFiles
-	}
-	return []string{o.GlobalFile}
+	return o.LoadingRules.GetLoadingPrecedence()
 }
 
 func (o *PathOptions) GetStartingConfig() (*clientcmdapi.Config, error) {
@@ -111,39 +104,15 @@ func (o *PathOptions) GetStartingConfig() (*clientcmdapi.Config, error) {
 }
 
 func (o *PathOptions) GetDefaultFilename() string {
-	if o.IsExplicitFile() {
-		return o.GetExplicitFile()
-	}
-
-	if envVarFiles := o.GetEnvVarFiles(); len(envVarFiles) > 0 {
-		if len(envVarFiles) == 1 {
-			return envVarFiles[0]
-		}
-
-		// if any of the envvar files already exists, return it
-		for _, envVarFile := range envVarFiles {
-			if _, err := os.Stat(envVarFile); err == nil {
-				return envVarFile
-			}
-		}
-
-		// otherwise, return the last one in the list
-		return envVarFiles[len(envVarFiles)-1]
-	}
-
-	return o.GlobalFile
+	return o.LoadingRules.GetDefaultFilename()
 }
 
 func (o *PathOptions) IsExplicitFile() bool {
-	if len(o.LoadingRules.ExplicitPath) > 0 {
-		return true
-	}
-
-	return false
+	return o.LoadingRules.IsExplicitFile()
 }
 
 func (o *PathOptions) GetExplicitFile() string {
-	return o.LoadingRules.ExplicitPath
+	return o.LoadingRules.GetExplicitFile()
 }
 
 func NewDefaultPathOptions() *PathOptions {
