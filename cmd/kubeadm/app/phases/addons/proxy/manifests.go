@@ -80,7 +80,9 @@ spec:
         - --config=/var/lib/kube-proxy/{{ .ProxyConfigMapKey }}
         - --hostname-override=$(NODE_NAME)
         securityContext:
-          privileged: true
+	  capabilities:
+	    add:
+	    - NET_ADMIN
         volumeMounts:
         - mountPath: /var/lib/kube-proxy
           name: kube-proxy
