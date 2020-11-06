@@ -588,6 +588,12 @@ const (
 	//        medium: HugePages-1Gi
 	HugePageStorageMediumSize featuregate.Feature = "HugePageStorageMediumSize"
 
+	// owner: @derekwaynecarr
+	// alpha: v1.20
+	//
+	// Enables usage of hugepages-<size> in downward API.
+	DownwardAPIHugePages featuregate.Feature = "DownwardAPIHugePages"
+
 	// owner: @freehan
 	// GA: v1.18
 	//
@@ -757,6 +763,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.Beta},
 	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.Beta},
 	HugePageStorageMediumSize:                      {Default: true, PreRelease: featuregate.Beta},
+	DownwardAPIHugePages:                           {Default: false, PreRelease: featuregate.Alpha},
 	ExternalPolicyForExternalIP:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
 	DefaultPodTopologySpread:                       {Default: true, PreRelease: featuregate.Beta},

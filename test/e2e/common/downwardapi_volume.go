@@ -261,7 +261,6 @@ var _ = ginkgo.Describe("[sig-storage] Downward API volume", func() {
 
 		f.TestContainerOutputRegexp("downward API volume plugin", pod, 0, []string{"[1-9]"})
 	})
-
 })
 
 func downwardAPIVolumePodForModeTest(name, filePath string, itemMode, defaultMode *int32) *v1.Pod {
