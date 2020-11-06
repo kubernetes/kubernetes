@@ -194,6 +194,10 @@ type DelegatingAuthenticationOptions struct {
 	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
 	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
 	WebhookRetryBackoff *wait.Backoff
+
+	// ClientTimeout specifies a time limit for requests made by the authorization webhook client.
+	// The default value is set to 10 seconds.
+	ClientTimeout time.Duration
 }
 
 func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
@@ -207,12 +211,18 @@ func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
 			ExtraHeaderPrefixes: []string{"x-remote-extra-"},
 		},
 		WebhookRetryBackoff: DefaultAuthWebhookRetryBackoff(),
+		ClientTimeout:       10 * time.Second,
 	}
 }
 
 // WithCustomRetryBackoff sets the custom backoff parameters for the authentication webhook retry logic.
 func (s *DelegatingAuthenticationOptions) WithCustomRetryBackoff(backoff wait.Backoff) {
 	s.WebhookRetryBackoff = &backoff
+}
+
+// WithClientTimeout sets the given timeout for the authentication webhook client.
+func (s *DelegatingAuthenticationOptions) WithClientTimeout(timeout time.Duration) {
+	s.ClientTimeout = timeout
 }
 
 func (s *DelegatingAuthenticationOptions) Validate() []error {
@@ -405,6 +415,7 @@ func (s *DelegatingAuthenticationOptions) getClient() (kubernetes.Interface, err
 	// set high qps/burst limits since this will effectively limit API server responsiveness
 	clientConfig.QPS = 200
 	clientConfig.Burst = 400
+	clientConfig.Timeout = s.ClientTimeout
 
 	return kubernetes.NewForConfig(clientConfig)
 }
