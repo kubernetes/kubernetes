@@ -163,6 +163,8 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 		zone := framework.TestContext.CloudConfig.Zone
 		if z, ok := node.Labels[v1.LabelFailureDomainBetaZone]; ok {
 			zone = z
+		} else if z, ok := node.Labels[v1.LabelTopologyZone]; ok {
+			zone = z
 		}
 		nodeNamesByZone[zone] = append(nodeNamesByZone[zone], node.Name)
 	}
