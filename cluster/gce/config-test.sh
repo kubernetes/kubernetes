@@ -592,3 +592,9 @@ export ETCD_PROGRESS_NOTIFY_INTERVAL="${ETCD_PROGRESS_NOTIFY_INTERVAL:-10m}"
 
 # Use host IP instead of localhost in control plane kubeconfig files.
 export KUBECONFIG_USE_HOST_IP="${KUBECONFIG_USE_HOST_IP:-false}"
+
+# Optional: Install Pigz on Windows.
+# Pigz is a multi-core optimized version of unzip.exe.
+# It improves container image pull performance since most time is spent
+# unzipping the image layers to disk.
+export WINDOWS_ENABLE_PIGZ="${WINDOWS_ENABLE_PIGZ:-true}"
