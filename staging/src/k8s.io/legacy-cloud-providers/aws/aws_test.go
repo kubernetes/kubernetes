@@ -2961,7 +2961,7 @@ func TestCloud_buildNLBHealthCheckConfiguration(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name: "invalid interval",
+			name: "interval not 10 or 30",
 			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-svc",
@@ -2982,8 +2982,15 @@ func TestCloud_buildNLBHealthCheckConfiguration(t *testing.T) {
 					},
 				},
 			},
-			want:      healthCheckConfig{},
-			wantError: true,
+			want: healthCheckConfig{
+				Port:               "traffic-port",
+				Protocol:           elbv2.ProtocolEnumTcp,
+				Interval:           23,
+				Timeout:            10,
+				HealthyThreshold:   3,
+				UnhealthyThreshold: 3,
+			},
+			wantError: false,
 		},
 		{
 			name: "invalid timeout",
@@ -3033,8 +3040,15 @@ func TestCloud_buildNLBHealthCheckConfiguration(t *testing.T) {
 					},
 				},
 			},
-			want:      healthCheckConfig{},
-			wantError: true,
+			want:      healthCheckConfig{
+				Port:               "traffic-port",
+				Protocol:           elbv2.ProtocolEnumTcp,
+				Interval:           30,
+				Timeout:            10,
+				HealthyThreshold:   7,
+				UnhealthyThreshold: 5,
+			},
+			wantError: false,
 		},
 	}
 
