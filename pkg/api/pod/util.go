@@ -21,8 +21,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
+	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -281,6 +286,91 @@ func UpdatePodCondition(status *api.PodStatus, condition *api.PodCondition) bool
 	status.Conditions[conditionIndex] = *condition
 	// Return true if one of the fields have changed.
 	return !isEqual
+}
+
+// usesHugePagesInProjectedVolume returns true if hugepages are used in downward api for volume
+func usesHugePagesInProjectedVolume(podSpec *api.PodSpec) bool {
+	// determine if any container is using hugepages in downward api volume
+	for _, volumeSource := range podSpec.Volumes {
+		if volumeSource.DownwardAPI != nil {
+			for _, item := range volumeSource.DownwardAPI.Items {
+				if item.ResourceFieldRef != nil {
+					if strings.HasPrefix(item.ResourceFieldRef.Resource, "requests.hugepages-") || strings.HasPrefix(item.ResourceFieldRef.Resource, "limits.hugepages-") {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+// usesHugePagesInProjectedEnv returns true if hugepages are used in downward api for volume
+func usesHugePagesInProjectedEnv(item api.Container) bool {
+	for _, env := range item.Env {
+		if env.ValueFrom != nil {
+			if env.ValueFrom.ResourceFieldRef != nil {
+				if strings.HasPrefix(env.ValueFrom.ResourceFieldRef.Resource, "requests.hugepages-") || strings.HasPrefix(env.ValueFrom.ResourceFieldRef.Resource, "limits.hugepages-") {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// usesMultipleHugePageResources returns true if the pod spec uses more than
+// one size of hugepage
+func usesMultipleHugePageResources(podSpec *api.PodSpec) bool {
+	hugePageResources := sets.NewString()
+	resourceSet := helper.ToPodResourcesSet(podSpec)
+	for resourceStr := range resourceSet {
+		if v1helper.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
+			hugePageResources.Insert(resourceStr)
+		}
+	}
+	return len(hugePageResources) > 1
+}
+
+// GetValidationOptionsFromPodSpec returns validation options based on pod specs
+func GetValidationOptionsFromPodSpec(podSpec, oldPodSpec *api.PodSpec) apivalidation.PodValidationOptions {
+	// default pod validation options based on feature gate
+	opts := validation.PodValidationOptions{
+		// Allow multiple huge pages on pod create if feature is enabled
+		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
+		// Allow pod spec to use hugepages in downward API if feature is enabled
+		AllowDownwardAPIHugePages: utilfeature.DefaultFeatureGate.Enabled(features.DownwardAPIHugePages),
+	}
+	// if we are not doing an update operation, just return with default options
+	if oldPodSpec == nil {
+		return opts
+	}
+	// if old spec used multiple huge page sizes, we must allow it
+	opts.AllowMultipleHugePageResources = opts.AllowMultipleHugePageResources || usesMultipleHugePageResources(oldPodSpec)
+	// if old spec used hugepages in downward api, we must allow it
+	opts.AllowDownwardAPIHugePages = opts.AllowDownwardAPIHugePages || usesHugePagesInProjectedVolume(oldPodSpec)
+	// determine if any container is using hugepages in env var
+	if !opts.AllowDownwardAPIHugePages {
+		VisitContainers(oldPodSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+			opts.AllowDownwardAPIHugePages = opts.AllowDownwardAPIHugePages || usesHugePagesInProjectedEnv(*c)
+			return !opts.AllowDownwardAPIHugePages
+		})
+	}
+	return opts
+}
+
+// GetValidationOptionsFromPodTemplate will return pod validation options for specified template.
+func GetValidationOptionsFromPodTemplate(podTemplate, oldPodTemplate *api.PodTemplateSpec) apivalidation.PodValidationOptions {
+	var newPodSpec, oldPodSpec *api.PodSpec
+	// we have to be careful about nil pointers here
+	// replication controller in particular is prone to passing nil
+	if podTemplate != nil {
+		newPodSpec = &podTemplate.Spec
+	}
+	if oldPodTemplate != nil {
+		oldPodSpec = &oldPodTemplate.Spec
+	}
+	return GetValidationOptionsFromPodSpec(newPodSpec, oldPodSpec)
 }
 
 // DropDisabledTemplateFields removes disabled fields from the pod template metadata and spec.
