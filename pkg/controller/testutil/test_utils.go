@@ -40,7 +40,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	ref "k8s.io/client-go/tools/reference"
-	v1apply "k8s.io/client-go/typebuilders/core/v1"
+	v1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
