@@ -35,6 +35,7 @@ var testDrivers = []func() testsuites.TestDriver{
 	drivers.InitEmptydirDriver,
 	drivers.InitCinderDriver,
 	drivers.InitGcePdDriver,
+	drivers.InitWindowsGcePdDriver,
 	drivers.InitVSphereDriver,
 	drivers.InitAzureDiskDriver,
 	drivers.InitAwsDriver,
