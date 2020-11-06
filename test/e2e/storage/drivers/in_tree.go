@@ -1228,17 +1228,12 @@ var _ testsuites.DynamicPVTestDriver = &gcePdDriver{}
 
 // InitGcePdDriver returns gcePdDriver that implements TestDriver interface
 func InitGcePdDriver() testsuites.TestDriver {
-	// In current test structure, it first initialize the driver and then set up
-	// the new framework, so we cannot get the correct OS here. So here set to
-	// support all fs types including both linux and windows. We have code to check Node OS later
-	// during test.
 	supportedTypes := sets.NewString(
 		"", // Default fsType
 		"ext2",
 		"ext3",
 		"ext4",
 		"xfs",
-		"ntfs",
 	)
 	return &gcePdDriver{
 		driverInfo: testsuites.DriverInfo{
@@ -1259,6 +1254,38 @@ func InitGcePdDriver() testsuites.TestDriver {
 				testsuites.CapMultiPODs:           true,
 				testsuites.CapControllerExpansion: true,
 				testsuites.CapNodeExpansion:       true,
+				// GCE supports volume limits, but the test creates large
+				// number of volumes and times out test suites.
+				testsuites.CapVolumeLimits: false,
+				testsuites.CapTopology:     true,
+			},
+		},
+	}
+}
+
+// InitWindowsGcePdDriver returns gcePdDriver running on Windows cluster that implements TestDriver interface
+// In current test structure, it first initialize the driver and then set up
+// the new framework, so we cannot get the correct OS here and select which file system is supported.
+// So here uses a separate Windows in-tree gce pd driver
+func InitWindowsGcePdDriver() testsuites.TestDriver {
+	supportedTypes := sets.NewString(
+		"ntfs",
+	)
+	return &gcePdDriver{
+		driverInfo: testsuites.DriverInfo{
+			Name:             "windows-gcepd",
+			InTreePluginName: "kubernetes.io/gce-pd",
+			MaxFileSize:      testpatterns.FileSizeMedium,
+			SupportedSizeRange: e2evolume.SizeRange{
+				Min: "1Gi",
+			},
+			SupportedFsType: supportedTypes,
+			TopologyKeys:    []string{v1.LabelZoneFailureDomain},
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapControllerExpansion: false,
+				testsuites.CapPersistence:         true,
+				testsuites.CapExec:                true,
+				testsuites.CapMultiPODs:           true,
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
 				testsuites.CapVolumeLimits: false,
