@@ -351,9 +351,9 @@ func (m *FakeNodeHandler) Patch(_ context.Context, name string, pt types.PatchTy
 }
 
 // Apply applies a Node in the fake store.
-func (m *FakeNodeHandler) Apply(ctx context.Context, node v1apply.NodeBuilder, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.Node, err error) {
+func (m *FakeNodeHandler) Apply(ctx context.Context, node *v1apply.NodeApplyConfiguration, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.Node, err error) {
 	patchOpts := opts.ToPatchOptions(fieldManager)
-	data, err := node.MarshalJSON()
+	data, err := json.Marshal(node)
 	if err != nil {
 		return nil, err
 	}

@@ -912,7 +912,7 @@ func TestApplyWithApplyConfigurations(t *testing.T) {
 			t.Fatalf("unexpected error when converting Deployment to unstructured: %v", err)
 		}
 		mf := appsv1mf.Deployment()
-		err = mf.FromUnstructured(u)
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(u, mf)
 		if err != nil {
 			t.Fatalf("unexpected error when converting unstructured to manifest: %v", err)
 		}
