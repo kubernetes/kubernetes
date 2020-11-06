@@ -8,8 +8,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
 	github.com/evanphx/json-patch v4.9.0+incompatible
-	github.com/go-openapi/jsonreference v0.19.3 // indirect
-	github.com/go-openapi/spec v0.19.3 // indirect
 	github.com/googleapis/gnostic v0.4.1
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/mailru/easyjson v0.7.0 // indirect
@@ -22,7 +20,7 @@ require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
-	k8s.io/kube-openapi v0.0.0-20200923155610-8b5066479488
+	k8s.io/kube-openapi v0.0.0-20201107163737-74b467f3a622
 	sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/yaml v1.2.0
 )

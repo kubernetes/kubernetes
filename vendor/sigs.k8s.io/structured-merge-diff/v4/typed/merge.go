@@ -183,7 +183,7 @@ func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (err
 	if rhs != nil {
 		for i := 0; i < rhs.Length(); i++ {
 			child := rhs.At(i)
-			pe, err := listItemToPathElement(w.allocator, t, i, child)
+			pe, err := listItemToPathElement(w.allocator, w.schema, t, i, child)
 			if err != nil {
 				errs = append(errs, errorf("rhs: element %v: %v", i, err.Error())...)
 				// If we can't construct the path element, we can't
@@ -204,7 +204,7 @@ func (w *mergingWalker) visitListItems(t *schema.List, lhs, rhs value.List) (err
 	if lhs != nil {
 		for i := 0; i < lhs.Length(); i++ {
 			child := lhs.At(i)
-			pe, err := listItemToPathElement(w.allocator, t, i, child)
+			pe, err := listItemToPathElement(w.allocator, w.schema, t, i, child)
 			if err != nil {
 				errs = append(errs, errorf("lhs: element %v: %v", i, err.Error())...)
 				// If we can't construct the path element, we can't
