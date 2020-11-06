@@ -43,7 +43,7 @@ var systemDefaultConstraints = []v1.TopologySpreadConstraint{
 		MaxSkew:           3,
 	},
 	{
-		TopologyKey:       v1.LabelZoneFailureDomainStable,
+		TopologyKey:       v1.LabelTopologyZone,
 		WhenUnsatisfiable: v1.ScheduleAnyway,
 		MaxSkew:           5,
 	},

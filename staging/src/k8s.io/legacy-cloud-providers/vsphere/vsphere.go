@@ -1735,8 +1735,8 @@ func (vs *VSphere) GetVolumeLabels(volumePath string) (map[string]string, error)
 	// FIXME: For now, pick the first zone of datastore as the zone of volume
 	labels := make(map[string]string)
 	if len(dsZones) > 0 {
-		labels[v1.LabelZoneRegion] = dsZones[0].Region
-		labels[v1.LabelZoneFailureDomain] = dsZones[0].FailureDomain
+		labels[v1.LabelFailureDomainBetaRegion] = dsZones[0].Region
+		labels[v1.LabelFailureDomainBetaZone] = dsZones[0].FailureDomain
 	}
 	return labels, nil
 }

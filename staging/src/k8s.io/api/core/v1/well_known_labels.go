@@ -19,10 +19,16 @@ package v1
 const (
 	LabelHostname = "kubernetes.io/hostname"
 
-	LabelZoneFailureDomain       = "failure-domain.beta.kubernetes.io/zone"
-	LabelZoneRegion              = "failure-domain.beta.kubernetes.io/region"
-	LabelZoneFailureDomainStable = "topology.kubernetes.io/zone"
-	LabelZoneRegionStable        = "topology.kubernetes.io/region"
+	LabelFailureDomainBetaZone   = "failure-domain.beta.kubernetes.io/zone"
+	LabelFailureDomainBetaRegion = "failure-domain.beta.kubernetes.io/region"
+	LabelTopologyZone            = "topology.kubernetes.io/zone"
+	LabelTopologyRegion          = "topology.kubernetes.io/region"
+
+	// Legacy names for compat.
+	LabelZoneFailureDomain       = LabelFailureDomainBetaZone   // deprecated, remove after 1.20
+	LabelZoneRegion              = LabelFailureDomainBetaRegion // deprecated, remove after 1.20
+	LabelZoneFailureDomainStable = LabelTopologyZone
+	LabelZoneRegionStable        = LabelTopologyRegion
 
 	LabelInstanceType       = "beta.kubernetes.io/instance-type"
 	LabelInstanceTypeStable = "node.kubernetes.io/instance-type"

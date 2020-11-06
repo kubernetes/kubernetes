@@ -518,11 +518,11 @@ func GetClusterZones(c clientset.Interface) (sets.String, error) {
 	// collect values of zone label from all nodes
 	zones := sets.NewString()
 	for _, node := range nodes.Items {
-		if zone, found := node.Labels[v1.LabelZoneFailureDomain]; found {
+		if zone, found := node.Labels[v1.LabelFailureDomainBetaZone]; found {
 			zones.Insert(zone)
 		}
 
-		if zone, found := node.Labels[v1.LabelZoneFailureDomainStable]; found {
+		if zone, found := node.Labels[v1.LabelTopologyZone]; found {
 			zones.Insert(zone)
 		}
 	}

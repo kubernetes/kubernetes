@@ -369,7 +369,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		zones = append(zones, zoneA)
 		nodeSelectorMap := map[string]string{
 			// nodeSelector set as zoneB
-			v1.LabelZoneFailureDomain: zoneB,
+			v1.LabelFailureDomainBetaZone: zoneB,
 		}
 		verifyPodSchedulingFails(client, namespace, nodeSelectorMap, scParameters, zones, storagev1.VolumeBindingWaitForFirstConsumer)
 	})

@@ -115,7 +115,7 @@ var (
 	nodeLabelValue = "node1"
 
 	// node topology for CSI migration
-	zone1Labels = map[string]string{v1.LabelZoneFailureDomain: "us-east-1", v1.LabelZoneRegion: "us-east-1a"}
+	zone1Labels = map[string]string{v1.LabelFailureDomainBetaZone: "us-east-1", v1.LabelFailureDomainBetaRegion: "us-east-1a"}
 )
 
 func init() {

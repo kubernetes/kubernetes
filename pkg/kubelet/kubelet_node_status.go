@@ -192,10 +192,10 @@ func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
 func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool {
 	defaultLabels := []string{
 		v1.LabelHostname,
-		v1.LabelZoneFailureDomainStable,
-		v1.LabelZoneRegionStable,
-		v1.LabelZoneFailureDomain,
-		v1.LabelZoneRegion,
+		v1.LabelTopologyZone,
+		v1.LabelTopologyRegion,
+		v1.LabelFailureDomainBetaZone,
+		v1.LabelFailureDomainBetaRegion,
 		v1.LabelInstanceTypeStable,
 		v1.LabelInstanceType,
 		v1.LabelOSStable,
@@ -392,16 +392,16 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 				return nil, fmt.Errorf("failed to get zone from cloud provider: %v", err)
 			}
 			if zone.FailureDomain != "" {
-				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneFailureDomain, zone.FailureDomain)
-				node.ObjectMeta.Labels[v1.LabelZoneFailureDomain] = zone.FailureDomain
-				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneFailureDomainStable, zone.FailureDomain)
-				node.ObjectMeta.Labels[v1.LabelZoneFailureDomainStable] = zone.FailureDomain
+				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelFailureDomainBetaZone, zone.FailureDomain)
+				node.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone] = zone.FailureDomain
+				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelTopologyZone, zone.FailureDomain)
+				node.ObjectMeta.Labels[v1.LabelTopologyZone] = zone.FailureDomain
 			}
 			if zone.Region != "" {
-				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegion, zone.Region)
-				node.ObjectMeta.Labels[v1.LabelZoneRegion] = zone.Region
-				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegionStable, zone.Region)
-				node.ObjectMeta.Labels[v1.LabelZoneRegionStable] = zone.Region
+				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelFailureDomainBetaRegion, zone.Region)
+				node.ObjectMeta.Labels[v1.LabelFailureDomainBetaRegion] = zone.Region
+				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelTopologyRegion, zone.Region)
+				node.ObjectMeta.Labels[v1.LabelTopologyRegion] = zone.Region
 			}
 		}
 	}

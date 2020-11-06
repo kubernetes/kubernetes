@@ -215,7 +215,7 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 		return nil, fmt.Errorf("pv is nil or GCE Persistent Disk source not defined on pv")
 	}
 
-	zonesLabel := pv.Labels[v1.LabelZoneFailureDomain]
+	zonesLabel := pv.Labels[v1.LabelFailureDomainBetaZone]
 	zones := strings.Split(zonesLabel, labelMultiZoneDelimiter)
 	if len(zones) == 1 && len(zones[0]) != 0 {
 		// Zonal

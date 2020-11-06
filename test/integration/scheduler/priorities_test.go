@@ -378,7 +378,7 @@ func TestDefaultPodTopologySpreadScore(t *testing.T) {
 		nodeName := fmt.Sprintf("node-%d", i)
 		zone := fmt.Sprintf("zone-%d", i%3)
 		zoneForNode[nodeName] = zone
-		_, err := createNode(cs, st.MakeNode().Name(nodeName).Label(v1.LabelHostname, nodeName).Label(v1.LabelZoneFailureDomainStable, zone).Obj())
+		_, err := createNode(cs, st.MakeNode().Name(nodeName).Label(v1.LabelHostname, nodeName).Label(v1.LabelTopologyZone, zone).Obj())
 		if err != nil {
 			t.Fatalf("Cannot create node: %v", err)
 		}
