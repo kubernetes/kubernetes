@@ -607,6 +607,17 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 			if resizeError != nil {
 				klog.Errorf("MountVolume.NodeExpandVolume failed with %v", resizeError)
+
+				// Resize failed. To make sure NodeExpand is re-tried again on the next attempt
+				// *before* SetUp(), mark the mounted device as uncertain.
+				markDeviceUncertainErr := actualStateOfWorld.MarkDeviceAsUncertain(
+					volumeToMount.VolumeName, devicePath, deviceMountPath)
+				if markDeviceUncertainErr != nil {
+					// just log, return the resizeError error instead
+					klog.Infof(volumeToMount.GenerateMsgDetailed(
+						"MountVolume.MountDevice failed to mark volume as uncertain",
+						markDeviceUncertainErr.Error()))
+				}
 				return volumeToMount.GenerateError("MountVolume.MountDevice failed while expanding volume", resizeError)
 			}
 		}
