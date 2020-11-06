@@ -631,7 +631,7 @@ func BenchmarkDecodeIntoJSONCodecGenConfigCompatibleWithStandardLibrary(b *testi
 	}
 
 	b.ResetTimer()
-	iter := json.CaseSensitiveJsonIterator()
+	iter := json.CaseSensitiveJSONIterator()
 	for i := 0; i < b.N; i++ {
 		obj := v1.Pod{}
 		if err := iter.Unmarshal(encoded[i%width], &obj); err != nil {
