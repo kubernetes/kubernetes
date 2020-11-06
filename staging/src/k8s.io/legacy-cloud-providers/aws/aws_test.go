@@ -3040,7 +3040,7 @@ func TestCloud_buildNLBHealthCheckConfiguration(t *testing.T) {
 					},
 				},
 			},
-			want:      healthCheckConfig{
+			want: healthCheckConfig{
 				Port:               "traffic-port",
 				Protocol:           elbv2.ProtocolEnumTcp,
 				Interval:           30,
