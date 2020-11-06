@@ -425,7 +425,7 @@ func (sched *Scheduler) finishBinding(fwk framework.Framework, assumed *v1.Pod, 
 	fwk.EventRecorder().Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
 }
 
-// scheduleOne does the entire scheduling workflow for a single pod.  It is serialized on the scheduling algorithm's host fitting.
+// scheduleOne does the entire scheduling workflow for a single pod. It is serialized on the scheduling algorithm's host fitting.
 func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	podInfo := sched.NextPod()
 	// pod could be nil when schedulerQueue is closed
@@ -585,7 +585,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			if err := sched.SchedulerCache.ForgetPod(assumedPod); err != nil {
 				klog.Errorf("scheduler cache ForgetPod failed: %v", err)
 			}
-			sched.recordSchedulingFailure(fwk, assumedPodInfo, fmt.Errorf("Binding rejected: %v", err), SchedulerError, "")
+			sched.recordSchedulingFailure(fwk, assumedPodInfo, fmt.Errorf("binding rejected: %w", err), SchedulerError, "")
 		} else {
 			// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
 			if klog.V(2).Enabled() {
