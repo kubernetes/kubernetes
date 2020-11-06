@@ -307,7 +307,7 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *schedulerapi
 	return nil
 }
 
-// Run begins watching and scheduling. It waits for cache to be synced, then starts scheduling and blocked until the context is done.
+// Run begins watching and scheduling. It starts scheduling and blocked until the context is done.
 func (sched *Scheduler) Run(ctx context.Context) {
 	sched.SchedulingQueue.Run()
 	wait.UntilWithContext(ctx, sched.scheduleOne, 0)
