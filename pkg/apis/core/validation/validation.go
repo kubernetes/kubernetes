@@ -5999,7 +5999,7 @@ func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.
 				allErrs = append(allErrs, field.Forbidden(idxPath.Child("ipMode"), "may not be used when `ip` is not set"))
 			}
 
-			if !supportedLoadBalancerIPMode.Has(*ingress.IPMode) {
+			if !supportedLoadBalancerIPMode.Has(string(*ingress.IPMode)) {
 				allErrs = append(allErrs, field.NotSupported(idxPath.Child("ipMode"), ingress.IPMode, supportedLoadBalancerIPMode.List()))
 			}
 		}
