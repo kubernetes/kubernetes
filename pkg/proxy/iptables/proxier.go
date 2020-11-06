@@ -1175,7 +1175,7 @@ func (proxier *Proxier) syncProxyRules() {
 					// This currently works for loadbalancers that preserves source ips.
 					// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
 
-					if !utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) || *ingress.IPMode == v1.LoadBalancerIPModeVIP {
+					if !utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) || ingress.IPMode == nil || *ingress.IPMode == v1.LoadBalancerIPModeVIP {
 						args = append(args[:0],
 							"-A", string(kubeServicesChain),
 							"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
