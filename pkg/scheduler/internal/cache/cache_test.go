@@ -1572,8 +1572,8 @@ func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("node-%d", i),
 					Labels: map[string]string{
-						v1.LabelFailureDomainBetaRegion: fmt.Sprintf("region-%d", zone),
-						v1.LabelFailureDomainBetaZone:   fmt.Sprintf("zone-%d", zone),
+						v1.LabelTopologyRegion: fmt.Sprintf("region-%d", zone),
+						v1.LabelTopologyZone:   fmt.Sprintf("zone-%d", zone),
 					},
 				},
 			})

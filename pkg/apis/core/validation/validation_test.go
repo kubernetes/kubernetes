@@ -11061,8 +11061,8 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.TopologyKeys = []string{
 					"kubernetes.io/hostname",
-					"failure-domain.beta.kubernetes.io/zone",
-					"failure-domain.beta.kubernetes.io/region",
+					"topology.kubernetes.io/zone",
+					"topology.kubernetes.io/region",
 					v1.TopologyKeyAny,
 				}
 			},
@@ -11090,7 +11090,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.TopologyKeys = []string{
 					"kubernetes.io/hostname",
 					v1.TopologyKeyAny,
-					"failure-domain.beta.kubernetes.io/zone",
+					"topology.kubernetes.io/zone",
 				}
 			},
 			numErrs: 1,
@@ -11101,7 +11101,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.TopologyKeys = []string{
 					"kubernetes.io/hostname",
 					"kubernetes.io/hostname",
-					"failure-domain.beta.kubernetes.io/zone",
+					"topology.kubernetes.io/zone",
 				}
 			},
 			numErrs: 1,
