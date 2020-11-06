@@ -2739,12 +2739,12 @@ func (c *Cloud) GetVolumeLabels(volumeName KubernetesVolumeID) (map[string]strin
 		return nil, fmt.Errorf("volume did not have AZ information: %q", aws.StringValue(info.VolumeId))
 	}
 
-	labels[v1.LabelZoneFailureDomain] = az
+	labels[v1.LabelFailureDomainBetaZone] = az
 	region, err := azToRegion(az)
 	if err != nil {
 		return nil, err
 	}
-	labels[v1.LabelZoneRegion] = region
+	labels[v1.LabelFailureDomainBetaRegion] = region
 
 	return labels, nil
 }

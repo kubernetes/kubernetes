@@ -121,12 +121,12 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 // Find the name of the zone in which a Node is running
 func getZoneNameForNode(node v1.Node) (string, error) {
 	for key, value := range node.Labels {
-		if key == v1.LabelZoneFailureDomain {
+		if key == v1.LabelFailureDomainBetaZone {
 			return value, nil
 		}
 	}
 	return "", fmt.Errorf("Zone name for node %s not found. No label with key %s",
-		node.Name, v1.LabelZoneFailureDomain)
+		node.Name, v1.LabelFailureDomainBetaZone)
 }
 
 // Return the number of zones in which we have nodes in this cluster.

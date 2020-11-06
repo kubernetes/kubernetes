@@ -351,7 +351,7 @@ func (c *Cloud) GetAzureDiskLabels(diskURI string) (map[string]string, error) {
 	}
 
 	labels := map[string]string{
-		v1.LabelZoneRegion: c.Location,
+		v1.LabelFailureDomainBetaRegion: c.Location,
 	}
 	// no azure credential is set, return nil
 	if c.DisksClient == nil {
@@ -380,6 +380,6 @@ func (c *Cloud) GetAzureDiskLabels(diskURI string) (map[string]string, error) {
 
 	zone := c.makeZone(c.Location, zoneID)
 	klog.V(4).Infof("Got zone %q for Azure disk %q", zone, diskName)
-	labels[v1.LabelZoneFailureDomain] = zone
+	labels[v1.LabelFailureDomainBetaZone] = zone
 	return labels, nil
 }

@@ -368,12 +368,12 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		for i := 0; i < 3; i++ {
 			requirements := []v1.NodeSelectorRequirement{
 				{
-					Key:      v1.LabelZoneRegion,
+					Key:      v1.LabelFailureDomainBetaRegion,
 					Operator: v1.NodeSelectorOpIn,
 					Values:   []string{diskController.GetLocation()},
 				},
 				{
-					Key:      v1.LabelZoneFailureDomain,
+					Key:      v1.LabelFailureDomainBetaZone,
 					Operator: v1.NodeSelectorOpIn,
 					Values:   []string{strconv.Itoa(i)},
 				},

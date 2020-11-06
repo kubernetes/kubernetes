@@ -417,8 +417,8 @@ func TestGetLabelsForVolume(t *testing.T) {
 			},
 			existedDisk: compute.Disk{Name: to.StringPtr(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}, Zones: &[]string{"1"}},
 			expected: map[string]string{
-				v1.LabelZoneRegion:        testCloud0.Location,
-				v1.LabelZoneFailureDomain: testCloud0.makeZone(testCloud0.Location, 1),
+				v1.LabelFailureDomainBetaRegion: testCloud0.Location,
+				v1.LabelFailureDomainBetaZone:   testCloud0.makeZone(testCloud0.Location, 1),
 			},
 			expectedErr: false,
 		},
@@ -454,7 +454,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 			},
 			existedDisk: compute.Disk{Name: to.StringPtr(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}},
 			expected: map[string]string{
-				v1.LabelZoneRegion: testCloud0.Location,
+				v1.LabelFailureDomainBetaRegion: testCloud0.Location,
 			},
 			expectedErr:    false,
 			expectedErrMsg: nil,
