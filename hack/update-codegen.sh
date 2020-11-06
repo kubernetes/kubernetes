@@ -74,7 +74,7 @@ ${applyconfigurationgen} \
 
 # This can be called with one flag, --verify-only, so it works for both the
 # update- and verify- scripts.
-${clientgen} --output-base "${KUBE_ROOT}/vendor" --output-package="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/api" --input="${GV_DIRS_CSV}" --go-header-file "${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt" "$@"
+${clientgen} --output-base "${KUBE_ROOT}/vendor" --output-package="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/api" --input="${GV_DIRS_CSV}" --apply-configuration-package "${applyconfigurations_package}" --go-header-file "${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt" "$@"
 
 listergen_external_apis=()
 kube::util::read-array listergen_external_apis < <(
