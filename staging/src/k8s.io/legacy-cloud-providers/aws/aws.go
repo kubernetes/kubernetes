@@ -3771,14 +3771,6 @@ func (c *Cloud) buildNLBHealthCheckConfiguration(svc *v1.Service) (healthCheckCo
 		return healthCheckConfig{}, err
 	}
 
-	if hc.HealthyThreshold != hc.UnhealthyThreshold {
-		return healthCheckConfig{}, fmt.Errorf("Health check healthy threshold and unhealthy threshold must be equal")
-	}
-
-	if hc.Interval != 10 && hc.Interval != 30 {
-		return healthCheckConfig{}, fmt.Errorf("Invalid health check interval '%v', must be either 10 or 30", hc.Interval)
-	}
-
 	if hc.Port != defaultHealthCheckPort {
 		if _, err := strconv.ParseInt(hc.Port, 10, 0); err != nil {
 			return healthCheckConfig{}, fmt.Errorf("Invalid health check port '%v'", hc.Port)
