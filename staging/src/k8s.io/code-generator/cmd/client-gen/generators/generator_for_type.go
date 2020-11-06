@@ -18,6 +18,7 @@ package generators
 
 import (
 	"io"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -31,13 +32,15 @@ import (
 // genClientForType produces a file for each top-level type.
 type genClientForType struct {
 	generator.DefaultGen
-	outputPackage    string
-	clientsetPackage string
-	group            string
-	version          string
-	groupGoName      string
-	typeToMatch      *types.Type
-	imports          namer.ImportTracker
+	outputPackage             string
+	inputPackage              string
+	clientsetPackage          string
+	applyConfigurationPackage string
+	group                     string
+	version                   string
+	groupGoName               string
+	typeToMatch               *types.Type
+	imports                   namer.ImportTracker
 }
 
 var _ generator.Generator = &genClientForType{}
@@ -74,6 +77,7 @@ func genStatus(t *types.Type) bool {
 
 // GenerateType makes the body of a file implementing the individual typed client for type t.
 func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
+	defaultVerbTemplates := buildDefaultVerbTemplates(len(g.applyConfigurationPackage) > 0)
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	pkg := filepath.Base(t.Name.Package)
 	tags, err := util.ParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
@@ -126,6 +130,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 			},
 		})
 	}
+
 	m := map[string]interface{}{
 		"type":                 t,
 		"inputType":            t,
@@ -143,11 +148,21 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"GetOptions":           c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GetOptions"}),
 		"ListOptions":          c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}),
 		"PatchOptions":         c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "PatchOptions"}),
+		"ApplyOptions":         c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ApplyOptions"}),
 		"UpdateOptions":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "UpdateOptions"}),
 		"PatchType":            c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "PatchType"}),
+		"ApplyPatchType":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "ApplyPatchType"}),
 		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
 		"RESTClientInterface":  c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
 		"schemeParameterCodec": c.Universe.Variable(types.Name{Package: filepath.Join(g.clientsetPackage, "scheme"), Name: "ParameterCodec"}),
+		"jsonMarshal":          c.Universe.Type(types.Name{Package: "encoding/json", Name: "Marshal"}),
+	}
+
+	generateApply := len(g.applyConfigurationPackage) > 0
+	if generateApply {
+		// Generated apply configuration type references required for generated Apply function
+		_, gvString := util.ParsePathGroupVersion(g.inputPackage)
+		m["applyConfig"] = types.Ref(path.Join(g.applyConfigurationPackage, gvString), t.Name.Name+"ApplyConfiguration")
 	}
 
 	sw.Do(getterComment, m)
@@ -166,7 +181,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		if len(extendedMethods) > 0 {
 			interfaceSuffix = "\n"
 		}
-		sw.Do("\n"+generateInterface(tags)+interfaceSuffix, m)
+		sw.Do("\n"+generateInterface(defaultVerbTemplates, tags)+interfaceSuffix, m)
 		// add extended verbs into interface
 		for _, v := range extendedMethods {
 			sw.Do(v.template+interfaceSuffix, v.args)
@@ -214,6 +229,9 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	}
 	if tags.HasVerb("patch") {
 		sw.Do(patchTemplate, m)
+		if generateApply {
+			sw.Do(applyTemplate, m)
+		}
 	}
 
 	// generate expansion methods
@@ -285,6 +303,9 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 
 		if e.HasVerb("patch") {
 			sw.Do(adjustTemplate(e.VerbName, e.VerbType, patchTemplate), m)
+			if generateApply {
+				sw.Do(adjustTemplate(e.VerbName, e.VerbType, applyTemplate), m)
+			}
 		}
 	}
 
@@ -298,7 +319,7 @@ func adjustTemplate(name, verbType, template string) string {
 	return strings.Replace(template, " "+strings.Title(verbType), " "+name, -1)
 }
 
-func generateInterface(tags util.Tags) string {
+func generateInterface(defaultVerbTemplates map[string]string, tags util.Tags) string {
 	// need an ordered list here to guarantee order of generated methods.
 	out := []string{}
 	for _, m := range util.SupportedVerbs {
@@ -316,16 +337,23 @@ var subresourceDefaultVerbTemplates = map[string]string{
 	"get":    `Get(ctx context.Context, $.type|private$Name string, options $.GetOptions|raw$) (*$.resultType|raw$, error)`,
 }
 
-var defaultVerbTemplates = map[string]string{
-	"create":           `Create(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (*$.resultType|raw$, error)`,
-	"update":           `Update(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (*$.resultType|raw$, error)`,
-	"updateStatus":     `UpdateStatus(ctx context.Context, $.inputType|private$ *$.type|raw$, opts $.UpdateOptions|raw$) (*$.type|raw$, error)`,
-	"delete":           `Delete(ctx context.Context, name string, opts $.DeleteOptions|raw$) error`,
-	"deleteCollection": `DeleteCollection(ctx context.Context, opts $.DeleteOptions|raw$, listOpts $.ListOptions|raw$) error`,
-	"get":              `Get(ctx context.Context, name string, opts $.GetOptions|raw$) (*$.resultType|raw$, error)`,
-	"list":             `List(ctx context.Context, opts $.ListOptions|raw$) (*$.resultType|raw$List, error)`,
-	"watch":            `Watch(ctx context.Context, opts $.ListOptions|raw$) ($.watchInterface|raw$, error)`,
-	"patch":            `Patch(ctx context.Context, name string, pt $.PatchType|raw$, data []byte, opts $.PatchOptions|raw$, subresources ...string) (result *$.resultType|raw$, err error)`,
+func buildDefaultVerbTemplates(generateApply bool) map[string]string {
+	m := map[string]string{
+		"create":           `Create(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (*$.resultType|raw$, error)`,
+		"update":           `Update(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (*$.resultType|raw$, error)`,
+		"updateStatus":     `UpdateStatus(ctx context.Context, $.inputType|private$ *$.type|raw$, opts $.UpdateOptions|raw$) (*$.type|raw$, error)`,
+		"delete":           `Delete(ctx context.Context, name string, opts $.DeleteOptions|raw$) error`,
+		"deleteCollection": `DeleteCollection(ctx context.Context, opts $.DeleteOptions|raw$, listOpts $.ListOptions|raw$) error`,
+		"get":              `Get(ctx context.Context, name string, opts $.GetOptions|raw$) (*$.resultType|raw$, error)`,
+		"list":             `List(ctx context.Context, opts $.ListOptions|raw$) (*$.resultType|raw$List, error)`,
+		"watch":            `Watch(ctx context.Context, opts $.ListOptions|raw$) ($.watchInterface|raw$, error)`,
+		"patch":            `Patch(ctx context.Context, name string, pt $.PatchType|raw$, data []byte, opts $.PatchOptions|raw$, subresources ...string) (result *$.resultType|raw$, err error)`,
+	}
+	if generateApply {
+		m["patch"] += `
+          Apply(ctx context.Context, $.inputType|private$ *$.applyConfig|raw$, fieldManager string, opts $.ApplyOptions|raw$, subresources ...string) (result *$.resultType|raw$, err error)`
+	}
+	return m
 }
 
 // group client will implement this interface.
@@ -602,6 +630,36 @@ func (c *$.type|privatePlural$) Patch(ctx context.Context, name string, pt $.Pat
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+`
+
+var applyTemplate = `
+// Apply takes the given apply declarative configuration, applies it and returns the applied $.resultType|private$.
+func (c *$.type|privatePlural$) Apply(ctx context.Context, $.inputType|private$ *$.applyConfig|raw$, fieldManager string, opts $.ApplyOptions|raw$, subresources ...string) (result *$.resultType|raw$, err error) {
+	patchOpts := opts.ToPatchOptions(fieldManager)
+	data, err := $.jsonMarshal|raw$($.inputType|private$)
+	if err != nil {
+		return nil, err
+	}
+    meta, ok := $.inputType|private$.GetObjectMeta()
+    if !ok {
+        return nil, fmt.Errorf("$.inputType|private$.ObjectMeta must be provided to Apply")
+    }
+    name, ok := meta.GetName()
+    if !ok {
+        return nil, fmt.Errorf("$.inputType|private$.ObjectMeta.Name must be provided to Apply")
+    }
+	result = &$.resultType|raw${}
+	err = c.client.Patch($.ApplyPatchType|raw$).
+		$if .namespaced$Namespace(c.ns).$end$
+		Resource("$.type|resource$").
+		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&patchOpts, $.schemeParameterCodec|raw$).
 		Body(data).
 		Do(ctx).
 		Into(result)

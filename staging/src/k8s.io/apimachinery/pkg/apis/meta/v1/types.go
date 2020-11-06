@@ -574,6 +574,32 @@ type PatchOptions struct {
 	FieldManager string `json:"fieldManager,omitempty" protobuf:"bytes,3,name=fieldManager"`
 }
 
+// ApplyOptions may be provided when applying an API object.
+// ApplyOptions is meant to be a subset of PatchOptions that does not include FieldManager.
+// FieldManager is required for apply requests so it is required parameter on clientset
+// Apply functions, and therefore not included in ApplyOptions.
+type ApplyOptions struct {
+	TypeMeta `json:",inline"`
+
+	// When present, indicates that modifications should not be
+	// persisted. An invalid or unrecognized dryRun directive will
+	// result in an error response and no further processing of the
+	// request. Valid values are:
+	// - All: all dry run stages will be processed
+	// +optional
+	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,1,rep,name=dryRun"`
+
+	// Force is going to "force" Apply requests. It means user will
+	// re-acquire conflicting fields owned by other people. Force
+	// flag must be unset for non-apply patch requests.
+	// +optional
+	Force *bool `json:"force,omitempty" protobuf:"varint,2,opt,name=force"`
+}
+
+func (o ApplyOptions) ToPatchOptions(fieldManager string) PatchOptions {
+	return PatchOptions{DryRun: o.DryRun, Force: o.Force, FieldManager: fieldManager}
+}
+
 // +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
