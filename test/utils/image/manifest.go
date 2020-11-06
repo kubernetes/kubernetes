@@ -17,9 +17,12 @@ limitations under the License.
 package image
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"strings"
 
 	yaml "gopkg.in/yaml.v2"
@@ -115,7 +118,7 @@ var (
 	sampleRegistry  = registry.SampleRegistry
 
 	// Preconfigured image configs
-	imageConfigs = initImageConfigs()
+	imageConfigs, originalImageConfigs = initImageConfigs()
 )
 
 const (
@@ -200,7 +203,7 @@ const (
 	VolumeRBDServer
 )
 
-func initImageConfigs() map[int]Config {
+func initImageConfigs() (map[int]Config, map[int]Config) {
 	configs := map[int]Config{}
 	configs[Agnhost] = Config{promoterE2eRegistry, "agnhost", "2.20"}
 	configs[AgnhostPrivate] = Config{PrivateRegistry, "agnhost", "2.6"}
@@ -241,7 +244,95 @@ func initImageConfigs() map[int]Config {
 	configs[VolumeISCSIServer] = Config{e2eVolumeRegistry, "iscsi", "2.0"}
 	configs[VolumeGlusterServer] = Config{e2eVolumeRegistry, "gluster", "1.0"}
 	configs[VolumeRBDServer] = Config{e2eVolumeRegistry, "rbd", "1.0.1"}
+
+	// if requested, map all the SHAs into a known format based on the input
+	originalImageConfigs := configs
+	if repo := os.Getenv("KUBE_TEST_REPO"); len(repo) > 0 {
+		configs = GetMappedImageConfigs(originalImageConfigs, repo)
+	}
+
+	return configs, originalImageConfigs
+}
+
+// GetMappedImageConfigs returns the images if they were mapped to the provided
+// image repository. This method is public to allow tooling to convert these configs
+// to an arbitrary repo.
+func GetMappedImageConfigs(originalImageConfigs map[int]Config, repo string) map[int]Config {
+	configs := make(map[int]Config)
+	for i, config := range originalImageConfigs {
+		switch i {
+		case InvalidRegistryImage, AuthenticatedAlpine,
+			AuthenticatedWindowsNanoServer, AgnhostPrivate:
+			// These images are special and can't be run out of the cloud - some because they
+			// are authenticated, and others because they are not real images. Tests that depend
+			// on these images can't be run without access to the public internet.
+			configs[i] = config
+			continue
+		}
+
+		// Build a new tag with a the index, a hash of the image spec (to be unique) and
+		// shorten and make the pull spec "safe" so it will fit in the tag
+		configs[i] = mapConfigToRepos(i, config, repo)
+	}
 	return configs
+}
+
+var (
+	reCharSafe = regexp.MustCompile(`[^\w]`)
+	reDashes   = regexp.MustCompile(`-+`)
+)
+
+// mapConfigToRepos maps an existing image to the provided repo, generating a
+// tag that is unique with the input config. The tag will contain the index, a hash of
+// the image spec (to be unique) and shorten and make the pull spec "safe" so it will
+// fit in the tag to allow a human to recognize the value. If index is -1, then no
+// index will be added to the tag.
+func mapConfigToRepos(index int, config Config, repo string) Config {
+	parts := strings.SplitN(repo, "/", 2)
+	registry, name := parts[0], parts[1]
+
+	pullSpec := config.GetE2EImage()
+
+	const (
+		// length of hash in base64-url chosen to minimize possible collisions (64^16 possible)
+		hashLength = 16
+		// maximum length of a Docker spec image tag
+		maxTagLength = 127
+		// when building a tag, there are at most 6 characters in the format (e2e and 3 dashes),
+		// and we should allow up to 10 digits for the index and additional qualifiers we may add
+		// in the future
+		tagFormatCharacters = 6 + 10
+	)
+
+	h := sha256.New()
+	h.Write([]byte(pullSpec))
+	hash := base64.RawURLEncoding.EncodeToString(h.Sum(nil))[:hashLength]
+
+	shortName := reCharSafe.ReplaceAllLiteralString(pullSpec, "-")
+	shortName = reDashes.ReplaceAllLiteralString(shortName, "-")
+	maxLength := maxTagLength - hashLength - tagFormatCharacters
+	if len(shortName) > maxLength {
+		shortName = shortName[len(shortName)-maxLength:]
+	}
+	var version string
+	if index == -1 {
+		version = fmt.Sprintf("e2e-%s-%s", shortName, hash)
+	} else {
+		version = fmt.Sprintf("e2e-%d-%s-%s", index, shortName, hash)
+	}
+
+	return Config{
+		registry: registry,
+		name:     name,
+		version:  version,
+	}
+}
+
+// GetOriginalImageConfigs returns the configuration before any mapping rules.  This
+// method is public to allow tooling gain access to the default values for images regardless
+// of environment variable being set.
+func GetOriginalImageConfigs() map[int]Config {
+	return originalImageConfigs
 }
 
 // GetImageConfigs returns the map of imageConfigs
@@ -274,6 +365,23 @@ func ReplaceRegistryInImageURL(imageURL string) (string, error) {
 	parts := strings.Split(imageURL, "/")
 	countParts := len(parts)
 	registryAndUser := strings.Join(parts[:countParts-1], "/")
+
+	if repo := os.Getenv("KUBE_TEST_REPO"); len(repo) > 0 {
+		index := -1
+		for i, v := range originalImageConfigs {
+			if v.GetE2EImage() == imageURL {
+				index = i
+				break
+			}
+		}
+		last := strings.SplitN(parts[countParts-1], ":", 2)
+		config := mapConfigToRepos(index, Config{
+			registry: parts[0],
+			name:     strings.Join([]string{strings.Join(parts[1:countParts-1], "/"), last[0]}, "/"),
+			version:  last[1],
+		}, repo)
+		return config.GetE2EImage(), nil
+	}
 
 	switch registryAndUser {
 	case "gcr.io/kubernetes-e2e-test-images":

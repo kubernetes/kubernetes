@@ -18,7 +18,10 @@ package image
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 type result struct {
@@ -133,5 +136,30 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 				t.Errorf("got %q, want %q", s, tt.out.result)
 			}
 		})
+	}
+}
+
+func TestGetOriginalImageConfigs(t *testing.T) {
+	if len(GetOriginalImageConfigs()) == 0 {
+		t.Fatalf("original map should not be empty")
+	}
+}
+
+func TestGetMappedImageConfigs(t *testing.T) {
+	originals := map[int]Config{
+		0: {registry: "docker.io", name: "source/repo", version: "1.0"},
+	}
+	mapping := GetMappedImageConfigs(originals, "quay.io/repo/for-test")
+
+	actual := make(map[string]string)
+	for i, mapping := range mapping {
+		source := originals[i]
+		actual[source.GetE2EImage()] = mapping.GetE2EImage()
+	}
+	expected := map[string]string{
+		"docker.io/source/repo:1.0": "quay.io/repo/for-test:e2e-0-docker-io-source-repo-1-0-72R4aXm7YnxQ4_ek",
+	}
+	if !reflect.DeepEqual(expected, actual) {
+		t.Fatal(diff.ObjectReflectDiff(expected, actual))
 	}
 }
