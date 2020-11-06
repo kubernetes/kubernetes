@@ -123,7 +123,7 @@ func testcases() []testcase {
 var decoders = map[string]func([]byte, interface{}) error{
 	"gojson":   gojson.Unmarshal,
 	"utiljson": utiljson.Unmarshal,
-	"jsoniter": CaseSensitiveJsonIterator().Unmarshal,
+	"jsoniter": CaseSensitiveJSONIterator().Unmarshal,
 }
 
 func TestJSONLimits(t *testing.T) {
