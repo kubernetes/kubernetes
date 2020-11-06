@@ -32,13 +32,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	k8stesting "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -95,7 +98,7 @@ func TestReconcile1Pod(t *testing.T) {
 	dualStackSvc.Spec.ClusterIP = "10.0.0.10"
 	dualStackSvc.Spec.ClusterIPs = []string{"10.0.0.10", "2000::1"}
 
-	pod1 := newPod(1, namespace, true, 1)
+	pod1 := newPod(1, namespace, true, 1, false)
 	pod1.Status.PodIPs = []corev1.PodIP{{IP: "1.2.3.4"}, {IP: "1234::5678:0000:0000:9abc:def0"}}
 	pod1.Spec.Hostname = "example-hostname"
 	node1 := &corev1.Node{
@@ -114,6 +117,7 @@ func TestReconcile1Pod(t *testing.T) {
 		expectedEndpoint         discovery.Endpoint
 		expectedLabels           map[string]string
 		expectedEndpointPerSlice map[discovery.AddressType][]discovery.Endpoint
+		terminatingGateEnabled   bool
 	}{
 		"no-family-service": {
 			service: noFamilyService,
@@ -140,7 +144,6 @@ func TestReconcile1Pod(t *testing.T) {
 				discovery.LabelServiceName: "foo",
 			},
 		},
-
 		"ipv4": {
 			service: svcv4,
 			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
@@ -166,6 +169,37 @@ func TestReconcile1Pod(t *testing.T) {
 				discovery.LabelServiceName: "foo",
 				corev1.IsHeadlessService:   "",
 			},
+		},
+		"ipv4-with-terminating-gate-enabled": {
+			service: svcv4,
+			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
+				discovery.AddressTypeIPv4: {
+					{
+						Addresses: []string{"1.2.3.4"},
+						Conditions: discovery.EndpointConditions{
+							Ready:       utilpointer.BoolPtr(true),
+							Serving:     utilpointer.BoolPtr(true),
+							Terminating: utilpointer.BoolPtr(false),
+						},
+						Topology: map[string]string{
+							"kubernetes.io/hostname":        "node-1",
+							"topology.kubernetes.io/zone":   "us-central1-a",
+							"topology.kubernetes.io/region": "us-central1",
+						},
+						TargetRef: &corev1.ObjectReference{
+							Kind:      "Pod",
+							Namespace: namespace,
+							Name:      "pod1",
+						},
+					},
+				},
+			},
+			expectedLabels: map[string]string{
+				discovery.LabelManagedBy:   controllerName,
+				discovery.LabelServiceName: "foo",
+				corev1.IsHeadlessService:   "",
+			},
+			terminatingGateEnabled: true,
 		},
 		"ipv4-clusterip": {
 			service: svcv4ClusterIP,
@@ -389,6 +423,8 @@ func TestReconcile1Pod(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceTerminatingCondition, testCase.terminatingGateEnabled)()
+
 			client := newClientset()
 			setupMetrics()
 			triggerTime := time.Now()
@@ -496,7 +532,7 @@ func TestReconcile1EndpointSlicePublishNotReadyAddresses(t *testing.T) {
 	pods := []*corev1.Pod{}
 	for i := 0; i < 50; i++ {
 		ready := !(i%3 == 0)
-		pods = append(pods, newPod(i, namespace, ready, 1))
+		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
 	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
@@ -530,7 +566,7 @@ func TestReconcileManyPods(t *testing.T) {
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
 		ready := !(i%3 == 0)
-		pods = append(pods, newPod(i, namespace, ready, 1))
+		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
 	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
@@ -563,7 +599,7 @@ func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
 		ready := !(i%3 == 0)
-		pods = append(pods, newPod(i, namespace, ready, 1))
+		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
 	// have approximately 1/4 in first slice
@@ -619,7 +655,7 @@ func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 	pods := []*corev1.Pod{}
 	for i := 0; i < 300; i++ {
 		ready := !(i%3 == 0)
-		pods = append(pods, newPod(i, namespace, ready, 1))
+		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
 	// have approximately 1/4 in first slice
@@ -665,7 +701,7 @@ func TestReconcileEndpointSlicesUpdating(t *testing.T) {
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
 		ready := !(i%3 == 0)
-		pods = append(pods, newPod(i, namespace, ready, 1))
+		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
 	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
@@ -698,7 +734,7 @@ func TestReconcileEndpointSlicesServicesLabelsUpdating(t *testing.T) {
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
 		ready := !(i%3 == 0)
-		pods = append(pods, newPod(i, namespace, ready, 1))
+		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
 	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
@@ -742,7 +778,7 @@ func TestReconcileEndpointSlicesServicesReservedLabels(t *testing.T) {
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
 		ready := !(i%3 == 0)
-		pods = append(pods, newPod(i, namespace, ready, 1))
+		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
 	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
@@ -776,7 +812,7 @@ func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 	pods := []*corev1.Pod{}
 	for i := 0; i < 300; i++ {
 		ready := !(i%3 == 0)
-		pods = append(pods, newPod(i, namespace, ready, 1))
+		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
 	// generate 10 existing slices with 30 pods/endpoints each
@@ -827,7 +863,7 @@ func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 
 	slice1 := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
 	for i := 0; i < 80; i++ {
-		pod := newPod(i, namespace, true, 1)
+		pod := newPod(i, namespace, true, 1, false)
 		slice1.Endpoints = append(slice1.Endpoints, podToEndpoint(pod, &corev1.Node{}, &svc, discovery.AddressTypeIPv4))
 		pods = append(pods, pod)
 	}
@@ -835,7 +871,7 @@ func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 
 	slice2 := newEmptyEndpointSlice(2, namespace, endpointMeta, svc)
 	for i := 100; i < 120; i++ {
-		pod := newPod(i, namespace, true, 1)
+		pod := newPod(i, namespace, true, 1, false)
 		slice2.Endpoints = append(slice2.Endpoints, podToEndpoint(pod, &corev1.Node{}, &svc, discovery.AddressTypeIPv4))
 		pods = append(pods, pod)
 	}
@@ -856,7 +892,7 @@ func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 
 	// add a few additional endpoints - no more than could fit in either slice.
 	for i := 200; i < 215; i++ {
-		pods = append(pods, newPod(i, namespace, true, 1))
+		pods = append(pods, newPod(i, namespace, true, 1, false))
 	}
 
 	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
@@ -888,7 +924,7 @@ func TestReconcileEndpointSlicesReplaceDeprecated(t *testing.T) {
 
 	slice1 := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
 	for i := 0; i < 80; i++ {
-		pod := newPod(i, namespace, true, 1)
+		pod := newPod(i, namespace, true, 1, false)
 		slice1.Endpoints = append(slice1.Endpoints, podToEndpoint(pod, &corev1.Node{}, &corev1.Service{Spec: corev1.ServiceSpec{}}, discovery.AddressTypeIPv4))
 		pods = append(pods, pod)
 	}
@@ -896,7 +932,7 @@ func TestReconcileEndpointSlicesReplaceDeprecated(t *testing.T) {
 
 	slice2 := newEmptyEndpointSlice(2, namespace, endpointMeta, svc)
 	for i := 100; i < 150; i++ {
-		pod := newPod(i, namespace, true, 1)
+		pod := newPod(i, namespace, true, 1, false)
 		slice2.Endpoints = append(slice2.Endpoints, podToEndpoint(pod, &corev1.Node{}, &corev1.Service{Spec: corev1.ServiceSpec{}}, discovery.AddressTypeIPv4))
 		pods = append(pods, pod)
 	}
@@ -955,7 +991,7 @@ func TestReconcileEndpointSlicesRecreation(t *testing.T) {
 			svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 			slice := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
 
-			pod := newPod(1, namespace, true, 1)
+			pod := newPod(1, namespace, true, 1, false)
 			slice.Endpoints = append(slice.Endpoints, podToEndpoint(pod, &corev1.Node{}, &corev1.Service{Spec: corev1.ServiceSpec{}}, discovery.AddressTypeIPv4))
 
 			if !tc.ownedByService {
@@ -1023,7 +1059,7 @@ func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 	for i := 0; i < 300; i++ {
 		ready := !(i%3 == 0)
 		portOffset := i % 5
-		pod := newPod(i, namespace, ready, 1)
+		pod := newPod(i, namespace, ready, 1, false)
 		pod.Spec.Containers[0].Ports = []corev1.ContainerPort{{
 			Name:          portNameIntStr.StrVal,
 			ContainerPort: int32(8080 + portOffset),
@@ -1073,7 +1109,7 @@ func TestReconcileMaxEndpointsPerSlice(t *testing.T) {
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
 		ready := !(i%3 == 0)
-		pods = append(pods, newPod(i, namespace, ready, 1))
+		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
 	testCases := []struct {
@@ -1125,7 +1161,7 @@ func TestReconcileEndpointSlicesMetrics(t *testing.T) {
 	// start with 20 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 20; i++ {
-		pods = append(pods, newPod(i, namespace, true, 1))
+		pods = append(pods, newPod(i, namespace, true, 1, false))
 	}
 
 	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
