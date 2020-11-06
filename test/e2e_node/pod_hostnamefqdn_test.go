@@ -71,11 +71,6 @@ func testPod(podnamebase string) *v1.Pod {
 
 var _ = SIGDescribe("Hostname of Pod [Feature:SetHostnameAsFQDN][NodeFeature:SetHostnameAsFQDN]", func() {
 	f := framework.NewDefaultFramework("hostfqdn")
-	dnsDomain := "cluster.local"
-	if cdn := framework.TestContext.ClusterDNSDomain; cdn != "" {
-		dnsDomain = cdn
-	}
-
 	/*
 	   Release: v1.19
 	   Testname: Create Pod without fully qualified domain name (FQDN)
@@ -119,7 +114,7 @@ var _ = SIGDescribe("Hostname of Pod [Feature:SetHostnameAsFQDN][NodeFeature:Set
 		// Set PodSpec subdomain field to generate FQDN for pod
 		pod.Spec.Subdomain = subdomain
 		// Expected Pod FQDN
-		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", pod.ObjectMeta.Name, subdomain, f.Namespace.Name, dnsDomain)
+		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", pod.ObjectMeta.Name, subdomain, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		output := []string{fmt.Sprintf("%s;%s;", pod.ObjectMeta.Name, hostFQDN)}
 		// Create Pod
 		f.TestContainerOutput("shortname and fqdn", pod, 0, output)
@@ -141,7 +136,7 @@ var _ = SIGDescribe("Hostname of Pod [Feature:SetHostnameAsFQDN][NodeFeature:Set
 		setHostnameAsFQDN := true
 		pod.Spec.SetHostnameAsFQDN = &setHostnameAsFQDN
 		// Expected Pod FQDN
-		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", pod.ObjectMeta.Name, subdomain, f.Namespace.Name, dnsDomain)
+		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", pod.ObjectMeta.Name, subdomain, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		// Fail if FQDN is longer than 64 characters, otherwise the Pod will remain pending until test timeout.
 		// In Linux, 64 characters is the limit of the hostname kernel field, which this test sets to the pod FQDN.
 		framework.ExpectEqual(len(hostFQDN) < 65, true, fmt.Sprintf("The FQDN of the Pod cannot be longer than 64 characters, requested %s which is %d characters long.", hostFQDN, len(hostFQDN)))
