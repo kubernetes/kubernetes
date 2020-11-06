@@ -48,7 +48,7 @@ spec:
         {{kube_cache_mutation_detector_env_name}}
           {{kube_cache_mutation_detector_env_value}}
         securityContext:
-          capabiltiies:
+          capabilties:
             add: ["NET_ADMIN"]
         volumeMounts:
         - mountPath: /var/log
