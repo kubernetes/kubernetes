@@ -18,6 +18,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"reflect"
@@ -26,8 +27,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -38,10 +43,13 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	appsv1mf "k8s.io/client-go/applyconfigurations/apps/v1"
+	corev1mf "k8s.io/client-go/applyconfigurations/core/v1"
+	metav1mf "k8s.io/client-go/applyconfigurations/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-
 	"k8s.io/component-base/version"
+
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -801,4 +809,226 @@ func TestSelfLinkOnNamespace(t *testing.T) {
 	c := clientset.NewForConfigOrDie(result.ClientConfig)
 
 	runSelfLinkTestOnNamespace(t, c, "default")
+}
+
+func TestApplyWithApplyConfigurations(t *testing.T) {
+	deploymentConfig := appsv1mf.Deployment().
+		SetTypeMeta(metav1mf.TypeMeta().
+			SetKind("Deployment").
+			SetAPIVersion("apps/v1"),
+		).
+		SetObjectMeta(metav1mf.ObjectMeta().
+			SetName("nginx-deployment-3"),
+		).
+		SetSpec(appsv1mf.DeploymentSpec().
+			SetSelector(metav1mf.LabelSelector().
+				SetMatchLabels(map[string]string{"app": "nginx"}),
+			).
+			SetTemplate(corev1mf.PodTemplateSpec().
+				SetObjectMeta(metav1mf.ObjectMeta().
+					SetLabels(map[string]string{"app": "nginx"}),
+				).
+				SetSpec(corev1mf.PodSpec().
+					SetContainers(corev1mf.ContainerList{
+						corev1mf.Container().
+							SetName("nginx").
+							SetImage("nginx:1.14.2").
+							SetStdin(true).
+							SetPorts(corev1mf.ContainerPortList{
+								corev1mf.ContainerPort().
+									SetContainerPort(8080).
+									SetProtocol(v1.ProtocolTCP),
+							}).
+							SetResources(corev1mf.ResourceRequirements().
+								SetLimits(v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("4"),
+									v1.ResourceMemory: resource.MustParse("32Gi"),
+								})),
+					}),
+				),
+			),
+		)
+	expectedDeployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "nginx-deployment-3",
+		},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "nginx"},
+			},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "nginx"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "nginx",
+							Image: "nginx:1.14.2",
+							Stdin: true,
+							Ports: []v1.ContainerPort{
+								{
+									ContainerPort: 8080,
+									Protocol:      v1.ProtocolTCP,
+								},
+							},
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("4"),
+									v1.ResourceMemory: resource.MustParse("32Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	data, _ := json.Marshal(deploymentConfig)
+	t.Logf("%s", string(data))
+	{
+		obj := &appsv1.Deployment{}
+		unstructuredConfig, err := runtime.DefaultUnstructuredConverter.ToUnstructured(deploymentConfig)
+		if err != nil {
+			t.Fatalf("unexpected error when converting manifest to unstructured: %v", err)
+		}
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredConfig, obj)
+		if err != nil {
+			t.Fatalf("unexpected error when converting manifest to Deployment struct: %v", err)
+		}
+		if !apiequality.Semantic.DeepEqual(obj, expectedDeployment) {
+			t.Fatalf("expected %#v but got %#v\ndiff:\n%s", expectedDeployment, obj, cmp.Diff(expectedDeployment, obj))
+		}
+	}
+
+	{
+		u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(expectedDeployment)
+		if err != nil {
+			t.Fatalf("unexpected error when converting Deployment to unstructured: %v", err)
+		}
+		mf := appsv1mf.Deployment()
+		err = mf.FromUnstructured(u)
+		if err != nil {
+			t.Fatalf("unexpected error when converting unstructured to manifest: %v", err)
+		}
+		obj := &appsv1.Deployment{}
+		unstructuredConfig, err := runtime.DefaultUnstructuredConverter.ToUnstructured(deploymentConfig)
+		if err != nil {
+			t.Fatalf("unexpected error when converting manifest to unstructured: %v", err)
+		}
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredConfig, obj)
+		if err != nil {
+			t.Fatalf("unexpected error when converting manifest to Deployment struct: %v", err)
+		}
+
+		if !apiequality.Semantic.DeepEqual(obj, expectedDeployment) {
+			t.Errorf("expected %#v but got %#v\ndiff:\n%s", expectedDeployment, obj, cmp.Diff(expectedDeployment, obj))
+		}
+	}
+
+	{
+		result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+		defer result.TearDownFn()
+
+		c := clientset.NewForConfigOrDie(result.ClientConfig)
+		obj, err := c.AppsV1().Deployments("default").Apply(context.TODO(), deploymentConfig, "test-mgr", metav1.ApplyOptions{})
+		if err != nil {
+			t.Fatalf("unexpected error when applying manifest for Deployment: %v", err)
+		}
+		// sanity the applied fields
+		if obj.Spec.Template.Spec.Containers[0].Image != "nginx:1.14.2" {
+			t.Errorf("expected image %s but got %s", "nginx:1.14.2", obj.Spec.Template.Spec.Containers[0].Image)
+		}
+		cpu := obj.Spec.Template.Spec.Containers[0].Resources.Limits[v1.ResourceCPU]
+		if cpu.Value() != int64(4) {
+			t.Errorf("expected resourceCPU limit %d but got %d", 4, cpu.Value())
+		}
+	}
+}
+
+func TestApplyApplyConfigurationAccessors(t *testing.T) {
+	deploymentManifest := appsv1mf.Deployment().
+		SetTypeMeta(metav1mf.TypeMeta().
+			SetKind("Deployment").
+			SetAPIVersion("apps/v1"),
+		).
+		SetObjectMeta(metav1mf.ObjectMeta().
+			SetName("nginx-deployment-3"),
+		).
+		SetSpec(appsv1mf.DeploymentSpec().
+			SetSelector(metav1mf.LabelSelector().
+				SetMatchLabels(map[string]string{"app": "nginx"}),
+			).
+			SetTemplate(corev1mf.PodTemplateSpec().
+				SetObjectMeta(metav1mf.ObjectMeta().
+					SetLabels(map[string]string{"app": "nginx"}),
+				).
+				SetSpec(corev1mf.PodSpec().
+					SetContainers(corev1mf.ContainerList{
+						corev1mf.Container().
+							SetName("nginx").
+							SetImage("nginx:1.14.2").
+							SetStdin(true).
+							SetPorts(corev1mf.ContainerPortList{
+								corev1mf.ContainerPort().
+									SetContainerPort(8080).
+									SetProtocol(v1.ProtocolTCP),
+							}).
+							SetResources(corev1mf.ResourceRequirements().
+								SetLimits(v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("4"),
+									v1.ResourceMemory: resource.MustParse("32Gi"),
+								})),
+					}),
+				),
+			),
+		)
+
+	var name string
+	var apiVersion string
+	if meta, ok := deploymentManifest.GetTypeMeta(); ok {
+		meta.SetKind("foo")
+		apiVersion, _ = meta.GetAPIVersion()
+	}
+	if spec, ok := deploymentManifest.GetSpec(); ok {
+		if template, ok := spec.GetTemplate(); ok {
+			if templateSpec, ok := template.GetSpec(); ok {
+				if containers, ok := templateSpec.GetContainers(); ok {
+					name, _ = containers[0].GetName()
+					containers[0].SetImage("replacement:1.0.0")
+				}
+			}
+		}
+	}
+	var kind string
+	var image string
+	if meta, ok := deploymentManifest.GetTypeMeta(); ok {
+		kind, _ = meta.GetKind()
+	}
+	if spec, ok := deploymentManifest.GetSpec(); ok {
+		if template, ok := spec.GetTemplate(); ok {
+			if templateSpec, ok := template.GetSpec(); ok {
+				if containers, ok := templateSpec.GetContainers(); ok {
+					image, _ = containers[0].GetImage()
+				}
+			}
+		}
+	}
+	if apiVersion != "apps/v1" {
+		t.Errorf("expected apiVersion %s but got %s", "apps/v1", apiVersion)
+	}
+	if kind != "foo" {
+		t.Errorf("expected kind %s but got %s", "foo", kind)
+	}
+	if name != "nginx" {
+		t.Errorf("expected name %s but got %s", "nginx", name)
+	}
+	if image != "replacement:1.0.0" {
+		t.Errorf("expected image %s but got %s", "replacement:1.0.0", image)
+	}
 }
