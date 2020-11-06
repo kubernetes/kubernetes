@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/Microsoft/hcsshim"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1beta1"
 	"k8s.io/klog/v2"
 )
 

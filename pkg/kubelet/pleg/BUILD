@@ -21,7 +21,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
+        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1beta1:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )

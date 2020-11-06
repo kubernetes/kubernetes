@@ -20,7 +20,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
-        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
+        "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1beta1:go_default_library",
         "//vendor/github.com/golang/mock/gomock:go_default_library",
         "//vendor/github.com/stretchr/testify/mock:go_default_library",
     ],

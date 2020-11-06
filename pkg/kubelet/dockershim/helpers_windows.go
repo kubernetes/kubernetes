@@ -28,7 +28,7 @@ import (
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	"k8s.io/klog/v2"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1beta1"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 

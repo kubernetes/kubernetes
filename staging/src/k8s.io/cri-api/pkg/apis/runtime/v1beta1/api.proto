@@ -17,8 +17,8 @@ limitations under the License.
 // To regenerate api.pb.go run hack/update-generated-runtime.sh
 syntax = "proto3";
 
-package runtime.v1alpha2;
-option go_package = "v1alpha2";
+package runtime.v1beta1;
+option go_package = "v1beta1";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 

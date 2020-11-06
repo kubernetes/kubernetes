@@ -28,7 +28,7 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 	"k8s.io/client-go/tools/remotecommand"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1beta1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
