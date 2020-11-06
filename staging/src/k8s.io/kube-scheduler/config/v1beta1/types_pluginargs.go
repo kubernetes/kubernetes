@@ -23,6 +23,28 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DefaultPreemptionArgs holds arguments used to configure the
+// DefaultPreemption plugin.
+type DefaultPreemptionArgs struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// MinCandidateNodesPercentage is the minimum number of candidates to
+	// shortlist when dry running preemption as a percentage of number of nodes.
+	// Must be in the range [0, 100]. Defaults to 10% of the cluster size if
+	// unspecified.
+	MinCandidateNodesPercentage *int32 `json:"minCandidateNodesPercentage,omitempty"`
+	// MinCandidateNodesAbsolute is the absolute minimum number of candidates to
+	// shortlist. The likely number of candidates enumerated for dry running
+	// preemption is given by the formula:
+	// numCandidates = max(numNodes * minCandidateNodesPercentage, minCandidateNodesAbsolute)
+	// We say "likely" because there are other factors such as PDB violations
+	// that play a role in the number of candidates shortlisted. Must be at least
+	// 0 nodes. Defaults to 100 nodes if unspecified.
+	MinCandidateNodesAbsolute *int32 `json:"minCandidateNodesAbsolute,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // InterPodAffinityArgs holds arguments used to configure the InterPodAffinity plugin.
 type InterPodAffinityArgs struct {
 	metav1.TypeMeta `json:",inline"`
