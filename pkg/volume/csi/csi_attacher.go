@@ -276,12 +276,11 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 
 	// Store volume metadata for UnmountDevice. Keep it around even if the
 	// driver does not support NodeStage, UnmountDevice still needs it.
-	parentDir := filepath.Dir(deviceMountPath)
-	if err = os.MkdirAll(parentDir, 0750); err != nil {
-		return errors.New(log("attacher.MountDevice failed to create dir %#v:  %v", parentDir, err))
+	if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
+		return errors.New(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
 	}
-	klog.V(4).Info(log("created target path successfully [%s]", parentDir))
-	dataDir := parentDir
+	klog.V(4).Info(log("created target path successfully [%s]", deviceMountPath))
+	dataDir := filepath.Dir(deviceMountPath)
 	data := map[string]string{
 		volDataKey.volHandle:  csiSource.VolumeHandle,
 		volDataKey.driverName: csiSource.Driver,
