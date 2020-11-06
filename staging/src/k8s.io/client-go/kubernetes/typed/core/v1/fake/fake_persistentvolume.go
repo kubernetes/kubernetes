@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -126,6 +129,28 @@ func (c *FakePersistentVolumes) DeleteCollection(ctx context.Context, opts v1.De
 func (c *FakePersistentVolumes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.PersistentVolume, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(persistentvolumesResource, name, pt, data, subresources...), &corev1.PersistentVolume{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*corev1.PersistentVolume), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied persistentVolume.
+func (c *FakePersistentVolumes) Apply(ctx context.Context, persistentVolume *applyconfigurationscorev1.PersistentVolumeApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *corev1.PersistentVolume, err error) {
+	data, err := json.Marshal(persistentVolume)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := persistentVolume.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("persistentVolume.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("persistentVolume.ObjectMeta.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(persistentvolumesResource, name, types.ApplyPatchType, data, subresources...), &corev1.PersistentVolume{})
 	if obj == nil {
 		return nil, err
 	}

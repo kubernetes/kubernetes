@@ -20,12 +20,15 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -46,6 +49,7 @@ type PodTemplateInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.PodTemplateList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PodTemplate, err error)
+	Apply(ctx context.Context, podTemplate *corev1.PodTemplateApplyConfiguration, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.PodTemplate, err error)
 	PodTemplateExpansion
 }
 
@@ -171,6 +175,34 @@ func (c *podTemplates) Patch(ctx context.Context, name string, pt types.PatchTyp
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied podTemplate.
+func (c *podTemplates) Apply(ctx context.Context, podTemplate *corev1.PodTemplateApplyConfiguration, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.PodTemplate, err error) {
+	patchOpts := opts.ToPatchOptions(fieldManager)
+	data, err := json.Marshal(podTemplate)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := podTemplate.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("podTemplate.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("podTemplate.ObjectMeta.Name must be provided to Apply")
+	}
+	result = &v1.PodTemplate{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("podtemplates").
+		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

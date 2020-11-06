@@ -20,12 +20,15 @@ package v1beta1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	certificatesv1beta1 "k8s.io/client-go/applyconfigurations/certificates/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -47,6 +50,7 @@ type CertificateSigningRequestInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.CertificateSigningRequestList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CertificateSigningRequest, err error)
+	Apply(ctx context.Context, certificateSigningRequest *certificatesv1beta1.CertificateSigningRequestApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *v1beta1.CertificateSigningRequest, err error)
 	CertificateSigningRequestExpansion
 }
 
@@ -177,6 +181,33 @@ func (c *certificateSigningRequests) Patch(ctx context.Context, name string, pt 
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied certificateSigningRequest.
+func (c *certificateSigningRequests) Apply(ctx context.Context, certificateSigningRequest *certificatesv1beta1.CertificateSigningRequestApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *v1beta1.CertificateSigningRequest, err error) {
+	patchOpts := opts.ToPatchOptions(fieldManager)
+	data, err := json.Marshal(certificateSigningRequest)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := certificateSigningRequest.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("certificateSigningRequest.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("certificateSigningRequest.ObjectMeta.Name must be provided to Apply")
+	}
+	result = &v1beta1.CertificateSigningRequest{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("certificatesigningrequests").
+		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

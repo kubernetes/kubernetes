@@ -20,12 +20,15 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	storagev1 "k8s.io/client-go/applyconfigurations/storage/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -47,6 +50,7 @@ type VolumeAttachmentInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.VolumeAttachmentList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.VolumeAttachment, err error)
+	Apply(ctx context.Context, volumeAttachment *storagev1.VolumeAttachmentApplyConfiguration, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.VolumeAttachment, err error)
 	VolumeAttachmentExpansion
 }
 
@@ -177,6 +181,33 @@ func (c *volumeAttachments) Patch(ctx context.Context, name string, pt types.Pat
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied volumeAttachment.
+func (c *volumeAttachments) Apply(ctx context.Context, volumeAttachment *storagev1.VolumeAttachmentApplyConfiguration, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.VolumeAttachment, err error) {
+	patchOpts := opts.ToPatchOptions(fieldManager)
+	data, err := json.Marshal(volumeAttachment)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := volumeAttachment.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("volumeAttachment.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("volumeAttachment.ObjectMeta.Name must be provided to Apply")
+	}
+	result = &v1.VolumeAttachment{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("volumeattachments").
+		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -20,12 +20,15 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	storagev1 "k8s.io/client-go/applyconfigurations/storage/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -46,6 +49,7 @@ type CSINodeInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.CSINodeList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CSINode, err error)
+	Apply(ctx context.Context, cSINode *storagev1.CSINodeApplyConfiguration, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.CSINode, err error)
 	CSINodeExpansion
 }
 
@@ -161,6 +165,33 @@ func (c *cSINodes) Patch(ctx context.Context, name string, pt types.PatchType, d
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied cSINode.
+func (c *cSINodes) Apply(ctx context.Context, cSINode *storagev1.CSINodeApplyConfiguration, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.CSINode, err error) {
+	patchOpts := opts.ToPatchOptions(fieldManager)
+	data, err := json.Marshal(cSINode)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := cSINode.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("cSINode.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("cSINode.ObjectMeta.Name must be provided to Apply")
+	}
+	result = &v1.CSINode{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("csinodes").
+		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -20,12 +20,15 @@ package v1beta1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	batchv1beta1 "k8s.io/client-go/applyconfigurations/batch/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -47,6 +50,7 @@ type CronJobInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.CronJobList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CronJob, err error)
+	Apply(ctx context.Context, cronJob *batchv1beta1.CronJobApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *v1beta1.CronJob, err error)
 	CronJobExpansion
 }
 
@@ -188,6 +192,34 @@ func (c *cronJobs) Patch(ctx context.Context, name string, pt types.PatchType, d
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied cronJob.
+func (c *cronJobs) Apply(ctx context.Context, cronJob *batchv1beta1.CronJobApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *v1beta1.CronJob, err error) {
+	patchOpts := opts.ToPatchOptions(fieldManager)
+	data, err := json.Marshal(cronJob)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := cronJob.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("cronJob.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("cronJob.ObjectMeta.Name must be provided to Apply")
+	}
+	result = &v1beta1.CronJob{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("cronjobs").
+		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

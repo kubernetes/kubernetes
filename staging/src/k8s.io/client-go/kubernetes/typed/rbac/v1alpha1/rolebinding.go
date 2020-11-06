@@ -20,12 +20,15 @@ package v1alpha1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -46,6 +49,7 @@ type RoleBindingInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.RoleBindingList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.RoleBinding, err error)
+	Apply(ctx context.Context, roleBinding *rbacv1alpha1.RoleBindingApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *v1alpha1.RoleBinding, err error)
 	RoleBindingExpansion
 }
 
@@ -171,6 +175,34 @@ func (c *roleBindings) Patch(ctx context.Context, name string, pt types.PatchTyp
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied roleBinding.
+func (c *roleBindings) Apply(ctx context.Context, roleBinding *rbacv1alpha1.RoleBindingApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *v1alpha1.RoleBinding, err error) {
+	patchOpts := opts.ToPatchOptions(fieldManager)
+	data, err := json.Marshal(roleBinding)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := roleBinding.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("roleBinding.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("roleBinding.ObjectMeta.Name must be provided to Apply")
+	}
+	result = &v1alpha1.RoleBinding{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("rolebindings").
+		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

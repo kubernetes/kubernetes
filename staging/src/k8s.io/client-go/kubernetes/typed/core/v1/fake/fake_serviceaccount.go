@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +30,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -123,6 +126,29 @@ func (c *FakeServiceAccounts) DeleteCollection(ctx context.Context, opts v1.Dele
 func (c *FakeServiceAccounts) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.ServiceAccount, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(serviceaccountsResource, c.ns, name, pt, data, subresources...), &corev1.ServiceAccount{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*corev1.ServiceAccount), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied serviceAccount.
+func (c *FakeServiceAccounts) Apply(ctx context.Context, serviceAccount *applyconfigurationscorev1.ServiceAccountApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *corev1.ServiceAccount, err error) {
+	data, err := json.Marshal(serviceAccount)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := serviceAccount.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("serviceAccount.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("serviceAccount.ObjectMeta.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(serviceaccountsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &corev1.ServiceAccount{})
 
 	if obj == nil {
 		return nil, err

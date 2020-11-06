@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsrbacv1 "k8s.io/client-go/applyconfigurations/rbac/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -122,6 +125,29 @@ func (c *FakeRoles) DeleteCollection(ctx context.Context, opts v1.DeleteOptions,
 func (c *FakeRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *rbacv1.Role, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(rolesResource, c.ns, name, pt, data, subresources...), &rbacv1.Role{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*rbacv1.Role), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied role.
+func (c *FakeRoles) Apply(ctx context.Context, role *applyconfigurationsrbacv1.RoleApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *rbacv1.Role, err error) {
+	data, err := json.Marshal(role)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := role.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("role.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("role.ObjectMeta.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(rolesResource, c.ns, name, types.ApplyPatchType, data, subresources...), &rbacv1.Role{})
 
 	if obj == nil {
 		return nil, err

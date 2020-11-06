@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsautoscalingv1 "k8s.io/client-go/applyconfigurations/autoscaling/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -134,6 +137,29 @@ func (c *FakeHorizontalPodAutoscalers) DeleteCollection(ctx context.Context, opt
 func (c *FakeHorizontalPodAutoscalers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *autoscalingv1.HorizontalPodAutoscaler, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, name, pt, data, subresources...), &autoscalingv1.HorizontalPodAutoscaler{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*autoscalingv1.HorizontalPodAutoscaler), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied horizontalPodAutoscaler.
+func (c *FakeHorizontalPodAutoscalers) Apply(ctx context.Context, horizontalPodAutoscaler *applyconfigurationsautoscalingv1.HorizontalPodAutoscalerApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *autoscalingv1.HorizontalPodAutoscaler, err error) {
+	data, err := json.Marshal(horizontalPodAutoscaler)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := horizontalPodAutoscaler.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("horizontalPodAutoscaler.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("horizontalPodAutoscaler.ObjectMeta.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, name, types.ApplyPatchType, data, subresources...), &autoscalingv1.HorizontalPodAutoscaler{})
 
 	if obj == nil {
 		return nil, err

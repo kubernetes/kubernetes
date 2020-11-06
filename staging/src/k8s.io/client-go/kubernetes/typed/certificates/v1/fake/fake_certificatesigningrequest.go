@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscertificatesv1 "k8s.io/client-go/applyconfigurations/certificates/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -126,6 +129,28 @@ func (c *FakeCertificateSigningRequests) DeleteCollection(ctx context.Context, o
 func (c *FakeCertificateSigningRequests) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *certificatesv1.CertificateSigningRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(certificatesigningrequestsResource, name, pt, data, subresources...), &certificatesv1.CertificateSigningRequest{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*certificatesv1.CertificateSigningRequest), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied certificateSigningRequest.
+func (c *FakeCertificateSigningRequests) Apply(ctx context.Context, certificateSigningRequest *applyconfigurationscertificatesv1.CertificateSigningRequestApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *certificatesv1.CertificateSigningRequest, err error) {
+	data, err := json.Marshal(certificateSigningRequest)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := certificateSigningRequest.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("certificateSigningRequest.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("certificateSigningRequest.ObjectMeta.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(certificatesigningrequestsResource, name, types.ApplyPatchType, data, subresources...), &certificatesv1.CertificateSigningRequest{})
 	if obj == nil {
 		return nil, err
 	}

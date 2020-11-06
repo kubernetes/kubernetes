@@ -20,12 +20,15 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -46,6 +49,7 @@ type SecretInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.SecretList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Secret, err error)
+	Apply(ctx context.Context, secret *corev1.SecretApplyConfiguration, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.Secret, err error)
 	SecretExpansion
 }
 
@@ -171,6 +175,34 @@ func (c *secrets) Patch(ctx context.Context, name string, pt types.PatchType, da
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied secret.
+func (c *secrets) Apply(ctx context.Context, secret *corev1.SecretApplyConfiguration, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.Secret, err error) {
+	patchOpts := opts.ToPatchOptions(fieldManager)
+	data, err := json.Marshal(secret)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := secret.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("secret.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("secret.ObjectMeta.Name must be provided to Apply")
+	}
+	result = &v1.Secret{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("secrets").
+		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

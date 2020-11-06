@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -126,6 +129,29 @@ func (c *FakeServices) Delete(ctx context.Context, name string, opts v1.DeleteOp
 func (c *FakeServices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.Service, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(servicesResource, c.ns, name, pt, data, subresources...), &corev1.Service{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*corev1.Service), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied service.
+func (c *FakeServices) Apply(ctx context.Context, service *applyconfigurationscorev1.ServiceApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *corev1.Service, err error) {
+	data, err := json.Marshal(service)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := service.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("service.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("service.ObjectMeta.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(servicesResource, c.ns, name, types.ApplyPatchType, data, subresources...), &corev1.Service{})
 
 	if obj == nil {
 		return nil, err

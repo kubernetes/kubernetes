@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	storagev1 "k8s.io/api/storage/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsstoragev1 "k8s.io/client-go/applyconfigurations/storage/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -115,6 +118,28 @@ func (c *FakeCSIDrivers) DeleteCollection(ctx context.Context, opts v1.DeleteOpt
 func (c *FakeCSIDrivers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *storagev1.CSIDriver, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(csidriversResource, name, pt, data, subresources...), &storagev1.CSIDriver{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*storagev1.CSIDriver), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied cSIDriver.
+func (c *FakeCSIDrivers) Apply(ctx context.Context, cSIDriver *applyconfigurationsstoragev1.CSIDriverApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *storagev1.CSIDriver, err error) {
+	data, err := json.Marshal(cSIDriver)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := cSIDriver.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("cSIDriver.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("cSIDriver.ObjectMeta.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(csidriversResource, name, types.ApplyPatchType, data, subresources...), &storagev1.CSIDriver{})
 	if obj == nil {
 		return nil, err
 	}

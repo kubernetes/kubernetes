@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -134,6 +137,29 @@ func (c *FakePersistentVolumeClaims) DeleteCollection(ctx context.Context, opts 
 func (c *FakePersistentVolumeClaims) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.PersistentVolumeClaim, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, name, pt, data, subresources...), &corev1.PersistentVolumeClaim{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*corev1.PersistentVolumeClaim), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied persistentVolumeClaim.
+func (c *FakePersistentVolumeClaims) Apply(ctx context.Context, persistentVolumeClaim *applyconfigurationscorev1.PersistentVolumeClaimApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *corev1.PersistentVolumeClaim, err error) {
+	data, err := json.Marshal(persistentVolumeClaim)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := persistentVolumeClaim.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("persistentVolumeClaim.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("persistentVolumeClaim.ObjectMeta.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &corev1.PersistentVolumeClaim{})
 
 	if obj == nil {
 		return nil, err

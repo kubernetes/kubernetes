@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1alpha1 "k8s.io/api/discovery/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	discoveryv1alpha1 "k8s.io/client-go/applyconfigurations/discovery/v1alpha1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -122,6 +125,29 @@ func (c *FakeEndpointSlices) DeleteCollection(ctx context.Context, opts v1.Delet
 func (c *FakeEndpointSlices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.EndpointSlice, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(endpointslicesResource, c.ns, name, pt, data, subresources...), &v1alpha1.EndpointSlice{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.EndpointSlice), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied endpointSlice.
+func (c *FakeEndpointSlices) Apply(ctx context.Context, endpointSlice *discoveryv1alpha1.EndpointSliceApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *v1alpha1.EndpointSlice, err error) {
+	data, err := json.Marshal(endpointSlice)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := endpointSlice.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("endpointSlice.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("endpointSlice.ObjectMeta.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(endpointslicesResource, c.ns, name, types.ApplyPatchType, data, subresources...), &v1alpha1.EndpointSlice{})
 
 	if obj == nil {
 		return nil, err

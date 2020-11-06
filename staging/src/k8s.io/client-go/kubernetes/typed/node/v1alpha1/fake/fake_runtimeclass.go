@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1alpha1 "k8s.io/api/node/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	nodev1alpha1 "k8s.io/client-go/applyconfigurations/node/v1alpha1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -115,6 +118,28 @@ func (c *FakeRuntimeClasses) DeleteCollection(ctx context.Context, opts v1.Delet
 func (c *FakeRuntimeClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.RuntimeClass, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(runtimeclassesResource, name, pt, data, subresources...), &v1alpha1.RuntimeClass{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.RuntimeClass), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied runtimeClass.
+func (c *FakeRuntimeClasses) Apply(ctx context.Context, runtimeClass *nodev1alpha1.RuntimeClassApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *v1alpha1.RuntimeClass, err error) {
+	data, err := json.Marshal(runtimeClass)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := runtimeClass.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("runtimeClass.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("runtimeClass.ObjectMeta.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(runtimeclassesResource, name, types.ApplyPatchType, data, subresources...), &v1alpha1.RuntimeClass{})
 	if obj == nil {
 		return nil, err
 	}

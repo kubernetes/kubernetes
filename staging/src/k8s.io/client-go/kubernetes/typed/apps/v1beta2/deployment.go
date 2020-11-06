@@ -20,12 +20,15 @@ package v1beta2
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	appsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -47,6 +50,7 @@ type DeploymentInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta2.DeploymentList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.Deployment, err error)
+	Apply(ctx context.Context, deployment *appsv1beta2.DeploymentApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *v1beta2.Deployment, err error)
 	DeploymentExpansion
 }
 
@@ -188,6 +192,34 @@ func (c *deployments) Patch(ctx context.Context, name string, pt types.PatchType
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied deployment.
+func (c *deployments) Apply(ctx context.Context, deployment *appsv1beta2.DeploymentApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *v1beta2.Deployment, err error) {
+	patchOpts := opts.ToPatchOptions(fieldManager)
+	data, err := json.Marshal(deployment)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := deployment.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("deployment.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("deployment.ObjectMeta.Name must be provided to Apply")
+	}
+	result = &v1beta2.Deployment{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("deployments").
+		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

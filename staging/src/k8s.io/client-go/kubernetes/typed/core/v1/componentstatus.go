@@ -20,12 +20,15 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -46,6 +49,7 @@ type ComponentStatusInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ComponentStatusList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ComponentStatus, err error)
+	Apply(ctx context.Context, componentStatus *corev1.ComponentStatusApplyConfiguration, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.ComponentStatus, err error)
 	ComponentStatusExpansion
 }
 
@@ -161,6 +165,33 @@ func (c *componentStatuses) Patch(ctx context.Context, name string, pt types.Pat
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied componentStatus.
+func (c *componentStatuses) Apply(ctx context.Context, componentStatus *corev1.ComponentStatusApplyConfiguration, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.ComponentStatus, err error) {
+	patchOpts := opts.ToPatchOptions(fieldManager)
+	data, err := json.Marshal(componentStatus)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := componentStatus.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("componentStatus.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("componentStatus.ObjectMeta.Name must be provided to Apply")
+	}
+	result = &v1.ComponentStatus{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("componentstatuses").
+		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

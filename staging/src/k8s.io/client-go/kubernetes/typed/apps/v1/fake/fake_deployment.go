@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -28,6 +30,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsappsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -135,6 +138,29 @@ func (c *FakeDeployments) DeleteCollection(ctx context.Context, opts v1.DeleteOp
 func (c *FakeDeployments) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1.Deployment, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, name, pt, data, subresources...), &appsv1.Deployment{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*appsv1.Deployment), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied deployment.
+func (c *FakeDeployments) Apply(ctx context.Context, deployment *applyconfigurationsappsv1.DeploymentApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *appsv1.Deployment, err error) {
+	data, err := json.Marshal(deployment)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := deployment.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("deployment.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("deployment.ObjectMeta.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &appsv1.Deployment{})
 
 	if obj == nil {
 		return nil, err

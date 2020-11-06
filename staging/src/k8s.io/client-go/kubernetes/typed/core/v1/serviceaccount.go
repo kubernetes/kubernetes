@@ -20,6 +20,8 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -27,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -47,6 +50,7 @@ type ServiceAccountInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ServiceAccountList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ServiceAccount, err error)
+	Apply(ctx context.Context, serviceAccount *corev1.ServiceAccountApplyConfiguration, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.ServiceAccount, err error)
 	CreateToken(ctx context.Context, serviceAccountName string, tokenRequest *authenticationv1.TokenRequest, opts metav1.CreateOptions) (*authenticationv1.TokenRequest, error)
 
 	ServiceAccountExpansion
@@ -174,6 +178,34 @@ func (c *serviceAccounts) Patch(ctx context.Context, name string, pt types.Patch
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied serviceAccount.
+func (c *serviceAccounts) Apply(ctx context.Context, serviceAccount *corev1.ServiceAccountApplyConfiguration, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.ServiceAccount, err error) {
+	patchOpts := opts.ToPatchOptions(fieldManager)
+	data, err := json.Marshal(serviceAccount)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := serviceAccount.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("serviceAccount.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("serviceAccount.ObjectMeta.Name must be provided to Apply")
+	}
+	result = &v1.ServiceAccount{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("serviceaccounts").
+		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

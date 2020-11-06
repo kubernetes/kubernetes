@@ -20,12 +20,15 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	autoscalingv1 "k8s.io/client-go/applyconfigurations/autoscaling/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -47,6 +50,7 @@ type HorizontalPodAutoscalerInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.HorizontalPodAutoscalerList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.HorizontalPodAutoscaler, err error)
+	Apply(ctx context.Context, horizontalPodAutoscaler *autoscalingv1.HorizontalPodAutoscalerApplyConfiguration, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.HorizontalPodAutoscaler, err error)
 	HorizontalPodAutoscalerExpansion
 }
 
@@ -188,6 +192,34 @@ func (c *horizontalPodAutoscalers) Patch(ctx context.Context, name string, pt ty
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied horizontalPodAutoscaler.
+func (c *horizontalPodAutoscalers) Apply(ctx context.Context, horizontalPodAutoscaler *autoscalingv1.HorizontalPodAutoscalerApplyConfiguration, fieldManager string, opts metav1.ApplyOptions, subresources ...string) (result *v1.HorizontalPodAutoscaler, err error) {
+	patchOpts := opts.ToPatchOptions(fieldManager)
+	data, err := json.Marshal(horizontalPodAutoscaler)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := horizontalPodAutoscaler.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("horizontalPodAutoscaler.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("horizontalPodAutoscaler.ObjectMeta.Name must be provided to Apply")
+	}
+	result = &v1.HorizontalPodAutoscaler{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("horizontalpodautoscalers").
+		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

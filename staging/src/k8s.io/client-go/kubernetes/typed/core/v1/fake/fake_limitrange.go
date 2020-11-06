@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -122,6 +125,29 @@ func (c *FakeLimitRanges) DeleteCollection(ctx context.Context, opts v1.DeleteOp
 func (c *FakeLimitRanges) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.LimitRange, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(limitrangesResource, c.ns, name, pt, data, subresources...), &corev1.LimitRange{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*corev1.LimitRange), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied limitRange.
+func (c *FakeLimitRanges) Apply(ctx context.Context, limitRange *applyconfigurationscorev1.LimitRangeApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *corev1.LimitRange, err error) {
+	data, err := json.Marshal(limitRange)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := limitRange.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("limitRange.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("limitRange.ObjectMeta.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(limitrangesResource, c.ns, name, types.ApplyPatchType, data, subresources...), &corev1.LimitRange{})
 
 	if obj == nil {
 		return nil, err

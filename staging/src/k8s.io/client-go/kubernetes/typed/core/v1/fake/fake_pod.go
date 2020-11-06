@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -134,6 +137,29 @@ func (c *FakePods) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, 
 func (c *FakePods) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.Pod, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, name, pt, data, subresources...), &corev1.Pod{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*corev1.Pod), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied pod.
+func (c *FakePods) Apply(ctx context.Context, pod *applyconfigurationscorev1.PodApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *corev1.Pod, err error) {
+	data, err := json.Marshal(pod)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := pod.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("pod.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("pod.ObjectMeta.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &corev1.Pod{})
 
 	if obj == nil {
 		return nil, err

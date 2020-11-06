@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -122,6 +125,29 @@ func (c *FakeSecrets) DeleteCollection(ctx context.Context, opts v1.DeleteOption
 func (c *FakeSecrets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.Secret, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(secretsResource, c.ns, name, pt, data, subresources...), &corev1.Secret{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*corev1.Secret), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied secret.
+func (c *FakeSecrets) Apply(ctx context.Context, secret *applyconfigurationscorev1.SecretApplyConfiguration, fieldManager string, opts v1.ApplyOptions, subresources ...string) (result *corev1.Secret, err error) {
+	data, err := json.Marshal(secret)
+	if err != nil {
+		return nil, err
+	}
+	meta, ok := secret.GetObjectMeta()
+	if !ok {
+		return nil, fmt.Errorf("secret.ObjectMeta must be provided to Apply")
+	}
+	name, ok := meta.GetName()
+	if !ok {
+		return nil, fmt.Errorf("secret.ObjectMeta.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(secretsResource, c.ns, name, types.ApplyPatchType, data, subresources...), &corev1.Secret{})
 
 	if obj == nil {
 		return nil, err
