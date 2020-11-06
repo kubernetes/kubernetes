@@ -32,7 +32,7 @@ spec:
       {{kube_cache_mutation_detector_env_value}}
     securityContext:
       capabilities:
-        add: ["NET_ADMIN"]
+        add: ["NET_ADMIN", "SYS_MODULE"]
     volumeMounts:
     - mountPath: /etc/ssl/certs
       name: etc-ssl-certs

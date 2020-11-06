@@ -81,7 +81,7 @@ spec:
         - --hostname-override=$(NODE_NAME)
         securityContext:
           capabilities:
-	          add: ["NET_ADMIN"]
+	          add: ["NET_ADMIN", "SYS_MODULE"]
         volumeMounts:
         - mountPath: /var/lib/kube-proxy
           name: kube-proxy
