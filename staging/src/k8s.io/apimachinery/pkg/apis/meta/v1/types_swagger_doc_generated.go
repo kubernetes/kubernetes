@@ -86,6 +86,17 @@ func (APIVersions) SwaggerDoc() map[string]string {
 	return map_APIVersions
 }
 
+var map_ApplyOptions = map[string]string{
+	"":             "ApplyOptions may be provided when applying an API object. FieldManager is required for apply requests. ApplyOptions is equivalent to PatchOptions. It is provided as a convenience with documentation that speaks specifically to how the options fields relate to apply.",
+	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"force":        "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people.",
+	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint. This field is required.",
+}
+
+func (ApplyOptions) SwaggerDoc() map[string]string {
+	return map_ApplyOptions
+}
+
 var map_Condition = map[string]string{
 	"":                   "Condition contains details for one aspect of the current state of this API Resource.",
 	"type":               "type of condition in CamelCase or in foo.example.com/CamelCase.",
