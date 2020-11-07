@@ -172,8 +172,7 @@ func TestNewBuilder(t *testing.T) {
     },
     "embedded-object": {
       "x-kubernetes-embedded-resource": true,
-      "x-kubernetes-preserve-unknown-fields": true,
-      "type":"object"
+      "x-kubernetes-preserve-unknown-fields": true
     }
   },
   "x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]
