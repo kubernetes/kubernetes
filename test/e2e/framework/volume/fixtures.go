@@ -466,7 +466,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 		} else {
 			// Filesystem: check content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
-			commands := generateReadFileCmd(fileName)
+			commands := GenerateReadFileCmd(fileName)
 			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
 
@@ -608,9 +608,9 @@ func generateWriteBlockCmd(content, fullPath string) []string {
 	return generateWriteCmd(content, fullPath)
 }
 
-// generateReadFileCmd generates the corresponding command lines to read from a file with the given file path.
+// GenerateReadFileCmd generates the corresponding command lines to read from a file with the given file path.
 // Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func generateReadFileCmd(fullPath string) []string {
+func GenerateReadFileCmd(fullPath string) []string {
 	var commands []string
 	if !framework.NodeOSDistroIs("windows") {
 		commands = []string{"cat", fullPath}
