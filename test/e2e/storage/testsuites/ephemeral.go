@@ -42,9 +42,19 @@ type ephemeralTestSuite struct {
 	tsInfo TestSuiteInfo
 }
 
-var _ TestSuite = &ephemeralTestSuite{}
+// InitCustomEphemeralTestSuite returns ephemeralTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomEphemeralTestSuite(patterns []testpatterns.TestPattern) TestSuite {
+	return &ephemeralTestSuite{
+		tsInfo: TestSuiteInfo{
+			Name:         "ephemeral",
+			TestPatterns: patterns,
+		},
+	}
+}
 
 // InitEphemeralTestSuite returns ephemeralTestSuite that implements TestSuite interface
+// using test suite default patterns
 func InitEphemeralTestSuite() TestSuite {
 	genericLateBinding := testpatterns.DefaultFsGenericEphemeralVolume
 	genericLateBinding.Name += " (late-binding)"
@@ -60,19 +70,14 @@ func InitEphemeralTestSuite() TestSuite {
 		genericImmediateBinding,
 	}
 
-	return &ephemeralTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name:         "ephemeral",
-			TestPatterns: patterns,
-		},
-	}
+	return InitCustomEphemeralTestSuite(patterns)
 }
 
 func (p *ephemeralTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return p.tsInfo
 }
 
-func (p *ephemeralTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (p *ephemeralTestSuite) SkipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
 func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
@@ -84,31 +89,18 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 		resource *VolumeResource
 	}
 	var (
-		dInfo   = driver.GetDriverInfo()
 		eDriver EphemeralTestDriver
 		l       local
 	)
 
-	ginkgo.BeforeEach(func() {
-		ok := false
-		switch pattern.VolType {
-		case testpatterns.CSIInlineVolume:
-			eDriver, ok = driver.(EphemeralTestDriver)
-		case testpatterns.GenericEphemeralVolume:
-			_, ok = driver.(DynamicPVTestDriver)
-		}
-		if !ok {
-			e2eskipper.Skipf("Driver %s doesn't support %q volumes -- skipping", dInfo.Name, pattern.VolType)
-		}
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("ephemeral", getDriverTimeouts(driver))
 
 	init := func() {
+		if pattern.VolType == testpatterns.CSIInlineVolume {
+			eDriver, _ = driver.(EphemeralTestDriver)
+		}
 		if pattern.VolType == testpatterns.GenericEphemeralVolume {
 			enabled, err := GenericEphemeralVolumesEnabled(f.ClientSet, f.Timeouts, f.Namespace.Name)
 			framework.ExpectNoError(err, "check GenericEphemeralVolume feature")

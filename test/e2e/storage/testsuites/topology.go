@@ -55,26 +55,42 @@ type topologyTest struct {
 
 type topology map[string]string
 
-var _ TestSuite = &topologyTestSuite{}
-
-// InitTopologyTestSuite returns topologyTestSuite that implements TestSuite interface
-func InitTopologyTestSuite() TestSuite {
+// InitCustomTopologyTestSuite returns topologyTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomTopologyTestSuite(patterns []testpatterns.TestPattern) TestSuite {
 	return &topologyTestSuite{
 		tsInfo: TestSuiteInfo{
-			Name: "topology",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.TopologyImmediate,
-				testpatterns.TopologyDelayed,
-			},
+			Name:         "topology",
+			TestPatterns: patterns,
 		},
 	}
+}
+
+// InitTopologyTestSuite returns topologyTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitTopologyTestSuite() TestSuite {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.TopologyImmediate,
+		testpatterns.TopologyDelayed,
+	}
+	return InitCustomTopologyTestSuite(patterns)
 }
 
 func (t *topologyTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *topologyTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *topologyTestSuite) SkipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	dInfo := driver.GetDriverInfo()
+	var ok bool
+	_, ok = driver.(DynamicPVTestDriver)
+	if !ok {
+		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+	}
+
+	if !dInfo.Capabilities[CapTopology] {
+		e2eskipper.Skipf("Driver %q does not support topology - skipping", dInfo.Name)
+	}
 }
 
 func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
@@ -85,28 +101,12 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		err     error
 	)
 
-	ginkgo.BeforeEach(func() {
-		// Check preconditions.
-		ok := false
-		dDriver, ok = driver.(DynamicPVTestDriver)
-		if !ok {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
-		}
-
-		if !dInfo.Capabilities[CapTopology] {
-			e2eskipper.Skipf("Driver %q does not support topology - skipping", dInfo.Name)
-		}
-
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("topology", getDriverTimeouts(driver))
 
 	init := func() topologyTest {
-
+		dDriver, _ = driver.(DynamicPVTestDriver)
 		l := topologyTest{}
 
 		// Now do the more expensive test initialization.

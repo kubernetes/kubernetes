@@ -57,17 +57,13 @@ type snapshottableStressTest struct {
 	cancel context.CancelFunc
 }
 
-var _ TestSuite = &snapshottableStressTestSuite{}
-
-// InitSnapshottableStressTestSuite returns snapshottableStressTestSuite that implements TestSuite interface
-func InitSnapshottableStressTestSuite() TestSuite {
+// InitCustomSnapshottableStressTestSuite returns snapshottableStressTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomSnapshottableStressTestSuite(patterns []testpatterns.TestPattern) TestSuite {
 	return &snapshottableStressTestSuite{
 		tsInfo: TestSuiteInfo{
-			Name: "snapshottable-stress",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DynamicSnapshotDelete,
-				testpatterns.DynamicSnapshotRetain,
-			},
+			Name:         "snapshottable-stress",
+			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
@@ -76,11 +72,41 @@ func InitSnapshottableStressTestSuite() TestSuite {
 	}
 }
 
+// InitSnapshottableStressTestSuite returns snapshottableStressTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitSnapshottableStressTestSuite() TestSuite {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.DynamicSnapshotDelete,
+		testpatterns.DynamicSnapshotRetain,
+	}
+	return InitCustomSnapshottableStressTestSuite(patterns)
+}
+
 func (t *snapshottableStressTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *snapshottableStressTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *snapshottableStressTestSuite) SkipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	driverInfo := driver.GetDriverInfo()
+	var ok bool
+	if driverInfo.VolumeSnapshotStressTestOptions == nil {
+		e2eskipper.Skipf("Driver %s doesn't specify snapshot stress test options -- skipping", driverInfo.Name)
+	}
+	if driverInfo.VolumeSnapshotStressTestOptions.NumPods <= 0 {
+		framework.Failf("NumPods in snapshot stress test options must be a positive integer, received: %d", driverInfo.VolumeSnapshotStressTestOptions.NumPods)
+	}
+	if driverInfo.VolumeSnapshotStressTestOptions.NumSnapshots <= 0 {
+		framework.Failf("NumSnapshots in snapshot stress test options must be a positive integer, received: %d", driverInfo.VolumeSnapshotStressTestOptions.NumSnapshots)
+	}
+	_, ok = driver.(SnapshottableTestDriver)
+	if !driverInfo.Capabilities[CapSnapshotDataSource] || !ok {
+		e2eskipper.Skipf("Driver %q doesn't implement SnapshottableTestDriver - skipping", driverInfo.Name)
+	}
+
+	_, ok = driver.(DynamicPVTestDriver)
+	if !ok {
+		e2eskipper.Skipf("Driver %s doesn't implement DynamicPVTestDriver -- skipping", driverInfo.Name)
+	}
 }
 
 func (t *snapshottableStressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
@@ -91,40 +117,13 @@ func (t *snapshottableStressTestSuite) DefineTests(driver TestDriver, pattern te
 		stressTest          *snapshottableStressTest
 	)
 
-	// Check preconditions before setting up namespace via framework below.
-	ginkgo.BeforeEach(func() {
-		driverInfo = driver.GetDriverInfo()
-		if driverInfo.VolumeSnapshotStressTestOptions == nil {
-			e2eskipper.Skipf("Driver %s doesn't specify snapshot stress test options -- skipping", driverInfo.Name)
-		}
-		if driverInfo.VolumeSnapshotStressTestOptions.NumPods <= 0 {
-			framework.Failf("NumPods in snapshot stress test options must be a positive integer, received: %d", driverInfo.VolumeSnapshotStressTestOptions.NumPods)
-		}
-		if driverInfo.VolumeSnapshotStressTestOptions.NumSnapshots <= 0 {
-			framework.Failf("NumSnapshots in snapshot stress test options must be a positive integer, received: %d", driverInfo.VolumeSnapshotStressTestOptions.NumSnapshots)
-		}
-
-		// Because we're initializing snapshottableDriver, both vars must exist.
-		ok := false
-
-		snapshottableDriver, ok = driver.(SnapshottableTestDriver)
-		if !driverInfo.Capabilities[CapSnapshotDataSource] || !ok {
-			e2eskipper.Skipf("Driver %q doesn't implement SnapshottableTestDriver - skipping", driverInfo.Name)
-		}
-
-		_, ok = driver.(DynamicPVTestDriver)
-		if !ok {
-			e2eskipper.Skipf("Driver %s doesn't implement DynamicPVTestDriver -- skipping", driverInfo.Name)
-		}
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("snapshottable-stress")
 
 	init := func() {
+		driverInfo = driver.GetDriverInfo()
+		snapshottableDriver, _ = driver.(SnapshottableTestDriver)
 		cs = f.ClientSet
 		config, driverCleanup := driver.PrepareTest(f)
 		ctx, cancel := context.WithCancel(context.Background())

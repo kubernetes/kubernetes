@@ -31,8 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 )
 
-type fakeSuite struct {
-}
+type fakeSuite struct{}
 
 func (f *fakeSuite) GetTestSuiteInfo() testsuites.TestSuiteInfo {
 	return testsuites.TestSuiteInfo{
@@ -46,7 +45,7 @@ func (f *fakeSuite) GetTestSuiteInfo() testsuites.TestSuiteInfo {
 func (f *fakeSuite) DefineTests(testsuites.TestDriver, testpatterns.TestPattern) {
 }
 
-func (f *fakeSuite) SkipRedundantSuite(testsuites.TestDriver, testpatterns.TestPattern) {
+func (f *fakeSuite) SkipUnsupportedTests(testsuites.TestDriver, testpatterns.TestPattern) {
 }
 
 var _ testsuites.TestSuite = &fakeSuite{}

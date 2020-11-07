@@ -47,14 +47,12 @@ type fsGroupChangePolicyTestSuite struct {
 
 var _ TestSuite = &fsGroupChangePolicyTestSuite{}
 
-// InitFsGroupChangePolicyTestSuite returns fsGroupChangePolicyTestSuite that implements TestSuite interface
-func InitFsGroupChangePolicyTestSuite() TestSuite {
+// InitCustomFsGroupChangePolicyTestSuite returns fsGroupChangePolicyTestSuite that implements TestSuite interface
+func InitCustomFsGroupChangePolicyTestSuite(patterns []testpatterns.TestPattern) TestSuite {
 	return &fsGroupChangePolicyTestSuite{
 		tsInfo: TestSuiteInfo{
-			Name: "fsgroupchangepolicy",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsDynamicPV,
-			},
+			Name:         "fsgroupchangepolicy",
+			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
@@ -62,12 +60,37 @@ func InitFsGroupChangePolicyTestSuite() TestSuite {
 	}
 }
 
+// InitFsGroupChangePolicyTestSuite returns fsGroupChangePolicyTestSuite that implements TestSuite interface
+func InitFsGroupChangePolicyTestSuite() TestSuite {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.DefaultFsDynamicPV,
+	}
+	return InitCustomFsGroupChangePolicyTestSuite(patterns)
+}
+
 func (s *fsGroupChangePolicyTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *fsGroupChangePolicyTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *fsGroupChangePolicyTestSuite) SkipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(testpatterns.CSIInlineVolume, testpatterns.GenericEphemeralVolume))
+	dInfo := driver.GetDriverInfo()
+	if !dInfo.Capabilities[CapFsGroup] {
+		e2eskipper.Skipf("Driver %q does not support FsGroup - skipping", dInfo.Name)
+	}
+
+	if pattern.VolMode == v1.PersistentVolumeBlock {
+		e2eskipper.Skipf("Test does not support non-filesystem volume mode - skipping")
+	}
+
+	if pattern.VolType != testpatterns.DynamicPV {
+		e2eskipper.Skipf("Suite %q does not support %v", s.tsInfo.Name, pattern.VolType)
+	}
+
+	_, ok := driver.(DynamicPVTestDriver)
+	if !ok {
+		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+	}
 }
 
 func (s *fsGroupChangePolicyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
@@ -78,29 +101,8 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver TestDriver, pattern te
 		resource      *VolumeResource
 	}
 	var l local
-	ginkgo.BeforeEach(func() {
-		dInfo := driver.GetDriverInfo()
-		if !dInfo.Capabilities[CapFsGroup] {
-			e2eskipper.Skipf("Driver %q does not support FsGroup - skipping", dInfo.Name)
-		}
 
-		if pattern.VolMode == v1.PersistentVolumeBlock {
-			e2eskipper.Skipf("Test does not support non-filesystem volume mode - skipping")
-		}
-
-		if pattern.VolType != testpatterns.DynamicPV {
-			e2eskipper.Skipf("Suite %q does not support %v", s.tsInfo.Name, pattern.VolType)
-		}
-
-		_, ok := driver.(DynamicPVTestDriver)
-		if !ok {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
-		}
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("fsgroupchangepolicy", getDriverTimeouts(driver))
 

@@ -54,17 +54,13 @@ type volumeModeTestSuite struct {
 
 var _ TestSuite = &volumeModeTestSuite{}
 
-// InitVolumeModeTestSuite returns volumeModeTestSuite that implements TestSuite interface
-func InitVolumeModeTestSuite() TestSuite {
+// InitCustomVolumeModeTestSuite returns volumeModeTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomVolumeModeTestSuite(patterns []testpatterns.TestPattern) TestSuite {
 	return &volumeModeTestSuite{
 		tsInfo: TestSuiteInfo{
-			Name: "volumeMode",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.FsVolModePreprovisionedPV,
-				testpatterns.FsVolModeDynamicPV,
-				testpatterns.BlockVolModePreprovisionedPV,
-				testpatterns.BlockVolModeDynamicPV,
-			},
+			Name:         "volumeMode",
+			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
@@ -72,11 +68,23 @@ func InitVolumeModeTestSuite() TestSuite {
 	}
 }
 
+// InitVolumeModeTestSuite returns volumeModeTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitVolumeModeTestSuite() TestSuite {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.FsVolModePreprovisionedPV,
+		testpatterns.FsVolModeDynamicPV,
+		testpatterns.BlockVolModePreprovisionedPV,
+		testpatterns.BlockVolModeDynamicPV,
+	}
+	return InitCustomVolumeModeTestSuite(patterns)
+}
+
 func (t *volumeModeTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeModeTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeModeTestSuite) SkipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
 func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
@@ -96,11 +104,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 		l     local
 	)
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("volumemode", getDriverTimeouts(driver))
 

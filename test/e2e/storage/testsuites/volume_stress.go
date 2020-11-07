@@ -57,24 +57,49 @@ type volumeStressTest struct {
 
 var _ TestSuite = &volumeStressTestSuite{}
 
-// InitVolumeStressTestSuite returns volumeStressTestSuite that implements TestSuite interface
-func InitVolumeStressTestSuite() TestSuite {
+// InitCustomVolumeStressTestSuite returns volumeStressTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomVolumeStressTestSuite(patterns []testpatterns.TestPattern) TestSuite {
 	return &volumeStressTestSuite{
 		tsInfo: TestSuiteInfo{
-			Name: "volume-stress",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsDynamicPV,
-				testpatterns.BlockVolModeDynamicPV,
-			},
+			Name:         "volume-stress",
+			TestPatterns: patterns,
 		},
 	}
+}
+
+// InitVolumeStressTestSuite returns volumeStressTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitVolumeStressTestSuite() TestSuite {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.DefaultFsDynamicPV,
+		testpatterns.BlockVolModeDynamicPV,
+	}
+	return InitCustomVolumeStressTestSuite(patterns)
 }
 
 func (t *volumeStressTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeStressTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeStressTestSuite) SkipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	dInfo := driver.GetDriverInfo()
+	if dInfo.StressTestOptions == nil {
+		e2eskipper.Skipf("Driver %s doesn't specify stress test options -- skipping", dInfo.Name)
+	}
+	if dInfo.StressTestOptions.NumPods <= 0 {
+		framework.Failf("NumPods in stress test options must be a positive integer, received: %d", dInfo.StressTestOptions.NumPods)
+	}
+	if dInfo.StressTestOptions.NumRestarts <= 0 {
+		framework.Failf("NumRestarts in stress test options must be a positive integer, received: %d", dInfo.StressTestOptions.NumRestarts)
+	}
+
+	if _, ok := driver.(DynamicPVTestDriver); !ok {
+		e2eskipper.Skipf("Driver %s doesn't implement DynamicPVTestDriver -- skipping", dInfo.Name)
+	}
+	if !driver.GetDriverInfo().Capabilities[CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
+		e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", dInfo.Name)
+	}
 }
 
 func (t *volumeStressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
@@ -84,30 +109,7 @@ func (t *volumeStressTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		l     *volumeStressTest
 	)
 
-	// Check preconditions before setting up namespace via framework below.
-	ginkgo.BeforeEach(func() {
-		if dInfo.StressTestOptions == nil {
-			e2eskipper.Skipf("Driver %s doesn't specify stress test options -- skipping", dInfo.Name)
-		}
-		if dInfo.StressTestOptions.NumPods <= 0 {
-			framework.Failf("NumPods in stress test options must be a positive integer, received: %d", dInfo.StressTestOptions.NumPods)
-		}
-		if dInfo.StressTestOptions.NumRestarts <= 0 {
-			framework.Failf("NumRestarts in stress test options must be a positive integer, received: %d", dInfo.StressTestOptions.NumRestarts)
-		}
-
-		if _, ok := driver.(DynamicPVTestDriver); !ok {
-			e2eskipper.Skipf("Driver %s doesn't implement DynamicPVTestDriver -- skipping", dInfo.Name)
-		}
-
-		if !driver.GetDriverInfo().Capabilities[CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
-			e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", dInfo.Name)
-		}
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("stress", getDriverTimeouts(driver))
 

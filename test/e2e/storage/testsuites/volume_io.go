@@ -59,18 +59,13 @@ type volumeIOTestSuite struct {
 	tsInfo TestSuiteInfo
 }
 
-var _ TestSuite = &volumeIOTestSuite{}
-
-// InitVolumeIOTestSuite returns volumeIOTestSuite that implements TestSuite interface
-func InitVolumeIOTestSuite() TestSuite {
+// InitCustomVolumeIOTestSuite returns volumeIOTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomVolumeIOTestSuite(patterns []testpatterns.TestPattern) TestSuite {
 	return &volumeIOTestSuite{
 		tsInfo: TestSuiteInfo{
-			Name: "volumeIO",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsInlineVolume,
-				testpatterns.DefaultFsPreprovisionedPV,
-				testpatterns.DefaultFsDynamicPV,
-			},
+			Name:         "volumeIO",
+			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
@@ -78,11 +73,22 @@ func InitVolumeIOTestSuite() TestSuite {
 	}
 }
 
+// InitVolumeIOTestSuite returns volumeIOTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitVolumeIOTestSuite() TestSuite {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.DefaultFsInlineVolume,
+		testpatterns.DefaultFsPreprovisionedPV,
+		testpatterns.DefaultFsDynamicPV,
+	}
+	return InitCustomVolumeIOTestSuite(patterns)
+}
+
 func (t *volumeIOTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeIOTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeIOTestSuite) SkipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(
 		testpatterns.PreprovisionedPV,
 		testpatterns.InlineVolume))
@@ -102,11 +108,7 @@ func (t *volumeIOTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		l     local
 	)
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("volumeio", getDriverTimeouts(driver))
 

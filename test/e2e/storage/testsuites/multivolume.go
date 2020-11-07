@@ -43,17 +43,13 @@ type multiVolumeTestSuite struct {
 
 var _ TestSuite = &multiVolumeTestSuite{}
 
-// InitMultiVolumeTestSuite returns multiVolumeTestSuite that implements TestSuite interface
-func InitMultiVolumeTestSuite() TestSuite {
+// InitCustomMultiVolumeTestSuite returns multiVolumeTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomMultiVolumeTestSuite(patterns []testpatterns.TestPattern) TestSuite {
 	return &multiVolumeTestSuite{
 		tsInfo: TestSuiteInfo{
-			Name: "multiVolume [Slow]",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.FsVolModePreprovisionedPV,
-				testpatterns.FsVolModeDynamicPV,
-				testpatterns.BlockVolModePreprovisionedPV,
-				testpatterns.BlockVolModeDynamicPV,
-			},
+			Name:         "multiVolume [Slow]",
+			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
@@ -61,12 +57,28 @@ func InitMultiVolumeTestSuite() TestSuite {
 	}
 }
 
+// InitMultiVolumeTestSuite returns multiVolumeTestSuite that implements TestSuite interface
+// using test suite default patterns
+func InitMultiVolumeTestSuite() TestSuite {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.FsVolModePreprovisionedPV,
+		testpatterns.FsVolModeDynamicPV,
+		testpatterns.BlockVolModePreprovisionedPV,
+		testpatterns.BlockVolModeDynamicPV,
+	}
+	return InitCustomMultiVolumeTestSuite(patterns)
+}
+
 func (t *multiVolumeTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *multiVolumeTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *multiVolumeTestSuite) SkipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	dInfo := driver.GetDriverInfo()
 	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(testpatterns.PreprovisionedPV))
+	if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[CapBlock] {
+		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolMode)
+	}
 }
 
 func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
@@ -86,16 +98,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		l     local
 	)
 
-	ginkgo.BeforeEach(func() {
-		// Check preconditions.
-		if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[CapBlock] {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolMode)
-		}
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("multivolume", getDriverTimeouts(driver))
 

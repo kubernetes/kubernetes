@@ -58,19 +58,13 @@ type subPathTestSuite struct {
 	tsInfo TestSuiteInfo
 }
 
-var _ TestSuite = &subPathTestSuite{}
-
-// InitSubPathTestSuite returns subPathTestSuite that implements TestSuite interface
-func InitSubPathTestSuite() TestSuite {
+// InitCustomSubPathTestSuite returns subPathTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomSubPathTestSuite(patterns []testpatterns.TestPattern) TestSuite {
 	return &subPathTestSuite{
 		tsInfo: TestSuiteInfo{
-			Name: "subPath",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsInlineVolume,
-				testpatterns.DefaultFsPreprovisionedPV,
-				testpatterns.DefaultFsDynamicPV,
-				testpatterns.NtfsDynamicPV,
-			},
+			Name:         "subPath",
+			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
@@ -78,11 +72,23 @@ func InitSubPathTestSuite() TestSuite {
 	}
 }
 
+// InitSubPathTestSuite returns subPathTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitSubPathTestSuite() TestSuite {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.DefaultFsInlineVolume,
+		testpatterns.DefaultFsPreprovisionedPV,
+		testpatterns.DefaultFsDynamicPV,
+		testpatterns.NtfsDynamicPV,
+	}
+	return InitCustomSubPathTestSuite(patterns)
+}
+
 func (s *subPathTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *subPathTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *subPathTestSuite) SkipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(
 		testpatterns.PreprovisionedPV,
 		testpatterns.InlineVolume))
@@ -106,11 +112,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 	}
 	var l local
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("provisioning", getDriverTimeouts(driver))
 

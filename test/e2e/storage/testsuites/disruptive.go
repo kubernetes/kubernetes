@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -35,30 +34,37 @@ type disruptiveTestSuite struct {
 	tsInfo TestSuiteInfo
 }
 
-var _ TestSuite = &disruptiveTestSuite{}
-
-// InitDisruptiveTestSuite returns subPathTestSuite that implements TestSuite interface
-func InitDisruptiveTestSuite() TestSuite {
+// InitCustomDisruptiveTestSuite returns subPathTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomDisruptiveTestSuite(patterns []testpatterns.TestPattern) TestSuite {
 	return &disruptiveTestSuite{
 		tsInfo: TestSuiteInfo{
-			Name:       "disruptive",
-			FeatureTag: "[Disruptive][LinuxOnly]",
-			TestPatterns: []testpatterns.TestPattern{
-				// FSVolMode is already covered in subpath testsuite
-				testpatterns.DefaultFsInlineVolume,
-				testpatterns.FsVolModePreprovisionedPV,
-				testpatterns.FsVolModeDynamicPV,
-				testpatterns.BlockVolModePreprovisionedPV,
-				testpatterns.BlockVolModeDynamicPV,
-			},
+			Name:         "disruptive",
+			FeatureTag:   "[Disruptive][LinuxOnly]",
+			TestPatterns: patterns,
 		},
 	}
 }
+
+// InitDisruptiveTestSuite returns subPathTestSuite that implements TestSuite interface
+// using test suite default patterns
+func InitDisruptiveTestSuite() TestSuite {
+	testPatterns := []testpatterns.TestPattern{
+		// FSVolMode is already covered in subpath testsuite
+		testpatterns.DefaultFsInlineVolume,
+		testpatterns.FsVolModePreprovisionedPV,
+		testpatterns.FsVolModeDynamicPV,
+		testpatterns.BlockVolModePreprovisionedPV,
+		testpatterns.BlockVolModeDynamicPV,
+	}
+	return InitCustomDisruptiveTestSuite(testPatterns)
+}
+
 func (s *disruptiveTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *disruptiveTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *disruptiveTestSuite) SkipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(testpatterns.PreprovisionedPV))
 }
 
@@ -76,11 +82,7 @@ func (s *disruptiveTestSuite) DefineTests(driver TestDriver, pattern testpattern
 	}
 	var l local
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("disruptive", getDriverTimeouts(driver))
 
@@ -91,10 +93,6 @@ func (s *disruptiveTestSuite) DefineTests(driver TestDriver, pattern testpattern
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-
-		if pattern.VolMode == v1.PersistentVolumeBlock && !driver.GetDriverInfo().Capabilities[CapBlock] {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", driver.GetDriverInfo().Name, pattern.VolMode)
-		}
 
 		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
 		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)

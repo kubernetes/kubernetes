@@ -55,21 +55,13 @@ type volumeExpandTestSuite struct {
 	tsInfo TestSuiteInfo
 }
 
-var _ TestSuite = &volumeExpandTestSuite{}
-
-// InitVolumeExpandTestSuite returns volumeExpandTestSuite that implements TestSuite interface
-func InitVolumeExpandTestSuite() TestSuite {
+// InitCustomVolumeExpandTestSuite returns volumeExpandTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomVolumeExpandTestSuite(patterns []testpatterns.TestPattern) TestSuite {
 	return &volumeExpandTestSuite{
 		tsInfo: TestSuiteInfo{
-			Name: "volume-expand",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsDynamicPV,
-				testpatterns.BlockVolModeDynamicPV,
-				testpatterns.DefaultFsDynamicPVAllowExpansion,
-				testpatterns.BlockVolModeDynamicPVAllowExpansion,
-				testpatterns.NtfsDynamicPV,
-				testpatterns.NtfsDynamicPVAllowExpansion,
-			},
+			Name:         "volume-expand",
+			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Gi",
 			},
@@ -77,11 +69,33 @@ func InitVolumeExpandTestSuite() TestSuite {
 	}
 }
 
+// InitVolumeExpandTestSuite returns volumeExpandTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitVolumeExpandTestSuite() TestSuite {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.DefaultFsDynamicPV,
+		testpatterns.BlockVolModeDynamicPV,
+		testpatterns.DefaultFsDynamicPVAllowExpansion,
+		testpatterns.BlockVolModeDynamicPVAllowExpansion,
+		testpatterns.NtfsDynamicPV,
+		testpatterns.NtfsDynamicPVAllowExpansion,
+	}
+	return InitCustomVolumeExpandTestSuite(patterns)
+}
+
 func (v *volumeExpandTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return v.tsInfo
 }
 
-func (v *volumeExpandTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (v *volumeExpandTestSuite) SkipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	// Check preconditions.
+	if !driver.GetDriverInfo().Capabilities[CapControllerExpansion] {
+		e2eskipper.Skipf("Driver %q does not support volume expansion - skipping", driver.GetDriverInfo().Name)
+	}
+	// Check preconditions.
+	if !driver.GetDriverInfo().Capabilities[CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
+		e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", driver.GetDriverInfo().Name)
+	}
 }
 
 func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
@@ -97,19 +111,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 	}
 	var l local
 
-	ginkgo.BeforeEach(func() {
-		// Check preconditions.
-		if !driver.GetDriverInfo().Capabilities[CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
-			e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", driver.GetDriverInfo().Name)
-		}
-		if !driver.GetDriverInfo().Capabilities[CapControllerExpansion] {
-			e2eskipper.Skipf("Driver %q does not support volume expansion - skipping", driver.GetDriverInfo().Name)
-		}
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("volume-expand", getDriverTimeouts(driver))
 

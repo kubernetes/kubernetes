@@ -57,23 +57,31 @@ const (
 
 var _ TestSuite = &volumeLimitsTestSuite{}
 
-// InitVolumeLimitsTestSuite returns volumeLimitsTestSuite that implements TestSuite interface
-func InitVolumeLimitsTestSuite() TestSuite {
+// InitCustomVolumeLimitsTestSuite returns volumeLimitsTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomVolumeLimitsTestSuite(patterns []testpatterns.TestPattern) TestSuite {
 	return &volumeLimitsTestSuite{
 		tsInfo: TestSuiteInfo{
-			Name: "volumeLimits",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.FsVolModeDynamicPV,
-			},
+			Name:         "volumeLimits",
+			TestPatterns: patterns,
 		},
 	}
+}
+
+// InitVolumeLimitsTestSuite returns volumeLimitsTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitVolumeLimitsTestSuite() TestSuite {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.FsVolModeDynamicPV,
+	}
+	return InitCustomVolumeLimitsTestSuite(patterns)
 }
 
 func (t *volumeLimitsTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeLimitsTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeLimitsTestSuite) SkipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
 func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
@@ -99,7 +107,8 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		l local
 	)
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
+	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("volumelimits", getDriverTimeouts(driver))
 
 	// This checks that CSIMaxVolumeLimitChecker works as expected.

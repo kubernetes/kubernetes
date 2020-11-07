@@ -64,24 +64,18 @@ type snapshottableTestSuite struct {
 	tsInfo TestSuiteInfo
 }
 
-var _ TestSuite = &snapshottableTestSuite{}
-
 var (
 	sDriver SnapshottableTestDriver
 	dDriver DynamicPVTestDriver
 )
 
-// InitSnapshottableTestSuite returns snapshottableTestSuite that implements TestSuite interface
-func InitSnapshottableTestSuite() TestSuite {
+// InitCustomSnapshottableTestSuite returns snapshottableTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomSnapshottableTestSuite(patterns []testpatterns.TestPattern) TestSuite {
 	return &snapshottableTestSuite{
 		tsInfo: TestSuiteInfo{
-			Name: "snapshottable",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DynamicSnapshotDelete,
-				testpatterns.DynamicSnapshotRetain,
-				testpatterns.PreprovisionedSnapshotDelete,
-				testpatterns.PreprovisionedSnapshotRetain,
-			},
+			Name:         "snapshottable",
+			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
@@ -90,31 +84,39 @@ func InitSnapshottableTestSuite() TestSuite {
 	}
 }
 
+// InitSnapshottableTestSuite returns snapshottableTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitSnapshottableTestSuite() TestSuite {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.DynamicSnapshotDelete,
+		testpatterns.DynamicSnapshotRetain,
+		testpatterns.PreprovisionedSnapshotDelete,
+		testpatterns.PreprovisionedSnapshotRetain,
+	}
+	return InitCustomSnapshottableTestSuite(patterns)
+}
+
 func (s *snapshottableTestSuite) GetTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *snapshottableTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *snapshottableTestSuite) SkipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	// Check preconditions.
+	dInfo := driver.GetDriverInfo()
+	ok := false
+	_, ok = driver.(SnapshottableTestDriver)
+	if !dInfo.Capabilities[CapSnapshotDataSource] || !ok {
+		e2eskipper.Skipf("Driver %q does not support snapshots - skipping", dInfo.Name)
+	}
+	_, ok = driver.(DynamicPVTestDriver)
+	if !ok {
+		e2eskipper.Skipf("Driver %q does not support dynamic provisioning - skipping", driver.GetDriverInfo().Name)
+	}
 }
 
 func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
-	ginkgo.BeforeEach(func() {
-		// Check preconditions.
-		dInfo := driver.GetDriverInfo()
-		ok := false
-		sDriver, ok = driver.(SnapshottableTestDriver)
-		if !dInfo.Capabilities[CapSnapshotDataSource] || !ok {
-			e2eskipper.Skipf("Driver %q does not support snapshots - skipping", dInfo.Name)
-		}
-		dDriver, ok = driver.(DynamicPVTestDriver)
-		if !ok {
-			e2eskipper.Skipf("Driver %q does not support dynamic provisioning - skipping", driver.GetDriverInfo().Name)
-		}
-	})
 
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("snapshotting")
 
@@ -133,6 +135,8 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 			originalMntTestData string
 		)
 		init := func() {
+			sDriver, _ = driver.(SnapshottableTestDriver)
+			dDriver, _ = driver.(DynamicPVTestDriver)
 			cleanupSteps = make([]func(), 0)
 			// init snap class, create a source PV, PVC, Pod
 			cs = f.ClientSet
