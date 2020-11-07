@@ -1470,12 +1470,14 @@ function addockeropt {
 	echo "Only one argument is accepeted"
 	exit 1
 	fi
+	# appends the given input to the docker opts file i.e. /etc/docker/daemon.json file
 	if [ -f "$DOCKER_OPTS_FILE" ]; then
 	cat >> "${DOCKER_OPTS_FILE}" <<EOF
   $1
 EOF
-	else
+	else # if file is not present it creates a new file.
 	cat > "${DOCKER_OPTS_FILE}" <<EOF
+  {
 EOF
 	fi	
 }
