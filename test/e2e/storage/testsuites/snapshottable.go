@@ -48,6 +48,9 @@ const snapshotGroup = "snapshot.storage.k8s.io"
 // snapshot CRD api version
 const snapshotAPIVersion = "snapshot.storage.k8s.io/v1beta1"
 
+// data file name
+const datapath = "/mnt/test/data"
+
 var (
 	// SnapshotGVR is GroupVersionResource for volumesnapshots
 	SnapshotGVR = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1beta1", Resource: "volumesnapshots"}
@@ -151,13 +154,12 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 
 			ginkgo.By("starting a pod to use the claim")
 			originalMntTestData = fmt.Sprintf("hello from %s namespace", pvc.GetNamespace())
-			command := fmt.Sprintf("echo '%s' > /mnt/test/data", originalMntTestData)
+			command := fmt.Sprintf("echo '%s' > %s", originalMntTestData, datapath)
 
 			RunInPodWithVolume(cs, pvc.Namespace, pvc.Name, "pvc-snapshottable-tester", command, config.ClientNodeSelection)
 
 			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
 			framework.ExpectNoError(err)
-
 			ginkgo.By("checking the claim")
 			// Get new copy of the claim
 			pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
@@ -239,7 +241,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 
 				ginkgo.By("modifying the data in the source PVC")
 
-				command := fmt.Sprintf("echo '%s' > /mnt/test/data", modifiedMntTestData)
+				command := fmt.Sprintf("echo '%s' > %s", modifiedMntTestData, datapath)
 				RunInPodWithVolume(cs, pvc.Namespace, pvc.Name, "pvc-snapshottable-data-tester", command, config.ClientNodeSelection)
 
 				ginkgo.By("creating a pvc from the snapshot")
@@ -274,11 +276,9 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 					StopPod(cs, restoredPod)
 				})
 				framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(cs, restoredPod.Name, restoredPod.Namespace))
-
-				command = "cat /mnt/test/data"
-				actualData, stderr, err := utils.PodExec(f, restoredPod, command)
-				framework.ExpectNoError(err, "command %q: stdout: %s\nstderr: %s", command, actualData, stderr)
-				framework.ExpectEqual(actualData, originalMntTestData)
+				commands := e2evolume.GenerateReadFileCmd(datapath)
+				_, err = framework.LookForStringInPodExec(restoredPod.Namespace, restoredPod.Name, commands, originalMntTestData, time.Minute)
+				framework.ExpectNoError(err)
 
 				ginkgo.By("should delete the VolumeSnapshotContent according to its deletion policy")
 				err = DeleteAndWaitSnapshot(dc, vs.GetNamespace(), vs.GetName(), framework.Poll, framework.SnapshotDeleteTimeout)
