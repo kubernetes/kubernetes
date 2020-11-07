@@ -576,6 +576,7 @@ const (
 	// owner: @robscott
 	// alpha: v1.18
 	// beta:  v1.19
+	// ga:    v1.20
 	//
 	// Enables AppProtocol field for Services and Endpoints.
 	ServiceAppProtocol featuregate.Feature = "ServiceAppProtocol"
@@ -755,7 +756,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
-	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.Beta},
+	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.Beta},
 	HugePageStorageMediumSize:                      {Default: true, PreRelease: featuregate.Beta},
 	ExternalPolicyForExternalIP:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22

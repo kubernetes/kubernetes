@@ -4143,7 +4143,7 @@ var supportedServiceIPFamily = sets.NewString(string(core.IPv4Protocol), string(
 var supportedServiceIPFamilyPolicy = sets.NewString(string(core.IPFamilyPolicySingleStack), string(core.IPFamilyPolicyPreferDualStack), string(core.IPFamilyPolicyRequireDualStack))
 
 // ValidateService tests if required fields/annotations of a Service are valid.
-func ValidateService(service *core.Service, allowAppProtocol bool) field.ErrorList {
+func ValidateService(service *core.Service) field.ErrorList {
 	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName, field.NewPath("metadata"))
 
 	specPath := field.NewPath("spec")
@@ -4197,7 +4197,7 @@ func ValidateService(service *core.Service, allowAppProtocol bool) field.ErrorLi
 	portsPath := specPath.Child("ports")
 	for i := range service.Spec.Ports {
 		portPath := portsPath.Index(i)
-		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], len(service.Spec.Ports) > 1, isHeadlessService(service), allowAppProtocol, &allPortNames, portPath)...)
+		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], len(service.Spec.Ports) > 1, isHeadlessService(service), &allPortNames, portPath)...)
 	}
 
 	if service.Spec.Selector != nil {
@@ -4352,7 +4352,7 @@ func ValidateService(service *core.Service, allowAppProtocol bool) field.ErrorLi
 	return allErrs
 }
 
-func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService, allowAppProtocol bool, allNames *sets.String, fldPath *field.Path) field.ErrorList {
+func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bool, allNames *sets.String, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if requireName && len(sp.Name) == 0 {
@@ -4379,12 +4379,8 @@ func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService, a
 	allErrs = append(allErrs, ValidatePortNumOrName(sp.TargetPort, fldPath.Child("targetPort"))...)
 
 	if sp.AppProtocol != nil {
-		if allowAppProtocol {
-			for _, msg := range validation.IsQualifiedName(*sp.AppProtocol) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("appProtocol"), sp.AppProtocol, msg))
-			}
-		} else {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("appProtocol"), "This field can be enabled with the ServiceAppProtocol feature gate"))
+		for _, msg := range validation.IsQualifiedName(*sp.AppProtocol) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("appProtocol"), sp.AppProtocol, msg))
 		}
 	}
 
@@ -4446,10 +4442,7 @@ func ValidateServiceExternalTrafficFieldsCombination(service *core.Service) fiel
 
 // ValidateServiceCreate validates Services as they are created.
 func ValidateServiceCreate(service *core.Service) field.ErrorList {
-	// allow AppProtocol value if the feature gate is set.
-	allowAppProtocol := utilfeature.DefaultFeatureGate.Enabled(features.ServiceAppProtocol)
-
-	return ValidateService(service, allowAppProtocol)
+	return ValidateService(service)
 }
 
 // ValidateServiceUpdate tests if required fields in the service are set during an update
@@ -4467,19 +4460,7 @@ func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 	upgradeDowngradeIPFamiliesErrs := validateUpgradeDowngradeIPFamilies(oldService, service)
 	allErrs = append(allErrs, upgradeDowngradeIPFamiliesErrs...)
 
-	// allow AppProtocol value if the feature gate is set or the field is
-	// already set on the resource.
-	allowAppProtocol := utilfeature.DefaultFeatureGate.Enabled(features.ServiceAppProtocol)
-	if !allowAppProtocol {
-		for _, port := range oldService.Spec.Ports {
-			if port.AppProtocol != nil {
-				allowAppProtocol = true
-				break
-			}
-		}
-	}
-
-	return append(allErrs, ValidateService(service, allowAppProtocol)...)
+	return append(allErrs, ValidateService(service)...)
 }
 
 // ValidateServiceStatusUpdate tests if required fields in the Service are set when updating status.
@@ -5657,17 +5638,16 @@ func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *core.Namespace)
 }
 
 // ValidateEndpoints validates Endpoints on create and update.
-func ValidateEndpoints(endpoints *core.Endpoints, allowAppProtocol bool) field.ErrorList {
+func ValidateEndpoints(endpoints *core.Endpoints) field.ErrorList {
 	allErrs := ValidateObjectMeta(&endpoints.ObjectMeta, true, ValidateEndpointsName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateEndpointsSpecificAnnotations(endpoints.Annotations, field.NewPath("annotations"))...)
-	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets, allowAppProtocol, field.NewPath("subsets"))...)
+	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets, field.NewPath("subsets"))...)
 	return allErrs
 }
 
 // ValidateEndpointsCreate validates Endpoints on create.
 func ValidateEndpointsCreate(endpoints *core.Endpoints) field.ErrorList {
-	allowAppProtocol := utilfeature.DefaultFeatureGate.Enabled(features.ServiceAppProtocol)
-	return ValidateEndpoints(endpoints, allowAppProtocol)
+	return ValidateEndpoints(endpoints)
 }
 
 // ValidateEndpointsUpdate validates Endpoints on update. NodeName changes are
@@ -5676,22 +5656,11 @@ func ValidateEndpointsCreate(endpoints *core.Endpoints) field.ErrorList {
 // happens.
 func ValidateEndpointsUpdate(newEndpoints, oldEndpoints *core.Endpoints) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newEndpoints.ObjectMeta, &oldEndpoints.ObjectMeta, field.NewPath("metadata"))
-	allowAppProtocol := utilfeature.DefaultFeatureGate.Enabled(features.ServiceAppProtocol)
-	if !allowAppProtocol {
-		for _, oldSubset := range oldEndpoints.Subsets {
-			for _, port := range oldSubset.Ports {
-				if port.AppProtocol != nil {
-					allowAppProtocol = true
-					break
-				}
-			}
-		}
-	}
-	allErrs = append(allErrs, ValidateEndpoints(newEndpoints, allowAppProtocol)...)
+	allErrs = append(allErrs, ValidateEndpoints(newEndpoints)...)
 	return allErrs
 }
 
-func validateEndpointSubsets(subsets []core.EndpointSubset, allowAppProtocol bool, fldPath *field.Path) field.ErrorList {
+func validateEndpointSubsets(subsets []core.EndpointSubset, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for i := range subsets {
 		ss := &subsets[i]
@@ -5709,7 +5678,7 @@ func validateEndpointSubsets(subsets []core.EndpointSubset, allowAppProtocol boo
 			allErrs = append(allErrs, validateEndpointAddress(&ss.NotReadyAddresses[addr], idxPath.Child("notReadyAddresses").Index(addr))...)
 		}
 		for port := range ss.Ports {
-			allErrs = append(allErrs, validateEndpointPort(&ss.Ports[port], len(ss.Ports) > 1, allowAppProtocol, idxPath.Child("ports").Index(port))...)
+			allErrs = append(allErrs, validateEndpointPort(&ss.Ports[port], len(ss.Ports) > 1, idxPath.Child("ports").Index(port))...)
 		}
 	}
 
@@ -5760,7 +5729,7 @@ func validateNonSpecialIP(ipAddress string, fldPath *field.Path) field.ErrorList
 	return allErrs
 }
 
-func validateEndpointPort(port *core.EndpointPort, requireName, allowAppProtocol bool, fldPath *field.Path) field.ErrorList {
+func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if requireName && len(port.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
@@ -5776,12 +5745,8 @@ func validateEndpointPort(port *core.EndpointPort, requireName, allowAppProtocol
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, supportedPortProtocols.List()))
 	}
 	if port.AppProtocol != nil {
-		if allowAppProtocol {
-			for _, msg := range validation.IsQualifiedName(*port.AppProtocol) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("appProtocol"), port.AppProtocol, msg))
-			}
-		} else {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("appProtocol"), "This field can be enabled with the ServiceAppProtocol feature gate"))
+		for _, msg := range validation.IsQualifiedName(*port.AppProtocol) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("appProtocol"), port.AppProtocol, msg))
 		}
 	}
 	return allErrs
