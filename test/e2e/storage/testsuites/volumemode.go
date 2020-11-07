@@ -49,37 +49,48 @@ const (
 )
 
 type volumeModeTestSuite struct {
+	TestSuiteInterface
 	tsInfo TestSuiteInfo
 }
 
-var _ TestSuite = &volumeModeTestSuite{}
+var _ TestSuiteInterface = &volumeModeTestSuite{}
 
-// InitVolumeModeTestSuite returns volumeModeTestSuite that implements TestSuite interface
-func InitVolumeModeTestSuite() TestSuite {
-	return &volumeModeTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "volumeMode",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.FsVolModePreprovisionedPV,
-				testpatterns.FsVolModeDynamicPV,
-				testpatterns.BlockVolModePreprovisionedPV,
-				testpatterns.BlockVolModeDynamicPV,
-			},
-			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "1Mi",
+// InitCustomVolumeModeTestSuite returns volumeModeTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomVolumeModeTestSuite(patterns []testpatterns.TestPattern) TestSuiteHandler {
+	return TestSuiteHandler{
+		testSuite: &volumeModeTestSuite{
+			tsInfo: TestSuiteInfo{
+				Name:         "volumeMode",
+				TestPatterns: patterns,
+				SupportedSizeRange: e2evolume.SizeRange{
+					Min: "1Mi",
+				},
 			},
 		},
 	}
 }
 
-func (t *volumeModeTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitVolumeModeTestSuite returns volumeModeTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitVolumeModeTestSuite() TestSuiteHandler {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.FsVolModePreprovisionedPV,
+		testpatterns.FsVolModeDynamicPV,
+		testpatterns.BlockVolModePreprovisionedPV,
+		testpatterns.BlockVolModeDynamicPV,
+	}
+	return InitCustomVolumeModeTestSuite(patterns)
+}
+
+func (t *volumeModeTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeModeTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeModeTestSuite) skipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
-func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
@@ -96,11 +107,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 		l     local
 	)
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("volumemode")
 
@@ -160,7 +167,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 					e2eskipper.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
 				}
 				l.Sc.VolumeBindingMode = &volBindMode
-				testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+				testVolumeSizeRange := t.getTestSuiteInfo().SupportedSizeRange
 				driverVolumeSizeRange := dInfo.SupportedSizeRange
 				claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 				framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
@@ -291,7 +298,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 	ginkgo.It("should fail to use a volume in a pod with mismatched mode [Slow]", func() {
 		skipTestIfBlockNotSupported(driver)
 		init()
-		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		testVolumeSizeRange := t.getTestSuiteInfo().SupportedSizeRange
 		l.VolumeResource = *CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		defer cleanup()
 
@@ -347,7 +354,7 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 			skipTestIfBlockNotSupported(driver)
 		}
 		init()
-		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		testVolumeSizeRange := t.getTestSuiteInfo().SupportedSizeRange
 		l.VolumeResource = *CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		defer cleanup()
 

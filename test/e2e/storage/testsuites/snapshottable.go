@@ -61,60 +61,65 @@ var (
 )
 
 type snapshottableTestSuite struct {
+	TestSuiteInterface
 	tsInfo TestSuiteInfo
 }
-
-var _ TestSuite = &snapshottableTestSuite{}
 
 var (
 	sDriver SnapshottableTestDriver
 	dDriver DynamicPVTestDriver
 )
 
-// InitSnapshottableTestSuite returns snapshottableTestSuite that implements TestSuite interface
-func InitSnapshottableTestSuite() TestSuite {
-	return &snapshottableTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "snapshottable",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DynamicSnapshotDelete,
-				testpatterns.DynamicSnapshotRetain,
-				testpatterns.PreprovisionedSnapshotDelete,
-				testpatterns.PreprovisionedSnapshotRetain,
+// InitCustomSnapshottableTestSuite returns snapshottableTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomSnapshottableTestSuite(patterns []testpatterns.TestPattern) TestSuiteHandler {
+	return TestSuiteHandler{
+		testSuite: &snapshottableTestSuite{
+			tsInfo: TestSuiteInfo{
+				Name:         "snapshottable",
+				TestPatterns: patterns,
+				SupportedSizeRange: e2evolume.SizeRange{
+					Min: "1Mi",
+				},
+				FeatureTag: "[Feature:VolumeSnapshotDataSource]",
 			},
-			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "1Mi",
-			},
-			FeatureTag: "[Feature:VolumeSnapshotDataSource]",
 		},
 	}
 }
 
-func (s *snapshottableTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitSnapshottableTestSuite returns snapshottableTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitSnapshottableTestSuite() TestSuiteHandler {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.DynamicSnapshotDelete,
+		testpatterns.DynamicSnapshotRetain,
+		testpatterns.PreprovisionedSnapshotDelete,
+		testpatterns.PreprovisionedSnapshotRetain,
+	}
+	return InitCustomSnapshottableTestSuite(patterns)
+}
+
+func (s *snapshottableTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *snapshottableTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *snapshottableTestSuite) skipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	// Check preconditions.
+	dInfo := driver.GetDriverInfo()
+	ok := false
+	_, ok = driver.(SnapshottableTestDriver)
+	if !dInfo.Capabilities[CapSnapshotDataSource] || !ok {
+		e2eskipper.Skipf("Driver %q does not support snapshots - skipping", dInfo.Name)
+	}
+	_, ok = driver.(DynamicPVTestDriver)
+	if !ok {
+		e2eskipper.Skipf("Driver %q does not support dynamic provisioning - skipping", driver.GetDriverInfo().Name)
+	}
 }
 
-func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
-	ginkgo.BeforeEach(func() {
-		// Check preconditions.
-		dInfo := driver.GetDriverInfo()
-		ok := false
-		sDriver, ok = driver.(SnapshottableTestDriver)
-		if !dInfo.Capabilities[CapSnapshotDataSource] || !ok {
-			e2eskipper.Skipf("Driver %q does not support snapshots - skipping", dInfo.Name)
-		}
-		dDriver, ok = driver.(DynamicPVTestDriver)
-		if !ok {
-			e2eskipper.Skipf("Driver %q does not support dynamic provisioning - skipping", driver.GetDriverInfo().Name)
-		}
-	})
+func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("snapshotting")
 
@@ -133,6 +138,8 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 			originalMntTestData string
 		)
 		init := func() {
+			sDriver, _ = driver.(SnapshottableTestDriver)
+			dDriver, _ = driver.(DynamicPVTestDriver)
 			cleanupSteps = make([]func(), 0)
 			// init snap class, create a source PV, PVC, Pod
 			cs = f.ClientSet
@@ -146,7 +153,7 @@ func (s *snapshottableTestSuite) DefineTests(driver TestDriver, pattern testpatt
 			cleanupSteps = append(cleanupSteps, func() {
 				framework.ExpectNoError(volumeResource.CleanupResource())
 			})
-			volumeResource = CreateVolumeResource(dDriver, config, pattern, s.GetTestSuiteInfo().SupportedSizeRange)
+			volumeResource = CreateVolumeResource(dDriver, config, pattern, s.getTestSuiteInfo().SupportedSizeRange)
 
 			pvc = volumeResource.Pvc
 			sc = volumeResource.Sc

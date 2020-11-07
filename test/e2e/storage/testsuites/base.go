@@ -73,7 +73,7 @@ type migrationOpCheck struct {
 }
 
 // BaseSuites is a list of storage test suites that work for in-tree and CSI drivers
-var BaseSuites = []func() TestSuite{
+var BaseSuites = []func() TestSuiteHandler{
 	InitVolumesTestSuite,
 	InitVolumeIOTestSuite,
 	InitVolumeModeTestSuite,
@@ -95,16 +95,50 @@ var CSISuites = append(BaseSuites,
 	InitSnapshottableStressTestSuite,
 )
 
-// TestSuite represents an interface for a set of tests which works with TestDriver
-type TestSuite interface {
-	// GetTestSuiteInfo returns the TestSuiteInfo for this TestSuite
-	GetTestSuiteInfo() TestSuiteInfo
-	// DefineTests defines tests of the testpattern for the driver.
+// TestSuiteInterface represents an interface for a set of tests which works with TestDriver.
+// Each testsuite should implement this interface and use a TestSuiteHandler to define its Tests.
+// The function defined inside should be called only by TestSuiteHandler.
+// All the functions are designed to not be exported so that caller has to use TestSuiteHandler to
+// actually define tests.
+type TestSuiteInterface interface {
+	getTestSuiteInfo() TestSuiteInfo
+	// defineTests defines tests of the testpattern for the driver.
 	// Called inside a Ginkgo context that reflects the current driver and test pattern,
 	// so the test suite can define tests directly with ginkgo.It.
-	DefineTests(TestDriver, testpatterns.TestPattern)
-	// SkipRedundantSuite will skip the test suite based on the given TestPattern and TestDriver
-	SkipRedundantSuite(TestDriver, testpatterns.TestPattern)
+	defineTests(TestDriver, testpatterns.TestPattern)
+	// skipUnsupportedTests will skip the test suite based on the given TestPattern, TestDriver
+	// Testsuite should check if the given pattern and driver works for the "whole testsuite"
+	// Testcase specific check should happen inside defineTests
+	skipUnsupportedTests(TestDriver, testpatterns.TestPattern)
+}
+
+// TestSuiteHandler is the actual data struct we use to define tests
+// All the test registration should happen from the handler
+type TestSuiteHandler struct {
+	testSuite TestSuiteInterface
+}
+
+// GetTestSuiteInfo returns the TestSuiteInfo for a given testsuite wrapper
+func (h *TestSuiteHandler) GetTestSuiteInfo() TestSuiteInfo {
+	return h.testSuite.getTestSuiteInfo()
+}
+
+// RegisterTests register the driver + pattern combination to the inside TestSuite
+// This function actually register tests inside testsuite
+func (h *TestSuiteHandler) RegisterTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	ginkgo.Context(getTestNameStr(h, pattern), func() {
+		ginkgo.BeforeEach(func() {
+			// skip all the invalid combination of driver and pattern first
+			SkipInvalidDriverPatternCombination(driver, pattern)
+			// skip the invalid test pattern and driver combination
+			h.testSuite.skipUnsupportedTests(driver, pattern)
+		})
+		// actually define the tests
+		// at this step the testsuite should not worry about if the pattern and driver
+		// does not fit for the whole testsuite. But driver&pattern check
+		// might still needed for specific independent test cases.
+		h.testSuite.defineTests(driver, pattern)
+	})
 }
 
 // TestSuiteInfo represents a set of parameters for TestSuite
@@ -115,40 +149,33 @@ type TestSuiteInfo struct {
 	SupportedSizeRange e2evolume.SizeRange        // Size range supported by the test suite
 }
 
-func getTestNameStr(suite TestSuite, pattern testpatterns.TestPattern) string {
-	tsInfo := suite.GetTestSuiteInfo()
+func getTestNameStr(handler *TestSuiteHandler, pattern testpatterns.TestPattern) string {
+	tsInfo := handler.GetTestSuiteInfo()
 	return fmt.Sprintf("[Testpattern: %s]%s %s%s", pattern.Name, pattern.FeatureTag, tsInfo.Name, tsInfo.FeatureTag)
 }
 
-// DefineTestSuite defines tests for all testpatterns and all testSuites for a driver
-func DefineTestSuite(driver TestDriver, tsInits []func() TestSuite) {
+// DefineTestSuites defines tests for all testpatterns and all testSuites for a driver
+func DefineTestSuites(driver TestDriver, tsInits []func() TestSuiteHandler) {
 	for _, testSuiteInit := range tsInits {
-		suite := testSuiteInit()
-		for _, pattern := range suite.GetTestSuiteInfo().TestPatterns {
-			p := pattern
-			ginkgo.Context(getTestNameStr(suite, p), func() {
-				ginkgo.BeforeEach(func() {
-					// Skip unsupported tests to avoid unnecessary resource initialization
-					suite.SkipRedundantSuite(driver, p)
-					skipUnsupportedTest(driver, p)
-				})
-				suite.DefineTests(driver, p)
-			})
+		handler := testSuiteInit()
+		for _, pattern := range handler.GetTestSuiteInfo().TestPatterns {
+			handler.RegisterTests(driver, pattern)
 		}
 	}
 }
 
-// skipUnsupportedTest will skip tests if the combination of driver,  and testpattern
-// is not suitable to be tested.
-// Whether it needs to be skipped is checked by following steps:
-// 1. Check if Whether SnapshotType is supported by driver from its interface
-// 2. Check if Whether volType is supported by driver from its interface
-// 3. Check if fsType is supported
-// 4. Check with driver specific logic
+// SkipInvalidDriverPatternCombination will skip tests if the combination of driver, and testpattern
+// is not compatible to be tested. This function will be called in the TestSuiteHandler to make
+// sure all the testsuites we defined are valid.
 //
-// Test suites can also skip tests inside their own DefineTests function or in
+// Whether it needs to be skipped is checked by following steps:
+// 0. Check with driver SkipUnsupportedTest
+// 1. Check if volType is supported by driver from its interface
+// 2. Check if fsType is supported
+//
+// Test suites can also skip tests inside their own skipUnsupportedTests function or in
 // individual tests.
-func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
+func SkipInvalidDriverPatternCombination(driver TestDriver, pattern testpatterns.TestPattern) {
 	dInfo := driver.GetDriverInfo()
 	var isSupported bool
 

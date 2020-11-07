@@ -39,53 +39,67 @@ import (
 )
 
 type volumesTestSuite struct {
+	TestSuiteInterface
 	tsInfo TestSuiteInfo
 }
 
-var _ TestSuite = &volumesTestSuite{}
+var _ TestSuiteInterface = &volumesTestSuite{}
 
-// InitVolumesTestSuite returns volumesTestSuite that implements TestSuite interface
-func InitVolumesTestSuite() TestSuite {
-	return &volumesTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "volumes",
-			TestPatterns: []testpatterns.TestPattern{
-				// Default fsType
-				testpatterns.DefaultFsInlineVolume,
-				testpatterns.DefaultFsPreprovisionedPV,
-				testpatterns.DefaultFsDynamicPV,
-				// ext3
-				testpatterns.Ext3InlineVolume,
-				testpatterns.Ext3PreprovisionedPV,
-				testpatterns.Ext3DynamicPV,
-				// ext4
-				testpatterns.Ext4InlineVolume,
-				testpatterns.Ext4PreprovisionedPV,
-				testpatterns.Ext4DynamicPV,
-				// xfs
-				testpatterns.XfsInlineVolume,
-				testpatterns.XfsPreprovisionedPV,
-				testpatterns.XfsDynamicPV,
-				// ntfs
-				testpatterns.NtfsInlineVolume,
-				testpatterns.NtfsPreprovisionedPV,
-				testpatterns.NtfsDynamicPV,
-				// block volumes
-				testpatterns.BlockVolModePreprovisionedPV,
-				testpatterns.BlockVolModeDynamicPV,
-			},
-			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "1Mi",
+// InitCustomVolumesTestSuite returns volumesTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomVolumesTestSuite(patterns []testpatterns.TestPattern) TestSuiteHandler {
+	return TestSuiteHandler{
+		testSuite: &volumesTestSuite{
+			tsInfo: TestSuiteInfo{
+				Name:         "volumes",
+				TestPatterns: patterns,
+				SupportedSizeRange: e2evolume.SizeRange{
+					Min: "1Mi",
+				},
 			},
 		},
 	}
 }
 
-func (t *volumesTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitVolumesTestSuite returns volumesTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitVolumesTestSuite() TestSuiteHandler {
+	patterns := []testpatterns.TestPattern{
+		// Default fsType
+		testpatterns.DefaultFsInlineVolume,
+		testpatterns.DefaultFsPreprovisionedPV,
+		testpatterns.DefaultFsDynamicPV,
+		// ext3
+		testpatterns.Ext3InlineVolume,
+		testpatterns.Ext3PreprovisionedPV,
+		testpatterns.Ext3DynamicPV,
+		// ext4
+		testpatterns.Ext4InlineVolume,
+		testpatterns.Ext4PreprovisionedPV,
+		testpatterns.Ext4DynamicPV,
+		// xfs
+		testpatterns.XfsInlineVolume,
+		testpatterns.XfsPreprovisionedPV,
+		testpatterns.XfsDynamicPV,
+		// ntfs
+		testpatterns.NtfsInlineVolume,
+		testpatterns.NtfsPreprovisionedPV,
+		testpatterns.NtfsDynamicPV,
+		// block volumes
+		testpatterns.BlockVolModePreprovisionedPV,
+		testpatterns.BlockVolModeDynamicPV,
+	}
+	return InitCustomVolumesTestSuite(patterns)
+}
+
+func (t *volumesTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumesTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumesTestSuite) skipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	if pattern.VolMode == v1.PersistentVolumeBlock {
+		skipTestIfBlockNotSupported(driver)
+	}
 }
 
 func skipExecTest(driver TestDriver) {
@@ -102,7 +116,7 @@ func skipTestIfBlockNotSupported(driver TestDriver) {
 	}
 }
 
-func (t *volumesTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
@@ -114,11 +128,7 @@ func (t *volumesTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 	var dInfo = driver.GetDriverInfo()
 	var l local
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("volume")
 
@@ -128,7 +138,7 @@ func (t *volumesTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
-		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		testVolumeSizeRange := t.getTestSuiteInfo().SupportedSizeRange
 		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		if l.resource.VolSource == nil {
 			e2eskipper.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
@@ -149,10 +159,6 @@ func (t *volumesTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 	}
 
 	ginkgo.It("should store data", func() {
-		if pattern.VolMode == v1.PersistentVolumeBlock {
-			skipTestIfBlockNotSupported(driver)
-		}
-
 		init()
 		defer func() {
 			e2evolume.TestServerCleanup(f, convertTestConfig(l.config))

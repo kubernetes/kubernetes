@@ -45,32 +45,57 @@ type fsGroupChangePolicyTestSuite struct {
 	tsInfo TestSuiteInfo
 }
 
-var _ TestSuite = &fsGroupChangePolicyTestSuite{}
+var _ TestSuiteInterface = &fsGroupChangePolicyTestSuite{}
 
-// InitFsGroupChangePolicyTestSuite returns fsGroupChangePolicyTestSuite that implements TestSuite interface
-func InitFsGroupChangePolicyTestSuite() TestSuite {
-	return &fsGroupChangePolicyTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "fsgroupchangepolicy",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsDynamicPV,
-			},
-			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "1Mi",
+// InitCustomFsGroupChangePolicyTestSuite returns fsGroupChangePolicyTestSuite that implements TestSuite interface
+func InitCustomFsGroupChangePolicyTestSuite(patterns []testpatterns.TestPattern) TestSuiteHandler {
+	return TestSuiteHandler{
+		testSuite: &fsGroupChangePolicyTestSuite{
+			tsInfo: TestSuiteInfo{
+				Name:         "fsgroupchangepolicy",
+				TestPatterns: patterns,
+				SupportedSizeRange: e2evolume.SizeRange{
+					Min: "1Mi",
+				},
 			},
 		},
 	}
 }
 
-func (s *fsGroupChangePolicyTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitFsGroupChangePolicyTestSuite returns fsGroupChangePolicyTestSuite that implements TestSuite interface
+func InitFsGroupChangePolicyTestSuite() TestSuiteHandler {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.DefaultFsDynamicPV,
+	}
+	return InitCustomFsGroupChangePolicyTestSuite(patterns)
+}
+
+func (s *fsGroupChangePolicyTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *fsGroupChangePolicyTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *fsGroupChangePolicyTestSuite) skipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(testpatterns.CSIInlineVolume, testpatterns.GenericEphemeralVolume))
+	dInfo := driver.GetDriverInfo()
+	if !dInfo.Capabilities[CapFsGroup] {
+		e2eskipper.Skipf("Driver %q does not support FsGroup - skipping", dInfo.Name)
+	}
+
+	if pattern.VolMode == v1.PersistentVolumeBlock {
+		e2eskipper.Skipf("Test does not support non-filesystem volume mode - skipping")
+	}
+
+	if pattern.VolType != testpatterns.DynamicPV {
+		e2eskipper.Skipf("Suite %q does not support %v", s.tsInfo.Name, pattern.VolType)
+	}
+
+	_, ok := driver.(DynamicPVTestDriver)
+	if !ok {
+		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+	}
 }
 
-func (s *fsGroupChangePolicyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *fsGroupChangePolicyTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
@@ -78,29 +103,8 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver TestDriver, pattern te
 		resource      *VolumeResource
 	}
 	var l local
-	ginkgo.BeforeEach(func() {
-		dInfo := driver.GetDriverInfo()
-		if !dInfo.Capabilities[CapFsGroup] {
-			e2eskipper.Skipf("Driver %q does not support FsGroup - skipping", dInfo.Name)
-		}
 
-		if pattern.VolMode == v1.PersistentVolumeBlock {
-			e2eskipper.Skipf("Test does not support non-filesystem volume mode - skipping")
-		}
-
-		if pattern.VolType != testpatterns.DynamicPV {
-			e2eskipper.Skipf("Suite %q does not support %v", s.tsInfo.Name, pattern.VolType)
-		}
-
-		_, ok := driver.(DynamicPVTestDriver)
-		if !ok {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
-		}
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("fsgroupchangepolicy")
 
@@ -109,7 +113,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver TestDriver, pattern te
 		l = local{}
 		l.driver = driver
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
+		testVolumeSizeRange := s.getTestSuiteInfo().SupportedSizeRange
 		l.resource = CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
 	}
 

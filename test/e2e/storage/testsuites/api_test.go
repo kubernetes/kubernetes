@@ -31,10 +31,15 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 )
 
+// test suite will have to explicitly set TestSuiteInterface in their stuct.
+// In order to define tests, they will have to use TestSuiteHandler
 type fakeSuite struct {
+	testsuites.TestSuiteInterface
 }
 
-func (f *fakeSuite) GetTestSuiteInfo() testsuites.TestSuiteInfo {
+//lint:ignore U1000 we dont need this to be called because the custom volume test suite
+// defined below compile is the test.
+func (f *fakeSuite) getTestSuiteInfo() testsuites.TestSuiteInfo {
 	return testsuites.TestSuiteInfo{
 		Name:               "fake",
 		FeatureTag:         "",
@@ -43,10 +48,14 @@ func (f *fakeSuite) GetTestSuiteInfo() testsuites.TestSuiteInfo {
 	}
 }
 
-func (f *fakeSuite) DefineTests(testsuites.TestDriver, testpatterns.TestPattern) {
+//lint:ignore U1000 we dont need this to be called because the custom volume test suite
+// defined below compile is the test.
+func (f *fakeSuite) defineTests(testsuites.TestDriver, testpatterns.TestPattern) {
 }
 
-func (f *fakeSuite) SkipRedundantSuite(testsuites.TestDriver, testpatterns.TestPattern) {
+//lint:ignore U1000 we dont need this to be called because the custom volume test suite
+// defined below compile is the test.
+func (f *fakeSuite) skipUnsupportedTests(testsuites.TestDriver, testpatterns.TestPattern) {
 }
 
-var _ testsuites.TestSuite = &fakeSuite{}
+var _ testsuites.TestSuiteInterface = &fakeSuite{}

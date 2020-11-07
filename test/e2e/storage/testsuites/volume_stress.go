@@ -36,6 +36,7 @@ import (
 )
 
 type volumeStressTestSuite struct {
+	TestSuiteInterface
 	tsInfo TestSuiteInfo
 }
 
@@ -55,59 +56,63 @@ type volumeStressTest struct {
 	testOptions StressTestOptions
 }
 
-var _ TestSuite = &volumeStressTestSuite{}
+var _ TestSuiteInterface = &volumeStressTestSuite{}
 
-// InitVolumeStressTestSuite returns volumeStressTestSuite that implements TestSuite interface
-func InitVolumeStressTestSuite() TestSuite {
-	return &volumeStressTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "volume-stress",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsDynamicPV,
-				testpatterns.BlockVolModeDynamicPV,
+// InitCustomVolumeStressTestSuite returns volumeStressTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomVolumeStressTestSuite(patterns []testpatterns.TestPattern) TestSuiteHandler {
+	return TestSuiteHandler{
+		testSuite: &volumeStressTestSuite{
+			tsInfo: TestSuiteInfo{
+				Name:         "volume-stress",
+				TestPatterns: patterns,
 			},
 		},
 	}
 }
 
-func (t *volumeStressTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitVolumeStressTestSuite returns volumeStressTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitVolumeStressTestSuite() TestSuiteHandler {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.DefaultFsDynamicPV,
+		testpatterns.BlockVolModeDynamicPV,
+	}
+	return InitCustomVolumeStressTestSuite(patterns)
+}
+
+func (t *volumeStressTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeStressTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeStressTestSuite) skipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	dInfo := driver.GetDriverInfo()
+	if dInfo.StressTestOptions == nil {
+		e2eskipper.Skipf("Driver %s doesn't specify stress test options -- skipping", dInfo.Name)
+	}
+	if dInfo.StressTestOptions.NumPods <= 0 {
+		framework.Failf("NumPods in stress test options must be a positive integer, received: %d", dInfo.StressTestOptions.NumPods)
+	}
+	if dInfo.StressTestOptions.NumRestarts <= 0 {
+		framework.Failf("NumRestarts in stress test options must be a positive integer, received: %d", dInfo.StressTestOptions.NumRestarts)
+	}
+
+	if _, ok := driver.(DynamicPVTestDriver); !ok {
+		e2eskipper.Skipf("Driver %s doesn't implement DynamicPVTestDriver -- skipping", dInfo.Name)
+	}
+	if !driver.GetDriverInfo().Capabilities[CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
+		e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", dInfo.Name)
+	}
 }
 
-func (t *volumeStressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeStressTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	var (
 		dInfo = driver.GetDriverInfo()
 		cs    clientset.Interface
 		l     *volumeStressTest
 	)
 
-	// Check preconditions before setting up namespace via framework below.
-	ginkgo.BeforeEach(func() {
-		if dInfo.StressTestOptions == nil {
-			e2eskipper.Skipf("Driver %s doesn't specify stress test options -- skipping", dInfo.Name)
-		}
-		if dInfo.StressTestOptions.NumPods <= 0 {
-			framework.Failf("NumPods in stress test options must be a positive integer, received: %d", dInfo.StressTestOptions.NumPods)
-		}
-		if dInfo.StressTestOptions.NumRestarts <= 0 {
-			framework.Failf("NumRestarts in stress test options must be a positive integer, received: %d", dInfo.StressTestOptions.NumRestarts)
-		}
-
-		if _, ok := driver.(DynamicPVTestDriver); !ok {
-			e2eskipper.Skipf("Driver %s doesn't implement DynamicPVTestDriver -- skipping", dInfo.Name)
-		}
-
-		if !driver.GetDriverInfo().Capabilities[CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
-			e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", dInfo.Name)
-		}
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("volume-stress")
 
@@ -127,7 +132,7 @@ func (t *volumeStressTestSuite) DefineTests(driver TestDriver, pattern testpatte
 	createPodsAndVolumes := func() {
 		for i := 0; i < l.testOptions.NumPods; i++ {
 			framework.Logf("Creating resources for pod %v/%v", i, l.testOptions.NumPods-1)
-			r := CreateVolumeResource(driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange)
+			r := CreateVolumeResource(driver, l.config, pattern, t.getTestSuiteInfo().SupportedSizeRange)
 			l.resources = append(l.resources, r)
 			podConfig := e2epod.Config{
 				NS:           f.Namespace.Name,

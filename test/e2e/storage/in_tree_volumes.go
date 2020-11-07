@@ -54,7 +54,7 @@ var _ = utils.SIGDescribe("In-tree Volumes", func() {
 		curDriver := initDriver()
 
 		ginkgo.Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
-			testsuites.DefineTestSuite(curDriver, testsuites.BaseSuites)
+			testsuites.DefineTestSuites(curDriver, testsuites.BaseSuites)
 		})
 	}
 })

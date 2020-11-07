@@ -55,40 +55,49 @@ var (
 )
 
 type subPathTestSuite struct {
+	TestSuiteInterface
 	tsInfo TestSuiteInfo
 }
 
-var _ TestSuite = &subPathTestSuite{}
-
-// InitSubPathTestSuite returns subPathTestSuite that implements TestSuite interface
-func InitSubPathTestSuite() TestSuite {
-	return &subPathTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "subPath",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsInlineVolume,
-				testpatterns.DefaultFsPreprovisionedPV,
-				testpatterns.DefaultFsDynamicPV,
-				testpatterns.NtfsDynamicPV,
-			},
-			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "1Mi",
+// InitCustomSubPathTestSuite returns subPathTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomSubPathTestSuite(patterns []testpatterns.TestPattern) TestSuiteHandler {
+	return TestSuiteHandler{
+		testSuite: &subPathTestSuite{
+			tsInfo: TestSuiteInfo{
+				Name:         "subPath",
+				TestPatterns: patterns,
+				SupportedSizeRange: e2evolume.SizeRange{
+					Min: "1Mi",
+				},
 			},
 		},
 	}
 }
 
-func (s *subPathTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitSubPathTestSuite returns subPathTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitSubPathTestSuite() TestSuiteHandler {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.DefaultFsInlineVolume,
+		testpatterns.DefaultFsPreprovisionedPV,
+		testpatterns.DefaultFsDynamicPV,
+		testpatterns.NtfsDynamicPV,
+	}
+	return InitCustomSubPathTestSuite(patterns)
+}
+
+func (s *subPathTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *subPathTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *subPathTestSuite) skipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(
 		testpatterns.PreprovisionedPV,
 		testpatterns.InlineVolume))
 }
 
-func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
@@ -106,11 +115,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 	}
 	var l local
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("provisioning")
 
@@ -120,7 +125,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
-		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
+		testVolumeSizeRange := s.getTestSuiteInfo().SupportedSizeRange
 		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		l.hostExec = utils.NewHostExec(f)
 

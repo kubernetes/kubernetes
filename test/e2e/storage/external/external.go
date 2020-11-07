@@ -167,7 +167,7 @@ func AddDriverDefinition(filename string) error {
 
 	description := "External Storage " + testsuites.GetDriverNameWithFeatureTags(driver)
 	ginkgo.Describe(description, func() {
-		testsuites.DefineTestSuite(driver, testsuites.CSISuites)
+		testsuites.DefineTestSuites(driver, testsuites.CSISuites)
 	})
 
 	return nil

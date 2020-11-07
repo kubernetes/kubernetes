@@ -39,38 +39,53 @@ import (
 )
 
 type multiVolumeTestSuite struct {
+	TestSuiteInterface
 	tsInfo TestSuiteInfo
 }
 
-var _ TestSuite = &multiVolumeTestSuite{}
+var _ TestSuiteInterface = &multiVolumeTestSuite{}
 
-// InitMultiVolumeTestSuite returns multiVolumeTestSuite that implements TestSuite interface
-func InitMultiVolumeTestSuite() TestSuite {
-	return &multiVolumeTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "multiVolume [Slow]",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.FsVolModePreprovisionedPV,
-				testpatterns.FsVolModeDynamicPV,
-				testpatterns.BlockVolModePreprovisionedPV,
-				testpatterns.BlockVolModeDynamicPV,
-			},
-			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "1Mi",
+// InitCustomMultiVolumeTestSuite returns multiVolumeTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomMultiVolumeTestSuite(patterns []testpatterns.TestPattern) TestSuiteHandler {
+	return TestSuiteHandler{
+		testSuite: &multiVolumeTestSuite{
+			tsInfo: TestSuiteInfo{
+				Name:         "multiVolume [Slow]",
+				TestPatterns: patterns,
+				SupportedSizeRange: e2evolume.SizeRange{
+					Min: "1Mi",
+				},
 			},
 		},
 	}
 }
 
-func (t *multiVolumeTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitMultiVolumeTestSuite returns multiVolumeTestSuite that implements TestSuite interface
+// using test suite default patterns
+func InitMultiVolumeTestSuite() TestSuiteHandler {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.FsVolModePreprovisionedPV,
+		testpatterns.FsVolModeDynamicPV,
+		testpatterns.BlockVolModePreprovisionedPV,
+		testpatterns.BlockVolModeDynamicPV,
+	}
+	return InitCustomMultiVolumeTestSuite(patterns)
+}
+
+func (t *multiVolumeTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *multiVolumeTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *multiVolumeTestSuite) skipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	dInfo := driver.GetDriverInfo()
 	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(testpatterns.PreprovisionedPV))
+	if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[CapBlock] {
+		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolMode)
+	}
 }
 
-func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
@@ -87,16 +102,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		l     local
 	)
 
-	ginkgo.BeforeEach(func() {
-		// Check preconditions.
-		if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[CapBlock] {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolMode)
-		}
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("multivolume")
 
@@ -143,7 +149,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		numVols := 2
 
 		for i := 0; i < numVols; i++ {
-			testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+			testVolumeSizeRange := t.getTestSuiteInfo().SupportedSizeRange
 			resource := CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
 			pvcs = append(pvcs, resource.Pvc)
@@ -193,7 +199,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		numVols := 2
 
 		for i := 0; i < numVols; i++ {
-			testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+			testVolumeSizeRange := t.getTestSuiteInfo().SupportedSizeRange
 			resource := CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
 			pvcs = append(pvcs, resource.Pvc)
@@ -232,7 +238,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 				// 1st volume should be block and set filesystem for 2nd and later volumes
 				curPattern.VolMode = v1.PersistentVolumeFilesystem
 			}
-			testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+			testVolumeSizeRange := t.getTestSuiteInfo().SupportedSizeRange
 			resource := CreateVolumeResource(driver, l.config, curPattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
 			pvcs = append(pvcs, resource.Pvc)
@@ -291,7 +297,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 				// 1st volume should be block and set filesystem for 2nd and later volumes
 				curPattern.VolMode = v1.PersistentVolumeFilesystem
 			}
-			testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+			testVolumeSizeRange := t.getTestSuiteInfo().SupportedSizeRange
 			resource := CreateVolumeResource(driver, l.config, curPattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
 			pvcs = append(pvcs, resource.Pvc)
@@ -317,7 +323,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		}
 
 		// Create volume
-		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		testVolumeSizeRange := t.getTestSuiteInfo().SupportedSizeRange
 		resource := CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
 		l.resources = append(l.resources, resource)
 
@@ -342,7 +348,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		}
 
 		// Create volume
-		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		testVolumeSizeRange := t.getTestSuiteInfo().SupportedSizeRange
 		resource := CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
 		l.resources = append(l.resources, resource)
 
@@ -387,7 +393,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		}
 
 		// Create volume
-		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		testVolumeSizeRange := t.getTestSuiteInfo().SupportedSizeRange
 		resource := CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
 		l.resources = append(l.resources, resource)
 

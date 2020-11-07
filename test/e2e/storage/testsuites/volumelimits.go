@@ -42,6 +42,7 @@ import (
 )
 
 type volumeLimitsTestSuite struct {
+	TestSuiteInterface
 	tsInfo TestSuiteInfo
 }
 
@@ -55,28 +56,38 @@ const (
 	csiNodeInfoTimeout = 1 * time.Minute
 )
 
-var _ TestSuite = &volumeLimitsTestSuite{}
+var _ TestSuiteInterface = &volumeLimitsTestSuite{}
 
-// InitVolumeLimitsTestSuite returns volumeLimitsTestSuite that implements TestSuite interface
-func InitVolumeLimitsTestSuite() TestSuite {
-	return &volumeLimitsTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "volumeLimits",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.FsVolModeDynamicPV,
+// InitCustomVolumeLimitsTestSuite returns volumeLimitsTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomVolumeLimitsTestSuite(patterns []testpatterns.TestPattern) TestSuiteHandler {
+	return TestSuiteHandler{
+		testSuite: &volumeLimitsTestSuite{
+			tsInfo: TestSuiteInfo{
+				Name:         "volumeLimits",
+				TestPatterns: patterns,
 			},
 		},
 	}
 }
 
-func (t *volumeLimitsTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitVolumeLimitsTestSuite returns volumeLimitsTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitVolumeLimitsTestSuite() TestSuiteHandler {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.FsVolModeDynamicPV,
+	}
+	return InitCustomVolumeLimitsTestSuite(patterns)
+}
+
+func (t *volumeLimitsTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeLimitsTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeLimitsTestSuite) skipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
-func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeLimitsTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config      *PerTestConfig
 		testCleanup func()
@@ -99,7 +110,8 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		l local
 	)
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
+	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("volumelimits")
 
 	// This checks that CSIMaxVolumeLimitChecker works as expected.
@@ -142,7 +154,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 
 		framework.Logf("Node %s can handle %d volumes of driver %s", nodeName, limit, driverInfo.Name)
 		// Create a storage class and generate a PVC. Do not instantiate the PVC yet, keep it for the last pod.
-		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		testVolumeSizeRange := t.getTestSuiteInfo().SupportedSizeRange
 		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
 		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, dDriver)

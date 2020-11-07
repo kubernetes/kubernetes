@@ -56,39 +56,48 @@ var md5hashes = map[int64]string{
 const mountPath = "/opt"
 
 type volumeIOTestSuite struct {
+	TestSuiteInterface
 	tsInfo TestSuiteInfo
 }
 
-var _ TestSuite = &volumeIOTestSuite{}
-
-// InitVolumeIOTestSuite returns volumeIOTestSuite that implements TestSuite interface
-func InitVolumeIOTestSuite() TestSuite {
-	return &volumeIOTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "volumeIO",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsInlineVolume,
-				testpatterns.DefaultFsPreprovisionedPV,
-				testpatterns.DefaultFsDynamicPV,
-			},
-			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "1Mi",
+// InitCustomVolumeIOTestSuite returns volumeIOTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomVolumeIOTestSuite(patterns []testpatterns.TestPattern) TestSuiteHandler {
+	return TestSuiteHandler{
+		testSuite: &volumeIOTestSuite{
+			tsInfo: TestSuiteInfo{
+				Name:         "volumeIO",
+				TestPatterns: patterns,
+				SupportedSizeRange: e2evolume.SizeRange{
+					Min: "1Mi",
+				},
 			},
 		},
 	}
 }
 
-func (t *volumeIOTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitVolumeIOTestSuite returns volumeIOTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitVolumeIOTestSuite() TestSuiteHandler {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.DefaultFsInlineVolume,
+		testpatterns.DefaultFsPreprovisionedPV,
+		testpatterns.DefaultFsDynamicPV,
+	}
+	return InitCustomVolumeIOTestSuite(patterns)
+}
+
+func (t *volumeIOTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeIOTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeIOTestSuite) skipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(
 		testpatterns.PreprovisionedPV,
 		testpatterns.InlineVolume))
 }
 
-func (t *volumeIOTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
@@ -102,11 +111,7 @@ func (t *volumeIOTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		l     local
 	)
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("volumeio")
 
@@ -117,7 +122,7 @@ func (t *volumeIOTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
 
-		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		testVolumeSizeRange := t.getTestSuiteInfo().SupportedSizeRange
 		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		if l.resource.VolSource == nil {
 			e2eskipper.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)

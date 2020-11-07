@@ -61,36 +61,53 @@ type StorageClassTest struct {
 }
 
 type provisioningTestSuite struct {
+	TestSuiteInterface
 	tsInfo TestSuiteInfo
 }
 
-var _ TestSuite = &provisioningTestSuite{}
-
-// InitProvisioningTestSuite returns provisioningTestSuite that implements TestSuite interface
-func InitProvisioningTestSuite() TestSuite {
-	return &provisioningTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "provisioning",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsDynamicPV,
-				testpatterns.BlockVolModeDynamicPV,
-				testpatterns.NtfsDynamicPV,
-			},
-			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "1Mi",
+// InitCustomProvisioningTestSuite returns provisioningTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomProvisioningTestSuite(patterns []testpatterns.TestPattern) TestSuiteHandler {
+	return TestSuiteHandler{
+		testSuite: &provisioningTestSuite{
+			tsInfo: TestSuiteInfo{
+				Name:         "provisioning",
+				TestPatterns: patterns,
+				SupportedSizeRange: e2evolume.SizeRange{
+					Min: "1Mi",
+				},
 			},
 		},
 	}
 }
 
-func (p *provisioningTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitProvisioningTestSuite returns provisioningTestSuite that implements TestSuite interface\
+// using test suite default patterns
+func InitProvisioningTestSuite() TestSuiteHandler {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.DefaultFsDynamicPV,
+		testpatterns.BlockVolModeDynamicPV,
+		testpatterns.NtfsDynamicPV,
+	}
+	return InitCustomProvisioningTestSuite(patterns)
+}
+
+func (p *provisioningTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return p.tsInfo
 }
 
-func (p *provisioningTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (p *provisioningTestSuite) skipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	// Check preconditions.
+	if pattern.VolType != testpatterns.DynamicPV {
+		e2eskipper.Skipf("Suite %q does not support %v", p.tsInfo.Name, pattern.VolType)
+	}
+	dInfo := driver.GetDriverInfo()
+	if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[CapBlock] {
+		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolMode)
+	}
 }
 
-func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config        *PerTestConfig
 		driverCleanup func()
@@ -109,36 +126,18 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		l       local
 	)
 
-	ginkgo.BeforeEach(func() {
-		// Check preconditions.
-		if pattern.VolType != testpatterns.DynamicPV {
-			e2eskipper.Skipf("Suite %q does not support %v", p.tsInfo.Name, pattern.VolType)
-		}
-		if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[CapBlock] {
-			e2eskipper.Skipf("Driver %q does not support block volumes - skipping", dInfo.Name)
-		}
-
-		ok := false
-		dDriver, ok = driver.(DynamicPVTestDriver)
-		if !ok {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
-		}
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("provisioning")
 
 	init := func() {
 		l = local{}
-
+		dDriver, _ = driver.(DynamicPVTestDriver)
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
 		l.cs = l.config.Framework.ClientSet
-		testVolumeSizeRange := p.GetTestSuiteInfo().SupportedSizeRange
+		testVolumeSizeRange := p.getTestSuiteInfo().SupportedSizeRange
 		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
 		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)

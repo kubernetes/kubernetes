@@ -38,6 +38,7 @@ import (
 )
 
 type topologyTestSuite struct {
+	TestSuiteInterface
 	tsInfo TestSuiteInfo
 }
 
@@ -54,29 +55,47 @@ type topologyTest struct {
 
 type topology map[string]string
 
-var _ TestSuite = &topologyTestSuite{}
-
-// InitTopologyTestSuite returns topologyTestSuite that implements TestSuite interface
-func InitTopologyTestSuite() TestSuite {
-	return &topologyTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "topology",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.TopologyImmediate,
-				testpatterns.TopologyDelayed,
+// InitCustomTopologyTestSuite returns topologyTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomTopologyTestSuite(patterns []testpatterns.TestPattern) TestSuiteHandler {
+	return TestSuiteHandler{
+		testSuite: &topologyTestSuite{
+			tsInfo: TestSuiteInfo{
+				Name:         "topology",
+				TestPatterns: patterns,
 			},
 		},
 	}
 }
 
-func (t *topologyTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitTopologyTestSuite returns topologyTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitTopologyTestSuite() TestSuiteHandler {
+	patterns := []testpatterns.TestPattern{
+		testpatterns.TopologyImmediate,
+		testpatterns.TopologyDelayed,
+	}
+	return InitCustomTopologyTestSuite(patterns)
+}
+
+func (t *topologyTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *topologyTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *topologyTestSuite) skipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
+	dInfo := driver.GetDriverInfo()
+	var ok bool
+	_, ok = driver.(DynamicPVTestDriver)
+	if !ok {
+		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+	}
+
+	if !dInfo.Capabilities[CapTopology] {
+		e2eskipper.Skipf("Driver %q does not support topology - skipping", dInfo.Name)
+	}
 }
 
-func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *topologyTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	var (
 		dInfo   = driver.GetDriverInfo()
 		dDriver DynamicPVTestDriver
@@ -84,28 +103,12 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		err     error
 	)
 
-	ginkgo.BeforeEach(func() {
-		// Check preconditions.
-		ok := false
-		dDriver, ok = driver.(DynamicPVTestDriver)
-		if !ok {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
-		}
-
-		if !dInfo.Capabilities[CapTopology] {
-			e2eskipper.Skipf("Driver %q does not support topology - skipping", dInfo.Name)
-		}
-
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("topology")
 
 	init := func() topologyTest {
-
+		dDriver, _ = driver.(DynamicPVTestDriver)
 		l := topologyTest{}
 
 		// Now do the more expensive test initialization.
@@ -138,7 +141,7 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		framework.ExpectNotEqual(l.resource.Sc, nil, "driver failed to provide a StorageClass")
 		l.resource.Sc.VolumeBindingMode = &pattern.BindingMode
 
-		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
+		testVolumeSizeRange := t.getTestSuiteInfo().SupportedSizeRange
 		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
 		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
