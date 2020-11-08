@@ -104,6 +104,15 @@ const (
 	// TODO(feiskyer): disable-tcp-reset annotations has been depracated since v1.18, it would removed on v1.20.
 	ServiceAnnotationLoadBalancerDisableTCPReset = "service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset"
 
+	// ServiceAnnotationLoadBalancerHealthProbeProtocol determines the network protocol that the load balancer health probe use.
+	// If not set, the local service would use the HTTP and the cluster service would use the TCP by default.
+	ServiceAnnotationLoadBalancerHealthProbeProtocol = "service.beta.kubernetes.io/azure-load-balancer-health-probe-protocol"
+
+	// ServiceAnnotationLoadBalancerHealthProbeRequestPath determines the request path of the load balancer health probe.
+	// This is only useful for the HTTP and HTTPS, and would be ignored when using TCP. If not set,
+	// `/healthz` would be configured by default.
+	ServiceAnnotationLoadBalancerHealthProbeRequestPath = "service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path"
+
 	// serviceTagKey is the service key applied for public IP tags.
 	serviceTagKey = "service"
 	// clusterNameKey is the cluster name key applied for public IP tags.
@@ -1561,6 +1570,23 @@ func (az *Cloud) checkLoadBalancerResourcesConflicted(
 	return nil
 }
 
+func parseHealthProbeProtocolAndPath(service *v1.Service) (string, string) {
+	var protocol, path string
+	if v, ok := service.Annotations[ServiceAnnotationLoadBalancerHealthProbeProtocol]; ok {
+		protocol = v
+	} else {
+		return protocol, path
+	}
+	// ignore the request path if using TCP
+	if strings.EqualFold(protocol, string(network.ProbeProtocolHTTP)) ||
+		strings.EqualFold(protocol, string(network.ProbeProtocolHTTPS)) {
+		if v, ok := service.Annotations[ServiceAnnotationLoadBalancerHealthProbeRequestPath]; ok {
+			path = v
+		}
+	}
+	return protocol, path
+}
+
 func (az *Cloud) reconcileLoadBalancerRule(
 	service *v1.Service,
 	wantLb bool,
@@ -1606,14 +1632,21 @@ func (az *Cloud) reconcileLoadBalancerRule(
 				return expectedProbes, expectedRules, err
 			}
 
+			probeProtocol, requestPath := parseHealthProbeProtocolAndPath(service)
 			if servicehelpers.NeedsHealthCheck(service) {
 				podPresencePath, podPresencePort := servicehelpers.GetServiceHealthCheckPathPort(service)
+				if probeProtocol == "" {
+					probeProtocol = string(network.ProbeProtocolHTTP)
+				}
+				if requestPath == "" {
+					requestPath = podPresencePath
+				}
 
 				expectedProbes = append(expectedProbes, network.Probe{
 					Name: &lbRuleName,
 					ProbePropertiesFormat: &network.ProbePropertiesFormat{
-						RequestPath:       to.StringPtr(podPresencePath),
-						Protocol:          network.ProbeProtocolHTTP,
+						RequestPath:       to.StringPtr(requestPath),
+						Protocol:          network.ProbeProtocol(probeProtocol),
 						Port:              to.Int32Ptr(podPresencePort),
 						IntervalInSeconds: to.Int32Ptr(5),
 						NumberOfProbes:    to.Int32Ptr(2),
@@ -1621,10 +1654,22 @@ func (az *Cloud) reconcileLoadBalancerRule(
 				})
 			} else if protocol != v1.ProtocolUDP && protocol != v1.ProtocolSCTP {
 				// we only add the expected probe if we're doing TCP
+				if probeProtocol == "" {
+					probeProtocol = string(*probeProto)
+				}
+				var actualPath *string
+				if !strings.EqualFold(probeProtocol, string(network.ProbeProtocolTCP)) {
+					if requestPath != "" {
+						actualPath = to.StringPtr(requestPath)
+					} else {
+						actualPath = to.StringPtr("/healthz")
+					}
+				}
 				expectedProbes = append(expectedProbes, network.Probe{
 					Name: &lbRuleName,
 					ProbePropertiesFormat: &network.ProbePropertiesFormat{
-						Protocol:          *probeProto,
+						Protocol:          network.ProbeProtocol(probeProtocol),
+						RequestPath:       actualPath,
 						Port:              to.Int32Ptr(port.NodePort),
 						IntervalInSeconds: to.Int32Ptr(5),
 						NumberOfProbes:    to.Int32Ptr(2),
