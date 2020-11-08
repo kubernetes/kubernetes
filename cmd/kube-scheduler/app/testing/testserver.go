@@ -107,17 +107,6 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		t.Logf("kube-scheduler will listen securely on port %d...", opts.SecureServing.BindPort)
 	}
 
-	if opts.CombinedInsecureServing.BindPort != 0 {
-		listener, port, err := createListenerOnFreePort()
-		if err != nil {
-			return result, fmt.Errorf("failed to create listener: %v", err)
-		}
-		opts.CombinedInsecureServing.BindPort = port
-		opts.CombinedInsecureServing.Healthz.Listener = listener
-		opts.CombinedInsecureServing.Metrics.Listener = listener
-		t.Logf("kube-scheduler will listen insecurely on port %d...", opts.CombinedInsecureServing.BindPort)
-	}
-
 	cc, sched, err := app.Setup(ctx, opts)
 	if err != nil {
 		return result, fmt.Errorf("failed to create config from options: %v", err)
