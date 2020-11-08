@@ -82,15 +82,6 @@ func IoctlRetInt(fd int, req uint) (int, error) {
 	return int(ret), nil
 }
 
-// IoctlSetPointerInt performs an ioctl operation which sets an
-// integer value on fd, using the specified request number. The ioctl
-// argument is called with a pointer to the integer value, rather than
-// passing the integer value directly.
-func IoctlSetPointerInt(fd int, req uint, value int) error {
-	v := int32(value)
-	return ioctl(fd, req, uintptr(unsafe.Pointer(&v)))
-}
-
 func IoctlSetRTCTime(fd int, value *RTCTime) error {
 	err := ioctl(fd, RTC_SET_TIME, uintptr(unsafe.Pointer(value)))
 	runtime.KeepAlive(value)
@@ -885,6 +876,35 @@ func (sa *SockaddrL2TPIP6) sockaddr() (unsafe.Pointer, _Socklen, error) {
 	return unsafe.Pointer(&sa.raw), SizeofSockaddrL2TPIP6, nil
 }
 
+// SockaddrIUCV implements the Sockaddr interface for AF_IUCV sockets.
+type SockaddrIUCV struct {
+	UserID string
+	Name   string
+	raw    RawSockaddrIUCV
+}
+
+func (sa *SockaddrIUCV) sockaddr() (unsafe.Pointer, _Socklen, error) {
+	sa.raw.Family = AF_IUCV
+	// These are EBCDIC encoded by the kernel, but we still need to pad them
+	// with blanks. Initializing with blanks allows the caller to feed in either
+	// a padded or an unpadded string.
+	for i := 0; i < 8; i++ {
+		sa.raw.Nodeid[i] = ' '
+		sa.raw.User_id[i] = ' '
+		sa.raw.Name[i] = ' '
+	}
+	if len(sa.UserID) > 8 || len(sa.Name) > 8 {
+		return nil, 0, EINVAL
+	}
+	for i, b := range []byte(sa.UserID[:]) {
+		sa.raw.User_id[i] = int8(b)
+	}
+	for i, b := range []byte(sa.Name[:]) {
+		sa.raw.Name[i] = int8(b)
+	}
+	return unsafe.Pointer(&sa.raw), SizeofSockaddrIUCV, nil
+}
+
 func anyToSockaddr(fd int, rsa *RawSockaddrAny) (Sockaddr, error) {
 	switch rsa.Addr.Family {
 	case AF_NETLINK:
@@ -1065,6 +1085,38 @@ func anyToSockaddr(fd int, rsa *RawSockaddrAny) (Sockaddr, error) {
 		}
 
 		return sa, nil
+	case AF_IUCV:
+		pp := (*RawSockaddrIUCV)(unsafe.Pointer(rsa))
+
+		var user [8]byte
+		var name [8]byte
+
+		for i := 0; i < 8; i++ {
+			user[i] = byte(pp.User_id[i])
+			name[i] = byte(pp.Name[i])
+		}
+
+		sa := &SockaddrIUCV{
+			UserID: string(user[:]),
+			Name:   string(name[:]),
+		}
+		return sa, nil
+
+	case AF_CAN:
+		pp := (*RawSockaddrCAN)(unsafe.Pointer(rsa))
+		sa := &SockaddrCAN{
+			Ifindex: int(pp.Ifindex),
+		}
+		rx := (*[4]byte)(unsafe.Pointer(&sa.RxID))
+		for i := 0; i < 4; i++ {
+			rx[i] = pp.Addr[i]
+		}
+		tx := (*[4]byte)(unsafe.Pointer(&sa.TxID))
+		for i := 0; i < 4; i++ {
+			tx[i] = pp.Addr[i+4]
+		}
+		return sa, nil
+
 	}
 	return nil, EAFNOSUPPORT
 }
@@ -1965,10 +2017,15 @@ func isGroupMember(gid int) bool {
 }
 
 //sys	faccessat(dirfd int, path string, mode uint32) (err error)
+//sys	Faccessat2(dirfd int, path string, mode uint32, flags int) (err error)
 
 func Faccessat(dirfd int, path string, mode uint32, flags int) (err error) {
-	if flags & ^(AT_SYMLINK_NOFOLLOW|AT_EACCESS) != 0 {
-		return EINVAL
+	if flags == 0 {
+		return faccessat(dirfd, path, mode)
+	}
+
+	if err := Faccessat2(dirfd, path, mode, flags); err != ENOSYS && err != EPERM {
+		return err
 	}
 
 	// The Linux kernel faccessat system call does not take any flags.
@@ -1977,8 +2034,8 @@ func Faccessat(dirfd int, path string, mode uint32, flags int) (err error) {
 	// Because people naturally expect syscall.Faccessat to act
 	// like C faccessat, we do the same.
 
-	if flags == 0 {
-		return faccessat(dirfd, path, mode)
+	if flags & ^(AT_SYMLINK_NOFOLLOW|AT_EACCESS) != 0 {
+		return EINVAL
 	}
 
 	var st Stat_t
@@ -2121,6 +2178,18 @@ func Klogset(typ int, arg int) (err error) {
 	}
 	return nil
 }
+
+// RemoteIovec is Iovec with the pointer replaced with an integer.
+// It is used for ProcessVMReadv and ProcessVMWritev, where the pointer
+// refers to a location in a different process' address space, which
+// would confuse the Go garbage collector.
+type RemoteIovec struct {
+	Base uintptr
+	Len  int
+}
+
+//sys	ProcessVMReadv(pid int, localIov []Iovec, remoteIov []RemoteIovec, flags uint) (n int, err error) = SYS_PROCESS_VM_READV
+//sys	ProcessVMWritev(pid int, localIov []Iovec, remoteIov []RemoteIovec, flags uint) (n int, err error) = SYS_PROCESS_VM_WRITEV
 
 /*
  * Unimplemented
