@@ -11,7 +11,7 @@ require (
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381 // indirect
-	golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4 // indirect
+	golang.org/x/sys v0.0.0-20200831180312-196b9ba8737a // indirect
 	golang.org/x/text v0.3.3 // indirect
 	google.golang.org/grpc v1.27.0
 	google.golang.org/protobuf v1.24.0 // indirect
