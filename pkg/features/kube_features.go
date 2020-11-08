@@ -672,6 +672,10 @@ const (
 	// Enables the usage of different protocols in the same Service with type=LoadBalancer
 	MixedProtocolLBService featuregate.Feature = "MixedProtocolLBService"
 
+	// owner: @cofyc
+	// alpha: v1.21
+	VolumeCapacityPriority featuregate.Feature = "VolumeCapacityPriority"
+
 	// owner: @ahg-g
 	// alpha: v1.21
 	//
@@ -786,6 +790,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	GracefulNodeShutdown:                           {Default: false, PreRelease: featuregate.Alpha},
 	ServiceLBNodePortControl:                       {Default: false, PreRelease: featuregate.Alpha},
 	MixedProtocolLBService:                         {Default: false, PreRelease: featuregate.Alpha},
+	VolumeCapacityPriority:                         {Default: false, PreRelease: featuregate.Alpha},
 	PreferNominatedNode:                            {Default: false, PreRelease: featuregate.Alpha},
 	RunAsGroup:                                     {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	PodDeletionCost:                                {Default: false, PreRelease: featuregate.Alpha},
