@@ -136,6 +136,12 @@ func Openat(dirfd int, path string, flags int, mode uint32) (fd int, err error) 
 	return openat(dirfd, path, flags|O_LARGEFILE, mode)
 }
 
+//sys	openat2(dirfd int, path string, open_how *OpenHow, size int) (fd int, err error)
+
+func Openat2(dirfd int, path string, how *OpenHow) (fd int, err error) {
+	return openat2(dirfd, path, how, SizeofOpenHow)
+}
+
 //sys	ppoll(fds *PollFd, nfds int, timeout *Timespec, sigmask *Sigset_t) (n int, err error)
 
 func Ppoll(fds []PollFd, timeout *Timespec, sigmask *Sigset_t) (n int, err error) {
