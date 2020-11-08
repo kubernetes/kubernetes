@@ -235,9 +235,10 @@ github.com/container-storage-interface/spec/lib/go/csi
 # github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59 => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 # github.com/containerd/cgroups => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 github.com/containerd/cgroups/stats/v1
-# github.com/containerd/console v1.0.0 => github.com/containerd/console v1.0.0
+# github.com/containerd/console v1.0.1 => github.com/containerd/console v1.0.1
+## explicit
 github.com/containerd/console
-# github.com/containerd/console => github.com/containerd/console v1.0.0
+# github.com/containerd/console => github.com/containerd/console v1.0.1
 # github.com/containerd/containerd v1.3.3 => github.com/containerd/containerd v1.3.3
 # github.com/containerd/containerd => github.com/containerd/containerd v1.3.3
 github.com/containerd/containerd/api/services/containers/v1
@@ -1314,9 +1315,9 @@ golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e => golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 # golang.org/x/sync => golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.0.0-20200831180312-196b9ba8737a => golang.org/x/sys v0.0.0-20200831180312-196b9ba8737a
+# golang.org/x/sys v0.0.0-20200916030750-2334cc1a136f => golang.org/x/sys v0.0.0-20200916030750-2334cc1a136f
 ## explicit
-# golang.org/x/sys => golang.org/x/sys v0.0.0-20200831180312-196b9ba8737a
+# golang.org/x/sys => golang.org/x/sys v0.0.0-20200916030750-2334cc1a136f
 golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
