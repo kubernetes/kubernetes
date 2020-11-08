@@ -36,7 +36,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/distribution v2.7.1+incompatible
-	github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c
+	github.com/docker/docker v17.12.0-ce-rc1.0.20200421142919-41d4112e8947+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units v0.4.0
 	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
@@ -229,7 +229,7 @@ replace (
 	github.com/dgrijalva/jwt-go => github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dnaeon/go-vcr => github.com/dnaeon/go-vcr v1.0.1
 	github.com/docker/distribution => github.com/docker/distribution v2.7.1+incompatible
-	github.com/docker/docker => github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c
+	github.com/docker/docker => github.com/docker/docker v17.12.0-ce-rc1.0.20200421142919-41d4112e8947+incompatible
 	github.com/docker/go-connections => github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units => github.com/docker/go-units v0.4.0
 	github.com/docker/spdystream => github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96

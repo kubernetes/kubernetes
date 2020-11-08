@@ -67,6 +67,7 @@ type ContainerAPIClient interface {
 	ContainerRestart(ctx context.Context, container string, timeout *time.Duration) error
 	ContainerStatPath(ctx context.Context, container, path string) (types.ContainerPathStat, error)
 	ContainerStats(ctx context.Context, container string, stream bool) (types.ContainerStats, error)
+	ContainerStatsOneShot(ctx context.Context, container string) (types.ContainerStats, error)
 	ContainerStart(ctx context.Context, container string, options types.ContainerStartOptions) error
 	ContainerStop(ctx context.Context, container string, timeout *time.Duration) error
 	ContainerTop(ctx context.Context, container string, arguments []string) (containertypes.ContainerTopOKBody, error)
