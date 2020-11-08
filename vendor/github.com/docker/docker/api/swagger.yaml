@@ -19,10 +19,10 @@ produces:
 consumes:
   - "application/json"
   - "text/plain"
-basePath: "/v1.40"
+basePath: "/v1.41"
 info:
   title: "Docker Engine API"
-  version: "1.40"
+  version: "1.41"
   x-logo:
     url: "https://docs.docker.com/images/logo-docker-main.png"
   description: |
@@ -49,8 +49,8 @@ info:
     the URL is not supported by the daemon, a HTTP `400 Bad Request` error message
     is returned.
 
-    If you omit the version-prefix, the current version of the API (v1.40) is used.
-    For example, calling `/info` is the same as calling `/v1.40/info`. Using the
+    If you omit the version-prefix, the current version of the API (v1.41) is used.
+    For example, calling `/info` is the same as calling `/v1.41/info`. Using the
     API without a version-prefix is deprecated and will be removed in a future release.
 
     Engine releases in the near future should support this version of the API,
@@ -800,6 +800,19 @@ definitions:
             description: "A list of kernel capabilities to drop from the container. Conflicts with option 'Capabilities'"
             items:
               type: "string"
+          CgroupnsMode:
+            type: "string"
+            enum:
+              - "private"
+              - "host"
+            description: |
+                    cgroup namespace mode for the container. Possible values are:
+
+                    - `"private"`: the container runs in its own private cgroup namespace
+                    - `"host"`: use the host system's cgroup namespace
+
+                    If not specified, the daemon default is used, which can either be `"private"`
+                    or `"host"`, depending on daemon version, kernel support and configuration.
           Dns:
             type: "array"
             description: "A list of DNS servers for the container to use."
@@ -2954,6 +2967,13 @@ definitions:
             description: "Run an init inside the container that forwards signals and reaps processes. This field is omitted if empty, and the default (as configured on the daemon) is used."
             type: "boolean"
             x-nullable: true
+          PidsLimit:
+            description: |
+              Tune a container's PIDs limit. Set `0` for unlimited.
+            type: "integer"
+            format: "int64"
+            default: 0
+            example: 100
           Sysctls:
             description: |
               Set kernel namedspaced parameters (sysctls) in the container.
@@ -2966,6 +2986,18 @@ definitions:
             type: "object"
             additionalProperties:
               type: "string"
+          # This option is not used by Windows containers
+          Capabilities:
+            type: "array"
+            description: |
+              A list of kernel capabilities to be available for container (this overrides the default set).
+            items:
+              type: "string"
+            example:
+              - "CAP_NET_RAW"
+              - "CAP_SYS_ADMIN"
+              - "CAP_SYS_CHROOT"
+              - "CAP_SYSLOG"
       NetworkAttachmentSpec:
         description: |
           Read-only spec type for non-swarm containers attached to swarm overlay
@@ -3180,6 +3212,12 @@ definitions:
                 type: "integer"
       DesiredState:
         $ref: "#/definitions/TaskState"
+      JobIteration:
+        description: |
+          If the Service this Task belongs to is a job-mode service, contains
+          the JobIteration of the Service this Task was created for. Absent if
+          the Task was created for a Replicated or Global Service.
+        $ref: "#/definitions/ObjectVersion"
     example:
       ID: "0kzzo1i0y4jz6027t0k7aezc7"
       Version:
@@ -3271,6 +3309,22 @@ definitions:
                 type: "integer"
                 format: "int64"
           Global:
+            type: "object"
+          ReplicatedJob:
+            description: "The mode used for services with a finite number of tasks that run to a completed state."
+            type: "object"
+            properties:
+              MaxConcurrent:
+                description: "The maximum number of replicas to run simultaneously."
+                type: "integer"
+                format: "int64"
+                default: 1
+              TotalCompletions:
+                description: "The total number of replicas desired to reach the Completed state. If unset, will default to the value of MaxConcurrent"
+                type: "integer"
+                format: "int64"
+          GlobalJob:
+            description: "The mode used for services which run a task to the completed state on each valid node."
             type: "object"
       UpdateConfig:
         description: "Specification for the update strategy of the service."
@@ -3451,6 +3505,58 @@ definitions:
             format: "dateTime"
           Message:
             type: "string"
+      ServiceStatus:
+        description: |
+          The status of the service's tasks. Provided only when requested as
+          part of a ServiceList operation.
+        type: "object"
+        properties:
+          RunningTasks:
+            description: "The number of tasks for the service currently in the Running state"
+            type: "integer"
+            format: "uint64"
+            example: 7
+          DesiredTasks:
+            description: |
+              The number of tasks for the service desired to be running.
+              For replicated services, this is the replica count from the
+              service spec. For global services, this is computed by taking
+              count of all tasks for the service with a Desired State other
+              than Shutdown.
+            type: "integer"
+            format: "uint64"
+            example: 10
+          CompletedTasks:
+            description: |
+              The number of tasks for a job that are in the Completed state.
+              This field must be cross-referenced with the service type, as the
+              value of 0 may mean the service is not in a job mode, or it may
+              mean the job-mode service has no tasks yet Completed.
+            type: "integer"
+            format: "uint64"
+      JobStatus:
+        description: |
+          The status of the service when it is in one of ReplicatedJob or
+          GlobalJob modes. Absent on Replicated and Global mode services. The
+          JobIteration is an ObjectVersion, but unlike the Service's version,
+          does not need to be sent with an update request.
+        type: "object"
+        properties:
+          JobIteration:
+            description: |
+              JobIteration is a value increased each time a Job is executed,
+              successfully or otherwise. "Executed", in this case, means the
+              job as a whole has been started, not that an individual Task has
+              been launched. A job is "Executed" when its ServiceSpec is
+              updated. JobIteration can be used to disambiguate Tasks belonging
+              to different executions of a job.  Though JobIteration will
+              increase with each subsequent execution, it may not necessarily
+              increase by 1, and so JobIteration should not be used to
+            $ref: "#/definitions/ObjectVersion"
+          LastExecution:
+            description: "The last time, as observed by the server, that this job was started"
+            type: "string"
+            format: "dateTime"
     example:
       ID: "9mnpnzenvg8p8tdbtq4wvbkcz"
       Version:
@@ -3854,44 +3960,6 @@ definitions:
           on Windows.
         type: "string"
         example: "/var/lib/docker"
-      SystemStatus:
-        description: |
-          Status information about this node (standalone Swarm API).
-
-          <p><br /></p>
-
-          > **Note**: The information returned in this field is only propagated
-          > by the Swarm standalone API, and is empty (`null`) when using
-          > built-in swarm mode.
-        type: "array"
-        items:
-          type: "array"
-          items:
-            type: "string"
-        example:
-          - ["Role", "primary"]
-          - ["State", "Healthy"]
-          - ["Strategy", "spread"]
-          - ["Filters", "health, port, containerslots, dependency, affinity, constraint, whitelist"]
-          - ["Nodes", "2"]
-          - [" swarm-agent-00", "192.168.99.102:2376"]
-          - ["  └ ID", "5CT6:FBGO:RVGO:CZL4:PB2K:WCYN:2JSV:KSHH:GGFW:QOPG:6J5Q:IOZ2|192.168.99.102:2376"]
-          - ["  └ Status", "Healthy"]
-          - ["  └ Containers", "1 (1 Running, 0 Paused, 0 Stopped)"]
-          - ["  └ Reserved CPUs", "0 / 1"]
-          - ["  └ Reserved Memory", "0 B / 1.021 GiB"]
-          - ["  └ Labels", "kernelversion=4.4.74-boot2docker, operatingsystem=Boot2Docker 17.06.0-ce (TCL 7.2); HEAD : 0672754 - Thu Jun 29 00:06:31 UTC 2017, ostype=linux, provider=virtualbox, storagedriver=aufs"]
-          - ["  └ UpdatedAt", "2017-08-09T10:03:46Z"]
-          - ["  └ ServerVersion", "17.06.0-ce"]
-          - [" swarm-manager", "192.168.99.101:2376"]
-          - ["  └ ID", "TAMD:7LL3:SEF7:LW2W:4Q2X:WVFH:RTXX:JSYS:XY2P:JEHL:ZMJK:JGIW|192.168.99.101:2376"]
-          - ["  └ Status", "Healthy"]
-          - ["  └ Containers", "2 (2 Running, 0 Paused, 0 Stopped)"]
-          - ["  └ Reserved CPUs", "0 / 1"]
-          - ["  └ Reserved Memory", "0 B / 1.021 GiB"]
-          - ["  └ Labels", "kernelversion=4.4.74-boot2docker, operatingsystem=Boot2Docker 17.06.0-ce (TCL 7.2); HEAD : 0672754 - Thu Jun 29 00:06:31 UTC 2017, ostype=linux, provider=virtualbox, storagedriver=aufs"]
-          - ["  └ UpdatedAt", "2017-08-09T10:04:11Z"]
-          - ["  └ ServerVersion", "17.06.0-ce"]
       Plugins:
         $ref: "#/definitions/PluginsInfo"
       MemoryLimit:
@@ -3998,6 +4066,17 @@ definitions:
           or "Windows Server 2016 Datacenter"
         type: "string"
         example: "Alpine Linux v3.5"
+      OSVersion:
+        description: |
+          Version of the host's operating system
+
+          <p><br /></p>
+
+          > **Note**: The information returned in this field, including its
+          > very existence, and the formatting of values, should not be considered
+          > stable, and may change without notice.
+        type: "string"
+        example: "16.04"
       OSType:
         description: |
           Generic type of the operating system of the host, as returned by the
@@ -4114,7 +4193,7 @@ definitions:
 
           <p><br /></p>
 
-          > **Note**: This field is only propagated when using standalone Swarm
+          > **Deprecated**: This field is only propagated when using standalone Swarm
           > mode, and overlay networking using an external k/v store. Overlay
           > networks with Swarm mode enabled use the built-in raft store, and
           > this field will be empty.
@@ -4128,7 +4207,7 @@ definitions:
 
           <p><br /></p>
 
-          > **Note**: This field is only propagated when using standalone Swarm
+          > **Deprecated**: This field is only propagated when using standalone Swarm
           > mode, and overlay networking using an external k/v store. Overlay
           > networks with Swarm mode enabled use the built-in raft store, and
           > this field will be empty.
@@ -5014,7 +5093,7 @@ paths:
                 x-nullable: true
                 $ref: "#/definitions/ContainerState"
               Image:
-                description: "The container's image"
+                description: "The container's image ID"
                 type: "string"
               ResolvConfPath:
                 type: "string"
@@ -5024,9 +5103,6 @@ paths:
                 type: "string"
               LogPath:
                 type: "string"
-              Node:
-                description: "TODO"
-                type: "object"
               Name:
                 type: "string"
               RestartCount:
@@ -5495,6 +5571,12 @@ paths:
         If either `precpu_stats.online_cpus` or `cpu_stats.online_cpus` is
         nil then for compatibility with older daemons the length of the
         corresponding `cpu_usage.percpu_usage` array should be used.
+
+        On a cgroup v2 host, the following fields are not set
+        * `blkio_stats`: all fields other than `io_service_bytes_recursive`
+        * `cpu_stats`: `cpu_usage.percpu_usage`
+        * `memory_stats`: `max_usage` and `failcnt`
+        Also, `memory_stats.stats` fields are incompatible with cgroup v1.
       operationId: "ContainerStats"
       produces: ["application/json"]
       responses:
@@ -5616,6 +5698,11 @@ paths:
           description: "Stream the output. If false, the stats will be output once and then it will disconnect."
           type: "boolean"
           default: true
+        - name: "one-shot"
+          in: "query"
+          description: "Only get a single stat instead of waiting for 2 cycles. Must be used with stream=false"
+          type: "boolean"
+          default: false
       tags: ["Container"]
   /containers/{id}/resize:
     post:
@@ -9441,6 +9528,10 @@ paths:
             - `label=<service label>`
             - `mode=["replicated"|"global"]`
             - `name=<service name>`
+        - name: "status"
+          in: "query"
+          type: "boolean"
+          description: "Include service status, with count of running and desired tasks"
       tags: ["Service"]
   /services/create:
     post:

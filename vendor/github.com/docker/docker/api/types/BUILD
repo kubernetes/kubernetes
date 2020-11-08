@@ -7,6 +7,7 @@ go_library(
         "client.go",
         "configs.go",
         "error_response.go",
+        "error_response_ext.go",
         "graph_driver_data.go",
         "id_response.go",
         "image_delete_response_item.go",

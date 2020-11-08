@@ -56,6 +56,12 @@ type Task struct {
 	DesiredState        TaskState           `json:",omitempty"`
 	NetworksAttachments []NetworkAttachment `json:",omitempty"`
 	GenericResources    []GenericResource   `json:",omitempty"`
+
+	// JobIteration is the JobIteration of the Service that this Task was
+	// spawned from, if the Service is a ReplicatedJob or GlobalJob. This is
+	// used to determine which Tasks belong to which run of the job. This field
+	// is absent if the Service mode is Replicated or Global.
+	JobIteration *Version `json:",omitempty"`
 }
 
 // TaskSpec represents the spec of a task.

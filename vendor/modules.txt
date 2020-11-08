@@ -319,9 +319,9 @@ github.com/dgrijalva/jwt-go
 github.com/docker/distribution/digestset
 github.com/docker/distribution/reference
 github.com/docker/distribution/registry/api/errcode
-# github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c => github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c
+# github.com/docker/docker v17.12.0-ce-rc1.0.20200421142919-41d4112e8947+incompatible => github.com/docker/docker v17.12.0-ce-rc1.0.20200421142919-41d4112e8947+incompatible
 ## explicit
-# github.com/docker/docker => github.com/docker/docker v1.4.2-0.20200309214505-aa6a9891b09c
+# github.com/docker/docker => github.com/docker/docker v17.12.0-ce-rc1.0.20200421142919-41d4112e8947+incompatible
 github.com/docker/docker/api
 github.com/docker/docker/api/types
 github.com/docker/docker/api/types/blkiodev
@@ -343,7 +343,6 @@ github.com/docker/docker/errdefs
 github.com/docker/docker/pkg/jsonmessage
 github.com/docker/docker/pkg/stdcopy
 github.com/docker/docker/pkg/term
-github.com/docker/docker/pkg/term/windows
 # github.com/docker/go-connections v0.4.0 => github.com/docker/go-connections v0.4.0
 ## explicit
 # github.com/docker/go-connections => github.com/docker/go-connections v0.4.0
