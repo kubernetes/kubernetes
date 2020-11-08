@@ -1547,6 +1547,8 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 		service         v1.Service
 		loadBalancerSku string
 		wantLb          bool
+		probeProtocol   string
+		probePath       string
 		expectedProbes  []network.Probe
 		expectedRules   []network.LoadBalancingRule
 		expectedErr     error
@@ -1561,131 +1563,46 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 			service:         getTestService("test1", v1.ProtocolTCP, map[string]string{"service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset": "true"}, false, 80),
 			loadBalancerSku: "basic",
 			wantLb:          true,
-			expectedProbes: []network.Probe{
-				{
-					Name: to.StringPtr("atest1-TCP-80"),
-					ProbePropertiesFormat: &network.ProbePropertiesFormat{
-						Protocol:          network.ProbeProtocol("Tcp"),
-						Port:              to.Int32Ptr(10080),
-						IntervalInSeconds: to.Int32Ptr(5),
-						NumberOfProbes:    to.Int32Ptr(2),
-					},
-				},
-			},
-			expectedRules: []network.LoadBalancingRule{
-				{
-					Name: to.StringPtr("atest1-TCP-80"),
-					LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
-						Protocol: network.TransportProtocol("Tcp"),
-						FrontendIPConfiguration: &network.SubResource{
-							ID: to.StringPtr("frontendIPConfigID"),
-						},
-						BackendAddressPool: &network.SubResource{
-							ID: to.StringPtr("backendPoolID"),
-						},
-						LoadDistribution:     "Default",
-						FrontendPort:         to.Int32Ptr(80),
-						BackendPort:          to.Int32Ptr(80),
-						EnableFloatingIP:     to.BoolPtr(true),
-						DisableOutboundSnat:  to.BoolPtr(false),
-						IdleTimeoutInMinutes: to.Int32Ptr(0),
-						Probe: &network.SubResource{
-							ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/" +
-								"Microsoft.Network/loadBalancers/lbname/probes/atest1-TCP-80"),
-						},
-						EnableTCPReset: nil,
-					},
-				},
-			},
+			expectedProbes:  getDefaultTestProbes("Tcp", ""),
+			expectedRules:   getDefaultTestRules(false),
 		},
 		{
 			desc:            "reconcileLoadBalancerRule shall return corresponding probe and lbRule (slb without tcp reset)",
 			service:         getTestService("test1", v1.ProtocolTCP, map[string]string{"service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset": "True"}, false, 80),
 			loadBalancerSku: "standard",
 			wantLb:          true,
-			expectedProbes: []network.Probe{
-				{
-					Name: to.StringPtr("atest1-TCP-80"),
-					ProbePropertiesFormat: &network.ProbePropertiesFormat{
-						Protocol:          network.ProbeProtocol("Tcp"),
-						Port:              to.Int32Ptr(10080),
-						IntervalInSeconds: to.Int32Ptr(5),
-						NumberOfProbes:    to.Int32Ptr(2),
-					},
-				},
-			},
-			expectedRules: []network.LoadBalancingRule{
-				{
-					Name: to.StringPtr("atest1-TCP-80"),
-					LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
-						Protocol: network.TransportProtocol("Tcp"),
-						FrontendIPConfiguration: &network.SubResource{
-							ID: to.StringPtr("frontendIPConfigID"),
-						},
-						BackendAddressPool: &network.SubResource{
-							ID: to.StringPtr("backendPoolID"),
-						},
-						LoadDistribution:     "Default",
-						FrontendPort:         to.Int32Ptr(80),
-						BackendPort:          to.Int32Ptr(80),
-						EnableFloatingIP:     to.BoolPtr(true),
-						DisableOutboundSnat:  to.BoolPtr(false),
-						IdleTimeoutInMinutes: to.Int32Ptr(0),
-						Probe: &network.SubResource{
-							ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/" +
-								"Microsoft.Network/loadBalancers/lbname/probes/atest1-TCP-80"),
-						},
-						EnableTCPReset: to.BoolPtr(true),
-					},
-				},
-			},
+			expectedProbes:  getDefaultTestProbes("Tcp", ""),
+			expectedRules:   getDefaultTestRules(true),
 		},
 		{
 			desc:            "reconcileLoadBalancerRule shall return corresponding probe and lbRule(slb with tcp reset)",
 			service:         getTestService("test1", v1.ProtocolTCP, nil, false, 80),
 			loadBalancerSku: "standard",
 			wantLb:          true,
-			expectedProbes: []network.Probe{
-				{
-					Name: to.StringPtr("atest1-TCP-80"),
-					ProbePropertiesFormat: &network.ProbePropertiesFormat{
-						Protocol:          network.ProbeProtocol("Tcp"),
-						Port:              to.Int32Ptr(10080),
-						IntervalInSeconds: to.Int32Ptr(5),
-						NumberOfProbes:    to.Int32Ptr(2),
-					},
-				},
-			},
-			expectedRules: []network.LoadBalancingRule{
-				{
-					Name: to.StringPtr("atest1-TCP-80"),
-					LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
-						Protocol: network.TransportProtocol("Tcp"),
-						FrontendIPConfiguration: &network.SubResource{
-							ID: to.StringPtr("frontendIPConfigID"),
-						},
-						BackendAddressPool: &network.SubResource{
-							ID: to.StringPtr("backendPoolID"),
-						},
-						LoadDistribution:     "Default",
-						FrontendPort:         to.Int32Ptr(80),
-						BackendPort:          to.Int32Ptr(80),
-						EnableFloatingIP:     to.BoolPtr(true),
-						DisableOutboundSnat:  to.BoolPtr(false),
-						IdleTimeoutInMinutes: to.Int32Ptr(0),
-						Probe: &network.SubResource{
-							ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/" +
-								"Microsoft.Network/loadBalancers/lbname/probes/atest1-TCP-80"),
-						},
-						EnableTCPReset: to.BoolPtr(true),
-					},
-				},
-			},
+			expectedProbes:  getDefaultTestProbes("Tcp", ""),
+			expectedRules:   getDefaultTestRules(true),
+		},
+		{
+			desc:            "reconcileLoadBalancerRule shall respect the probe protocol and path configuration in the config file",
+			service:         getTestService("test1", v1.ProtocolTCP, nil, false, 80),
+			loadBalancerSku: "standard",
+			wantLb:          true,
+			probeProtocol:   "http",
+			probePath:       "/healthy",
+			expectedProbes:  getDefaultTestProbes("http", "/healthy"),
+			expectedRules:   getDefaultTestRules(true),
 		},
 	}
 	for i, test := range testCases {
 		az := GetTestCloud(ctrl)
 		az.Config.LoadBalancerSku = test.loadBalancerSku
+		service := test.service
+		if test.probeProtocol != "" {
+			service.Annotations[ServiceAnnotationLoadBalancerHealthProbeProtocol] = test.probeProtocol
+		}
+		if test.probePath != "" {
+			service.Annotations[ServiceAnnotationLoadBalancerHealthProbeRequestPath] = test.probePath
+		}
 		probe, lbrule, err := az.reconcileLoadBalancerRule(&test.service, test.wantLb,
 			"frontendIPConfigID", "backendPoolID", "lbname", to.Int32Ptr(0))
 
@@ -1697,6 +1614,55 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 			assert.NoError(t, err)
 		}
 	}
+}
+
+func getDefaultTestProbes(protocol, path string) []network.Probe {
+	expectedProbes := []network.Probe{
+		{
+			Name: to.StringPtr("atest1-TCP-80"),
+			ProbePropertiesFormat: &network.ProbePropertiesFormat{
+				Protocol:          network.ProbeProtocol(protocol),
+				Port:              to.Int32Ptr(10080),
+				IntervalInSeconds: to.Int32Ptr(5),
+				NumberOfProbes:    to.Int32Ptr(2),
+			},
+		},
+	}
+	if path != "" {
+		expectedProbes[0].RequestPath = to.StringPtr(path)
+	}
+	return expectedProbes
+}
+
+func getDefaultTestRules(enableTCPReset bool) []network.LoadBalancingRule {
+	expectedRules := []network.LoadBalancingRule{
+		{
+			Name: to.StringPtr("atest1-TCP-80"),
+			LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+				Protocol: network.TransportProtocol("Tcp"),
+				FrontendIPConfiguration: &network.SubResource{
+					ID: to.StringPtr("frontendIPConfigID"),
+				},
+				BackendAddressPool: &network.SubResource{
+					ID: to.StringPtr("backendPoolID"),
+				},
+				LoadDistribution:     "Default",
+				FrontendPort:         to.Int32Ptr(80),
+				BackendPort:          to.Int32Ptr(80),
+				EnableFloatingIP:     to.BoolPtr(true),
+				DisableOutboundSnat:  to.BoolPtr(false),
+				IdleTimeoutInMinutes: to.Int32Ptr(0),
+				Probe: &network.SubResource{
+					ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/" +
+						"Microsoft.Network/loadBalancers/lbname/probes/atest1-TCP-80"),
+				},
+			},
+		},
+	}
+	if enableTCPReset {
+		expectedRules[0].EnableTCPReset = to.BoolPtr(true)
+	}
+	return expectedRules
 }
 
 func getTestLoadBalancer(name, rgName, clusterName, identifier *string, service v1.Service, lbSku string) network.LoadBalancer {
