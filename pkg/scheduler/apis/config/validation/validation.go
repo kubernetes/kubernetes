@@ -18,7 +18,10 @@ package validation
 
 import (
 	"fmt"
+	"net"
 	"reflect"
+	"strconv"
+	"strings"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -59,11 +62,31 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) u
 		}
 		errs = append(errs, validateCommonQueueSort(profilesPath, cc.Profiles)...)
 	}
-	for _, msg := range validation.IsValidSocketAddr(cc.HealthzBindAddress) {
-		errs = append(errs, field.Invalid(field.NewPath("healthzBindAddress"), cc.HealthzBindAddress, msg))
+	if len(cc.HealthzBindAddress) > 0 {
+		host, port, err := splitHostIntPort(cc.HealthzBindAddress)
+		if err != nil {
+			errs = append(errs, field.Invalid(field.NewPath("healthzBindAddress"), cc.HealthzBindAddress, err.Error()))
+		} else {
+			if errMsgs := validation.IsValidIP(host); errMsgs != nil {
+				errs = append(errs, field.Invalid(field.NewPath("healthzBindAddress"), cc.HealthzBindAddress, strings.Join(errMsgs, ",")))
+			}
+			if port != 0 {
+				errs = append(errs, field.Invalid(field.NewPath("healthzBindAddress"), cc.HealthzBindAddress, "must be empty or with an explicit 0 port"))
+			}
+		}
 	}
-	for _, msg := range validation.IsValidSocketAddr(cc.MetricsBindAddress) {
-		errs = append(errs, field.Invalid(field.NewPath("metricsBindAddress"), cc.MetricsBindAddress, msg))
+	if len(cc.MetricsBindAddress) > 0 {
+		host, port, err := splitHostIntPort(cc.MetricsBindAddress)
+		if err != nil {
+			errs = append(errs, field.Invalid(field.NewPath("metricsBindAddress"), cc.MetricsBindAddress, err.Error()))
+		} else {
+			if errMsgs := validation.IsValidIP(host); errMsgs != nil {
+				errs = append(errs, field.Invalid(field.NewPath("metricsBindAddress"), cc.MetricsBindAddress, strings.Join(errMsgs, ",")))
+			}
+			if port != 0 {
+				errs = append(errs, field.Invalid(field.NewPath("metricsBindAddress"), cc.MetricsBindAddress, "must be empty or with an explicit 0 port"))
+			}
+		}
 	}
 	if cc.PercentageOfNodesToScore < 0 || cc.PercentageOfNodesToScore > 100 {
 		errs = append(errs, field.Invalid(field.NewPath("percentageOfNodesToScore"),
@@ -80,6 +103,18 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) u
 
 	errs = append(errs, validateExtenders(field.NewPath("extenders"), cc.Extenders)...)
 	return utilerrors.Flatten(utilerrors.NewAggregate(errs))
+}
+
+func splitHostIntPort(s string) (string, int, error) {
+	host, port, err := net.SplitHostPort(s)
+	if err != nil {
+		return "", 0, err
+	}
+	portInt, err := strconv.Atoi(port)
+	if err != nil {
+		return "", 0, err
+	}
+	return host, portInt, err
 }
 
 type removedPlugins struct {

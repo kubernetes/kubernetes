@@ -379,9 +379,7 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
-				Parallelism:        16,
-				HealthzBindAddress: "0.0.0.0:10251",
-				MetricsBindAddress: "0.0.0.0:10251",
+				Parallelism: 16,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -452,9 +450,7 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1beta1.SchemeGroupVersion.String(),
 				},
-				Parallelism:        16,
-				HealthzBindAddress: "0.0.0.0:10251",
-				MetricsBindAddress: "0.0.0.0:10251",
+				Parallelism: 16,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -556,9 +552,7 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
-				Parallelism:        16,
-				HealthzBindAddress: "", // defaults empty when not running from config file
-				MetricsBindAddress: "", // defaults empty when not running from config file
+				Parallelism: 16,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -628,9 +622,7 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
-				Parallelism:        16,
-				HealthzBindAddress: "", // defaults empty when not running from config file
-				MetricsBindAddress: "", // defaults empty when not running from config file
+				Parallelism: 16,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -674,9 +666,7 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
-				Parallelism:        16,
-				HealthzBindAddress: "0.0.0.0:10251",
-				MetricsBindAddress: "0.0.0.0:10251",
+				Parallelism: 16,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -790,9 +780,7 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1beta1.SchemeGroupVersion.String(),
 				},
-				Parallelism:        16,
-				HealthzBindAddress: "0.0.0.0:10251",
-				MetricsBindAddress: "0.0.0.0:10251",
+				Parallelism: 16,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -919,9 +907,7 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
-				Parallelism:        16,
-				HealthzBindAddress: "0.0.0.0:10251",
-				MetricsBindAddress: "0.0.0.0:10251",
+				Parallelism: 16,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -1041,9 +1027,7 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1beta1.SchemeGroupVersion.String(),
 				},
-				Parallelism:        16,
-				HealthzBindAddress: "0.0.0.0:10251",
-				MetricsBindAddress: "0.0.0.0:10251",
+				Parallelism: 16,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -1172,9 +1156,7 @@ profiles:
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: v1beta2.SchemeGroupVersion.String(),
 				},
-				Parallelism:        16,
-				HealthzBindAddress: "0.0.0.0:10251",
-				MetricsBindAddress: "0.0.0.0:10251",
+				Parallelism: 16,
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,

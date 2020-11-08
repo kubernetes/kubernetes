@@ -36,9 +36,7 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: v1beta2.SchemeGroupVersion.String(),
 		},
-		Parallelism:        8,
-		HealthzBindAddress: "0.0.0.0:10254",
-		MetricsBindAddress: "0.0.0.0:10254",
+		Parallelism: 8,
 		ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 			AcceptContentTypes: "application/json",
 			ContentType:        "application/json",
@@ -104,27 +102,15 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	resourceNamespaceNotSet := validConfig.DeepCopy()
 	resourceNamespaceNotSet.LeaderElection.ResourceNamespace = ""
 
-	metricsBindAddrHostInvalid := validConfig.DeepCopy()
-	metricsBindAddrHostInvalid.MetricsBindAddress = "0.0.0.0.0:9090"
-
-	metricsBindAddrPortInvalid := validConfig.DeepCopy()
-	metricsBindAddrPortInvalid.MetricsBindAddress = "0.0.0.0:909090"
-
-	metricsBindAddrHostOnlyInvalid := validConfig.DeepCopy()
-	metricsBindAddrHostOnlyInvalid.MetricsBindAddress = "999.999.999.999"
-
-	healthzBindAddrHostInvalid := validConfig.DeepCopy()
-	healthzBindAddrHostInvalid.HealthzBindAddress = "0.0.0.0.0:9090"
-
-	healthzBindAddrPortInvalid := validConfig.DeepCopy()
-	healthzBindAddrPortInvalid.HealthzBindAddress = "0.0.0.0:909090"
-
-	healthzBindAddrHostOnlyInvalid := validConfig.DeepCopy()
-	healthzBindAddrHostOnlyInvalid.HealthzBindAddress = "999.999.999.999"
-
 	enableContentProfilingSetWithoutEnableProfiling := validConfig.DeepCopy()
 	enableContentProfilingSetWithoutEnableProfiling.EnableProfiling = false
 	enableContentProfilingSetWithoutEnableProfiling.EnableContentionProfiling = true
+
+	metricsBindAddrInvalid := validConfig.DeepCopy()
+	metricsBindAddrInvalid.MetricsBindAddress = "0.0.0.0:9090"
+
+	healthzBindAddrInvalid := validConfig.DeepCopy()
+	healthzBindAddrInvalid.HealthzBindAddress = "0.0.0.0:9090"
 
 	percentageOfNodesToScore101 := validConfig.DeepCopy()
 	percentageOfNodesToScore101.PercentageOfNodesToScore = int32(101)
@@ -281,29 +267,13 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 			expectedToFail: true,
 			config:         resourceNamespaceNotSet,
 		},
-		"bad-healthz-port-invalid": {
+		"non-empty-metrics-bind-addr": {
 			expectedToFail: true,
-			config:         healthzBindAddrPortInvalid,
+			config:         metricsBindAddrInvalid,
 		},
-		"bad-healthz-host-invalid": {
+		"non-empty-healthz-bind-addr": {
 			expectedToFail: true,
-			config:         healthzBindAddrHostInvalid,
-		},
-		"bad-healthz-host-only-invalid": {
-			expectedToFail: true,
-			config:         healthzBindAddrHostOnlyInvalid,
-		},
-		"bad-metrics-port-invalid": {
-			expectedToFail: true,
-			config:         metricsBindAddrPortInvalid,
-		},
-		"bad-metrics-host-invalid": {
-			expectedToFail: true,
-			config:         metricsBindAddrHostInvalid,
-		},
-		"bad-metrics-host-only-invalid": {
-			expectedToFail: true,
-			config:         metricsBindAddrHostOnlyInvalid,
+			config:         healthzBindAddrInvalid,
 		},
 		"bad-percentage-of-nodes-to-score": {
 			expectedToFail: true,
