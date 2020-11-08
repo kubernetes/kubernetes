@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 )
 
 const (
@@ -40,6 +41,8 @@ const (
 	DefaultBindTimeoutSeconds = 600
 
 	stateKey framework.StateKey = Name
+
+	maxUtilization = 100
 )
 
 // the state is initialized in PreFilter phase. because we save the pointer in
@@ -68,12 +71,14 @@ type VolumeBinding struct {
 	Binder                               scheduling.SchedulerVolumeBinder
 	PVCLister                            corelisters.PersistentVolumeClaimLister
 	GenericEphemeralVolumeFeatureEnabled bool
+	scorer                               volumeCapacityScorer
 }
 
 var _ framework.PreFilterPlugin = &VolumeBinding{}
 var _ framework.FilterPlugin = &VolumeBinding{}
 var _ framework.ReservePlugin = &VolumeBinding{}
 var _ framework.PreBindPlugin = &VolumeBinding{}
+var _ framework.ScorePlugin = &VolumeBinding{}
 
 // Name is the name of the plugin used in Registry and configurations.
 const Name = "VolumeBinding"
@@ -214,6 +219,54 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 	return nil
 }
 
+var (
+	// TODO (for alpha) make it configurable in config.VolumeBindingArgs
+	defaultShapePoint = []config.UtilizationShapePoint{
+		{
+			Utilization: 0,
+			Score:       0,
+		},
+		{
+			Utilization: 100,
+			Score:       int32(config.MaxCustomPriorityScore),
+		},
+	}
+)
+
+// Score invoked at the score extension point.
+func (pl *VolumeBinding) Score(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	if pl.scorer == nil {
+		return 0, nil
+	}
+	state, err := getStateData(cs)
+	if err != nil {
+		return 0, framework.AsStatus(err)
+	}
+	podVolumes, ok := state.podVolumesByNode[nodeName]
+	if !ok {
+		return 0, nil
+	}
+	// group by storage class
+	classToWeight := make(classToWeightMap)
+	requestedClassToValueMap := make(map[string]int64)
+	capacityClassToValueMap := make(map[string]int64)
+	for _, staticBinding := range podVolumes.StaticBindings {
+		class := staticBinding.StorageClassName()
+		volumeResource := staticBinding.VolumeResource()
+		if _, ok := requestedClassToValueMap[class]; !ok {
+			classToWeight[class] = 1 // in alpha stage, all classes have the same weight
+		}
+		requestedClassToValueMap[class] += volumeResource.Requested
+		capacityClassToValueMap[class] += volumeResource.Capacity
+	}
+	return pl.scorer(requestedClassToValueMap, capacityClassToValueMap, classToWeight), nil
+}
+
+// ScoreExtensions of the Score plugin.
+func (pl *VolumeBinding) ScoreExtensions() framework.ScoreExtensions {
+	return nil
+}
+
 // Reserve reserves volumes of pod and saves binding status in cycle state.
 func (pl *VolumeBinding) Reserve(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	state, err := getStateData(cs)
@@ -303,10 +356,24 @@ func New(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 		}
 	}
 	binder := scheduling.NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
+
+	// build score function
+	var scorer volumeCapacityScorer
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
+		shape := make(helper.FunctionShape, 0, len(defaultShapePoint))
+		for _, point := range defaultShapePoint {
+			shape = append(shape, helper.FunctionShapePoint{
+				Utilization: int64(point.Utilization),
+				Score:       int64(point.Score) * (framework.MaxNodeScore / config.MaxCustomPriorityScore),
+			})
+		}
+		scorer = buildScorerFunction(shape)
+	}
 	return &VolumeBinding{
 		Binder:                               binder,
 		PVCLister:                            pvcInformer.Lister(),
 		GenericEphemeralVolumeFeatureEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume),
+		scorer:                               scorer,
 	}, nil
 }
 
