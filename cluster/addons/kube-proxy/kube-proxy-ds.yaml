@@ -49,7 +49,7 @@ spec:
           {{kube_cache_mutation_detector_env_value}}
         securityContext:
           capabilities:
-            add: ["NET_ADMIN", "SYS_MODULE", "SYS_ADMIN"]
+            add: ["NET_ADMIN", "SYS_MODULE", "DAC_OVERRIDE"]
         volumeMounts:
         - mountPath: /var/log
           name: varlog
