@@ -666,7 +666,7 @@ func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command
 			Containers: []v1.Container{
 				{
 					Name:    "volume-tester",
-					Image:   e2evolume.GetTestImage(framework.BusyBoxImage),
+					Image:   e2evolume.GetDefaultTestImage(),
 					Command: e2evolume.GenerateScriptCmd(command),
 					VolumeMounts: []v1.VolumeMount{
 						{

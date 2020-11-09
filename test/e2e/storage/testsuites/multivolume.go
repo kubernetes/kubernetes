@@ -30,12 +30,10 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 type multiVolumeTestSuite struct {
@@ -405,8 +403,9 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 	podConfig := e2epod.Config{
 		NS:            ns,
 		PVCs:          pvcs,
-		SeLinuxLabel:  e2epv.SELinuxLabel,
+		SeLinuxLabel:  e2evolume.GetLinuxLabel(),
 		NodeSelection: node,
+		ImageID:       e2evolume.GetDefaultTestImageId(),
 	}
 	pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, framework.PodStartTimeout)
 	defer func() {
@@ -482,11 +481,11 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		ginkgo.By(fmt.Sprintf("Creating pod%d with a volume on %+v", index, node))
 		podConfig := e2epod.Config{
 			NS:            ns,
-			ImageID:       imageutils.DebianIptables,
 			PVCs:          []*v1.PersistentVolumeClaim{pvc},
-			SeLinuxLabel:  e2epv.SELinuxLabel,
+			SeLinuxLabel:  e2evolume.GetLinuxLabel(),
 			NodeSelection: node,
 			PVCsReadOnly:  readOnly,
+			ImageID:       e2evolume.GetDefaultTestImageId(),
 		}
 		pod, err := e2epod.CreateSecPodWithNodeSelection(cs, &podConfig, framework.PodStartTimeout)
 		defer func() {
@@ -649,8 +648,9 @@ func initializeVolume(cs clientset.Interface, ns string, pvc *v1.PersistentVolum
 	podConfig := e2epod.Config{
 		NS:            ns,
 		PVCs:          []*v1.PersistentVolumeClaim{pvc},
-		SeLinuxLabel:  e2epv.SELinuxLabel,
+		SeLinuxLabel:  e2evolume.GetLinuxLabel(),
 		NodeSelection: node,
+		ImageID:       e2evolume.GetDefaultTestImageId(),
 	}
 	pod, err := e2epod.CreateSecPod(cs, &podConfig, framework.PodStartTimeout)
 	defer func() {

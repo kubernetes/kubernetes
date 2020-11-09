@@ -54,6 +54,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -388,7 +389,7 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 			Containers: []v1.Container{
 				{
 					Name:       config.Prefix + "-" + podSuffix,
-					Image:      GetTestImage(framework.BusyBoxImage),
+					Image:      GetDefaultTestImage(),
 					WorkingDir: "/opt",
 					// An imperative and easily debuggable container which reads/writes vol contents for
 					// us to scan in the tests or by eye.
@@ -654,9 +655,35 @@ func GeneratePodSecurityContext(fsGroup *int64, seLinuxOptions *v1.SELinuxOption
 // GetTestImage returns the image name with the given input
 // If the Node OS is windows, currently we return Agnhost image for Windows node
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
-func GetTestImage(image string) string {
+func GetTestImage(id int) string {
 	if framework.NodeOSDistroIs("windows") {
 		return imageutils.GetE2EImage(imageutils.Agnhost)
 	}
-	return image
+	return imageutils.GetE2EImage(id)
+}
+
+// GetDefaultTestImage returns the default test image based on OS.
+// If the node OS is windows, currently we return Agnhost image for Windows node
+// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
+// If the node OS is linux, return busybox image
+func GetDefaultTestImage() string {
+	return imageutils.GetE2EImage(GetDefaultTestImageId())
+}
+
+// GetDefaultTestImageId returns the default test image id based on OS.
+// If the node OS is windows, currently we return Agnhost image for Windows node
+// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
+// If the node OS is linux, return busybox image
+func GetDefaultTestImageId() int {
+	if framework.NodeOSDistroIs("windows") {
+		return imageutils.Agnhost
+	}
+	return imageutils.BusyBox
+}
+
+func GetLinuxLabel() *v1.SELinuxOptions {
+	if framework.NodeOSDistroIs("windows") {
+		return nil
+	}
+	return e2epv.SELinuxLabel
 }
