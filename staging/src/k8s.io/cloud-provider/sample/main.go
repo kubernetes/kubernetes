@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,43 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// The external controller manager is responsible for running controller loops that
-// are cloud provider dependent. It uses the API to listen to new events on resources.
-
 // This file should be written by each cloud provider.
-// The current file demonstrate how other cloud provider should leverage CCM and it uses fake parameters. Please modify for your own use.
+// This is an minimal example. For more details, please refer to k8s.io/kubernetes/cmd/cloud-controller-manager/controller-manager.go
 
-package main
+package sample
 
 import (
 	"fmt"
 	"math/rand"
-	"net/http"
 	"os"
 	"time"
 
 	"github.com/spf13/pflag"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
-	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
 	"k8s.io/cloud-provider/options"
 	"k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugins
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
-	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/klog/v2"
-	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
 )
 
 const (
 	// cloudProviderName shows an sample of using hard coded parameter
 	cloudProviderName = "SampleCloudProviderName"
-
-	// defaultNodeMaskCIDRIPv4 is default mask size for IPv4 node cidr
-	defaultNodeMaskCIDRIPv4 = 24
-	// defaultNodeMaskCIDRIPv6 is default mask size for IPv6 node cidr
-	defaultNodeMaskCIDRIPv6 = 64
 )
 
 func main() {
@@ -99,23 +87,6 @@ func main() {
 	}
 
 	controllerInitializers := app.DefaultControllerInitializers(c.Complete(), cloud)
-
-	// Here is an example to remove the controller which is not needed.
-	// e.g. remove the cloud-node-lifecycle controller which current cloud provider does not need.
-	//delete(controllerInitializers, "cloud-node-lifecycle")
-
-	// Here is an example to add an controller(NodeIpamController) which will be used by cloud provider
-	// generate nodeipamconfig. Here is an sample code. Please pass the right parameter in your code.
-	// If you do not need additional controller, please ignore.
-	nodeipamconfig := nodeipamconfig.NodeIPAMControllerConfiguration{
-		ServiceCIDR:          "sample",
-		SecondaryServiceCIDR: "sample",
-		NodeCIDRMaskSize:     11,
-		NodeCIDRMaskSizeIPv4: 11,
-		NodeCIDRMaskSizeIPv6: 111,
-	}
-	controllerInitializers["nodeipam"] = startNodeIpamControllerWrapper(c.Complete(), nodeipamconfig, cloud)
-
 	command := app.NewCloudControllerManagerCommand(s, c, controllerInitializers)
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
@@ -136,11 +107,5 @@ func main() {
 	})
 	if err := command.Execute(); err != nil {
 		os.Exit(1)
-	}
-}
-
-func startNodeIpamControllerWrapper(ccmconfig *cloudcontrollerconfig.CompletedConfig, nodeipamconfig nodeipamconfig.NodeIPAMControllerConfiguration, cloud cloudprovider.Interface) func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
-	return func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
-		return startNodeIpamController(ccmconfig, nodeipamconfig, ctx, cloud)
 	}
 }
