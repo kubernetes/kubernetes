@@ -235,11 +235,37 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 							},
 						},
 					},
+					InitContainers: []v1.Container{
+						{
+							Name:    "init-log-file",
+							Image:   "debian",
+							Command: []string{"/bin/sh"},
+							Args: []string{
+								"-c",
+								fmt.Sprintf("touch %s", logFile),
+							},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      logVolume,
+									MountPath: path.Dir(logFile),
+								},
+								{
+									Name:      localtimeVolume,
+									MountPath: etcLocaltime,
+								},
+							},
+						},
+					},
 					Containers: []v1.Container{
 						{
 							Name:    name,
 							Image:   image,
-							Command: []string{"sh", "-c", "touch " + logFile + " && /node-problem-detector --logtostderr --system-log-monitors=" + configFile + fmt.Sprintf(" --apiserver-override=%s?inClusterConfig=true", framework.TestContext.Host)},
+							Command: []string{"/node-problem-detector"},
+							Args: []string{
+								"--logtostderr",
+								fmt.Sprintf("--system-log-monitors=%s", configFile),
+								fmt.Sprintf(" --apiserver-override=%s?inClusterConfig=true", framework.TestContext.Host),
+							},
 							Env: []v1.EnvVar{
 								{
 									Name: "NODE_NAME",
