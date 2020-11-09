@@ -31,7 +31,7 @@ import (
 // Client has the methods required to update the storage version.
 type Client interface {
 	Create(context.Context, *v1alpha1.StorageVersion, metav1.CreateOptions) (*v1alpha1.StorageVersion, error)
-	Update(context.Context, *v1alpha1.StorageVersion, metav1.UpdateOptions) (*v1alpha1.StorageVersion, error)
+	UpdateStatus(context.Context, *v1alpha1.StorageVersion, metav1.UpdateOptions) (*v1alpha1.StorageVersion, error)
 	Get(context.Context, string, metav1.GetOptions) (*v1alpha1.StorageVersion, error)
 }
 
@@ -91,10 +91,16 @@ func singleUpdate(c Client, apiserverID string, gr schema.GroupResource, encodin
 	}
 	updatedSV := localUpdateStorageVersion(sv, apiserverID, encodingVersion, decodableVersions)
 	if shouldCreate {
-		_, err := c.Create(context.TODO(), updatedSV, metav1.CreateOptions{})
+		createdSV, err := c.Create(context.TODO(), updatedSV, metav1.CreateOptions{})
+		if err != nil {
+			return err
+		}
+		// assign the calculated status to the object just created, then update status
+		createdSV.Status = updatedSV.Status
+		_, err = c.UpdateStatus(context.TODO(), createdSV, metav1.UpdateOptions{})
 		return err
 	}
-	_, err = c.Update(context.TODO(), updatedSV, metav1.UpdateOptions{})
+	_, err = c.UpdateStatus(context.TODO(), updatedSV, metav1.UpdateOptions{})
 	return err
 }
 
