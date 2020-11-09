@@ -73,7 +73,9 @@ import (
 
 const (
 	// CloudProviderName is the value used for the --cloud-provider flag
-	CloudProviderName      = "azure"
+	CloudProviderName = "azure"
+	// AzureStackCloudName is the cloud name of Azure Stack
+	AzureStackCloudName    = "AZURESTACKCLOUD"
 	rateLimitQPSDefault    = 1.0
 	rateLimitBucketDefault = 5
 	backoffRetriesDefault  = 6
@@ -609,6 +611,7 @@ func (az *Cloud) configAzureClients(
 
 func (az *Cloud) getAzureClientConfig(servicePrincipalToken *adal.ServicePrincipalToken) *azclients.ClientConfig {
 	azClientConfig := &azclients.ClientConfig{
+		CloudName:               az.Config.Cloud,
 		Location:                az.Config.Location,
 		SubscriptionID:          az.Config.SubscriptionID,
 		ResourceManagerEndpoint: az.Environment.ResourceManagerEndpoint,
