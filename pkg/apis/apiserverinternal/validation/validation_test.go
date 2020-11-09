@@ -75,7 +75,7 @@ func TestValidateServerStorageVersion(t *testing.T) {
 				EncodingVersion:   "mygroup.com/v2",
 				DecodableVersions: []string{"mygroup.com/v2", "/v3"},
 			},
-			expectedErr: `[].decodableVersions[1]: Invalid value: "/v3": group part must be non-empty`,
+			expectedErr: `[].decodableVersions[1]: Invalid value: "/v3": group part: must be non-empty`,
 		},
 		{
 			ssv: apiserverinternal.ServerStorageVersion{
@@ -83,7 +83,7 @@ func TestValidateServerStorageVersion(t *testing.T) {
 				EncodingVersion:   "mygroup.com/v2",
 				DecodableVersions: []string{"mygroup.com/v2", "mygroup.com/"},
 			},
-			expectedErr: `[].decodableVersions[1]: Invalid value: "mygroup.com/": version part must be non-empty`,
+			expectedErr: `[].decodableVersions[1]: Invalid value: "mygroup.com/": version part: must be non-empty`,
 		},
 		{
 			ssv: apiserverinternal.ServerStorageVersion{
@@ -91,7 +91,7 @@ func TestValidateServerStorageVersion(t *testing.T) {
 				EncodingVersion:   "/v3",
 				DecodableVersions: []string{"mygroup.com/v2", "/v3"},
 			},
-			expectedErr: `[].encodingVersion: Invalid value: "/v3": group part must be non-empty`,
+			expectedErr: `[].encodingVersion: Invalid value: "/v3": group part: must be non-empty`,
 		},
 		{
 			ssv: apiserverinternal.ServerStorageVersion{
@@ -99,7 +99,7 @@ func TestValidateServerStorageVersion(t *testing.T) {
 				EncodingVersion:   "v1",
 				DecodableVersions: []string{"v1", "mygroup_com/v2"},
 			},
-			expectedErr: `[].decodableVersions[1]: Invalid value: "mygroup_com/v2": group part a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`,
+			expectedErr: `[].decodableVersions[1]: Invalid value: "mygroup_com/v2": group part: a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`,
 		},
 		{
 			ssv: apiserverinternal.ServerStorageVersion{
@@ -107,7 +107,7 @@ func TestValidateServerStorageVersion(t *testing.T) {
 				EncodingVersion:   "v1",
 				DecodableVersions: []string{"v1", "mygroup.com/v2_"},
 			},
-			expectedErr: `[].decodableVersions[1]: Invalid value: "mygroup.com/v2_": version part a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`,
+			expectedErr: `[].decodableVersions[1]: Invalid value: "mygroup.com/v2_": version part: a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`,
 		},
 		{
 			ssv: apiserverinternal.ServerStorageVersion{
@@ -115,7 +115,7 @@ func TestValidateServerStorageVersion(t *testing.T) {
 				EncodingVersion:   "v1",
 				DecodableVersions: []string{"v1", "mygroup.com/v2/myresource"},
 			},
-			expectedErr: `[].decodableVersions[1]: Invalid value: "mygroup.com/v2/myresource": an apiVersion a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?') with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyVersion')`,
+			expectedErr: `[].decodableVersions[1]: Invalid value: "mygroup.com/v2/myresource": an apiVersion is a DNS-1035 label, which must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?') with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyVersion')`,
 		},
 	}
 
