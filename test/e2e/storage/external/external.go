@@ -299,7 +299,7 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(e2econfig *testsuites
 		// reconsidered if we eventually need to move in-tree storage tests out.
 		sc.Parameters["csi.storage.k8s.io/fstype"] = fsType
 	}
-	return testsuites.GetStorageClass(sc.Provisioner, sc.Parameters, sc.VolumeBindingMode, f.Namespace.Name, "e2e-sc")
+	return testsuites.GetStorageClass(sc.Provisioner, sc.Parameters, sc.VolumeBindingMode, f.Namespace.Name)
 }
 
 func loadSnapshotClass(filename string) (*unstructured.Unstructured, error) {
@@ -325,7 +325,6 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *testsuites.PerTestConfig)
 	snapshotter := d.DriverInfo.Name
 	parameters := map[string]string{}
 	ns := e2econfig.Framework.Namespace.Name
-	suffix := "vsc"
 
 	switch {
 	case d.SnapshotClass.FromName:
@@ -358,7 +357,7 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *testsuites.PerTestConfig)
 		}
 	}
 
-	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
+	return testsuites.GetSnapshotClass(snapshotter, parameters, ns)
 }
 
 func (d *driverDefinition) GetVolume(e2econfig *testsuites.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {

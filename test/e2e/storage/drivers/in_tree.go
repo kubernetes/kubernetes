@@ -152,9 +152,8 @@ func (n *nfsDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestCo
 	provisioner := n.externalPluginName
 	parameters := map[string]string{"mountOptions": "vers=4.1"}
 	ns := config.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-sc", n.driverInfo.Name)
 
-	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, nil, ns)
 }
 
 func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
@@ -1133,9 +1132,8 @@ func (c *cinderDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTes
 		parameters["fsType"] = fsType
 	}
 	ns := config.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-sc", c.driverInfo.Name)
 
-	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, nil, ns)
 }
 
 func (c *cinderDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
@@ -1344,10 +1342,9 @@ func (g *gcePdDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTest
 		parameters["fsType"] = fsType
 	}
 	ns := config.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
 	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
-	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns)
 }
 
 func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
@@ -1487,9 +1484,8 @@ func (v *vSphereDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTe
 		parameters["fsType"] = fsType
 	}
 	ns := config.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-sc", v.driverInfo.Name)
 
-	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, nil, ns)
 }
 
 func (v *vSphereDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
@@ -1618,10 +1614,9 @@ func (a *azureDiskDriver) GetDynamicProvisionStorageClass(config *testsuites.Per
 		parameters["fsType"] = fsType
 	}
 	ns := config.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-sc", a.driverInfo.Name)
 	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
-	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns)
 }
 
 func (a *azureDiskDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
@@ -1751,10 +1746,9 @@ func (a *awsDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestCo
 		parameters["fsType"] = fsType
 	}
 	ns := config.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-sc", a.driverInfo.Name)
 	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
-	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns)
 }
 
 func (a *awsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
