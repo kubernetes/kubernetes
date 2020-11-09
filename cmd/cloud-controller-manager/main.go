@@ -18,6 +18,9 @@ limitations under the License.
 // are cloud provider dependent. It uses the API to listen to new events on resources.
 
 // This file should be written by each cloud provider.
+// For an minimal working example, please refer to k8s.io/cloud-provider/sample/basic_main.go
+// For an advanced example, please refer to k8s.io/cloud-provider/sample/advanced_main.go
+// For more details, please refer to k8s.io/kubernetes/cmd/cloud-controller-manager/main.go
 // The current file demonstrate how other cloud provider should leverage CCM and it uses fake parameters. Please modify for your own use.
 
 package main
@@ -41,16 +44,13 @@ import (
 	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/klog/v2"
 	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
+	// For existing cloud providers, the option to import legacy providers is still available.
+	// e.g. _"k8s.io/legacy-cloud-providers/<provider>"
 )
 
 const (
-	// cloudProviderName shows an sample of using hard coded parameter
+	// cloudProviderName shows an sample of using hard coded parameter, please edit the value for your case.
 	cloudProviderName = "SampleCloudProviderName"
-
-	// defaultNodeMaskCIDRIPv4 is default mask size for IPv4 node cidr
-	defaultNodeMaskCIDRIPv4 = 24
-	// defaultNodeMaskCIDRIPv6 is default mask size for IPv6 node cidr
-	defaultNodeMaskCIDRIPv6 = 64
 )
 
 func main() {
