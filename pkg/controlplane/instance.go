@@ -44,6 +44,7 @@ import (
 	coordinationapiv1 "k8s.io/api/coordination/v1"
 	coordinationapiv1beta1 "k8s.io/api/coordination/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	eventsv1 "k8s.io/api/events/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
@@ -80,7 +81,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
+	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
 	"k8s.io/component-helpers/lease"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
@@ -654,6 +655,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		certificatesapiv1beta1.SchemeGroupVersion,
 		coordinationapiv1.SchemeGroupVersion,
 		coordinationapiv1beta1.SchemeGroupVersion,
+		discoveryv1.SchemeGroupVersion,
 		discoveryv1beta1.SchemeGroupVersion,
 		eventsv1.SchemeGroupVersion,
 		eventsv1beta1.SchemeGroupVersion,

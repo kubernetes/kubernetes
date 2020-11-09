@@ -521,6 +521,8 @@ const (
 
 	// owner: @robscott @freehan
 	// alpha: v1.16
+	// beta: v1.17
+	// GA: v1.20
 	//
 	// Enable Endpoint Slices for more scalable Service endpoints.
 	EndpointSlice featuregate.Feature = "EndpointSlice"
@@ -537,6 +539,12 @@ const (
 	//
 	// Enable Endpoint Slice consumption by kube-proxy in Windows for improved scalability.
 	WindowsEndpointSliceProxying featuregate.Feature = "WindowsEndpointSliceProxying"
+
+	// owner: @robscott
+	// beta: v1.20
+	//
+	// Enable Endpoint Slice topology fields.
+	EndpointSliceTopology featuregate.Feature = "EndpointSliceTopology"
 
 	// owner: @Huang-Wei
 	// alpha: v1.16
@@ -746,10 +754,11 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	VolumePVCDataSource:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	PodOverhead:                                    {Default: true, PreRelease: featuregate.Beta},
 	IPv6DualStack:                                  {Default: false, PreRelease: featuregate.Alpha},
-	EndpointSlice:                                  {Default: true, PreRelease: featuregate.Beta},
+	EndpointSlice:                                  {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	EndpointSliceProxying:                          {Default: true, PreRelease: featuregate.Beta},
 	EndpointSliceTerminatingCondition:              {Default: false, PreRelease: featuregate.Alpha},
 	WindowsEndpointSliceProxying:                   {Default: false, PreRelease: featuregate.Alpha},
+	EndpointSliceTopology:                          {Default: true, PreRelease: featuregate.Beta},
 	EvenPodsSpread:                                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	StartupProbe:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},

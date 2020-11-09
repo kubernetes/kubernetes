@@ -19,12 +19,12 @@ package reconcilers
 import (
 	"context"
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
+	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
 	utilnet "k8s.io/utils/net"
 )
 
