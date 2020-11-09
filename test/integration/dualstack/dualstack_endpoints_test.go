@@ -24,7 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -115,7 +115,7 @@ func TestDualStackEndpoints(t *testing.T) {
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Services(),
 		informers.Core().V1().Nodes(),
-		informers.Discovery().V1beta1().EndpointSlices(),
+		informers.Discovery().V1().EndpointSlices(),
 		int32(100),
 		client,
 		1*time.Second)
