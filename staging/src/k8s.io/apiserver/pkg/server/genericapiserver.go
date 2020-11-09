@@ -443,7 +443,8 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		resourceInfos = append(resourceInfos, r...)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
 		// API installation happens before we start listening on the handlers,
 		// therefore it is safe to register ResourceInfos here. The handler will block
 		// write requests until the storage versions of the targeting resources are updated.

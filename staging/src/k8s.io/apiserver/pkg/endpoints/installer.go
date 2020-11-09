@@ -513,6 +513,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	var resourceInfo *storageversion.ResourceInfo
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) &&
 		isStorageVersionProvider &&
 		storageVersionProvider.StorageVersion() != nil {
 
