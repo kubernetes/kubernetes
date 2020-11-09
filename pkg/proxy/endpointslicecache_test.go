@@ -114,6 +114,28 @@ func TestEndpointsMapFromESC(t *testing.T) {
 				},
 			},
 		},
+		// 2 slices with all endpoints overlapping, some unready and terminating.
+		"2 slices, overlapping endpoints, some endpoints unready and some endpoints terminating": {
+			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			endpointSlices: []*discovery.EndpointSlice{
+				generateEndpointSlice("svc1", "ns1", 1, 10, 3, 5, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
+				generateEndpointSlice("svc1", "ns1", 1, 10, 6, 5, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
+			},
+			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
+					&BaseEndpointInfo{Endpoint: "10.0.1.10:80", IsLocal: false, Ready: false, Serving: true, Terminating: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{Endpoint: "10.0.1.4:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{Endpoint: "10.0.1.5:80", IsLocal: false, Ready: false, Serving: true, Terminating: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.6:80", IsLocal: false, Ready: false, Serving: false, Terminating: false},
+					&BaseEndpointInfo{Endpoint: "10.0.1.7:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{Endpoint: "10.0.1.8:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+					&BaseEndpointInfo{Endpoint: "10.0.1.9:80", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+				},
+			},
+		},
 		"2 slices, overlapping endpoints, all unready": {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
 			endpointSlices: []*discovery.EndpointSlice{
