@@ -215,3 +215,19 @@ type VolumeBindingArgs struct {
 	// If this value is nil, the default value (600) will be used.
 	BindTimeoutSeconds *int64 `json:"bindTimeoutSeconds,omitempty"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeAffinityArgs holds arguments to configure the NodeAffinity plugin.
+type NodeAffinityArgs struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// AddedAffinity is applied to all Pods additionally to the NodeAffinity
+	// specified in the PodSpec. That is, Nodes need to satisfy AddedAffinity
+	// AND .spec.NodeAffinity. AddedAffinity is empty by default (all Nodes
+	// match).
+	// When AddedAffinity is used, some Pods with affinity requirements that match
+	// a specific Node (such as Daemonset Pods) might remain unschedulable.
+	// +optional
+	AddedAffinity *corev1.NodeAffinity `json:"addedAffinity,omitempty"`
+}

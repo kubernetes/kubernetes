@@ -87,6 +87,15 @@ profiles:
   - name: VolumeBinding
     args:
       bindTimeoutSeconds: 300
+  - name: NodeAffinity
+    args:
+      addedAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: foo
+              operator: In
+              values: ["bar"]
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
@@ -146,6 +155,26 @@ profiles:
 							Name: "VolumeBinding",
 							Args: &config.VolumeBindingArgs{
 								BindTimeoutSeconds: 300,
+							},
+						},
+						{
+							Name: "NodeAffinity",
+							Args: &config.NodeAffinityArgs{
+								AddedAffinity: &corev1.NodeAffinity{
+									RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+										NodeSelectorTerms: []corev1.NodeSelectorTerm{
+											{
+												MatchExpressions: []corev1.NodeSelectorRequirement{
+													{
+														Key:      "foo",
+														Operator: corev1.NodeSelectorOpIn,
+														Values:   []string{"bar"},
+													},
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -271,6 +300,7 @@ profiles:
   - name: VolumeBinding
     args:
   - name: PodTopologySpread
+  - name: NodeAffinity
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
@@ -314,6 +344,10 @@ profiles:
 							Args: &config.PodTopologySpreadArgs{
 								DefaultingType: config.SystemDefaulting,
 							},
+						},
+						{
+							Name: "NodeAffinity",
+							Args: &config.NodeAffinityArgs{},
 						},
 					},
 				},
