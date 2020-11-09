@@ -647,14 +647,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 
 		var reservedSystemCPUs cpuset.CPUSet
-		var errParse error
 		if s.ReservedSystemCPUs != "" {
-			reservedSystemCPUs, errParse = cpuset.Parse(s.ReservedSystemCPUs)
-			if errParse != nil {
-				// invalid cpu list is provided, set reservedSystemCPUs to empty, so it won't overwrite kubeReserved/systemReserved
-				klog.Infof("Invalid ReservedSystemCPUs \"%s\"", s.ReservedSystemCPUs)
-				return errParse
-			}
 			// is it safe do use CAdvisor here ??
 			machineInfo, err := kubeDeps.CAdvisorInterface.MachineInfo()
 			if err != nil {
@@ -662,6 +655,13 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				klog.Warning("Failed to get MachineInfo, set reservedSystemCPUs to empty")
 				reservedSystemCPUs = cpuset.NewCPUSet()
 			} else {
+				var errParse error
+				reservedSystemCPUs, errParse = cpuset.Parse(s.ReservedSystemCPUs)
+				if errParse != nil {
+					// invalid cpu list is provided, set reservedSystemCPUs to empty, so it won't overwrite kubeReserved/systemReserved
+					klog.Infof("Invalid ReservedSystemCPUs \"%s\"", s.ReservedSystemCPUs)
+					return errParse
+				}
 				reservedList := reservedSystemCPUs.ToSlice()
 				first := reservedList[0]
 				last := reservedList[len(reservedList)-1]
