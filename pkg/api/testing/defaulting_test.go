@@ -95,6 +95,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "discovery.k8s.io", Version: "v1alpha1", Kind: "EndpointSliceList"}:                             {},
 		{Group: "discovery.k8s.io", Version: "v1beta1", Kind: "EndpointSlice"}:                                  {},
 		{Group: "discovery.k8s.io", Version: "v1beta1", Kind: "EndpointSliceList"}:                              {},
+		{Group: "discovery.k8s.io", Version: "v1", Kind: "EndpointSlice"}:                                       {},
+		{Group: "discovery.k8s.io", Version: "v1", Kind: "EndpointSliceList"}:                                   {},
 		{Group: "extensions", Version: "v1beta1", Kind: "DaemonSet"}:                                            {},
 		{Group: "extensions", Version: "v1beta1", Kind: "DaemonSetList"}:                                        {},
 		{Group: "apps", Version: "v1beta2", Kind: "DaemonSet"}:                                                  {},

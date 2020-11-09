@@ -22,8 +22,11 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/discovery"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -36,8 +39,10 @@ func TestValidateEndpointSlice(t *testing.T) {
 	testCases := map[string]struct {
 		expectedErrors int
 		endpointSlice  *discovery.EndpointSlice
+		enableTopology bool
 	}{
 		"good-slice": {
+			enableTopology: true,
 			expectedErrors: 0,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -53,6 +58,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"good-fqdns": {
+			enableTopology: true,
 			expectedErrors: 0,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -68,6 +74,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"all-protocols": {
+			enableTopology: true,
 			expectedErrors: 0,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -89,6 +96,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"app-protocols": {
+			enableTopology: true,
 			expectedErrors: 0,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -117,6 +125,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"empty-port-name": {
+			enableTopology: true,
 			expectedErrors: 0,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -134,6 +143,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"long-port-name": {
+			enableTopology: true,
 			expectedErrors: 0,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -148,6 +158,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"empty-ports-and-endpoints": {
+			enableTopology: true,
 			expectedErrors: 0,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -157,6 +168,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"max-endpoints": {
+			enableTopology: true,
 			expectedErrors: 0,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -166,6 +178,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"max-ports": {
+			enableTopology: true,
 			expectedErrors: 0,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -174,6 +187,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"max-addresses": {
+			enableTopology: true,
 			expectedErrors: 0,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -188,6 +202,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"max-topology-keys": {
+			enableTopology: true,
 			expectedErrors: 0,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -205,6 +220,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 
 		// expected failures
 		"duplicate-port-name": {
+			enableTopology: true,
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -220,6 +236,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-port-name-caps": {
+			enableTopology: true,
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -232,6 +249,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-port-name-chars": {
+			enableTopology: true,
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -244,6 +262,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-port-name-length": {
+			enableTopology: true,
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -256,6 +275,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"invalid-port-protocol": {
+			enableTopology: true,
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -267,6 +287,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"too-many-ports": {
+			enableTopology: true,
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -275,6 +296,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"too-many-endpoints": {
+			enableTopology: true,
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -284,6 +306,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"no-endpoint-addresses": {
+			enableTopology: true,
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -298,6 +321,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"too-many-addresses": {
+			enableTopology: true,
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -312,6 +336,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-topology-key": {
+			enableTopology: true,
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -326,7 +351,24 @@ func TestValidateEndpointSlice(t *testing.T) {
 				}},
 			},
 		},
+		"topology-disabled": {
+			enableTopology: false,
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+					Topology:  generateTopology(1),
+				}},
+			},
+		},
 		"too-many-topology-keys": {
+			enableTopology: true,
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -342,6 +384,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-hostname": {
+			enableTopology: true,
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -357,6 +400,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-meta": {
+			enableTopology: true,
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
@@ -375,6 +419,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-ip": {
+			enableTopology: true,
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -390,6 +435,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-ipv4": {
+			enableTopology: true,
 			expectedErrors: 2,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -405,6 +451,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-ipv6": {
+			enableTopology: true,
 			expectedErrors: 2,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -420,6 +467,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-fqdns": {
+			enableTopology: true,
 			expectedErrors: 4,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -435,6 +483,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-app-protocol": {
+			enableTopology: true,
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -451,6 +500,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"empty-everything": {
+			enableTopology: true,
 			expectedErrors: 3,
 			endpointSlice:  &discovery.EndpointSlice{},
 		},
@@ -458,6 +508,8 @@ func TestValidateEndpointSlice(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceTopology, testCase.enableTopology)()
+
 			errs := ValidateEndpointSlice(testCase.endpointSlice, supportedAddressTypes.Union(deprecatedAddressTypes))
 			if len(errs) != testCase.expectedErrors {
 				t.Errorf("Expected %d errors, got %d errors: %v", testCase.expectedErrors, len(errs), errs)

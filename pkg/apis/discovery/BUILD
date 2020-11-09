@@ -31,6 +31,7 @@ filegroup(
         ":package-srcs",
         "//pkg/apis/discovery/fuzzer:all-srcs",
         "//pkg/apis/discovery/install:all-srcs",
+        "//pkg/apis/discovery/v1:all-srcs",
         "//pkg/apis/discovery/v1alpha1:all-srcs",
         "//pkg/apis/discovery/v1beta1:all-srcs",
         "//pkg/apis/discovery/validation:all-srcs",

@@ -38,6 +38,7 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	v1alpha1 "k8s.io/api/discovery/v1alpha1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	eventsv1 "k8s.io/api/events/v1"
@@ -205,6 +206,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().V1().Services().Informer()}, nil
 	case corev1.SchemeGroupVersion.WithResource("serviceaccounts"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().V1().ServiceAccounts().Informer()}, nil
+
+		// Group=discovery.k8s.io, Version=v1
+	case discoveryv1.SchemeGroupVersion.WithResource("endpointslices"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Discovery().V1().EndpointSlices().Informer()}, nil
 
 		// Group=discovery.k8s.io, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("endpointslices"):

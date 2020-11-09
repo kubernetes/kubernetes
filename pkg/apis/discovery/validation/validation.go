@@ -22,9 +22,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/discovery"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -111,10 +113,14 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 		}
 
 		topologyPath := idxPath.Child("topology")
-		if len(endpoint.Topology) > maxTopologyLabels {
-			allErrs = append(allErrs, field.TooMany(topologyPath, len(endpoint.Topology), maxTopologyLabels))
+		if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTopology) {
+			if len(endpoint.Topology) > maxTopologyLabels {
+				allErrs = append(allErrs, field.TooMany(topologyPath, len(endpoint.Topology), maxTopologyLabels))
+			}
+			allErrs = append(allErrs, metavalidation.ValidateLabels(endpoint.Topology, topologyPath)...)
+		} else if len(endpoint.Topology) > 0 {
+			allErrs = append(allErrs, field.Forbidden(topologyPath, "topology fields are not enabled"))
 		}
-		allErrs = append(allErrs, metavalidation.ValidateLabels(endpoint.Topology, topologyPath)...)
 
 		if endpoint.Hostname != nil {
 			allErrs = append(allErrs, apivalidation.ValidateDNS1123Label(*endpoint.Hostname, idxPath.Child("hostname"))...)
