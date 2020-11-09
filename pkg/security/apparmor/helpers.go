@@ -19,7 +19,8 @@ package apparmor
 import (
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 // Checks whether app armor is required for pod to be run.
@@ -41,6 +42,28 @@ func GetProfileName(pod *v1.Pod, containerName string) string {
 // pod annotations
 func GetProfileNameFromPodAnnotations(annotations map[string]string, containerName string) string {
 	return annotations[v1.AppArmorBetaContainerAnnotationKeyPrefix+containerName]
+}
+
+// GetProfile builds the `SecurityProfile` from the provided annotations and
+// containerName.
+func GetProfile(annotations map[string]string, containerName string) *runtimeapi.SecurityProfile {
+	profileName, ok := annotations[v1.AppArmorBetaContainerAnnotationKeyPrefix+containerName]
+
+	// TODO: if no profile is set, switch to RuntimeDefault instead of Unconfined
+	if !ok || profileName == v1.AppArmorBetaProfileNameUnconfined {
+		return &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_Unconfined,
+		}
+	} else if profileName == v1.AppArmorBetaProfileRuntimeDefault {
+		return &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+		}
+	}
+
+	return &runtimeapi.SecurityProfile{
+		ProfileType:  runtimeapi.SecurityProfile_Localhost,
+		LocalhostRef: profileName,
+	}
 }
 
 // SetProfileName sets the name of the profile to use with the container.

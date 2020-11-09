@@ -42,6 +42,7 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 
 	// set ApparmorProfile.
 	synthesized.ApparmorProfile = apparmor.GetProfileNameFromPodAnnotations(pod.Annotations, container.Name)
+	synthesized.Apparmor = apparmor.GetProfile(pod.Annotations, container.Name)
 
 	// set RunAsUser.
 	if synthesized.RunAsUser == nil {
