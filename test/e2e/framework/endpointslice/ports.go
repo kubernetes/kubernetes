@@ -17,7 +17,7 @@ limitations under the License.
 package endpointslice
 
 import (
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -25,7 +25,7 @@ import (
 type PortsByPodUID map[types.UID][]int
 
 // GetContainerPortsByPodUID returns a PortsByPodUID map on the given endpoints.
-func GetContainerPortsByPodUID(eps []discoveryv1beta1.EndpointSlice) PortsByPodUID {
+func GetContainerPortsByPodUID(eps []discoveryv1.EndpointSlice) PortsByPodUID {
 	m := PortsByPodUID{}
 
 	for _, es := range eps {

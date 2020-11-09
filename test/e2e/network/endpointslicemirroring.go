@@ -23,7 +23,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -72,8 +72,8 @@ var _ = SIGDescribe("EndpointSliceMirroring", func() {
 			framework.ExpectNoError(err, "Unexpected error creating Endpoints")
 
 			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
-				esList, err := cs.DiscoveryV1beta1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
-					LabelSelector: discoveryv1beta1.LabelServiceName + "=" + svc.Name,
+				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
 				})
 				if err != nil {
 					framework.Logf("Error listing EndpointSlices: %v", err)
@@ -124,8 +124,8 @@ var _ = SIGDescribe("EndpointSliceMirroring", func() {
 
 			// Expect mirrored EndpointSlice resource to be updated.
 			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
-				esList, err := cs.DiscoveryV1beta1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
-					LabelSelector: discoveryv1beta1.LabelServiceName + "=" + svc.Name,
+				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
 				})
 				if err != nil {
 					return false, err
@@ -171,8 +171,8 @@ var _ = SIGDescribe("EndpointSliceMirroring", func() {
 
 			// Expect mirrored EndpointSlice resource to be updated.
 			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
-				esList, err := cs.DiscoveryV1beta1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
-					LabelSelector: discoveryv1beta1.LabelServiceName + "=" + svc.Name,
+				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
 				})
 				if err != nil {
 					return false, err
