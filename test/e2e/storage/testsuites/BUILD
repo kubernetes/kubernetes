@@ -14,6 +14,7 @@ go_library(
         "subpath.go",
         "testdriver.go",
         "topology.go",
+        "util.go",
         "volume_expand.go",
         "volume_io.go",
         "volume_stress.go",

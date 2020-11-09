@@ -69,14 +69,19 @@ const (
 
 // PodExec runs f.ExecCommandInContainerWithFullOutput to execute a shell cmd in target pod
 func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, string, error) {
-	stdout, stderr, err := f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
-	return stdout, stderr, err
+	if framework.NodeOSDistroIs("windows") {
+		return f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "powershell", "/c", shExec)
+	}
+	return f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
+
 }
 
 // VerifyExecInPodSucceed verifies shell cmd in target pod succeed
 func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, shExec string) {
 	stdout, stderr, err := PodExec(f, pod, shExec)
+	fmt.Printf("shExec %s", shExec)
 	if err != nil {
+
 		if exiterr, ok := err.(uexec.CodeExitError); ok {
 			exitCode := exiterr.ExitStatus()
 			framework.ExpectNoError(err,
@@ -636,11 +641,17 @@ func CheckReadWriteToPath(f *framework.Framework, pod *v1.Pod, volMode v1.Persis
 		// text -> file1 (write to file)
 		VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path))
 		// grep file1 (read from file and check contents)
-		VerifyExecInPodSucceed(f, pod, fmt.Sprintf("grep 'Hello world.' %s/file1.txt", path))
-
+		VerifyExecInPodSucceed(f, pod, readFile("Hello word.", path))
 		// Check that writing to directory as block volume fails
 		VerifyExecInPodFail(f, pod, fmt.Sprintf("dd if=/dev/urandom of=%s bs=64 count=1", path), 1)
 	}
+}
+
+func readFile(content, path string) string {
+	if framework.NodeOSDistroIs("windows") {
+		return fmt.Sprintf("Select-String '%s' %s/file1.txt", content, path)
+	}
+	return fmt.Sprintf("grep 'Hello world.' %s/file1.txt", path)
 }
 
 // genBinDataFromSeed generate binData with random seed

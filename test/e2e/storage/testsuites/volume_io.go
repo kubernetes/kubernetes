@@ -42,6 +42,7 @@ import (
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // MD5 hashes of the test file corresponding to each file size.
@@ -141,7 +142,7 @@ func (t *volumeIOTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
-	ginkgo.It("should write files of various sizes, verify size, validate content [Slow]", func() {
+	ginkgo.It("should write files of various sizes, verify size, validate content [Slow][LinuxOnly]", func() {
 		init()
 		defer cleanup()
 
@@ -197,7 +198,7 @@ func makePodSpec(config e2evolume.TestConfig, initCmd string, volsrc v1.VolumeSo
 			InitContainers: []v1.Container{
 				{
 					Name:  config.Prefix + "-io-init",
-					Image: framework.BusyBoxImage,
+					Image: imageutils.GetE2EImage(getTestImage()),
 					Command: []string{
 						"/bin/sh",
 						"-c",
@@ -214,7 +215,7 @@ func makePodSpec(config e2evolume.TestConfig, initCmd string, volsrc v1.VolumeSo
 			Containers: []v1.Container{
 				{
 					Name:  config.Prefix + "-io-client",
-					Image: framework.BusyBoxImage,
+					Image: imageutils.GetE2EImage(getTestImage()),
 					Command: []string{
 						"/bin/sh",
 						"-c",

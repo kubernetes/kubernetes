@@ -215,8 +215,9 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 				podConfig := e2epod.Config{
 					NS:            l.ns.Name,
 					PVCs:          []*v1.PersistentVolumeClaim{l.Pvc},
-					SeLinuxLabel:  e2epv.SELinuxLabel,
+					SeLinuxLabel:  getLinuxLabel(),
 					NodeSelection: l.config.ClientNodeSelection,
+					ImageID:       getTestImage(),
 				}
 				pod, err := e2epod.MakeSecPod(&podConfig)
 				framework.ExpectNoError(err, "Failed to create pod")
@@ -300,7 +301,8 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 		podConfig := e2epod.Config{
 			NS:           l.ns.Name,
 			PVCs:         []*v1.PersistentVolumeClaim{l.Pvc},
-			SeLinuxLabel: e2epv.SELinuxLabel,
+			SeLinuxLabel: getLinuxLabel(),
+			ImageID:      getTestImage(),
 		}
 		pod, err := e2epod.MakeSecPod(&podConfig)
 		framework.ExpectNoError(err)
@@ -356,7 +358,8 @@ func (t *volumeModeTestSuite) DefineTests(driver TestDriver, pattern testpattern
 		podConfig := e2epod.Config{
 			NS:           l.ns.Name,
 			PVCs:         []*v1.PersistentVolumeClaim{l.Pvc},
-			SeLinuxLabel: e2epv.SELinuxLabel,
+			SeLinuxLabel: getLinuxLabel(),
+			ImageID:      getTestImage(),
 		}
 		pod, err := e2epod.MakeSecPod(&podConfig)
 		framework.ExpectNoError(err)
