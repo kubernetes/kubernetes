@@ -18,7 +18,7 @@ package endpointslicemirroring
 
 import (
 	"k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 )
 
 // slicesByAction includes lists of slices to create, update, or delete.

@@ -19,7 +19,7 @@ package metrics
 import (
 	"testing"
 
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 )

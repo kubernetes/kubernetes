@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -656,7 +656,7 @@ func TestReconcile(t *testing.T) {
 					discovery.LabelServiceName: endpoints.Name,
 					discovery.LabelManagedBy:   controllerName,
 				}
-				_, err := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(context.TODO(), epSlice, metav1.CreateOptions{})
+				_, err := client.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), epSlice, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Expected no error creating EndpointSlice, got %v", err)
 				}
@@ -858,7 +858,7 @@ func expectMatchingAddresses(t *testing.T, epSubset corev1.EndpointSubset, esEnd
 
 func fetchEndpointSlices(t *testing.T, client *fake.Clientset, namespace string) []discovery.EndpointSlice {
 	t.Helper()
-	fetchedSlices, err := client.DiscoveryV1beta1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{
+	fetchedSlices, err := client.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: discovery.LabelManagedBy + "=" + controllerName,
 	})
 	if err != nil {
