@@ -26,6 +26,8 @@ import (
 //	appsv1 "k8s.io/api/apps/v1"
 //	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	imageutils "k8s.io/kubernetes/test/utils/image"
+
 
 	"github.com/onsi/ginkgo"
 )
@@ -112,7 +114,8 @@ var _ = SIGDescribe("Device Plugin", func() {
 //		framework.ExpectNoError(err)
 
 		ginkgo.By("creating Windows testing Pod")
-		windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
+		windowsPod := createTestPod(f, imageutils.GetE2EImage(imageutils.WindowsServer), windowsOS)
+		windowsPod.Spec.Containers[0].Args = []string{"powershell.exe", "Start-Sleep", "3600" }
 		windowsPod = f.PodClient().CreateSync(windowsPod)
 
 		ginkgo.By("verifying device access in Windows testing Pod")
