@@ -155,9 +155,8 @@ func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.P
 	provisioner := config.GetUniqueDriverName()
 	parameters := map[string]string{}
 	ns := config.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-sc", provisioner)
 
-	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, nil, ns)
 }
 
 func (h *hostpathCSIDriver) GetVolume(config *testsuites.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {
@@ -172,9 +171,8 @@ func (h *hostpathCSIDriver) GetSnapshotClass(config *testsuites.PerTestConfig) *
 	snapshotter := config.GetUniqueDriverName()
 	parameters := map[string]string{}
 	ns := config.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-vsc", snapshotter)
 
-	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
+	return testsuites.GetSnapshotClass(snapshotter, parameters, ns)
 }
 
 func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
@@ -338,18 +336,16 @@ func (m *mockCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTe
 	provisioner := config.GetUniqueDriverName()
 	parameters := map[string]string{}
 	ns := config.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-sc", provisioner)
 
-	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, nil, ns)
 }
 
 func (m *mockCSIDriver) GetSnapshotClass(config *testsuites.PerTestConfig) *unstructured.Unstructured {
 	parameters := map[string]string{}
 	snapshotter := m.driverInfo.Name + "-" + config.Framework.UniqueName
 	ns := config.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-vsc", snapshotter)
 
-	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
+	return testsuites.GetSnapshotClass(snapshotter, parameters, ns)
 }
 
 func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
@@ -544,7 +540,6 @@ func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
 	ns := config.Framework.Namespace.Name
 	provisioner := g.driverInfo.Name
-	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
 
 	parameters := map[string]string{"type": "pd-standard"}
 	if fsType != "" {
@@ -552,16 +547,15 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.PerT
 	}
 	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
-	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns)
 }
 
 func (g *gcePDCSIDriver) GetSnapshotClass(config *testsuites.PerTestConfig) *unstructured.Unstructured {
 	parameters := map[string]string{}
 	snapshotter := g.driverInfo.Name
 	ns := config.Framework.Namespace.Name
-	suffix := fmt.Sprintf("%s-vsc", snapshotter)
 
-	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
+	return testsuites.GetSnapshotClass(snapshotter, parameters, ns)
 }
 
 func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {

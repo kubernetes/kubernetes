@@ -61,7 +61,6 @@ func GetStorageClass(
 	parameters map[string]string,
 	bindingMode *storagev1.VolumeBindingMode,
 	ns string,
-	suffix string,
 ) *storagev1.StorageClass {
 	if bindingMode == nil {
 		defaultBindingMode := storagev1.VolumeBindingImmediate
@@ -73,8 +72,7 @@ func GetStorageClass(
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			// Name must be unique, so let's base it on namespace name and use GenerateName
-			// TODO(#96234): Remove unnecessary suffix.
-			Name: names.SimpleNameGenerator.GenerateName(ns + "-" + suffix),
+			Name: names.SimpleNameGenerator.GenerateName(ns),
 		},
 		Provisioner:       provisioner,
 		Parameters:        parameters,
@@ -88,7 +86,6 @@ func GetSnapshotClass(
 	snapshotter string,
 	parameters map[string]string,
 	ns string,
-	suffix string,
 ) *unstructured.Unstructured {
 	snapshotClass := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -96,8 +93,7 @@ func GetSnapshotClass(
 			"apiVersion": snapshotAPIVersion,
 			"metadata": map[string]interface{}{
 				// Name must be unique, so let's base it on namespace name and use GenerateName
-				// TODO(#96234): Remove unnecessary suffix.
-				"name": names.SimpleNameGenerator.GenerateName(ns + "-" + suffix),
+				"name": names.SimpleNameGenerator.GenerateName(ns),
 			},
 			"driver":         snapshotter,
 			"parameters":     parameters,
