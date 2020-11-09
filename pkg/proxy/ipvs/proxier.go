@@ -2044,7 +2044,12 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	// curEndpoints represents IPVS destinations listed from current system.
 	curEndpoints := sets.NewString()
 	// newEndpoints represents Endpoints watched from API Server.
-	newEndpoints := sets.NewString()
+	readyEndpoints := sets.NewString()
+	// localReadyEndpoints represents local endpoints that are ready and NOT terminating.
+	localReadyEndpoints := sets.NewString()
+	// localReadyTerminatingEndpoints represents local endpoints that are ready AND terminating.
+	// Fall back to these endpoints if no non-terminating ready endpoints exist for node-local traffic.
+	localReadyTerminatingEndpoints := sets.NewString()
 
 	curDests, err := proxier.ipvs.GetRealServers(appliedVirtualServer)
 	if err != nil {
@@ -2069,10 +2074,32 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	}
 
 	for _, epInfo := range endpoints {
-		if onlyNodeLocalEndpoints && !epInfo.GetIsLocal() {
-			continue
+		if onlyNodeLocalEndpoints {
+			if !epInfo.GetIsLocal() {
+				continue
+			}
+
+			if epInfo.IsReady() {
+				localReadyEndpoints.Insert(epInfo.String())
+			}
+
+			if epInfo.IsServing() && epInfo.IsTerminating() {
+				localReadyTerminatingEndpoints.Insert(epInfo.String())
+			}
 		}
-		newEndpoints.Insert(epInfo.String())
+
+		if epInfo.IsReady() {
+			readyEndpoints.Insert(epInfo.String())
+		}
+	}
+
+	newEndpoints := readyEndpoints
+	if onlyNodeLocalEndpoints {
+		if localReadyEndpoints.Len() > 0 {
+			newEndpoints = localReadyEndpoints
+		} else if localReadyTerminatingEndpoints.Len() > 0 {
+			newEndpoints = localReadyTerminatingEndpoints
+		}
 	}
 
 	// Create new endpoints
