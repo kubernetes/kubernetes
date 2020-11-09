@@ -1379,15 +1379,36 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Now write loadbalancing & DNAT rules.
-		n := len(endpointChains)
-		localEndpointChains := make([]utiliptables.Chain, 0)
+
+		// Firstly categorize each endpoint into three buckets:
+		//   1. all endpoints that are ready and NOT terminating
+		//   2. all endpoints that are local, ready and NOT terminating
+		//   3. all endpoints that are local, ready and terminating.
+		readyEndpointChains := make([]utiliptables.Chain, 0)
+		readyEndpoints := make([]*endpointsInfo, 0)
+		localReadyEndpointChains := make([]utiliptables.Chain, 0)
+		localReadyTerminatingEndpointChains := make([]utiliptables.Chain, 0)
 		for i, endpointChain := range endpointChains {
-			// Write ingress loadbalancing & DNAT rules only for services that request OnlyLocal traffic.
 			if svcInfo.NodeLocalExternal() && endpoints[i].IsLocal {
-				localEndpointChains = append(localEndpointChains, endpointChains[i])
+				if endpoints[i].Ready {
+					localReadyEndpointChains = append(localReadyEndpointChains, endpointChain)
+				}
+
+				if endpoints[i].Serving && endpoints[i].Terminating {
+					localReadyTerminatingEndpointChains = append(localReadyTerminatingEndpointChains, endpointChain)
+				}
 			}
 
-			epIP := endpoints[i].IP()
+			if endpoints[i].Ready {
+				readyEndpointChains = append(readyEndpointChains, endpointChain)
+				readyEndpoints = append(readyEndpoints, endpoints[i])
+			}
+		}
+
+		// Only add Ready endpoint chains to the service chain.
+		numReadyEndpoints := len(readyEndpointChains)
+		for i, endpointChain := range readyEndpointChains {
+			epIP := readyEndpoints[i].IP()
 			if epIP == "" {
 				// Error parsing this endpoint has been logged. Skip to next endpoint.
 				continue
@@ -1396,16 +1417,26 @@ func (proxier *Proxier) syncProxyRules() {
 			// Balancing rules in the per-service chain.
 			args = append(args[:0], "-A", string(svcChain))
 			args = proxier.appendServiceCommentLocked(args, svcNameString)
-			if i < (n - 1) {
+			if i < (numReadyEndpoints - 1) {
 				// Each rule is a probabilistic match.
 				args = append(args,
 					"-m", "statistic",
 					"--mode", "random",
-					"--probability", proxier.probability(n-i))
+					"--probability", proxier.probability(numReadyEndpoints-i))
 			}
 			// The final (or only if n == 1) rule is a guaranteed match.
 			args = append(args, "-j", string(endpointChain))
 			utilproxy.WriteLine(proxier.natRules, args...)
+		}
+
+		// Every endpoint gets a chain, regardless of its state. This is required later since we may
+		// want to jump to endpoint chains that are terminating.
+		for i, endpointChain := range endpointChains {
+			epIP := endpoints[i].IP()
+			if epIP == "" {
+				// Error parsing this endpoint has been logged. Skip to next endpoint.
+				continue
+			}
 
 			// Rules in the per-endpoint chain.
 			args = append(args[:0], "-A", string(endpointChain))
@@ -1451,21 +1482,17 @@ func (proxier *Proxier) syncProxyRules() {
 			"-m", "comment", "--comment", fmt.Sprintf(`"route LOCAL traffic for %s LB IP to service chain"`, svcNameString),
 			"-m", "addrtype", "--src-type", "LOCAL", "-j", string(svcChain))...)
 
-		numLocalEndpoints := len(localEndpointChains)
-		if numLocalEndpoints == 0 {
-			// Blackhole all traffic since there are no local endpoints
-			args = append(args[:0],
-				"-A", string(svcXlbChain),
-				"-m", "comment", "--comment",
-				fmt.Sprintf(`"%s has no local endpoints"`, svcNameString),
-				"-j",
-				string(KubeMarkDropChain),
-			)
-			utilproxy.WriteLine(proxier.natRules, args...)
-		} else {
+		// This is where we jump to local endpoint chains. The list of local endpoints is selected based on the first
+		// set of endpoints that are one of:
+		//   1. ready and NOT terminating
+		//   2. ready and terminating
+		//   3. otherwise, blackhole traffic
+		numLocalReadyEndpoints := len(localReadyEndpointChains)
+		numLocalReadyTerminatingEndpoints := len(localReadyTerminatingEndpointChains)
+		if len(localReadyEndpointChains) > 0 {
 			// First write session affinity rules only over local endpoints, if applicable.
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
-				for _, endpointChain := range localEndpointChains {
+				for _, endpointChain := range localReadyEndpointChains {
 					utilproxy.WriteLine(proxier.natRules,
 						"-A", string(svcXlbChain),
 						"-m", "comment", "--comment", svcNameString,
@@ -1475,25 +1502,64 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 			}
 
-			// Setup probability filter rules only over local endpoints
-			for i, endpointChain := range localEndpointChains {
+			for i, endpointChain := range localReadyEndpointChains {
 				// Balancing rules in the per-service chain.
 				args = append(args[:0],
 					"-A", string(svcXlbChain),
 					"-m", "comment", "--comment",
 					fmt.Sprintf(`"Balancing rule %d for %s"`, i, svcNameString),
 				)
-				if i < (numLocalEndpoints - 1) {
+				if i < (numLocalReadyEndpoints - 1) {
 					// Each rule is a probabilistic match.
 					args = append(args,
 						"-m", "statistic",
 						"--mode", "random",
-						"--probability", proxier.probability(numLocalEndpoints-i))
+						"--probability", proxier.probability(numLocalReadyEndpoints-i))
 				}
 				// The final (or only if n == 1) rule is a guaranteed match.
 				args = append(args, "-j", string(endpointChain))
 				utilproxy.WriteLine(proxier.natRules, args...)
 			}
+		} else if len(localReadyTerminatingEndpointChains) > 0 {
+			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
+				for _, endpointChain := range localReadyTerminatingEndpointChains {
+					utilproxy.WriteLine(proxier.natRules,
+						"-A", string(svcXlbChain),
+						"-m", "comment", "--comment", svcNameString,
+						"-m", "recent", "--name", string(endpointChain),
+						"--rcheck", "--seconds", strconv.Itoa(svcInfo.StickyMaxAgeSeconds()), "--reap",
+						"-j", string(endpointChain))
+				}
+			}
+
+			for i, endpointChain := range localReadyTerminatingEndpointChains {
+				// Balancing rules in the per-service chain.
+				args = append(args[:0],
+					"-A", string(svcXlbChain),
+					"-m", "comment", "--comment",
+					fmt.Sprintf(`"Balancing rule %d for %s"`, i, svcNameString),
+				)
+				if i < (numLocalReadyTerminatingEndpoints - 1) {
+					// Each rule is a probabilistic match.
+					args = append(args,
+						"-m", "statistic",
+						"--mode", "random",
+						"--probability", proxier.probability(numLocalReadyTerminatingEndpoints-i))
+				}
+				// The final (or only if n == 1) rule is a guaranteed match.
+				args = append(args, "-j", string(endpointChain))
+				utilproxy.WriteLine(proxier.natRules, args...)
+			}
+		} else {
+			// Blackhole all traffic since there are no local endpoints (including endpoints that are terminating).
+			args = append(args[:0],
+				"-A", string(svcXlbChain),
+				"-m", "comment", "--comment",
+				fmt.Sprintf(`"%s has no local endpoints"`, svcNameString),
+				"-j",
+				string(KubeMarkDropChain),
+			)
+			utilproxy.WriteLine(proxier.natRules, args...)
 		}
 	}
 
