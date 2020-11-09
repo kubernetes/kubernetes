@@ -13,7 +13,6 @@ require (
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/evanphx/json-patch v4.9.0+incompatible
-	github.com/go-openapi/jsonreference v0.19.3 // indirect
 	github.com/go-openapi/spec v0.19.3
 	github.com/gogo/protobuf v1.3.1
 	github.com/google/go-cmp v0.4.0
@@ -46,10 +45,10 @@ require (
 	k8s.io/client-go v0.0.0
 	k8s.io/component-base v0.0.0
 	k8s.io/klog/v2 v2.4.0
-	k8s.io/kube-openapi v0.0.0-20200923155610-8b5066479488
+	k8s.io/kube-openapi v0.0.0-20201107163737-74b467f3a622
 	k8s.io/utils v0.0.0-20201104234853-8146046b121e
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.12
-	sigs.k8s.io/structured-merge-diff/v4 v4.0.2-0.20201001033253-b3cf1e8ff931
+	sigs.k8s.io/structured-merge-diff/v4 v4.0.2
 	sigs.k8s.io/yaml v1.2.0
 )
 

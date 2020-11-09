@@ -41,7 +41,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/component-helpers v0.0.0
 	k8s.io/klog/v2 v2.4.0
-	k8s.io/kube-openapi v0.0.0-20200923155610-8b5066479488
+	k8s.io/kube-openapi v0.0.0-20201107163737-74b467f3a622
 	k8s.io/metrics v0.0.0
 	k8s.io/utils v0.0.0-20201104234853-8146046b121e
 	sigs.k8s.io/kustomize v2.0.3+incompatible

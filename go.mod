@@ -128,7 +128,7 @@ require (
 	k8s.io/klog/v2 v2.4.0
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
-	k8s.io/kube-openapi v0.0.0-20200923155610-8b5066479488
+	k8s.io/kube-openapi v0.0.0-20201107163737-74b467f3a622
 	k8s.io/kube-proxy v0.0.0
 	k8s.io/kube-scheduler v0.0.0
 	k8s.io/kubectl v0.0.0
@@ -507,7 +507,7 @@ replace (
 	k8s.io/klog/v2 => k8s.io/klog/v2 v2.4.0
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
-	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20200923155610-8b5066479488
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20201107163737-74b467f3a622
 	k8s.io/kube-proxy => ./staging/src/k8s.io/kube-proxy
 	k8s.io/kube-scheduler => ./staging/src/k8s.io/kube-scheduler
 	k8s.io/kubectl => ./staging/src/k8s.io/kubectl
@@ -528,6 +528,6 @@ replace (
 	rsc.io/pdf => rsc.io/pdf v0.1.1
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.12
 	sigs.k8s.io/kustomize => sigs.k8s.io/kustomize v2.0.3+incompatible
-	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.0.2-0.20201001033253-b3cf1e8ff931
+	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.0.2
 	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
 )
