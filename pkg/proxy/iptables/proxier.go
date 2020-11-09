@@ -1381,13 +1381,13 @@ func (proxier *Proxier) syncProxyRules() {
 		// Now write loadbalancing & DNAT rules.
 
 		// Firstly categorize each endpoint into three buckets:
-		//   1. all endpoints that are ready and NOT terminating
-		//   2. all endpoints that are local, ready and NOT terminating
-		//   3. all endpoints that are local, ready and terminating.
+		//   1. all endpoints that are ready and NOT terminating.
+		//   2. all endpoints that are local, ready (NOT terminating).
+		//   3. all endpoints that are local, serving and terminating.
 		readyEndpointChains := make([]utiliptables.Chain, 0)
 		readyEndpoints := make([]*endpointsInfo, 0)
 		localReadyEndpointChains := make([]utiliptables.Chain, 0)
-		localReadyTerminatingEndpointChains := make([]utiliptables.Chain, 0)
+		localServingTerminatingEndpointChains := make([]utiliptables.Chain, 0)
 		for i, endpointChain := range endpointChains {
 			if svcInfo.NodeLocalExternal() && endpoints[i].IsLocal {
 				if endpoints[i].Ready {
@@ -1395,7 +1395,7 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 
 				if endpoints[i].Serving && endpoints[i].Terminating {
-					localReadyTerminatingEndpointChains = append(localReadyTerminatingEndpointChains, endpointChain)
+					localServingTerminatingEndpointChains = append(localServingTerminatingEndpointChains, endpointChain)
 				}
 			}
 
@@ -1488,8 +1488,8 @@ func (proxier *Proxier) syncProxyRules() {
 		//   2. ready and terminating
 		//   3. otherwise, blackhole traffic
 		numLocalReadyEndpoints := len(localReadyEndpointChains)
-		numLocalReadyTerminatingEndpoints := len(localReadyTerminatingEndpointChains)
-		if len(localReadyEndpointChains) > 0 {
+		numLocalServingTerminatingEndpoints := len(localServingTerminatingEndpointChains)
+		if numLocalReadyEndpoints > 0 {
 			// First write session affinity rules only over local endpoints, if applicable.
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 				for _, endpointChain := range localReadyEndpointChains {
@@ -1520,9 +1520,9 @@ func (proxier *Proxier) syncProxyRules() {
 				args = append(args, "-j", string(endpointChain))
 				utilproxy.WriteLine(proxier.natRules, args...)
 			}
-		} else if len(localReadyTerminatingEndpointChains) > 0 {
+		} else if numLocalServingTerminatingEndpoints > 0 {
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
-				for _, endpointChain := range localReadyTerminatingEndpointChains {
+				for _, endpointChain := range localServingTerminatingEndpointChains {
 					utilproxy.WriteLine(proxier.natRules,
 						"-A", string(svcXlbChain),
 						"-m", "comment", "--comment", svcNameString,
@@ -1532,19 +1532,19 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 			}
 
-			for i, endpointChain := range localReadyTerminatingEndpointChains {
+			for i, endpointChain := range localServingTerminatingEndpointChains {
 				// Balancing rules in the per-service chain.
 				args = append(args[:0],
 					"-A", string(svcXlbChain),
 					"-m", "comment", "--comment",
 					fmt.Sprintf(`"Balancing rule %d for %s"`, i, svcNameString),
 				)
-				if i < (numLocalReadyTerminatingEndpoints - 1) {
+				if i < (numLocalServingTerminatingEndpoints - 1) {
 					// Each rule is a probabilistic match.
 					args = append(args,
 						"-m", "statistic",
 						"--mode", "random",
-						"--probability", proxier.probability(numLocalReadyTerminatingEndpoints-i))
+						"--probability", proxier.probability(numLocalServingTerminatingEndpoints-i))
 				}
 				// The final (or only if n == 1) rule is a guaranteed match.
 				args = append(args, "-j", string(endpointChain))
