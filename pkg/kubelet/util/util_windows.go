@@ -152,3 +152,8 @@ func NormalizePath(path string) string {
 	}
 	return path
 }
+
+// Umask returns an error on Windows
+func Umask(mask int) (old int, err error) {
+	return 0, fmt.Errorf("platform and architecture is not supported")
+}

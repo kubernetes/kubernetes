@@ -334,7 +334,14 @@ func ensureHostsFile(fileName string, hostIPs []string, hostName, hostDomainName
 		hostsFileContent = managedHostsFileContent(hostIPs, hostName, hostDomainName, hostAliases)
 	}
 
-	return ioutil.WriteFile(fileName, hostsFileContent, 0644)
+	oldMask, err := util.Umask(0)
+	if err != nil {
+		klog.Warning("failed to reset umask to zero, %v", err)
+	}
+
+	err = ioutil.WriteFile(fileName, hostsFileContent, 0644)
+	util.Umask(oldMask)
+	return err
 }
 
 // nodeHostsFileContent reads the content of node's hosts file.

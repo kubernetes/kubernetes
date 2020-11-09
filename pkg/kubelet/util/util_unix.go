@@ -152,3 +152,8 @@ func IsUnixDomainSocket(filePath string) (bool, error) {
 func NormalizePath(path string) string {
 	return path
 }
+
+// Umask is a wrapper for `unix.Umask()` on non-Windows platforms
+func Umask(mask int) (old int, err error) {
+	return unix.Umask(mask), nil
+}
