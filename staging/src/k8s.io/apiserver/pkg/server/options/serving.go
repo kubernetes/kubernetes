@@ -25,6 +25,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/armon/go-proxyproto"
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
@@ -357,10 +358,12 @@ func CreateListener(network, addr string, config net.ListenConfig) (net.Listener
 		network = "tcp"
 	}
 
-	ln, err := config.Listen(context.TODO(), network, addr)
+	l, err := config.Listen(context.TODO(), network, addr)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to listen on %v: %v", addr, err)
 	}
+
+	ln := &proxyproto.Listener{Listener: l}
 
 	// get port
 	tcpAddr, ok := ln.Addr().(*net.TCPAddr)
