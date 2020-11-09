@@ -369,7 +369,7 @@ func (em EndpointsMap) Update(changes *EndpointChangeTracker) (result UpdateEndp
 	// TODO: If this will appear to be computationally expensive, consider
 	// computing this incrementally similarly to endpointsMap.
 	result.HCEndpointsLocalIPSize = make(map[types.NamespacedName]int)
-	localIPs := em.getLocalEndpointIPs()
+	localIPs := em.getLocalReadyEndpointIPs()
 	for nsn, ips := range localIPs {
 		result.HCEndpointsLocalIPSize[nsn] = len(ips)
 	}
@@ -481,10 +481,16 @@ func (em EndpointsMap) unmerge(other EndpointsMap) {
 }
 
 // GetLocalEndpointIPs returns endpoints IPs if given endpoint is local - local means the endpoint is running in same host as kube-proxy.
-func (em EndpointsMap) getLocalEndpointIPs() map[types.NamespacedName]sets.String {
+func (em EndpointsMap) getLocalReadyEndpointIPs() map[types.NamespacedName]sets.String {
 	localIPs := make(map[types.NamespacedName]sets.String)
 	for svcPortName, epList := range em {
 		for _, ep := range epList {
+			// Only add ready endpoints for health checking. Terminating endpoints may still serve traffic
+			// but the health check signal should fail if there are only terminating endpoints on a node.
+			if !ep.IsReady() {
+				continue
+			}
+
 			if ep.GetIsLocal() {
 				nsn := svcPortName.NamespacedName
 				if localIPs[nsn] == nil {

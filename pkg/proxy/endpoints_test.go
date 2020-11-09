@@ -109,11 +109,36 @@ func TestGetLocalEndpointIPs(t *testing.T) {
 			{Namespace: "ns2", Name: "ep2"}: sets.NewString("2.2.2.2", "2.2.2.22", "2.2.2.3"),
 			{Namespace: "ns4", Name: "ep4"}: sets.NewString("4.4.4.4", "4.4.4.6"),
 		},
+	}, {
+		// Case[5]: named local and non-local ports for different IPs, some not ready.
+		endpointsMap: EndpointsMap{
+			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolTCP): []Endpoint{
+				&BaseEndpointInfo{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+			},
+			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolTCP): []Endpoint{
+				&BaseEndpointInfo{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				&BaseEndpointInfo{Endpoint: "2.2.2.22:22", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+			},
+			makeServicePortName("ns2", "ep2", "p23", v1.ProtocolTCP): []Endpoint{
+				&BaseEndpointInfo{Endpoint: "2.2.2.3:23", IsLocal: true, Ready: false, Serving: true, Terminating: true},
+			},
+			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolTCP): []Endpoint{
+				&BaseEndpointInfo{Endpoint: "4.4.4.4:44", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+				&BaseEndpointInfo{Endpoint: "4.4.4.5:44", IsLocal: false, Ready: true, Serving: true, Terminating: false},
+			},
+			makeServicePortName("ns4", "ep4", "p45", v1.ProtocolTCP): []Endpoint{
+				&BaseEndpointInfo{Endpoint: "4.4.4.6:45", IsLocal: true, Ready: true, Serving: true, Terminating: false},
+			},
+		},
+		expected: map[types.NamespacedName]sets.String{
+			{Namespace: "ns2", Name: "ep2"}: sets.NewString("2.2.2.2", "2.2.2.22"),
+			{Namespace: "ns4", Name: "ep4"}: sets.NewString("4.4.4.4", "4.4.4.6"),
+		},
 	}}
 
 	for tci, tc := range testCases {
 		// outputs
-		localIPs := tc.endpointsMap.getLocalEndpointIPs()
+		localIPs := tc.endpointsMap.getLocalReadyEndpointIPs()
 
 		if !reflect.DeepEqual(localIPs, tc.expected) {
 			t.Errorf("[%d] expected %#v, got %#v", tci, tc.expected, localIPs)
