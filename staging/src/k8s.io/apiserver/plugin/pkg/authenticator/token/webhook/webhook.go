@@ -44,14 +44,15 @@ func DefaultRetryBackoff() *wait.Backoff {
 	return &backoff
 }
 
-// Ensure WebhookTokenAuthenticator implements the authenticator.Token interface.
-var _ authenticator.Token = (*WebhookTokenAuthenticator)(nil)
+// Ensure TokenAuthenticator implements the authenticator.Token interface.
+var _ authenticator.Token = (*TokenAuthenticator)(nil)
 
 type tokenReviewer interface {
 	Create(ctx context.Context, review *authenticationv1.TokenReview, _ metav1.CreateOptions) (*authenticationv1.TokenReview, error)
 }
 
-type WebhookTokenAuthenticator struct {
+// TokenAuthenticator is implementation of authenticator.Token interface.
+type TokenAuthenticator struct {
 	tokenReview  tokenReviewer
 	retryBackoff wait.Backoff
 	implicitAuds authenticator.Audiences
@@ -61,15 +62,15 @@ type WebhookTokenAuthenticator struct {
 // client. It is recommend to wrap this authenticator with the token cache
 // authenticator implemented in
 // k8s.io/apiserver/pkg/authentication/token/cache.
-func NewFromInterface(tokenReview authenticationv1client.TokenReviewInterface, implicitAuds authenticator.Audiences, retryBackoff wait.Backoff) (*WebhookTokenAuthenticator, error) {
+func NewFromInterface(tokenReview authenticationv1client.TokenReviewInterface, implicitAuds authenticator.Audiences, retryBackoff wait.Backoff) (*TokenAuthenticator, error) {
 	return newWithBackoff(tokenReview, retryBackoff, implicitAuds)
 }
 
-// New creates a new WebhookTokenAuthenticator from the provided kubeconfig
+// New creates a new TokenAuthenticator from the provided kubeconfig
 // file. It is recommend to wrap this authenticator with the token cache
 // authenticator implemented in
 // k8s.io/apiserver/pkg/authentication/token/cache.
-func New(kubeConfigFile string, version string, implicitAuds authenticator.Audiences, retryBackoff wait.Backoff, customDial utilnet.DialFunc) (*WebhookTokenAuthenticator, error) {
+func New(kubeConfigFile string, version string, implicitAuds authenticator.Audiences, retryBackoff wait.Backoff, customDial utilnet.DialFunc) (*TokenAuthenticator, error) {
 	tokenReview, err := tokenReviewInterfaceFromKubeconfig(kubeConfigFile, version, retryBackoff, customDial)
 	if err != nil {
 		return nil, err
@@ -78,13 +79,13 @@ func New(kubeConfigFile string, version string, implicitAuds authenticator.Audie
 }
 
 // newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(tokenReview tokenReviewer, retryBackoff wait.Backoff, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
-	return &WebhookTokenAuthenticator{tokenReview, retryBackoff, implicitAuds}, nil
+func newWithBackoff(tokenReview tokenReviewer, retryBackoff wait.Backoff, implicitAuds authenticator.Audiences) (*TokenAuthenticator, error) {
+	return &TokenAuthenticator{tokenReview, retryBackoff, implicitAuds}, nil
 }
 
 // AuthenticateToken implements the authenticator.Token interface.
-func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
-	// We take implicit audiences of the API server at WebhookTokenAuthenticator
+func (w *TokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	// We take implicit audiences of the API server at TokenAuthenticator
 	// construction time. The outline of how we validate audience here is:
 	//
 	// * if the ctx is not audience limited, don't do any audience validation.
