@@ -28,6 +28,8 @@ go_library(
         "labels.go",
         "legacy.go",
         "security_context.go",
+        "security_context_others.go",
+        "security_context_windows.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/kuberuntime",
     deps = [
@@ -41,6 +43,7 @@ go_library(
         "//pkg/kubelet/images:go_default_library",
         "//pkg/kubelet/kuberuntime/logs:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
+        "//pkg/kubelet/logs:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/prober/results:go_default_library",
         "//pkg/kubelet/runtimeclass:go_default_library",
@@ -105,7 +108,8 @@ go_test(
         "kuberuntime_sandbox_test.go",
         "labels_test.go",
         "legacy_test.go",
-        "security_context_test.go",
+        "security_context_others_test.go",
+        "security_context_windows_test.go",
     ],
     embed = [":go_default_library"],
     deps = [

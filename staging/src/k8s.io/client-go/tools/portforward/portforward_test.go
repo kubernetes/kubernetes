@@ -17,6 +17,7 @@ limitations under the License.
 package portforward
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -309,12 +310,13 @@ func TestGetListener(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		expectedListenerPort := "12345"
-		listener, err := pf.getListener(testCase.Protocol, testCase.Hostname, &ForwardedPort{12345, 12345})
+		forwardedPort := &ForwardedPort{Local: 0, Remote: 12345}
+		listener, err := pf.getListener(testCase.Protocol, testCase.Hostname, forwardedPort)
 		if err != nil && strings.Contains(err.Error(), "cannot assign requested address") {
 			t.Logf("Can't test #%d: %v", i, err)
 			continue
 		}
+		expectedListenerPort := fmt.Sprintf("%d", forwardedPort.Local)
 		errorRaised := err != nil
 
 		if testCase.ShouldRaiseError != errorRaised {
@@ -331,7 +333,7 @@ func TestGetListener(t *testing.T) {
 		}
 
 		host, port, _ := net.SplitHostPort(listener.Addr().String())
-		t.Logf("Asked a %s forward for: %s:%v, got listener %s:%s, expected: %s", testCase.Protocol, testCase.Hostname, 12345, host, port, expectedListenerPort)
+		t.Logf("Asked a %s forward for: %s:0, got listener %s:%s, expected: %s", testCase.Protocol, testCase.Hostname, host, port, expectedListenerPort)
 		if host != testCase.ExpectedListenerAddress {
 			t.Errorf("Test case #%d failed: Listener does not listen on expected address: asked '%v' got '%v'", i, testCase.ExpectedListenerAddress, host)
 		}
@@ -340,7 +342,6 @@ func TestGetListener(t *testing.T) {
 
 		}
 		listener.Close()
-
 	}
 }
 

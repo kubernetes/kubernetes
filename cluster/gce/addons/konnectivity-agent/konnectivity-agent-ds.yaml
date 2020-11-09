@@ -23,7 +23,7 @@ spec:
         - key: "CriticalAddonsOnly"
           operator: "Exists"
       containers:
-        - image: k8s.gcr.io/kas-network-proxy/proxy-agent:v0.0.9
+        - image: k8s.gcr.io/kas-network-proxy/proxy-agent:v0.0.12
           name: konnectivity-agent
           command: ["/proxy-agent"]
           args: [

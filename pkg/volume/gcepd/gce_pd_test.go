@@ -26,7 +26,7 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,7 +86,7 @@ type fakePDManager struct {
 func (fake *fakePDManager) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
 	labels = make(map[string]string)
 	labels["fakepdmanager"] = "yes"
-	labels[v1.LabelZoneFailureDomain] = "zone1__zone2"
+	labels[v1.LabelFailureDomainBetaZone] = "zone1__zone2"
 	return "test-gce-volume-name", 100, labels, "", nil
 }
 
@@ -200,8 +200,8 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Provision() returned unexpected value for fakepdmanager: %v", persistentSpec.Labels["fakepdmanager"])
 	}
 
-	if persistentSpec.Labels[v1.LabelZoneFailureDomain] != "zone1__zone2" {
-		t.Errorf("Provision() returned unexpected value for %s: %v", v1.LabelZoneFailureDomain, persistentSpec.Labels[v1.LabelZoneFailureDomain])
+	if persistentSpec.Labels[v1.LabelFailureDomainBetaZone] != "zone1__zone2" {
+		t.Errorf("Provision() returned unexpected value for %s: %v", v1.LabelFailureDomainBetaZone, persistentSpec.Labels[v1.LabelFailureDomainBetaZone])
 	}
 
 	if persistentSpec.Spec.NodeAffinity == nil {
@@ -219,13 +219,14 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("NodeSelectorRequirement fakepdmanager-in-yes not found in volume NodeAffinity")
 	}
 	zones, _ := volumehelpers.ZonesToSet("zone1,zone2")
-	r, _ = getNodeSelectorRequirementWithKey(v1.LabelZoneFailureDomain, term)
+	r, _ = getNodeSelectorRequirementWithKey(v1.LabelFailureDomainBetaZone, term)
 	if r == nil {
-		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", v1.LabelZoneFailureDomain, zones)
-	}
-	sort.Strings(r.Values)
-	if !reflect.DeepEqual(r.Values, zones.List()) {
-		t.Errorf("ZoneFailureDomain elements %v does not match zone labels %v", r.Values, zones)
+		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", v1.LabelFailureDomainBetaZone, zones)
+	} else {
+		sort.Strings(r.Values)
+		if !reflect.DeepEqual(r.Values, zones.List()) {
+			t.Errorf("ZoneFailureDomain elements %v does not match zone labels %v", r.Values, zones)
+		}
 	}
 
 	// Test Deleter

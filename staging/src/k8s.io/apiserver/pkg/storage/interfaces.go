@@ -215,9 +215,9 @@ type Interface interface {
 	// or zero value in 'ptrToType' parameter otherwise.
 	// If the object to update has the same value as previous, it won't do any update
 	// but will return the object in 'ptrToType' parameter.
-	// If 'suggestion' can contain zero or one element - in such case this can be used as
-	// a suggestion about the current version of the object to avoid read operation from
-	// storage to get it.
+	// If 'suggestion' is non-nil, it can be used as a suggestion about the current version
+	// of the object to avoid read operation from storage to get it. However, the
+	// implementations have to retry in case suggestion is stale.
 	//
 	// Example:
 	//
@@ -239,7 +239,7 @@ type Interface interface {
 	// )
 	GuaranteedUpdate(
 		ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
-		precondtions *Preconditions, tryUpdate UpdateFunc, suggestion ...runtime.Object) error
+		precondtions *Preconditions, tryUpdate UpdateFunc, suggestion runtime.Object) error
 
 	// Count returns number of different entries under the key (generally being path prefix).
 	Count(key string) (int64, error)
@@ -269,4 +269,7 @@ type ListOptions struct {
 	ResourceVersionMatch metav1.ResourceVersionMatch
 	// Predicate provides the selection rules for the list operation.
 	Predicate SelectionPredicate
+	// ProgressNotify determines whether storage-originated bookmark (progress notify) events should
+	// be delivered to the users. The option is ignored for non-watch requests.
+	ProgressNotify bool
 }

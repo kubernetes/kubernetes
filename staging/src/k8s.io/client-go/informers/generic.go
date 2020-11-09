@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/admissionregistration/v1"
 	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	v1beta2 "k8s.io/api/apps/v1beta2"
@@ -54,7 +55,6 @@ import (
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	schedulingv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
-	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
@@ -242,6 +242,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case flowcontrolv1alpha1.SchemeGroupVersion.WithResource("prioritylevelconfigurations"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Flowcontrol().V1alpha1().PriorityLevelConfigurations().Informer()}, nil
 
+		// Group=internal.apiserver.k8s.io, Version=v1alpha1
+	case apiserverinternalv1alpha1.SchemeGroupVersion.WithResource("storageversions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Internal().V1alpha1().StorageVersions().Informer()}, nil
+
 		// Group=networking.k8s.io, Version=v1
 	case networkingv1.SchemeGroupVersion.WithResource("ingresses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1().Ingresses().Informer()}, nil
@@ -311,10 +315,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=scheduling.k8s.io, Version=v1beta1
 	case schedulingv1beta1.SchemeGroupVersion.WithResource("priorityclasses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1beta1().PriorityClasses().Informer()}, nil
-
-		// Group=settings.k8s.io, Version=v1alpha1
-	case settingsv1alpha1.SchemeGroupVersion.WithResource("podpresets"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Settings().V1alpha1().PodPresets().Informer()}, nil
 
 		// Group=storage.k8s.io, Version=v1
 	case storagev1.SchemeGroupVersion.WithResource("csidrivers"):

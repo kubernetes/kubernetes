@@ -42,14 +42,14 @@ import (
 
 var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
-var _ = SIGDescribe("Network", func() {
+var _ = SIGDescribe("KubeProxy", func() {
 	const (
 		testDaemonHTTPPort    = 11301
 		testDaemonTCPPort     = 11302
 		postFinTimeoutSeconds = 30
 	)
 
-	fr := framework.NewDefaultFramework("network")
+	fr := framework.NewDefaultFramework("kube-proxy")
 
 	ginkgo.It("should set TCP CLOSE_WAIT timeout [Privileged]", func() {
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(fr.ClientSet, 2)
@@ -313,7 +313,7 @@ var _ = SIGDescribe("Network", func() {
 						Name:  "startup-script",
 						Image: imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{
-							"bash", "-c", "while true; do sleep 2; nc boom-server 9000& done",
+							"sh", "-c", "while true; do sleep 2; nc boom-server 9000& done",
 						},
 					},
 				},

@@ -112,7 +112,7 @@ func (f *RemoteRuntime) StopPodSandbox(ctx context.Context, req *kubeapi.StopPod
 // This call is idempotent, and must not return an error if the sandbox has
 // already been removed.
 func (f *RemoteRuntime) RemovePodSandbox(ctx context.Context, req *kubeapi.RemovePodSandboxRequest) (*kubeapi.RemovePodSandboxResponse, error) {
-	err := f.RuntimeService.StopPodSandbox(req.PodSandboxId)
+	err := f.RuntimeService.RemovePodSandbox(req.PodSandboxId)
 	if err != nil {
 		return nil, err
 	}

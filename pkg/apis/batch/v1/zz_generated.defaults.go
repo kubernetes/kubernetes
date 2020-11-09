@@ -194,6 +194,7 @@ func SetObjectDefaults_Job(in *v1.Job) {
 	}
 	for i := range in.Spec.Template.Spec.EphemeralContainers {
 		a := &in.Spec.Template.Spec.EphemeralContainers[i]
+		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
 			corev1.SetDefaults_ContainerPort(b)

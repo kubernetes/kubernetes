@@ -50,6 +50,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	"k8s.io/apiserver/pkg/endpoints/filterlatency"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -223,6 +224,9 @@ type Config struct {
 	// EquivalentResourceRegistry provides information about resources equivalent to a given resource,
 	// and the kind associated with a given resource. As resources are installed, they are registered here.
 	EquivalentResourceRegistry runtime.EquivalentResourceRegistry
+
+	// APIServerID is the ID of this API server
+	APIServerID string
 }
 
 type RecommendedConfig struct {
@@ -286,6 +290,10 @@ type AuthorizationInfo struct {
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
 	defaultHealthChecks := []healthz.HealthChecker{healthz.PingHealthz, healthz.LogHealthz}
+	var id string
+	if feature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		id = "kube-apiserver-" + uuid.New().String()
+	}
 	return &Config{
 		Serializer:                  codecs,
 		BuildHandlerChainFunc:       DefaultBuildHandlerChain,
@@ -324,6 +332,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
 		LongRunningFunc: genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+		APIServerID:     id,
 	}
 }
 
@@ -573,6 +582,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 		maxRequestBodyBytes: c.MaxRequestBodyBytes,
 		livezClock:          clock.RealClock{},
+		APIServerID:         c.APIServerID,
 	}
 
 	for {
@@ -614,11 +624,11 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 			if err != nil {
 				return nil, err
 			}
-			// TODO: Once we get rid of /healthz consider changing this to post-start-hook.
-			err = s.addReadyzChecks(healthz.NewInformerSyncHealthz(c.SharedInformerFactory))
-			if err != nil {
-				return nil, err
-			}
+		}
+		// TODO: Once we get rid of /healthz consider changing this to post-start-hook.
+		err := s.addReadyzChecks(healthz.NewInformerSyncHealthz(c.SharedInformerFactory))
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -626,6 +636,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	if s.isPostStartHookRegistered(priorityAndFairnessConfigConsumerHookName) {
 	} else if c.FlowControl != nil {
 		err := s.AddPostStartHook(priorityAndFairnessConfigConsumerHookName, func(context PostStartHookContext) error {
+			go c.FlowControl.MaintainObservations(context.StopCh)
 			go c.FlowControl.Run(context.StopCh)
 			return nil
 		})
@@ -635,6 +646,31 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		// TODO(yue9944882): plumb pre-shutdown-hook for request-management system?
 	} else {
 		klog.V(3).Infof("Not requested to run hook %s", priorityAndFairnessConfigConsumerHookName)
+	}
+
+	// Add PostStartHooks for maintaining the watermarks for the Priority-and-Fairness and the Max-in-Flight filters.
+	if c.FlowControl != nil {
+		const priorityAndFairnessFilterHookName = "priority-and-fairness-filter"
+		if !s.isPostStartHookRegistered(priorityAndFairnessFilterHookName) {
+			err := s.AddPostStartHook(priorityAndFairnessFilterHookName, func(context PostStartHookContext) error {
+				genericfilters.StartPriorityAndFairnessWatermarkMaintenance(context.StopCh)
+				return nil
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		const maxInFlightFilterHookName = "max-in-flight-filter"
+		if !s.isPostStartHookRegistered(maxInFlightFilterHookName) {
+			err := s.AddPostStartHook(maxInFlightFilterHookName, func(context PostStartHookContext) error {
+				genericfilters.StartMaxInFlightWatermarkMaintenance(context.StopCh)
+				return nil
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	for _, delegateCheck := range delegationTarget.HealthzChecks() {
@@ -668,17 +704,34 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 }
 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
-	handler := genericapifilters.WithAuthorization(apiHandler, c.Authorization.Authorizer, c.Serializer)
+	handler := filterlatency.TrackCompleted(apiHandler)
+	handler = genericapifilters.WithAuthorization(handler, c.Authorization.Authorizer, c.Serializer)
+	handler = filterlatency.TrackStarted(handler, "authorization")
+
 	if c.FlowControl != nil {
+		handler = filterlatency.TrackCompleted(handler)
 		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl)
+		handler = filterlatency.TrackStarted(handler, "priorityandfairness")
 	} else {
 		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
 	}
+
+	handler = filterlatency.TrackCompleted(handler)
 	handler = genericapifilters.WithImpersonation(handler, c.Authorization.Authorizer, c.Serializer)
+	handler = filterlatency.TrackStarted(handler, "impersonation")
+
+	handler = filterlatency.TrackCompleted(handler)
 	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
+	handler = filterlatency.TrackStarted(handler, "audit")
+
 	failedHandler := genericapifilters.Unauthorized(c.Serializer)
 	failedHandler = genericapifilters.WithFailedAuthenticationAudit(failedHandler, c.AuditBackend, c.AuditPolicyChecker)
+
+	failedHandler = filterlatency.TrackCompleted(failedHandler)
+	handler = filterlatency.TrackCompleted(handler)
 	handler = genericapifilters.WithAuthentication(handler, c.Authentication.Authenticator, failedHandler, c.Authentication.APIAudiences)
+	handler = filterlatency.TrackStarted(handler, "authentication")
+
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc, c.RequestTimeout)
 	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)
@@ -689,6 +742,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithAuditAnnotations(handler, c.AuditBackend, c.AuditPolicyChecker)
 	handler = genericapifilters.WithWarningRecorder(handler)
 	handler = genericapifilters.WithCacheControl(handler)
+	handler = genericapifilters.WithRequestReceivedTimestamp(handler)
 	handler = genericfilters.WithPanicRecovery(handler)
 	return handler
 }

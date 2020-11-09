@@ -25,7 +25,7 @@ import (
 
 	"github.com/google/uuid"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -49,7 +49,7 @@ type quobytePlugin struct {
 // Quobyte API server and holds all information
 type quobyteAPIConfig struct {
 	quobyteUser      string
-	quobytePassword  string
+	quobytePassword  string `datapolicy:"password"`
 	quobyteAPIServer string
 }
 
@@ -259,7 +259,7 @@ func (mounter *quobyteMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 
 	//if a trailing slash is missing we add it here
 	mountOptions := util.JoinMountOptions(mounter.mountOptions, options)
-	if err := mounter.mounter.Mount(mounter.correctTraillingSlash(mounter.registry), dir, "quobyte", mountOptions); err != nil {
+	if err := mounter.mounter.MountSensitiveWithoutSystemd(mounter.correctTraillingSlash(mounter.registry), dir, "quobyte", mountOptions, nil); err != nil {
 		return fmt.Errorf("quobyte: mount failed: %v", err)
 	}
 

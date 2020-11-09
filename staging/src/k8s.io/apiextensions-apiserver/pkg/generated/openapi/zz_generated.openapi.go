@@ -30,6 +30,8 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
+		"k8s.io/api/autoscaling/v1.ContainerResourceMetricSource":        schema_k8sio_api_autoscaling_v1_ContainerResourceMetricSource(ref),
+		"k8s.io/api/autoscaling/v1.ContainerResourceMetricStatus":        schema_k8sio_api_autoscaling_v1_ContainerResourceMetricStatus(ref),
 		"k8s.io/api/autoscaling/v1.CrossVersionObjectReference":          schema_k8sio_api_autoscaling_v1_CrossVersionObjectReference(ref),
 		"k8s.io/api/autoscaling/v1.ExternalMetricSource":                 schema_k8sio_api_autoscaling_v1_ExternalMetricSource(ref),
 		"k8s.io/api/autoscaling/v1.ExternalMetricStatus":                 schema_k8sio_api_autoscaling_v1_ExternalMetricStatus(ref),
@@ -101,6 +103,92 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/apimachinery/pkg/runtime.TypeMeta":                       schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref),
 		"k8s.io/apimachinery/pkg/runtime.Unknown":                        schema_k8sio_apimachinery_pkg_runtime_Unknown(ref),
 		"k8s.io/apimachinery/pkg/version.Info":                           schema_k8sio_apimachinery_pkg_version_Info(ref),
+	}
+}
+
+func schema_k8sio_api_autoscaling_v1_ContainerResourceMetricSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ContainerResourceMetricSource indicates how to scale on a resource metric known to Kubernetes, as specified in the requests and limits, describing a single container in each of the pods of the current scale target(e.g. CPU or memory). The values will be averaged together before being compared to the target. Such metrics are built into Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. Only one \"target\" type should be set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is the name of the resource in question.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"targetAverageUtilization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "targetAverageUtilization is the target value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"targetAverageValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "targetAverageValue is the target value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type.",
+							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+						},
+					},
+					"container": {
+						SchemaProps: spec.SchemaProps{
+							Description: "container is the name of the container in the pods of the scaling target.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "container"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+	}
+}
+
+func schema_k8sio_api_autoscaling_v1_ContainerResourceMetricStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ContainerResourceMetricStatus indicates the current value of a resource metric known to Kubernetes, as specified in requests and limits, describing a single container in each pod in the current scale target (e.g. CPU or memory).  Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is the name of the resource in question.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"currentAverageUtilization": {
+						SchemaProps: spec.SchemaProps{
+							Description: "currentAverageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.  It will only be present if `targetAverageValue` was set in the corresponding metric specification.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"currentAverageValue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "currentAverageValue is the current value of the average of the resource metric across all relevant pods, as a raw value (instead of as a percentage of the request), similar to the \"pods\" metric source type. It will always be set, regardless of the corresponding metric specification.",
+							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+						},
+					},
+					"container": {
+						SchemaProps: spec.SchemaProps{
+							Description: "container is the name of the container in the pods of the scaling taget",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "currentAverageValue", "container"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
@@ -469,7 +557,7 @@ func schema_k8sio_api_autoscaling_v1_MetricSpec(ref common.ReferenceCallback) co
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "type is the type of metric source.  It should be one of \"Object\", \"Pods\" or \"Resource\", each mapping to a matching field in the object.",
+							Description: "type is the type of metric source.  It should be one of \"ContainerResource\", \"External\", \"Object\", \"Pods\" or \"Resource\", each mapping to a matching field in the object. Note: \"ContainerResource\" type is available on when the feature-gate HPAContainerMetrics is enabled",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -492,6 +580,12 @@ func schema_k8sio_api_autoscaling_v1_MetricSpec(ref common.ReferenceCallback) co
 							Ref:         ref("k8s.io/api/autoscaling/v1.ResourceMetricSource"),
 						},
 					},
+					"containerResource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "container resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod of the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source. This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.",
+							Ref:         ref("k8s.io/api/autoscaling/v1.ContainerResourceMetricSource"),
+						},
+					},
 					"external": {
 						SchemaProps: spec.SchemaProps{
 							Description: "external refers to a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
@@ -503,7 +597,7 @@ func schema_k8sio_api_autoscaling_v1_MetricSpec(ref common.ReferenceCallback) co
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/autoscaling/v1.ExternalMetricSource", "k8s.io/api/autoscaling/v1.ObjectMetricSource", "k8s.io/api/autoscaling/v1.PodsMetricSource", "k8s.io/api/autoscaling/v1.ResourceMetricSource"},
+			"k8s.io/api/autoscaling/v1.ContainerResourceMetricSource", "k8s.io/api/autoscaling/v1.ExternalMetricSource", "k8s.io/api/autoscaling/v1.ObjectMetricSource", "k8s.io/api/autoscaling/v1.PodsMetricSource", "k8s.io/api/autoscaling/v1.ResourceMetricSource"},
 	}
 }
 
@@ -516,7 +610,7 @@ func schema_k8sio_api_autoscaling_v1_MetricStatus(ref common.ReferenceCallback) 
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "type is the type of metric source.  It will be one of \"Object\", \"Pods\" or \"Resource\", each corresponds to a matching field in the object.",
+							Description: "type is the type of metric source.  It will be one of \"ContainerResource\", \"External\", \"Object\", \"Pods\" or \"Resource\", each corresponds to a matching field in the object. Note: \"ContainerResource\" type is available on when the feature-gate HPAContainerMetrics is enabled",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -539,6 +633,12 @@ func schema_k8sio_api_autoscaling_v1_MetricStatus(ref common.ReferenceCallback) 
 							Ref:         ref("k8s.io/api/autoscaling/v1.ResourceMetricStatus"),
 						},
 					},
+					"containerResource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "container resource refers to a resource metric (such as those specified in requests and limits) known to Kubernetes describing a single container in each pod in the current scale target (e.g. CPU or memory). Such metrics are built in to Kubernetes, and have special scaling options on top of those available to normal per-pod metrics using the \"pods\" source.",
+							Ref:         ref("k8s.io/api/autoscaling/v1.ContainerResourceMetricStatus"),
+						},
+					},
 					"external": {
 						SchemaProps: spec.SchemaProps{
 							Description: "external refers to a global metric that is not associated with any Kubernetes object. It allows autoscaling based on information coming from components running outside of cluster (for example length of queue in cloud messaging service, or QPS from loadbalancer running outside of cluster).",
@@ -550,7 +650,7 @@ func schema_k8sio_api_autoscaling_v1_MetricStatus(ref common.ReferenceCallback) 
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/autoscaling/v1.ExternalMetricStatus", "k8s.io/api/autoscaling/v1.ObjectMetricStatus", "k8s.io/api/autoscaling/v1.PodsMetricStatus", "k8s.io/api/autoscaling/v1.ResourceMetricStatus"},
+			"k8s.io/api/autoscaling/v1.ContainerResourceMetricStatus", "k8s.io/api/autoscaling/v1.ExternalMetricStatus", "k8s.io/api/autoscaling/v1.ObjectMetricStatus", "k8s.io/api/autoscaling/v1.PodsMetricStatus", "k8s.io/api/autoscaling/v1.ResourceMetricStatus"},
 	}
 }
 
@@ -1716,6 +1816,11 @@ func schema_pkg_apis_meta_v1_LabelSelector(ref common.ReferenceCallback) common.
 							},
 						},
 					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-map-type": "atomic",
 				},
 			},
 		},

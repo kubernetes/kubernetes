@@ -127,7 +127,7 @@ var (
 		KeyVaultDNSSuffix:            "vault.usgovcloudapi.net",
 		ServiceBusEndpointSuffix:     "servicebus.usgovcloudapi.net",
 		ServiceManagementVMDNSSuffix: "usgovcloudapp.net",
-		ResourceManagerVMDNSSuffix:   "cloudapp.windowsazure.us",
+		ResourceManagerVMDNSSuffix:   "cloudapp.usgovcloudapi.net",
 		ContainerRegistryDNSSuffix:   "azurecr.us",
 		CosmosDBDNSSuffix:            "documents.azure.us",
 		TokenAudience:                "https://management.usgovcloudapi.net/",
@@ -160,7 +160,7 @@ var (
 		KeyVaultDNSSuffix:            "vault.azure.cn",
 		ServiceBusEndpointSuffix:     "servicebus.chinacloudapi.cn",
 		ServiceManagementVMDNSSuffix: "chinacloudapp.cn",
-		ResourceManagerVMDNSSuffix:   "cloudapp.azure.cn",
+		ResourceManagerVMDNSSuffix:   "cloudapp.chinacloudapi.cn",
 		ContainerRegistryDNSSuffix:   "azurecr.cn",
 		CosmosDBDNSSuffix:            "documents.azure.cn",
 		TokenAudience:                "https://management.chinacloudapi.cn/",
@@ -241,4 +241,9 @@ func EnvironmentFromFile(location string) (unmarshaled Environment, err error) {
 	err = json.Unmarshal(fileContents, &unmarshaled)
 
 	return
+}
+
+// SetEnvironment updates the environment map with the specified values.
+func SetEnvironment(name string, env Environment) {
+	environments[strings.ToUpper(name)] = env
 }

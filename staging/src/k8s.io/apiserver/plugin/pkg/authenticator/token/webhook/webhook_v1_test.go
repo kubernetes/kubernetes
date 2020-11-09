@@ -33,11 +33,19 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/token/cache"
 	"k8s.io/apiserver/pkg/authentication/user"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
+
+var testRetryBackoff = wait.Backoff{
+	Duration: 5 * time.Millisecond,
+	Factor:   1.5,
+	Jitter:   0.2,
+	Steps:    5,
+}
 
 // V1Service mocks a remote authentication service.
 type V1Service interface {
@@ -193,12 +201,12 @@ func newV1TokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte,
 		return nil, err
 	}
 
-	c, err := tokenReviewInterfaceFromKubeconfig(p, "v1", nil)
+	c, err := tokenReviewInterfaceFromKubeconfig(p, "v1", testRetryBackoff, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	authn, err := newWithBackoff(c, 0, implicitAuds)
+	authn, err := newWithBackoff(c, testRetryBackoff, implicitAuds)
 	if err != nil {
 		return nil, err
 	}

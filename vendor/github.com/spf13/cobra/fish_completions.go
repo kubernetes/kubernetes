@@ -5,9 +5,15 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 func genFishComp(buf *bytes.Buffer, name string, includeDesc bool) {
+	// Variables should not contain a '-' or ':' character
+	nameForVar := name
+	nameForVar = strings.Replace(nameForVar, "-", "_", -1)
+	nameForVar = strings.Replace(nameForVar, ":", "_", -1)
+
 	compCmd := ShellCompRequestCmd
 	if !includeDesc {
 		compCmd = ShellCompNoDescRequestCmd
@@ -37,7 +43,13 @@ function __%[1]s_perform_completion
     end
     __%[1]s_debug "emptyArg: $emptyArg"
 
-    set requestComp "$args[1] %[2]s $args[2..-1] $emptyArg"
+    if not type -q "$args[1]"
+        # This can happen when "complete --do-complete %[2]s" is called when running this script.
+        __%[1]s_debug "Cannot find $args[1]. No completions."
+        return
+    end
+
+    set requestComp "$args[1] %[3]s $args[2..-1] $emptyArg"
     __%[1]s_debug "Calling $requestComp"
 
     set results (eval $requestComp 2> /dev/null)
@@ -71,7 +83,8 @@ function __%[1]s_prepare_completions
 
     # Check if the command-line is already provided.  This is useful for testing.
     if not set --query __%[1]s_comp_commandLine
-        set __%[1]s_comp_commandLine (commandline)
+        # Use the -c flag to allow for completion in the middle of the line
+        set __%[1]s_comp_commandLine (commandline -c)
     end
     __%[1]s_debug "commandLine is: $__%[1]s_comp_commandLine"
 
@@ -83,7 +96,7 @@ function __%[1]s_prepare_completions
         __%[1]s_debug "No completion, probably due to a failure"
         # Might as well do file completion, in case it helps
         set --global __%[1]s_comp_do_file_comp 1
-        return 0
+        return 1
     end
 
     set directive (string sub --start 2 $results[-1])
@@ -92,20 +105,35 @@ function __%[1]s_prepare_completions
     __%[1]s_debug "Completions are: $__%[1]s_comp_results"
     __%[1]s_debug "Directive is: $directive"
 
+    set shellCompDirectiveError %[4]d
+    set shellCompDirectiveNoSpace %[5]d
+    set shellCompDirectiveNoFileComp %[6]d
+    set shellCompDirectiveFilterFileExt %[7]d
+    set shellCompDirectiveFilterDirs %[8]d
+
     if test -z "$directive"
         set directive 0
     end
 
-    set compErr (math (math --scale 0 $directive / %[3]d) %% 2)
+    set compErr (math (math --scale 0 $directive / $shellCompDirectiveError) %% 2)
     if test $compErr -eq 1
         __%[1]s_debug "Received error directive: aborting."
         # Might as well do file completion, in case it helps
         set --global __%[1]s_comp_do_file_comp 1
-        return 0
+        return 1
     end
 
-    set nospace (math (math --scale 0 $directive / %[4]d) %% 2)
-    set nofiles (math (math --scale 0 $directive / %[5]d) %% 2)
+    set filefilter (math (math --scale 0 $directive / $shellCompDirectiveFilterFileExt) %% 2)
+    set dirfilter (math (math --scale 0 $directive / $shellCompDirectiveFilterDirs) %% 2)
+    if test $filefilter -eq 1; or test $dirfilter -eq 1
+        __%[1]s_debug "File extension filtering or directory filtering not supported"
+        # Do full file completion instead
+        set --global __%[1]s_comp_do_file_comp 1
+        return 1
+    end
+
+    set nospace (math (math --scale 0 $directive / $shellCompDirectiveNoSpace) %% 2)
+    set nofiles (math (math --scale 0 $directive / $shellCompDirectiveNoFileComp) %% 2)
 
     __%[1]s_debug "nospace: $nospace, nofiles: $nofiles"
 
@@ -132,24 +160,31 @@ function __%[1]s_prepare_completions
     return (not set --query __%[1]s_comp_do_file_comp)
 end
 
-# Remove any pre-existing completions for the program since we will be handling all of them
-# TODO this cleanup is not sufficient.  Fish completions are only loaded once the user triggers
-# them, so the below deletion will not work as it is run too early.  What else can we do?
-complete -c %[1]s -e
+# Since Fish completions are only loaded once the user triggers them, we trigger them ourselves
+# so we can properly delete any completions provided by another script.
+# The space after the the program name is essential to trigger completion for the program
+# and not completion of the program name itself.
+complete --do-complete "%[2]s " > /dev/null 2>&1
+# Using '> /dev/null 2>&1' since '&>' is not supported in older versions of fish.
+
+# Remove any pre-existing completions for the program since we will be handling all of them.
+complete -c %[2]s -e
 
 # The order in which the below two lines are defined is very important so that __%[1]s_prepare_completions
 # is called first.  It is __%[1]s_prepare_completions that sets up the __%[1]s_comp_do_file_comp variable.
 #
 # This completion will be run second as complete commands are added FILO.
 # It triggers file completion choices when __%[1]s_comp_do_file_comp is set.
-complete -c %[1]s -n 'set --query __%[1]s_comp_do_file_comp'
+complete -c %[2]s -n 'set --query __%[1]s_comp_do_file_comp'
 
 # This completion will be run first as complete commands are added FILO.
-# The call to __%[1]s_prepare_completions will setup both __%[1]s_comp_results abd __%[1]s_comp_do_file_comp.
+# The call to __%[1]s_prepare_completions will setup both __%[1]s_comp_results and __%[1]s_comp_do_file_comp.
 # It provides the program's completion choices.
-complete -c %[1]s -n '__%[1]s_prepare_completions' -f -a '$__%[1]s_comp_results'
+complete -c %[2]s -n '__%[1]s_prepare_completions' -f -a '$__%[1]s_comp_results'
 
-`, name, compCmd, ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp))
+`, nameForVar, name, compCmd,
+		ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp,
+		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs))
 }
 
 // GenFishCompletion generates fish completion file and writes to the passed writer.

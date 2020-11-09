@@ -17,9 +17,12 @@ limitations under the License.
 package framework
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"sort"
 	"strings"
@@ -32,11 +35,12 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
+
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 const (
-	defaultHost = "http://127.0.0.1:8080"
+	defaultHost = "https://127.0.0.1:6443"
 
 	// DefaultNumNodes is the number of nodes. If not specified, then number of nodes is auto-detected
 	DefaultNumNodes = -1
@@ -77,6 +81,7 @@ type TestContextType struct {
 	KubeVolumeDir      string
 	CertDir            string
 	Host               string
+	BearerToken        string `datapolicy:"token"`
 	// TODO: Deprecating this over time... instead just use gobindata_util.go , see #23987.
 	RepoRoot                string
 	DockershimCheckpointDir string
@@ -286,7 +291,7 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flags.BoolVar(&TestContext.DeleteNamespaceOnFailure, "delete-namespace-on-failure", true, "If true, framework will delete test namespace on failure. Used only during test debugging.")
 	flags.IntVar(&TestContext.AllowedNotReadyNodes, "allowed-not-ready-nodes", 0, "If non-zero, framework will allow for that many non-ready nodes when checking for all ready nodes.")
 
-	flags.StringVar(&TestContext.Host, "host", "", fmt.Sprintf("The host, or apiserver, to connect to. Will default to %s if this argument and --kubeconfig are not set", defaultHost))
+	flags.StringVar(&TestContext.Host, "host", "", fmt.Sprintf("The host, or apiserver, to connect to. Will default to %s if this argument and --kubeconfig are not set.", defaultHost))
 	flags.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
 	flags.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	flags.Var(cliflag.NewMapStringBool(&TestContext.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
@@ -402,6 +407,21 @@ func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
 	return configCmd
 }
 
+// GenerateSecureToken returns a string of length tokenLen, consisting
+// of random bytes encoded as base64 for use as a Bearer Token during
+// communication with an APIServer
+func GenerateSecureToken(tokenLen int) (string, error) {
+	// Number of bytes to be tokenLen when base64 encoded.
+	tokenSize := math.Ceil(float64(tokenLen) * 6 / 8)
+	rawToken := make([]byte, int(tokenSize))
+	if _, err := rand.Read(rawToken); err != nil {
+		return "", err
+	}
+	encoded := base64.RawURLEncoding.EncodeToString(rawToken)
+	token := encoded[:tokenLen]
+	return token, nil
+}
+
 // AfterReadingAllFlags makes changes to the context after all flags
 // have been read.
 func AfterReadingAllFlags(t *TestContextType) {
@@ -421,6 +441,14 @@ func AfterReadingAllFlags(t *TestContextType) {
 			t.Host = defaultHost
 		}
 	}
+	if len(t.BearerToken) == 0 {
+		var err error
+		t.BearerToken, err = GenerateSecureToken(16)
+		if err != nil {
+			klog.Fatalf("Failed to generate bearer token: %v", err)
+		}
+	}
+
 	// Allow 1% of nodes to be unready (statistically) - relevant for large clusters.
 	if t.AllowedNotReadyNodes == 0 {
 		t.AllowedNotReadyNodes = t.CloudConfig.NumNodes / 100

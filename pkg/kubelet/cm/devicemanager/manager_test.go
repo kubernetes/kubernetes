@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 const (
@@ -469,6 +469,7 @@ func TestCheckpoint(t *testing.T) {
 	as := assert.New(t)
 	tmpDir, err := ioutil.TempDir("", "checkpoint")
 	as.Nil(err)
+	defer os.RemoveAll(tmpDir)
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
 	as.Nil(err)
 	testManager := &ManagerImpl{
@@ -873,6 +874,7 @@ func TestUpdatePluginResources(t *testing.T) {
 	monitorCallback := func(resourceName string, devices []pluginapi.Device) {}
 	tmpDir, err := ioutil.TempDir("", "checkpoint")
 	as.Nil(err)
+	defer os.RemoveAll(tmpDir)
 
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
 	as.Nil(err)
@@ -973,6 +975,7 @@ func TestResetExtendedResource(t *testing.T) {
 	as := assert.New(t)
 	tmpDir, err := ioutil.TempDir("", "checkpoint")
 	as.Nil(err)
+	defer os.RemoveAll(tmpDir)
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
 	as.Nil(err)
 	testManager := &ManagerImpl{

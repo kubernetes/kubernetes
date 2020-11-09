@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script generates `/pkg/kubelet/apis/podresources/v1alpha1/api.pb.go`
-# from the protobuf file `/pkg/kubelet/apis/podresources/v1alpha1/api.proto`
+# This script generates `/staging/src/k8s.io/kubelet/pkg/apis/podresources/v1alpha1/api.pb.go`
+# from the protobuf file `/staging/src/k8s.io/kubelet/pkg/apis/podresources/v1alpha1/api.proto`
 # for pods.
 # Usage: `hack/update-generated-pod-resources.sh`.
 

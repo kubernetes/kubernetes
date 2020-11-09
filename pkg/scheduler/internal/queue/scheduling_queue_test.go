@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/component-base/metrics/testutil"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -359,17 +359,41 @@ func TestPriorityQueue_Delete(t *testing.T) {
 }
 
 func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
-	q := NewPriorityQueue(newDefaultQueueSort())
+	c := clock.NewFakeClock(time.Now())
+	q := NewPriorityQueue(newDefaultQueueSort(), WithClock(c))
 	q.Add(&medPriorityPod)
 	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&unschedulablePod), q.SchedulingCycle())
 	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&highPriorityPod), q.SchedulingCycle())
+	// Pods is still backing off, move the pod into backoffQ.
 	q.MoveAllToActiveOrBackoffQueue("test")
 	if q.activeQ.Len() != 1 {
-		t.Error("Expected 1 item to be in activeQ")
+		t.Errorf("Expected 1 item to be in activeQ, but got: %v", q.activeQ.Len())
 	}
 	if q.podBackoffQ.Len() != 2 {
-		t.Error("Expected 2 items to be in podBackoffQ")
+		t.Errorf("Expected 2 items to be in podBackoffQ, but got: %v", q.podBackoffQ.Len())
 	}
+
+	// pop out the pods in the backoffQ.
+	q.podBackoffQ.Pop()
+	q.podBackoffQ.Pop()
+
+	q.schedulingCycle++
+	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&unschedulablePod), q.SchedulingCycle())
+	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&highPriorityPod), q.SchedulingCycle())
+	if q.unschedulableQ.get(&unschedulablePod) == nil || q.unschedulableQ.get(&highPriorityPod) == nil {
+		t.Errorf("Expected %v and %v in the unschedulableQ", unschedulablePod.Name, highPriorityPod.Name)
+	}
+	// Move clock by podInitialBackoffDuration, so that pods in the unschedulableQ would pass the backing off,
+	// and the pods will be moved into activeQ.
+	c.Step(q.podInitialBackoffDuration)
+	q.MoveAllToActiveOrBackoffQueue("test")
+	if q.activeQ.Len() != 3 {
+		t.Errorf("Expected 3 items to be in activeQ, but got: %v", q.activeQ.Len())
+	}
+	if q.podBackoffQ.Len() != 0 {
+		t.Errorf("Expected 0 item to be in podBackoffQ, but got: %v", q.podBackoffQ.Len())
+	}
+
 }
 
 // TestPriorityQueue_AssignedPodAdded tests AssignedPodAdded. It checks that

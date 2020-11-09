@@ -27,9 +27,11 @@ ZONE=${KUBE_GCE_ZONE:-us-central1-b}
 export REGION=${ZONE%-*}
 RELEASE_REGION_FALLBACK=${RELEASE_REGION_FALLBACK:-false}
 REGIONAL_KUBE_ADDONS=${REGIONAL_KUBE_ADDONS:-true}
+# TODO: Migrate to e2-standard machine family.
 NODE_SIZE=${NODE_SIZE:-n1-standard-2}
 NUM_NODES=${NUM_NODES:-3}
 NUM_WINDOWS_NODES=${NUM_WINDOWS_NODES:-0}
+# TODO: Migrate to e2-standard machine family.
 MASTER_SIZE=${MASTER_SIZE:-n1-standard-$(get-master-size)}
 MASTER_MIN_CPU_ARCHITECTURE=${MASTER_MIN_CPU_ARCHITECTURE:-} # To allow choosing better architectures.
 export MASTER_DISK_TYPE=pd-ssd
@@ -40,6 +42,7 @@ NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
 NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
 NODE_LABELS="${KUBE_NODE_LABELS:-}"
 WINDOWS_NODE_LABELS="${WINDOWS_NODE_LABELS:-}"
+NODE_LOCAL_SSDS_EPHEMERAL=${NODE_LOCAL_SSDS_EPHEMERAL:-}
 
 # KUBE_CREATE_NODES can be used to avoid creating nodes, while master will be sized for NUM_NODES nodes.
 # Firewalls and node templates are still created.
@@ -83,7 +86,7 @@ fi
 # you are updating the os image versions, update this variable.
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-GCI_VERSION=${KUBE_GCI_VERSION:-cos-81-12871-59-0}
+GCI_VERSION=${KUBE_GCI_VERSION:-cos-85-13310-1041-9}
 export MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 export NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
@@ -307,7 +310,7 @@ NODE_PROBLEM_DETECTOR_TAR_HASH="${NODE_PROBLEM_DETECTOR_TAR_HASH:-}"
 NODE_PROBLEM_DETECTOR_RELEASE_PATH="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-}"
 NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
 
-CNI_SHA1="${CNI_SHA1:-}"
+CNI_HASH="${CNI_HASH:-}"
 CNI_TAR_PREFIX="${CNI_TAR_PREFIX:-cni-plugins-linux-amd64-}"
 CNI_STORAGE_URL_BASE="${CNI_STORAGE_URL_BASE:-https://storage.googleapis.com/k8s-artifacts-cni/release}"
 
@@ -425,12 +428,19 @@ METADATA_CLOBBERS_CONFIG="${METADATA_CLOBBERS_CONFIG:-false}"
 
 ENABLE_BIG_CLUSTER_SUBNETS="${ENABLE_BIG_CLUSTER_SUBNETS:-false}"
 
+# Optional: Enable log rotation for k8s services
+ENABLE_LOGROTATE_FILES="${ENABLE_LOGROTATE_FILES:-true}"
+PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_LOGROTATE_FILES"
 if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_FILES_MAX_COUNT"
 fi
 if [[ -n "${LOGROTATE_MAX_SIZE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_MAX_SIZE"
 fi
+
+# Optional: Enable log rotation for pod logs
+ENABLE_POD_LOG="${ENABLE_POD_LOG:-false}"
+PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_POD_LOG"
 
 if [[ -n "${POD_LOG_MAX_FILE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} POD_LOG_MAX_FILE"
@@ -475,6 +485,16 @@ ENABLE_PROMETHEUS_TO_SD="${ENABLE_PROMETHEUS_TO_SD:-false}"
 # Optional: [Experiment Only] Run kube-proxy as a DaemonSet if set to true, run as static pods otherwise.
 KUBE_PROXY_DAEMONSET="${KUBE_PROXY_DAEMONSET:-false}" # true, false
 
+# Control whether the startup scripts manage the lifecycle of kube-proxy
+# When true, the startup scripts do not enable kube-proxy either as a daemonset addon or as a static pod
+# regardless of the value of KUBE_PROXY_DAEMONSET.
+# When false, the value of KUBE_PROXY_DAEMONSET controls whether kube-proxy comes up as a static pod or
+# as an addon daemonset.
+KUBE_PROXY_DISABLE="${KUBE_PROXY_DISABLE:-false}" # true, false
+
+# Will be passed into the kube-proxy via `--detect-local-mode`
+DETECT_LOCAL_MODE="${DETECT_LOCAL_MODE:-}"
+
 # Optional: duration of cluster signed certificates.
 CLUSTER_SIGNING_DURATION="${CLUSTER_SIGNING_DURATION:-}"
 
@@ -503,6 +523,35 @@ WINDOWS_NODE_TAINTS="${WINDOWS_NODE_TAINTS:-node.kubernetes.io/os=win1809:NoSche
 export GCE_PRIVATE_CLUSTER="${KUBE_GCE_PRIVATE_CLUSTER:-false}"
 export GCE_PRIVATE_CLUSTER_PORTS_PER_VM="${KUBE_GCE_PRIVATE_CLUSTER_PORTS_PER_VM:-}"
 
-# Optional: Create apiserver konnectivity server and agent.
-export ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE="${KUBE_ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}"
+# When KUBE_ENABLE_KONNECTIVITY_SERVICE is enabled, the three variables below will
+# default to true to enable the konnectivity network proxy and start the required pods.
+# Their values can be overridden for more granular control of the proxy.
+
+# Optional: Whether to do the setup for the konnectivity service
+# Includes setting up kubeconfig, tokens, egress files, and firewall rules
+export PREPARE_KONNECTIVITY_SERVICE="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-false}"
+# Optional: Whether to use konnectivity network proxy for all egress from apiserver.
+export EGRESS_VIA_KONNECTIVITY="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-false}"
+# Optional: Whether to start the konnectivity server and agent pods.
+export RUN_KONNECTIVITY_PODS="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-false}"
+# Proxy Protocol Mode determines the protocol to use to communicate between apiserver and network proxy.
+# Valid options are grpc and http-connect. Default is grpc.
 export KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE="${KUBE_KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}"
+
+# Optional: Enable Windows CSI-Proxy
+export ENABLE_CSI_PROXY="${ENABLE_CSI_PROXY:-true}"
+
+# KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP decides whether
+# kube-apiserver is healthchecked on host IP instead of 127.0.0.1.
+export KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP="${KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP:-false}"
+
+# ETCD_LISTEN_ON_HOST_IP decides whether etcd servers should also listen on host IP, 
+# in addition to listening to 127.0.0.1, and whether kube-apiserver should connect to etcd servers
+# through host IP.
+export ETCD_LISTEN_ON_HOST_IP="${ETCD_LISTEN_ON_HOST_IP:-false}"
+
+# ETCD_PROGRESS_NOTIFY_INTERVAL defines the interval for etcd watch progress notify events.
+export ETCD_PROGRESS_NOTIFY_INTERVAL="${ETCD_PROGRESS_NOTIFY_INTERVAL:-10m}"
+
+# Use host IP instead of localhost in control plane kubeconfig files.
+export KUBECONFIG_USE_HOST_IP="${KUBECONFIG_USE_HOST_IP:-false}"

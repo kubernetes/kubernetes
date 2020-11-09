@@ -40,9 +40,12 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapi "k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -179,10 +182,6 @@ type GenericAPIServer struct {
 	// and the kind associated with a given resource. As resources are installed, they are registered here.
 	EquivalentResourceRegistry runtime.EquivalentResourceRegistry
 
-	// enableAPIResponseCompression indicates whether API Responses should support compression
-	// if the client requests it via Accept-Encoding
-	enableAPIResponseCompression bool
-
 	// delegationTarget is the next delegate in the chain. This is never nil.
 	delegationTarget DelegationTarget
 
@@ -197,6 +196,9 @@ type GenericAPIServer struct {
 	// The limit on the request body size that would be accepted and decoded in a write request.
 	// 0 means no limit.
 	maxRequestBodyBytes int64
+
+	// APIServerID is the ID of this API server
+	APIServerID string
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -418,6 +420,15 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
 		}
 		apiGroupVersion.OpenAPIModels = openAPIModels
+
+		if openAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+			typeConverter, err := fieldmanager.NewTypeConverter(openAPIModels, false)
+			if err != nil {
+				return err
+			}
+			apiGroupVersion.TypeConverter = typeConverter
+		}
+
 		apiGroupVersion.MaxRequestBodyBytes = s.maxRequestBodyBytes
 
 		if err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer); err != nil {

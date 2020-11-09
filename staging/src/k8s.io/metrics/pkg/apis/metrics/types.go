@@ -27,7 +27,7 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// resource usage metrics of a node.
+// NodeMetrics sets resource usage metrics of a node.
 type NodeMetrics struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta
@@ -59,7 +59,7 @@ type NodeMetricsList struct {
 // +genclient:readonly
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// resource usage metrics of a pod.
+// PodMetrics sets resource usage metrics of a pod.
 type PodMetrics struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta
@@ -86,7 +86,7 @@ type PodMetricsList struct {
 	Items []PodMetrics
 }
 
-// resource usage metrics of a container.
+// ContainerMetrics sets resource usage metrics of a container.
 type ContainerMetrics struct {
 	// Container name corresponding to the one from pod.spec.containers.
 	Name string

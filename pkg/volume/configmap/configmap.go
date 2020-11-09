@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -256,7 +256,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 		return err
 	}
 
-	err = volume.SetVolumeOwnership(b, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/)
+	err = volume.SetVolumeOwnership(b, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(b.plugin, nil))
 	if err != nil {
 		klog.Errorf("Error applying volume ownership settings for group: %v", mounterArgs.FsGroup)
 		return err

@@ -19,7 +19,7 @@ package framework
 import (
 	"context"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -58,7 +58,7 @@ func NewIntegrationTestNodePreparerWithNodeSpec(client clientset.Interface, coun
 }
 
 // PrepareNodes prepares countToStrategy test nodes.
-func (p *IntegrationTestNodePreparer) PrepareNodes() error {
+func (p *IntegrationTestNodePreparer) PrepareNodes(nextNodeIndex int) error {
 	numNodes := 0
 	for _, v := range p.countToStrategy {
 		numNodes += v.Count
@@ -90,7 +90,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 		var err error
 		for retry := 0; retry < retries; retry++ {
 			_, err = p.client.CoreV1().Nodes().Create(context.TODO(), baseNode, metav1.CreateOptions{})
-			if err == nil || !testutils.IsRetryableAPIError(err) {
+			if err == nil {
 				break
 			}
 		}
@@ -103,11 +103,9 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 	if err != nil {
 		klog.Fatalf("Error listing nodes: %v", err)
 	}
-	index := 0
-	sum := 0
+	index := nextNodeIndex
 	for _, v := range p.countToStrategy {
-		sum += v.Count
-		for ; index < sum; index++ {
+		for i := 0; i < v.Count; i, index = i+1, index+1 {
 			if err := testutils.DoPrepareNode(p.client, &nodes.Items[index], v.Strategy); err != nil {
 				klog.Errorf("Aborting node preparation: %v", err)
 				return err
@@ -119,14 +117,18 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 
 // CleanupNodes deletes existing test nodes.
 func (p *IntegrationTestNodePreparer) CleanupNodes() error {
+	// TODO(#93794): make CleanupNodes only clean up the nodes created by this
+	// IntegrationTestNodePreparer to make this more intuitive.
 	nodes, err := GetReadySchedulableNodes(p.client)
 	if err != nil {
 		klog.Fatalf("Error listing nodes: %v", err)
 	}
+	var errRet error
 	for i := range nodes.Items {
 		if err := p.client.CoreV1().Nodes().Delete(context.TODO(), nodes.Items[i].Name, metav1.DeleteOptions{}); err != nil {
 			klog.Errorf("Error while deleting Node: %v", err)
+			errRet = err
 		}
 	}
-	return nil
+	return errRet
 }

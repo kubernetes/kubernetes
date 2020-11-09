@@ -259,11 +259,11 @@ func (tc *CustomMetricTestCase) Run() {
 	}
 	defer monitoring.CleanupDescriptors(gcmService, projectID)
 
-	err = monitoring.CreateAdapter(tc.framework.Namespace.ObjectMeta.Name, monitoring.AdapterDefault)
+	err = monitoring.CreateAdapter(monitoring.AdapterDefault)
 	if err != nil {
 		framework.Failf("Failed to set up: %v", err)
 	}
-	defer monitoring.CleanupAdapter(tc.framework.Namespace.ObjectMeta.Name, monitoring.AdapterDefault)
+	defer monitoring.CleanupAdapter(monitoring.AdapterDefault)
 
 	// Run application that exports the metric
 	err = createDeploymentToScale(tc.framework, tc.kubeClient, tc.deployment, tc.pod)

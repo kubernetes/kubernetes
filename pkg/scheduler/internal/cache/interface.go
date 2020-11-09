@@ -18,8 +18,7 @@ package cache
 
 import (
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // Cache collects pods' information and provides node-level aggregated information.
@@ -57,8 +56,13 @@ import (
 // - Both "Expired" and "Deleted" are valid end states. In case of some problems, e.g. network issue,
 //   a pod might have changed its state (e.g. added and deleted) without delivering notification to the cache.
 type Cache interface {
-	// ListPods lists all pods in the cache.
-	ListPods(selector labels.Selector) ([]*v1.Pod, error)
+	// NodeCount returns the number of nodes in the cache.
+	// DO NOT use outside of tests.
+	NodeCount() int
+
+	// PodCount returns the number of pods in the cache (including those from deleted nodes).
+	// DO NOT use outside of tests.
+	PodCount() (int, error)
 
 	// AssumePod assumes a pod scheduled and aggregates the pod's information into its node.
 	// The implementation also decides the policy to expire pod before being confirmed (receiving Add event).
@@ -100,6 +104,8 @@ type Cache interface {
 	// UpdateSnapshot updates the passed infoSnapshot to the current contents of Cache.
 	// The node info contains aggregated information of pods scheduled (including assumed to be)
 	// on this node.
+	// The snapshot only includes Nodes that are not deleted at the time this function is called.
+	// nodeinfo.Node() is guaranteed to be not nil for all the nodes in the snapshot.
 	UpdateSnapshot(nodeSnapshot *Snapshot) error
 
 	// Dump produces a dump of the current cache.

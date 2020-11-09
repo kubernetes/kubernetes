@@ -96,8 +96,8 @@ const (
 const (
 	// PreConfiguredBackendPoolLoadBalancerTypesNone means that the load balancers are not pre-configured
 	PreConfiguredBackendPoolLoadBalancerTypesNone = ""
-	// PreConfiguredBackendPoolLoadBalancerTypesInteral means that the `internal` load balancers are pre-configured
-	PreConfiguredBackendPoolLoadBalancerTypesInteral = "internal"
+	// PreConfiguredBackendPoolLoadBalancerTypesInternal means that the `internal` load balancers are pre-configured
+	PreConfiguredBackendPoolLoadBalancerTypesInternal = "internal"
 	// PreConfiguredBackendPoolLoadBalancerTypesExternal means that the `external` load balancers are pre-configured
 	PreConfiguredBackendPoolLoadBalancerTypesExternal = "external"
 	// PreConfiguredBackendPoolLoadBalancerTypesAll means that all load balancers are pre-configured
@@ -197,6 +197,12 @@ type Config struct {
 	//   "external": for external LoadBalancer
 	//   "all": for both internal and external LoadBalancer
 	PreConfiguredBackendPoolLoadBalancerTypes string `json:"preConfiguredBackendPoolLoadBalancerTypes,omitempty" yaml:"preConfiguredBackendPoolLoadBalancerTypes,omitempty"`
+	// EnableMultipleStandardLoadBalancers determines the behavior of the standard load balancer. If set to true
+	// there would be one standard load balancer per VMAS or VMSS, which is similar with the behavior of the basic
+	// load balancer. Users could select the specific standard load balancer for their service by the service
+	// annotation `service.beta.kubernetes.io/azure-load-balancer-mode`, If set to false, the same standard load balancer
+	// would be shared by all services in the cluster. In this case, the mode selection annotation would be ignored.
+	EnableMultipleStandardLoadBalancers bool `json:"enableMultipleStandardLoadBalancers,omitempty" yaml:"enableMultipleStandardLoadBalancers,omitempty"`
 
 	// AvailabilitySetNodesCacheTTLInSeconds sets the Cache TTL for availabilitySetNodesCache
 	// if not set, will use default value
@@ -248,7 +254,7 @@ type Cloud struct {
 
 	ResourceRequestBackoff wait.Backoff
 	metadata               *InstanceMetadataService
-	vmSet                  VMSet
+	VMSet                  VMSet
 
 	// ipv6DualStack allows overriding for unit testing.  It's normally initialized from featuregates
 	ipv6DualStackEnabled bool
@@ -383,7 +389,7 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 	if err == auth.ErrorNoAuth {
 		// Only controller-manager would lazy-initialize from secret, and credentials are required for such case.
 		if fromSecret {
-			err := fmt.Errorf("No credentials provided for Azure cloud provider")
+			err := fmt.Errorf("no credentials provided for Azure cloud provider")
 			klog.Fatalf("%v", err)
 			return err
 		}
@@ -491,12 +497,12 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 	}
 
 	if strings.EqualFold(vmTypeVMSS, az.Config.VMType) {
-		az.vmSet, err = newScaleSet(az)
+		az.VMSet, err = newScaleSet(az)
 		if err != nil {
 			return err
 		}
 	} else {
-		az.vmSet = newAvailabilitySet(az)
+		az.VMSet = newAvailabilitySet(az)
 	}
 
 	az.vmCache, err = az.newVMCache()
@@ -665,6 +671,7 @@ func (az *Cloud) Instances() (cloudprovider.Instances, bool) {
 }
 
 // InstancesV2 returns an instancesV2 interface. Also returns true if the interface is supported, false otherwise.
+// TODO: implement ONLY for external cloud provider
 func (az *Cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
 	return nil, false
 }
@@ -726,8 +733,8 @@ func (az *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 		UpdateFunc: func(prev, obj interface{}) {
 			prevNode := prev.(*v1.Node)
 			newNode := obj.(*v1.Node)
-			if newNode.Labels[v1.LabelZoneFailureDomain] ==
-				prevNode.Labels[v1.LabelZoneFailureDomain] {
+			if newNode.Labels[v1.LabelFailureDomainBetaZone] ==
+				prevNode.Labels[v1.LabelFailureDomainBetaZone] {
 				return
 			}
 			az.updateNodeCaches(prevNode, newNode)
@@ -761,7 +768,7 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 
 	if prevNode != nil {
 		// Remove from nodeZones cache.
-		prevZone, ok := prevNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
+		prevZone, ok := prevNode.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone]
 		if ok && az.isAvailabilityZone(prevZone) {
 			az.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
 			if az.nodeZones[prevZone].Len() == 0 {
@@ -784,7 +791,7 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 
 	if newNode != nil {
 		// Add to nodeZones cache.
-		newZone, ok := newNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
+		newZone, ok := newNode.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone]
 		if ok && az.isAvailabilityZone(newZone) {
 			if az.nodeZones[newZone] == nil {
 				az.nodeZones[newZone] = sets.NewString()
@@ -809,7 +816,7 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 // GetActiveZones returns all the zones in which k8s nodes are currently running.
 func (az *Cloud) GetActiveZones() (sets.String, error) {
 	if az.nodeInformerSynced == nil {
-		return nil, fmt.Errorf("Azure cloud provider doesn't have informers set")
+		return nil, fmt.Errorf("azure cloud provider doesn't have informers set")
 	}
 
 	az.nodeCachesLock.RLock()

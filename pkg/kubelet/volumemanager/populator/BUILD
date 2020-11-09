@@ -60,6 +60,7 @@ go_test(
         "//pkg/kubelet/status:go_default_library",
         "//pkg/kubelet/status/testing:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
+        "//pkg/volume:go_default_library",
         "//pkg/volume/csimigration:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util:go_default_library",

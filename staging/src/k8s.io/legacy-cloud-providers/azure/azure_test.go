@@ -231,6 +231,7 @@ func setMockLBs(az *Cloud, ctrl *gomock.Controller, expectedLBs *[]network.LoadB
 		fips := []network.FrontendIPConfiguration{
 			{
 				Name: to.StringPtr(fmt.Sprintf("a%s%d", fullServiceName, serviceIndex)),
+				ID:   to.StringPtr("fip"),
 				FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
 					PrivateIPAllocationMethod: "Dynamic",
 					PublicIPAddress:           &network.PublicIPAddress{ID: to.StringPtr(fmt.Sprintf("testCluster-a%s%d", fullServiceName, serviceIndex))},
@@ -249,6 +250,7 @@ func setMockLBs(az *Cloud, ctrl *gomock.Controller, expectedLBs *[]network.LoadB
 		})
 		fip := network.FrontendIPConfiguration{
 			Name: to.StringPtr(fmt.Sprintf("a%s%d", fullServiceName, serviceIndex)),
+			ID:   to.StringPtr("fip"),
 			FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
 				PrivateIPAllocationMethod: "Dynamic",
 				PublicIPAddress:           &network.PublicIPAddress{ID: to.StringPtr(fmt.Sprintf("testCluster-a%s%d", fullServiceName, serviceIndex))},
@@ -292,10 +294,10 @@ func testLoadBalancerServiceDefaultModeSelection(t *testing.T, isInternal bool) 
 		svcName := fmt.Sprintf("service-%d", index)
 		var svc v1.Service
 		if isInternal {
-			svc = getInternalTestService(svcName, 8081)
+			svc = getInternalTestService(svcName, int32(index))
 			validateTestSubnet(t, az, &svc)
 		} else {
-			svc = getTestService(svcName, v1.ProtocolTCP, nil, false, 8081)
+			svc = getTestService(svcName, v1.ProtocolTCP, nil, false, int32(index))
 		}
 
 		expectedLBName := setMockLBs(az, ctrl, &expectedLBs, "service", 1, index, isInternal)
@@ -349,10 +351,10 @@ func testLoadBalancerServiceAutoModeSelection(t *testing.T, isInternal bool) {
 		svcName := fmt.Sprintf("service-%d", index)
 		var svc v1.Service
 		if isInternal {
-			svc = getInternalTestService(svcName, 8081)
+			svc = getInternalTestService(svcName, int32(index))
 			validateTestSubnet(t, az, &svc)
 		} else {
-			svc = getTestService(svcName, v1.ProtocolTCP, nil, false, 8081)
+			svc = getTestService(svcName, v1.ProtocolTCP, nil, false, int32(index))
 		}
 		setLoadBalancerAutoModeAnnotation(&svc)
 
@@ -421,10 +423,10 @@ func testLoadBalancerServicesSpecifiedSelection(t *testing.T, isInternal bool) {
 		svcName := fmt.Sprintf("service-%d", index)
 		var svc v1.Service
 		if isInternal {
-			svc = getInternalTestService(svcName, 8081)
+			svc = getInternalTestService(svcName, int32(index))
 			validateTestSubnet(t, az, &svc)
 		} else {
-			svc = getTestService(svcName, v1.ProtocolTCP, nil, false, 8081)
+			svc = getTestService(svcName, v1.ProtocolTCP, nil, false, int32(index))
 		}
 		lbMode := fmt.Sprintf("%s,%s", selectedAvailabilitySetName1, selectedAvailabilitySetName2)
 		setLoadBalancerModeAnnotation(&svc, lbMode)
@@ -470,10 +472,10 @@ func testLoadBalancerMaxRulesServices(t *testing.T, isInternal bool) {
 		svcName := fmt.Sprintf("service-%d", index)
 		var svc v1.Service
 		if isInternal {
-			svc = getInternalTestService(svcName, 8081)
+			svc = getInternalTestService(svcName, int32(index))
 			validateTestSubnet(t, az, &svc)
 		} else {
-			svc = getTestService(svcName, v1.ProtocolTCP, nil, false, 8081)
+			svc = getTestService(svcName, v1.ProtocolTCP, nil, false, int32(index))
 		}
 
 		setMockLBs(az, ctrl, &expectedLBs, "service", az.Config.MaximumLoadBalancerRuleCount, index, isInternal)
@@ -551,10 +553,10 @@ func testLoadBalancerServiceAutoModeDeleteSelection(t *testing.T, isInternal boo
 		svcName := fmt.Sprintf("service-%d", index)
 		var svc v1.Service
 		if isInternal {
-			svc = getInternalTestService(svcName, 8081)
+			svc = getInternalTestService(svcName, int32(index))
 			validateTestSubnet(t, az, &svc)
 		} else {
-			svc = getTestService(svcName, v1.ProtocolTCP, nil, false, 8081)
+			svc = getTestService(svcName, v1.ProtocolTCP, nil, false, int32(index))
 		}
 		setLoadBalancerAutoModeAnnotation(&svc)
 
@@ -573,10 +575,10 @@ func testLoadBalancerServiceAutoModeDeleteSelection(t *testing.T, isInternal boo
 		svcName := fmt.Sprintf("service-%d", index)
 		var svc v1.Service
 		if isInternal {
-			svc = getInternalTestService(svcName, 8081)
+			svc = getInternalTestService(svcName, int32(index))
 			validateTestSubnet(t, az, &svc)
 		} else {
-			svc = getTestService(svcName, v1.ProtocolTCP, nil, false, 8081)
+			svc = getTestService(svcName, v1.ProtocolTCP, nil, false, int32(index))
 		}
 
 		setLoadBalancerAutoModeAnnotation(&svc)
@@ -919,7 +921,7 @@ func TestReconcileLoadBalancerMultipleServices(t *testing.T) {
 	setMockEnv(az, ctrl, expectedInterfaces, expectedVirtualMachines, 2)
 
 	svc1 := getTestService("service1", v1.ProtocolTCP, nil, false, 80, 443)
-	svc2 := getTestService("service2", v1.ProtocolTCP, nil, false, 80)
+	svc2 := getTestService("service2", v1.ProtocolTCP, nil, false, 81)
 
 	expectedLBs := make([]network.LoadBalancer, 0)
 	setMockLBs(az, ctrl, &expectedLBs, "service", 1, 1, false)
@@ -945,7 +947,7 @@ func findLBRuleForPort(lbRules []network.LoadBalancingRule, port int32) (network
 			return lbRule, nil
 		}
 	}
-	return network.LoadBalancingRule{}, fmt.Errorf("Expected LB rule with port %d but none found", port)
+	return network.LoadBalancingRule{}, fmt.Errorf("expected LB rule with port %d but none found", port)
 }
 
 func TestServiceDefaultsToNoSessionPersistence(t *testing.T) {
@@ -1030,7 +1032,7 @@ func TestServiceRespectsNoSessionAffinity(t *testing.T) {
 	mockPIPsClient := mockpublicipclient.NewMockInterface(ctrl)
 	az.PublicIPAddressesClient = mockPIPsClient
 	mockPIPsClient.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	mockPIPsClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "testCluster-aservicesanone", gomock.Any()).Return(expectedPIP, nil).AnyTimes()
+	mockPIPsClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, gomock.Any(), gomock.Any()).Return(expectedPIP, nil).AnyTimes()
 
 	lb, err := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true /* wantLb */)
 	if err != nil {
@@ -1082,7 +1084,7 @@ func TestServiceRespectsClientIPSessionAffinity(t *testing.T) {
 	mockPIPsClient := mockpublicipclient.NewMockInterface(ctrl)
 	az.PublicIPAddressesClient = mockPIPsClient
 	mockPIPsClient.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	mockPIPsClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, "testCluster-aservicesaclientip", gomock.Any()).Return(expectedPIP, nil).AnyTimes()
+	mockPIPsClient.EXPECT().Get(gomock.Any(), az.ResourceGroup, gomock.Any(), gomock.Any()).Return(expectedPIP, nil).AnyTimes()
 
 	lb, err := az.reconcileLoadBalancer(testClusterName, &svc, clusterResources.nodes, true /* wantLb */)
 	if err != nil {
@@ -1257,7 +1259,7 @@ func TestReconcileSecurityGroupEtagMismatch(t *testing.T) {
 
 	newSG, err := az.reconcileSecurityGroup(testClusterName, &svc1, &lbStatus.Ingress[0].IP, true /* wantLb */)
 	assert.Nil(t, newSG)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 
 	assert.Equal(t, expectedError.Error(), err)
 }
@@ -1600,7 +1602,7 @@ func validateLoadBalancer(t *testing.T, loadBalancer *network.LoadBalancer, serv
 				}
 			}
 			expectedFrontendIP := ExpectedFrontendIPInfo{
-				Name:   az.getFrontendIPConfigName(&svc),
+				Name:   az.getDefaultFrontendIPConfigName(&svc),
 				Subnet: to.StringPtr(expectedSubnetName),
 			}
 			expectedFrontendIPs = append(expectedFrontendIPs, expectedFrontendIP)
@@ -1881,7 +1883,7 @@ func TestSecurityRulePriorityFailsIfExhausted(t *testing.T) {
 
 	_, err := getNextAvailablePriority(rules)
 	if err == nil {
-		t.Error("Expectected an error. There are no priority levels left.")
+		t.Error("Expect an error. There are no priority levels left.")
 	}
 }
 
@@ -2180,7 +2182,7 @@ func TestGetNodeNameByProviderID(t *testing.T) {
 	}
 
 	for _, test := range providers {
-		name, err := az.vmSet.GetNodeNameByProviderID(test.providerID)
+		name, err := az.VMSet.GetNodeNameByProviderID(test.providerID)
 		if (err != nil) != test.fail {
 			t.Errorf("Expected to fail=%t, with pattern %v", test.fail, test)
 		}
@@ -3090,7 +3092,7 @@ func TestGetResourceGroupFromDiskURI(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			// case insentive check
+			// case insensitive check
 			diskURL:        "/subscriptions/4be8920b-2978-43d7-axyz-04d8549c1d05/resourcegroups/azure-k8s1102/providers/Microsoft.Compute/disks/andy-mghyb1102-dynamic-pvc-f7f014c9-49f4-11e8-ab5c-000d3af7b38e",
 			expectedResult: "azure-k8s1102",
 			expectError:    false,
@@ -3246,9 +3248,9 @@ func TestUpdateNodeCaches(t *testing.T) {
 	prevNode := v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				v1.LabelZoneFailureDomain:  zone,
-				externalResourceGroupLabel: "true",
-				managedByAzureLabel:        "false",
+				v1.LabelFailureDomainBetaZone: zone,
+				externalResourceGroupLabel:    "true",
+				managedByAzureLabel:           "false",
 			},
 			Name: "prevNode",
 		},
@@ -3262,9 +3264,9 @@ func TestUpdateNodeCaches(t *testing.T) {
 	newNode := v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				v1.LabelZoneFailureDomain:  zone,
-				externalResourceGroupLabel: "true",
-				managedByAzureLabel:        "false",
+				v1.LabelFailureDomainBetaZone: zone,
+				externalResourceGroupLabel:    "true",
+				managedByAzureLabel:           "false",
 			},
 			Name: "newNode",
 		},
@@ -3283,7 +3285,7 @@ func TestGetActiveZones(t *testing.T) {
 
 	az.nodeInformerSynced = nil
 	zones, err := az.GetActiveZones()
-	expectedErr := fmt.Errorf("Azure cloud provider doesn't have informers set")
+	expectedErr := fmt.Errorf("azure cloud provider doesn't have informers set")
 	assert.Equal(t, expectedErr, err)
 	assert.Nil(t, zones)
 

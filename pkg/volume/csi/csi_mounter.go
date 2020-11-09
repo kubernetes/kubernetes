@@ -35,8 +35,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -278,7 +279,8 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	if c.supportsFSGroup(fsType, mounterArgs.FsGroup, c.fsGroupPolicy) {
-		err := volume.SetVolumeOwnership(c, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+		// fullPluginName helps to distinguish different driver from csi plugin
+		err := volume.SetVolumeOwnership(c, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(c.plugin, c.spec))
 		if err != nil {
 			// At this point mount operation is successful:
 			//   1. Since volume can not be used by the pod because of invalid permissions, we must return error

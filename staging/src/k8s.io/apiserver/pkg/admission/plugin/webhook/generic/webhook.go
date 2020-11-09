@@ -141,7 +141,18 @@ func (a *Webhook) ValidateInitialization() error {
 // ShouldCallHook returns invocation details if the webhook should be called, nil if the webhook should not be called,
 // or an error if an error was encountered during evaluation.
 func (a *Webhook) ShouldCallHook(h webhook.WebhookAccessor, attr admission.Attributes, o admission.ObjectInterfaces) (*WebhookInvocation, *apierrors.StatusError) {
-	var err *apierrors.StatusError
+	matches, matchNsErr := a.namespaceMatcher.MatchNamespaceSelector(h, attr)
+	// Should not return an error here for webhooks which do not apply to the request, even if err is an unexpected scenario.
+	if !matches && matchNsErr == nil {
+		return nil, nil
+	}
+
+	// Should not return an error here for webhooks which do not apply to the request, even if err is an unexpected scenario.
+	matches, matchObjErr := a.objectMatcher.MatchObjectSelector(h, attr)
+	if !matches && matchObjErr == nil {
+		return nil, nil
+	}
+
 	var invocation *WebhookInvocation
 	for _, r := range h.GetRules() {
 		m := rules.Matcher{Rule: r, Attr: attr}
@@ -189,15 +200,11 @@ func (a *Webhook) ShouldCallHook(h webhook.WebhookAccessor, attr admission.Attri
 	if invocation == nil {
 		return nil, nil
 	}
-
-	matches, err := a.namespaceMatcher.MatchNamespaceSelector(h, attr)
-	if !matches || err != nil {
-		return nil, err
+	if matchNsErr != nil {
+		return nil, matchNsErr
 	}
-
-	matches, err = a.objectMatcher.MatchObjectSelector(h, attr)
-	if !matches || err != nil {
-		return nil, err
+	if matchObjErr != nil {
+		return nil, matchObjErr
 	}
 
 	return invocation, nil

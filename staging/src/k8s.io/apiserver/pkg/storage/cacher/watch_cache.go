@@ -320,8 +320,9 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	}
 
 	// Avoid calling event handler under lock.
-	// This is safe as long as there is at most one call to processEvent in flight
-	// at any point in time.
+	// This is safe as long as there is at most one call to Add/Update/Delete and
+	// UpdateResourceVersion in flight at any point in time, which is true now,
+	// because reflector calls them synchronously from its main thread.
 	if w.eventHandler != nil {
 		w.eventHandler(wcEvent)
 	}
@@ -379,6 +380,32 @@ func (w *watchCache) doCacheResizeLocked(capacity int) {
 	w.cache = newCache
 	recordsWatchCacheCapacityChange(w.objectType.String(), w.capacity, capacity)
 	w.capacity = capacity
+}
+
+func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
+	rv, err := w.versioner.ParseResourceVersion(resourceVersion)
+	if err != nil {
+		klog.Errorf("Couldn't parse resourceVersion: %v", err)
+		return
+	}
+
+	func() {
+		w.Lock()
+		defer w.Unlock()
+		w.resourceVersion = rv
+	}()
+
+	// Avoid calling event handler under lock.
+	// This is safe as long as there is at most one call to Add/Update/Delete and
+	// UpdateResourceVersion in flight at any point in time, which is true now,
+	// because reflector calls them synchronously from its main thread.
+	if w.eventHandler != nil {
+		wcEvent := &watchCacheEvent{
+			Type:            watch.Bookmark,
+			ResourceVersion: rv,
+		}
+		w.eventHandler(wcEvent)
+	}
 }
 
 // List returns list of pointers to <storeElement> objects.

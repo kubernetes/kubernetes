@@ -55,7 +55,7 @@ func TestCreatePdb(t *testing.T) {
 	cmd := NewCmdCreatePodDisruptionBudget(tf, ioStreams)
 	cmd.Flags().Set("min-available", "1")
 	cmd.Flags().Set("selector", "app=rails")
-	cmd.Flags().Set("dry-run", "true")
+	cmd.Flags().Set("dry-run", "client")
 	cmd.Flags().Set("output", outputFormat)
 
 	printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)

@@ -41,7 +41,7 @@ function convert-manifest-params {
   for flag in "${FLAGS[@]}"; do
     params+="\n\"$flag\","
   done
-  if [ ! -z $params ]; then
+  if [ -n "$params" ]; then
     echo "${params::-1}"  #  drop trailing comma
   fi
 }
@@ -118,6 +118,8 @@ function gce-metadata-fw-helper {
       ;;
   esac
 
+  # Deliberately allow word split here
+  # shellcheck disable=SC2086
   iptables ${command} OUTPUT -p tcp --dport 80 -d ${METADATA_SERVER_IP} -m owner ${invert:-} --uid-owner=${METADATA_SERVER_ALLOWED_UID_RANGE:-0-2999} -j ${action}
 }
 
@@ -171,8 +173,10 @@ function config-ip-firewall {
   # node because we don't expect the daemonset to run on this node.
   if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]] && [[ ! "${METADATA_CONCEALMENT_NO_FIREWALL:-}" == "true" ]]; then
     echo "Add rule for metadata concealment"
-    iptables -w -t nat -I PREROUTING -p tcp -d ${METADATA_SERVER_IP} --dport 80 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j DNAT --to-destination 127.0.0.1:988
+    iptables -w -t nat -I PREROUTING -p tcp ! -i eth0 -d "${METADATA_SERVER_IP}" --dport 80 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j REDIRECT --to-ports 988
+    iptables -w -t nat -I PREROUTING -p tcp ! -i eth0 -d "${METADATA_SERVER_IP}" --dport 8080 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j REDIRECT --to-ports 987
   fi
+  iptables -w -t raw -I OUTPUT -s 169.254.169.254 -j DROP
 
   # Log all metadata access not from approved processes.
   case "${METADATA_SERVER_FIREWALL_MODE:-off}" in
@@ -200,7 +204,7 @@ function get-local-disk-num() {
   local format="${2}"
 
   localdisknum=0
-  if [[ ! -z "${NODE_LOCAL_SSDS_EXT:-}" ]]; then
+  if [[ -n "${NODE_LOCAL_SSDS_EXT:-}" ]]; then
     IFS=";" read -r -a ssdgroups <<< "${NODE_LOCAL_SSDS_EXT:-}"
     for ssdgroup in "${ssdgroups[@]}"; do
       IFS="," read -r -a ssdopts <<< "${ssdgroup}"
@@ -246,13 +250,13 @@ function get-or-generate-uuid(){
   fi
 
   # each line of the ssdmap looks like "${device} persistent-uuid"
-  if [[ ! -z $(grep ${device} ${ssdmap}) ]]; then
+  local myuuid
+  if grep -q "${device}" "${ssdmap}"; then
     #create symlink based on saved uuid
-    local myuuid=$(grep ${device} ${ssdmap} | cut -d ' ' -f 2)
+    myuuid=$(grep "${device}" "${ssdmap}" | cut -d ' ' -f 2)
   else
     # generate new uuid and add it to the map
-    local myuuid=$(uuidgen)
-    if [[ ! ${?} -eq 0 ]]; then
+    if ! myuuid=$(uuidgen); then
       echo "Failed to generate valid UUID with uuidgen" >&2
       exit 2
     fi
@@ -270,8 +274,10 @@ function get-or-generate-uuid(){
 #Formats the given device ($1) if needed and mounts it at given mount point
 # ($2).
 function safe-format-and-mount() {
-  local device="${1}"
-  local mountpoint="${2}"
+  local device
+  local mountpoint
+  device="$1"
+  mountpoint="$2"
 
   # Format only if the disk is not already formatted.
   if ! tune2fs -l "${device}" ; then
@@ -288,16 +294,19 @@ function safe-format-and-mount() {
 # Gets a devices UUID and bind mounts the device to mount location in
 # /mnt/disks/by-id/
 function unique-uuid-bind-mount(){
-  local mountpoint="${1}"
-  local actual_device="${2}"
+  local mountpoint
+  local actual_device
+  mountpoint="$1"
+  actual_device="$2"
 
   # Trigger udev refresh so that newly formatted devices are propagated in by-uuid
   udevadm control --reload-rules
   udevadm trigger
   udevadm settle
 
-  # grep the exact match of actual device, prevents substring matching
-  local myuuid=$(ls -l /dev/disk/by-uuid/ | grep "/${actual_device}$" | tr -s ' ' | cut -d ' ' -f 9)
+  # find uuid for actual_device
+  local myuuid
+  myuuid=$(find -L /dev/disk/by-uuid -maxdepth 1 -samefile /dev/"${actual_device}" -printf '%P')
   # myuuid should be the uuid of the device as found in /dev/disk/by-uuid/
   if [[ -z "${myuuid}" ]]; then
     echo "Failed to get a uuid for device ${actual_device} when mounting." >&2
@@ -340,7 +349,8 @@ function mount-ext(){
   # TODO: Handle partitioned disks. Right now this code just ignores partitions
   if [[ "${format}" == "fs" ]]; then
     if [[ "${interface}" == "scsi" ]]; then
-      local actual_device=$(readlink -f "${ssd}" | cut -d '/' -f 3)
+      local actual_device
+      actual_device=$(readlink -f "${ssd}" | cut -d '/' -f 3)
       # Error checking
       if [[ "${actual_device}" != sd* ]]; then
         echo "'actual_device' is not of the correct format. It must be the kernel name of the device, got ${actual_device} instead" >&2
@@ -350,7 +360,8 @@ function mount-ext(){
     else
       # This path is required because the existing Google images do not
       # expose NVMe devices in /dev/disk/by-id so we are using the /dev/nvme instead
-      local actual_device=$(echo ${ssd} | cut -d '/' -f 3)
+      local actual_device
+      actual_device=$(echo "${ssd}" | cut -d '/' -f 3)
       # Error checking
       if [[ "${actual_device}" != nvme* ]]; then
         echo "'actual_device' is not of the correct format. It must be the kernel name of the device, got ${actual_device} instead" >&2
@@ -362,7 +373,7 @@ function mount-ext(){
     safe-format-and-mount "${ssd}" "${mountpoint}"
     # We only do the bindmount if users are using the new local ssd request method
     # see https://github.com/kubernetes/kubernetes/pull/53466#discussion_r146431894
-    if [[ ! -z "${NODE_LOCAL_SSDS_EXT:-}" ]]; then
+    if [[ -n "${NODE_LOCAL_SSDS_EXT:-}" ]]; then
       unique-uuid-bind-mount "${mountpoint}" "${actual_device}"
     fi
   elif [[ "${format}" == "block" ]]; then
@@ -376,12 +387,17 @@ function mount-ext(){
 # Local ssds, if present, are mounted or symlinked to their appropriate
 # locations
 function ensure-local-ssds() {
+  if [ "${NODE_LOCAL_SSDS_EPHEMERAL:-false}" == "true" ]; then
+    ensure-local-ssds-ephemeral-storage
+    return
+  fi
   get-local-disk-num "scsi" "block"
   local scsiblocknum="${localdisknum}"
   local i=0
   for ssd in /dev/disk/by-id/google-local-ssd-*; do
     if [ -e "${ssd}" ]; then
-      local devicenum=`echo ${ssd} | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/'`
+      local devicenum
+      devicenum=$(echo "${ssd}" | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/')
       if [[ "${i}" -lt "${scsiblocknum}" ]]; then
         mount-ext "${ssd}" "${devicenum}" "scsi" "block"
       else
@@ -410,8 +426,9 @@ function ensure-local-ssds() {
     if [ -e "${ssd}" ]; then
       # This workaround to find if the NVMe device is a disk is required because
       # the existing Google images does not expose NVMe devices in /dev/disk/by-id
-      if [[ `udevadm info --query=property --name=${ssd} | grep DEVTYPE | sed "s/DEVTYPE=//"` == "disk" ]]; then
-        local devicenum=`echo ${ssd} | sed -e 's/\/dev\/nvme0n\([0-9]*\)/\1/'`
+      if [[ $(udevadm info --query=property --name="${ssd}" | grep DEVTYPE | sed "s/DEVTYPE=//") == "disk" ]]; then
+        # shellcheck disable=SC2155
+        local devicenum=$(echo "${ssd}" | sed -e 's/\/dev\/nvme0n\([0-9]*\)/\1/')
         if [[ "${i}" -lt "${nvmeblocknum}" ]]; then
           mount-ext "${ssd}" "${devicenum}" "nvme" "block"
         else
@@ -425,20 +442,78 @@ function ensure-local-ssds() {
   done
 }
 
+# Local SSDs, if present, are used in a single RAID 0 array and directories that
+# back ephemeral storage are mounted on them (kubelet root, container runtime
+# root and pod logs).
+function ensure-local-ssds-ephemeral-storage() {
+  local devices=()
+  # Get nvme devices
+  for ssd in /dev/nvme*n*; do
+    if [ -e "${ssd}" ]; then
+      # This workaround to find if the NVMe device is a local SSD is required
+      # because the existing Google images does not them in /dev/disk/by-id
+      if [[ "$(lsblk -o MODEL -dn "${ssd}")" == "nvme_card" ]]; then
+        devices+=("${ssd}")
+      fi
+    fi
+  done
+  if [ "${#devices[@]}" -eq 0 ]; then
+    echo "No local NVMe SSD disks found."
+    return
+  fi
+
+  local device="${devices[0]}"
+  if [ "${#devices[@]}" -ne 1 ]; then
+    seen_arrays=(/dev/md/*)
+    device=${seen_arrays[0]}
+    echo "Setting RAID array with local SSDs on device ${device}"
+    if [ ! -e "$device" ]; then
+      device="/dev/md/0"
+      echo "y" | mdadm --create "${device}" --level=0 --raid-devices=${#devices[@]} "${devices[@]}"
+    fi
+  fi
+
+  local ephemeral_mountpoint="/mnt/stateful_partition/kube-ephemeral-ssd"
+  safe-format-and-mount "${device}" "${ephemeral_mountpoint}"
+
+  # mount container runtime root dir on SSD
+  local container_runtime="${CONTAINER_RUNTIME:-docker}"
+  systemctl stop "$container_runtime"
+  # Some images remount the container runtime root dir.
+  umount "/var/lib/${container_runtime}" || true
+  # Move the container runtime's directory to the new location to preserve
+  # preloaded images.
+  if [ ! -d "${ephemeral_mountpoint}/${container_runtime}" ]; then
+    mv "/var/lib/${container_runtime}" "${ephemeral_mountpoint}/${container_runtime}"
+  fi
+  safe-bind-mount "${ephemeral_mountpoint}/${container_runtime}" "/var/lib/${container_runtime}"
+  systemctl start "$container_runtime"
+
+  # mount kubelet root dir on SSD
+  mkdir -p "${ephemeral_mountpoint}/kubelet"
+  safe-bind-mount "${ephemeral_mountpoint}/kubelet" "/var/lib/kubelet"
+
+  # mount pod logs root dir on SSD
+  mkdir -p "${ephemeral_mountpoint}/log_pods"
+  safe-bind-mount "${ephemeral_mountpoint}/log_pods" "/var/log/pods"
+}
+
 # Installs logrotate configuration files
 function setup-logrotate() {
   mkdir -p /etc/logrotate.d/
-  # Configure log rotation for all logs in /var/log, which is where k8s services
-  # are configured to write their log files. Whenever logrotate is ran, this
-  # config will:
-  # * rotate the log file if its size is > 100Mb OR if one day has elapsed
-  # * save rotated logs into a gzipped timestamped backup
-  # * log file timestamp (controlled by 'dateformat') includes seconds too. This
-  #   ensures that logrotate can generate unique logfiles during each rotation
-  #   (otherwise it skips rotation if 'maxsize' is reached multiple times in a
-  #   day).
-  # * keep only 5 old (rotated) logs, and will discard older logs.
-  cat > /etc/logrotate.d/allvarlogs <<EOF
+
+  if [[ "${ENABLE_LOGROTATE_FILES:-true}" = "true" ]]; then
+    # Configure log rotation for all logs in /var/log, which is where k8s services
+    # are configured to write their log files. Whenever logrotate is ran, this
+    # config will:
+    # * rotate the log file if its size is > 100Mb OR if one day has elapsed
+    # * save rotated logs into a gzipped timestamped backup
+    # * log file timestamp (controlled by 'dateformat') includes seconds too. This
+    #   ensures that logrotate can generate unique logfiles during each rotation
+    #   (otherwise it skips rotation if 'maxsize' is reached multiple times in a
+    #   day).
+    # * keep only 5 old (rotated) logs, and will discard older logs.
+    cat > /etc/logrotate.d/allvarlogs <<EOF
 /var/log/*.log {
     rotate ${LOGROTATE_FILES_MAX_COUNT:-5}
     copytruncate
@@ -452,9 +527,11 @@ function setup-logrotate() {
     create 0644 root root
 }
 EOF
+  fi
 
-  # Configure log rotation for pod logs in /var/log/pods/NAMESPACE_NAME_UID.
-  cat > /etc/logrotate.d/allpodlogs <<EOF
+  if [[ "${ENABLE_POD_LOG:-false}" = "true" ]]; then
+    # Configure log rotation for pod logs in /var/log/pods/NAMESPACE_NAME_UID.
+    cat > /etc/logrotate.d/allpodlogs <<EOF
 /var/log/pods/*/*.log {
     rotate ${POD_LOG_MAX_FILE:-5}
     copytruncate
@@ -468,6 +545,7 @@ EOF
     create 0644 root root
 }
 EOF
+  fi
 }
 
 # Finds the master PD device; returns it in MASTER_PD_DEVICE
@@ -506,7 +584,8 @@ function mount-master-pd {
   # locations.
 
   # Contains all the data stored in etcd.
-  mkdir -m 700 -p "${mount_point}/var/etcd"
+  mkdir -p "${mount_point}/var/etcd"
+  chmod 700 "${mount_point}/var/etcd"
   ln -s -f "${mount_point}/var/etcd" /var/etcd
   mkdir -p /etc/srv
   # Contains the dynamically generated apiserver auth certs and keys.
@@ -528,8 +607,8 @@ function append_or_replace_prefixed_line {
   local -r file="${1:-}"
   local -r prefix="${2:-}"
   local -r suffix="${3:-}"
-  local -r dirname="$(dirname ${file})"
-  local -r tmpfile="$(mktemp -t filtered.XXXX --tmpdir=${dirname})"
+  local -r dirname=$(dirname "${file}")
+  local -r tmpfile=$(mktemp -t filtered.XXXX --tmpdir="${dirname}")
 
   touch "${file}"
   awk -v pfx="${prefix}" 'substr($0,1,length(pfx)) != pfx { print }' "${file}" > "${tmpfile}"
@@ -540,7 +619,12 @@ function append_or_replace_prefixed_line {
 function write-pki-data {
   local data="${1}"
   local path="${2}"
-  (umask 077; echo "${data}" | base64 --decode > "${path}")
+  if [[ -n "${KUBE_PKI_READERS_GROUP:-}" ]]; then
+    (umask 027; echo "${data}" | base64 --decode > "${path}")
+    chgrp "${KUBE_PKI_READERS_GROUP:-}" "${path}"
+  else
+    (umask 077; echo "${data}" | base64 --decode > "${path}")
+  fi
 }
 
 function create-node-pki {
@@ -556,7 +640,7 @@ function create-node-pki {
   CA_CERT_BUNDLE_PATH="${pki_dir}/ca-certificates.crt"
   write-pki-data "${CA_CERT_BUNDLE}" "${CA_CERT_BUNDLE_PATH}"
 
-  if [[ ! -z "${KUBELET_CERT:-}" && ! -z "${KUBELET_KEY:-}" ]]; then
+  if [[ -n "${KUBELET_CERT:-}" && -n "${KUBELET_KEY:-}" ]]; then
     KUBELET_CERT_PATH="${pki_dir}/kubelet.crt"
     write-pki-data "${KUBELET_CERT}" "${KUBELET_CERT_PATH}"
 
@@ -575,7 +659,7 @@ function create-master-pki {
   write-pki-data "${CA_CERT}" "${CA_CERT_PATH}"
 
   # this is not true on GKE
-  if [[ ! -z "${CA_KEY:-}" ]]; then
+  if [[ -n "${CA_KEY:-}" ]]; then
     CA_KEY_PATH="${pki_dir}/ca.key"
     write-pki-data "${CA_KEY}" "${CA_KEY_PATH}"
   fi
@@ -620,7 +704,7 @@ function create-master-pki {
   SERVICEACCOUNT_KEY_PATH="${pki_dir}/serviceaccount.key"
   write-pki-data "${SERVICEACCOUNT_KEY}" "${SERVICEACCOUNT_KEY_PATH}"
 
-  if [[ ! -z "${REQUESTHEADER_CA_CERT:-}" ]]; then
+  if [[ -n "${REQUESTHEADER_CA_CERT:-}" ]]; then
     REQUESTHEADER_CA_CERT_PATH="${pki_dir}/aggr_ca.crt"
     write-pki-data "${REQUESTHEADER_CA_CERT}" "${REQUESTHEADER_CA_CERT_PATH}"
 
@@ -685,14 +769,18 @@ function create-master-auth {
   fi
   if [[ -n "${KONNECTIVITY_SERVER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KONNECTIVITY_SERVER_TOKEN},"     "system:konnectivity-server,uid:system:konnectivity-server"
-    create-kubeconfig "konnectivity-server" ${KONNECTIVITY_SERVER_TOKEN}
+    create-kubeconfig "konnectivity-server" "${KONNECTIVITY_SERVER_TOKEN}"
+  fi
+  if [[ -n "${MONITORING_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${MONITORING_TOKEN},"     "system:monitoring,uid:system:monitoring,system:monitoring"
   fi
 
   if [[ -n "${EXTRA_STATIC_AUTH_COMPONENTS:-}" ]]; then
     # Create a static Bearer token and kubeconfig for extra, comma-separated components.
     IFS="," read -r -a extra_components <<< "${EXTRA_STATIC_AUTH_COMPONENTS:-}"
     for extra_component in "${extra_components[@]}"; do
-      local token="$(secure_random 32)"
+      local token
+      token="$(secure_random 32)"
       append_or_replace_prefixed_line "${known_tokens_csv}" "${token}," "system:${extra_component},uid:system:${extra_component}"
       create-kubeconfig "${extra_component}" "${token}"
     done
@@ -747,14 +835,14 @@ EOF
     use_cloud_config="true"
     if [[ -n "${NODE_TAGS:-}" ]]; then
       # split NODE_TAGS into an array by comma.
-      IFS=',' read -r -a node_tags <<< ${NODE_TAGS}
+      IFS=',' read -r -a node_tags <<< "${NODE_TAGS}"
     else
-      local -r node_tags="${NODE_INSTANCE_PREFIX}"
+      local -r node_tags=("${NODE_INSTANCE_PREFIX}")
     fi
     cat <<EOF >>/etc/gce.conf
 node-instance-prefix = ${NODE_INSTANCE_PREFIX}
 EOF
-    for tag in ${node_tags[@]}; do
+    for tag in "${node_tags[@]}"; do
       cat <<EOF >>/etc/gce.conf
 node-tags = ${tag}
 EOF
@@ -778,8 +866,8 @@ EOF
   if [[ -n "${GCE_ALPHA_FEATURES:-}" ]]; then
     use_cloud_config="true"
     # split GCE_ALPHA_FEATURES into an array by comma.
-    IFS=',' read -r -a alpha_features <<< ${GCE_ALPHA_FEATURES}
-    for feature in ${alpha_features[@]}; do
+    IFS=',' read -r -a alpha_features <<< "${GCE_ALPHA_FEATURES}"
+    for feature in "${alpha_features[@]}"; do
       cat <<EOF >>/etc/gce.conf
 alpha-features = ${feature}
 EOF
@@ -834,7 +922,7 @@ contexts:
   name: webhook
 EOF
   fi
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${PREPARE_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'grpc' ]]; then
       cat <<EOF >/etc/srv/kubernetes/egress_selector_configuration.yaml
 apiVersion: apiserver.k8s.io/v1beta1
@@ -924,7 +1012,7 @@ EOF
     limitedResources:
     - resource: pods
       matchScopes:
-      - scopeName: PriorityClass 
+      - scopeName: PriorityClass
         operator: In
         values: ["system-node-critical", "system-cluster-critical"]
 EOF
@@ -1019,7 +1107,6 @@ function create-master-audit-policy {
       - group: "policy"
       - group: "rbac.authorization.k8s.io"
       - group: "scheduling.k8s.io"
-      - group: "settings.k8s.io"
       - group: "storage.k8s.io"'
 
   cat <<EOF >"${path}"
@@ -1093,7 +1180,7 @@ rules:
       - /version
       - /swagger*
 
-  # Don't log events requests.
+  # Don't log events requests because of performance impact.
   - level: None
     resources:
       - group: "" # core
@@ -1178,12 +1265,19 @@ EOF
   fi
 }
 
+# Create kubeconfig files for control plane components.
 function create-kubeconfig {
   local component=$1
   local token=$2
   echo "Creating kubeconfig file for component ${component}"
-  mkdir -p /etc/srv/kubernetes/${component}
-  cat <<EOF >/etc/srv/kubernetes/${component}/kubeconfig
+  mkdir -p "/etc/srv/kubernetes/${component}"
+
+  local kube_apiserver="localhost"
+  if [[ ${KUBECONFIG_USE_HOST_IP:-} == "true" ]] ; then
+    kube_apiserver=$(hostname -i)
+  fi
+  
+  cat <<EOF >"/etc/srv/kubernetes/${component}/kubeconfig"
 apiVersion: v1
 kind: Config
 users:
@@ -1194,7 +1288,7 @@ clusters:
 - name: local
   cluster:
     insecure-skip-tls-verify: true
-    server: https://localhost:443
+    server: https://${kube_apiserver}:443
 contexts:
 - context:
     cluster: local
@@ -1251,7 +1345,7 @@ function create-master-kubelet-auth {
   # set in the environment.
   if [[ -n "${KUBELET_APISERVER:-}" && -n "${KUBELET_CERT:-}" && -n "${KUBELET_KEY:-}" ]]; then
     REGISTER_MASTER_KUBELET="true"
-    create-kubelet-kubeconfig ${KUBELET_APISERVER}
+    create-kubelet-kubeconfig "${KUBELET_APISERVER}"
   fi
 }
 
@@ -1373,12 +1467,10 @@ function assemble-docker-flags {
   else
     docker_opts+=" --log-level=warn"
   fi
-  local use_net_plugin="true"
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" || "${NETWORK_PROVIDER:-}" == "cni" ]]; then
     # set docker0 cidr to private ip address range to avoid conflict with cbr0 cidr range
     docker_opts+=" --bip=169.254.123.1/24"
   else
-    use_net_plugin="false"
     docker_opts+=" --bridge=cbr0"
   fi
 
@@ -1521,11 +1613,17 @@ EOF
 #
 # $1 is the file to create.
 # $2: the log owner uid to set for the log file.
-# $3: the log owner gid to set for the log file.
+# $3: the log owner gid to set for the log file. If $KUBE_POD_LOG_READERS_GROUP
+# is set then this value will not be used.
 function prepare-log-file {
-  touch $1
-  chmod 644 $1
-  chown "${2:-${LOG_OWNER_USER:-root}}":"${3:-${LOG_OWNER_GROUP:-root}}" $1
+  touch "$1"
+  if [[ -n "${KUBE_POD_LOG_READERS_GROUP:-}" ]]; then
+    chmod 640 "$1"
+    chown "${2:-root}":"${KUBE_POD_LOG_READERS_GROUP}" "$1"
+  else
+    chmod 644 "$1"
+    chown "${2:-${LOG_OWNER_USER:-root}}":"${3:-${LOG_OWNER_GROUP:-root}}" "$1"
+  fi
 }
 
 # Prepares parameters for kube-proxy manifest.
@@ -1549,13 +1647,11 @@ function prepare-kube-proxy-manifest-variables {
     # https://github.com/kubernetes/kubernetes/pull/70398
     local -r kernel_version=$(uname -r | cut -d\. -f1,2)
     local conntrack_module="nf_conntrack"
-    if [[ $(printf "${kernel_version}\n4.18\n" | sort -V | tail -1) == "4.18" ]]; then
+    if [[ $(printf '%s\n4.18\n' "${kernel_version}" | sort -V | tail -1) == "4.18" ]]; then
       conntrack_module="nf_conntrack_ipv4"
     fi
 
-    sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh ${conntrack_module}
-    if [[ $? -eq 0 ]];
-    then
+    if sudo modprobe -a ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh ${conntrack_module}; then
       params+=" --proxy-mode=ipvs"
     else
       # If IPVS modules are not present, make sure the node does not come up as
@@ -1567,6 +1663,9 @@ function prepare-kube-proxy-manifest-variables {
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
     params+=" ${KUBEPROXY_TEST_ARGS}"
   fi
+  if [[ -n "${DETECT_LOCAL_MODE:-}" ]]; then
+    params+=" --detect-local-mode=${DETECT_LOCAL_MODE}"
+  fi
   local container_env=""
   local kube_cache_mutation_detector_env_name=""
   local kube_cache_mutation_detector_env_value=""
@@ -1575,18 +1674,18 @@ function prepare-kube-proxy-manifest-variables {
     kube_cache_mutation_detector_env_name="- name: KUBE_CACHE_MUTATION_DETECTOR"
     kube_cache_mutation_detector_env_value="value: \"${ENABLE_CACHE_MUTATION_DETECTOR}\""
   fi
-  sed -i -e "s@{{kubeconfig}}@${kubeconfig}@g" ${src_file}
-  sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" ${src_file}
-  sed -i -e "s@{{pillar\['kube-proxy_docker_tag'\]}}@${kube_proxy_docker_tag}@g" ${src_file}
-  sed -i -e "s@{{params}}@${params}@g" ${src_file}
-  sed -i -e "s@{{container_env}}@${container_env}@g" ${src_file}
-  sed -i -e "s@{{kube_cache_mutation_detector_env_name}}@${kube_cache_mutation_detector_env_name}@g" ${src_file}
-  sed -i -e "s@{{kube_cache_mutation_detector_env_value}}@${kube_cache_mutation_detector_env_value}@g" ${src_file}
-  sed -i -e "s@{{ cpurequest }}@100m@g" ${src_file}
-  sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" ${src_file}
-  sed -i -e "s@{{kubernetes_service_host_env_value}}@${KUBERNETES_MASTER_NAME}@g" ${src_file}
+  sed -i -e "s@{{kubeconfig}}@${kubeconfig}@g" "${src_file}"
+  sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" "${src_file}"
+  sed -i -e "s@{{pillar\['kube-proxy_docker_tag'\]}}@${kube_proxy_docker_tag}@g" "${src_file}"
+  sed -i -e "s@{{params}}@${params}@g" "${src_file}"
+  sed -i -e "s@{{container_env}}@${container_env}@g" "${src_file}"
+  sed -i -e "s@{{kube_cache_mutation_detector_env_name}}@${kube_cache_mutation_detector_env_name}@g" "${src_file}"
+  sed -i -e "s@{{kube_cache_mutation_detector_env_value}}@${kube_cache_mutation_detector_env_value}@g" "${src_file}"
+  sed -i -e "s@{{ cpurequest }}@100m@g" "${src_file}"
+  sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" "${src_file}"
+  sed -i -e "s@{{kubernetes_service_host_env_value}}@${KUBERNETES_MASTER_NAME}@g" "${src_file}"
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
-    sed -i -e "s@{{cluster_cidr}}@--cluster-cidr=${CLUSTER_IP_RANGE}@g" ${src_file}
+    sed -i -e "s@{{cluster_cidr}}@--cluster-cidr=${CLUSTER_IP_RANGE}@g" "${src_file}"
   fi
 }
 
@@ -1603,13 +1702,13 @@ function start-kube-proxy {
 # Replaces the variables in the etcd manifest file with the real values, and then
 # copy the file to the manifest dir
 # $1: value for variable 'suffix'
-# $2: value for variable 'port'
-# $3: value for variable 'server_port'
+# $2: value for variable 'port', for listening to clients
+# $3: value for variable 'server_port', for etcd peering
 # $4: value for variable 'cpulimit'
 # $5: pod name, which should be either etcd or etcd-events
 function prepare-etcd-manifest {
   local host_name=${ETCD_HOSTNAME:-$(hostname -s)}
-  local host_ip=$(${PYTHON} -c "import socket;print(socket.gethostbyname(\"${host_name}\"))")
+  local -r host_ip=$(${PYTHON} -c "import socket;print(socket.gethostbyname(\"${host_name}\"))")
   local etcd_cluster=""
   local cluster_state="new"
   local etcd_protocol="http"
@@ -1623,19 +1722,43 @@ function prepare-etcd-manifest {
   if [[ -n "${INITIAL_ETCD_CLUSTER_STATE:-}" ]]; then
     cluster_state="${INITIAL_ETCD_CLUSTER_STATE}"
   fi
+
+  # Configure mTLS for etcd peers.
   if [[ -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
     etcd_creds=" --peer-trusted-ca-file /etc/srv/kubernetes/etcd-ca.crt --peer-cert-file /etc/srv/kubernetes/etcd-peer.crt --peer-key-file /etc/srv/kubernetes/etcd-peer.key -peer-client-cert-auth "
     etcd_protocol="https"
   fi
 
-  # mTLS should only be enabled for etcd server but not etcd-events. if $1 suffix is empty, it's etcd server.
+  # host_primary_ip is the primary internal IP of the host.
+  # Override host primary IP if specifically provided.
+  local host_primary_ip
+  host_primary_ip="${HOST_PRIMARY_IP:-$(hostname -i)}"
+
+  # Configure mTLS for clients (e.g. kube-apiserver).
+  # mTLS should only be enabled for etcd server but not etcd-events. If $1 suffix is empty, it's etcd server.
+  local etcd_listen_metrics_urls=""
   if [[ -z "${suffix}" && -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
     etcd_apiserver_creds=" --client-cert-auth --trusted-ca-file ${ETCD_APISERVER_CA_CERT_PATH} --cert-file ${ETCD_APISERVER_SERVER_CERT_PATH} --key-file ${ETCD_APISERVER_SERVER_KEY_PATH} "
     etcd_apiserver_protocol="https"
     etcd_livenessprobe_port="2382"
-    etcd_extra_args+=" --listen-metrics-urls=http://${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}:${etcd_livenessprobe_port} "
+    etcd_listen_metrics_urls="http://${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}:${etcd_livenessprobe_port}"
+    if [[ ${ETCD_LISTEN_ON_HOST_IP:-} == "true" ]]; then
+      etcd_listen_metrics_urls+=",http://${host_primary_ip}:${etcd_livenessprobe_port}"
+    fi
+    etcd_extra_args+=" --listen-metrics-urls=${etcd_listen_metrics_urls} "
   fi
 
+  if [[ -n "${ETCD_PROGRESS_NOTIFY_INTERVAL:-}" ]]; then
+    etcd_extra_args+=" --experimental-watch-progress-notify-interval=${ETCD_PROGRESS_NOTIFY_INTERVAL}"
+  fi
+
+  # If etcd is configured to listen on host IP, an additional client listening URL is added.
+  local etcd_listen_client_urls="${etcd_apiserver_protocol}://${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}:$2"
+  if [[ ${ETCD_LISTEN_ON_HOST_IP:-} == "true" ]] ; then
+    etcd_listen_client_urls+=",${etcd_apiserver_protocol}://${host_primary_ip}:$2"
+  fi
+
+  # Generate etcd member URLs.
   for host in $(echo "${INITIAL_ETCD_CLUSTER:-${host_name}}" | tr "," "\n"); do
     etcd_host="etcd-${host}=${etcd_protocol}://${host}:$3"
     if [[ -n "${etcd_cluster}" ]]; then
@@ -1655,9 +1778,10 @@ function prepare-etcd-manifest {
   sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${temp_file}"
   sed -i -e "s@{{ *liveness_probe_initial_delay *}}@${ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC:-15}@g" "${temp_file}"
   sed -i -e "s@{{ *listen_client_ip *}}@${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}@g" "${temp_file}"
+  sed -i -e "s@{{ *etcd_listen_client_urls *}}@${etcd_listen_client_urls:-}@g" "${temp_file}"
   # Get default storage backend from manifest file.
-  local -r default_storage_backend=$(cat "${temp_file}" | \
-    grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
+  local -r default_storage_backend=$( \
+    grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" "${temp_file}" | \
     sed -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@\1@g")
   if [[ -n "${STORAGE_BACKEND:-}" ]]; then
     sed -i -e "s@{{ *pillar\.get('storage_backend', '\(.*\)') *}}@${STORAGE_BACKEND}@g" "${temp_file}"
@@ -1805,8 +1929,12 @@ function compute-master-manifest-variables {
 
   INSECURE_PORT_MAPPING=""
   if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" == "true" ]]; then
-    INSECURE_PORT_MAPPING="{ \"name\": \"local\", \"containerPort\": 8080, \"hostPort\": 8080},"
+    # INSECURE_PORT_MAPPING is used by sed
+    # shellcheck disable=SC2089
+    INSECURE_PORT_MAPPING='{ "name": "local", "containerPort": 8080, "hostPort": 8080},'
   fi
+  # shellcheck disable=SC2090
+  export INSECURE_PORT_MAPPING
 }
 
 # A helper function that bind mounts kubelet dirs for running mount in a chroot
@@ -1854,8 +1982,10 @@ function update-node-label() {
 
 # A helper function that sets file permissions for kube-controller-manager to
 # run as non root.
+# User and group should never contain characters that need to be quoted
+# shellcheck disable=SC2086
 function run-kube-controller-manager-as-non-root {
-  prepare-log-file /var/log/kube-controller-manager.log ${KUBE_CONTROLLER_MANAGER_RUNASUSER} ${KUBE_CONTROLLER_MANAGER_RUNASGROUP}
+  prepare-log-file /var/log/kube-controller-manager.log ${KUBE_CONTROLLER_MANAGER_RUNASUSER}
   setfacl -m u:${KUBE_CONTROLLER_MANAGER_RUNASUSER}:r "${CA_CERT_BUNDLE_PATH}"
   setfacl -m u:${KUBE_CONTROLLER_MANAGER_RUNASUSER}:r "${SERVICEACCOUNT_CERT_PATH}"
   setfacl -m u:${KUBE_CONTROLLER_MANAGER_RUNASUSER}:r "${SERVICEACCOUNT_KEY_PATH}"
@@ -1873,67 +2003,67 @@ function run-kube-controller-manager-as-non-root {
 #   DOCKER_REGISTRY
 function start-kube-controller-manager {
   echo "Start kubernetes controller-manager"
-  create-kubeconfig "kube-controller-manager" ${KUBE_CONTROLLER_MANAGER_TOKEN}
+  create-kubeconfig "kube-controller-manager" "${KUBE_CONTROLLER_MANAGER_TOKEN}"
   prepare-log-file /var/log/kube-controller-manager.log
   # Calculate variables and assemble the command line.
-  local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
-  params+=" --use-service-account-credentials"
-  params+=" --cloud-provider=gce"
-  params+=" --kubeconfig=/etc/srv/kubernetes/kube-controller-manager/kubeconfig"
-  params+=" --root-ca-file=${CA_CERT_BUNDLE_PATH}"
-  params+=" --service-account-private-key-file=${SERVICEACCOUNT_KEY_PATH}"
+  local params=("${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"}" "${CONTROLLER_MANAGER_TEST_ARGS:-}" "${CLOUD_CONFIG_OPT}")
+  params+=("--use-service-account-credentials")
+  params+=("--cloud-provider=gce")
+  params+=("--kubeconfig=/etc/srv/kubernetes/kube-controller-manager/kubeconfig")
+  params+=("--root-ca-file=${CA_CERT_BUNDLE_PATH}")
+  params+=("--service-account-private-key-file=${SERVICEACCOUNT_KEY_PATH}")
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
-    params+=" --enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}"
+    params+=("--enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}")
   fi
   if [[ -n "${INSTANCE_PREFIX:-}" ]]; then
-    params+=" --cluster-name=${INSTANCE_PREFIX}"
+    params+=("--cluster-name=${INSTANCE_PREFIX}")
   fi
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
-    params+=" --cluster-cidr=${CLUSTER_IP_RANGE}"
+    params+=("--cluster-cidr=${CLUSTER_IP_RANGE}")
   fi
   if [[ -n "${CA_KEY:-}" ]]; then
-    params+=" --cluster-signing-cert-file=${CA_CERT_PATH}"
-    params+=" --cluster-signing-key-file=${CA_KEY_PATH}"
+    params+=("--cluster-signing-cert-file=${CA_CERT_PATH}")
+    params+=("--cluster-signing-key-file=${CA_KEY_PATH}")
   fi
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
-    params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
+    params+=("--service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}")
   fi
   if [[ -n "${CONCURRENT_SERVICE_SYNCS:-}" ]]; then
-    params+=" --concurrent-service-syncs=${CONCURRENT_SERVICE_SYNCS}"
+    params+=("--concurrent-service-syncs=${CONCURRENT_SERVICE_SYNCS}")
   fi
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]]; then
-    params+=" --allocate-node-cidrs=true"
+    params+=("--allocate-node-cidrs=true")
   elif [[ -n "${ALLOCATE_NODE_CIDRS:-}" ]]; then
-    params+=" --allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}"
+    params+=("--allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}")
   fi
   if [[ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]]; then
-    params+=" --terminated-pod-gc-threshold=${TERMINATED_POD_GC_THRESHOLD}"
+    params+=("--terminated-pod-gc-threshold=${TERMINATED_POD_GC_THRESHOLD}")
   fi
   if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
-    params+=" --cidr-allocator-type=${NODE_IPAM_MODE}"
-    params+=" --configure-cloud-routes=false"
+    params+=("--cidr-allocator-type=${NODE_IPAM_MODE}")
+    params+=("--configure-cloud-routes=false")
   fi
   if [[ -n "${FEATURE_GATES:-}" ]]; then
-    params+=" --feature-gates=${FEATURE_GATES}"
+    params+=("--feature-gates=${FEATURE_GATES}")
   fi
   if [[ -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
-    params+=" --flex-volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
+    params+=("--flex-volume-plugin-dir=${VOLUME_PLUGIN_DIR}")
   fi
   if [[ -n "${CLUSTER_SIGNING_DURATION:-}" ]]; then
-    params+=" --cluster-signing-duration=$CLUSTER_SIGNING_DURATION"
+    params+=("--cluster-signing-duration=$CLUSTER_SIGNING_DURATION")
   fi
   # Disable using HPA metrics REST clients if metrics-server isn't enabled,
   # or if we want to explicitly disable it by setting HPA_USE_REST_CLIENT.
   if [[ "${ENABLE_METRICS_SERVER:-}" != "true" ]] ||
      [[ "${HPA_USE_REST_CLIENTS:-}" == "false" ]]; then
-    params+=" --horizontal-pod-autoscaler-use-rest-clients=false"
+    params+=("--horizontal-pod-autoscaler-use-rest-clients=false")
   fi
   if [[ -n "${PV_RECYCLER_OVERRIDE_TEMPLATE:-}" ]]; then
-    params+=" --pv-recycler-pod-template-filepath-nfs=$PV_RECYCLER_OVERRIDE_TEMPLATE"
-    params+=" --pv-recycler-pod-template-filepath-hostpath=$PV_RECYCLER_OVERRIDE_TEMPLATE"
+    params+=("--pv-recycler-pod-template-filepath-nfs=$PV_RECYCLER_OVERRIDE_TEMPLATE")
+    params+=("--pv-recycler-pod-template-filepath-hostpath=$PV_RECYCLER_OVERRIDE_TEMPLATE")
   fi
   if [[ -n "${RUN_CONTROLLERS:-}" ]]; then
-    params+=" --controllers=${RUN_CONTROLLERS}"
+    params+=("--controllers=${RUN_CONTROLLERS}")
   fi
 
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
@@ -1942,13 +2072,14 @@ function start-kube-controller-manager {
     container_env="\"env\":[{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}],"
   fi
 
-  params="$(convert-manifest-params "${params}")"
+  local paramstring
+  paramstring="$(convert-manifest-params "${params[*]}")"
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-controller-manager.manifest"
   # Evaluate variables.
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-controller-manager_docker_tag'\]}}@${kube_rc_docker_tag}@g" "${src_file}"
-  sed -i -e "s@{{params}}@${params}@g" "${src_file}"
-  sed -i -e "s@{{container_env}}@${container_env}@g" ${src_file}
+  sed -i -e "s@{{params}}@${paramstring}@g" "${src_file}"
+  sed -i -e "s@{{container_env}}@${container_env}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
@@ -1979,38 +2110,41 @@ function start-kube-controller-manager {
 #   DOCKER_REGISTRY
 function start-kube-scheduler {
   echo "Start kubernetes scheduler"
-  create-kubeconfig "kube-scheduler" ${KUBE_SCHEDULER_TOKEN}
-  prepare-log-file /var/log/kube-scheduler.log ${KUBE_SCHEDULER_RUNASUSER:-2001} ${KUBE_SCHEDULER_RUNASGROUP:-2001}
+  create-kubeconfig "kube-scheduler" "${KUBE_SCHEDULER_TOKEN}"
+  # User and group should never contain characters that need to be quoted
+  # shellcheck disable=SC2086
+  prepare-log-file /var/log/kube-scheduler.log ${KUBE_SCHEDULER_RUNASUSER:-2001}
 
   # Calculate variables and set them in the manifest.
-  params="${SCHEDULER_TEST_LOG_LEVEL:-"--v=2"} ${SCHEDULER_TEST_ARGS:-}"
+  params=("${SCHEDULER_TEST_LOG_LEVEL:-"--v=2"}" "${SCHEDULER_TEST_ARGS:-}")
   if [[ -n "${FEATURE_GATES:-}" ]]; then
-    params+=" --feature-gates=${FEATURE_GATES}"
+    params+=("--feature-gates=${FEATURE_GATES}")
   fi
 
   # Scheduler Component Config takes precedence over some flags.
   if [[ -n "${KUBE_SCHEDULER_CONFIG:-}" ]]; then
     create-kube-scheduler-config
-    params+=" --config=/etc/srv/kubernetes/kube-scheduler/config"
+    params+=("--config=/etc/srv/kubernetes/kube-scheduler/config")
   else
-    params+=" --kubeconfig=/etc/srv/kubernetes/kube-scheduler/kubeconfig"
+    params+=("--kubeconfig=/etc/srv/kubernetes/kube-scheduler/kubeconfig")
     if [[ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}"  ]]; then
-      params+=" --algorithm-provider=${SCHEDULING_ALGORITHM_PROVIDER}"
+      params+=("--algorithm-provider=${SCHEDULING_ALGORITHM_PROVIDER}")
     fi
     if [[ -n "${SCHEDULER_POLICY_CONFIG:-}" ]]; then
       create-kubescheduler-policy-config
-      params+=" --use-legacy-policy-config"
-      params+=" --policy-config-file=/etc/srv/kubernetes/kube-scheduler/policy-config"
+      params+=("--use-legacy-policy-config")
+      params+=("--policy-config-file=/etc/srv/kubernetes/kube-scheduler/policy-config")
     fi
   fi
 
-  params="$(convert-manifest-params "${params}")"
+  local paramstring
+  paramstring="$(convert-manifest-params "${params[*]}")"
   local -r kube_scheduler_docker_tag=$(cat "${KUBE_HOME}/kube-docker-files/kube-scheduler.docker_tag")
 
   # Remove salt comments and replace variables with values.
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-scheduler.manifest"
 
-  sed -i -e "s@{{params}}@${params}@g" "${src_file}"
+  sed -i -e "s@{{params}}@${paramstring}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-scheduler_docker_tag'\]}}@${kube_scheduler_docker_tag}@g" "${src_file}"
   sed -i -e "s@{{cpurequest}}@${KUBE_SCHEDULER_CPU_REQUEST}@g" "${src_file}"
@@ -2028,18 +2162,20 @@ function start-cluster-autoscaler {
   if [[ "${ENABLE_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
     echo "Start kubernetes cluster autoscaler"
     setup-addon-manifests "addons" "rbac/cluster-autoscaler"
-    create-kubeconfig "cluster-autoscaler" ${KUBE_CLUSTER_AUTOSCALER_TOKEN}
+    create-kubeconfig "cluster-autoscaler" "${KUBE_CLUSTER_AUTOSCALER_TOKEN}"
     prepare-log-file /var/log/cluster-autoscaler.log
 
     # Remove salt comments and replace variables with values
     local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
 
-    local params="${AUTOSCALER_MIG_CONFIG} ${CLOUD_CONFIG_OPT} ${AUTOSCALER_EXPANDER_CONFIG:---expander=price}"
-    params+=" --kubeconfig=/etc/srv/kubernetes/cluster-autoscaler/kubeconfig"
+    local params
+    read -r -a params <<< "${AUTOSCALER_MIG_CONFIG}"
+    params+=("${CLOUD_CONFIG_OPT}" "${AUTOSCALER_EXPANDER_CONFIG:---expander=price}")
+    params+=("--kubeconfig=/etc/srv/kubernetes/cluster-autoscaler/kubeconfig")
 
     # split the params into separate arguments passed to binary
     local params_split
-    params_split=$(eval "for param in $params; do echo -n \\\"\$param\\\",; done")
+    params_split=$(eval 'for param in "${params[@]}"; do echo -n \""$param"\",; done')
     params_split=${params_split%?}
 
     sed -i -e "s@{{params}}@${params_split}@g" "${src_file}"
@@ -2109,6 +2245,8 @@ function download-extra-addons {
 #
 # $1: URL path after /computeMetadata/v1/ (without heading slash).
 function get-metadata-value {
+    # We do not want quotes for CURL_RETRY_CONNREFUSED
+    # shellcheck disable=SC2086
     curl \
         --retry 5 \
         --retry-delay 3 \
@@ -2130,16 +2268,13 @@ function copy-manifests {
   if [[ ! -d "${dst_dir}" ]]; then
     mkdir -p "${dst_dir}"
   fi
-  local files=$(find "${src_dir}" -maxdepth 1 -name "*.yaml")
-  if [[ -n "${files}" ]]; then
+  if [[ -n "$(ls "${src_dir}"/*.yaml 2>/dev/null)" ]]; then
     cp "${src_dir}/"*.yaml "${dst_dir}"
   fi
-  files=$(find "${src_dir}" -maxdepth 1 -name "*.json")
-  if [[ -n "${files}" ]]; then
+  if [[ -n "$(ls "${src_dir}"/*.json 2>/dev/null)" ]]; then
     cp "${src_dir}/"*.json "${dst_dir}"
   fi
-  files=$(find "${src_dir}" -maxdepth 1 -name "*.yaml.in")
-  if [[ -n "${files}" ]]; then
+  if [[ -n "$(ls "${src_dir}"/*.yaml.in 2>/dev/null)" ]]; then
     cp "${src_dir}/"*.yaml.in "${dst_dir}"
   fi
   chown -R root:root "${dst_dir}"
@@ -2279,7 +2414,7 @@ function update-daemon-set-prometheus-to-sd-parameters {
     # Removes all lines between two patterns (throws away prometheus-to-sd)
     sed -i -e "/# BEGIN_PROMETHEUS_TO_SD/,/# END_PROMETHEUS_TO_SD/d" "$1"
   else
-    update-prometheus-to-sd-parameters $1
+    update-prometheus-to-sd-parameters "$1"
   fi
 }
 
@@ -2302,10 +2437,10 @@ function setup-coredns-manifest {
   local -r coredns_file="${dst_dir}/0-dns/coredns/coredns.yaml"
   mv "${dst_dir}/0-dns/coredns/coredns.yaml.in" "${coredns_file}"
   # Replace the salt configurations with variable values.
-  sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${coredns_file}"
-  sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${coredns_file}"
+  sed -i -e "s@dns_domain@${DNS_DOMAIN}@g" "${coredns_file}"
+  sed -i -e "s@dns_server@${DNS_SERVER_IP}@g" "${coredns_file}"
   sed -i -e "s@{{ *pillar\['service_cluster_ip_range'\] *}}@${SERVICE_CLUSTER_IP_RANGE}@g" "${coredns_file}"
-  sed -i -e "s@{{ *pillar\['dns_memory_limit'\] *}}@${DNS_MEMORY_LIMIT:-170Mi}@g" "${coredns_file}"
+  sed -i -e "s@dns_memory_limit@${DNS_MEMORY_LIMIT:-170Mi}@g" "${coredns_file}"
 
   if [[ "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns-horizontal-autoscaler" "gce"
@@ -2336,10 +2471,10 @@ function setup-fluentd {
   sed -i -e "s@{{ fluentd_gcp_yaml_version }}@${fluentd_gcp_yaml_version}@g" "${fluentd_gcp_scaler_yaml}"
   fluentd_gcp_version="${FLUENTD_GCP_VERSION:-1.6.17}"
   sed -i -e "s@{{ fluentd_gcp_version }}@${fluentd_gcp_version}@g" "${fluentd_gcp_yaml}"
-  update-daemon-set-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
-  start-fluentd-resource-update ${fluentd_gcp_yaml}
-  update-container-runtime ${fluentd_gcp_configmap_yaml}
-  update-node-journal ${fluentd_gcp_configmap_yaml}
+  update-daemon-set-prometheus-to-sd-parameters "${fluentd_gcp_yaml}"
+  start-fluentd-resource-update "${fluentd_gcp_yaml}"
+  update-container-runtime "${fluentd_gcp_configmap_yaml}"
+  update-node-journal "${fluentd_gcp_configmap_yaml}"
 }
 
 # Sets up the manifests of kube-dns for k8s addons.
@@ -2352,12 +2487,12 @@ function setup-kube-dns-manifest {
     cat > "${kubedns_file}" <<EOF
 $CUSTOM_KUBE_DNS_YAML
 EOF
-    update-prometheus-to-sd-parameters ${kubedns_file}
+    update-prometheus-to-sd-parameters "${kubedns_file}"
   fi
   # Replace the salt configurations with variable values.
-  sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${kubedns_file}"
-  sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${kubedns_file}"
-  sed -i -e "s@{{ *pillar\['dns_memory_limit'\] *}}@${DNS_MEMORY_LIMIT:-170Mi}@g" "${kubedns_file}"
+  sed -i -e "s@dns_domain@${DNS_DOMAIN}@g" "${kubedns_file}"
+  sed -i -e "s@dns_server@${DNS_SERVER_IP}@g" "${kubedns_file}"
+  sed -i -e "s@dns_memory_limit@${DNS_MEMORY_LIMIT:-170Mi}@g" "${kubedns_file}"
 
   if [[ "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns-horizontal-autoscaler" "gce"
@@ -2371,7 +2506,7 @@ function setup-nodelocaldns-manifest {
   setup-addon-manifests "addons" "0-dns/nodelocaldns"
   local -r localdns_file="${dst_dir}/0-dns/nodelocaldns/nodelocaldns.yaml"
   setup-addon-custom-yaml "addons" "0-dns/nodelocaldns" "nodelocaldns.yaml" "${CUSTOM_NODELOCAL_DNS_YAML:-}"
-  # Replace the sed configurations with variable values.
+  # eventually all the __PILLAR__ stuff will be gone, but theyre still in nodelocaldns for backward compat.
   sed -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" "${localdns_file}"
   sed -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" "${localdns_file}"
   sed -i -e "s/__PILLAR__LOCAL__DNS__/${LOCAL_DNS_IP}/g" "${localdns_file}"
@@ -2415,8 +2550,10 @@ function start-kube-addons {
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   local -r dst_dir="/etc/kubernetes/addons"
 
-  create-kubeconfig "addon-manager" ${ADDON_MANAGER_TOKEN}
-  prepare-log-file /var/log/kube-addon-manager.log ${KUBE_ADDON_MANAGER_RUNASUSER:-2002} ${KUBE_ADDON_MANAGER_RUNASGROUP:-2002}
+  create-kubeconfig "addon-manager" "${ADDON_MANAGER_TOKEN}"
+  # User and group should never contain characters that need to be quoted
+  # shellcheck disable=SC2086
+  prepare-log-file /var/log/kube-addon-manager.log ${KUBE_ADDON_MANAGER_RUNASUSER:-2002}
 
   # prep addition kube-up specific rbac objects
   setup-addon-manifests "addons" "rbac/kubelet-api-auth"
@@ -2432,7 +2569,7 @@ function start-kube-addons {
   fi
 
   # Set up manifests of other addons.
-  if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" ]]; then
+  if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
     if [ -n "${CUSTOM_KUBE_PROXY_YAML:-}" ]; then
       # Replace with custom GKE kube proxy.
       cat > "$src_dir/kube-proxy/kube-proxy-ds.yaml" <<EOF
@@ -2443,8 +2580,8 @@ EOF
     prepare-kube-proxy-manifest-variables "$src_dir/kube-proxy/kube-proxy-ds.yaml"
     setup-addon-manifests "addons" "kube-proxy"
   fi
-  if ([[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]] &&
-     [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]); then
+  if [[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]] &&
+     [[ "${LOGGING_DESTINATION:-}" == "gcp" ]]; then
     if [[ "${ENABLE_METADATA_AGENT:-}" == "stackdriver" ]]; then
       metadata_agent_cpu_request="${METADATA_AGENT_CPU_REQUEST:-40m}"
       metadata_agent_memory_request="${METADATA_AGENT_MEMORY_REQUEST:-50Mi}"
@@ -2481,10 +2618,10 @@ EOF
   fi
   if [[ "${ENABLE_NODE_TERMINATION_HANDLER:-}" == "true" ]]; then
       setup-addon-manifests "addons" "node-termination-handler"
-      setup-node-termination-handler-manifest
+      setup-node-termination-handler-manifest ''
   fi
   # Setting up the konnectivity-agent daemonset
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${RUN_KONNECTIVITY_PODS:-false}" == "true" ]]; then
     setup-addon-manifests "addons" "konnectivity-agent"
     setup-konnectivity-agent-manifest
   fi
@@ -2496,7 +2633,7 @@ EOF
     BASE_ADDON_DIR=${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty
     BASE_DNS_DIR=${BASE_ADDON_DIR}/dns
     NEW_DNS_DIR=${BASE_ADDON_DIR}/0-dns
-    mkdir ${NEW_DNS_DIR} && mv ${BASE_DNS_DIR}/* ${NEW_DNS_DIR} && rm -r ${BASE_DNS_DIR}
+    mkdir "${NEW_DNS_DIR}" && mv "${BASE_DNS_DIR}"/* "${NEW_DNS_DIR}" && rm -r "${BASE_DNS_DIR}"
     if [[ "${CLUSTER_DNS_CORE_DNS:-}" == "true" ]]; then
       setup-coredns-manifest
     else
@@ -2613,7 +2750,7 @@ function start-lb-controller {
     prepare-log-file /var/log/glbc.log
     setup-addon-manifests "addons" "cluster-loadbalancing/glbc"
     setup-addon-manifests "addons" "rbac/cluster-loadbalancing/glbc"
-    create-kubeconfig "l7-lb-controller" ${GCE_GLBC_TOKEN}
+    create-kubeconfig "l7-lb-controller" "${GCE_GLBC_TOKEN}"
 
     local -r src_manifest="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/glbc.manifest"
     local -r dest_manifest="/etc/kubernetes/manifests/glbc.manifest"
@@ -2656,7 +2793,8 @@ function reset-motd {
   local -r version="$("${KUBE_HOME}"/bin/kubelet --version=true | cut -f2 -d " ")"
   # This logic grabs either a release tag (v1.2.1 or v1.2.1-alpha.1),
   # or the git hash that's in the build info.
-  local gitref="$(echo "${version}" | sed -r "s/(v[0-9]+\.[0-9]+\.[0-9]+)(-[a-z]+\.[0-9]+)?.*/\1\2/g")"
+  local gitref
+  gitref="$(echo "${version}" | sed -r "s/(v[0-9]+\.[0-9]+\.[0-9]+)(-[a-z]+\.[0-9]+)?.*/\1\2/g")"
   local devel=""
   if [[ "${gitref}" != "${version}" ]]; then
     devel="
@@ -2693,6 +2831,7 @@ function override-kubectl {
 
     # source the file explicitly otherwise we have
     # issues on a ubuntu OS image finding the kubectl
+    # shellcheck disable=SC1091
     source /etc/profile.d/kube_env.sh
 
     # Add ${KUBE_HOME}/bin into sudoer secure path.
@@ -2716,7 +2855,7 @@ function override-pv-recycler {
   PV_RECYCLER_VOLUME="{\"name\": \"pv-recycler-mount\",\"hostPath\": {\"path\": \"${PV_RECYCLER_OVERRIDE_TEMPLATE}\", \"type\": \"FileOrCreate\"}},"
   PV_RECYCLER_MOUNT="{\"name\": \"pv-recycler-mount\",\"mountPath\": \"${PV_RECYCLER_OVERRIDE_TEMPLATE}\", \"readOnly\": true},"
 
-  cat > ${PV_RECYCLER_OVERRIDE_TEMPLATE} <<EOF
+  cat > "${PV_RECYCLER_OVERRIDE_TEMPLATE}" <<EOF
 version: v1
 kind: Pod
 metadata:
@@ -2824,8 +2963,8 @@ EOF
   fi
 
   # Reuse docker group for containerd.
-  local containerd_gid="$(cat /etc/group | grep ^docker: | cut -d: -f 3)"
-  if [[ ! -z "${containerd_gid:-}" ]]; then
+  local -r containerd_gid="$(grep ^docker: /etc/group | cut -d: -f 3)"
+  if [[ -n "${containerd_gid:-}" ]]; then
     cat >> "${config_path}" <<EOF
 # reuse id of the docker group
 [grpc]
@@ -2876,7 +3015,7 @@ function main() {
       exit 2
     fi
   fi
-  echo "Version : " $(${PYTHON} -V 2>&1)
+  echo "Version :  $(${PYTHON} -V 2>&1)"
 
   if [[ ! -e "${KUBE_HOME}/kube-env" ]]; then
     echo "The ${KUBE_HOME}/kube-env file does not exist!! Terminate cluster initialization."
@@ -2911,16 +3050,18 @@ function main() {
   if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
     KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
   fi
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${PREPARE_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     KONNECTIVITY_SERVER_TOKEN="$(secure_random 32)"
   fi
-
+  if [[ "${ENABLE_MONITORING_TOKEN:-false}" == "true" ]]; then
+    MONITORING_TOKEN="$(secure_random 32)"
+  fi
 
   setup-os-params
   config-ip-firewall
   create-dirs
-  setup-kubelet-dir
   ensure-local-ssds
+  setup-kubelet-dir
   setup-logrotate
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     mount-master-pd
@@ -2935,13 +3076,13 @@ function main() {
     gke-master-start
   else
     create-node-pki
-    create-kubelet-kubeconfig ${KUBERNETES_MASTER_NAME}
-    if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
+    create-kubelet-kubeconfig "${KUBERNETES_MASTER_NAME}"
+    if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
       create-kubeproxy-user-kubeconfig
     fi
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
       if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
-        create-node-problem-detector-kubeconfig ${KUBERNETES_MASTER_NAME}
+        create-node-problem-detector-kubeconfig "${KUBERNETES_MASTER_NAME}"
       elif [[ -f "/var/lib/kubelet/kubeconfig" ]]; then
         create-node-problem-detector-kubeconfig-from-kubelet
       else
@@ -2961,6 +3102,13 @@ function main() {
     systemctl stop docker || echo "unable to stop docker"
     setup-containerd
   fi
+
+  if [[ -n "${KUBE_POD_LOG_READERS_GROUP:-}" ]]; then
+     mkdir -p /var/log/pods/
+     chgrp -R "${KUBE_POD_LOG_READERS_GROUP:-}" /var/log/pods/
+     chmod -R g+s /var/log/pods/
+  fi
+
   start-kubelet
 
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
@@ -2970,7 +3118,7 @@ function main() {
     fi
     source ${KUBE_BIN}/configure-kubeapiserver.sh
     start-kube-apiserver
-    if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+    if [[ "${RUN_KONNECTIVITY_PODS:-false}" == "true" ]]; then
       start-konnectivity-server
     fi
     start-kube-controller-manager
@@ -2981,7 +3129,7 @@ function main() {
     start-lb-controller
     update-legacy-addon-node-labels &
   else
-    if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
+    if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
       start-kube-proxy
     fi
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then

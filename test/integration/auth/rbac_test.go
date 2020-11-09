@@ -49,7 +49,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
-	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
 	clusterrolestore "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/storage"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding"
@@ -78,7 +78,7 @@ func clientsetForToken(user string, config *restclient.Config) (clientset.Interf
 }
 
 type testRESTOptionsGetter struct {
-	config *master.Config
+	config *controlplane.Config
 }
 
 func (getter *testRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
@@ -89,7 +89,7 @@ func (getter *testRESTOptionsGetter) GetRESTOptions(resource schema.GroupResourc
 	return generic.RESTOptions{StorageConfig: storageConfig, Decorator: generic.UndecoratedStorage, ResourcePrefix: resource.Resource}, nil
 }
 
-func newRBACAuthorizer(t *testing.T, config *master.Config) authorizer.Authorizer {
+func newRBACAuthorizer(t *testing.T, config *controlplane.Config) authorizer.Authorizer {
 	optsGetter := &testRESTOptionsGetter{config}
 	roleRest, err := rolestore.NewREST(optsGetter)
 	if err != nil {

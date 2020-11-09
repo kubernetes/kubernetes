@@ -52,9 +52,9 @@ import (
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
-	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	netutils "k8s.io/utils/net"
 )
@@ -4139,13 +4139,16 @@ var supportedSessionAffinityType = sets.NewString(string(core.ServiceAffinityCli
 var supportedServiceType = sets.NewString(string(core.ServiceTypeClusterIP), string(core.ServiceTypeNodePort),
 	string(core.ServiceTypeLoadBalancer), string(core.ServiceTypeExternalName))
 
+var supportedServiceIPFamily = sets.NewString(string(core.IPv4Protocol), string(core.IPv6Protocol))
+var supportedServiceIPFamilyPolicy = sets.NewString(string(core.IPFamilyPolicySingleStack), string(core.IPFamilyPolicyPreferDualStack), string(core.IPFamilyPolicyRequireDualStack))
+
 // ValidateService tests if required fields/annotations of a Service are valid.
 func ValidateService(service *core.Service, allowAppProtocol bool) field.ErrorList {
 	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName, field.NewPath("metadata"))
 
 	specPath := field.NewPath("spec")
-	isHeadlessService := service.Spec.ClusterIP == core.ClusterIPNone
-	if len(service.Spec.Ports) == 0 && !isHeadlessService && service.Spec.Type != core.ServiceTypeExternalName {
+
+	if len(service.Spec.Ports) == 0 && !isHeadlessService(service) && service.Spec.Type != core.ServiceTypeExternalName {
 		allErrs = append(allErrs, field.Required(specPath.Child("ports"), ""))
 	}
 	switch service.Spec.Type {
@@ -4160,16 +4163,25 @@ func ValidateService(service *core.Service, allowAppProtocol bool) field.ErrorLi
 				allErrs = append(allErrs, field.Invalid(portPath, port.Port, fmt.Sprintf("may not expose port %v externally since it is used by kubelet", ports.KubeletPort)))
 			}
 		}
-		if service.Spec.ClusterIP == "None" {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterIP"), service.Spec.ClusterIP, "may not be set to 'None' for LoadBalancer services"))
+		if isHeadlessService(service) {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterIPs").Index(0), service.Spec.ClusterIPs[0], "may not be set to 'None' for LoadBalancer services"))
 		}
 	case core.ServiceTypeNodePort:
-		if service.Spec.ClusterIP == "None" {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterIP"), service.Spec.ClusterIP, "may not be set to 'None' for NodePort services"))
+		if isHeadlessService(service) {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterIPs").Index(0), service.Spec.ClusterIPs[0], "may not be set to 'None' for NodePort services"))
 		}
 	case core.ServiceTypeExternalName:
-		if service.Spec.ClusterIP != "" {
-			allErrs = append(allErrs, field.Forbidden(specPath.Child("clusterIP"), "must be empty for ExternalName services"))
+		// must have  len(.spec.ClusterIPs) == 0 // note: strategy sets ClusterIPs based on ClusterIP
+		if len(service.Spec.ClusterIPs) > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("clusterIPs"), "may not be set for ExternalName services"))
+		}
+
+		// must have nil families and nil policy
+		if len(service.Spec.IPFamilies) > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("ipFamilies"), "may not be set for ExternalName services"))
+		}
+		if service.Spec.IPFamilyPolicy != nil {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("ipFamilyPolicy"), "may not be set for ExternalName services"))
 		}
 
 		// The value (a CNAME) may have a trailing dot to denote it as fully qualified
@@ -4185,7 +4197,7 @@ func ValidateService(service *core.Service, allowAppProtocol bool) field.ErrorLi
 	portsPath := specPath.Child("ports")
 	for i := range service.Spec.Ports {
 		portPath := portsPath.Index(i)
-		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], len(service.Spec.Ports) > 1, isHeadlessService, allowAppProtocol, &allPortNames, portPath)...)
+		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], len(service.Spec.Ports) > 1, isHeadlessService(service), allowAppProtocol, &allPortNames, portPath)...)
 	}
 
 	if service.Spec.Selector != nil {
@@ -4206,11 +4218,8 @@ func ValidateService(service *core.Service, allowAppProtocol bool) field.ErrorLi
 		}
 	}
 
-	if helper.IsServiceIPSet(service) {
-		if ip := net.ParseIP(service.Spec.ClusterIP); ip == nil {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterIP"), service.Spec.ClusterIP, "must be empty, 'None', or a valid IP address"))
-		}
-	}
+	// dualstack <-> ClusterIPs <-> ipfamilies
+	allErrs = append(allErrs, validateServiceClusterIPsRelatedFields(service)...)
 
 	ipPath := specPath.Child("externalIPs")
 	for i, ip := range service.Spec.ExternalIPs {
@@ -4338,6 +4347,7 @@ func ValidateService(service *core.Service, allowAppProtocol bool) field.ErrorLi
 		}
 	}
 
+	// external traffic fields
 	allErrs = append(allErrs, validateServiceExternalTrafficFieldsValue(service)...)
 	return allErrs
 }
@@ -4446,13 +4456,16 @@ func ValidateServiceCreate(service *core.Service) field.ErrorList {
 func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&service.ObjectMeta, &oldService.ObjectMeta, field.NewPath("metadata"))
 
-	// ClusterIP should be immutable for services using it (every type other than ExternalName)
-	// which do not have ClusterIP assigned yet (empty string value)
-	if service.Spec.Type != core.ServiceTypeExternalName {
-		if oldService.Spec.Type != core.ServiceTypeExternalName && oldService.Spec.ClusterIP != "" {
-			allErrs = append(allErrs, ValidateImmutableField(service.Spec.ClusterIP, oldService.Spec.ClusterIP, field.NewPath("spec", "clusterIP"))...)
-		}
-	}
+	// User can upgrade (add another clusterIP or ipFamily)
+	//      can downgrade (remove secondary clusterIP or ipFamily)
+	// but *CAN NOT* change primary/secondary clusterIP || ipFamily *UNLESS*
+	// they are changing from/to/ON ExternalName
+
+	upgradeDowngradeClusterIPsErrs := validateUpgradeDowngradeClusterIPs(oldService, service)
+	allErrs = append(allErrs, upgradeDowngradeClusterIPsErrs...)
+
+	upgradeDowngradeIPFamiliesErrs := validateUpgradeDowngradeIPFamilies(oldService, service)
+	allErrs = append(allErrs, upgradeDowngradeIPFamiliesErrs...)
 
 	// allow AppProtocol value if the feature gate is set or the field is
 	// already set on the resource.
@@ -5960,6 +5973,10 @@ func ValidatePodLogOptions(opts *core.PodLogOptions) field.ErrorList {
 	return allErrs
 }
 
+var (
+	supportedLoadBalancerIPMode = sets.NewString(string(core.LoadBalancerIPModeVIP), string(core.LoadBalancerIPModeProxy))
+)
+
 // ValidateLoadBalancerStatus validates required fields on a LoadBalancerStatus
 func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -5970,6 +5987,23 @@ func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("ip"), ingress.IP, "must be a valid IP address"))
 			}
 		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) {
+			if len(ingress.IP) > 0 && ingress.IPMode == nil {
+				allErrs = append(allErrs, field.Required(idxPath.Child("ipMode"), "must be specified when `ip` is set"))
+			}
+		}
+
+		if ingress.IPMode != nil {
+			if len(ingress.IP) == 0 {
+				allErrs = append(allErrs, field.Forbidden(idxPath.Child("ipMode"), "may not be used when `ip` is not set"))
+			}
+
+			if !supportedLoadBalancerIPMode.Has(string(*ingress.IPMode)) {
+				allErrs = append(allErrs, field.NotSupported(idxPath.Child("ipMode"), ingress.IPMode, supportedLoadBalancerIPMode.List()))
+			}
+		}
+
 		if len(ingress.Hostname) > 0 {
 			for _, msg := range validation.IsDNS1123Subdomain(ingress.Hostname) {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, msg))
@@ -6093,4 +6127,256 @@ func ValidateSpreadConstraintNotRepeat(fldPath *field.Path, constraint core.Topo
 		}
 	}
 	return nil
+}
+
+// validateServiceClusterIPsRelatedFields validates .spec.ClusterIPs,, .spec.IPFamilies, .spec.ipFamilyPolicy
+func validateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorList {
+	// ClusterIP, ClusterIPs, IPFamilyPolicy and IPFamilies are validated prior (all must be unset) for ExternalName service
+	if service.Spec.Type == core.ServiceTypeExternalName {
+		return field.ErrorList{}
+	}
+
+	allErrs := field.ErrorList{}
+	hasInvalidIPs := false
+
+	specPath := field.NewPath("spec")
+	clusterIPsField := specPath.Child("clusterIPs")
+	ipFamiliesField := specPath.Child("ipFamilies")
+	ipFamilyPolicyField := specPath.Child("ipFamilyPolicy")
+
+	// Make sure ClusterIP and ClusterIPs are synced.  For most cases users can
+	// just manage one or the other and we'll handle the rest (see PrepareFor*
+	// in strategy).
+	if len(service.Spec.ClusterIP) != 0 {
+		// If ClusterIP is set, ClusterIPs[0] must match.
+		if len(service.Spec.ClusterIPs) == 0 {
+			allErrs = append(allErrs, field.Required(clusterIPsField, ""))
+		} else if service.Spec.ClusterIPs[0] != service.Spec.ClusterIP {
+			allErrs = append(allErrs, field.Invalid(clusterIPsField, service.Spec.ClusterIPs, "element [0] must match clusterIP"))
+		}
+	} else { // ClusterIP == ""
+		// If ClusterIP is not set, ClusterIPs must also be unset.
+		if len(service.Spec.ClusterIPs) != 0 {
+			allErrs = append(allErrs, field.Invalid(clusterIPsField, service.Spec.ClusterIPs, "must be empty when clusterIP is empty"))
+		}
+	}
+
+	// ipfamilies stand alone validation
+	// must be either IPv4 or IPv6
+	seen := sets.String{}
+	for i, ipFamily := range service.Spec.IPFamilies {
+		if !supportedServiceIPFamily.Has(string(ipFamily)) {
+			allErrs = append(allErrs, field.NotSupported(ipFamiliesField.Index(i), ipFamily, supportedServiceIPFamily.List()))
+		}
+		// no duplicate check also ensures that ipfamilies is dualstacked, in any order
+		if seen.Has(string(ipFamily)) {
+			allErrs = append(allErrs, field.Duplicate(ipFamiliesField.Index(i), ipFamily))
+		}
+		seen.Insert(string(ipFamily))
+	}
+
+	// IPFamilyPolicy stand alone validation
+	//note: nil is ok, defaulted in alloc check registry/core/service/*
+	if service.Spec.IPFamilyPolicy != nil {
+		// must have a supported value
+		if !supportedServiceIPFamilyPolicy.Has(string(*(service.Spec.IPFamilyPolicy))) {
+			allErrs = append(allErrs, field.NotSupported(ipFamilyPolicyField, service.Spec.IPFamilyPolicy, supportedServiceIPFamilyPolicy.List()))
+		}
+	}
+
+	// clusterIPs stand alone validation
+	// valid ips with None and empty string handling
+	// duplication check is done as part of DualStackvalidation below
+	for i, clusterIP := range service.Spec.ClusterIPs {
+		// valid at first location only. if and only if len(clusterIPs) == 1
+		if i == 0 && clusterIP == core.ClusterIPNone {
+			if len(service.Spec.ClusterIPs) > 1 {
+				hasInvalidIPs = true
+				allErrs = append(allErrs, field.Invalid(clusterIPsField, service.Spec.ClusterIPs, "'None' must be the first and only value"))
+			}
+			continue
+		}
+
+		// is it valid ip?
+		errorMessages := validation.IsValidIP(clusterIP)
+		hasInvalidIPs = (len(errorMessages) != 0) || hasInvalidIPs
+		for _, msg := range errorMessages {
+			allErrs = append(allErrs, field.Invalid(clusterIPsField.Index(i), clusterIP, msg))
+		}
+	}
+
+	// max two
+	if len(service.Spec.ClusterIPs) > 2 {
+		allErrs = append(allErrs, field.Invalid(clusterIPsField, service.Spec.ClusterIPs, "may only hold up to 2 values"))
+	}
+
+	// at this stage if there is an invalid ip or misplaced none/empty string
+	// it will skew the error messages (bad index || dualstackness of already bad ips). so we
+	// stop here if there are errors in clusterIPs validation
+	if hasInvalidIPs {
+		return allErrs
+	}
+
+	// must be dual stacked ips if they are more than one ip
+	if len(service.Spec.ClusterIPs) > 1 /* meaning: it does not have a None or empty string */ {
+		dualStack, err := netutils.IsDualStackIPStrings(service.Spec.ClusterIPs)
+		if err != nil { // though we check for that earlier. safe > sorry
+			allErrs = append(allErrs, field.InternalError(clusterIPsField, fmt.Errorf("failed to check for dual stack with error:%v", err)))
+		}
+
+		// We only support one from each IP family (i.e. max two IPs in this list).
+		if !dualStack {
+			allErrs = append(allErrs, field.Invalid(clusterIPsField, service.Spec.ClusterIPs, "may specify no more than one IP for each IP family"))
+		}
+	}
+
+	// match clusterIPs to their families, if they were provided
+	if !isHeadlessService(service) && len(service.Spec.ClusterIPs) > 0 && len(service.Spec.IPFamilies) > 0 {
+		for i, ip := range service.Spec.ClusterIPs {
+			if i > (len(service.Spec.IPFamilies) - 1) {
+				break // no more families to check
+			}
+
+			// 4=>6
+			if service.Spec.IPFamilies[i] == core.IPv4Protocol && netutils.IsIPv6String(ip) {
+				allErrs = append(allErrs, field.Invalid(clusterIPsField.Index(i), ip, fmt.Sprintf("expected an IPv4 value as indicated by `ipFamilies[%v]`", i)))
+			}
+			// 6=>4
+			if service.Spec.IPFamilies[i] == core.IPv6Protocol && !netutils.IsIPv6String(ip) {
+				allErrs = append(allErrs, field.Invalid(clusterIPsField.Index(i), ip, fmt.Sprintf("expected an IPv6 value as indicated by `ipFamilies[%v]`", i)))
+			}
+		}
+	}
+
+	return allErrs
+}
+
+// specific validation for clusterIPs in cases of user upgrading or downgrading to/from dualstack
+func validateUpgradeDowngradeClusterIPs(oldService, service *core.Service) field.ErrorList {
+	allErrs := make(field.ErrorList, 0)
+
+	// bail out early for ExternalName
+	if service.Spec.Type == core.ServiceTypeExternalName || oldService.Spec.Type == core.ServiceTypeExternalName {
+		return allErrs
+	}
+	newIsHeadless := isHeadlessService(service)
+	oldIsHeadless := isHeadlessService(oldService)
+
+	if oldIsHeadless && newIsHeadless {
+		return allErrs
+	}
+
+	switch {
+	// no change in ClusterIP lengths
+	// compare each
+	case len(oldService.Spec.ClusterIPs) == len(service.Spec.ClusterIPs):
+		for i, ip := range oldService.Spec.ClusterIPs {
+			if ip != service.Spec.ClusterIPs[i] {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "clusterIPs").Index(i), service.Spec.ClusterIPs, "may not change once set"))
+			}
+		}
+
+	// something has been released (downgraded)
+	case len(oldService.Spec.ClusterIPs) > len(service.Spec.ClusterIPs):
+		// primary ClusterIP has been released
+		if len(service.Spec.ClusterIPs) == 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "clusterIPs").Index(0), service.Spec.ClusterIPs, "primary clusterIP can not be unset"))
+		}
+
+		// test if primary clusterIP has changed
+		if len(oldService.Spec.ClusterIPs) > 0 &&
+			len(service.Spec.ClusterIPs) > 0 &&
+			service.Spec.ClusterIPs[0] != oldService.Spec.ClusterIPs[0] {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "clusterIPs").Index(0), service.Spec.ClusterIPs, "may not change once set"))
+		}
+
+		// test if secondary ClusterIP has been released. has this service been downgraded correctly?
+		// user *must* set IPFamilyPolicy == SingleStack
+		if len(service.Spec.ClusterIPs) == 1 {
+			if service.Spec.IPFamilyPolicy == nil || *(service.Spec.IPFamilyPolicy) != core.IPFamilyPolicySingleStack {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "clusterIPs").Index(0), service.Spec.ClusterIPs, "`ipFamilyPolicy` must be set to 'SingleStack' when releasing the secondary clusterIP"))
+			}
+		}
+	case len(oldService.Spec.ClusterIPs) < len(service.Spec.ClusterIPs):
+		// something has been added (upgraded)
+		// test if primary clusterIP has changed
+		if len(oldService.Spec.ClusterIPs) > 0 &&
+			service.Spec.ClusterIPs[0] != oldService.Spec.ClusterIPs[0] {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "clusterIPs").Index(0), service.Spec.ClusterIPs, "may not change once set"))
+		}
+		// we don't check for Policy == RequireDualStack here since, Validation/Creation func takes care of it
+	}
+	return allErrs
+}
+
+// specific validation for ipFamilies in cases of user upgrading or downgrading to/from dualstack
+func validateUpgradeDowngradeIPFamilies(oldService, service *core.Service) field.ErrorList {
+	allErrs := make(field.ErrorList, 0)
+	// bail out early for ExternalName
+	if service.Spec.Type == core.ServiceTypeExternalName || oldService.Spec.Type == core.ServiceTypeExternalName {
+		return allErrs
+	}
+
+	oldIsHeadless := isHeadlessService(oldService)
+	newIsHeadless := isHeadlessService(service)
+
+	// if changed to/from headless, then bail out
+	if newIsHeadless != oldIsHeadless {
+		return allErrs
+	}
+	// headless can change families
+	if newIsHeadless {
+		return allErrs
+	}
+
+	switch {
+	case len(oldService.Spec.IPFamilies) == len(service.Spec.IPFamilies):
+		// no change in ClusterIP lengths
+		// compare each
+
+		for i, ip := range oldService.Spec.IPFamilies {
+			if ip != service.Spec.IPFamilies[i] {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "ipFamilies").Index(0), service.Spec.IPFamilies, "may not change once set"))
+			}
+		}
+
+	case len(oldService.Spec.IPFamilies) > len(service.Spec.IPFamilies):
+		// something has been released (downgraded)
+
+		// test if primary ipfamily has been released
+		if len(service.Spec.ClusterIPs) == 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "ipFamilies").Index(0), service.Spec.IPFamilies, "primary ipFamily can not be unset"))
+		}
+
+		// test if primary ipFamily has changed
+		if len(service.Spec.IPFamilies) > 0 &&
+			service.Spec.IPFamilies[0] != oldService.Spec.IPFamilies[0] {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "ipFamilies").Index(0), service.Spec.ClusterIPs, "may not change once set"))
+		}
+
+		// test if secondary IPFamily has been released. has this service been downgraded correctly?
+		// user *must* set IPFamilyPolicy == SingleStack
+		if len(service.Spec.IPFamilies) == 1 {
+			if service.Spec.IPFamilyPolicy == nil || *(service.Spec.IPFamilyPolicy) != core.IPFamilyPolicySingleStack {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "clusterIPs").Index(0), service.Spec.ClusterIPs, "`ipFamilyPolicy` must be set to 'SingleStack' when releasing the secondary ipFamily"))
+			}
+		}
+	case len(oldService.Spec.IPFamilies) < len(service.Spec.IPFamilies):
+		// something has been added (upgraded)
+
+		// test if primary ipFamily has changed
+		if len(oldService.Spec.IPFamilies) > 0 &&
+			len(service.Spec.IPFamilies) > 0 &&
+			service.Spec.IPFamilies[0] != oldService.Spec.IPFamilies[0] {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "ipFamilies").Index(0), service.Spec.ClusterIPs, "may not change once set"))
+		}
+		// we don't check for Policy == RequireDualStack here since, Validation/Creation func takes care of it
+	}
+	return allErrs
+}
+
+func isHeadlessService(service *core.Service) bool {
+	return service != nil &&
+		len(service.Spec.ClusterIPs) == 1 &&
+		service.Spec.ClusterIPs[0] == core.ClusterIPNone
 }

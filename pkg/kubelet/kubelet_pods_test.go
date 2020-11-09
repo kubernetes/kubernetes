@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"testing"
 
@@ -42,6 +43,7 @@ import (
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String() is changed
 	// to "v1"?
 
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -2419,5 +2421,195 @@ func TestTruncatePodHostname(t *testing.T) {
 		output, err := truncatePodHostnameIfNeeded("test-pod", test.input)
 		assert.NoError(t, err)
 		assert.Equal(t, test.output, output)
+	}
+}
+
+func TestPodResourcesAreReclaimed(t *testing.T) {
+
+	type args struct {
+		pod           *v1.Pod
+		status        v1.PodStatus
+		runtimeStatus kubecontainer.PodStatus
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			"pod with running containers",
+			args{
+				pod: &v1.Pod{},
+				status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			false,
+		},
+		{
+			"pod with containers in runtime cache",
+			args{
+				pod:    &v1.Pod{},
+				status: v1.PodStatus{},
+				runtimeStatus: kubecontainer.PodStatus{
+					ContainerStatuses: []*kubecontainer.Status{
+						{},
+					},
+				},
+			},
+			false,
+		},
+		{
+			"pod with sandbox present",
+			args{
+				pod:    &v1.Pod{},
+				status: v1.PodStatus{},
+				runtimeStatus: kubecontainer.PodStatus{
+					SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+						{},
+					},
+				},
+			},
+			false,
+		},
+	}
+
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testKubelet.fakeRuntime.PodStatus = tt.args.runtimeStatus
+			if got := kl.PodResourcesAreReclaimed(tt.args.pod, tt.args.status); got != tt.want {
+				t.Errorf("PodResourcesAreReclaimed() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
+	testcases := []struct {
+		name          string
+		dualStack     bool
+		nodeAddresses []v1.NodeAddress
+		criPodIPs     []string
+		podIPs        []v1.PodIP
+	}{
+		{
+			name: "Simple",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+			},
+			podIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+			},
+		},
+		{
+			name: "InternalIP is preferred over ExternalIP",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeExternalIP, Address: "192.168.0.1"},
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+			},
+			podIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+			},
+		},
+		{
+			name: "Dual-stack addresses are ignored in single-stack cluster",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
+			},
+			podIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+			},
+		},
+		{
+			name: "Single-stack addresses in dual-stack cluster",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+			},
+			dualStack: true,
+			podIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+			},
+		},
+		{
+			name: "Multiple single-stack addresses in dual-stack cluster",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "10.0.0.2"},
+				{Type: v1.NodeExternalIP, Address: "192.168.0.1"},
+			},
+			dualStack: true,
+			podIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+			},
+		},
+		{
+			name: "Dual-stack addresses in dual-stack cluster",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
+			},
+			dualStack: true,
+			podIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+				{IP: "fd01::1234"},
+			},
+		},
+		{
+			name: "CRI PodIPs override NodeAddresses",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
+			},
+			dualStack: true,
+			criPodIPs: []string{"192.168.0.1"},
+			podIPs: []v1.PodIP{
+				{IP: "192.168.0.1"},
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.dualStack)()
+
+			kl.nodeLister = testNodeLister{nodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+					Status: v1.NodeStatus{
+						Addresses: tc.nodeAddresses,
+					},
+				},
+			}}
+
+			pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
+			pod.Spec.HostNetwork = true
+
+			criStatus := &kubecontainer.PodStatus{
+				ID:        pod.UID,
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+				IPs:       tc.criPodIPs,
+			}
+
+			status := kl.generateAPIPodStatus(pod, criStatus)
+			if !reflect.DeepEqual(status.PodIPs, tc.podIPs) {
+				t.Fatalf("Expected PodIPs %#v, got %#v", tc.podIPs, status.PodIPs)
+			}
+			if tc.criPodIPs == nil && status.HostIP != status.PodIPs[0].IP {
+				t.Fatalf("Expected HostIP %q to equal PodIPs[0].IP %q", status.HostIP, status.PodIPs[0].IP)
+			}
+		})
 	}
 }

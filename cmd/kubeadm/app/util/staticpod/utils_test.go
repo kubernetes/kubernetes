@@ -25,8 +25,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/lithammer/dedent"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -753,47 +751,6 @@ func TestManifestFilesAreEqual(t *testing.T) {
 				)
 			}
 		})
-	}
-}
-
-func TestKustomizeStaticPod(t *testing.T) {
-	// Create temp folder for the test case
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
-
-	patchString := dedent.Dedent(`
-    apiVersion: v1
-    kind: Pod
-    metadata:
-        name: kube-apiserver
-        namespace: kube-system
-        annotations:
-            kustomize: patch for kube-apiserver
-    `)
-
-	err := ioutil.WriteFile(filepath.Join(tmpdir, "patch.yaml"), []byte(patchString), 0644)
-	if err != nil {
-		t.Fatalf("WriteFile returned unexpected error: %v", err)
-	}
-
-	pod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Pod",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-apiserver",
-			Namespace: "kube-system",
-		},
-	}
-
-	kpod, err := KustomizeStaticPod(pod, tmpdir)
-	if err != nil {
-		t.Errorf("KustomizeStaticPod returned unexpected error: %v", err)
-	}
-
-	if _, ok := kpod.ObjectMeta.Annotations["kustomize"]; !ok {
-		t.Error("Kustomize did not apply patches corresponding to the resource")
 	}
 }
 

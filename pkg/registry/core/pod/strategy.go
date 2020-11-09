@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -95,10 +95,7 @@ func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 		// Allow multiple huge pages on pod create if feature is enabled
 		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
 	}
-	allErrs := validation.ValidatePodCreate(pod, opts)
-	allErrs = append(allErrs, validation.ValidateConditionalPod(pod, nil, field.NewPath(""))...)
-
-	return allErrs
+	return validation.ValidatePodCreate(pod, opts)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -117,9 +114,7 @@ func (podStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 		// Allow multiple huge pages on pod create if feature is enabled or if the old pod already has multiple hugepages specified
 		AllowMultipleHugePageResources: oldFailsSingleHugepagesValidation || utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
 	}
-	errorList := validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
-	errorList = append(errorList, validation.ValidateConditionalPod(obj.(*api.Pod), old.(*api.Pod), field.NewPath(""))...)
-	return errorList
+	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod), opts)
 }
 
 // AllowUnconditionalUpdate allows pods to be overwritten
@@ -317,7 +312,13 @@ func ResourceLocation(ctx context.Context, getter ResourceGetter, rt http.RoundT
 		Scheme: scheme,
 	}
 	if port == "" {
-		loc.Host = podIP
+		// when using an ipv6 IP as a hostname in a URL, it must be wrapped in [...]
+		// net.JoinHostPort does this for you.
+		if strings.Contains(podIP, ":") {
+			loc.Host = "[" + podIP + "]"
+		} else {
+			loc.Host = podIP
+		}
 	} else {
 		loc.Host = net.JoinHostPort(podIP, port)
 	}

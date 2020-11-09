@@ -3,7 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
-        "conversion.go",
         "defaults.go",
         "doc.go",
         "register.go",
@@ -31,7 +30,6 @@ go_library(
         "//pkg/controller/replicaset/config/v1alpha1:go_default_library",
         "//pkg/controller/replication/config/v1alpha1:go_default_library",
         "//pkg/controller/resourcequota/config/v1alpha1:go_default_library",
-        "//pkg/controller/service/config/v1alpha1:go_default_library",
         "//pkg/controller/serviceaccount/config/v1alpha1:go_default_library",
         "//pkg/controller/statefulset/config/v1alpha1:go_default_library",
         "//pkg/controller/ttlafterfinished/config/v1alpha1:go_default_library",
@@ -41,9 +39,10 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/component-base/config/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/config/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/service/config/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/controller-manager/config/v1alpha1:go_default_library",
         "//staging/src/k8s.io/kube-controller-manager/config/v1alpha1:go_default_library",
-        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

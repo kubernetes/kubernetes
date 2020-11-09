@@ -20,13 +20,13 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
+	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // Manager manages all the Device Plugins running on a node.

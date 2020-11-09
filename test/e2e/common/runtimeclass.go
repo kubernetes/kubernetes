@@ -39,12 +39,12 @@ import (
 var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
 
-	ginkgo.It("should reject a Pod requesting a non-existent RuntimeClass", func() {
+	ginkgo.It("should reject a Pod requesting a non-existent RuntimeClass [NodeFeature:RuntimeHandler]", func() {
 		rcName := f.Namespace.Name + "-nonexistent"
 		expectPodRejection(f, e2enode.NewRuntimeClassPod(rcName))
 	})
 
-	ginkgo.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler", func() {
+	ginkgo.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler [NodeFeature:RuntimeHandler]", func() {
 		handler := f.Namespace.Name + "-handler"
 		rcName := createRuntimeClass(f, "unconfigured-handler", handler)
 		pod := f.PodClient().Create(e2enode.NewRuntimeClassPod(rcName))
@@ -61,7 +61,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 		expectPodSuccess(f, pod)
 	})
 
-	ginkgo.It("should reject a Pod requesting a deleted RuntimeClass", func() {
+	ginkgo.It("should reject a Pod requesting a deleted RuntimeClass [NodeFeature:RuntimeHandler]", func() {
 		rcName := createRuntimeClass(f, "delete-me", "runc")
 		rcClient := f.ClientSet.NodeV1beta1().RuntimeClasses()
 

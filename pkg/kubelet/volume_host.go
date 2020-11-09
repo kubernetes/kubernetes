@@ -22,8 +22,8 @@ import (
 	"runtime"
 
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/token"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -151,6 +152,11 @@ func (kvh *kubeletVolumeHost) GetSubpather() subpath.Interface {
 	return kvh.kubelet.subpather
 }
 
+func (kvh *kubeletVolumeHost) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
+	// FilteredDial is not needed in the kubelet.
+	return nil
+}
+
 func (kvh *kubeletVolumeHost) GetHostUtil() hostutil.HostUtils {
 	return kvh.kubelet.hostutil
 }
@@ -225,7 +231,11 @@ func (kvh *kubeletVolumeHost) GetHostName() string {
 }
 
 func (kvh *kubeletVolumeHost) GetHostIP() (net.IP, error) {
-	return kvh.kubelet.GetHostIP()
+	hostIPs, err := kvh.kubelet.GetHostIPs()
+	if err != nil {
+		return nil, err
+	}
+	return hostIPs[0], err
 }
 
 func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {

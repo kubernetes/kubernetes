@@ -85,5 +85,3 @@ That said, if you have questions, reach out to us
 [kubernetes.io]: https://kubernetes.io
 [Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
 [troubleshooting guide]: https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/README.md?pixel)]()

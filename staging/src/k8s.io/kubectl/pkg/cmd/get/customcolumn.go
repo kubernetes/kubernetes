@@ -162,8 +162,8 @@ func (s *CustomColumnsPrinter) PrintObj(obj runtime.Object, out io.Writer) error
 		return fmt.Errorf(printers.InternalObjectPrinterErr)
 	}
 
-	if w, found := out.(*tabwriter.Writer); !found {
-		w = printers.GetNewTabWriter(out)
+	if _, found := out.(*tabwriter.Writer); !found {
+		w := printers.GetNewTabWriter(out)
 		out = w
 		defer w.Flush()
 	}

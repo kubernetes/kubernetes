@@ -36,7 +36,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -102,6 +102,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/utils/exec"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -213,6 +214,10 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			// This is the default "last-known-good" config for dynamic config, and must always remain valid.
 			if err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig); err != nil {
 				klog.Fatal(err)
+			}
+
+			if (kubeletConfig.KubeletCgroups != "" && kubeletConfig.KubeReservedCgroup != "") && (0 != strings.Index(kubeletConfig.KubeletCgroups, kubeletConfig.KubeReservedCgroup)) {
+				klog.Warning("unsupported configuration:KubeletCgroups is not within KubeReservedCgroup")
 			}
 
 			// use dynamic kubelet config, if enabled
@@ -409,7 +414,7 @@ func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	logOption.Apply()
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
-	if err := initForOS(s.KubeletFlags.WindowsService); err != nil {
+	if err := initForOS(s.KubeletFlags.WindowsService, s.KubeletFlags.WindowsPriorityClass); err != nil {
 		return fmt.Errorf("failed OS init: %v", err)
 	}
 	if err := run(ctx, s, kubeDeps, featureGate); err != nil {
@@ -642,14 +647,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 
 		var reservedSystemCPUs cpuset.CPUSet
-		var errParse error
 		if s.ReservedSystemCPUs != "" {
-			reservedSystemCPUs, errParse = cpuset.Parse(s.ReservedSystemCPUs)
-			if errParse != nil {
-				// invalid cpu list is provided, set reservedSystemCPUs to empty, so it won't overwrite kubeReserved/systemReserved
-				klog.Infof("Invalid ReservedSystemCPUs \"%s\"", s.ReservedSystemCPUs)
-				return errParse
-			}
 			// is it safe do use CAdvisor here ??
 			machineInfo, err := kubeDeps.CAdvisorInterface.MachineInfo()
 			if err != nil {
@@ -657,6 +655,13 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				klog.Warning("Failed to get MachineInfo, set reservedSystemCPUs to empty")
 				reservedSystemCPUs = cpuset.NewCPUSet()
 			} else {
+				var errParse error
+				reservedSystemCPUs, errParse = cpuset.Parse(s.ReservedSystemCPUs)
+				if errParse != nil {
+					// invalid cpu list is provided, set reservedSystemCPUs to empty, so it won't overwrite kubeReserved/systemReserved
+					klog.Infof("Invalid ReservedSystemCPUs \"%s\"", s.ReservedSystemCPUs)
+					return errParse
+				}
 				reservedList := reservedSystemCPUs.ToSlice()
 				first := reservedList[0]
 				last := reservedList[len(reservedList)-1]
@@ -1082,6 +1087,27 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	// Setup event recorder if required.
 	makeEventRecorder(kubeDeps, nodeName)
 
+	var nodeIPs []net.IP
+	if kubeServer.NodeIP != "" {
+		for _, ip := range strings.Split(kubeServer.NodeIP, ",") {
+			parsedNodeIP := net.ParseIP(strings.TrimSpace(ip))
+			if parsedNodeIP == nil {
+				klog.Warningf("Could not parse --node-ip value %q; ignoring", ip)
+			} else {
+				nodeIPs = append(nodeIPs, parsedNodeIP)
+			}
+		}
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && len(nodeIPs) > 1 {
+		return fmt.Errorf("dual-stack --node-ip %q not supported in a single-stack cluster", kubeServer.NodeIP)
+	} else if len(nodeIPs) > 2 || (len(nodeIPs) == 2 && utilnet.IsIPv6(nodeIPs[0]) == utilnet.IsIPv6(nodeIPs[1])) {
+		return fmt.Errorf("bad --node-ip %q; must contain either a single IP or a dual-stack pair of IPs", kubeServer.NodeIP)
+	} else if len(nodeIPs) == 2 && kubeServer.CloudProvider != "" {
+		return fmt.Errorf("dual-stack --node-ip %q not supported when using a cloud provider", kubeServer.NodeIP)
+	} else if len(nodeIPs) == 2 && (nodeIPs[0].IsUnspecified() || nodeIPs[1].IsUnspecified()) {
+		return fmt.Errorf("dual-stack --node-ip %q cannot include '0.0.0.0' or '::'", kubeServer.NodeIP)
+	}
+
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
@@ -1100,7 +1126,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		hostname,
 		hostnameOverridden,
 		nodeName,
-		kubeServer.NodeIP,
+		nodeIPs,
 		kubeServer.ProviderID,
 		kubeServer.CloudProvider,
 		kubeServer.CertDirectory,
@@ -1174,7 +1200,7 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	hostname string,
 	hostnameOverridden bool,
 	nodeName types.NodeName,
-	nodeIP string,
+	nodeIPs []net.IP,
 	providerID string,
 	cloudProvider string,
 	certDirectory string,
@@ -1205,7 +1231,7 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		hostname,
 		hostnameOverridden,
 		nodeName,
-		nodeIP,
+		nodeIPs,
 		providerID,
 		cloudProvider,
 		certDirectory,
@@ -1248,16 +1274,14 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 		switch v1.ResourceName(k) {
 		// CPU, memory, local storage, and PID resources are supported.
 		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage, pidlimit.PIDs:
-			if v1.ResourceName(k) != pidlimit.PIDs || utilfeature.DefaultFeatureGate.Enabled(features.SupportNodePidsLimit) {
-				q, err := resource.ParseQuantity(v)
-				if err != nil {
-					return nil, err
-				}
-				if q.Sign() == -1 {
-					return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
-				}
-				rl[v1.ResourceName(k)] = q
+			q, err := resource.ParseQuantity(v)
+			if err != nil {
+				return nil, err
 			}
+			if q.Sign() == -1 {
+				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
+			}
+			rl[v1.ResourceName(k)] = q
 		default:
 			return nil, fmt.Errorf("cannot reserve %q resource", k)
 		}

@@ -217,8 +217,8 @@ func TestFakeTimer(t *testing.T) {
 		t.Errorf("unexpected channel read")
 	default:
 	}
-	if twoSec.Reset(time.Second) {
-		t.Errorf("Expected twoSec.Reset() to return false")
+	if !twoSec.Reset(time.Second) {
+		t.Errorf("Expected twoSec.Reset() to return true")
 	}
 	if !treSec.Reset(time.Second) {
 		t.Errorf("Expected treSec.Reset() to return true")
@@ -238,8 +238,9 @@ func TestFakeTimer(t *testing.T) {
 	case <-oneSec.C():
 		t.Errorf("unexpected channel read")
 	case <-twoSec.C():
-		t.Errorf("unexpected channel read")
+		// Expected!
 	default:
+		t.Errorf("unexpected channel non-read")
 	}
 	select {
 	case <-treSec.C():

@@ -38,9 +38,6 @@ const (
 func RetryErrorCondition(condition wait.ConditionFunc) wait.ConditionFunc {
 	return func() (bool, error) {
 		done, err := condition()
-		if err != nil && IsRetryableAPIError(err) {
-			return false, nil
-		}
 		return done, err
 	}
 }

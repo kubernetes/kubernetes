@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -103,6 +104,10 @@ func TestMaxInFlightNonMutating(t *testing.T) {
 	server := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, AllowedNonMutatingInflightRequestsNo, 1)
 	defer server.Close()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	StartMaxInFlightWatermarkMaintenance(ctx.Done())
+
 	// These should hang, but not affect accounting.  use a query param match
 	for i := 0; i < AllowedNonMutatingInflightRequestsNo; i++ {
 		// These should hang waiting on block...
@@ -182,6 +187,10 @@ func TestMaxInFlightMutating(t *testing.T) {
 
 	server := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, 1, AllowedMutatingInflightRequestsNo)
 	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	StartMaxInFlightWatermarkMaintenance(ctx.Done())
 
 	// These should hang and be accounted, i.e. saturate the server
 	for i := 0; i < AllowedMutatingInflightRequestsNo; i++ {
@@ -274,6 +283,10 @@ func TestMaxInFlightSkipsMasters(t *testing.T) {
 
 	server := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, 1, AllowedMutatingInflightRequestsNo)
 	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	StartMaxInFlightWatermarkMaintenance(ctx.Done())
 
 	// These should hang and be accounted, i.e. saturate the server
 	for i := 0; i < AllowedMutatingInflightRequestsNo; i++ {

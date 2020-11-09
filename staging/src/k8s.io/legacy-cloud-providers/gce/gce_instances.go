@@ -64,7 +64,7 @@ func splitNodesByZone(nodes []*v1.Node) map[string][]*v1.Node {
 }
 
 func getZone(n *v1.Node) string {
-	zone, ok := n.Labels[v1.LabelZoneFailureDomain]
+	zone, ok := n.Labels[v1.LabelFailureDomainBetaZone]
 	if !ok {
 		return defaultZone
 	}
@@ -210,34 +210,9 @@ func (g *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID str
 	return false, cloudprovider.NotImplemented
 }
 
-// InstanceMetadataByProviderID returns metadata of the specified instance.
-func (g *Cloud) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
-	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Hour)
-	defer cancel()
-
-	if providerID == "" {
-		return nil, fmt.Errorf("couldn't compute InstanceMetadata for empty providerID")
-	}
-
-	_, zone, name, err := splitProviderID(providerID)
-	if err != nil {
-		return nil, err
-	}
-
-	instance, err := g.c.Instances().Get(timeoutCtx, meta.ZonalKey(canonicalizeInstanceName(name), zone))
-	if err != nil {
-		return nil, fmt.Errorf("error while querying for providerID %q: %v", providerID, err)
-	}
-
-	addresses, err := nodeAddressesFromInstance(instance)
-	if err != nil {
-		return nil, err
-	}
-	return &cloudprovider.InstanceMetadata{
-		ProviderID:    providerID,
-		Type:          lastComponent(instance.MachineType),
-		NodeAddresses: addresses,
-	}, nil
+// InstanceShutdown returns true if the instance is in safe state to detach volumes
+func (g *Cloud) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, error) {
+	return false, cloudprovider.NotImplemented
 }
 
 func nodeAddressesFromInstance(instance *compute.Instance) ([]v1.NodeAddress, error) {
@@ -281,6 +256,64 @@ func (g *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID strin
 	}
 
 	return true, nil
+}
+
+// InstanceExists returns true if the instance with the given provider id still exists and is running.
+// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+func (g *Cloud) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {
+	providerID := node.Spec.ProviderID
+	if providerID == "" {
+		var err error
+		if providerID, err = cloudprovider.GetInstanceProviderID(ctx, g, types.NodeName(node.Name)); err != nil {
+			if err == cloudprovider.InstanceNotFound {
+				return false, nil
+			}
+			return false, err
+		}
+	}
+	return g.InstanceExistsByProviderID(ctx, providerID)
+}
+
+// InstanceMetadata returns metadata of the specified instance.
+func (g *Cloud) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Hour)
+	defer cancel()
+
+	providerID := node.Spec.ProviderID
+	if providerID == "" {
+		var err error
+		if providerID, err = cloudprovider.GetInstanceProviderID(ctx, g, types.NodeName(node.Name)); err != nil {
+			return nil, err
+		}
+	}
+
+	_, zone, name, err := splitProviderID(providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	region, err := GetGCERegion(zone)
+	if err != nil {
+		return nil, err
+	}
+
+	instance, err := g.c.Instances().Get(timeoutCtx, meta.ZonalKey(canonicalizeInstanceName(name), zone))
+	if err != nil {
+		return nil, fmt.Errorf("error while querying for providerID %q: %v", providerID, err)
+	}
+
+	addresses, err := nodeAddressesFromInstance(instance)
+	if err != nil {
+		return nil, err
+	}
+
+	return &cloudprovider.InstanceMetadata{
+		ProviderID:    providerID,
+		InstanceType:  lastComponent(instance.MachineType),
+		NodeAddresses: addresses,
+		Zone:          zone,
+		Region:        region,
+	}, nil
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified NodeName.
@@ -528,7 +561,11 @@ func (g *Cloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
 		return nil, err
 	}
 	if len(foundInstances) != len(names) {
-		return nil, cloudprovider.InstanceNotFound
+		if len(foundInstances) == 0 {
+			// return error so the TargetPool nodecount does not drop to 0 unexpectedly.
+			return nil, cloudprovider.InstanceNotFound
+		}
+		klog.Warningf("getFoundInstanceByNames - input instances %d, found %d. Continuing LoadBalancer Update", len(names), len(foundInstances))
 	}
 	return foundInstances, nil
 }

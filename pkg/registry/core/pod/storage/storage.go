@@ -214,7 +214,7 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podID, oldMa
 		})
 		finalPod = pod
 		return pod, nil
-	}), dryRun)
+	}), dryRun, nil)
 	return finalPod, err
 }
 
@@ -346,11 +346,24 @@ func (r *EphemeralContainersREST) Update(ctx context.Context, name string, objIn
 		return newPod, nil
 	})
 
-	obj, _, err = r.store.Update(ctx, name, updatedPodInfo, createValidation, updateValidation, false, options)
+	// Validation should be passed the API kind (EphemeralContainers) rather than the storage kind.
+	obj, _, err = r.store.Update(ctx, name, updatedPodInfo, toEphemeralContainersCreateValidation(createValidation), toEphemeralContainersUpdateValidation(updateValidation), false, options)
 	if err != nil {
 		return nil, false, err
 	}
 	return ephemeralContainersInPod(obj.(*api.Pod)), false, err
+}
+
+func toEphemeralContainersCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {
+	return func(ctx context.Context, obj runtime.Object) error {
+		return f(ctx, ephemeralContainersInPod(obj.(*api.Pod)))
+	}
+}
+
+func toEphemeralContainersUpdateValidation(f rest.ValidateObjectUpdateFunc) rest.ValidateObjectUpdateFunc {
+	return func(ctx context.Context, obj, old runtime.Object) error {
+		return f(ctx, ephemeralContainersInPod(obj.(*api.Pod)), ephemeralContainersInPod(old.(*api.Pod)))
+	}
 }
 
 // Extract the list of Ephemeral Containers from a Pod

@@ -15,7 +15,13 @@ go_library(
     importpath = "k8s.io/kubernetes/test/images/agnhost/dns",
     deps = [
         "//vendor/github.com/spf13/cobra:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/golang.org/x/sys/windows:go_default_library",
+            "//vendor/golang.org/x/sys/windows/registry:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

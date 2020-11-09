@@ -15,7 +15,7 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-attacher
-          image: gcr.io/k8s-staging-csi/csi-attacher:v3.0.0-rc1
+          image: k8s.gcr.io/sig-storage/csi-attacher:v2.2.0
           args:
             - --v=5
             - --csi-address=$(ADDRESS)

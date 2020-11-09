@@ -39,7 +39,7 @@ type mutatingWebhookConfigurationStrategy struct {
 // Strategy is the default logic that applies when creating and updating mutatingWebhookConfiguration objects.
 var Strategy = mutatingWebhookConfigurationStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// NamespaceScoped returns true because all mutatingWebhookConfiguration' need to be within a namespace.
+// NamespaceScoped returns false because MutatingWebhookConfiguration is cluster-scoped resource.
 func (mutatingWebhookConfigurationStrategy) NamespaceScoped() bool {
 	return false
 }

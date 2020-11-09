@@ -47,13 +47,14 @@ func (el *EndpointsLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte
 	if el.e.Annotations == nil {
 		el.e.Annotations = make(map[string]string)
 	}
-	recordBytes, found := el.e.Annotations[LeaderElectionRecordAnnotationKey]
+	recordStr, found := el.e.Annotations[LeaderElectionRecordAnnotationKey]
+	recordBytes := []byte(recordStr)
 	if found {
-		if err := json.Unmarshal([]byte(recordBytes), &record); err != nil {
+		if err := json.Unmarshal(recordBytes, &record); err != nil {
 			return nil, nil, err
 		}
 	}
-	return &record, []byte(recordBytes), nil
+	return &record, recordBytes, nil
 }
 
 // Create attempts to create a LeaderElectionRecord annotation
@@ -87,8 +88,12 @@ func (el *EndpointsLock) Update(ctx context.Context, ler LeaderElectionRecord) e
 		el.e.Annotations = make(map[string]string)
 	}
 	el.e.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
-	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Update(ctx, el.e, metav1.UpdateOptions{})
-	return err
+	e, err := el.Client.Endpoints(el.EndpointsMeta.Namespace).Update(ctx, el.e, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	el.e = e
+	return nil
 }
 
 // RecordEvent in leader election while adding meta-data

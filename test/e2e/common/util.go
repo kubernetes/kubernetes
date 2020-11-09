@@ -161,7 +161,7 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 	for i := range nodes {
 		node := &nodes[i]
 		zone := framework.TestContext.CloudConfig.Zone
-		if z, ok := node.Labels[v1.LabelZoneFailureDomain]; ok {
+		if z, ok := node.Labels[v1.LabelFailureDomainBetaZone]; ok {
 			zone = z
 		}
 		nodeNamesByZone[zone] = append(nodeNamesByZone[zone], node.Name)
@@ -240,4 +240,15 @@ func getFileModeRegex(filePath string, mask *int32) string {
 	windowsOutput := fmt.Sprintf("mode of Windows file \"%v\": %s", filePath, os.FileMode(windowsMask))
 
 	return fmt.Sprintf("(%s|%s)", linuxOutput, windowsOutput)
+}
+
+// createMounts creates a v1.VolumeMount list with a single element.
+func createMounts(volumeName, volumeMountPath string, readOnly bool) []v1.VolumeMount {
+	return []v1.VolumeMount{
+		{
+			Name:      volumeName,
+			MountPath: volumeMountPath,
+			ReadOnly:  readOnly,
+		},
+	}
 }

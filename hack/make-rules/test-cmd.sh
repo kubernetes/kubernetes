@@ -34,6 +34,15 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/test.sh"
 source "${KUBE_ROOT}/test/cmd/legacy-script.sh"
 
+# setup envs for TokenRequest required flags
+SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-true}
+SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-/tmp/kube-serviceaccount.key}
+# Generate ServiceAccount key if needed
+if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
+  mkdir -p "$(dirname "${SERVICE_ACCOUNT_KEY}")"
+  openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
+fi
+
 # Runs kube-apiserver
 #
 # Exports:
@@ -56,9 +65,7 @@ function run_kube_apiserver() {
   ENABLE_FEATURE_GATES="ServerSideApply=true"
 
   "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
-    --insecure-bind-address="127.0.0.1" \
     --bind-address="127.0.0.1" \
-    --insecure-port="${API_PORT}" \
     --authorization-mode="${AUTHORIZATION_MODE}" \
     --secure-port="${SECURE_API_PORT}" \
     --feature-gates="${ENABLE_FEATURE_GATES}" \
@@ -66,6 +73,10 @@ function run_kube_apiserver() {
     --disable-admission-plugins="${DISABLE_ADMISSION_PLUGINS}" \
     --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
     --runtime-config=api/v1 \
+    --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
+    --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
+    --service-account-issuer="https://kubernetes.default.svc" \
+    --service-account-signing-key-file="${SERVICE_ACCOUNT_KEY}" \
     --storage-media-type="${KUBE_TEST_API_STORAGE_TYPE-}" \
     --cert-dir="${TMPDIR:-/tmp/}" \
     --service-cluster-ip-range="10.0.0.0/24" \
@@ -73,7 +84,7 @@ function run_kube_apiserver() {
     --token-auth-file=hack/testdata/auth-tokens.csv 1>&2 &
   export APISERVER_PID=$!
 
-  kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver"
+  kube::util::wait_for_url_with_bearer_token "https://127.0.0.1:${SECURE_API_PORT}/healthz" "admin-token" "apiserver"
 }
 
 # Runs run_kube_controller_manager
@@ -85,14 +96,35 @@ function run_kube_controller_manager() {
   make -C "${KUBE_ROOT}" WHAT="cmd/kube-controller-manager"
 
   # Start controller manager
+  kube::log::status 'Generate kubeconfig for controller-manager'
+  local config
+  config="$(mktemp controller-manager.kubeconfig.XXXXX)"
+  cat <<EOF > "$config"
+kind: Config
+users:
+- name: controller-manager
+  user:
+    token: admin-token
+clusters:
+- cluster:
+    server: https://127.0.0.1:${SECURE_API_PORT}
+    insecure-skip-tls-verify: true
+  name: local
+contexts:
+- context:
+    cluster: local
+    user: controller-manager
+  name: local-context
+current-context: local-context
+EOF
+
   kube::log::status "Starting controller-manager"
   "${KUBE_OUTPUT_HOSTBIN}/kube-controller-manager" \
-    --port="${CTLRMGR_PORT}" \
     --kube-api-content-type="${KUBE_TEST_API_TYPE-}" \
-    --master="127.0.0.1:${API_PORT}" 1>&2 &
+    --kubeconfig="${config}" 1>&2 &
   export CTLRMGR_PID=$!
 
-  kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager"
+  kube::util::wait_for_url "https://127.0.0.1:${SECURE_CTLRMGR_PORT}/healthz" "controller-manager"
 }
 
 # Creates a node object with name 127.0.0.1. This is required because we do not
@@ -101,7 +133,7 @@ function run_kube_controller_manager() {
 # Exports:
 #   SUPPORTED_RESOURCES(Array of all resources supported by the apiserver).
 function create_node() {
-  kubectl create -f - -s "http://127.0.0.1:${API_PORT}" << __EOF__
+  kubectl create -f - << __EOF__
 {
   "kind": "Node",
   "apiVersion": "v1",

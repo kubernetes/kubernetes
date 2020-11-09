@@ -25,7 +25,6 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"net/url"
-	"path"
 	"reflect"
 	goruntime "runtime"
 	"strconv"
@@ -42,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/utils/clock"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -61,13 +60,12 @@ import (
 	"k8s.io/component-base/logs"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
-	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
@@ -91,13 +89,12 @@ const (
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
 type Server struct {
-	auth                       AuthInterface
-	host                       HostInterface
-	restfulCont                containerInterface
-	metricsBuckets             sets.String
-	metricsMethodBuckets       sets.String
-	resourceAnalyzer           stats.ResourceAnalyzer
-	redirectContainerStreaming bool
+	auth                 AuthInterface
+	host                 HostInterface
+	restfulCont          containerInterface
+	metricsBuckets       sets.String
+	metricsMethodBuckets sets.String
+	resourceAnalyzer     stats.ResourceAnalyzer
 }
 
 // TLSOptions holds the TLS options.
@@ -146,11 +143,9 @@ func ListenAndServeKubeletServer(
 	enableCAdvisorJSONEndpoints,
 	enableDebuggingHandlers,
 	enableContentionProfiling,
-	redirectContainerStreaming,
-	enableSystemLogHandler bool,
-	criHandler http.Handler) {
+	enableSystemLogHandler bool) {
 	klog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, redirectContainerStreaming, enableSystemLogHandler, criHandler)
+	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, enableSystemLogHandler)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -172,7 +167,7 @@ func ListenAndServeKubeletServer(
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint, enableCAdvisorJSONEndpoints bool) {
 	klog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
-	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, false, false, false, false, nil)
+	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, false, false, false)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -226,24 +221,21 @@ func NewServer(
 	enableCAdvisorJSONEndpoints,
 	enableDebuggingHandlers,
 	enableContentionProfiling,
-	redirectContainerStreaming,
-	enableSystemLogHandler bool,
-	criHandler http.Handler) Server {
+	enableSystemLogHandler bool) Server {
 	server := Server{
-		host:                       host,
-		resourceAnalyzer:           resourceAnalyzer,
-		auth:                       auth,
-		restfulCont:                &filteringContainer{Container: restful.NewContainer()},
-		metricsBuckets:             sets.NewString(),
-		metricsMethodBuckets:       sets.NewString("OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"),
-		redirectContainerStreaming: redirectContainerStreaming,
+		host:                 host,
+		resourceAnalyzer:     resourceAnalyzer,
+		auth:                 auth,
+		restfulCont:          &filteringContainer{Container: restful.NewContainer()},
+		metricsBuckets:       sets.NewString(),
+		metricsMethodBuckets: sets.NewString("OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"),
 	}
 	if auth != nil {
 		server.InstallAuthFilter()
 	}
 	server.InstallDefaultHandlers(enableCAdvisorJSONEndpoints)
 	if enableDebuggingHandlers {
-		server.InstallDebuggingHandlers(criHandler)
+		server.InstallDebuggingHandlers()
 		// To maintain backward compatibility serve logs only when enableDebuggingHandlers is also enabled
 		// see https://github.com/kubernetes/kubernetes/pull/87273
 		server.InstallSystemLogHandler(enableSystemLogHandler)
@@ -343,7 +335,6 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 	s.addMetricsBucketMatcher("metrics")
 	s.addMetricsBucketMatcher("metrics/cadvisor")
 	s.addMetricsBucketMatcher("metrics/probes")
-	s.addMetricsBucketMatcher("metrics/resource/v1alpha1")
 	s.addMetricsBucketMatcher("metrics/resource")
 	//lint:ignore SA1019 https://github.com/kubernetes/enhancements/issues/1206
 	s.restfulCont.Handle(metricsPath, legacyregistry.Handler())
@@ -376,14 +367,6 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 	r.RawMustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics, clock.RealClock{}, cadvisorOpts))
 	s.restfulCont.Handle(cadvisorMetricsPath,
 		compbasemetrics.HandlerFor(r, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
-	)
-
-	// deprecated endpoint which will be removed in release 1.20.0+.
-	s.addMetricsBucketMatcher("metrics/resource/v1alpha1")
-	v1alpha1ResourceRegistry := compbasemetrics.NewKubeRegistry()
-	v1alpha1ResourceRegistry.CustomMustRegister(stats.NewPrometheusResourceMetricCollector(s.resourceAnalyzer, stats.Config()))
-	s.restfulCont.Handle(path.Join(resourceMetricsPath, v1alpha1.Version),
-		compbasemetrics.HandlerFor(v1alpha1ResourceRegistry, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
 
 	s.addMetricsBucketMatcher("metrics/resource")
@@ -420,7 +403,7 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 const pprofBasePath = "/debug/pprof/"
 
 // InstallDebuggingHandlers registers the HTTP request patterns that serve logs or run commands/containers
-func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
+func (s *Server) InstallDebuggingHandlers() {
 	klog.Infof("Adding debug handlers to kubelet server.")
 
 	s.addMetricsBucketMatcher("run")
@@ -538,11 +521,6 @@ func (s *Server) InstallDebuggingHandlers(criHandler http.Handler) {
 		To(s.getRunningPods).
 		Operation("getRunningPods"))
 	s.restfulCont.Add(ws)
-
-	s.addMetricsBucketMatcher("cri")
-	if criHandler != nil {
-		s.restfulCont.Handle("/cri/", criHandler)
-	}
 }
 
 // InstallDebuggingDisabledHandlers registers the HTTP request patterns that provide better error message
@@ -796,10 +774,6 @@ func (s *Server) getAttach(request *restful.Request, response *restful.Response)
 		return
 	}
 
-	if s.redirectContainerStreaming {
-		http.Redirect(response.ResponseWriter, request.Request, url.String(), http.StatusFound)
-		return
-	}
 	proxyStream(response.ResponseWriter, request.Request, url)
 }
 
@@ -822,10 +796,6 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 	url, err := s.host.GetExec(podFullName, params.podUID, params.containerName, params.cmd, *streamOpts)
 	if err != nil {
 		streaming.WriteError(err, response.ResponseWriter)
-		return
-	}
-	if s.redirectContainerStreaming {
-		http.Redirect(response.ResponseWriter, request.Request, url.String(), http.StatusFound)
 		return
 	}
 	proxyStream(response.ResponseWriter, request.Request, url)
@@ -888,10 +858,6 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 	url, err := s.host.GetPortForward(pod.Name, pod.Namespace, pod.UID, *portForwardOptions)
 	if err != nil {
 		streaming.WriteError(err, response.ResponseWriter)
-		return
-	}
-	if s.redirectContainerStreaming {
-		http.Redirect(response.ResponseWriter, request.Request, url.String(), http.StatusFound)
 		return
 	}
 	proxyStream(response.ResponseWriter, request.Request, url)

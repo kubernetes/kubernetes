@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
@@ -147,7 +147,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 			podName := fmt.Sprintf("netexec%v", i)
 
 			framework.Logf("Creating netexec pod %q on node %v in namespace %q", podName, nodeName, ns)
-			pod := newAgnhostPod(podName,
+			pod := e2epod.NewAgnhostPod(ns, podName, nil, nil, nil,
 				"netexec",
 				fmt.Sprintf("--http-port=%d", firewallTestHTTPPort),
 				fmt.Sprintf("--udp-port=%d", firewallTestUDPPort))
@@ -180,7 +180,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		// Instance could run in a different zone in multi-zone test. Figure out which zone
 		// it is in before proceeding.
 		zone := cloudConfig.Zone
-		if zoneInLabel, ok := nodeList.Items[0].Labels[v1.LabelZoneFailureDomain]; ok {
+		if zoneInLabel, ok := nodeList.Items[0].Labels[v1.LabelFailureDomainBetaZone]; ok {
 			zone = zoneInLabel
 		}
 		removedTags := gce.SetInstanceTags(cloudConfig, nodesNames[0], zone, []string{})
@@ -216,19 +216,19 @@ var _ = SIGDescribe("Firewall rule", func() {
 			framework.Failf("did not find any node addresses")
 		}
 
-		masterAddresses := framework.GetAllMasterAddresses(cs)
-		for _, masterAddress := range masterAddresses {
-			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureKubeControllerManagerPort, firewallTestTCPTimeout)
-			assertNotReachableHTTPTimeout(masterAddress, kubeschedulerconfig.DefaultInsecureSchedulerPort, firewallTestTCPTimeout)
+		controlPlaneAddresses := framework.GetControlPlaneAddresses(cs)
+		for _, instanceAddress := range controlPlaneAddresses {
+			assertNotReachableHTTPTimeout(instanceAddress, "/healthz", ports.KubeControllerManagerPort, firewallTestTCPTimeout, true)
+			assertNotReachableHTTPTimeout(instanceAddress, "/healthz", kubeschedulerconfig.DefaultKubeSchedulerPort, firewallTestTCPTimeout, true)
 		}
-		assertNotReachableHTTPTimeout(nodeAddr, ports.KubeletPort, firewallTestTCPTimeout)
-		assertNotReachableHTTPTimeout(nodeAddr, ports.KubeletReadOnlyPort, firewallTestTCPTimeout)
-		assertNotReachableHTTPTimeout(nodeAddr, ports.ProxyStatusPort, firewallTestTCPTimeout)
+		assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletPort, firewallTestTCPTimeout, false)
+		assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletReadOnlyPort, firewallTestTCPTimeout, false)
+		assertNotReachableHTTPTimeout(nodeAddr, "/", ports.ProxyStatusPort, firewallTestTCPTimeout, false)
 	})
 })
 
-func assertNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) {
-	result := e2enetwork.PokeHTTP(ip, port, "/", &e2enetwork.HTTPPokeParams{Timeout: timeout})
+func assertNotReachableHTTPTimeout(ip, path string, port int, timeout time.Duration, enableHTTPS bool) {
+	result := e2enetwork.PokeHTTP(ip, port, path, &e2enetwork.HTTPPokeParams{Timeout: timeout, EnableHTTPS: enableHTTPS})
 	if result.Status == e2enetwork.HTTPError {
 		framework.Failf("Unexpected error checking for reachability of %s:%d: %v", ip, port, result.Error)
 	}

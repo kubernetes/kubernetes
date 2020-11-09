@@ -42,7 +42,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/controller"
+	controllerpkg "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 	utilnet "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
@@ -159,8 +159,51 @@ func makeTestServer(t *testing.T, namespace string) (*httptest.Server, *utiltest
 	return httptest.NewServer(mux), &fakeEndpointsHandler
 }
 
+// makeBlockingEndpointDeleteTestServer will signal the blockNextAction channel on endpoint "POST" & "DELETE" requests. All
+// block endpoint "DELETE" requestsi will wait on a blockDelete signal to delete endpoint. If controller is nil, a error will
+// be sent in the response.
+func makeBlockingEndpointDeleteTestServer(t *testing.T, controller *endpointController, endpoint *v1.Endpoints, blockDelete, blockNextAction chan struct{}, namespace string) *httptest.Server {
+
+	handlerFunc := func(res http.ResponseWriter, req *http.Request) {
+		if controller == nil {
+			res.WriteHeader(http.StatusInternalServerError)
+			res.Write([]byte("controller has not been set yet"))
+			return
+		}
+
+		if req.Method == "POST" {
+			controller.endpointsStore.Add(endpoint)
+			blockNextAction <- struct{}{}
+		}
+
+		if req.Method == "DELETE" {
+			go func() {
+				// Delay the deletion of endoints to make endpoint cache out of sync
+				<-blockDelete
+				controller.endpointsStore.Delete(endpoint)
+				controller.onEndpointsDelete(endpoint)
+			}()
+			blockNextAction <- struct{}{}
+		}
+
+		res.WriteHeader(http.StatusOK)
+		res.Write([]byte(runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{})))
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/namespaces/"+namespace+"/endpoints", handlerFunc)
+	mux.HandleFunc("/api/v1/namespaces/"+namespace+"/endpoints/", handlerFunc)
+	mux.HandleFunc("/api/v1/namespaces/"+namespace+"/events", func(res http.ResponseWriter, req *http.Request) {})
+	mux.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
+		t.Errorf("unexpected request: %v", req.RequestURI)
+		http.Error(res, "", http.StatusNotFound)
+	})
+	return httptest.NewServer(mux)
+
+}
+
 type endpointController struct {
-	*EndpointController
+	*Controller
 	podStore       cache.Store
 	serviceStore   cache.Store
 	endpointsStore cache.Store
@@ -168,7 +211,7 @@ type endpointController struct {
 
 func newController(url string, batchPeriod time.Duration) *endpointController {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: url, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(client, controllerpkg.NoResyncPeriodFunc())
 	endpoints := NewEndpointController(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Services(),
 		informerFactory.Core().V1().Endpoints(), client, batchPeriod)
 	endpoints.podsSynced = alwaysReady
@@ -338,6 +381,33 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 		}},
 	})
 	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+}
+
+func TestSyncEndpointsHeadlessServiceLabel(t *testing.T) {
+	ns := metav1.NamespaceDefault
+	testServer, endpointsHandler := makeTestServer(t, ns)
+	defer testServer.Close()
+	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints.endpointsStore.Add(&v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
+		},
+		Subsets: []v1.EndpointSubset{},
+	})
+	endpoints.serviceStore.Add(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
+			Selector: map[string]string{"foo": "bar"},
+			Ports:    []v1.ServicePort{{Port: 80}},
+		},
+	})
+	endpoints.syncService(ns + "/foo")
+	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
 func TestSyncEndpointsProtocolUDP(t *testing.T) {
@@ -1186,8 +1256,8 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone,
-					IPFamily:  &ipv4,
+					ClusterIP:  v1.ClusterIPNone,
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			},
 
@@ -1219,7 +1289,7 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 				},
 			},
 
-			expectedEndpointFamily: ipv4,
+			expectedEndpointFamily: ipv6,
 		},
 		{
 			name: "v6 service, in a dual stack cluster",
@@ -1250,33 +1320,32 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name: "v6 headless service, in a dual stack cluster",
+			name: "v6 headless service, in a dual stack cluster (connected to a new api-server)",
 
 			enableDualStack: true,
 			ipFamilies:      ipv4ipv6,
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone,
-					IPFamily:  &ipv6,
+					ClusterIP:  v1.ClusterIPNone,
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol}, // <- set by a api-server defaulting logic
 				},
 			},
 
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name: "v6 legacy headless service, in a dual stack cluster",
+			name: "v6 legacy headless service, in a dual stack cluster  (connected to a old api-server)",
 
 			enableDualStack: false,
 			ipFamilies:      ipv4ipv6,
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone,
+					ClusterIP: v1.ClusterIPNone, // <- families are not set by api-server
 				},
 			},
 
-			// This is not the behavior we *want*, but it's the behavior we currently expect.
 			expectedEndpointFamily: ipv4,
 		},
 
@@ -1954,9 +2023,105 @@ func TestEndpointPortFromServicePort(t *testing.T) {
 	}
 }
 
+// TestMultipleServiceChanges tests that endpoints that are not created because of an out of sync endpoints cache are eventually recreated
+// A service will be created. After the endpoints exist, the service will be deleted and the endpoints will not be deleted from the cache immediately.
+// After the service is recreated, the endpoints will be deleted replicating an out of sync cache. Expect that eventually the endpoints will be recreated.
+func TestMultipleServiceChanges(t *testing.T) {
+	ns := metav1.NamespaceDefault
+	expectedSubsets := []v1.EndpointSubset{{
+		Addresses: []v1.EndpointAddress{
+			{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}},
+		},
+	}}
+	endpoint := &v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns, ResourceVersion: "1"},
+		Subsets:    expectedSubsets,
+	}
+
+	controller := &endpointController{}
+	blockDelete := make(chan struct{})
+	blockNextAction := make(chan struct{})
+	stopChan := make(chan struct{})
+	testServer := makeBlockingEndpointDeleteTestServer(t, controller, endpoint, blockDelete, blockNextAction, ns)
+	defer testServer.Close()
+
+	*controller = *newController(testServer.URL, 0*time.Second)
+	addPods(controller.podStore, ns, 1, 1, 0, ipv4only)
+
+	go func() { controller.Run(1, stopChan) }()
+
+	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
+			Selector:  map[string]string{"foo": "bar"},
+			ClusterIP: "None",
+			Ports:     nil,
+		},
+	}
+
+	controller.serviceStore.Add(svc)
+	controller.onServiceUpdate(svc)
+	// blockNextAction should eventually unblock once server gets endpoint request.
+	waitForChanReceive(t, 1*time.Second, blockNextAction, "Service Add should have caused a request to be sent to the test server")
+
+	controller.serviceStore.Delete(svc)
+	controller.onServiceDelete(svc)
+	waitForChanReceive(t, 1*time.Second, blockNextAction, "Service Delete should have caused a request to be sent to the test server")
+
+	// If endpoints cache has not updated before service update is registered
+	// Services add will not trigger a Create endpoint request.
+	controller.serviceStore.Add(svc)
+	controller.onServiceUpdate(svc)
+
+	// Ensure the work queue has been processed by looping for up to a second to prevent flakes.
+	wait.PollImmediate(50*time.Millisecond, 1*time.Second, func() (bool, error) {
+		return controller.queue.Len() == 0, nil
+	})
+
+	// Cause test server to delete endpoints
+	close(blockDelete)
+	waitForChanReceive(t, 1*time.Second, blockNextAction, "Endpoint should have been recreated")
+
+	close(blockNextAction)
+	close(stopChan)
+}
+
+func TestEndpointsDeletionEvents(t *testing.T) {
+	ns := metav1.NamespaceDefault
+	testServer, _ := makeTestServer(t, ns)
+	defer testServer.Close()
+	controller := newController(testServer.URL, 0)
+	store := controller.endpointsStore
+	ep1 := &v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "rv1",
+		},
+	}
+
+	// Test Unexpected and Expected Deletes
+	store.Delete(ep1)
+	controller.onEndpointsDelete(ep1)
+
+	if controller.queue.Len() != 1 {
+		t.Errorf("Expected one service to be in the queue, found %d", controller.queue.Len())
+	}
+}
+
 func stringVal(str *string) string {
 	if str == nil {
 		return "nil"
 	}
 	return *str
+}
+
+// waitForChanReceive blocks up to the timeout waiting for the receivingChan to receive
+func waitForChanReceive(t *testing.T, timeout time.Duration, receivingChan chan struct{}, errorMsg string) {
+	timer := time.NewTimer(timeout)
+	select {
+	case <-timer.C:
+		t.Errorf(errorMsg)
+	case <-receivingChan:
+	}
 }

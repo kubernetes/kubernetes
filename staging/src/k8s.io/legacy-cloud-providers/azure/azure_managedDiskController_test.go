@@ -369,9 +369,9 @@ func TestResizeDisk(t *testing.T) {
 			mockDisksClient.EXPECT().Get(gomock.Any(), testCloud.ResourceGroup, test.diskName).Return(test.existedDisk, nil).AnyTimes()
 		}
 		if test.diskName == fakeCreateDiskFailed {
-			mockDisksClient.EXPECT().CreateOrUpdate(gomock.Any(), testCloud.ResourceGroup, test.diskName, gomock.Any()).Return(&retry.Error{RawError: fmt.Errorf("Create Disk failed")}).AnyTimes()
+			mockDisksClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, test.diskName, gomock.Any()).Return(&retry.Error{RawError: fmt.Errorf("Create Disk failed")}).AnyTimes()
 		} else {
-			mockDisksClient.EXPECT().CreateOrUpdate(gomock.Any(), testCloud.ResourceGroup, test.diskName, gomock.Any()).Return(nil).AnyTimes()
+			mockDisksClient.EXPECT().Update(gomock.Any(), testCloud.ResourceGroup, test.diskName, gomock.Any()).Return(nil).AnyTimes()
 		}
 
 		result, err := managedDiskController.ResizeDisk(diskURI, test.oldSize, test.newSize)
@@ -417,8 +417,8 @@ func TestGetLabelsForVolume(t *testing.T) {
 			},
 			existedDisk: compute.Disk{Name: to.StringPtr(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}, Zones: &[]string{"1"}},
 			expected: map[string]string{
-				v1.LabelZoneRegion:        testCloud0.Location,
-				v1.LabelZoneFailureDomain: testCloud0.makeZone(testCloud0.Location, 1),
+				v1.LabelFailureDomainBetaRegion: testCloud0.Location,
+				v1.LabelFailureDomainBetaZone:   testCloud0.makeZone(testCloud0.Location, 1),
 			},
 			expectedErr: false,
 		},
@@ -454,7 +454,7 @@ func TestGetLabelsForVolume(t *testing.T) {
 			},
 			existedDisk: compute.Disk{Name: to.StringPtr(diskName), DiskProperties: &compute.DiskProperties{DiskSizeGB: &diskSizeGB}},
 			expected: map[string]string{
-				v1.LabelZoneRegion: testCloud0.Location,
+				v1.LabelFailureDomainBetaRegion: testCloud0.Location,
 			},
 			expectedErr:    false,
 			expectedErrMsg: nil,

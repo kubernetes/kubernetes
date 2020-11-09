@@ -3508,10 +3508,36 @@ type LoadBalancerIngress struct {
 	// (typically AWS load-balancers)
 	// +optional
 	Hostname string
+
+	// IPMode specifies how the load-balancer's IP behaves.
+	// Setting this to "VIP" indicates that the traffic passing through
+	// this load-balancer is delivered with the destination IP and port set to the load-balancer's IP and port.
+	// Setting this to "Proxy" indicates that the load-balancer acts like a proxy,
+	// delivering traffic with the destination IP and port set to the node's IP and nodePort or to the pod's IP and targetPort.
+	// This field can only be set when the ip field is also set, and defaults to "VIP" if not specified.
+	// +optional
+	IPMode *LoadBalancerIPMode
 }
 
+const (
+	// MaxServiceTopologyKeys is the largest number of topology keys allowed on a service
+	MaxServiceTopologyKeys = 16
+)
+
+// LoadBalancerIPMode represents the mode of the LoadBalancer ingress IP
+type LoadBalancerIPMode string
+
+const (
+	// LoadBalancerIPModeVIP indicates that the traffic passing through this LoadBalancer
+	// is delivered with the destination IP set to the specified LoadBalancer IP
+	LoadBalancerIPModeVIP LoadBalancerIPMode = "VIP"
+	// LoadBalancerIPModeProxy indicates that the specified LoadBalancer acts like a proxy,
+	// changing the destination IP to the node IP and the source IP to the LoadBalancer (mostly private) IP
+	LoadBalancerIPModeProxy LoadBalancerIPMode = "Proxy"
+)
+
 // IPFamily represents the IP Family (IPv4 or IPv6). This type is used
-// to express the family of an IP expressed by a type (i.e. service.Spec.IPFamily)
+// to express the family of an IP expressed by a type (e.g. service.spec.ipFamilies).
 type IPFamily string
 
 const (
@@ -3519,8 +3545,29 @@ const (
 	IPv4Protocol IPFamily = "IPv4"
 	// IPv6Protocol indicates that this IP is IPv6 protocol
 	IPv6Protocol IPFamily = "IPv6"
-	// MaxServiceTopologyKeys is the largest number of topology keys allowed on a service
-	MaxServiceTopologyKeys = 16
+)
+
+// IPFamilyPolicyType represents the dual-stack-ness requested or required by a Service
+type IPFamilyPolicyType string
+
+const (
+	// IPFamilyPolicySingleStack indicates that this service is required to have a single IPFamily.
+	// The IPFamily assigned is based on the default IPFamily used by the cluster
+	// or as identified by service.spec.ipFamilies field
+	IPFamilyPolicySingleStack IPFamilyPolicyType = "SingleStack"
+	// IPFamilyPolicyPreferDualStack indicates that this service prefers dual-stack when
+	// the cluster is configured for dual-stack. If the cluster is not configured
+	// for dual-stack the service will be assigned a single IPFamily. If the IPFamily is not
+	// set in service.spec.ipFamilies then the service will be assigned the default IPFamily
+	// configured on the cluster
+	IPFamilyPolicyPreferDualStack IPFamilyPolicyType = "PreferDualStack"
+	// IPFamilyPolicyRequireDualStack indicates that this service requires dual-stack. Using
+	// IPFamilyPolicyRequireDualStack on a single stack cluster will result in validation errors. The
+	// IPFamilies (and their order) assigned  to this service is based on service.spec.ipFamilies. If
+	// service.spec.ipFamilies was not provided then it will be assigned according to how they are
+	// configured on the cluster. If service.spec.ipFamilies has only one entry then the alternative
+	// IPFamily will be added by apiserver
+	IPFamilyPolicyRequireDualStack IPFamilyPolicyType = "RequireDualStack"
 )
 
 // ServiceSpec describes the attributes that a user creates on a service
@@ -3564,6 +3611,36 @@ type ServiceSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 	// +optional
 	ClusterIP string
+
+	// ClusterIPs identifies all the ClusterIPs assigned to this
+	// service. ClusterIPs are assigned or reserved based on the values of
+	// service.spec.ipFamilies. A maximum of two entries (dual-stack IPs) are
+	// allowed in ClusterIPs. The IPFamily of each ClusterIP must match
+	// values provided in service.spec.ipFamilies. Clients using ClusterIPs must
+	// keep it in sync with ClusterIP (if provided) by having ClusterIP matching
+	// first element of ClusterIPs.
+	// +optional
+	ClusterIPs []string
+
+	// IPFamilies identifies all the IPFamilies assigned for this Service. If a value
+	// was not provided for IPFamilies it will be defaulted based on the cluster
+	// configuration and the value of service.spec.ipFamilyPolicy. A maximum of two
+	// values (dual-stack IPFamilies) are allowed in IPFamilies. IPFamilies field is
+	// conditionally mutable: it allows for adding or removing a secondary IPFamily,
+	// but it does not allow changing the primary IPFamily of the service.
+	// +optional
+	IPFamilies []IPFamily
+
+	// IPFamilyPolicy represents the dual-stack-ness requested or required by this
+	// Service. If there is no value provided, then this Service will be considered
+	// SingleStack (single IPFamily). Services can be SingleStack (single IPFamily),
+	// PreferDualStack (two dual-stack IPFamilies on dual-stack clusters or single
+	// IPFamily on single-stack clusters), or RequireDualStack (two dual-stack IPFamilies
+	// on dual-stack configured clusters, otherwise fail). The IPFamilies and ClusterIPs assigned
+	// to this service can be controlled by service.spec.ipFamilies and service.spec.clusterIPs
+	// respectively.
+	// +optional
+	IPFamilyPolicy *IPFamilyPolicyType
 
 	// ExternalName is the external reference that kubedns or equivalent will
 	// return as a CNAME record for this service. No proxying will be involved.
@@ -3625,24 +3702,6 @@ type ServiceSpec struct {
 	// through the Endpoints or EndpointSlice resources can safely assume this behavior.
 	// +optional
 	PublishNotReadyAddresses bool
-
-	// ipFamily specifies whether this Service has a preference for a particular IP family (e.g.
-	// IPv4 vs. IPv6) when the IPv6DualStack feature gate is enabled. In a dual-stack cluster,
-	// you can specify ipFamily when creating a ClusterIP Service to determine whether the
-	// controller will allocate an IPv4 or IPv6 IP for it, and you can specify ipFamily when
-	// creating a headless Service to determine whether it will have IPv4 or IPv6 Endpoints. In
-	// either case, if you do not specify an ipFamily explicitly, it will default to the
-	// cluster's primary IP family.
-	// This field is part of an alpha feature, and you should not make any assumptions about its
-	// semantics other than those described above. In particular, you should not assume that it
-	// can (or cannot) be changed after creation time; that it can only have the values "IPv4"
-	// and "IPv6"; or that its current value on a given Service correctly reflects the current
-	// state of that Service. (For ClusterIP Services, look at clusterIP to see if the Service
-	// is IPv4 or IPv6. For headless Services, look at the endpoints, which may be dual-stack in
-	// the future. For ExternalName Services, ipFamily has no meaning, but it may be set to an
-	// irrelevant value anyway.)
-	// +optional
-	IPFamily *IPFamily
 
 	// topologyKeys is a preference-order list of topology keys which
 	// implementations of services should use to preferentially sort endpoints
@@ -4564,14 +4623,19 @@ const (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// Event is a report of an event somewhere in the cluster.
+// Event is a report of an event somewhere in the cluster.  Events
+// have a limited retention time and triggers and messages may evolve
+// with time.  Event consumers should not rely on the timing of an event
+// with a given Reason reflecting a consistent underlying trigger, or the
+// continued existence of events with that Reason.  Events should be
+// treated as informative, best-effort, supplemental data.
 // TODO: Decide whether to store these separately or with the object they apply to.
 type Event struct {
 	metav1.TypeMeta
-	// +optional
+
 	metav1.ObjectMeta
 
-	// Required. The object that this event is about. Mapped to events.Event.regarding
+	// The object that this event is about. Mapped to events.Event.regarding
 	// +optional
 	InvolvedObject ObjectReference
 
@@ -4893,7 +4957,7 @@ type Secret struct {
 	// base64 encoded string, representing the arbitrary (possibly non-string)
 	// data value here.
 	// +optional
-	Data map[string][]byte
+	Data map[string][]byte `datapolicy:"password,security-key,token"`
 
 	// Used to facilitate programmatic handling of secret data.
 	// +optional

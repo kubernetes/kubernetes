@@ -98,3 +98,15 @@ func AssertKubeConfigCurrentAuthInfoWithToken(t *testing.T, config *clientcmdapi
 		return
 	}
 }
+
+// AssertKubeConfigCurrentContextWithClusterName is a utility function for kubeadm testing that asserts if the Current Cluster config in
+// the given KubeConfig object refers to expected cluster name
+func AssertKubeConfigCurrentContextWithClusterName(t *testing.T, config *clientcmdapi.Config, expectedClusterName string) {
+	currentContext := config.Contexts[config.CurrentContext]
+
+	// assert cluster name
+	if currentContext.Cluster != expectedClusterName {
+		t.Errorf("kubeconfig.currentContext.clusterName [%s], expected [%s]", currentContext.Cluster, expectedClusterName)
+		return
+	}
+}

@@ -143,7 +143,7 @@ func (c *CreateClusterRoleOptions) Validate() error {
 	if len(c.Resources) > 0 {
 		for _, v := range c.Verbs {
 			if !arrayContains(validResourceVerbs, v) {
-				return fmt.Errorf("invalid verb: '%s'", v)
+				fmt.Fprintf(c.ErrOut, "Warning: '%s' is not a standard resource verb\n", v)
 			}
 		}
 		if err := c.validateResource(); err != nil {

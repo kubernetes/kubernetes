@@ -34,8 +34,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/component-base/logs/datapol:all-srcs",
         "//staging/src/k8s.io/component-base/logs/json:all-srcs",
         "//staging/src/k8s.io/component-base/logs/logreduction:all-srcs",
+        "//staging/src/k8s.io/component-base/logs/sanitization:all-srcs",
     ],
     tags = ["automanaged"],
 )

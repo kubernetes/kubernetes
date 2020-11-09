@@ -25,9 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/configmap"
 	"k8s.io/kubernetes/pkg/volume/downwardapi"
@@ -239,7 +237,7 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 		return err
 	}
 
-	err = volume.SetVolumeOwnership(s, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/)
+	err = volume.SetVolumeOwnership(s, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(s.plugin, nil))
 	if err != nil {
 		klog.Errorf("Error applying volume ownership settings for group: %v", mounterArgs.FsGroup)
 		return err
@@ -322,10 +320,6 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				payload[k] = v
 			}
 		case source.ServiceAccountToken != nil:
-			if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
-				errlist = append(errlist, fmt.Errorf("pod request ServiceAccountToken projection but the TokenRequestProjection feature was not enabled"))
-				continue
-			}
 			tp := source.ServiceAccountToken
 
 			// When FsGroup is set, we depend on SetVolumeOwnership to

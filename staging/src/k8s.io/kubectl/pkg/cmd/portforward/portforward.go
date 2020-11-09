@@ -76,8 +76,8 @@ var (
 		# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the deployment
 		kubectl port-forward deployment/mydeployment 5000 6000
 
-		# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in a pod selected by the service
-		kubectl port-forward service/myservice 5000 6000
+		# Listen on port 8443 locally, forwarding to the targetPort of the service's port named "https" in a pod selected by the service
+		kubectl port-forward service/myservice 8443:https
 
 		# Listen on port 8888 locally, forwarding to 5000 in the pod
 		kubectl port-forward pod/mypod 8888:5000
@@ -260,35 +260,37 @@ func checkUDPPorts(udpOnlyPorts sets.Int, ports []string, obj metav1.Object) err
 // checkUDPPortInService returns an error if remote port in Service is a UDP port
 // TODO: remove this check after #47862 is solved
 func checkUDPPortInService(ports []string, svc *corev1.Service) error {
-	udpOnlyPorts := sets.NewInt()
+	udpPorts := sets.NewInt()
+	tcpPorts := sets.NewInt()
 	for _, port := range svc.Spec.Ports {
 		portNum := int(port.Port)
 		switch port.Protocol {
 		case corev1.ProtocolUDP:
-			udpOnlyPorts.Insert(portNum)
+			udpPorts.Insert(portNum)
 		case corev1.ProtocolTCP:
-			udpOnlyPorts.Delete(portNum)
+			tcpPorts.Insert(portNum)
 		}
 	}
-	return checkUDPPorts(udpOnlyPorts, ports, svc)
+	return checkUDPPorts(udpPorts.Difference(tcpPorts), ports, svc)
 }
 
 // checkUDPPortInPod returns an error if remote port in Pod is a UDP port
 // TODO: remove this check after #47862 is solved
 func checkUDPPortInPod(ports []string, pod *corev1.Pod) error {
-	udpOnlyPorts := sets.NewInt()
+	udpPorts := sets.NewInt()
+	tcpPorts := sets.NewInt()
 	for _, ct := range pod.Spec.Containers {
 		for _, ctPort := range ct.Ports {
 			portNum := int(ctPort.ContainerPort)
 			switch ctPort.Protocol {
 			case corev1.ProtocolUDP:
-				udpOnlyPorts.Insert(portNum)
+				udpPorts.Insert(portNum)
 			case corev1.ProtocolTCP:
-				udpOnlyPorts.Delete(portNum)
+				tcpPorts.Insert(portNum)
 			}
 		}
 	}
-	return checkUDPPorts(udpOnlyPorts, ports, pod)
+	return checkUDPPorts(udpPorts.Difference(tcpPorts), ports, pod)
 }
 
 // Complete completes all the required options for port-forward cmd.

@@ -62,7 +62,7 @@ EVICTION_PRESSURE_TRANSITION_PERIOD=${EVICTION_PRESSURE_TRANSITION_PERIOD:-"1m"}
 # This script uses docker0 (or whatever container bridge docker is currently using)
 # and we don't know the IP of the DNS pod to pass in as --cluster-dns.
 # To set this up by hand, set this flag and change DNS_SERVER_IP.
-# Note also that you need API_HOST (defined above) for correct DNS.
+# Note also that you need API_HOST (defined below) for correct DNS.
 KUBE_PROXY_MODE=${KUBE_PROXY_MODE:-""}
 ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-true}
 ENABLE_NODELOCAL_DNS=${KUBE_ENABLE_NODELOCAL_DNS:-false}
@@ -207,7 +207,7 @@ fi
 # Shut down anyway if there's an error.
 set +e
 
-API_PORT=${API_PORT:-8080}
+API_PORT=${API_PORT:-0}
 API_SECURE_PORT=${API_SECURE_PORT:-6443}
 
 # WARNING: For DNS to work on most setups you should export API_HOST as the docker0 ip address,
@@ -576,8 +576,6 @@ EOF
       --secure-port="${API_SECURE_PORT}" \
       --tls-cert-file="${CERT_DIR}/serving-kube-apiserver.crt" \
       --tls-private-key-file="${CERT_DIR}/serving-kube-apiserver.key" \
-      --insecure-bind-address="${API_HOST_IP}" \
-      --insecure-port="${API_PORT}" \
       --storage-backend="${STORAGE_BACKEND}" \
       --storage-media-type="${STORAGE_MEDIA_TYPE}" \
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
@@ -640,6 +638,7 @@ function start_controller_manager {
       --v="${LOG_LEVEL}" \
       --vmodule="${LOG_SPEC}" \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
+      --service-cluster-ip-range="${SERVICE_CLUSTER_IP_RANGE}" \
       --root-ca-file="${ROOT_CA_FILE}" \
       --cluster-signing-cert-file="${CLUSTER_SIGNING_CERT_FILE}" \
       --cluster-signing-key-file="${CLUSTER_SIGNING_KEY_FILE}" \
@@ -715,35 +714,9 @@ function start_kubelet {
     fi
 
     mkdir -p "/var/lib/kubelet" &>/dev/null || sudo mkdir -p "/var/lib/kubelet"
-    # Enable dns
-    if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
-      if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
-        dns_args=("--cluster-dns=${LOCAL_DNS_IP}" "--cluster-domain=${DNS_DOMAIN}")
-      else
-        dns_args=("--cluster-dns=${DNS_SERVER_IP}" "--cluster-domain=${DNS_DOMAIN}")
-      fi
-    else
-      # To start a private DNS server set ENABLE_CLUSTER_DNS and
-      # DNS_SERVER_IP/DOMAIN. This will at least provide a working
-      # DNS server for real world hostnames.
-      dns_args=("--cluster-dns=8.8.8.8")
-    fi
     net_plugin_args=()
     if [[ -n "${NET_PLUGIN}" ]]; then
       net_plugin_args=("--network-plugin=${NET_PLUGIN}")
-    fi
-
-    auth_args=()
-    if [[ "${KUBELET_AUTHORIZATION_WEBHOOK:-}" != "false" ]]; then
-      auth_args+=("--authorization-mode=Webhook")
-    fi
-    if [[ "${KUBELET_AUTHENTICATION_WEBHOOK:-}" != "false" ]]; then
-      auth_args+=("--authentication-token-webhook")
-    fi
-    if [[ -n "${CLIENT_CA_FILE:-}" ]]; then
-      auth_args+=("--client-ca-file=${CLIENT_CA_FILE}")
-    else
-      auth_args+=("--client-ca-file=${CERT_DIR}/client-ca.crt")
     fi
 
     cni_conf_dir_args=()
@@ -774,30 +747,13 @@ function start_kubelet {
       "--container-runtime=${CONTAINER_RUNTIME}"
       "--hostname-override=${HOSTNAME_OVERRIDE}"
       "${cloud_config_arg[@]}"
-      "--address=${KUBELET_HOST}"
       "--bootstrap-kubeconfig=${CERT_DIR}/kubelet.kubeconfig"
       "--kubeconfig=${CERT_DIR}/kubelet-rotated.kubeconfig"
-      "--rotate-certificates=true"
-      "--feature-gates=${FEATURE_GATES}"
-      "--cpu-cfs-quota=${CPU_CFS_QUOTA}"
-      "--enable-controller-attach-detach=${ENABLE_CONTROLLER_ATTACH_DETACH}"
-      "--cgroups-per-qos=${CGROUPS_PER_QOS}"
-      "--cgroup-driver=${CGROUP_DRIVER}"
-      "--cgroup-root=${CGROUP_ROOT}"
-      "--eviction-hard=${EVICTION_HARD}"
-      "--eviction-soft=${EVICTION_SOFT}"
-      "--eviction-pressure-transition-period=${EVICTION_PRESSURE_TRANSITION_PERIOD}"
-      "--pod-manifest-path=${POD_MANIFEST_PATH}"
-      "--fail-swap-on=${FAIL_SWAP_ON}"
-      ${auth_args[@]+"${auth_args[@]}"}
-      ${dns_args[@]+"${dns_args[@]}"}
       ${cni_conf_dir_args[@]+"${cni_conf_dir_args[@]}"}
       ${cni_bin_dir_args[@]+"${cni_bin_dir_args[@]}"}
       ${net_plugin_args[@]+"${net_plugin_args[@]}"}
       ${container_runtime_endpoint_args[@]+"${container_runtime_endpoint_args[@]}"}
       ${image_service_endpoint_args[@]+"${image_service_endpoint_args[@]}"}
-      "--runtime-request-timeout=${RUNTIME_REQUEST_TIMEOUT}"
-      "--port=${KUBELET_PORT}"
       ${KUBELET_FLAGS}
     )
 
@@ -813,8 +769,78 @@ function start_kubelet {
         generate_kubelet_certs
     fi
 
+    cat <<EOF > /tmp/kubelet.yaml
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+address: "${KUBELET_HOST}"
+cgroupDriver: "${CGROUP_DRIVER}"
+cgroupRoot: "${CGROUP_ROOT}"
+cgroupsPerQOS: ${CGROUPS_PER_QOS}
+cpuCFSQuota: ${CPU_CFS_QUOTA}
+enableControllerAttachDetach: ${ENABLE_CONTROLLER_ATTACH_DETACH}
+evictionPressureTransitionPeriod: "${EVICTION_PRESSURE_TRANSITION_PERIOD}"
+failSwapOn: ${FAIL_SWAP_ON}
+port: ${KUBELET_PORT}
+rotateCertificates: true
+runtimeRequestTimeout: "${RUNTIME_REQUEST_TIMEOUT}"
+staticPodPath: "${POD_MANIFEST_PATH}"
+EOF
+    {
+      # authentication
+      echo "authentication:"
+      echo "  webhook:"
+      if [[ "${KUBELET_AUTHENTICATION_WEBHOOK:-}" != "false" ]]; then
+        echo "    enabled: true"
+      else
+        echo "    enabled: false"
+      fi
+      echo "  x509:"
+      if [[ -n "${CLIENT_CA_FILE:-}" ]]; then
+        echo "    clientCAFile: \"${CLIENT_CA_FILE}\""
+      else
+        echo "    clientCAFile: \"${CERT_DIR}/client-ca.crt\""
+      fi
+
+      # authorization
+      if [[ "${KUBELET_AUTHORIZATION_WEBHOOK:-}" != "false" ]]; then
+        echo "authorization:"
+        echo "  mode: Webhook"
+      fi
+
+      # dns
+      if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
+        if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
+          echo "clusterDNS: [ \"${LOCAL_DNS_IP}\" ]"
+        else
+          echo "clusterDNS: [ \"${DNS_SERVER_IP}\" ]"
+        fi
+        echo "clusterDomain: \"${DNS_DOMAIN}\""
+      else
+        # To start a private DNS server set ENABLE_CLUSTER_DNS and
+        # DNS_SERVER_IP/DOMAIN. This will at least provide a working
+        # DNS server for real world hostnames.
+        echo "clusterDNS: [ \"8.8.8.8\" ]"
+      fi
+
+      # eviction
+      if [[ -n ${EVICTION_HARD} ]]; then
+        echo "evictionHard:"
+        parse_eviction "${EVICTION_HARD}"
+      fi
+      if [[ -n ${EVICTION_SOFT} ]]; then
+        echo "evictionSoft:"
+        parse_eviction "${EVICTION_SOFT}"
+      fi
+
+      # feature gate
+      if [[ -n ${FEATURE_GATES} ]]; then
+        parse_feature_gates "${FEATURE_GATES}"
+      fi
+    } >>/tmp/kubelet.yaml
+
     # shellcheck disable=SC2024
-    sudo -E "${GO_OUT}/kubelet" "${all_kubelet_flags[@]}" >"${KUBELET_LOG}" 2>&1 &
+    sudo -E "${GO_OUT}/kubelet" "${all_kubelet_flags[@]}" \
+      --config=/tmp/kubelet.yaml >"${KUBELET_LOG}" 2>&1 &
     KUBELET_PID=$!
 
     # Quick check that kubelet is running.
@@ -828,9 +854,11 @@ function start_kubelet {
 function start_kubeproxy {
     PROXY_LOG=${LOG_DIR}/kube-proxy.log
 
-    # wait for kubelet collect node information
-    echo "wait kubelet ready"
-    wait_node_ready
+    if [[ "${START_MODE}" != "nokubelet" ]]; then
+      # wait for kubelet collect node information
+      echo "wait kubelet ready"
+      wait_node_ready
+    fi
 
     cat <<EOF > /tmp/kube-proxy.yaml
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
@@ -841,13 +869,7 @@ hostnameOverride: ${HOSTNAME_OVERRIDE}
 mode: ${KUBE_PROXY_MODE}
 EOF
     if [[ -n ${FEATURE_GATES} ]]; then
-      echo "featureGates:"
-      # Convert from foo=true,bar=false to
-      #   foo: true
-      #   bar: false
-      for gate in $(echo "${FEATURE_GATES}" | tr ',' ' '); do
-        echo "${gate}" | ${SED} -e 's/\(.*\)=\(.*\)/  \1: \2/'
-      done
+      parse_feature_gates "${FEATURE_GATES}"
     fi >>/tmp/kube-proxy.yaml
 
     if [[ "${REUSE_CERTS}" != true ]]; then
@@ -884,22 +906,29 @@ EOF
 function start_kubedns {
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
         cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns/kube-dns.yaml.in" kube-dns.yaml
-        ${SED} -i -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" kube-dns.yaml
-        ${SED} -i -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" kube-dns.yaml
-        ${SED} -i -e "s/{{ pillar\['dns_memory_limit'\] }}/${DNS_MEMORY_LIMIT}/g" kube-dns.yaml
+        ${SED} -i -e "s/dns_domain/${DNS_DOMAIN}/g" kube-dns.yaml
+        ${SED} -i -e "s/dns_server/${DNS_SERVER_IP}/g" kube-dns.yaml
+        ${SED} -i -e "s/dns_memory_limit/${DNS_MEMORY_LIMIT}/g" kube-dns.yaml
         # TODO update to dns role once we have one.
         # use kubectl to create kubedns addon
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kube-dns.yaml
-        echo "Kube-dns addon successfully deployed."
+        if ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kube-dns.yaml ; then
+       		echo "Kube-dns addon successfully deployed."
+        else
+		echo "Something is wrong with your DNS input"
+		cat kube-dns.yaml
+		exit 1
+        fi
         rm kube-dns.yaml
     fi
 }
 
 function start_nodelocaldns {
   cp "${KUBE_ROOT}/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml" nodelocaldns.yaml
+  # eventually all the __PILLAR__ stuff will be gone, but theyre still in nodelocaldns for backward compat.
   ${SED} -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" nodelocaldns.yaml
   ${SED} -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" nodelocaldns.yaml
   ${SED} -i -e "s/__PILLAR__LOCAL__DNS__/${LOCAL_DNS_IP}/g" nodelocaldns.yaml
+
   # use kubectl to create nodelocaldns addon
   ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f nodelocaldns.yaml
   echo "NodeLocalDNS addon successfully deployed."
@@ -1006,6 +1035,26 @@ Logs:
   ${KUBELET_LOG}
 EOF
 fi
+}
+
+function parse_feature_gates {
+  echo "featureGates:"
+  # Convert from foo=true,bar=false to
+  #   foo: true
+  #   bar: false
+  for gate in $(echo "$1" | tr ',' ' '); do
+    echo "${gate}" | ${SED} -e 's/\(.*\)=\(.*\)/  \1: \2/'
+  done
+}
+
+function parse_eviction {
+  # Convert from memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5% to
+  #   memory.available: "100Mi"
+  #   nodefs.available: "10%"
+  #   nodefs.inodesFree: "5%"
+  for eviction in $(echo "$1" | tr ',' ' '); do
+    echo "${eviction}" | ${SED} -e 's/</: \"/' | ${SED} -e 's/^/  /' | ${SED} -e 's/$/\"/'
+  done
 }
 
 # If we are running in the CI, we need a few more things before we can start

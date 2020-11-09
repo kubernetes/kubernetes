@@ -32,6 +32,7 @@ filegroup(
         "//staging/src/k8s.io/kubectl/pkg/cmd/apiresources:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/apply:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/attach:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/auth:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/autoscale:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/certificates:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo:all-srcs",

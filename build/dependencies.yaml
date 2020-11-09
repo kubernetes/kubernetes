@@ -1,7 +1,23 @@
 dependencies:
+  # agnhost: bump this one first
+  - name: "agnhost"
+    version: "2.25"
+    refPaths:
+    - path: test/images/agnhost/VERSION
+      match: \d.\d
+    - path: test/images/agnhost/agnhost.go
+      match: "Version:"
+
+  # then after merge and successful postsubmit image push / promotion, bump this
+  - name: "agnhost: dependents"
+    version: "2.21"
+    refPaths:
+    - path: test/utils/image/manifest.go
+      match: configs\[Agnhost\] = Config{promoterE2eRegistry, "agnhost", "\d+\.\d+"}
+
   # Bazel
   - name: "repo-infra"
-    version: 0.0.10
+    version: 0.1.1
     refPaths:
     - path: build/root/WORKSPACE
       match: strip_prefix = "repo-infra-\d+.\d+.\d+"
@@ -10,7 +26,7 @@ dependencies:
 
   # CNI plugins
   - name: "cni"
-    version: 0.8.6
+    version: 0.8.7
     refPaths:
     - path: build/workspace.bzl
       match: CNI_VERSION =
@@ -40,7 +56,7 @@ dependencies:
 
   # CRI Tools
   - name: "crictl"
-    version: 1.18.0
+    version: 1.19.0
     refPaths:
     - path: build/workspace.bzl
       match: CRI_TOOLS_VERSION =
@@ -58,7 +74,7 @@ dependencies:
 
   # etcd
   - name: "etcd"
-    version: 3.4.9
+    version: 3.4.13
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
@@ -75,70 +91,60 @@ dependencies:
       match: const etcdImage
 
   - name: "etcd-image"
-    version: 3.4.9
+    version: 3.4.13
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
     - path: cluster/images/etcd/migrate/options.go
 
   # Golang
-  - name: "golang"
-    version: 1.15.0-rc.1
+  - name: "golang: upstream version"
+    version: 1.15.2
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: build/root/WORKSPACE
-      match: (override_)?go_version = "((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"
-
-  - name: "golang: upstream container image"
-    version: 1.15rc1
-    refPaths:
+      match: (override_)?go_version = "\d+.\d+(alpha|beta|rc)?\.?\d+"
     - path: test/images/Makefile
-      match: GOLANG_VERSION=\d+.\d+(alpha|beta|rc)\d+
+      match: GOLANG_VERSION=\d+.\d+(alpha|beta|rc)?\.?\d+
+    - path: staging/publishing/rules.yaml
+      match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.15.0-rc.1-1
+    version: v1.15.2-1
     refPaths:
     - path: build/build-image/cross/VERSION
-    - path: test/images/sample-apiserver/Dockerfile
+    - path: test/images/sample-apiserver/Makefile
       match: k8s\.gcr\.io\/build-image\/kube-cross:v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   # Base images
   - name: "k8s.gcr.io/debian-base: dependents"
-    version: 2.1.2
+    version: buster-v1.2.0
     refPaths:
-    - path: build/common.sh
-      match: debian_base_version=
     - path: build/workspace.bzl
       match: tag =
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-arm:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-arm:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-arm64:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-arm64:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-ppc64le:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-ppc64le:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-s390x:v\d+\.\d+\.\d+
+      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-s390x:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   - name: "k8s.gcr.io/debian-iptables: dependents"
-    version: 12.1.1
+    version: buster-v1.3.0
     refPaths:
     - path: build/common.sh
       match: debian_iptables_version=
     - path: build/workspace.bzl
       match: tag =
     - path: test/utils/image/manifest.go
-      match: configs\[DebianIptables\] = Config{buildImageRegistry, "debian-iptables", "v\d+\.\d+.\d+"}
-
-  - name: "k8s.gcr.io/go-runner"
-    version: 0.1.1
-    refPaths:
-    - path: build/go-runner/Makefile
-      match: TAG \?=
+      match: configs\[DebianIptables\] = Config{buildImageRegistry, "debian-iptables", "[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"}
 
   - name: "k8s.gcr.io/go-runner: dependents"
-    version: 0.1.1
+    version: buster-v2.0.1
     refPaths:
     - path: build/common.sh
       match: go_runner_version=
@@ -146,7 +152,7 @@ dependencies:
       match: tag =
 
   - name: "k8s.gcr.io/pause"
-    version: 3.3
+    version: 3.4
     refPaths:
     - path: build/pause/Makefile
       match: TAG =

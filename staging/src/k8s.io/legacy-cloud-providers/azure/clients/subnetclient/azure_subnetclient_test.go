@@ -71,7 +71,7 @@ func TestGet(t *testing.T) {
 		Name: to.StringPtr("subnet1"),
 	}
 	subnet, err := testSubnet.MarshalJSON()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	response := &http.Response{
 		StatusCode: http.StatusOK,
 		Body:       ioutil.NopCloser(bytes.NewReader(subnet)),
@@ -202,7 +202,7 @@ func TestList(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	subnetList := []network.Subnet{getTestSubnet("subnet1"), getTestSubnet("subnet2"), getTestSubnet("subnet3")}
 	responseBody, err := json.Marshal(network.SubnetListResult{Value: &subnetList})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusOK,
@@ -292,7 +292,7 @@ func TestListWithListResponderError(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	subnetList := []network.Subnet{getTestSubnet("subnet1"), getTestSubnet("subnet2"), getTestSubnet("subnet3")}
 	responseBody, err := json.Marshal(network.SubnetListResult{Value: &subnetList})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusNotFound,
@@ -303,6 +303,35 @@ func TestListWithListResponderError(t *testing.T) {
 	result, rerr := subnetClient.List(context.TODO(), "rg", "vnet")
 	assert.NotNil(t, rerr)
 	assert.Equal(t, 0, len(result))
+}
+
+func TestListWithNextPage(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet/subnets"
+	armClient := mockarmclient.NewMockInterface(ctrl)
+	subnetList := []network.Subnet{getTestSubnet("subnet1"), getTestSubnet("subnet2"), getTestSubnet("subnet3")}
+	partialResponse, err := json.Marshal(network.SubnetListResult{Value: &subnetList, NextLink: to.StringPtr("nextLink")})
+	assert.NoError(t, err)
+	pagedResponse, err := json.Marshal(network.SubnetListResult{Value: &subnetList})
+	assert.NoError(t, err)
+	armClient.EXPECT().PrepareGetRequest(gomock.Any(), gomock.Any()).Return(&http.Request{}, nil)
+	armClient.EXPECT().Send(gomock.Any(), gomock.Any()).Return(
+		&http.Response{
+			StatusCode: http.StatusOK,
+			Body:       ioutil.NopCloser(bytes.NewReader(pagedResponse)),
+		}, nil)
+	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
+		&http.Response{
+			StatusCode: http.StatusOK,
+			Body:       ioutil.NopCloser(bytes.NewReader(partialResponse)),
+		}, nil).Times(1)
+	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(2)
+	subnetClient := getTestSubnetClient(armClient)
+	result, rerr := subnetClient.List(context.TODO(), "rg", "vnet")
+	assert.Nil(t, rerr)
+	assert.Equal(t, 6, len(result))
 }
 
 func TestListNeverRateLimiter(t *testing.T) {
@@ -381,7 +410,7 @@ func TestListNextResultsMultiPages(t *testing.T) {
 		subnetClient := getTestSubnetClient(armClient)
 		result, err := subnetClient.listNextResults(context.TODO(), lastResult)
 		if test.prepareErr != nil || test.sendErr != nil {
-			assert.NotNil(t, err)
+			assert.Error(t, err)
 		} else {
 			assert.NoError(t, err)
 		}
@@ -430,7 +459,7 @@ func TestListNextResultsMultiPagesWithListResponderError(t *testing.T) {
 	expected.Response = autorest.Response{Response: response}
 	subnetClient := getTestSubnetClient(armClient)
 	result, err := subnetClient.listNextResults(context.TODO(), lastResult)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 	assert.Equal(t, expected, result)
 }
 

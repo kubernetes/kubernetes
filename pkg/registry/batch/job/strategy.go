@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
-	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -104,9 +103,7 @@ func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	if job.Spec.ManualSelector == nil || *job.Spec.ManualSelector == false {
 		generateSelector(job)
 	}
-	allErrs := validation.ValidateJob(job)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&job.Spec.Template, nil, field.NewPath("spec.template"))...)
-	return allErrs
+	return validation.ValidateJob(job)
 }
 
 // generateSelector adds a selector to a job and labels to its template
@@ -178,7 +175,6 @@ func (jobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	oldJob := old.(*batch.Job)
 	validationErrorList := validation.ValidateJob(job)
 	updateErrorList := validation.ValidateJobUpdate(job, oldJob)
-	updateErrorList = append(updateErrorList, corevalidation.ValidateConditionalPodTemplate(&job.Spec.Template, &oldJob.Spec.Template, field.NewPath("spec.template"))...)
 	return append(validationErrorList, updateErrorList...)
 }
 

@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
+	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 )
 
 // DevicesProvider knows how to provide the devices used by the given container

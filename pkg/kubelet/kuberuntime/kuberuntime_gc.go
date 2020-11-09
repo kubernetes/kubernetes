@@ -161,23 +161,10 @@ func (cgc *containerGC) removeOldestNSandboxes(sandboxes []sandboxGCInfo, toRemo
 	// Remove from oldest to newest (last to first).
 	for i := len(sandboxes) - 1; i >= numToKeep; i-- {
 		if !sandboxes[i].active {
-			cgc.removeSandbox(sandboxes[i].id)
+			if err := cgc.manager.DeleteSandbox(sandboxes[i].id); err != nil {
+				klog.Errorf("Failed to remove sandbox %q: %v", sandboxes[i].id, err)
+			}
 		}
-	}
-}
-
-// removeSandbox removes the sandbox by sandboxID.
-func (cgc *containerGC) removeSandbox(sandboxID string) {
-	klog.V(4).Infof("Removing sandbox %q", sandboxID)
-	// In normal cases, kubelet should've already called StopPodSandbox before
-	// GC kicks in. To guard against the rare cases where this is not true, try
-	// stopping the sandbox before removing it.
-	if err := cgc.client.StopPodSandbox(sandboxID); err != nil {
-		klog.Errorf("Failed to stop sandbox %q before removing: %v", sandboxID, err)
-		return
-	}
-	if err := cgc.client.RemovePodSandbox(sandboxID); err != nil {
-		klog.Errorf("Failed to remove sandbox %q: %v", sandboxID, err)
 	}
 }
 

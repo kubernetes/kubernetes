@@ -22,6 +22,7 @@ import (
 	"reflect"
 	goruntime "runtime"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -99,9 +100,12 @@ func AddObjectMetaFieldsSet(source fields.Set, objectMeta *metav1.ObjectMeta, ha
 	return source
 }
 
+func newPod() runtime.Object     { return &example.Pod{} }
+func newPodList() runtime.Object { return &example.PodList{} }
+
 func newEtcdTestStorage(t *testing.T, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
-	storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), prefix, value.IdentityTransformer, true)
+	storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), newPod, prefix, value.IdentityTransformer, true)
 	return server, storage
 }
 
@@ -118,8 +122,8 @@ func newTestCacherWithClock(s storage.Interface, clock clock.Clock) (*cacherstor
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
 		GetAttrsFunc:   GetAttrs,
-		NewFunc:        func() runtime.Object { return &example.Pod{} },
-		NewListFunc:    func() runtime.Object { return &example.PodList{} },
+		NewFunc:        newPod,
+		NewListFunc:    newPodList,
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 		Clock:          clock,
 	}
@@ -145,7 +149,7 @@ func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *exampl
 		return obj.DeepCopyObject(), nil, nil
 	}
 	key := "pods/" + obj.Namespace + "/" + obj.Name
-	if err := s.GuaranteedUpdate(context.TODO(), key, &example.Pod{}, old == nil, nil, updateFn); err != nil {
+	if err := s.GuaranteedUpdate(context.TODO(), key, &example.Pod{}, old == nil, nil, updateFn, nil); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	obj.ResourceVersion = ""
@@ -938,8 +942,12 @@ func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
 	defer watcher.Stop()
 
 	done := make(chan struct{})
-	defer close(done)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	defer wg.Wait()   // We must wait for the waitgroup to exit before we terminate the cache or the server in prior defers
+	defer close(done) // call close first, so the goroutine knows to exit
 	go func() {
+		defer wg.Done()
 		for i := 0; i < 100; i++ {
 			select {
 			case <-done:

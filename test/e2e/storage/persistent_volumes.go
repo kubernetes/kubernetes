@@ -307,6 +307,11 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 				framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
 				framework.Logf("Pod exited without failure; the volume has been recycled.")
+
+				// Delete the PVC and wait for the recycler to finish before the NFS server gets shutdown during cleanup.
+				framework.Logf("Removing second PVC, waiting for the recycler to finish before cleanup.")
+				framework.ExpectNoError(e2epv.DeletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeAvailable))
+				pvc = nil
 			})
 		})
 	})

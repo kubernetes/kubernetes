@@ -64,7 +64,7 @@ func kubectlCreate(ns, file string) {
 		framework.Fail(err.Error())
 	}
 	input := string(data)
-	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
+	framework.RunKubectlOrDieInput(ns, input, "create", "-f", "-")
 }
 
 // Setup creates etcd statefulset and then verifies that the etcd is writable.

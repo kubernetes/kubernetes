@@ -36,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -49,11 +50,9 @@ import (
 	"k8s.io/klog/v2"
 	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 )
 
@@ -185,7 +184,6 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	}
 
 	// Start all informers.
-	go cc.PodInformer.Informer().Run(ctx.Done())
 	cc.InformerFactory.Start(ctx.Done())
 
 	// Wait for all caches to sync before scheduling.
@@ -217,9 +215,9 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 // buildHandlerChain wraps the given handler with the standard filters.
 func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz authorizer.Authorizer) http.Handler {
 	requestInfoResolver := &apirequest.RequestInfoFactory{}
-	failedHandler := genericapifilters.Unauthorized(legacyscheme.Codecs)
+	failedHandler := genericapifilters.Unauthorized(scheme.Codecs)
 
-	handler = genericapifilters.WithAuthorization(handler, authz, legacyscheme.Codecs)
+	handler = genericapifilters.WithAuthorization(handler, authz, scheme.Codecs)
 	handler = genericapifilters.WithAuthentication(handler, authn, failedHandler, nil)
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericapifilters.WithCacheControl(handler)
@@ -234,7 +232,6 @@ func installMetricHandler(pathRecorderMux *mux.PathRecorderMux) {
 	defaultMetricsHandler := legacyregistry.Handler().ServeHTTP
 	pathRecorderMux.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method == "DELETE" {
-			metrics.Reset()
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			w.Header().Set("X-Content-Type-Options", "nosniff")
 			io.WriteString(w, "metrics reset\n")
@@ -316,7 +313,6 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 	// Create the scheduler.
 	sched, err := scheduler.New(cc.Client,
 		cc.InformerFactory,
-		cc.PodInformer,
 		recorderFactory,
 		ctx.Done(),
 		scheduler.WithProfiles(cc.ComponentConfig.Profiles...),
@@ -326,6 +322,7 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 		scheduler.WithPodMaxBackoffSeconds(cc.ComponentConfig.PodMaxBackoffSeconds),
 		scheduler.WithPodInitialBackoffSeconds(cc.ComponentConfig.PodInitialBackoffSeconds),
 		scheduler.WithExtenders(cc.ComponentConfig.Extenders...),
+		scheduler.WithParallelism(cc.ComponentConfig.Parallelism),
 	)
 	if err != nil {
 		return nil, nil, err

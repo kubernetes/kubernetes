@@ -54,6 +54,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/kubelet/dockershim/libdocker/testing:all-srcs",
+    ],
     tags = ["automanaged"],
 )

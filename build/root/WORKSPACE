@@ -3,13 +3,12 @@ workspace(name = "io_k8s_kubernetes")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load("//build:workspace_mirror.bzl", "mirror")
 
-# TODO(go1.15): Update once we've published a repo-infra release that supports go1.15
 http_archive(
     name = "io_k8s_repo_infra",
-    strip_prefix = "repo-infra-0.0.10",
-    sha256 = "b2d39b7d32eab3bf85bf693685b315ece4f942fca4110cf24aac3f260f2f3c6c",
+    strip_prefix = "repo-infra-0.1.1",
+    sha256 = "6c916da43b701e2947f147f3791b3355d8a342dd6cb81887b7d6db184879e387",
     urls = [
-        "https://github.com/kubernetes/repo-infra/archive/v0.0.10.tar.gz",
+        "https://github.com/kubernetes/repo-infra/archive/v0.1.1.tar.gz",
     ],
 )
 
@@ -24,20 +23,18 @@ load("@io_k8s_repo_infra//:repos.bzl", repo_infra_configure = "configure", repo_
 #            'override_go_version': used to specify an alternate go version provided
 #                                   by kubernetes/repo-infra
 repo_infra_configure(
-    # TODO(go1.15): Uncomment once we've published a repo-infra release that supports go1.15
-    #go_version = "1.15.0",
-    # TODO(go1.15): Comment out once we've published a repo-infra release that supports go1.15
-    override_go_version = "1.15.0-rc.1",
+    go_version = "1.15.2",
     minimum_bazel_version = "2.2.0",
 )
 
 repo_infra_go_repositories()
 
+# begin setup rules_docker
 http_archive(
     name = "io_bazel_rules_docker",
-    sha256 = "aed1c249d4ec8f703edddf35cbe9dfaca0b5f5ea6e4cd9e83e99f3b0d1136c3d",
-    strip_prefix = "rules_docker-0.7.0",
-    urls = mirror("https://github.com/bazelbuild/rules_docker/archive/v0.7.0.tar.gz"),
+    sha256 = "4521794f0fba2e20f3bf15846ab5e01d5332e587e9ce81629c7f96c793bb7036",
+    strip_prefix = "rules_docker-0.14.4",
+    urls = mirror("https://github.com/bazelbuild/rules_docker/releases/download/v0.14.4/rules_docker-v0.14.4.tar.gz"),
 )
 
 load(
@@ -47,7 +44,20 @@ load(
 
 container_repositories()
 
-load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
+load("@io_bazel_rules_docker//repositories:deps.bzl", container_deps = "deps")
+
+container_deps()
+
+load("@io_bazel_rules_docker//repositories:pip_repositories.bzl", "pip_deps")
+
+pip_deps()
+
+load(
+    "@io_bazel_rules_docker//container:container.bzl",
+    "container_pull",
+)
+
+# end setup rules_docker
 
 container_pull(
     name = "distroless_base",

@@ -127,5 +127,3 @@ example, you could use the following one-liner:
 ```bash
 SOURCE_DATE_EPOCH=$(git show -s --format=format:%ct HEAD)
 ```
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build/README.md?pixel)]()

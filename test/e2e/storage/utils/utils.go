@@ -33,6 +33,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -67,41 +68,41 @@ const (
 )
 
 // PodExec runs f.ExecCommandInContainerWithFullOutput to execute a shell cmd in target pod
-func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, error) {
-	stdout, _, err := f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
-	return stdout, err
+func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, string, error) {
+	stdout, stderr, err := f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
+	return stdout, stderr, err
 }
 
 // VerifyExecInPodSucceed verifies shell cmd in target pod succeed
 func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, shExec string) {
-	_, err := PodExec(f, pod, shExec)
+	stdout, stderr, err := PodExec(f, pod, shExec)
 	if err != nil {
 		if exiterr, ok := err.(uexec.CodeExitError); ok {
 			exitCode := exiterr.ExitStatus()
 			framework.ExpectNoError(err,
-				"%q should succeed, but failed with exit code %d and error message %q",
-				shExec, exitCode, exiterr)
+				"%q should succeed, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",
+				shExec, exitCode, exiterr, stdout, stderr)
 		} else {
 			framework.ExpectNoError(err,
-				"%q should succeed, but failed with error message %q",
-				shExec, err)
+				"%q should succeed, but failed with error message %q\nstdout: %s\nstderr: %s",
+				shExec, err, stdout, stderr)
 		}
 	}
 }
 
 // VerifyExecInPodFail verifies shell cmd in target pod fail with certain exit code
 func VerifyExecInPodFail(f *framework.Framework, pod *v1.Pod, shExec string, exitCode int) {
-	_, err := PodExec(f, pod, shExec)
+	stdout, stderr, err := PodExec(f, pod, shExec)
 	if err != nil {
 		if exiterr, ok := err.(clientexec.ExitError); ok {
 			actualExitCode := exiterr.ExitStatus()
 			framework.ExpectEqual(actualExitCode, exitCode,
-				"%q should fail with exit code %d, but failed with exit code %d and error message %q",
-				shExec, exitCode, actualExitCode, exiterr)
+				"%q should fail with exit code %d, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",
+				shExec, exitCode, actualExitCode, exiterr, stdout, stderr)
 		} else {
 			framework.ExpectNoError(err,
-				"%q should fail with exit code %d, but failed with error message %q",
-				shExec, exitCode, err)
+				"%q should fail with exit code %d, but failed with error message %q\nstdout: %s\nstderr: %s",
+				shExec, exitCode, err, stdout, stderr)
 		}
 	}
 	framework.ExpectError(err, "%q should fail with exit code %d, but exit without error", shExec, exitCode)
@@ -241,13 +242,13 @@ func TestKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Fra
 	seed := time.Now().UTC().UnixNano()
 
 	ginkgo.By("Writing to the volume.")
-	CheckWriteToPath(f, clientPod, v1.PersistentVolumeFilesystem, path, byteLen, seed)
+	CheckWriteToPath(f, clientPod, v1.PersistentVolumeFilesystem, false, path, byteLen, seed)
 
 	ginkgo.By("Restarting kubelet")
 	KubeletCommand(KRestart, c, clientPod)
 
 	ginkgo.By("Testing that written file is accessible.")
-	CheckReadFromPath(f, clientPod, v1.PersistentVolumeFilesystem, path, byteLen, seed)
+	CheckReadFromPath(f, clientPod, v1.PersistentVolumeFilesystem, false, path, byteLen, seed)
 
 	framework.Logf("Volume mount detected on pod %s and written file %s is readable post-restart.", clientPod.Name, path)
 }
@@ -259,13 +260,13 @@ func TestKubeletRestartsAndRestoresMap(c clientset.Interface, f *framework.Frame
 	seed := time.Now().UTC().UnixNano()
 
 	ginkgo.By("Writing to the volume.")
-	CheckWriteToPath(f, clientPod, v1.PersistentVolumeBlock, path, byteLen, seed)
+	CheckWriteToPath(f, clientPod, v1.PersistentVolumeBlock, false, path, byteLen, seed)
 
 	ginkgo.By("Restarting kubelet")
 	KubeletCommand(KRestart, c, clientPod)
 
 	ginkgo.By("Testing that written pv is accessible.")
-	CheckReadFromPath(f, clientPod, v1.PersistentVolumeBlock, path, byteLen, seed)
+	CheckReadFromPath(f, clientPod, v1.PersistentVolumeBlock, false, path, byteLen, seed)
 
 	framework.Logf("Volume map detected on pod %s and written data %s is readable post-restart.", clientPod.Name, path)
 }
@@ -656,33 +657,54 @@ func genBinDataFromSeed(len int, seed int64) []byte {
 }
 
 // CheckReadFromPath validate that file can be properly read.
-func CheckReadFromPath(f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, path string, len int, seed int64) {
+//
+// Note: directIO does not work with (default) BusyBox Pods. A requirement for
+// directIO to function correctly, is to read whole sector(s) for Block-mode
+// PVCs (normally a sector is 512 bytes), or memory pages for files (commonly
+// 4096 bytes).
+func CheckReadFromPath(f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, directIO bool, path string, len int, seed int64) {
 	var pathForVolMode string
+	var iflag string
+
 	if volMode == v1.PersistentVolumeBlock {
 		pathForVolMode = path
 	} else {
 		pathForVolMode = filepath.Join(path, "file1.txt")
 	}
 
+	if directIO {
+		iflag = "iflag=direct"
+	}
+
 	sum := sha256.Sum256(genBinDataFromSeed(len, seed))
 
-	VerifyExecInPodSucceed(f, pod, fmt.Sprintf("dd if=%s bs=%d count=1 | sha256sum", pathForVolMode, len))
-	VerifyExecInPodSucceed(f, pod, fmt.Sprintf("dd if=%s bs=%d count=1 | sha256sum | grep -Fq %x", pathForVolMode, len, sum))
+	VerifyExecInPodSucceed(f, pod, fmt.Sprintf("dd if=%s %s bs=%d count=1 | sha256sum", pathForVolMode, iflag, len))
+	VerifyExecInPodSucceed(f, pod, fmt.Sprintf("dd if=%s %s bs=%d count=1 | sha256sum | grep -Fq %x", pathForVolMode, iflag, len, sum))
 }
 
 // CheckWriteToPath that file can be properly written.
-func CheckWriteToPath(f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, path string, len int, seed int64) {
+//
+// Note: nocache does not work with (default) BusyBox Pods. To read without
+// caching, enable directIO with CheckReadFromPath and check the hints about
+// the len requirements.
+func CheckWriteToPath(f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, nocache bool, path string, len int, seed int64) {
 	var pathForVolMode string
+	var oflag string
+
 	if volMode == v1.PersistentVolumeBlock {
 		pathForVolMode = path
 	} else {
 		pathForVolMode = filepath.Join(path, "file1.txt")
+	}
+
+	if nocache {
+		oflag = "oflag=nocache"
 	}
 
 	encoded := base64.StdEncoding.EncodeToString(genBinDataFromSeed(len, seed))
 
 	VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo %s | base64 -d | sha256sum", encoded))
-	VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo %s | base64 -d | dd of=%s bs=%d count=1", encoded, pathForVolMode, len))
+	VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo %s | base64 -d | dd of=%s %s bs=%d count=1", encoded, pathForVolMode, oflag, len))
 }
 
 // findMountPoints returns all mount points on given node under specified directory.
@@ -709,9 +731,11 @@ func FindVolumeGlobalMountPoints(hostExec HostExec, node *v1.Node) sets.String {
 // CreateDriverNamespace creates a namespace for CSI driver installation.
 // The namespace is still tracked and ensured that gets deleted when test terminates.
 func CreateDriverNamespace(f *framework.Framework) *v1.Namespace {
-	ginkgo.By(fmt.Sprintf("Building a driver namespace object, basename %s", f.BaseName))
-	namespace, err := f.CreateNamespace(f.BaseName, map[string]string{
-		"e2e-framework": f.BaseName,
+	ginkgo.By(fmt.Sprintf("Building a driver namespace object, basename %s", f.Namespace.Name))
+	// The driver namespace will be bound to the test namespace in the prefix
+	namespace, err := f.CreateNamespace(f.Namespace.Name, map[string]string{
+		"e2e-framework":      f.BaseName,
+		"e2e-test-namespace": f.Namespace.Name,
 	})
 	framework.ExpectNoError(err)
 
@@ -725,7 +749,7 @@ func CreateDriverNamespace(f *framework.Framework) *v1.Namespace {
 	return namespace
 }
 
-// WaitForGVRDeletion waits until an object has been deleted
+// WaitForGVRDeletion waits until a non-namespaced object has been deleted
 func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, objectName string, poll, timeout time.Duration) error {
 	framework.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)
 
@@ -735,7 +759,7 @@ func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, ob
 			framework.Logf("%s %v is not found and has been deleted", gvr.Resource, objectName)
 			return true
 		} else if err != nil {
-			framework.Logf("Get $s %v returned an error: %v", objectName, err.Error())
+			framework.Logf("Get %s returned an error: %v", objectName, err.Error())
 		} else {
 			framework.Logf("%s %v has been found and is not deleted", gvr.Resource, objectName)
 		}
@@ -746,6 +770,29 @@ func WaitForGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, ob
 	}
 
 	return fmt.Errorf("%s %s is not deleted within %v", gvr.Resource, objectName, timeout)
+}
+
+// WaitForNamespacedGVRDeletion waits until a namespaced object has been deleted
+func WaitForNamespacedGVRDeletion(c dynamic.Interface, gvr schema.GroupVersionResource, ns, objectName string, poll, timeout time.Duration) error {
+	framework.Logf("Waiting up to %v for %s %s to be deleted", timeout, gvr.Resource, objectName)
+
+	if successful := WaitUntil(poll, timeout, func() bool {
+		_, err := c.Resource(gvr).Namespace(ns).Get(context.TODO(), objectName, metav1.GetOptions{})
+		if err != nil && apierrors.IsNotFound(err) {
+			framework.Logf("%s %s is not found in namespace %s and has been deleted", gvr.Resource, objectName, ns)
+			return true
+		} else if err != nil {
+			framework.Logf("Get %s in namespace %s returned an error: %v", objectName, ns, err.Error())
+		} else {
+			framework.Logf("%s %s has been found in namespace %s and is not deleted", gvr.Resource, objectName, ns)
+		}
+
+		return false
+	}); successful {
+		return nil
+	}
+
+	return fmt.Errorf("%s %s in namespace %s is not deleted within %v", gvr.Resource, objectName, ns, timeout)
 }
 
 // WaitUntil runs checkDone until a timeout is reached
@@ -759,4 +806,38 @@ func WaitUntil(poll, timeout time.Duration, checkDone func() bool) bool {
 
 	framework.Logf("WaitUntil failed after reaching the timeout %v", timeout)
 	return false
+}
+
+// WaitForGVRFinalizer waits until a object from a given GVR contains a finalizer
+// If namespace is empty, assume it is a non-namespaced object
+func WaitForGVRFinalizer(ctx context.Context, c dynamic.Interface, gvr schema.GroupVersionResource, objectName, objectNamespace, finalizer string, poll, timeout time.Duration) error {
+	framework.Logf("Waiting up to %v for object %s %s of resource %s to contain finalizer %s", timeout, objectNamespace, objectName, gvr.Resource, finalizer)
+	var (
+		err      error
+		resource *unstructured.Unstructured
+	)
+	if successful := WaitUntil(poll, timeout, func() bool {
+		switch objectNamespace {
+		case "":
+			resource, err = c.Resource(gvr).Get(ctx, objectName, metav1.GetOptions{})
+		default:
+			resource, err = c.Resource(gvr).Namespace(objectNamespace).Get(ctx, objectName, metav1.GetOptions{})
+		}
+		if err != nil {
+			framework.Logf("Failed to get object %s %s with err: %v. Will retry in %v", objectNamespace, objectName, err, timeout)
+			return false
+		}
+		for _, f := range resource.GetFinalizers() {
+			if f == finalizer {
+				return true
+			}
+		}
+		return false
+	}); successful {
+		return nil
+	}
+	if err == nil {
+		err = fmt.Errorf("finalizer %s not added to object %s %s of resource %s", finalizer, objectNamespace, objectName, gvr)
+	}
+	return err
 }
