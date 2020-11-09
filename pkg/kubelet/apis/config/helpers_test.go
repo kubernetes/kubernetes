@@ -184,6 +184,7 @@ var (
 		"HealthzBindAddress",
 		"HealthzPort",
 		"Logging.Format",
+		"Logging.Sanitization",
 		"TLSCipherSuites[*]",
 		"TLSMinVersion",
 		"IPTablesDropBit",
