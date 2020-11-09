@@ -535,11 +535,11 @@ export GCE_PRIVATE_CLUSTER_PORTS_PER_VM="${KUBE_GCE_PRIVATE_CLUSTER_PORTS_PER_VM
 
 # Optional: Whether to do the setup for the konnectivity service
 # Includes setting up kubeconfig, tokens, egress files, and firewall rules
-export PREPARE_KONNECTIVITY_SERVICE="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-false}"
+export PREPARE_KONNECTIVITY_SERVICE="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-true}"
 # Optional: Whether to use konnectivity network proxy for all egress from apiserver.
-export EGRESS_VIA_KONNECTIVITY="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-false}"
+export EGRESS_VIA_KONNECTIVITY="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-true}"
 # Optional: Whether to start the konnectivity server and agent pods.
-export RUN_KONNECTIVITY_PODS="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-false}"
+export RUN_KONNECTIVITY_PODS="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-true}"
 # Proxy Protocol Mode determines the protocol to use to communicate between apiserver and network proxy.
 # Valid options are grpc and http-connect. Default is grpc.
 export KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE="${KUBE_KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}"
@@ -551,7 +551,7 @@ export ENABLE_CSI_PROXY="${ENABLE_CSI_PROXY:-true}"
 # kube-apiserver is healthchecked on host IP instead of 127.0.0.1.
 export KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP="${KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP:-false}"
 
-# ETCD_LISTEN_ON_HOST_IP decides whether etcd servers should also listen on host IP, 
+# ETCD_LISTEN_ON_HOST_IP decides whether etcd servers should also listen on host IP,
 # in addition to listening to 127.0.0.1, and whether kube-apiserver should connect to etcd servers
 # through host IP.
 export ETCD_LISTEN_ON_HOST_IP="${ETCD_LISTEN_ON_HOST_IP:-false}"
