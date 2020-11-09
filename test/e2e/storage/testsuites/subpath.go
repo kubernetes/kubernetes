@@ -441,7 +441,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		defer cleanup()
 
 		// Change volume container to busybox so we can exec later
-		l.pod.Spec.Containers[1].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+		l.pod.Spec.Containers[1].Image = e2evolume.GetDefaultTestImage()
 		l.pod.Spec.Containers[1].Command = e2evolume.GenerateScriptCmd("sleep 100000")
 		l.pod.Spec.Containers[1].Args = nil
 
@@ -539,7 +539,7 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 			InitContainers: []v1.Container{
 				{
 					Name:            fmt.Sprintf("init-volume-%s", suffix),
-					Image:           e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox)),
+					Image:           e2evolume.GetDefaultTestImage(),
 					VolumeMounts:    []v1.VolumeMount{volumeMount, probeMount},
 					SecurityContext: e2evolume.GenerateSecurityContext(privilegedSecurityContext),
 				},
@@ -608,7 +608,7 @@ func volumeFormatPod(f *framework.Framework, volumeSource *v1.VolumeSource) *v1.
 			Containers: []v1.Container{
 				{
 					Name:    fmt.Sprintf("init-volume-%s", f.Namespace.Name),
-					Image:   e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox)),
+					Image:   e2evolume.GetDefaultTestImage(),
 					Command: e2evolume.GenerateScriptCmd("echo nothing"),
 					VolumeMounts: []v1.VolumeMount{
 						{
@@ -787,10 +787,10 @@ func (h *podContainerRestartHooks) FixLivenessProbe(pod *v1.Pod, probeFilePath s
 func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks *podContainerRestartHooks) {
 	pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
 
-	pod.Spec.Containers[0].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[0].Image = e2evolume.GetDefaultTestImage()
 	pod.Spec.Containers[0].Command = e2evolume.GenerateScriptCmd("sleep 100000")
 	pod.Spec.Containers[0].Args = nil
-	pod.Spec.Containers[1].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[1].Image = e2evolume.GetDefaultTestImage()
 	pod.Spec.Containers[1].Command = e2evolume.GenerateScriptCmd("sleep 100000")
 	pod.Spec.Containers[1].Args = nil
 	hooks.AddLivenessProbe(pod, probeFilePath)
@@ -961,10 +961,10 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 	}
 
 	// Change to busybox
-	pod.Spec.Containers[0].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[0].Image = e2evolume.GetDefaultTestImage()
 	pod.Spec.Containers[0].Command = e2evolume.GenerateScriptCmd("sleep 100000")
 	pod.Spec.Containers[0].Args = nil
-	pod.Spec.Containers[1].Image = e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
+	pod.Spec.Containers[1].Image = e2evolume.GetDefaultTestImage()
 	pod.Spec.Containers[1].Command = e2evolume.GenerateScriptCmd("sleep 100000")
 	pod.Spec.Containers[1].Args = nil
 	// If grace period is too short, then there is not enough time for the volume
