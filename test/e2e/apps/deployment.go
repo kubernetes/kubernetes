@@ -356,15 +356,16 @@ var _ = SIGDescribe("Deployment", func() {
 			if deployment, ok := event.Object.(*appsv1.Deployment); ok {
 				found := deployment.ObjectMeta.Name == testDeployment.Name &&
 					deployment.ObjectMeta.Labels["test-deployment-static"] == "true" &&
-					deployment.Status.ReadyReplicas == testDeploymentDefaultReplicas
+					deployment.Status.ReadyReplicas == testDeploymentMinimumReplicas
 				if !found {
 					framework.Logf("observed Deployment %v in namespace %v with ReadyReplicas %v and labels %v", deployment.ObjectMeta.Name, deployment.ObjectMeta.Namespace, deployment.Status.ReadyReplicas, deployment.ObjectMeta.Labels)
 				}
+				framework.Logf("observed Deployment %v in namespace %v with ReadyReplicas %v and labels %v", deployment.ObjectMeta.Name, deployment.ObjectMeta.Namespace, deployment.Status.ReadyReplicas, deployment.ObjectMeta.Labels)
 				return found, nil
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see replicas of %v in namespace %v scale to requested amount of %v", testDeployment.Name, testNamespaceName, testDeploymentDefaultReplicas)
+		framework.ExpectNoError(err, "failed to fetch DeploymentStatus: %v in namespace %v", testDeployment.Name, testNamespaceName)
 
 		ginkgo.By("patching the DeploymentStatus")
 		deploymentStatusPatch, err := json.Marshal(map[string]interface{}{
@@ -408,16 +409,17 @@ var _ = SIGDescribe("Deployment", func() {
 			if deployment, ok := event.Object.(*appsv1.Deployment); ok {
 				found := deployment.ObjectMeta.Name == testDeployment.Name &&
 					deployment.ObjectMeta.Labels["test-deployment-static"] == "true" &&
-					deployment.Status.ReadyReplicas == testDeploymentDefaultReplicas &&
+					deployment.Status.ReadyReplicas == testDeploymentMinimumReplicas &&
 					deployment.Spec.Template.Spec.Containers[0].Image == testDeploymentUpdateImage
 				if !found {
 					framework.Logf("observed Deployment %v in namespace %v with ReadyReplicas %v", deployment.ObjectMeta.Name, deployment.ObjectMeta.Namespace, deployment.Status.ReadyReplicas)
 				}
+				framework.Logf("observed Deployment %v in namespace %v with ReadyReplicas %v", deployment.ObjectMeta.Name, deployment.ObjectMeta.Namespace, deployment.Status.ReadyReplicas)
 				return found, nil
 			}
 			return false, nil
 		})
-		framework.ExpectNoError(err, "failed to see replicas of %v in namespace %v scale to requested amount of %v", testDeployment.Name, testNamespaceName, testDeploymentDefaultReplicas)
+		framework.ExpectNoError(err, "failed to fetch DeploymentStatus: %v in namespace %v", testDeployment.Name, testNamespaceName)
 
 		ginkgo.By("deleting the Deployment")
 		err = f.ClientSet.AppsV1().Deployments(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &zero}, metav1.ListOptions{LabelSelector: testDeploymentLabelsFlat})
