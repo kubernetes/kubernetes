@@ -83,13 +83,13 @@ func validateServerStorageVersion(ssv apiserverinternal.ServerStorageVersion, fl
 	for _, msg := range apimachineryvalidation.NameIsDNSSubdomain(ssv.APIServerID, false) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("apiServerID"), ssv.APIServerID, msg))
 	}
-	if errs := utilvalidation.IsDNS1035Label(ssv.EncodingVersion); len(errs) > 0 {
+	if errs := isValidAPIVersion(ssv.EncodingVersion); len(errs) > 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("encodingVersion"), ssv.EncodingVersion, strings.Join(errs, ",")))
 	}
 
 	found := false
 	for i, dv := range ssv.DecodableVersions {
-		if errs := utilvalidation.IsDNS1035Label(dv); len(errs) > 0 {
+		if errs := isValidAPIVersion(dv); len(errs) > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("decodableVersions").Index(i), dv, strings.Join(errs, ",")))
 		}
 		if dv == ssv.EncodingVersion {
@@ -157,4 +157,47 @@ func validateStorageVersionCondition(conditions []apiserverinternal.StorageVersi
 		}
 	}
 	return allErrs
+}
+
+const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
+const dns1035LabelErrMsg string = "a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character"
+
+// isValidAPIVersion tests whether the value passed is a valid apiVersion. A
+// valid apiVersion contains a version string that matches DNS_LABEL format,
+// with an optional group/ prefix, where the group string matches DNS_SUBDOMAIN
+// format. If the value is not valid, a list of error strings is returned.
+// Otherwise an empty list (or nil) is returned.
+func isValidAPIVersion(apiVersion string) []string {
+	var errs []string
+	parts := strings.Split(apiVersion, "/")
+	var version string
+	switch len(parts) {
+	case 1:
+		version = parts[0]
+	case 2:
+		var group string
+		group, version = parts[0], parts[1]
+		if len(group) == 0 {
+			errs = append(errs, "group part "+utilvalidation.EmptyError())
+		} else if msgs := utilvalidation.IsDNS1123Subdomain(group); len(msgs) != 0 {
+			errs = append(errs, prefixEach(msgs, "group part ")...)
+		}
+	default:
+		return append(errs, "an apiVersion "+utilvalidation.RegexError(dns1035LabelErrMsg, dns1035LabelFmt, "my-name", "abc-123")+
+			" with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyVersion')")
+	}
+
+	if len(version) == 0 {
+		errs = append(errs, "version part "+utilvalidation.EmptyError())
+	} else if msgs := utilvalidation.IsDNS1035Label(version); len(msgs) != 0 {
+		errs = append(errs, prefixEach(msgs, "version part ")...)
+	}
+	return errs
+}
+
+func prefixEach(msgs []string, prefix string) []string {
+	for i := range msgs {
+		msgs[i] = prefix + msgs[i]
+	}
+	return msgs
 }
