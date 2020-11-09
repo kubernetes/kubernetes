@@ -105,13 +105,9 @@ func (info *BaseServiceInfo) ExternalIPStrings() []string {
 	return info.externalIPs
 }
 
-// LoadBalancerIPStrings is part of ServicePort interface.
-func (info *BaseServiceInfo) LoadBalancerIPStrings() []string {
-	var ips []string
-	for _, ing := range info.loadBalancerStatus.Ingress {
-		ips = append(ips, ing.IP)
-	}
-	return ips
+// LoadBalancerIngress is part of ServicePort interface.
+func (info *BaseServiceInfo) LoadBalancerIngress() []v1.LoadBalancerIngress {
+	return info.loadBalancerStatus.Ingress
 }
 
 // OnlyNodeLocalEndpoints is part of ServicePort interface.
@@ -167,23 +163,16 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		klog.V(4).Infof("service change tracker(%v) ignored the following load balancer source ranges(%s) for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(incorrectIPs, ","), service.Namespace, service.Name)
 	}
 
-	// Obtain Load Balancer Ingress IPs
-	var ips []string
-	for _, ing := range service.Status.LoadBalancer.Ingress {
-		ips = append(ips, ing.IP)
-	}
+	correctIngresses, incorrectIngresses := utilproxy.FilterIncorrectLoadBalancerIngress(service.Status.LoadBalancer.Ingress, sct.ipFamily)
 
-	if len(ips) > 0 {
-		correctIPs, incorrectIPs := utilproxy.FilterIncorrectIPVersion(ips, sct.ipFamily)
+	info.loadBalancerStatus.Ingress = correctIngresses
 
-		if len(incorrectIPs) > 0 {
-			klog.V(4).Infof("service change tracker(%v) ignored the following load balancer(%s) ingress ips for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(incorrectIPs, ","), service.Namespace, service.Name)
-
+	if len(incorrectIngresses) > 0 {
+		var incorrectIPs []string
+		for _, incorrectIng := range incorrectIngresses {
+			incorrectIPs = append(incorrectIPs, incorrectIng.IP)
 		}
-		// Create the LoadBalancerStatus with the filtered IPs
-		for _, ip := range correctIPs {
-			info.loadBalancerStatus.Ingress = append(info.loadBalancerStatus.Ingress, v1.LoadBalancerIngress{IP: ip})
-		}
+		klog.V(4).Infof("service change tracker(%v) ignored the following load balancer(%s) ingress ips for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(incorrectIPs, ","), service.Namespace, service.Name)
 	}
 
 	if apiservice.NeedsHealthCheck(service) {

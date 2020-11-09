@@ -11071,6 +11071,90 @@ func TestValidateServiceCreate(t *testing.T) {
 	}
 }
 
+func TestValidateLoadBalancerStatus(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, true)()
+
+	ipModeVIP := core.LoadBalancerIPModeVIP
+	ipModeProxy := core.LoadBalancerIPModeProxy
+	ipModeDummy := core.LoadBalancerIPMode("dummy")
+
+	testCases := []struct {
+		name          string
+		tweakLBStatus func(s *core.LoadBalancerStatus)
+		numErrs       int
+	}{
+		/* LoadBalancerIPMode*/
+		{
+			name: `valid vip ipMode`,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{
+					{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeVIP,
+					},
+				}
+			},
+			numErrs: 0,
+		},
+		{
+			name: `valid proxy ipMode`,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{
+					{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeProxy,
+					},
+				}
+			},
+			numErrs: 0,
+		},
+		{
+			name: `invalid ipMode`,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{
+					{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeDummy,
+					},
+				}
+			},
+			numErrs: 1,
+		},
+		{
+			name: `missing ipMode`,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{
+					{
+						IP: "1.2.3.4",
+					},
+				}
+			},
+			numErrs: 1,
+		},
+		{
+			name: `missing ip with ipMode present`,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{
+					{
+						IPMode: &ipModeProxy,
+					},
+				}
+			},
+			numErrs: 1,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := core.LoadBalancerStatus{}
+			tc.tweakLBStatus(&s)
+			errs := ValidateLoadBalancerStatus(&s, field.NewPath("status"))
+			if len(errs) != tc.numErrs {
+				t.Errorf("Unexpected error list for case %q(expected:%v got %v) - Errors:\n %v", tc.name, tc.numErrs, len(errs), errs.ToAggregate())
+			}
+		})
+	}
+}
+
 func TestValidateServiceExternalTrafficFieldsCombination(t *testing.T) {
 	testCases := []struct {
 		name     string
