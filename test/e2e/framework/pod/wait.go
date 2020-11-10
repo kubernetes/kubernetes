@@ -51,7 +51,7 @@ const (
 	podScheduledBeforeTimeout = podListTimeout + (20 * time.Second)
 
 	// podStartTimeout is how long to wait for the pod to be started.
-	podStartTimeout = 5 * time.Minute
+	podStartTimeout = 60 * time.Minute
 
 	// poll is how often to poll pods, nodes and claims.
 	poll = 2 * time.Second
