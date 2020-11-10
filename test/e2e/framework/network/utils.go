@@ -54,8 +54,9 @@ const (
 	// EndpointUDPPort is an endpoint UDP port for testing.
 	EndpointUDPPort = 8081
 	// EndpointSCTPPort is an endpoint SCTP port for testing.
-	EndpointSCTPPort      = 8082
-	testContainerHTTPPort = 8080
+	EndpointSCTPPort = 8082
+	// testContainerHTTPPort is the test container http port.
+	testContainerHTTPPort = 9080
 	// ClusterHTTPPort is a cluster HTTP port for testing.
 	ClusterHTTPPort = 80
 	// ClusterUDPPort is a cluster UDP port for testing.
@@ -90,9 +91,34 @@ const (
 // NetexecImageName is the image name for agnhost.
 var NetexecImageName = imageutils.GetE2EImage(imageutils.Agnhost)
 
+// Option is used to configure the NetworkingTest object
+type Option func(*NetworkingTestConfig)
+
+// EnableSCTP listen on SCTP ports on the endpoints
+func EnableSCTP(config *NetworkingTestConfig) {
+	config.SCTPEnabled = true
+}
+
+// UseHostNetwork run the test container with HostNetwork=true.
+func UseHostNetwork(config *NetworkingTestConfig) {
+	config.HostNetwork = true
+}
+
+// EndpointsUseHostNetwork run the endpoints pods with HostNetwork=true.
+func EndpointsUseHostNetwork(config *NetworkingTestConfig) {
+	config.EndpointsHostNetwork = true
+}
+
 // NewNetworkingTestConfig creates and sets up a new test config helper.
-func NewNetworkingTestConfig(f *framework.Framework, hostNetwork, SCTPEnabled bool) *NetworkingTestConfig {
-	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork, SCTPEnabled: SCTPEnabled}
+func NewNetworkingTestConfig(f *framework.Framework, setters ...Option) *NetworkingTestConfig {
+	// default options
+	config := &NetworkingTestConfig{
+		f:         f,
+		Namespace: f.Namespace.Name,
+	}
+	for _, setter := range setters {
+		setter(config)
+	}
 	ginkgo.By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setup(getServiceSelector())
 	return config
@@ -100,7 +126,12 @@ func NewNetworkingTestConfig(f *framework.Framework, hostNetwork, SCTPEnabled bo
 
 // NewCoreNetworkingTestConfig creates and sets up a new test config helper for Node E2E.
 func NewCoreNetworkingTestConfig(f *framework.Framework, hostNetwork bool) *NetworkingTestConfig {
-	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork}
+	// default options
+	config := &NetworkingTestConfig{
+		f:           f,
+		Namespace:   f.Namespace.Name,
+		HostNetwork: hostNetwork,
+	}
 	ginkgo.By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setupCore(getServiceSelector())
 	return config
@@ -125,6 +156,8 @@ type NetworkingTestConfig struct {
 	HostTestContainerPod *v1.Pod
 	// if the HostTestContainerPod is running with HostNetwork=true.
 	HostNetwork bool
+	// if the endpoints Pods are running with HostNetwork=true.
+	EndpointsHostNetwork bool
 	// if the test pods are listening on sctp port. We need this as sctp tests
 	// are marked as disruptive as they may load the sctp module.
 	SCTPEnabled bool
@@ -213,7 +246,11 @@ func (config *NetworkingTestConfig) diagnoseMissingEndpoints(foundEndpoints sets
 func (config *NetworkingTestConfig) EndpointHostnames() sets.String {
 	expectedEps := sets.NewString()
 	for _, p := range config.EndpointPods {
-		expectedEps.Insert(p.Name)
+		if config.EndpointsHostNetwork {
+			expectedEps.Insert(p.Spec.NodeSelector["kubernetes.io/hostname"])
+		} else {
+			expectedEps.Insert(p.Name)
+		}
 	}
 	return expectedEps
 }
@@ -574,8 +611,7 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Args: []string{
 						"netexec",
-						fmt.Sprintf("--http-port=%d", EndpointHTTPPort),
-						fmt.Sprintf("--udp-port=%d", EndpointUDPPort),
+						fmt.Sprintf("--http-port=%d", testContainerHTTPPort),
 					},
 					Ports: []v1.ContainerPort{
 						{
@@ -586,10 +622,6 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 				},
 			},
 		},
-	}
-	// we want sctp to be optional as it will load the sctp kernel module
-	if config.SCTPEnabled {
-		pod.Spec.Containers[0].Args = append(pod.Spec.Containers[0].Args, fmt.Sprintf("--sctp-port=%d", EndpointSCTPPort))
 	}
 	return pod
 }
@@ -750,6 +782,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 		hostname, _ := n.Labels["kubernetes.io/hostname"]
 		pod := config.createNetShellPodSpec(podName, hostname)
 		pod.ObjectMeta.Labels = selector
+		pod.Spec.HostNetwork = config.EndpointsHostNetwork
 		createdPod := config.createPod(pod)
 		createdPods = append(createdPods, createdPod)
 	}

@@ -2966,7 +2966,7 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 			const threshold = 2
 			nodes, err := getEndpointNodesWithInternalIP(jig)
 			framework.ExpectNoError(err)
-			config := e2enetwork.NewNetworkingTestConfig(f, false, false)
+			config := e2enetwork.NewNetworkingTestConfig(f)
 			for _, internalIP := range nodes {
 				err := testHTTPHealthCheckNodePortFromTestContainer(
 					config,
@@ -3013,7 +3013,7 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		framework.ExpectNoError(err)
 
 		dialCmd := "clientip"
-		config := e2enetwork.NewNetworkingTestConfig(f, false, false)
+		config := e2enetwork.NewNetworkingTestConfig(f)
 
 		for nodeName, nodeIP := range endpointsNodeMap {
 			ginkgo.By(fmt.Sprintf("reading clientIP using the TCP service's NodePort, on node %v: %v:%v/%v", nodeName, nodeIP, tcpNodePort, dialCmd))
@@ -3064,7 +3064,7 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		svcTCPPort := int(svc.Spec.Ports[0].Port)
 
 		const threshold = 2
-		config := e2enetwork.NewNetworkingTestConfig(f, false, false)
+		config := e2enetwork.NewNetworkingTestConfig(f)
 		for i := 0; i < len(nodes.Items); i++ {
 			endpointNodeName := nodes.Items[i].Name
 
@@ -3229,7 +3229,7 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		path := "/clientip"
 		dialCmd := "clientip"
 
-		config := e2enetwork.NewNetworkingTestConfig(f, false, false)
+		config := e2enetwork.NewNetworkingTestConfig(f)
 
 		ginkgo.By(fmt.Sprintf("endpoints present on nodes %v, absent on nodes %v", endpointNodeMap, noEndpointNodeMap))
 		for nodeName, nodeIP := range noEndpointNodeMap {
