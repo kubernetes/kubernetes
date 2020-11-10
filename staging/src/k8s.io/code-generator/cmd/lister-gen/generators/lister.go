@@ -212,8 +212,6 @@ func (g *listerGenerator) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	imports = append(imports, "k8s.io/apimachinery/pkg/api/errors")
 	imports = append(imports, "k8s.io/apimachinery/pkg/labels")
-	// for Indexer
-	imports = append(imports, "k8s.io/client-go/tools/cache")
 	return
 }
 
@@ -222,9 +220,12 @@ func (g *listerGenerator) GenerateType(c *generator.Context, t *types.Type, w io
 
 	klog.V(5).Infof("processing type %v", t)
 	m := map[string]interface{}{
-		"Resource":   c.Universe.Function(types.Name{Package: t.Name.Package, Name: "Resource"}),
-		"type":       t,
-		"objectMeta": g.objectMeta,
+		"Resource":                    c.Universe.Function(types.Name{Package: t.Name.Package, Name: "Resource"}),
+		"type":                        t,
+		"objectMeta":                  g.objectMeta,
+		"cacheIndexers":               c.Universe.Type(cacheIndexers),
+		"cacheMetaNamespaceIndexFunc": c.Universe.Function(cacheMetaNamespaceIndexFunc),
+		"cacheNamespaceIndex":         c.Universe.Variable(cacheNamespaceIndex),
 	}
 
 	tags, err := util.ParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
@@ -239,6 +240,7 @@ func (g *listerGenerator) GenerateType(c *generator.Context, t *types.Type, w io
 	}
 
 	sw.Do(typeListerStruct, m)
+	sw.Do(defaultIndexerConstructor, m)
 	sw.Do(typeListerConstructor, m)
 	sw.Do(typeLister_List, m)
 
@@ -287,6 +289,14 @@ var typeListerStruct = `
 // $.type|private$Lister implements the $.type|public$Lister interface.
 type $.type|private$Lister struct {
 	indexer cache.Indexer
+}
+`
+
+var defaultIndexerConstructor = `
+// New$.type|public$DefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func New$.type|public$DefaultIndexer() $.cacheIndexers|raw$ {
+	return $.cacheIndexers|raw${$.cacheNamespaceIndex|raw$: $.cacheMetaNamespaceIndexFunc|raw$}
 }
 `
 

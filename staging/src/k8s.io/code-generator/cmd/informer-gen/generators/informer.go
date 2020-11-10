@@ -81,8 +81,6 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"apiScheme":                       c.Universe.Type(apiScheme),
 		"cacheIndexers":                   c.Universe.Type(cacheIndexers),
 		"cacheListWatch":                  c.Universe.Type(cacheListWatch),
-		"cacheMetaNamespaceIndexFunc":     c.Universe.Function(cacheMetaNamespaceIndexFunc),
-		"cacheNamespaceIndex":             c.Universe.Variable(cacheNamespaceIndex),
 		"cacheNewSharedIndexInformer":     c.Universe.Function(cacheNewSharedIndexInformer),
 		"cacheSharedIndexInformer":        c.Universe.Type(cacheSharedIndexInformer),
 		"clientSetInterface":              clientSetInterface,
@@ -95,6 +93,7 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"namespaceAll":                    c.Universe.Type(metav1NamespaceAll),
 		"namespaced":                      !tags.NonNamespaced,
 		"newLister":                       c.Universe.Function(types.Name{Package: listerPackage, Name: "New" + t.Name.Name + "Lister"}),
+		"newDefaultIndexer":               c.Universe.Function(types.Name{Package: listerPackage, Name: "New" + t.Name.Name + "DefaultIndexer"}),
 		"runtimeObject":                   c.Universe.Type(runtimeObject),
 		"timeDuration":                    c.Universe.Type(timeDuration),
 		"type":                            t,
@@ -169,7 +168,7 @@ func NewFiltered$.type|public$Informer(client $.clientSetInterface|raw$$if .name
 
 var typeInformerConstructor = `
 func (f *$.type|private$Informer) defaultInformer(client $.clientSetInterface|raw$, resyncPeriod $.timeDuration|raw$) $.cacheSharedIndexInformer|raw$ {
-	return NewFiltered$.type|public$Informer(client$if .namespaced$, f.namespace$end$, resyncPeriod, $.cacheIndexers|raw${$.cacheNamespaceIndex|raw$: $.cacheMetaNamespaceIndexFunc|raw$}, f.tweakListOptions)
+	return NewFiltered$.type|public$Informer(client$if .namespaced$, f.namespace$end$, resyncPeriod, $.newDefaultIndexer|raw$(), f.tweakListOptions)
 }
 `
 
