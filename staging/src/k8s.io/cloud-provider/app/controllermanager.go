@@ -20,14 +20,24 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	cacheddiscovery "k8s.io/client-go/discovery/cached"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/metadata"
+	"k8s.io/client-go/metadata/metadatainformer"
+	"k8s.io/client-go/restmapper"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/cloud-provider/app/config"
+	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
 	"k8s.io/cloud-provider/options"
+	"k8s.io/controller-manager/pkg/clientbuilder"
+	"k8s.io/controller-manager/pkg/informerfactory"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -54,11 +64,7 @@ const (
 )
 
 // NewCloudControllerManagerCommand creates a *cobra.Command object with default parameters
-func NewCloudControllerManagerCommand() *cobra.Command {
-	s, err := options.NewCloudControllerManagerOptions()
-	if err != nil {
-		klog.Fatalf("unable to initialize command options: %v", err)
-	}
+func NewCloudControllerManagerCommand(s *options.CloudControllerManagerOptions, c *cloudcontrollerconfig.Config, controllerInitializers map[string]InitFunc) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: "cloud-controller-manager",
@@ -68,13 +74,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
 
-			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault.List())
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
-			}
-
-			if err := Run(c.Complete(), wait.NeverStop); err != nil {
+			if err := Run(c.Complete(), controllerInitializers, wait.NeverStop); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -91,7 +91,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 	}
 
 	fs := cmd.Flags()
-	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault.List())
+	namedFlagSets := s.Flags(KnownControllers(controllerInitializers), ControllersDisabledByDefault.List())
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
 
@@ -122,25 +122,9 @@ the cloud specific control loops shipped with Kubernetes.`,
 }
 
 // Run runs the ExternalCMServer.  This should never exit.
-func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
+func Run(c *cloudcontrollerconfig.CompletedConfig, controllerInitializers map[string]InitFunc, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
-
-	cloud, err := cloudprovider.InitCloudProvider(c.ComponentConfig.KubeCloudShared.CloudProvider.Name, c.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile)
-	if err != nil {
-		klog.Fatalf("Cloud provider could not be initialized: %v", err)
-	}
-	if cloud == nil {
-		klog.Fatalf("cloud provider is nil")
-	}
-
-	if !cloud.HasClusterID() {
-		if c.ComponentConfig.KubeCloudShared.AllowUntaggedCloud {
-			klog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
-		} else {
-			klog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
-		}
-	}
 
 	// setup /configz endpoint
 	if cz, err := configz.New(ConfigzName); err == nil {
@@ -176,7 +160,14 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	}
 
 	run := func(ctx context.Context) {
-		if err := startControllers(c, ctx.Done(), cloud, newControllerInitializers()); err != nil {
+		clientBuilder := clientbuilder.SimpleControllerClientBuilder{
+			ClientConfig: c.Kubeconfig,
+		}
+		controllerContext, err := CreateControllerContext(c, clientBuilder, ctx.Done())
+		if err != nil {
+			klog.Fatalf("error building controller context: %v", err)
+		}
+		if err := startControllers(controllerContext, c, ctx.Done(), controllerInitializers); err != nil {
 			klog.Fatalf("error running controllers: %v", err)
 		}
 	}
@@ -227,14 +218,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 }
 
 // startControllers starts the cloud specific controller loops.
-func startControllers(c *config.CompletedConfig, stopCh <-chan struct{}, cloud cloudprovider.Interface, controllers map[string]initFunc) error {
-	// Initialize the cloud provider with a reference to the clientBuilder
-	cloud.Initialize(c.ClientBuilder, stopCh)
-	// Set the informer on the user cloud object
-	if informerUserCloud, ok := cloud.(cloudprovider.InformerUser); ok {
-		informerUserCloud.SetInformers(c.SharedInformers)
-	}
-
+func startControllers(ctx genericcontrollermanager.ControllerContext, c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}, controllers map[string]InitFunc) error {
 	for controllerName, initFn := range controllers {
 		if !genericcontrollermanager.IsControllerEnabled(controllerName, ControllersDisabledByDefault, c.ComponentConfig.Generic.Controllers) {
 			klog.Warningf("%q is disabled", controllerName)
@@ -242,7 +226,7 @@ func startControllers(c *config.CompletedConfig, stopCh <-chan struct{}, cloud c
 		}
 
 		klog.V(1).Infof("Starting %q", controllerName)
-		_, started, err := initFn(c, cloud, stopCh)
+		_, started, err := initFn(ctx)
 		if err != nil {
 			klog.Errorf("Error starting %q", controllerName)
 			return err
@@ -267,27 +251,136 @@ func startControllers(c *config.CompletedConfig, stopCh <-chan struct{}, cloud c
 	select {}
 }
 
-// initFunc is used to launch a particular controller.  It may run additional "should I activate checks".
+// InitFunc is used to launch a particular controller.  It may run additional "should I activate checks".
 // Any error returned will cause the controller process to `Fatal`
 // The bool indicates whether the controller was enabled.
-type initFunc func(ctx *config.CompletedConfig, cloud cloudprovider.Interface, stop <-chan struct{}) (debuggingHandler http.Handler, enabled bool, err error)
+type InitFunc func(ctx genericcontrollermanager.ControllerContext) (debuggingHandler http.Handler, enabled bool, err error)
 
 // KnownControllers indicate the default controller we are known.
-func KnownControllers() []string {
-	ret := sets.StringKeySet(newControllerInitializers())
+func KnownControllers(controllerInitializers map[string]InitFunc) []string {
+	ret := sets.StringKeySet(controllerInitializers)
 	return ret.List()
 }
 
 // ControllersDisabledByDefault is the controller disabled default when starting cloud-controller managers.
 var ControllersDisabledByDefault = sets.NewString()
 
-// newControllerInitializers is a private map of named controller groups (you can start more than one in an init func)
-// paired to their initFunc.  This allows for structured downstream composition and subdivision.
-func newControllerInitializers() map[string]initFunc {
-	controllers := map[string]initFunc{}
-	controllers["cloud-node"] = startCloudNodeController
-	controllers["cloud-node-lifecycle"] = startCloudNodeLifecycleController
-	controllers["service"] = startServiceController
-	controllers["route"] = startRouteController
+// DefaultControllerInitializers is a private map of named controller groups (you can start more than one in an init func)
+// paired to their InitFunc.  This allows for structured downstream composition and subdivision.
+func DefaultControllerInitializers(completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) map[string]InitFunc {
+	controllers := map[string]InitFunc{}
+	controllers["cloud-node"] = StartCloudNodeControllerWrapper(completedConfig, cloud)
+	controllers["cloud-node-lifecycle"] = startCloudNodeLifecycleControllerWrapper(completedConfig, cloud)
+	controllers["service"] = startServiceControllerWrapper(completedConfig, cloud)
+	controllers["route"] = startRouteControllerWrapper(completedConfig, cloud)
 	return controllers
+}
+
+// StartCloudNodeControllerWrapper is used to take cloud cofig as input and start cloud node controller
+func StartCloudNodeControllerWrapper(completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
+	return func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
+		return startCloudNodeController(completedConfig, cloud, ctx.Stop)
+	}
+}
+
+// startCloudNodeLifecycleControllerWrapper is used to take cloud cofig as input and start cloud node lifecycle controller
+func startCloudNodeLifecycleControllerWrapper(completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
+	return func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
+		return startCloudNodeLifecycleController(completedConfig, cloud, ctx.Stop)
+	}
+}
+
+// startServiceControllerWrapper is used to take cloud cofig as input and start service controller
+func startServiceControllerWrapper(completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
+	return func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
+		return startServiceController(completedConfig, cloud, ctx.Stop)
+	}
+}
+
+// startRouteControllerWrapper is used to take cloud cofig as input and start route controller
+func startRouteControllerWrapper(completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
+	return func(ctx genericcontrollermanager.ControllerContext) (http.Handler, bool, error) {
+		return startRouteController(completedConfig, cloud, ctx.Stop)
+	}
+}
+
+// CreateControllerContext creates a context struct containing references to resources needed by the
+// controllers such as the cloud provider and clientBuilder. rootClientBuilder is only used for
+// the shared-informers client and token controller.
+func CreateControllerContext(s *cloudcontrollerconfig.CompletedConfig, clientBuilder clientbuilder.ControllerClientBuilder, stop <-chan struct{}) (genericcontrollermanager.ControllerContext, error) {
+	versionedClient := clientBuilder.ClientOrDie("shared-informers")
+	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
+
+	metadataClient := metadata.NewForConfigOrDie(clientBuilder.ConfigOrDie("metadata-informers"))
+	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, ResyncPeriod(s)())
+
+	// If apiserver is not running we should wait for some time and fail only then. This is particularly
+	// important when we start apiserver and controller manager at the same time.
+	if err := genericcontrollermanager.WaitForAPIServer(versionedClient, 10*time.Second); err != nil {
+		return genericcontrollermanager.ControllerContext{}, fmt.Errorf("failed to wait for apiserver being healthy: %v", err)
+	}
+
+	// Use a discovery client capable of being refreshed.
+	discoveryClient := clientBuilder.ClientOrDie("controller-discovery")
+	cachedClient := cacheddiscovery.NewMemCacheClient(discoveryClient.Discovery())
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedClient)
+	go wait.Until(func() {
+		restMapper.Reset()
+	}, 30*time.Second, stop)
+
+	availableResources, err := GetAvailableResources(clientBuilder)
+	if err != nil {
+		return genericcontrollermanager.ControllerContext{}, err
+	}
+
+	ctx := genericcontrollermanager.ControllerContext{
+		ClientBuilder:                   clientBuilder,
+		InformerFactory:                 sharedInformers,
+		ObjectOrMetadataInformerFactory: informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
+		RESTMapper:                      restMapper,
+		AvailableResources:              availableResources,
+		Stop:                            stop,
+		InformersStarted:                make(chan struct{}),
+		ResyncPeriod:                    ResyncPeriod(s),
+	}
+	return ctx, nil
+}
+
+// GetAvailableResources gets the map which contains all available resources of the apiserver
+// TODO: In general, any controller checking this needs to be dynamic so
+// users don't have to restart their controller manager if they change the apiserver.
+// Until we get there, the structure here needs to be exposed for the construction of a proper ControllerContext.
+func GetAvailableResources(clientBuilder clientbuilder.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
+	client := clientBuilder.ClientOrDie("controller-discovery")
+	discoveryClient := client.Discovery()
+	_, resourceMap, err := discoveryClient.ServerGroupsAndResources()
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("unable to get all supported resources from server: %v", err))
+	}
+	if len(resourceMap) == 0 {
+		return nil, fmt.Errorf("unable to get any supported resources from server")
+	}
+
+	allResources := map[schema.GroupVersionResource]bool{}
+	for _, apiResourceList := range resourceMap {
+		version, err := schema.ParseGroupVersion(apiResourceList.GroupVersion)
+		if err != nil {
+			return nil, err
+		}
+		for _, apiResource := range apiResourceList.APIResources {
+			allResources[version.WithResource(apiResource.Name)] = true
+		}
+	}
+
+	return allResources, nil
+}
+
+// ResyncPeriod returns a function which generates a duration each time it is
+// invoked; this is so that multiple controllers don't get into lock-step and all
+// hammer the apiserver with list requests simultaneously.
+func ResyncPeriod(c *cloudcontrollerconfig.CompletedConfig) func() time.Duration {
+	return func() time.Duration {
+		factor := rand.Float64() + 1
+		return time.Duration(float64(c.ComponentConfig.Generic.MinResyncPeriod.Nanoseconds()) * factor)
+	}
 }

@@ -20,8 +20,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
-        "//vendor/github.com/go-openapi/strfmt:go_default_library",
-        "//vendor/github.com/go-openapi/validate:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/validation/strfmt:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/validation/validate:go_default_library",
     ],
 )
 

@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 
 	"github.com/stretchr/testify/assert"
@@ -34,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
@@ -46,6 +48,8 @@ import (
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 	utilpointer "k8s.io/utils/pointer"
+
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func checkAllLines(t *testing.T, table utiliptables.Table, save []byte, expectedLines map[utiliptables.Chain]string) {
@@ -2680,6 +2684,87 @@ COMMIT
 	fp.OnEndpointSliceDelete(endpointSlice)
 	fp.syncProxyRules()
 	assert.NotEqual(t, expectedIPTablesWithSlice, fp.iptablesData.String())
+}
+
+func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, true)()
+	ipModeProxy := v1.LoadBalancerIPModeProxy
+	ipModeVIP := v1.LoadBalancerIPModeVIP
+
+	testCases := []struct {
+		svcIP        string
+		svcLBIP      string
+		ipMode       *v1.LoadBalancerIPMode
+		expectedRule bool
+	}{
+		{
+			svcIP:        "10.20.30.41",
+			svcLBIP:      "1.2.3.4",
+			ipMode:       &ipModeProxy,
+			expectedRule: false,
+		},
+		{
+			svcIP:        "10.20.30.42",
+			svcLBIP:      "1.2.3.5",
+			ipMode:       &ipModeVIP,
+			expectedRule: true,
+		},
+	}
+
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	for _, testCase := range testCases {
+		ipt := iptablestest.NewFake()
+		fp := NewFakeProxier(ipt, false)
+		makeServiceMap(fp,
+			makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+				svc.Spec.Type = "LoadBalancer"
+				svc.Spec.ClusterIP = testCase.svcIP
+				svc.Spec.Ports = []v1.ServicePort{{
+					Name:     svcPortName.Port,
+					Port:     int32(svcPort),
+					Protocol: v1.ProtocolTCP,
+					NodePort: int32(svcNodePort),
+				}}
+				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+					IP:     testCase.svcLBIP,
+					IPMode: testCase.ipMode,
+				}}
+			}),
+		)
+
+		epIP := "10.180.0.1"
+		makeEndpointsMap(fp,
+			makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
+				ept.Subsets = []v1.EndpointSubset{{
+					Addresses: []v1.EndpointAddress{{
+						IP: epIP,
+					}},
+					Ports: []v1.EndpointPort{{
+						Name:     svcPortName.Port,
+						Port:     int32(svcPort),
+						Protocol: v1.ProtocolTCP,
+					}},
+				}}
+			}),
+		)
+
+		fp.syncProxyRules()
+
+		proto := strings.ToLower(string(v1.ProtocolTCP))
+		fwChain := string(serviceFirewallChainName(svcPortName.String(), proto))
+
+		kubeSvcRules := ipt.GetRules(string(kubeServicesChain))
+		if hasJump(kubeSvcRules, fwChain, testCase.svcLBIP, svcPort) != testCase.expectedRule {
+			errorf(fmt.Sprintf("Found jump to firewall chain %v", fwChain), kubeSvcRules, t)
+		}
+	}
 }
 
 // TODO(thockin): add *more* tests for syncProxyRules() or break it down further and test the pieces.

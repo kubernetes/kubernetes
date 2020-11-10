@@ -6,10 +6,7 @@ go 1.15
 
 require (
 	github.com/emicklei/go-restful v2.9.5+incompatible
-	github.com/go-openapi/errors v0.19.2
 	github.com/go-openapi/spec v0.19.3
-	github.com/go-openapi/strfmt v0.19.3
-	github.com/go-openapi/validate v0.19.5
 	github.com/gogo/protobuf v1.3.1
 	github.com/google/go-cmp v0.4.0
 	github.com/google/gofuzz v1.1.0
@@ -28,7 +25,7 @@ require (
 	k8s.io/code-generator v0.0.0
 	k8s.io/component-base v0.0.0
 	k8s.io/klog/v2 v2.4.0
-	k8s.io/kube-openapi v0.0.0-20200923155610-8b5066479488
+	k8s.io/kube-openapi v0.0.0-20201107163737-74b467f3a622
 	k8s.io/utils v0.0.0-20201104234853-8146046b121e
 	sigs.k8s.io/yaml v1.2.0
 )

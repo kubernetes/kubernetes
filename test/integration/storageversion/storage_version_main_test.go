@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package json implements a simple encoder and decoder for streams
-// of watch events over io.Writer/Readers
-package json // import "k8s.io/kubernetes/pkg/watch/json"
+package storageversion
+
+import (
+	"testing"
+
+	"k8s.io/kubernetes/test/integration/framework"
+)
+
+func TestMain(m *testing.M) {
+	framework.EtcdMain(m.Run)
+}

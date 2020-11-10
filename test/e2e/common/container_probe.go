@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
@@ -213,8 +212,6 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call  does not return within the timeout specified, liveness probe MUST restart the Pod.
 	*/
 	ginkgo.It("should be restarted with a docker exec liveness probe with timeout ", func() {
-		// TODO: enable this test once the default exec handler supports timeout.
-		e2eskipper.Skipf("The default exec handler, dockertools.NativeExecHandler, does not support timeouts due to a limitation in the Docker Remote API")
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
 		livenessProbe := &v1.Probe{
 			Handler:             execHandler([]string{"/bin/sh", "-c", "sleep 10"}),
@@ -224,6 +221,23 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
 		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Release: v1.20
+		Testname: Pod readiness probe, docker exec, not ready
+		Description: A Pod is created with readiness probe with a Exec action on the Pod. If the readiness probe call does not return within the timeout specified, readiness probe MUST not be Ready.
+	*/
+	ginkgo.It("should not be ready with a docker exec readiness probe timeout ", func() {
+		cmd := []string{"/bin/sh", "-c", "sleep 600"}
+		readinessProbe := &v1.Probe{
+			Handler:             execHandler([]string{"/bin/sh", "-c", "sleep 10"}),
+			InitialDelaySeconds: 15,
+			TimeoutSeconds:      1,
+			FailureThreshold:    1,
+		}
+		pod := busyBoxPodSpec(readinessProbe, nil, cmd)
+		runReadinessFailTest(f, pod, time.Minute)
 	})
 
 	/*
@@ -623,5 +637,37 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 		int(observedRestarts) < expectNumRestarts) {
 		framework.Failf("pod %s/%s - expected number of restarts: %d, found restarts: %d",
 			ns, pod.Name, expectNumRestarts, observedRestarts)
+	}
+}
+
+func runReadinessFailTest(f *framework.Framework, pod *v1.Pod, notReadyUntil time.Duration) {
+	podClient := f.PodClient()
+	ns := f.Namespace.Name
+	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
+
+	// At the end of the test, clean up by removing the pod.
+	defer func() {
+		ginkgo.By("deleting the pod")
+		podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0))
+	}()
+	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
+	podClient.Create(pod)
+
+	// Wait until the pod is not pending. (Here we need to check for something other than
+	// 'Pending', since when failures occur, we go to 'Terminated' which can cause indefinite blocking.)
+	framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, ns, pod.Name),
+		fmt.Sprintf("starting pod %s in namespace %s", pod.Name, ns))
+	framework.Logf("Started pod %s in namespace %s", pod.Name, ns)
+
+	// Wait for the not ready state to be true for notReadyUntil duration
+	deadline := time.Now().Add(notReadyUntil)
+	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
+		// poll for Not Ready
+		if podutil.IsPodReady(pod) {
+			framework.Failf("pod %s/%s - expected to be not ready", ns, pod.Name)
+		}
+
+		framework.Logf("pod %s/%s is not ready (%v elapsed)",
+			ns, pod.Name, time.Since(start))
 	}
 }

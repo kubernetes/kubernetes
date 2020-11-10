@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
@@ -51,6 +53,8 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 
 	utilnet "k8s.io/utils/net"
+
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 const testHostname = "test-hostname"
@@ -4318,5 +4322,83 @@ func TestFilterCIDRs(t *testing.T) {
 	cidrs = filterCIDRs(false, cidrList)
 	if len(cidrs) > 0 {
 		t.Errorf("cidrs %v is not expected %v", cidrs, expected)
+	}
+}
+
+func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, true)()
+	ipModeProxy := v1.LoadBalancerIPModeProxy
+	ipModeVIP := v1.LoadBalancerIPModeVIP
+
+	testCases := []struct {
+		svcIP            string
+		svcLBIP          string
+		ipMode           *v1.LoadBalancerIPMode
+		expectedServices int
+	}{
+		{
+			svcIP:            "10.20.30.41",
+			svcLBIP:          "1.2.3.4",
+			ipMode:           &ipModeProxy,
+			expectedServices: 1,
+		},
+		{
+			svcIP:            "10.20.30.42",
+			svcLBIP:          "1.2.3.5",
+			ipMode:           &ipModeVIP,
+			expectedServices: 2,
+		},
+	}
+
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+
+	for _, testCase := range testCases {
+		_, fp := buildFakeProxier()
+		makeServiceMap(fp,
+			makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+				svc.Spec.Type = "LoadBalancer"
+				svc.Spec.ClusterIP = testCase.svcIP
+				svc.Spec.Ports = []v1.ServicePort{{
+					Name:     svcPortName.Port,
+					Port:     int32(svcPort),
+					Protocol: v1.ProtocolTCP,
+					NodePort: int32(svcNodePort),
+				}}
+				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+					IP:     testCase.svcLBIP,
+					IPMode: testCase.ipMode,
+				}}
+			}),
+		)
+
+		epIP := "10.180.0.1"
+		makeEndpointsMap(fp,
+			makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
+				ept.Subsets = []v1.EndpointSubset{{
+					Addresses: []v1.EndpointAddress{{
+						IP: epIP,
+					}},
+					Ports: []v1.EndpointPort{{
+						Name: svcPortName.Port,
+						Port: int32(svcPort),
+					}},
+				}}
+			}),
+		)
+
+		fp.syncProxyRules()
+
+		services, err := fp.ipvs.GetVirtualServers()
+		if err != nil {
+			t.Errorf("Failed to get ipvs services, err: %v", err)
+		}
+		if len(services) != testCase.expectedServices {
+			t.Errorf("Expected %d ipvs services, got %d", testCase.expectedServices, len(services))
+		}
 	}
 }

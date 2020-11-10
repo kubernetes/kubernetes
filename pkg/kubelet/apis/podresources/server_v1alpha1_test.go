@@ -46,7 +46,7 @@ func (m *mockProvider) UpdateAllocatedDevices() {
 	m.Called()
 }
 
-func TestListPodResources(t *testing.T) {
+func TestListPodResourcesV1alpha1(t *testing.T) {
 	podName := "pod-name"
 	podNamespace := "pod-namespace"
 	podUID := types.UID("pod-uid")
@@ -145,7 +145,7 @@ func TestListPodResources(t *testing.T) {
 			m.On("GetPods").Return(tc.pods)
 			m.On("GetDevices", string(podUID), containerName).Return(tc.devices)
 			m.On("UpdateAllocatedDevices").Return()
-			server := NewPodResourcesServer(m, m)
+			server := NewV1alpha1PodResourcesServer(m, m)
 			resp, err := server.List(context.TODO(), &v1alpha1.ListPodResourcesRequest{})
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)

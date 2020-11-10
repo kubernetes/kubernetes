@@ -403,3 +403,26 @@ func GetClusterIPByFamily(ipFamily v1.IPFamily, service *v1.Service) string {
 
 	return ""
 }
+
+// FilterIncorrectLoadBalancerIngress filters out the ingresses with an IP version different from the given one
+func FilterIncorrectLoadBalancerIngress(ingresses []v1.LoadBalancerIngress, ipFamily v1.IPFamily) ([]v1.LoadBalancerIngress, []v1.LoadBalancerIngress) {
+	var validIngresses []v1.LoadBalancerIngress
+	var invalidIngresses []v1.LoadBalancerIngress
+
+	for _, ing := range ingresses {
+		// []string{ing.IP} have a len of 1, so len(correctIPs) + len(incorrectIPs) == 1
+		correctIPs, _ := FilterIncorrectIPVersion([]string{ing.IP}, ipFamily)
+
+		// len is either 1 or 0
+		if len(correctIPs) == 1 {
+			// Update the LoadBalancerStatus with the filtered IP
+			validIngresses = append(validIngresses, ing)
+			continue
+		}
+
+		// here len(incorrectIPs) == 1 since len(correctIPs) == 0
+		invalidIngresses = append(invalidIngresses, ing)
+	}
+
+	return validIngresses, invalidIngresses
+}

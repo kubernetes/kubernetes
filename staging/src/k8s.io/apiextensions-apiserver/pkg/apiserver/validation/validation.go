@@ -20,10 +20,10 @@ import (
 	"encoding/json"
 	"strings"
 
-	openapierrors "github.com/go-openapi/errors"
-	"github.com/go-openapi/spec"
-	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/validate"
+	openapierrors "k8s.io/kube-openapi/pkg/validation/errors"
+	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
+	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apimachinery/pkg/util/validation/field"

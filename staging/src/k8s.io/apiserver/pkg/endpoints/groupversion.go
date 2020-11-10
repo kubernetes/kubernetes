@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storageversion"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 )
 
@@ -96,7 +97,7 @@ type APIGroupVersion struct {
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash.
-func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
+func (g *APIGroupVersion) InstallREST(container *restful.Container) ([]*storageversion.ResourceInfo, error) {
 	prefix := path.Join(g.Root, g.GroupVersion.Group, g.GroupVersion.Version)
 	installer := &APIInstaller{
 		group:             g,
@@ -104,11 +105,24 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 		minRequestTimeout: g.MinRequestTimeout,
 	}
 
-	apiResources, ws, registrationErrors := installer.Install()
+	apiResources, resourceInfos, ws, registrationErrors := installer.Install()
 	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{apiResources})
 	versionDiscoveryHandler.AddToWebService(ws)
 	container.Add(ws)
-	return utilerrors.NewAggregate(registrationErrors)
+	return removeNonPersistedResources(resourceInfos), utilerrors.NewAggregate(registrationErrors)
+}
+
+func removeNonPersistedResources(infos []*storageversion.ResourceInfo) []*storageversion.ResourceInfo {
+	var filtered []*storageversion.ResourceInfo
+	for _, info := range infos {
+		// if EncodingVersion is empty, then the apiserver does not
+		// need to register this resource via the storage version API,
+		// thus we can remove it.
+		if info != nil && len(info.EncodingVersion) > 0 {
+			filtered = append(filtered, info)
+		}
+	}
+	return filtered
 }
 
 // staticLister implements the APIResourceLister interface
