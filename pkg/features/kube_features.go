@@ -668,6 +668,12 @@ const (
 	// may depend on old behavior where exec probe timeouts were ignored.
 	// Lock to default in v1.21 and remove in v1.22.
 	ExecProbeTimeout featuregate.Feature = "ExecProbeTimeout"
+
+	// owner: @andrewsykim
+	// alpha: v1.20
+	//
+	// Enable kubelet exec plugins for image pull credentials.
+	KubeletCredentialProviders featuregate.Feature = "KubeletCredentialProviders"
 )
 
 func init() {
@@ -769,6 +775,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SizeMemoryBackedVolumes:                        {Default: false, PreRelease: featuregate.Alpha},
 	LoadBalancerIPMode:                             {Default: false, PreRelease: featuregate.Alpha},
 	ExecProbeTimeout:                               {Default: true, PreRelease: featuregate.GA}, // lock to default in v1.21 and remove in v1.22
+	KubeletCredentialProviders:                     {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
