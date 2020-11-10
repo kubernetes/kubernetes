@@ -841,3 +841,22 @@ func WaitForGVRFinalizer(ctx context.Context, c dynamic.Interface, gvr schema.Gr
 	}
 	return err
 }
+
+// VerifyFilePathGidInPod verfies expected GID of the target filepath
+func VerifyFilePathGidInPod(f *framework.Framework, filePath, expectedGid string, pod *v1.Pod) {
+	cmd := fmt.Sprintf("ls -l %s", filePath)
+	stdout, stderr, err := PodExec(f, pod, cmd)
+	framework.ExpectNoError(err)
+	framework.Logf("pod %s/%s exec for cmd %s, stdout: %s, stderr: %s", pod.Namespace, pod.Name, cmd, stdout, stderr)
+	ll := strings.Fields(stdout)
+	framework.Logf("stdout split: %v, expected gid: %v", ll, expectedGid)
+	framework.ExpectEqual(ll[3], expectedGid)
+}
+
+// ChangeFilePathGidInPod changes the GID of the target filepath.
+func ChangeFilePathGidInPod(f *framework.Framework, filePath, targetGid string, pod *v1.Pod) {
+	cmd := fmt.Sprintf("chgrp %s %s", targetGid, filePath)
+	_, _, err := PodExec(f, pod, cmd)
+	framework.ExpectNoError(err)
+	VerifyFilePathGidInPod(f, filePath, targetGid, pod)
+}
