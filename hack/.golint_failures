@@ -87,6 +87,7 @@ pkg/controller/volume/persistentvolume
 pkg/controller/volume/persistentvolume/config/v1alpha1
 pkg/controlplane/controller/crdregistration
 pkg/controlplane/tunneler
+pkg/credentialprovider/plugin
 pkg/features
 pkg/kubeapiserver
 pkg/kubectl/cmd/convert
@@ -454,6 +455,8 @@ staging/src/k8s.io/kubectl/pkg/polymorphichelpers
 staging/src/k8s.io/kubectl/pkg/scale
 staging/src/k8s.io/kubectl/pkg/util/templates
 staging/src/k8s.io/kubelet/config/v1beta1
+staging/src/k8s.io/kubelet/pkg/apis/credentialprovider
+staging/src/k8s.io/kubelet/pkg/apis/credentialprovider/v1alpha1
 staging/src/k8s.io/legacy-cloud-providers/vsphere
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1
