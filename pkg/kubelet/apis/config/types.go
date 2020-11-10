@@ -495,7 +495,8 @@ type CredentialProvider struct {
 	DefaultCacheDuration *metav1.Duration
 
 	// Required input version of the exec CredentialProviderRequest. The returned CredentialProviderResponse
-	// MUST use the same encoding version as the input.
+	// MUST use the same encoding version as the input. Current supported values are:
+	// - credentialprovider.kubelet.k8s.io/v1alpha1
 	APIVersion string
 
 	// Arguments to pass to the command when executing it.
