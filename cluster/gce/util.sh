@@ -241,7 +241,7 @@ function copy-to-staging() {
 
   echo "${hash}" > "${tar}.sha512"
   gsutil -m -q -h "Cache-Control:private, max-age=0" cp "${tar}" "${tar}.sha512" "${staging_path}"
-  gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha512" >/dev/null 2>&1
+  gsutil -m acl ch -g all:R "${gs_url}" "${gs_url}.sha512" >/dev/null 2>&1 || true
   echo "+++ ${basename_tar} uploaded (sha512 = ${hash})"
 }
 
