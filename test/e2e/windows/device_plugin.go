@@ -44,16 +44,16 @@ var _ = SIGDescribe("Device Plugin", func() {
 	})
 	ginkgo.It("should be able to create a functioning device plugin for Windows", func() {
 		ginkgo.By("creating Windows device plugin daemonset")
-//		dsName := "directx-device-plugin"
-//		daemonsetNameLabel := "daemonset-name"
-//		image := "directxplugin"
-//		mountName := "device-plugin"
-//		mountPath := "/var/lib/kubelet/device-plugins"
-//		privileged := true
-/*		labels := map[string]string{
+		dsName := "directx-device-plugin"
+		daemonsetNameLabel := "daemonset-name"
+		image := "directxplugin"
+		mountName := "device-plugin"
+		mountPath := "/var/lib/kubelet/device-plugins"
+		privileged := true
+		labels := map[string]string{
 			daemonsetNameLabel: dsName,
-		}*/
-/*        	ds := &appsv1.DaemonSet{
+		}
+        	ds := &appsv1.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: dsName,
 				Namespace: "kube-system",
@@ -108,10 +108,10 @@ var _ = SIGDescribe("Device Plugin", func() {
 				},
 			},
 		}
-*/
+
 		ns := f.Namespace.Name
-//		ds, err := cs.AppsV1().DaemonSets(ns).Create(context.TODO(), ds, metav1.CreateOptions{})
-//		framework.ExpectNoError(err)
+		ds, err := cs.AppsV1().DaemonSets(ns).Create(context.TODO(), ds, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
 
 		ginkgo.By("creating Windows testing Pod")
 		windowsPod := createTestPod(f, imageutils.GetE2EImage(imageutils.WindowsServer), windowsOS)
