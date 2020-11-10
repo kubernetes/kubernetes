@@ -108,7 +108,10 @@ func (c *Controller) gc() {
 			continue
 		}
 		if errors.IsNotFound(err) || lease == nil {
-			// the lease was deleted by the same GC controller in another apiserver
+			// In an HA cluster, this can happen if the lease was deleted
+			// by the same GC controller in another apiserver, which is legit.
+			// We don't expect other components to delete the lease.
+			klog.V(4).Infof("cannot find apiserver lease: %v", err)
 			continue
 		}
 		// evaluate lease from apiserver
@@ -116,10 +119,15 @@ func (c *Controller) gc() {
 			continue
 		}
 		if err := c.kubeclientset.CoordinationV1().Leases(c.leaseNamespace).Delete(
-			context.TODO(), lease.Name, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-			// If we get a 404, the lease was deleted by the same GC controller
-			// in another apiserver. Only log error if we get something other than 404.
-			klog.Errorf("Error deleting lease: %v", err)
+			context.TODO(), lease.Name, metav1.DeleteOptions{}); err != nil {
+			if errors.IsNotFound(err) {
+				// In an HA cluster, this can happen if the lease was deleted
+				// by the same GC controller in another apiserver, which is legit.
+				// We don't expect other components to delete the lease.
+				klog.V(4).Infof("apiserver lease is gone already: %v", err)
+			} else {
+				klog.Errorf("Error deleting lease: %v", err)
+			}
 		}
 	}
 }
