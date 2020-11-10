@@ -529,12 +529,14 @@ aliases:
     - derekwaynecarr  # Node
     - dims            # Architecture
     - jdumars         # Architecture, Release
+    - jsafrane        # Storage
     - kow3ns          # Apps
     - lavalamp        # API Machinery
     - liggitt         # Auth
     - luxas           # Cluster Lifecycle
     - mattfarina      # Apps
     - michmike        # Windows
+    - msau42          # Storage
     - mwielgus        # Autoscaling
     - piosz           # Instrumentation
     - prydonius       # Apps
@@ -547,6 +549,7 @@ aliases:
     - tallclair       # Auth
     - thockin         # Network
     - timothysc       # Cluster Lifecycle, Scheduling
+    - xing-yang       # Storage
     - wojtek-t        # Scalability
 
   # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/20190412-conformance-behaviors.md
