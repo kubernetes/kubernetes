@@ -17,8 +17,10 @@ limitations under the License.
 package vclib
 
 import (
+	"sync"
 	"time"
 
+	"github.com/vmware/govmomi/vim25/types"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -42,6 +44,15 @@ const (
 	OperationCreateVolumeWithPolicy        = "CreateVolumeWithPolicyOperation"
 	OperationCreateVolumeWithRawVSANPolicy = "CreateVolumeWithRawVSANPolicyOperation"
 )
+
+var vCenterMetric *vcenterMetric
+
+func init() {
+	vCenterMetric = &vcenterMetric{
+		vCenterInfos: make(map[string]types.AboutInfo),
+		mux:          sync.Mutex{},
+	}
+}
 
 // vsphereAPIMetric is for recording latency of Single API Call.
 var vsphereAPIMetric = metrics.NewHistogramVec(
@@ -81,12 +92,55 @@ var vsphereOperationErrorMetric = metrics.NewCounterVec(
 	[]string{"operation"},
 )
 
+var vsphereVersion = metrics.NewDesc(
+	"cloudprovider_vsphere_vcenter_versions",
+	"Versions for connected vSphere vCenters",
+	[]string{"hostname", "version", "build"}, nil,
+	metrics.ALPHA, "")
+
 // RegisterMetrics registers all the API and Operation metrics
 func RegisterMetrics() {
 	legacyregistry.MustRegister(vsphereAPIMetric)
 	legacyregistry.MustRegister(vsphereAPIErrorMetric)
 	legacyregistry.MustRegister(vsphereOperationMetric)
 	legacyregistry.MustRegister(vsphereOperationErrorMetric)
+	legacyregistry.CustomMustRegister(vCenterMetric)
+}
+
+type vcenterMetric struct {
+	metrics.BaseStableCollector
+
+	mux          sync.Mutex
+	vCenterInfos map[string]types.AboutInfo
+}
+
+func (collector *vcenterMetric) DescribeWithStability(ch chan<- *metrics.Desc) {
+	ch <- vsphereVersion
+}
+
+func (collector *vcenterMetric) CollectWithStability(ch chan<- metrics.Metric) {
+	collector.mux.Lock()
+	defer collector.mux.Unlock()
+
+	for vCenter, info := range collector.vCenterInfos {
+		ch <- metrics.NewLazyMetricWithTimestamp(time.Now(),
+			metrics.NewLazyConstMetric(vsphereVersion,
+				metrics.GaugeValue,
+				float64(1),
+				vCenter,
+				info.Version,
+				info.Build))
+	}
+}
+
+func (collector *vcenterMetric) setAbout(server string, info types.AboutInfo) {
+	collector.mux.Lock()
+	defer collector.mux.Unlock()
+	collector.vCenterInfos[server] = info
+}
+
+func setVCenterInfoMetric(connection *VSphereConnection) {
+	vCenterMetric.setAbout(connection.Hostname, connection.Client.ServiceContent.About)
 }
 
 // RecordvSphereMetric records the vSphere API and Operation metrics
