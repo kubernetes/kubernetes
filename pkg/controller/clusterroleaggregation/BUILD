@@ -42,15 +42,13 @@ go_test(
     srcs = ["clusterroleaggregation_controller_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/controller:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
-        "//staging/src/k8s.io/client-go/listers/rbac/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/listers/rbac/v1_fakelister:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )

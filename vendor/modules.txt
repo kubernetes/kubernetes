@@ -2083,6 +2083,7 @@ k8s.io/client-go/listers/node/v1alpha1
 k8s.io/client-go/listers/node/v1beta1
 k8s.io/client-go/listers/policy/v1beta1
 k8s.io/client-go/listers/rbac/v1
+k8s.io/client-go/listers/rbac/v1_fakelister
 k8s.io/client-go/listers/rbac/v1alpha1
 k8s.io/client-go/listers/rbac/v1beta1
 k8s.io/client-go/listers/scheduling/v1

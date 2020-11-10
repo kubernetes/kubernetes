@@ -19,16 +19,15 @@ package clusterroleaggregation
 import (
 	"testing"
 
+	"k8s.io/client-go/listers/rbac/v1_fakelister"
+
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
-	rbaclisters "k8s.io/client-go/listers/rbac/v1"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 func TestSyncClusterRole(t *testing.T) {
@@ -139,16 +138,16 @@ func TestSyncClusterRole(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			indexer := cache.NewIndexer(controller.KeyFunc, cache.Indexers{})
+			fakeClusterRoleLister := v1_fakelister.NewFakeClusterRoleLister()
+			fakeClusterRoleLister.Add(test.startingClusterRoles...)
 			objs := []runtime.Object{}
 			for _, obj := range test.startingClusterRoles {
 				objs = append(objs, obj)
-				indexer.Add(obj)
 			}
 			fakeClient := fakeclient.NewSimpleClientset(objs...)
 			c := ClusterRoleAggregationController{
 				clusterRoleClient: fakeClient.RbacV1(),
-				clusterRoleLister: rbaclisters.NewClusterRoleLister(indexer),
+				clusterRoleLister: fakeClusterRoleLister,
 			}
 			err := c.syncClusterRole(test.clusterRoleToSync)
 			if err != nil {
