@@ -78,7 +78,7 @@ func NewFilteredJobInformer(client kubernetes.Interface, namespace string, resyn
 }
 
 func (f *jobInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredJobInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredJobInformer(client, f.namespace, resyncPeriod, v1.NewJobDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *jobInformer) Informer() cache.SharedIndexInformer {

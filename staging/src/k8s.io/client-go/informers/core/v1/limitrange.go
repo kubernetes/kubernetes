@@ -78,7 +78,7 @@ func NewFilteredLimitRangeInformer(client kubernetes.Interface, namespace string
 }
 
 func (f *limitRangeInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredLimitRangeInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredLimitRangeInformer(client, f.namespace, resyncPeriod, v1.NewLimitRangeDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *limitRangeInformer) Informer() cache.SharedIndexInformer {

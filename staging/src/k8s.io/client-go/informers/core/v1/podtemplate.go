@@ -78,7 +78,7 @@ func NewFilteredPodTemplateInformer(client kubernetes.Interface, namespace strin
 }
 
 func (f *podTemplateInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPodTemplateInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredPodTemplateInformer(client, f.namespace, resyncPeriod, v1.NewPodTemplateDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *podTemplateInformer) Informer() cache.SharedIndexInformer {

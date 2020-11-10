@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CertificateSigningRequestLister helps list CertificateSigningRequests.
@@ -40,6 +40,12 @@ type CertificateSigningRequestLister interface {
 // certificateSigningRequestLister implements the CertificateSigningRequestLister interface.
 type certificateSigningRequestLister struct {
 	indexer cache.Indexer
+}
+
+// NewCertificateSigningRequestDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewCertificateSigningRequestDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewCertificateSigningRequestLister returns a new CertificateSigningRequestLister.

@@ -22,7 +22,7 @@ import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ReplicaSetLister helps list ReplicaSets.
@@ -39,6 +39,12 @@ type ReplicaSetLister interface {
 // replicaSetLister implements the ReplicaSetLister interface.
 type replicaSetLister struct {
 	indexer cache.Indexer
+}
+
+// NewReplicaSetDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewReplicaSetDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewReplicaSetLister returns a new ReplicaSetLister.

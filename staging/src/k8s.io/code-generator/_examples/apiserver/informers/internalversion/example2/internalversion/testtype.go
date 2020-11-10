@@ -77,7 +77,7 @@ func NewFilteredTestTypeInformer(client clientsetinternalversion.Interface, resy
 }
 
 func (f *testTypeInformer) defaultInformer(client clientsetinternalversion.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredTestTypeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredTestTypeInformer(client, resyncPeriod, internalversion.NewTestTypeDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *testTypeInformer) Informer() cache.SharedIndexInformer {

@@ -78,7 +78,7 @@ func NewFilteredDeploymentInformer(client kubernetes.Interface, namespace string
 }
 
 func (f *deploymentInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredDeploymentInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredDeploymentInformer(client, f.namespace, resyncPeriod, v1beta1.NewDeploymentDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *deploymentInformer) Informer() cache.SharedIndexInformer {

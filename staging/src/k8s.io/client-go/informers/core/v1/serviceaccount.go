@@ -78,7 +78,7 @@ func NewFilteredServiceAccountInformer(client kubernetes.Interface, namespace st
 }
 
 func (f *serviceAccountInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredServiceAccountInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredServiceAccountInformer(client, f.namespace, resyncPeriod, v1.NewServiceAccountDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *serviceAccountInformer) Informer() cache.SharedIndexInformer {

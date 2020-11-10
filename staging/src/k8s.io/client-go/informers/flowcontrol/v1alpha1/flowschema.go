@@ -77,7 +77,7 @@ func NewFilteredFlowSchemaInformer(client kubernetes.Interface, resyncPeriod tim
 }
 
 func (f *flowSchemaInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredFlowSchemaInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredFlowSchemaInformer(client, resyncPeriod, v1alpha1.NewFlowSchemaDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *flowSchemaInformer) Informer() cache.SharedIndexInformer {

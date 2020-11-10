@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // EndpointsLister helps list Endpoints.
@@ -39,6 +39,12 @@ type EndpointsLister interface {
 // endpointsLister implements the EndpointsLister interface.
 type endpointsLister struct {
 	indexer cache.Indexer
+}
+
+// NewEndpointsDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewEndpointsDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewEndpointsLister returns a new EndpointsLister.

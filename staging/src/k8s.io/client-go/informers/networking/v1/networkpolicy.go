@@ -78,7 +78,7 @@ func NewFilteredNetworkPolicyInformer(client kubernetes.Interface, namespace str
 }
 
 func (f *networkPolicyInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredNetworkPolicyInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredNetworkPolicyInformer(client, f.namespace, resyncPeriod, v1.NewNetworkPolicyDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *networkPolicyInformer) Informer() cache.SharedIndexInformer {

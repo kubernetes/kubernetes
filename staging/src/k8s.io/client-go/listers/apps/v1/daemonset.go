@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // DaemonSetLister helps list DaemonSets.
@@ -39,6 +39,12 @@ type DaemonSetLister interface {
 // daemonSetLister implements the DaemonSetLister interface.
 type daemonSetLister struct {
 	indexer cache.Indexer
+}
+
+// NewDaemonSetDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewDaemonSetDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewDaemonSetLister returns a new DaemonSetLister.

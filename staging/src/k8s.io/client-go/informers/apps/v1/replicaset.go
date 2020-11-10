@@ -78,7 +78,7 @@ func NewFilteredReplicaSetInformer(client kubernetes.Interface, namespace string
 }
 
 func (f *replicaSetInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredReplicaSetInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredReplicaSetInformer(client, f.namespace, resyncPeriod, v1.NewReplicaSetDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *replicaSetInformer) Informer() cache.SharedIndexInformer {

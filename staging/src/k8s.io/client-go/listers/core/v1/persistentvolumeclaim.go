@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // PersistentVolumeClaimLister helps list PersistentVolumeClaims.
@@ -39,6 +39,12 @@ type PersistentVolumeClaimLister interface {
 // persistentVolumeClaimLister implements the PersistentVolumeClaimLister interface.
 type persistentVolumeClaimLister struct {
 	indexer cache.Indexer
+}
+
+// NewPersistentVolumeClaimDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewPersistentVolumeClaimDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewPersistentVolumeClaimLister returns a new PersistentVolumeClaimLister.

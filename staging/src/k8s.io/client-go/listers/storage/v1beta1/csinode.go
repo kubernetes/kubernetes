@@ -22,7 +22,7 @@ import (
 	v1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CSINodeLister helps list CSINodes.
@@ -40,6 +40,12 @@ type CSINodeLister interface {
 // cSINodeLister implements the CSINodeLister interface.
 type cSINodeLister struct {
 	indexer cache.Indexer
+}
+
+// NewCSINodeDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewCSINodeDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewCSINodeLister returns a new CSINodeLister.

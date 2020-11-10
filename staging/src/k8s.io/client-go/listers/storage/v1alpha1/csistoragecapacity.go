@@ -22,7 +22,7 @@ import (
 	v1alpha1 "k8s.io/api/storage/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CSIStorageCapacityLister helps list CSIStorageCapacities.
@@ -39,6 +39,12 @@ type CSIStorageCapacityLister interface {
 // cSIStorageCapacityLister implements the CSIStorageCapacityLister interface.
 type cSIStorageCapacityLister struct {
 	indexer cache.Indexer
+}
+
+// NewCSIStorageCapacityDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewCSIStorageCapacityDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewCSIStorageCapacityLister returns a new CSIStorageCapacityLister.

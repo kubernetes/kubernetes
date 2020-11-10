@@ -77,7 +77,7 @@ func NewFilteredPersistentVolumeInformer(client kubernetes.Interface, resyncPeri
 }
 
 func (f *persistentVolumeInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPersistentVolumeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredPersistentVolumeInformer(client, resyncPeriod, v1.NewPersistentVolumeDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *persistentVolumeInformer) Informer() cache.SharedIndexInformer {

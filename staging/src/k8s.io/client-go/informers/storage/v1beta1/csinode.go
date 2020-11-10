@@ -77,7 +77,7 @@ func NewFilteredCSINodeInformer(client kubernetes.Interface, resyncPeriod time.D
 }
 
 func (f *cSINodeInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredCSINodeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredCSINodeInformer(client, resyncPeriod, v1beta1.NewCSINodeDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *cSINodeInformer) Informer() cache.SharedIndexInformer {

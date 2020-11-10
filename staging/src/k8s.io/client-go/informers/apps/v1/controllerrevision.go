@@ -78,7 +78,7 @@ func NewFilteredControllerRevisionInformer(client kubernetes.Interface, namespac
 }
 
 func (f *controllerRevisionInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredControllerRevisionInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredControllerRevisionInformer(client, f.namespace, resyncPeriod, v1.NewControllerRevisionDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *controllerRevisionInformer) Informer() cache.SharedIndexInformer {

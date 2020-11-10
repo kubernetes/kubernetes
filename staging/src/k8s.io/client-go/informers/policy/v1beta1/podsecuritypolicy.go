@@ -77,7 +77,7 @@ func NewFilteredPodSecurityPolicyInformer(client kubernetes.Interface, resyncPer
 }
 
 func (f *podSecurityPolicyInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPodSecurityPolicyInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredPodSecurityPolicyInformer(client, resyncPeriod, v1beta1.NewPodSecurityPolicyDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *podSecurityPolicyInformer) Informer() cache.SharedIndexInformer {

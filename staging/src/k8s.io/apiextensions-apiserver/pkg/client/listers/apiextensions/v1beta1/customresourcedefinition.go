@@ -22,7 +22,7 @@ import (
 	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CustomResourceDefinitionLister helps list CustomResourceDefinitions.
@@ -40,6 +40,12 @@ type CustomResourceDefinitionLister interface {
 // customResourceDefinitionLister implements the CustomResourceDefinitionLister interface.
 type customResourceDefinitionLister struct {
 	indexer cache.Indexer
+}
+
+// NewCustomResourceDefinitionDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewCustomResourceDefinitionDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewCustomResourceDefinitionLister returns a new CustomResourceDefinitionLister.

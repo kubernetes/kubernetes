@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ReplicationControllerLister helps list ReplicationControllers.
@@ -39,6 +39,12 @@ type ReplicationControllerLister interface {
 // replicationControllerLister implements the ReplicationControllerLister interface.
 type replicationControllerLister struct {
 	indexer cache.Indexer
+}
+
+// NewReplicationControllerDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewReplicationControllerDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewReplicationControllerLister returns a new ReplicationControllerLister.

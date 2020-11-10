@@ -22,7 +22,7 @@ import (
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // PodSecurityPolicyLister helps list PodSecurityPolicies.
@@ -40,6 +40,12 @@ type PodSecurityPolicyLister interface {
 // podSecurityPolicyLister implements the PodSecurityPolicyLister interface.
 type podSecurityPolicyLister struct {
 	indexer cache.Indexer
+}
+
+// NewPodSecurityPolicyDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewPodSecurityPolicyDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewPodSecurityPolicyLister returns a new PodSecurityPolicyLister.

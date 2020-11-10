@@ -22,7 +22,7 @@ import (
 	v1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // StorageVersionLister helps list StorageVersions.
@@ -40,6 +40,12 @@ type StorageVersionLister interface {
 // storageVersionLister implements the StorageVersionLister interface.
 type storageVersionLister struct {
 	indexer cache.Indexer
+}
+
+// NewStorageVersionDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewStorageVersionDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewStorageVersionLister returns a new StorageVersionLister.

@@ -77,7 +77,7 @@ func NewFilteredStorageClassInformer(client kubernetes.Interface, resyncPeriod t
 }
 
 func (f *storageClassInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredStorageClassInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredStorageClassInformer(client, resyncPeriod, v1.NewStorageClassDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *storageClassInformer) Informer() cache.SharedIndexInformer {

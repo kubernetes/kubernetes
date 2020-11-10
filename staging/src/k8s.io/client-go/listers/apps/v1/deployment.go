@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // DeploymentLister helps list Deployments.
@@ -39,6 +39,12 @@ type DeploymentLister interface {
 // deploymentLister implements the DeploymentLister interface.
 type deploymentLister struct {
 	indexer cache.Indexer
+}
+
+// NewDeploymentDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewDeploymentDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewDeploymentLister returns a new DeploymentLister.

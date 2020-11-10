@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // VolumeAttachmentLister helps list VolumeAttachments.
@@ -40,6 +40,12 @@ type VolumeAttachmentLister interface {
 // volumeAttachmentLister implements the VolumeAttachmentLister interface.
 type volumeAttachmentLister struct {
 	indexer cache.Indexer
+}
+
+// NewVolumeAttachmentDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewVolumeAttachmentDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewVolumeAttachmentLister returns a new VolumeAttachmentLister.

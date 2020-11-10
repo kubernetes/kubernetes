@@ -22,7 +22,7 @@ import (
 	v1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ClusterRoleBindingLister helps list ClusterRoleBindings.
@@ -40,6 +40,12 @@ type ClusterRoleBindingLister interface {
 // clusterRoleBindingLister implements the ClusterRoleBindingLister interface.
 type clusterRoleBindingLister struct {
 	indexer cache.Indexer
+}
+
+// NewClusterRoleBindingDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewClusterRoleBindingDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewClusterRoleBindingLister returns a new ClusterRoleBindingLister.

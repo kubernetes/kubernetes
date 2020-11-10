@@ -21,7 +21,7 @@ package v1
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 	v1 "k8s.io/code-generator/_examples/apiserver/apis/example2/v1"
 )
 
@@ -39,6 +39,12 @@ type TestTypeLister interface {
 // testTypeLister implements the TestTypeLister interface.
 type testTypeLister struct {
 	indexer cache.Indexer
+}
+
+// NewTestTypeDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewTestTypeDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewTestTypeLister returns a new TestTypeLister.

@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ComponentStatusLister helps list ComponentStatuses.
@@ -40,6 +40,12 @@ type ComponentStatusLister interface {
 // componentStatusLister implements the ComponentStatusLister interface.
 type componentStatusLister struct {
 	indexer cache.Indexer
+}
+
+// NewComponentStatusDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewComponentStatusDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewComponentStatusLister returns a new ComponentStatusLister.

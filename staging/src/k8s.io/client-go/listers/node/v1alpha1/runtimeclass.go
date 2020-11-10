@@ -22,7 +22,7 @@ import (
 	v1alpha1 "k8s.io/api/node/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // RuntimeClassLister helps list RuntimeClasses.
@@ -40,6 +40,12 @@ type RuntimeClassLister interface {
 // runtimeClassLister implements the RuntimeClassLister interface.
 type runtimeClassLister struct {
 	indexer cache.Indexer
+}
+
+// NewRuntimeClassDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewRuntimeClassDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewRuntimeClassLister returns a new RuntimeClassLister.

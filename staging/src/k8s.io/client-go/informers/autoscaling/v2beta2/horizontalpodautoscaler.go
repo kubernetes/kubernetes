@@ -78,7 +78,7 @@ func NewFilteredHorizontalPodAutoscalerInformer(client kubernetes.Interface, nam
 }
 
 func (f *horizontalPodAutoscalerInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredHorizontalPodAutoscalerInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredHorizontalPodAutoscalerInformer(client, f.namespace, resyncPeriod, v2beta2.NewHorizontalPodAutoscalerDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *horizontalPodAutoscalerInformer) Informer() cache.SharedIndexInformer {

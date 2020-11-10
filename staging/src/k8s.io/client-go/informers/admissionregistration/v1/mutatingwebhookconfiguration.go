@@ -77,7 +77,7 @@ func NewFilteredMutatingWebhookConfigurationInformer(client kubernetes.Interface
 }
 
 func (f *mutatingWebhookConfigurationInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredMutatingWebhookConfigurationInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredMutatingWebhookConfigurationInformer(client, resyncPeriod, v1.NewMutatingWebhookConfigurationDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *mutatingWebhookConfigurationInformer) Informer() cache.SharedIndexInformer {

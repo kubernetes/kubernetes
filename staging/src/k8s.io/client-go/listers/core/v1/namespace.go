@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // NamespaceLister helps list Namespaces.
@@ -40,6 +40,12 @@ type NamespaceLister interface {
 // namespaceLister implements the NamespaceLister interface.
 type namespaceLister struct {
 	indexer cache.Indexer
+}
+
+// NewNamespaceDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewNamespaceDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewNamespaceLister returns a new NamespaceLister.

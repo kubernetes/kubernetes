@@ -22,7 +22,7 @@ import (
 	v1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // PriorityClassLister helps list PriorityClasses.
@@ -40,6 +40,12 @@ type PriorityClassLister interface {
 // priorityClassLister implements the PriorityClassLister interface.
 type priorityClassLister struct {
 	indexer cache.Indexer
+}
+
+// NewPriorityClassDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewPriorityClassDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewPriorityClassLister returns a new PriorityClassLister.

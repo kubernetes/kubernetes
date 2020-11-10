@@ -22,7 +22,7 @@ import (
 	v1alpha1 "k8s.io/api/discovery/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // EndpointSliceLister helps list EndpointSlices.
@@ -39,6 +39,12 @@ type EndpointSliceLister interface {
 // endpointSliceLister implements the EndpointSliceLister interface.
 type endpointSliceLister struct {
 	indexer cache.Indexer
+}
+
+// NewEndpointSliceDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewEndpointSliceDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewEndpointSliceLister returns a new EndpointSliceLister.

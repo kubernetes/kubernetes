@@ -22,7 +22,7 @@ import (
 	v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ClusterRoleLister helps list ClusterRoles.
@@ -40,6 +40,12 @@ type ClusterRoleLister interface {
 // clusterRoleLister implements the ClusterRoleLister interface.
 type clusterRoleLister struct {
 	indexer cache.Indexer
+}
+
+// NewClusterRoleDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewClusterRoleDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewClusterRoleLister returns a new ClusterRoleLister.

@@ -77,7 +77,7 @@ func NewFilteredCustomResourceDefinitionInformer(client clientset.Interface, res
 }
 
 func (f *customResourceDefinitionInformer) defaultInformer(client clientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredCustomResourceDefinitionInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredCustomResourceDefinitionInformer(client, resyncPeriod, v1.NewCustomResourceDefinitionDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *customResourceDefinitionInformer) Informer() cache.SharedIndexInformer {

@@ -22,7 +22,7 @@ import (
 	v1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // PriorityLevelConfigurationLister helps list PriorityLevelConfigurations.
@@ -40,6 +40,12 @@ type PriorityLevelConfigurationLister interface {
 // priorityLevelConfigurationLister implements the PriorityLevelConfigurationLister interface.
 type priorityLevelConfigurationLister struct {
 	indexer cache.Indexer
+}
+
+// NewPriorityLevelConfigurationDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewPriorityLevelConfigurationDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewPriorityLevelConfigurationLister returns a new PriorityLevelConfigurationLister.

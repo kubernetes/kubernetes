@@ -77,7 +77,7 @@ func NewFilteredCSIDriverInformer(client kubernetes.Interface, resyncPeriod time
 }
 
 func (f *cSIDriverInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredCSIDriverInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredCSIDriverInformer(client, resyncPeriod, v1beta1.NewCSIDriverDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *cSIDriverInformer) Informer() cache.SharedIndexInformer {

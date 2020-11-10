@@ -78,7 +78,7 @@ func NewFilteredFlunderInformer(client versioned.Interface, namespace string, re
 }
 
 func (f *flunderInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredFlunderInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredFlunderInformer(client, f.namespace, resyncPeriod, v1alpha1.NewFlunderDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *flunderInformer) Informer() cache.SharedIndexInformer {

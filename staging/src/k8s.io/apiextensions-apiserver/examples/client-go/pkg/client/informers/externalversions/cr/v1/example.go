@@ -78,7 +78,7 @@ func NewFilteredExampleInformer(client versioned.Interface, namespace string, re
 }
 
 func (f *exampleInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredExampleInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredExampleInformer(client, f.namespace, resyncPeriod, v1.NewExampleDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *exampleInformer) Informer() cache.SharedIndexInformer {

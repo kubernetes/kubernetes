@@ -77,7 +77,7 @@ func NewFilteredPriorityLevelConfigurationInformer(client kubernetes.Interface, 
 }
 
 func (f *priorityLevelConfigurationInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredPriorityLevelConfigurationInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredPriorityLevelConfigurationInformer(client, resyncPeriod, v1alpha1.NewPriorityLevelConfigurationDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *priorityLevelConfigurationInformer) Informer() cache.SharedIndexInformer {

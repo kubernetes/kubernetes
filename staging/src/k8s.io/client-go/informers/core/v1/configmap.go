@@ -78,7 +78,7 @@ func NewFilteredConfigMapInformer(client kubernetes.Interface, namespace string,
 }
 
 func (f *configMapInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredConfigMapInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredConfigMapInformer(client, f.namespace, resyncPeriod, v1.NewConfigMapDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *configMapInformer) Informer() cache.SharedIndexInformer {

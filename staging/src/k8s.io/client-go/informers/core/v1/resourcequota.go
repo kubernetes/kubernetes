@@ -78,7 +78,7 @@ func NewFilteredResourceQuotaInformer(client kubernetes.Interface, namespace str
 }
 
 func (f *resourceQuotaInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredResourceQuotaInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredResourceQuotaInformer(client, f.namespace, resyncPeriod, v1.NewResourceQuotaDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *resourceQuotaInformer) Informer() cache.SharedIndexInformer {

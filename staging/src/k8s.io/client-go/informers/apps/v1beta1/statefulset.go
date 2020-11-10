@@ -78,7 +78,7 @@ func NewFilteredStatefulSetInformer(client kubernetes.Interface, namespace strin
 }
 
 func (f *statefulSetInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredStatefulSetInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredStatefulSetInformer(client, f.namespace, resyncPeriod, v1beta1.NewStatefulSetDefaultIndexer(), f.tweakListOptions)
 }
 
 func (f *statefulSetInformer) Informer() cache.SharedIndexInformer {

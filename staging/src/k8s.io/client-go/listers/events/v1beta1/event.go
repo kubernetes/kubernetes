@@ -22,7 +22,7 @@ import (
 	v1beta1 "k8s.io/api/events/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // EventLister helps list Events.
@@ -39,6 +39,12 @@ type EventLister interface {
 // eventLister implements the EventLister interface.
 type eventLister struct {
 	indexer cache.Indexer
+}
+
+// NewEventDefaultIndexer provides the standard set of indexers to use for lister construction.
+// Other indexers can be directly provided, but this default indexer allows a common base set of indexes.
+func NewEventDefaultIndexer() cache.Indexers {
+	return cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}
 }
 
 // NewEventLister returns a new EventLister.
