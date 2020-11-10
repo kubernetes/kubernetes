@@ -394,7 +394,7 @@ staging/src/k8s.io/cloud-provider/config/v1alpha1
 staging/src/k8s.io/cloud-provider/controllers/node
 staging/src/k8s.io/cloud-provider/controllers/nodelifecycle
 staging/src/k8s.io/cloud-provider/controllers/route
-staging/src/k8s.io/cloud-provider/service/config/v1alpha1
+staging/src/k8s.io/cloud-provider/controllers/service/config/v1alpha1
 staging/src/k8s.io/code-generator/cmd/client-gen/args
 staging/src/k8s.io/code-generator/cmd/client-gen/generators/fake
 staging/src/k8s.io/code-generator/cmd/client-gen/generators/scheme

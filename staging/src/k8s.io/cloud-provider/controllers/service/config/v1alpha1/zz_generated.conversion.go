@@ -23,7 +23,7 @@ package v1alpha1
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	config "k8s.io/cloud-provider/service/config"
+	config "k8s.io/cloud-provider/controllers/service/config"
 )
 
 func init() {

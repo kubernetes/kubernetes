@@ -18,7 +18,7 @@ package config
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	serviceconfig "k8s.io/cloud-provider/service/config"
+	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
 	cmconfig "k8s.io/controller-manager/config"
 )
 
