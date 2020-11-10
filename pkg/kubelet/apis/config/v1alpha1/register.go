@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,32 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package config
+package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	kubeletconfigv1alpha1 "k8s.io/kubelet/config/v1alpha1"
 )
 
 // GroupName is the group name used in this package
 const GroupName = "kubelet.config.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
 
 var (
-	// SchemeBuilder is the scheme builder with scheme init functions to run for this API package
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	// localSchemeBuilder extends the SchemeBuilder instance with the external types. In this package,
+	// defaulting and conversion init funcs are registered as well.
+	localSchemeBuilder = &kubeletconfigv1alpha1.SchemeBuilder
 	// AddToScheme is a global function that registers this API group & version to a scheme
-	AddToScheme = SchemeBuilder.AddToScheme
+	AddToScheme = localSchemeBuilder.AddToScheme
 )
-
-// addKnownTypes registers known types to the given scheme
-func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(SchemeGroupVersion,
-		&KubeletConfiguration{},
-		&SerializedNodeConfigSource{},
-		&CredentialProviderConfig{},
-	)
-	return nil
-}
