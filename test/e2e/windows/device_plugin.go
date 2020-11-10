@@ -17,14 +17,14 @@ limitations under the License.
 package windows
 
 import (
-//	"context"
+	"context"
 	"time"
 
 //	v1 "k8s.io/api/core/v1"
-//	clientset "k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-//	appsv1 "k8s.io/api/apps/v1"
-//	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -35,12 +35,12 @@ import (
 var _ = SIGDescribe("Device Plugin", func() {
 	f := framework.NewDefaultFramework("device-plugin")
 
-//	var cs clientset.Interface
+	var cs clientset.Interface
 
 	ginkgo.BeforeEach(func() {
 		//Only for Windows containers
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
-//		cs = f.ClientSet
+		cs = f.ClientSet
 	})
 	ginkgo.It("should be able to create a functioning device plugin for Windows", func() {
 		ginkgo.By("creating Windows device plugin daemonset")
