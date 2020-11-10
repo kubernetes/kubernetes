@@ -17,13 +17,14 @@ limitations under the License.
 package filters
 
 import (
-	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/klog/v2"
+	"fmt"
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/httplog"
+	"k8s.io/klog/v2"
 )
 
 // WithPanicRecovery wraps an http Handler to recover and log panics (except in the special case of http.ErrAbortHandler panics, which suppress logging).
@@ -42,12 +43,15 @@ func WithPanicRecovery(handler http.Handler, isTerminating func() bool, resolver
 			//
 			// Note that the ReallyCrash variable controls the behaviour of the HandleCrash function
 			// So it might actually crash, after calling the handlers
-			info, err := resolver.NewRequestInfo(req)
-			if err != nil {
+			if info, err := resolver.NewRequestInfo(req); err != nil {
 				metrics.RecordRequestAbort(req, nil)
-				return
+			} else {
+				metrics.RecordRequestAbort(req, info)
 			}
-			metrics.RecordRequestAbort(req, info)
+			// This call can have different handlers, but the default chain rate limits. Call it after the metrics are updated
+			// in case the rate limit delays it.  If you outrun the rate for this one timed out requests, something has gone
+			// seriously wrong with your server, but generally having a logging signal for timeouts is useful.
+			runtime.HandleError(fmt.Errorf("timeout or abort while handling: %v %q", req.Method, req.URL.Path))
 			return
 		}
 		http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)
