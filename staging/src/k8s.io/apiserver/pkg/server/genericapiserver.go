@@ -45,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
+	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	restclient "k8s.io/client-go/rest"
@@ -199,6 +200,9 @@ type GenericAPIServer struct {
 
 	// APIServerID is the ID of this API server
 	APIServerID string
+
+	// StorageVersionManager holds the storage versions of the API resources installed by this server.
+	StorageVersionManager storageversion.Manager
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -409,6 +413,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan
 
 // installAPIResources is a private method for installing the REST storage backing each api groupversionresource
 func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo, openAPIModels openapiproto.Models) error {
+	var resourceInfos []*storageversion.ResourceInfo
 	for _, groupVersion := range apiGroupInfo.PrioritizedVersions {
 		if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
 			klog.Warningf("Skipping API %v because it has no resources.", groupVersion)
@@ -431,9 +436,19 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 
 		apiGroupVersion.MaxRequestBodyBytes = s.maxRequestBodyBytes
 
-		if err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer); err != nil {
+		r, err := apiGroupVersion.InstallREST(s.Handler.GoRestfulContainer)
+		if err != nil {
 			return fmt.Errorf("unable to setup API %v: %v", apiGroupInfo, err)
 		}
+		resourceInfos = append(resourceInfos, r...)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		// API installation happens before we start listening on the handlers,
+		// therefore it is safe to register ResourceInfos here. The handler will block
+		// write requests until the storage versions of the targeting resources are updated.
+		s.StorageVersionManager.AddResourceInfo(resourceInfos...)
 	}
 
 	return nil
