@@ -179,6 +179,11 @@ func (d *delayedRouteUpdater) updateRoutes() {
 		}
 	}
 
+	changed := d.az.ensureRouteTableTagged(&routeTable)
+	if changed {
+		dirty = true
+	}
+
 	if dirty {
 		routeTable.Routes = &routes
 		err = d.az.CreateOrUpdateRouteTable(routeTable)
@@ -186,6 +191,7 @@ func (d *delayedRouteUpdater) updateRoutes() {
 			klog.Errorf("CreateOrUpdateRouteTable() failed with error: %v", err)
 			return
 		}
+		d.az.rtCache.Delete(to.String(routeTable.Name))
 	}
 }
 
@@ -454,4 +460,23 @@ func cidrtoRfc1035(cidr string) string {
 	cidr = strings.ReplaceAll(cidr, ".", "")
 	cidr = strings.ReplaceAll(cidr, "/", "")
 	return cidr
+}
+
+//  ensureRouteTableTagged ensures the route table is tagged as configured
+func (az *Cloud) ensureRouteTableTagged(rt *network.RouteTable) bool {
+	if az.Tags == "" {
+		return false
+	}
+	changed := false
+	tags := parseTags(az.Tags)
+	if rt.Tags == nil {
+		rt.Tags = make(map[string]*string)
+	}
+	for k, v := range tags {
+		if vv, ok := rt.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
+			rt.Tags[k] = v
+			changed = true
+		}
+	}
+	return changed
 }
