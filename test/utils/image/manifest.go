@@ -40,7 +40,7 @@ type RegistryList struct {
 	GcrReleaseRegistry      string `yaml:"gcrReleaseRegistry"`
 	PrivateRegistry         string `yaml:"privateRegistry"`
 	SampleRegistry          string `yaml:"sampleRegistry"`
-        Microsoft		string `yaml:"microsoft"`
+        MicrosoftRegistry	string `yaml:"microsoftRegistry"`
 }
 
 // Config holds an images registry, name, and version
@@ -80,7 +80,7 @@ func initReg() RegistryList {
 		GcrReleaseRegistry:      "gcr.io/gke-release",
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
-		Microsoft:		 "mcr.microsoft.com",
+		MicrosoftRegistry:	 "mcr.microsoft.com",
 	}
 	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
 	if repoList == "" {
@@ -119,7 +119,7 @@ var (
 	// Preconfigured image configs
 	imageConfigs = initImageConfigs()
 
-        microsoft = registry.Microsoft
+        microsoftRegistry = registry.Microsoft
 )
 
 const (
@@ -247,7 +247,7 @@ func initImageConfigs() map[int]Config {
 	configs[VolumeISCSIServer] = Config{e2eVolumeRegistry, "iscsi", "2.0"}
 	configs[VolumeGlusterServer] = Config{e2eVolumeRegistry, "gluster", "1.0"}
 	configs[VolumeRBDServer] = Config{e2eVolumeRegistry, "rbd", "1.0.1"}
-	configs[WindowsServer] = Config{microsoft, "windows", "1809"}
+	configs[WindowsServer] = Config{microsoftRegistry, "windows", "1809"}
 	return configs
 }
 
