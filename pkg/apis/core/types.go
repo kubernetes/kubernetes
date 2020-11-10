@@ -2964,7 +2964,7 @@ type PodSecurityContext struct {
 	// volume types which support fsGroup based ownership(and permissions).
 	// It will have no effect on ephemeral volume types such as: secret, configmaps
 	// and emptydir.
-	// Valid values are "OnRootMismatch" and "Always". If not specified defaults to "Always".
+	// Valid values are "OnRootMismatch" and "Always". If not specified, "Always" is used.
 	// +optional
 	FSGroupChangePolicy *PodFSGroupChangePolicy
 	// Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported

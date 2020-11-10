@@ -436,6 +436,7 @@ const (
 
 	// owner: @gnufied
 	// alpha: v1.18
+	// beta: v1.20
 	// Allows user to configure volume permission change policy for fsGroups when mounting
 	// a volume in a Pod.
 	ConfigurableFSGroupPolicy featuregate.Feature = "ConfigurableFSGroupPolicy"
