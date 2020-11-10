@@ -60,12 +60,6 @@ type EndpointSlice struct {
 type AddressType string
 
 const (
-	// AddressTypeIP represents an IP Address.
-	// This address type has been deprecated and has been replaced by the IPv4
-	// and IPv6 adddress types. New resources with this address type will be
-	// considered invalid. This will be fully removed in 1.18.
-	// +deprecated
-	AddressTypeIP = AddressType("IP")
 	// AddressTypeIPv4 represents an IPv4 Address.
 	AddressTypeIPv4 = AddressType(v1.IPv4Protocol)
 	// AddressTypeIPv6 represents an IPv6 Address.

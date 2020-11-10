@@ -305,6 +305,77 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 	cmc.Check(t)
 }
 
+// Ensure SyncService correctly handles deprecated IP address type.
+func TestSyncServiceDeprecatedIPAddrType(t *testing.T) {
+	client, esController := newController([]string{"node-1"}, time.Duration(0))
+	ns := metav1.NamespaceDefault
+	serviceName := "testing-1"
+	service := createService(t, esController, ns, serviceName)
+
+	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
+	ownerRef := metav1.NewControllerRef(service, gvk)
+
+	// slice with deprecated IP address type
+	endpointSlices := []*discovery.EndpointSlice{{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "deprecated",
+			Namespace:       ns,
+			OwnerReferences: []metav1.OwnerReference{*ownerRef},
+			Labels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   controllerName,
+			},
+		},
+		AddressType: discovery.AddressType("IP"),
+	}}
+
+	cmc := newCacheMutationCheck(endpointSlices)
+
+	// need to add them to both store and fake clientset
+	for _, endpointSlice := range endpointSlices {
+		err := esController.endpointSliceStore.Add(endpointSlice)
+		if err != nil {
+			t.Fatalf("Expected no error adding EndpointSlice: %v", err)
+		}
+		_, err = client.DiscoveryV1().EndpointSlices(ns).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Expected no error creating EndpointSlice: %v", err)
+		}
+	}
+
+	numActionsBefore := len(client.Actions())
+	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+	if err != nil {
+		t.Fatalf("error syncing service: %v", err)
+	}
+
+	if len(client.Actions()) != numActionsBefore+2 {
+		t.Errorf("Expected 2 more actions, got %d", len(client.Actions())-numActionsBefore)
+	}
+
+	// 1 new EndpointSlice should be created, deprecated one should be deleted
+	expectAction(t, client.Actions(), numActionsBefore, "create", "endpointslices")
+	expectAction(t, client.Actions(), numActionsBefore+1, "delete", "endpointslices")
+
+	sliceList, err := client.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("error fetching slices: %v", err)
+	}
+
+	if len(sliceList.Items) != 1 {
+		t.Fatalf("expected 1 EndpointSlice, got %d", len(sliceList.Items))
+	}
+
+	// ensure all attributes of endpoint slice match expected state
+	slice := sliceList.Items[0]
+	if slice.AddressType != discovery.AddressTypeIPv4 {
+		t.Fatalf("expected address type to be %s, got %s", discovery.AddressTypeIPv4, slice.AddressType)
+	}
+
+	// ensure cache mutation has not occurred
+	cmc.Check(t)
+}
+
 func TestOnEndpointSliceUpdate(t *testing.T) {
 	_, esController := newController([]string{"node-1"}, time.Duration(0))
 	ns := metav1.NamespaceDefault
