@@ -55,6 +55,9 @@ import (
 // object.
 type ObjectFunc func(obj runtime.Object) error
 
+// FinishFunc is a function returned by Begin hooks to complete an operation.
+type FinishFunc func(ctx context.Context, success bool)
+
 // GenericStore interface can be used for type assertions when we need to access the underlying strategies.
 type GenericStore interface {
 	GetCreateStrategy() rest.RESTCreateStrategy
@@ -146,14 +149,27 @@ type Store struct {
 	// specific cases where storage of the value is not appropriate, since
 	// they cannot be watched.
 	Decorator ObjectFunc
+
 	// CreateStrategy implements resource-specific behavior during creation.
 	CreateStrategy rest.RESTCreateStrategy
+	// BeginCreate is an optional hook that returns a "transaction-like"
+	// commit/revert function which will be called at the end of the operation,
+	// but before AfterCreate and Decorator, indicating via the argument
+	// whether the operation succeeded.  If this returns an error, the function
+	// is not called.  Almost nobody should use this hook.
+	BeginCreate func(ctx context.Context, obj runtime.Object, options *metav1.CreateOptions) (FinishFunc, error)
 	// AfterCreate implements a further operation to run after a resource is
 	// created and before it is decorated, optional.
 	AfterCreate ObjectFunc
 
 	// UpdateStrategy implements resource-specific behavior during updates.
 	UpdateStrategy rest.RESTUpdateStrategy
+	// BeginUpdate is an optional hook that returns a "transaction-like"
+	// commit/revert function which will be called at the end of the operation,
+	// but before AfterUpdate and Decorator, indicating via the argument
+	// whether the operation succeeded.  If this returns an error, the function
+	// is not called.  Almost nobody should use this hook.
+	BeginUpdate func(ctx context.Context, obj, old runtime.Object, options *metav1.UpdateOptions) (FinishFunc, error)
 	// AfterUpdate implements a further operation to run after a resource is
 	// updated and before it is decorated, optional.
 	AfterUpdate ObjectFunc
@@ -171,9 +187,11 @@ type Store struct {
 	// If specified, this is checked in addition to standard finalizer,
 	// deletionTimestamp, and deletionGracePeriodSeconds checks.
 	ShouldDeleteDuringUpdate func(ctx context.Context, key string, obj, existing runtime.Object) bool
+
 	// ExportStrategy implements resource-specific behavior during export,
 	// optional. Exported objects are not decorated.
 	ExportStrategy rest.RESTExportStrategy
+
 	// TableConvertor is an optional interface for transforming items or lists
 	// of items into tabular output. If unset, the default will be used.
 	TableConvertor rest.TableConvertor
@@ -335,8 +353,24 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 	return list, storeerr.InterpretListError(err, qualifiedResource)
 }
 
+// finishNothing is a do-nothing FinishFunc.
+func finishNothing(context.Context, bool) {}
+
 // Create inserts a new item according to the unique key from the object.
 func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	var finishCreate FinishFunc = finishNothing
+
+	if e.BeginCreate != nil {
+		fn, err := e.BeginCreate(ctx, obj, options)
+		if err != nil {
+			return nil, err
+		}
+		finishCreate = fn
+		defer func() {
+			finishCreate(ctx, false)
+		}()
+	}
+
 	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 		return nil, err
 	}
@@ -381,6 +415,12 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 		}
 		return nil, err
 	}
+	// The operation has succeeded.  Call the finish function if there is one,
+	// and then make sure the defer doesn't call it again.
+	fn := finishCreate
+	finishCreate = finishNothing
+	fn(ctx, true)
+
 	if e.AfterCreate != nil {
 		if err := e.AfterCreate(out); err != nil {
 			return nil, err
@@ -500,6 +540,19 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		doUnconditionalUpdate := newResourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
 
 		if existingResourceVersion == 0 {
+			var finishCreate FinishFunc = finishNothing
+
+			if e.BeginCreate != nil {
+				fn, err := e.BeginCreate(ctx, obj, newCreateOptionsFromUpdateOptions(options))
+				if err != nil {
+					return nil, nil, err
+				}
+				finishCreate = fn
+				defer func() {
+					finishCreate(ctx, false)
+				}()
+			}
+
 			creating = true
 			creatingObj = obj
 			if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
@@ -516,6 +569,12 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			if err != nil {
 				return nil, nil, err
 			}
+
+			// The operation has succeeded.  Call the finish function if there is one,
+			// and then make sure the defer doesn't call it again.
+			fn := finishCreate
+			finishCreate = finishNothing
+			fn(ctx, true)
 
 			return obj, &ttl, nil
 		}
@@ -544,6 +603,20 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 				return nil, nil, apierrors.NewConflict(qualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg))
 			}
 		}
+
+		var finishUpdate FinishFunc = finishNothing
+
+		if e.BeginUpdate != nil {
+			fn, err := e.BeginUpdate(ctx, obj, existing, options)
+			if err != nil {
+				return nil, nil, err
+			}
+			finishUpdate = fn
+			defer func() {
+				finishUpdate(ctx, false)
+			}()
+		}
+
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
 			return nil, nil, err
 		}
@@ -564,6 +637,13 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		if err != nil {
 			return nil, nil, err
 		}
+
+		// The operation has succeeded.  Call the finish function if there is one,
+		// and then make sure the defer doesn't call it again.
+		fn := finishUpdate
+		finishUpdate = finishNothing
+		fn(ctx, true)
+
 		if int64(ttl) != res.TTL {
 			return obj, &ttl, nil
 		}
@@ -603,6 +683,17 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		}
 	}
 	return out, creating, nil
+}
+
+// This is a helper to convert UpdateOptions to CreateOptions for the
+// create-on-update path.
+func newCreateOptionsFromUpdateOptions(in *metav1.UpdateOptions) *metav1.CreateOptions {
+	co := &metav1.CreateOptions{
+		DryRun:       in.DryRun,
+		FieldManager: in.FieldManager,
+	}
+	co.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("CreateOptions"))
+	return co
 }
 
 // Get retrieves the item from storage.
