@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
-	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 )
 
 func TestListPodResourcesV1(t *testing.T) {
@@ -33,7 +32,7 @@ func TestListPodResourcesV1(t *testing.T) {
 	podUID := types.UID("pod-uid")
 	containerName := "container-name"
 
-	devs := []*v1alpha1.ContainerDevices{
+	devs := []*podresourcesapi.ContainerDevices{
 		{
 			ResourceName: "resource",
 			DeviceIds:    []string{"dev0", "dev1"},
@@ -43,13 +42,13 @@ func TestListPodResourcesV1(t *testing.T) {
 	for _, tc := range []struct {
 		desc             string
 		pods             []*v1.Pod
-		devices          []*v1alpha1.ContainerDevices
+		devices          []*podresourcesapi.ContainerDevices
 		expectedResponse *podresourcesapi.ListPodResourcesResponse
 	}{
 		{
 			desc:             "no pods",
 			pods:             []*v1.Pod{},
-			devices:          []*v1alpha1.ContainerDevices{},
+			devices:          []*podresourcesapi.ContainerDevices{},
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{},
 		},
 		{
@@ -70,7 +69,7 @@ func TestListPodResourcesV1(t *testing.T) {
 					},
 				},
 			},
-			devices: []*v1alpha1.ContainerDevices{},
+			devices: []*podresourcesapi.ContainerDevices{},
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
 				PodResources: []*podresourcesapi.PodResources{
 					{
@@ -113,7 +112,7 @@ func TestListPodResourcesV1(t *testing.T) {
 						Containers: []*podresourcesapi.ContainerResources{
 							{
 								Name:    containerName,
-								Devices: alphaDevicesToV1(devs),
+								Devices: devs,
 							},
 						},
 					},

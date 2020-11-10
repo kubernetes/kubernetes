@@ -22,7 +22,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 
 	"k8s.io/kubelet/pkg/apis/podresources/v1"
-	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 )
 
 // podResourcesServerV1alpha1 implements PodResourcesListerServer
@@ -38,16 +37,6 @@ func NewV1PodResourcesServer(podsProvider PodsProvider, devicesProvider DevicesP
 		podsProvider:    podsProvider,
 		devicesProvider: devicesProvider,
 	}
-}
-
-func alphaDevicesToV1(alphaDevs []*v1alpha1.ContainerDevices) []*v1.ContainerDevices {
-	var devs []*v1.ContainerDevices
-	for _, alphaDev := range alphaDevs {
-		dev := v1.ContainerDevices(*alphaDev)
-		devs = append(devs, &dev)
-	}
-
-	return devs
 }
 
 // List returns information about the resources assigned to pods on the node
@@ -68,7 +57,7 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *v1.ListPodResource
 		for j, container := range pod.Spec.Containers {
 			pRes.Containers[j] = &v1.ContainerResources{
 				Name:    container.Name,
-				Devices: alphaDevicesToV1(p.devicesProvider.GetDevices(string(pod.UID), container.Name)),
+				Devices: p.devicesProvider.GetDevices(string(pod.UID), container.Name),
 			}
 		}
 		podResources[i] = &pRes
