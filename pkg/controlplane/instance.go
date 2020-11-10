@@ -83,6 +83,7 @@ import (
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
 	"k8s.io/component-helpers/lease"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/pkg/controlplane/tunneler"
@@ -130,6 +131,8 @@ const (
 	IdentityLeaseComponentLabelKey = "k8s.io/component"
 	// KubeAPIServer defines variable used internally when referring to kube-apiserver component
 	KubeAPIServer = "kube-apiserver"
+	// KubeAPIServerIdentityLeaseLabelSelector selects kube-apiserver identity leases
+	KubeAPIServerIdentityLeaseLabelSelector = IdentityLeaseComponentLabelKey + "=" + KubeAPIServer
 )
 
 // ExtraConfig defines extra configuration for the master
@@ -496,7 +499,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	})
 
 	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.APIServerIdentity) {
-		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-controller", func(hookContext genericapiserver.PostStartHookContext) error {
 			kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
 			if err != nil {
 				return err
@@ -511,6 +514,19 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				metav1.NamespaceSystem,
 				labelAPIServerHeartbeat)
 			go controller.Run(wait.NeverStop)
+			return nil
+		})
+		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-garbage-collector", func(hookContext genericapiserver.PostStartHookContext) error {
+			kubeClient, err := kubernetes.NewForConfig(hookContext.LoopbackClientConfig)
+			if err != nil {
+				return err
+			}
+			go apiserverleasegc.NewAPIServerLeaseGC(
+				kubeClient,
+				time.Duration(c.ExtraConfig.IdentityLeaseDurationSeconds)*time.Second,
+				metav1.NamespaceSystem,
+				KubeAPIServerIdentityLeaseLabelSelector,
+			).Run(wait.NeverStop)
 			return nil
 		})
 	}
