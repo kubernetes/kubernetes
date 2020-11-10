@@ -86,10 +86,6 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 			switch container.Name {
 			case o.DriverContainerName:
 				container.Args = append(container.Args, o.DriverContainerArguments...)
-			case o.ProvisionerContainerName:
-				// Driver name is expected to be the same
-				// as the provisioner here.
-				container.Args = append(container.Args, "--provisioner="+o.NewDriverName)
 			}
 		}
 	}

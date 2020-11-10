@@ -30,6 +30,7 @@ type RegistryList struct {
 	GcAuthenticatedRegistry string `yaml:"gcAuthenticatedRegistry"`
 	DockerLibraryRegistry   string `yaml:"dockerLibraryRegistry"`
 	DockerGluster           string `yaml:"dockerGluster"`
+	DockerTestSnapshot      string `yaml:"dockerTestSnapshot"`
 	E2eRegistry             string `yaml:"e2eRegistry"`
 	E2eVolumeRegistry       string `yaml:"e2eVolumeRegistry"`
 	PromoterE2eRegistry     string `yaml:"promoterE2eRegistry"`
@@ -69,6 +70,7 @@ func initReg() RegistryList {
 		GcAuthenticatedRegistry: "gcr.io/authenticated-image-pulling",
 		DockerLibraryRegistry:   "docker.io/library",
 		DockerGluster:           "docker.io/gluster",
+		DockerTestSnapshot:      "docker.io/xyang105",
 		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
 		E2eVolumeRegistry:       "gcr.io/kubernetes-e2e-test-images/volume",
 		PromoterE2eRegistry:     "k8s.gcr.io/e2e-test-images",
@@ -101,6 +103,7 @@ var (
 	registry                = initReg()
 	dockerLibraryRegistry   = registry.DockerLibraryRegistry
 	dockerGluster           = registry.DockerGluster
+	dockerTestSnapshot      = registry.DockerTestSnapshot
 	e2eRegistry             = registry.E2eRegistry
 	e2eVolumeRegistry       = registry.E2eVolumeRegistry
 	promoterE2eRegistry     = registry.PromoterE2eRegistry
@@ -198,6 +201,12 @@ const (
 	VolumeGlusterServer
 	// VolumeRBDServer image
 	VolumeRBDServer
+	// SnapshotController image
+	SnapshotController
+	// CSISnapshotter image
+	CSISnapshotter
+	// CSIProvisioner image
+	CSIProvisioner
 )
 
 func initImageConfigs() map[int]Config {
@@ -241,6 +250,9 @@ func initImageConfigs() map[int]Config {
 	configs[VolumeISCSIServer] = Config{e2eVolumeRegistry, "iscsi", "2.0"}
 	configs[VolumeGlusterServer] = Config{e2eVolumeRegistry, "gluster", "1.0"}
 	configs[VolumeRBDServer] = Config{e2eVolumeRegistry, "rbd", "1.0.1"}
+	configs[SnapshotController] = Config{dockerTestSnapshot, "snapshot-controller", "apiv1"}
+	configs[CSISnapshotter] = Config{dockerTestSnapshot, "csi-snapshotter", "apiv1"}
+	configs[CSIProvisioner] = Config{dockerTestSnapshot, "csi-provisioner", "apiv1"}
 	return configs
 }
 
@@ -292,6 +304,8 @@ func ReplaceRegistryInImageURL(imageURL string) (string, error) {
 		registryAndUser = gcrReleaseRegistry
 	case "docker.io/library":
 		registryAndUser = dockerLibraryRegistry
+	case "docker.io/xyang105":
+		registryAndUser = dockerTestSnapshot
 	default:
 		if countParts == 1 {
 			// We assume we found an image from docker hub library
