@@ -109,7 +109,7 @@ var _ = SIGDescribe("Device Plugin", func() {
 			},
 		}
 
-		ns := f.Namespace.Name
+		ns := "kube-system"
 		ds, err := cs.AppsV1().DaemonSets(ns).Create(context.TODO(), ds, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
