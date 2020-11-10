@@ -160,7 +160,7 @@ type Store struct {
 	BeginCreate func(ctx context.Context, obj runtime.Object, options *metav1.CreateOptions) (FinishFunc, error)
 	// AfterCreate implements a further operation to run after a resource is
 	// created and before it is decorated, optional.
-	AfterCreate ObjectFunc
+	AfterCreate func(runtime.Object)
 
 	// UpdateStrategy implements resource-specific behavior during updates.
 	UpdateStrategy rest.RESTUpdateStrategy
@@ -172,13 +172,13 @@ type Store struct {
 	BeginUpdate func(ctx context.Context, obj, old runtime.Object, options *metav1.UpdateOptions) (FinishFunc, error)
 	// AfterUpdate implements a further operation to run after a resource is
 	// updated and before it is decorated, optional.
-	AfterUpdate ObjectFunc
+	AfterUpdate func(runtime.Object)
 
 	// DeleteStrategy implements resource-specific behavior during deletion.
 	DeleteStrategy rest.RESTDeleteStrategy
 	// AfterDelete implements a further operation to run after a resource is
 	// deleted and before it is decorated, optional.
-	AfterDelete ObjectFunc
+	AfterDelete func(runtime.Object)
 	// ReturnDeletedObject determines whether the Store returns the object
 	// that was deleted. Otherwise, return a generic success status response.
 	ReturnDeletedObject bool
@@ -422,9 +422,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 	fn(ctx, true)
 
 	if e.AfterCreate != nil {
-		if err := e.AfterCreate(out); err != nil {
-			return nil, err
-		}
+		e.AfterCreate(out)
 	}
 	if e.Decorator != nil {
 		if err := e.Decorator(out); err != nil {
@@ -666,15 +664,11 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 
 	if creating {
 		if e.AfterCreate != nil {
-			if err := e.AfterCreate(out); err != nil {
-				return nil, false, err
-			}
+			e.AfterCreate(out)
 		}
 	} else {
 		if e.AfterUpdate != nil {
-			if err := e.AfterUpdate(out); err != nil {
-				return nil, false, err
-			}
+			e.AfterUpdate(out)
 		}
 	}
 	if e.Decorator != nil {
@@ -1165,9 +1159,7 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 // returns the decorated deleted object if appropriate.
 func (e *Store) finalizeDelete(ctx context.Context, obj runtime.Object, runHooks bool) (runtime.Object, error) {
 	if runHooks && e.AfterDelete != nil {
-		if err := e.AfterDelete(obj); err != nil {
-			return nil, err
-		}
+		e.AfterDelete(obj)
 	}
 	if e.ReturnDeletedObject {
 		if e.Decorator != nil {

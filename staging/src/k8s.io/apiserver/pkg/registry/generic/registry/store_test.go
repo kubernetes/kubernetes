@@ -440,7 +440,7 @@ func TestStoreCreateHooks(t *testing.T) {
 		name        string
 		decorator   ObjectFunc
 		beginCreate func(context.Context, runtime.Object, *metav1.CreateOptions) (FinishFunc, error)
-		afterCreate ObjectFunc
+		afterCreate func(runtime.Object)
 		// the TTLFunc is an easy hook to force a failure
 		ttl              func(obj runtime.Object, existing uint64, update bool) (uint64, error)
 		expectError      bool
@@ -457,9 +457,8 @@ func TestStoreCreateHooks(t *testing.T) {
 		expectAnnotation: "DecoratorWasCalled",
 	}, {
 		name: "AfterCreate mutation",
-		afterCreate: func(obj runtime.Object) error {
+		afterCreate: func(obj runtime.Object) {
 			setAnn(obj, "AfterCreateWasCalled")
-			return nil
 		},
 		expectAnnotation: "AfterCreateWasCalled",
 	}, {
@@ -475,9 +474,8 @@ func TestStoreCreateHooks(t *testing.T) {
 			mile("Decorator")
 			return nil
 		},
-		afterCreate: func(obj runtime.Object) error {
+		afterCreate: func(obj runtime.Object) {
 			mile("AfterCreate")
-			return nil
 		},
 		beginCreate: func(_ context.Context, obj runtime.Object, _ *metav1.CreateOptions) (FinishFunc, error) {
 			mile("BeginCreate")
@@ -492,9 +490,8 @@ func TestStoreCreateHooks(t *testing.T) {
 			mile("Decorator")
 			return nil
 		},
-		afterCreate: func(obj runtime.Object) error {
+		afterCreate: func(obj runtime.Object) {
 			mile("AfterCreate")
-			return nil
 		},
 		beginCreate: func(_ context.Context, obj runtime.Object, _ *metav1.CreateOptions) (FinishFunc, error) {
 			mile("BeginCreate")
@@ -515,9 +512,8 @@ func TestStoreCreateHooks(t *testing.T) {
 			mile("Decorator")
 			return fmt.Errorf("decorator")
 		},
-		afterCreate: func(obj runtime.Object) error {
+		afterCreate: func(obj runtime.Object) {
 			mile("AfterCreate")
-			return nil
 		},
 		beginCreate: func(_ context.Context, obj runtime.Object, _ *metav1.CreateOptions) (FinishFunc, error) {
 			mile("BeginCreate")
@@ -527,33 +523,14 @@ func TestStoreCreateHooks(t *testing.T) {
 		},
 		expectMilestones: []string{"BeginCreate", "FinishCreate(true)", "AfterCreate", "Decorator"},
 	}, {
-		name:        "fail AfterCreate ordering",
-		expectError: true,
-		decorator: func(obj runtime.Object) error {
-			mile("Decorator")
-			return nil
-		},
-		afterCreate: func(obj runtime.Object) error {
-			mile("AfterCreate")
-			return fmt.Errorf("after")
-		},
-		beginCreate: func(_ context.Context, obj runtime.Object, _ *metav1.CreateOptions) (FinishFunc, error) {
-			mile("BeginCreate")
-			return func(_ context.Context, success bool) {
-				mile(fmt.Sprintf("FinishCreate(%v)", success))
-			}, nil
-		},
-		expectMilestones: []string{"BeginCreate", "FinishCreate(true)", "AfterCreate"},
-	}, {
 		name:        "fail BeginCreate ordering",
 		expectError: true,
 		decorator: func(obj runtime.Object) error {
 			mile("Decorator")
 			return nil
 		},
-		afterCreate: func(obj runtime.Object) error {
+		afterCreate: func(obj runtime.Object) {
 			mile("AfterCreate")
-			return nil
 		},
 		beginCreate: func(_ context.Context, obj runtime.Object, _ *metav1.CreateOptions) (FinishFunc, error) {
 			mile("BeginCreate")
@@ -783,9 +760,9 @@ func TestStoreUpdateHooks(t *testing.T) {
 		decorator ObjectFunc
 		// create-on-update is tested elsewhere, but this proves non-use here
 		beginCreate      func(context.Context, runtime.Object, *metav1.CreateOptions) (FinishFunc, error)
-		afterCreate      ObjectFunc
+		afterCreate      func(runtime.Object)
 		beginUpdate      func(context.Context, runtime.Object, runtime.Object, *metav1.UpdateOptions) (FinishFunc, error)
-		afterUpdate      ObjectFunc
+		afterUpdate      func(runtime.Object)
 		expectError      bool
 		expectAnnotation string   // to test object mutations
 		expectMilestones []string // to test sequence
@@ -800,9 +777,8 @@ func TestStoreUpdateHooks(t *testing.T) {
 		expectAnnotation: "DecoratorWasCalled",
 	}, {
 		name: "AfterUpdate mutation",
-		afterUpdate: func(obj runtime.Object) error {
+		afterUpdate: func(obj runtime.Object) {
 			setAnn(obj, "AfterUpdateWasCalled")
-			return nil
 		},
 		expectAnnotation: "AfterUpdateWasCalled",
 	}, {
@@ -818,9 +794,8 @@ func TestStoreUpdateHooks(t *testing.T) {
 			mile("Decorator")
 			return nil
 		},
-		afterCreate: func(obj runtime.Object) error {
+		afterCreate: func(obj runtime.Object) {
 			mile("AfterCreate")
-			return nil
 		},
 		beginCreate: func(_ context.Context, obj runtime.Object, _ *metav1.CreateOptions) (FinishFunc, error) {
 			mile("BeginCreate")
@@ -828,9 +803,8 @@ func TestStoreUpdateHooks(t *testing.T) {
 				mile(fmt.Sprintf("FinishCreate(%v)", success))
 			}, nil
 		},
-		afterUpdate: func(obj runtime.Object) error {
+		afterUpdate: func(obj runtime.Object) {
 			mile("AfterUpdate")
-			return nil
 		},
 		beginUpdate: func(_ context.Context, obj, _ runtime.Object, _ *metav1.UpdateOptions) (FinishFunc, error) {
 			mile("BeginUpdate")
@@ -846,9 +820,8 @@ func TestStoreUpdateHooks(t *testing.T) {
 			mile("Decorator")
 			return fmt.Errorf("decorator")
 		},
-		afterUpdate: func(obj runtime.Object) error {
+		afterUpdate: func(obj runtime.Object) {
 			mile("AfterUpdate")
-			return nil
 		},
 		beginUpdate: func(_ context.Context, obj, _ runtime.Object, _ *metav1.UpdateOptions) (FinishFunc, error) {
 			mile("BeginUpdate")
@@ -858,33 +831,14 @@ func TestStoreUpdateHooks(t *testing.T) {
 		},
 		expectMilestones: []string{"BeginUpdate", "FinishUpdate(true)", "AfterUpdate", "Decorator"},
 	}, {
-		name:        "fail AfterUpdate ordering",
-		expectError: true,
-		decorator: func(obj runtime.Object) error {
-			mile("Decorator")
-			return nil
-		},
-		afterUpdate: func(obj runtime.Object) error {
-			mile("AfterUpdate")
-			return fmt.Errorf("after")
-		},
-		beginUpdate: func(_ context.Context, obj, _ runtime.Object, _ *metav1.UpdateOptions) (FinishFunc, error) {
-			mile("BeginUpdate")
-			return func(_ context.Context, success bool) {
-				mile(fmt.Sprintf("FinishUpdate(%v)", success))
-			}, nil
-		},
-		expectMilestones: []string{"BeginUpdate", "FinishUpdate(true)", "AfterUpdate"},
-	}, {
 		name:        "fail BeginUpdate ordering",
 		expectError: true,
 		decorator: func(obj runtime.Object) error {
 			mile("Decorator")
 			return nil
 		},
-		afterUpdate: func(obj runtime.Object) error {
+		afterUpdate: func(obj runtime.Object) {
 			mile("AfterUpdate")
-			return nil
 		},
 		beginUpdate: func(_ context.Context, obj, _ runtime.Object, _ *metav1.UpdateOptions) (FinishFunc, error) {
 			mile("BeginUpdate")
@@ -955,9 +909,9 @@ func TestStoreCreateOnUpdateHooks(t *testing.T) {
 		name        string
 		decorator   ObjectFunc
 		beginCreate func(context.Context, runtime.Object, *metav1.CreateOptions) (FinishFunc, error)
-		afterCreate ObjectFunc
+		afterCreate func(runtime.Object)
 		beginUpdate func(context.Context, runtime.Object, runtime.Object, *metav1.UpdateOptions) (FinishFunc, error)
-		afterUpdate ObjectFunc
+		afterUpdate func(runtime.Object)
 		// the TTLFunc is an easy hook to force a failure
 		ttl              func(obj runtime.Object, existing uint64, update bool) (uint64, error)
 		expectError      bool
@@ -970,9 +924,8 @@ func TestStoreCreateOnUpdateHooks(t *testing.T) {
 			mile("Decorator")
 			return nil
 		},
-		afterCreate: func(obj runtime.Object) error {
+		afterCreate: func(obj runtime.Object) {
 			mile("AfterCreate")
-			return nil
 		},
 		beginCreate: func(_ context.Context, obj runtime.Object, _ *metav1.CreateOptions) (FinishFunc, error) {
 			mile("BeginCreate")
@@ -980,9 +933,8 @@ func TestStoreCreateOnUpdateHooks(t *testing.T) {
 				mile(fmt.Sprintf("FinishCreate(%v)", success))
 			}, nil
 		},
-		afterUpdate: func(obj runtime.Object) error {
+		afterUpdate: func(obj runtime.Object) {
 			mile("AfterUpdate")
-			return nil
 		},
 		beginUpdate: func(_ context.Context, obj, _ runtime.Object, _ *metav1.UpdateOptions) (FinishFunc, error) {
 			mile("BeginUpdate")
@@ -997,9 +949,8 @@ func TestStoreCreateOnUpdateHooks(t *testing.T) {
 			mile("Decorator")
 			return nil
 		},
-		afterCreate: func(obj runtime.Object) error {
+		afterCreate: func(obj runtime.Object) {
 			mile("AfterCreate")
-			return nil
 		},
 		beginCreate: func(_ context.Context, obj runtime.Object, _ *metav1.CreateOptions) (FinishFunc, error) {
 			mile("BeginCreate")
@@ -1007,9 +958,8 @@ func TestStoreCreateOnUpdateHooks(t *testing.T) {
 				mile(fmt.Sprintf("FinishCreate(%v)", success))
 			}, nil
 		},
-		afterUpdate: func(obj runtime.Object) error {
+		afterUpdate: func(obj runtime.Object) {
 			mile("AfterUpdate")
-			return nil
 		},
 		beginUpdate: func(_ context.Context, obj, _ runtime.Object, _ *metav1.UpdateOptions) (FinishFunc, error) {
 			mile("BeginUpdate")
@@ -1030,9 +980,8 @@ func TestStoreCreateOnUpdateHooks(t *testing.T) {
 			mile("Decorator")
 			return fmt.Errorf("decorator")
 		},
-		afterCreate: func(obj runtime.Object) error {
+		afterCreate: func(obj runtime.Object) {
 			mile("AfterCreate")
-			return nil
 		},
 		beginCreate: func(_ context.Context, obj runtime.Object, _ *metav1.CreateOptions) (FinishFunc, error) {
 			mile("BeginCreate")
@@ -1040,9 +989,8 @@ func TestStoreCreateOnUpdateHooks(t *testing.T) {
 				mile(fmt.Sprintf("FinishCreate(%v)", success))
 			}, nil
 		},
-		afterUpdate: func(obj runtime.Object) error {
+		afterUpdate: func(obj runtime.Object) {
 			mile("AfterUpdate")
-			return nil
 		},
 		beginUpdate: func(_ context.Context, obj, _ runtime.Object, _ *metav1.UpdateOptions) (FinishFunc, error) {
 			mile("BeginUpdate")
@@ -1052,43 +1000,14 @@ func TestStoreCreateOnUpdateHooks(t *testing.T) {
 		},
 		expectMilestones: []string{"BeginCreate", "FinishCreate(true)", "AfterCreate", "Decorator"},
 	}, {
-		name:        "fail AfterCreate ordering",
-		expectError: true,
-		decorator: func(obj runtime.Object) error {
-			mile("Decorator")
-			return nil
-		},
-		afterCreate: func(obj runtime.Object) error {
-			mile("AfterCreate")
-			return fmt.Errorf("after")
-		},
-		beginCreate: func(_ context.Context, obj runtime.Object, _ *metav1.CreateOptions) (FinishFunc, error) {
-			mile("BeginCreate")
-			return func(_ context.Context, success bool) {
-				mile(fmt.Sprintf("FinishCreate(%v)", success))
-			}, nil
-		},
-		afterUpdate: func(obj runtime.Object) error {
-			mile("AfterUpdate")
-			return nil
-		},
-		beginUpdate: func(_ context.Context, obj, _ runtime.Object, _ *metav1.UpdateOptions) (FinishFunc, error) {
-			mile("BeginUpdate")
-			return func(_ context.Context, success bool) {
-				mile(fmt.Sprintf("FinishUpdate(%v)", success))
-			}, nil
-		},
-		expectMilestones: []string{"BeginCreate", "FinishCreate(true)", "AfterCreate"},
-	}, {
 		name:        "fail BeginCreate ordering",
 		expectError: true,
 		decorator: func(obj runtime.Object) error {
 			mile("Decorator")
 			return nil
 		},
-		afterCreate: func(obj runtime.Object) error {
+		afterCreate: func(obj runtime.Object) {
 			mile("AfterCreate")
-			return nil
 		},
 		beginCreate: func(_ context.Context, obj runtime.Object, _ *metav1.CreateOptions) (FinishFunc, error) {
 			mile("BeginCreate")
@@ -1096,9 +1015,8 @@ func TestStoreCreateOnUpdateHooks(t *testing.T) {
 				mile(fmt.Sprintf("FinishCreate(%v)", success))
 			}, fmt.Errorf("begin")
 		},
-		afterUpdate: func(obj runtime.Object) error {
+		afterUpdate: func(obj runtime.Object) {
 			mile("AfterUpdate")
-			return nil
 		},
 		beginUpdate: func(_ context.Context, obj, _ runtime.Object, _ *metav1.UpdateOptions) (FinishFunc, error) {
 			mile("BeginUpdate")
@@ -1174,7 +1092,7 @@ func TestStoreUpdateHooksInnerRetry(t *testing.T) {
 		name        string
 		decorator   func(runtime.Object) error
 		beginUpdate func(context.Context, runtime.Object, runtime.Object, *metav1.UpdateOptions) (FinishFunc, error)
-		afterUpdate func(runtime.Object) error
+		afterUpdate func(runtime.Object)
 		// the TTLFunc is an easy hook to force an inner-loop retry
 		ttl              func(obj runtime.Object, existing uint64, update bool) (uint64, error)
 		expectError      bool
@@ -1185,9 +1103,8 @@ func TestStoreUpdateHooksInnerRetry(t *testing.T) {
 			mile("Decorator")
 			return nil
 		},
-		afterUpdate: func(obj runtime.Object) error {
+		afterUpdate: func(obj runtime.Object) {
 			mile("AfterUpdate")
-			return nil
 		},
 		beginUpdate: func(_ context.Context, obj, _ runtime.Object, _ *metav1.UpdateOptions) (FinishFunc, error) {
 			mile("BeginUpdate")
@@ -1203,9 +1120,8 @@ func TestStoreUpdateHooksInnerRetry(t *testing.T) {
 			mile("Decorator")
 			return nil
 		},
-		afterUpdate: func(obj runtime.Object) error {
+		afterUpdate: func(obj runtime.Object) {
 			mile("AfterUpdate")
-			return nil
 		},
 		beginUpdate: func(_ context.Context, obj, _ runtime.Object, _ *metav1.UpdateOptions) (FinishFunc, error) {
 			mile("BeginUpdate")
