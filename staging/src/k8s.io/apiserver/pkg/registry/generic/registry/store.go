@@ -148,7 +148,7 @@ type Store struct {
 	// integrations that are above storage and should only be used for
 	// specific cases where storage of the value is not appropriate, since
 	// they cannot be watched.
-	Decorator ObjectFunc
+	Decorator func(runtime.Object)
 
 	// CreateStrategy implements resource-specific behavior during creation.
 	CreateStrategy rest.RESTCreateStrategy
@@ -322,9 +322,7 @@ func (e *Store) List(ctx context.Context, options *metainternalversion.ListOptio
 		return nil, err
 	}
 	if e.Decorator != nil {
-		if err := e.Decorator(out); err != nil {
-			return nil, err
-		}
+		e.Decorator(out)
 	}
 	return out, nil
 }
@@ -425,9 +423,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 		e.AfterCreate(out)
 	}
 	if e.Decorator != nil {
-		if err := e.Decorator(out); err != nil {
-			return nil, err
-		}
+		e.Decorator(out)
 	}
 	return out, nil
 }
@@ -672,9 +668,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		}
 	}
 	if e.Decorator != nil {
-		if err := e.Decorator(out); err != nil {
-			return nil, false, err
-		}
+		e.Decorator(out)
 	}
 	return out, creating, nil
 }
@@ -701,9 +695,7 @@ func (e *Store) Get(ctx context.Context, name string, options *metav1.GetOptions
 		return nil, storeerr.InterpretGetError(err, e.qualifiedResourceFromContext(ctx), name)
 	}
 	if e.Decorator != nil {
-		if err := e.Decorator(obj); err != nil {
-			return nil, err
-		}
+		e.Decorator(obj)
 	}
 	return obj, nil
 }
@@ -1163,9 +1155,7 @@ func (e *Store) finalizeDelete(ctx context.Context, obj runtime.Object, runHooks
 	}
 	if e.ReturnDeletedObject {
 		if e.Decorator != nil {
-			if err := e.Decorator(obj); err != nil {
-				return nil, err
-			}
+			e.Decorator(obj)
 		}
 		return obj, nil
 	}
