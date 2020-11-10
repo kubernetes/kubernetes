@@ -134,28 +134,60 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				})
 
 				for _, t := range typesToGenerate {
-					generators = append(generators, &listerGenerator{
-						DefaultGen: generator.DefaultGen{
-							OptionalName: strings.ToLower(t.Name.Name),
+					generators = append(
+						generators,
+						&listerGenerator{
+							DefaultGen: generator.DefaultGen{
+								OptionalName: strings.ToLower(t.Name.Name),
+							},
+							outputPackage:  arguments.OutputPackagePath,
+							groupVersion:   gv,
+							internalGVPkg:  internalGVPkg,
+							typeToGenerate: t,
+							imports:        generator.NewImportTracker(),
+							objectMeta:     objectMeta,
 						},
-						outputPackage:  arguments.OutputPackagePath,
-						groupVersion:   gv,
-						internalGVPkg:  internalGVPkg,
-						typeToGenerate: t,
-						imports:        generator.NewImportTracker(),
-						objectMeta:     objectMeta,
-					})
+					)
 				}
 				return generators
 			},
-			FilterFunc: func(c *generator.Context, t *types.Type) bool {
-				tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
-				return tags.GenerateClient && tags.HasVerb("list") && tags.HasVerb("get")
+			FilterFunc: typeMustBeListable,
+		})
+		// now add the fake listers
+		fakeListerPackageName := strings.ToLower(gv.Version.NonEmpty()) + "_fakelister"
+		fakeListerPackage := filepath.Join(arguments.OutputPackagePath, groupPackageName, fakeListerPackageName)
+		packageList = append(packageList, &generator.DefaultPackage{
+			PackageName: fakeListerPackageName,
+			PackagePath: fakeListerPackage,
+			HeaderText:  boilerplate,
+			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+				for _, t := range typesToGenerate {
+					generators = append(
+						generators,
+						&fakeListerGenerator{
+							DefaultGen: generator.DefaultGen{
+								OptionalName: strings.ToLower(t.Name.Name),
+							},
+							outputPackage:  fakeListerPackage,
+							typeToGenerate: t,
+							imports:        generator.NewImportTracker(),
+							objectMeta:     objectMeta,
+							listersPackage: packagePath,
+						},
+					)
+				}
+				return generators
 			},
+			FilterFunc: typeMustBeListable,
 		})
 	}
 
 	return packageList
+}
+
+func typeMustBeListable(c *generator.Context, t *types.Type) bool {
+	tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
+	return tags.GenerateClient && tags.HasVerb("list") && tags.HasVerb("get")
 }
 
 // objectMetaForPackage returns the type of ObjectMeta used by package p.
