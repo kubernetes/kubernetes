@@ -38,6 +38,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
@@ -107,6 +108,13 @@ func TestCreateFromConfig(t *testing.T) {
 				"apiVersion" : "v1"
 			}`),
 			wantPluginConfig: []schedulerapi.PluginConfig{
+				{
+					Name: defaultpreemption.Name,
+					Args: &schedulerapi.DefaultPreemptionArgs{
+						MinCandidateNodesPercentage: 10,
+						MinCandidateNodesAbsolute:   100,
+					},
+				},
 				{
 					Name: interpodaffinity.Name,
 					Args: &schedulerapi.InterPodAffinityArgs{
@@ -232,6 +240,13 @@ func TestCreateFromConfig(t *testing.T) {
 			}`),
 			wantPluginConfig: []schedulerapi.PluginConfig{
 				{
+					Name: defaultpreemption.Name,
+					Args: &schedulerapi.DefaultPreemptionArgs{
+						MinCandidateNodesPercentage: 10,
+						MinCandidateNodesAbsolute:   100,
+					},
+				},
+				{
 					Name: interpodaffinity.Name,
 					Args: &schedulerapi.InterPodAffinityArgs{
 						HardPodAffinityWeight: 1,
@@ -312,6 +327,13 @@ func TestCreateFromConfig(t *testing.T) {
 				"hardPodAffinitySymmetricWeight" : 10
 			}`),
 			wantPluginConfig: []schedulerapi.PluginConfig{
+				{
+					Name: defaultpreemption.Name,
+					Args: &schedulerapi.DefaultPreemptionArgs{
+						MinCandidateNodesPercentage: 10,
+						MinCandidateNodesAbsolute:   100,
+					},
+				},
 				{
 					Name: interpodaffinity.Name,
 					Args: &schedulerapi.InterPodAffinityArgs{
