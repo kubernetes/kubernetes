@@ -39,6 +39,8 @@
                     "--cloud-provider=gke",
                     "--expendable-pods-priority-cutoff=-10",
                     "--filter-out-schedulable-pods-uses-packing=true",
+                    "--node-autoprovisioning-pvms=true",
+                    "--pvm-unfitness-penalty-enabled=true",
                     {{params}}
                 ],
                 "env": [
