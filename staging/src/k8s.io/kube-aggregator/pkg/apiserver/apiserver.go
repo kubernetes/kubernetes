@@ -24,9 +24,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/pkg/version"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
@@ -263,6 +266,35 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		go availableController.Run(5, context.StopCh)
 		return nil
 	})
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
+		// Spawn a goroutine in aggregator apiserver to update storage version for
+		// all built-in resources
+		s.GenericAPIServer.AddPostStartHookOrDie("built-in-resources-storage-version-updater", func(context genericapiserver.PostStartHookContext) error {
+			// Technically an apiserver only needs to update storage version once during bootstrap.
+			// Reconcile StorageVersion objects every 10 minutes will help in the case that the
+			// StorageVersion objects get accidentally modified/deleted by a different agent. In that
+			// case, the reconciliation ensures future storage migration still works. If nothing gets
+			// changed, the reconciliation update is a noop and gets short-circuited by the apiserver,
+			// therefore won't change the resource version and trigger storage migration.
+			go wait.PollImmediateUntil(10*time.Minute, func() (bool, error) {
+				// All apiservers (aggregator-apiserver, kube-apiserver, apiextensions-apiserver)
+				// share the same generic apiserver config. The same StorageVersion manager is used
+				// to register all built-in resources when the generic apiservers install APIs.
+				s.GenericAPIServer.StorageVersionManager.UpdateStorageVersions(context.LoopbackClientConfig, s.GenericAPIServer.APIServerID)
+				return false, nil
+			}, context.StopCh)
+			// Once the storage version updater finishes the first round of update,
+			// the PostStartHook will return to unblock /healthz. The handler chain
+			// won't block write requests anymore. Check every second since it's not
+			// expensive.
+			wait.PollImmediateUntil(1*time.Second, func() (bool, error) {
+				return s.GenericAPIServer.StorageVersionManager.Completed(), nil
+			}, context.StopCh)
+			return nil
+		})
+	}
 
 	return s, nil
 }

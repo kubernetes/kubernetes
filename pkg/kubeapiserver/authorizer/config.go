@@ -82,6 +82,7 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 		// Keep cases in sync with constant list in k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes/modes.go.
 		switch authorizationMode {
 		case modes.ModeNode:
+			node.RegisterMetrics()
 			graph := node.NewGraph()
 			node.AddGraphEventHandlers(
 				graph,

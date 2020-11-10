@@ -90,6 +90,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/endpoints/warning:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storageversion:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/version:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",

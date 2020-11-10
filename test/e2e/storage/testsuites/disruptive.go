@@ -41,7 +41,7 @@ func InitDisruptiveTestSuite() TestSuite {
 	return &disruptiveTestSuite{
 		tsInfo: TestSuiteInfo{
 			Name:       "disruptive",
-			FeatureTag: "[Disruptive]",
+			FeatureTag: "[Disruptive][LinuxOnly]",
 			TestPatterns: []testpatterns.TestPattern{
 				// FSVolMode is already covered in subpath testsuite
 				testpatterns.DefaultFsInlineVolume,
@@ -166,6 +166,7 @@ func (s *disruptiveTestSuite) DefineTests(driver TestDriver, pattern testpattern
 						InlineVolumeSources: inlineSources,
 						SeLinuxLabel:        e2epv.SELinuxLabel,
 						NodeSelection:       l.config.ClientNodeSelection,
+						ImageID:             getTestImage(),
 					}
 					l.pod, err = e2epod.CreateSecPodWithNodeSelection(l.cs, &podConfig, framework.PodStartTimeout)
 					framework.ExpectNoError(err, "While creating pods for kubelet restart test")
