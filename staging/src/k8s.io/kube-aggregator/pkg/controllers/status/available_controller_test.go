@@ -18,13 +18,14 @@ package apiserver
 
 import (
 	"fmt"
-	"k8s.io/utils/pointer"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/utils/pointer"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -133,6 +134,7 @@ func setupAPIServices(apiServices []*apiregistration.APIService) (*AvailableCond
 			// the maximum disruption time to a minimum, but it does prevent hot loops.
 			workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second),
 			"AvailableConditionController"),
+		metrics: newAvailabilityMetrics(),
 	}
 	for _, svc := range apiServices {
 		c.addAPIService(svc)
@@ -356,6 +358,7 @@ func TestSync(t *testing.T) {
 				endpointsLister:  v1listers.NewEndpointsLister(endpointsIndexer),
 				discoveryClient:  testServer.Client(),
 				serviceResolver:  &fakeServiceResolver{url: testServer.URL},
+				metrics:          newAvailabilityMetrics(),
 			}
 			c.sync(tc.apiServiceName)
 
@@ -405,13 +408,18 @@ func TestUpdateAPIServiceStatus(t *testing.T) {
 	bar := &apiregistration.APIService{Status: apiregistration.APIServiceStatus{Conditions: []apiregistration.APIServiceCondition{{Type: "bar"}}}}
 
 	fakeClient := fake.NewSimpleClientset()
-	updateAPIServiceStatus(fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter), foo, foo)
+	c := AvailableConditionController{
+		apiServiceClient: fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter),
+		metrics:          newAvailabilityMetrics(),
+	}
+
+	c.updateAPIServiceStatus(foo, foo)
 	if e, a := 0, len(fakeClient.Actions()); e != a {
 		t.Error(spew.Sdump(fakeClient.Actions()))
 	}
 
 	fakeClient.ClearActions()
-	updateAPIServiceStatus(fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter), foo, bar)
+	c.updateAPIServiceStatus(foo, bar)
 	if e, a := 1, len(fakeClient.Actions()); e != a {
 		t.Error(spew.Sdump(fakeClient.Actions()))
 	}
