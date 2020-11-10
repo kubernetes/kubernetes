@@ -119,9 +119,22 @@ var _ = SIGDescribe("Device Plugin", func() {
 		windowsPod = f.PodClient().CreateSync(windowsPod)
 
 		ginkgo.By("verifying device access in Windows testing Pod")
-		command := []string{"cmd.exe", "/c", "dxdiag", "/t", "dxdiag_output.txt", "&", "type", "dxdiag_output.txt"}
-		expectedString := "Todo: DirectX Version: DirectX 12"
-		_, err := framework.LookForStringInPodExec(ns, windowsPod.Name, command, expectedString, time.Minute)
-		framework.ExpectNoError(err, "failed: didn't find expected string in dxdiag output.")
+		dxdiagCommand := []string{"cmd.exe", "/c", "dxdiag", "/t", "dxdiag_output.txt", "&", "type", "dxdiag_output.txt"}
+		dxdiagDirectxVersion := "Todo: DirectX Version: DirectX 12"
+		_, dxdiagDirectxVersionErr := framework.LookForStringInPodExec(ns, windowsPod.Name, dxdiagCommand, dxdiagDirectxVersion, time.Minute)
+		framework.ExpectNoError(dxdiagDirectxVersionErr, "failed: didn't find directX version dxdiag output.")
+
+		dxdiagDdiVersion := "DDI Version: 12"
+		_, dxdiagDdiVersionErr := framework.LookForStringInPodExec(ns, windowsPod.Name, dxdiagCommand, dxdiagDdiVersion, time.Minute)
+		framework.ExpectNoError(dxdiagDdiVersionErr, "failed: didn't find DDI version in dxdiag output.")
+
+		dxdiagVendorID := "Vendor ID: 0x10DE"
+		_, dxdiagVendorIdErr := framework.LookForStringInPodExec(ns, windowsPod.Name, dxdiagCommand, dxdiagVendorID, time.Minute)
+		framework.ExpectNoError(dxdiagVendorIdErr, "failed: didn't find vendorID in dxdiag output.")
+
+		envVarCommand := []string{"cmd.exe", "/c", "set", "DIRECTX_GPU_Name"}
+		envVarDirectxGpuName := "DIRECTX_GPU_Name="
+		_, envVarDirectxGpuNameErr := framework.LookForStringInPodExec(ns, windowsPod.Name, envVarCommand, envVarDirectxGpuName, time.Minute)
+		framework.ExpectNoError(envVarDirectxGpuNameErr, "failed: didn't find expected environment variable.")
 	})
 })
