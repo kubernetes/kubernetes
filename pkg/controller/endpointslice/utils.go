@@ -41,27 +41,6 @@ import (
 
 // podToEndpoint returns an Endpoint object generated from a Pod, a Node, and a Service for a particular addressType.
 func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service, addressType discovery.AddressType) discovery.Endpoint {
-	// Build out topology information. This is currently limited to hostname,
-	// zone, and region, but this will be expanded in the future.
-	topology := map[string]string{}
-
-	if pod.Spec.NodeName != "" {
-		topology["kubernetes.io/hostname"] = pod.Spec.NodeName
-	}
-
-	if node != nil {
-		topologyLabels := []string{
-			"topology.kubernetes.io/zone",
-			"topology.kubernetes.io/region",
-		}
-
-		for _, topologyLabel := range topologyLabels {
-			if node.Labels[topologyLabel] != "" {
-				topology[topologyLabel] = node.Labels[topologyLabel]
-			}
-		}
-	}
-
 	serving := podutil.IsPodReady(pod)
 	terminating := pod.DeletionTimestamp != nil
 	// For compatibility reasons, "ready" should never be "true" if a pod is terminatng, unless
@@ -72,7 +51,6 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service, 
 		Conditions: discovery.EndpointConditions{
 			Ready: &ready,
 		},
-		Topology: topology,
 		TargetRef: &corev1.ObjectReference{
 			Kind:            "Pod",
 			Namespace:       pod.ObjectMeta.Namespace,
@@ -85,6 +63,31 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service, 
 	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition) {
 		ep.Conditions.Serving = &serving
 		ep.Conditions.Terminating = &terminating
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTopology) {
+		// Build out topology information. This is currently limited to
+		// hostname, zone, and region, but may be expanded in the future.
+		topology := map[string]string{}
+
+		if pod.Spec.NodeName != "" {
+			topology["kubernetes.io/hostname"] = pod.Spec.NodeName
+		}
+
+		if node != nil {
+			topologyLabels := []string{
+				"topology.kubernetes.io/zone",
+				"topology.kubernetes.io/region",
+			}
+
+			for _, topologyLabel := range topologyLabels {
+				if node.Labels[topologyLabel] != "" {
+					topology[topologyLabel] = node.Labels[topologyLabel]
+				}
+			}
+		}
+
+		ep.Topology = topology
 	}
 
 	if endpointutil.ShouldSetHostname(pod, service) {

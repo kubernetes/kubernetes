@@ -252,11 +252,13 @@ func TestPodToEndpoint(t *testing.T) {
 		expectedEndpoint         discovery.Endpoint
 		publishNotReadyAddresses bool
 		terminatingGateEnabled   bool
+		topologyGateEnabled      bool
 	}{
 		{
-			name: "Ready pod",
-			pod:  readyPod,
-			svc:  &svc,
+			name:                "Ready pod",
+			pod:                 readyPod,
+			svc:                 &svc,
+			topologyGateEnabled: true,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
@@ -271,9 +273,10 @@ func TestPodToEndpoint(t *testing.T) {
 			},
 		},
 		{
-			name: "Ready pod + publishNotReadyAddresses",
-			pod:  readyPod,
-			svc:  &svcPublishNotReady,
+			name:                "Ready pod + publishNotReadyAddresses",
+			pod:                 readyPod,
+			svc:                 &svcPublishNotReady,
+			topologyGateEnabled: true,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
@@ -288,9 +291,10 @@ func TestPodToEndpoint(t *testing.T) {
 			},
 		},
 		{
-			name: "Unready pod",
-			pod:  unreadyPod,
-			svc:  &svc,
+			name:                "Unready pod",
+			pod:                 unreadyPod,
+			svc:                 &svc,
+			topologyGateEnabled: true,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
@@ -305,9 +309,10 @@ func TestPodToEndpoint(t *testing.T) {
 			},
 		},
 		{
-			name: "Unready pod + publishNotReadyAddresses",
-			pod:  unreadyPod,
-			svc:  &svcPublishNotReady,
+			name:                "Unready pod + publishNotReadyAddresses",
+			pod:                 unreadyPod,
+			svc:                 &svcPublishNotReady,
+			topologyGateEnabled: true,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
@@ -322,10 +327,11 @@ func TestPodToEndpoint(t *testing.T) {
 			},
 		},
 		{
-			name: "Ready pod + node labels",
-			pod:  readyPod,
-			node: node1,
-			svc:  &svc,
+			name:                "Ready pod + node labels",
+			pod:                 readyPod,
+			node:                node1,
+			svc:                 &svc,
+			topologyGateEnabled: true,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
@@ -344,10 +350,29 @@ func TestPodToEndpoint(t *testing.T) {
 			},
 		},
 		{
-			name: "Multi IP Ready pod + node labels",
-			pod:  multiIPPod,
-			node: node1,
-			svc:  &svc,
+			name:                "Ready pod + node labels, topology gate disabled",
+			pod:                 readyPod,
+			node:                node1,
+			svc:                 &svc,
+			topologyGateEnabled: false,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses:  []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				TargetRef: &v1.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       ns,
+					Name:            readyPod.Name,
+					UID:             readyPod.UID,
+					ResourceVersion: readyPod.ResourceVersion,
+				},
+			},
+		},
+		{
+			name:                "Multi IP Ready pod + node labels",
+			pod:                 multiIPPod,
+			node:                node1,
+			svc:                 &svc,
+			topologyGateEnabled: true,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.4"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
@@ -366,10 +391,11 @@ func TestPodToEndpoint(t *testing.T) {
 			},
 		},
 		{
-			name: "Ready pod + hostname",
-			pod:  readyPodHostname,
-			node: node1,
-			svc:  &svc,
+			name:                "Ready pod + hostname",
+			pod:                 readyPodHostname,
+			node:                node1,
+			svc:                 &svc,
+			topologyGateEnabled: true,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
@@ -389,9 +415,11 @@ func TestPodToEndpoint(t *testing.T) {
 			},
 		},
 		{
-			name: "Ready pod, terminating gate enabled",
-			pod:  readyPod,
-			svc:  &svc,
+			name:                   "Ready pod, terminating gate enabled",
+			pod:                    readyPod,
+			svc:                    &svc,
+			topologyGateEnabled:    true,
+			terminatingGateEnabled: true,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
@@ -408,12 +436,13 @@ func TestPodToEndpoint(t *testing.T) {
 					ResourceVersion: readyPod.ResourceVersion,
 				},
 			},
-			terminatingGateEnabled: true,
 		},
 		{
-			name: "Ready terminating pod, terminating gate disabled",
-			pod:  readyTerminatingPod,
-			svc:  &svc,
+			name:                   "Ready terminating pod, terminating gate disabled",
+			pod:                    readyTerminatingPod,
+			svc:                    &svc,
+			topologyGateEnabled:    true,
+			terminatingGateEnabled: false,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
@@ -428,12 +457,13 @@ func TestPodToEndpoint(t *testing.T) {
 					ResourceVersion: readyPod.ResourceVersion,
 				},
 			},
-			terminatingGateEnabled: false,
 		},
 		{
-			name: "Ready terminating pod, terminating gate enabled",
-			pod:  readyTerminatingPod,
-			svc:  &svc,
+			name:                   "Ready terminating pod, terminating gate enabled",
+			pod:                    readyTerminatingPod,
+			svc:                    &svc,
+			topologyGateEnabled:    true,
+			terminatingGateEnabled: true,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
@@ -450,12 +480,13 @@ func TestPodToEndpoint(t *testing.T) {
 					ResourceVersion: readyPod.ResourceVersion,
 				},
 			},
-			terminatingGateEnabled: true,
 		},
 		{
-			name: "Not ready terminating pod, terminating gate disabled",
-			pod:  unreadyTerminatingPod,
-			svc:  &svc,
+			name:                   "Not ready terminating pod, terminating gate disabled",
+			pod:                    unreadyTerminatingPod,
+			svc:                    &svc,
+			topologyGateEnabled:    true,
+			terminatingGateEnabled: false,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
@@ -470,12 +501,13 @@ func TestPodToEndpoint(t *testing.T) {
 					ResourceVersion: readyPod.ResourceVersion,
 				},
 			},
-			terminatingGateEnabled: false,
 		},
 		{
-			name: "Not ready terminating pod, terminating gate enabled",
-			pod:  unreadyTerminatingPod,
-			svc:  &svc,
+			name:                   "Not ready terminating pod, terminating gate enabled",
+			pod:                    unreadyTerminatingPod,
+			svc:                    &svc,
+			topologyGateEnabled:    true,
+			terminatingGateEnabled: true,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
@@ -492,13 +524,13 @@ func TestPodToEndpoint(t *testing.T) {
 					ResourceVersion: readyPod.ResourceVersion,
 				},
 			},
-			terminatingGateEnabled: true,
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceTerminatingCondition, testCase.terminatingGateEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceTopology, testCase.topologyGateEnabled)()
 
 			endpoint := podToEndpoint(testCase.pod, testCase.node, testCase.svc, discovery.AddressTypeIPv4)
 			if !reflect.DeepEqual(testCase.expectedEndpoint, endpoint) {
