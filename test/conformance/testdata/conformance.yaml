@@ -1598,6 +1598,34 @@
     DNS configuration MUST be configured in the Pod.
   release: v1.17
   file: test/e2e/network/dns.go
+- testname: 'Network: EndpointSlice should create Endpoints and'
+  codename: '[sig-network] EndpointSlice should create Endpoints and EndpointSlices
+    for Pods matching a Service [Conformance]'
+  description: The EndpointSlice controller should create EndpointSlices for Pods
+    matching a Service.
+  release: v1.20
+  file: test/e2e/network/endpointslice.go
+- testname: 'Network: EndpointSlice should create and delete Endpoints and'
+  codename: '[sig-network] EndpointSlice should create and delete Endpoints and EndpointSlices
+    for a Service with a selector specified [Conformance]'
+  description: The EndpointSlice controller should create and delete EndpointSlices
+    for Pods matching a Service.
+  release: v1.20
+  file: test/e2e/network/endpointslice.go
+- testname: 'Network: EndpointSlice should have Endpoints and'
+  codename: '[sig-network] EndpointSlice should have Endpoints and EndpointSlices
+    pointing to API Server [Conformance]'
+  description: API Server should create self referential Endpoints and EndpointSlices
+    named "kubernetes" in the default namespace.
+  release: v1.20
+  file: test/e2e/network/endpointslice.go
+- testname: 'Network: EndpointSliceMirroring should mirror a custom'
+  codename: '[sig-network] EndpointSliceMirroring should mirror a custom Endpoints
+    resource through create update and delete [Conformance]'
+  description: EndpointSlice Mirroring controller should mirror a custom Endpoitns
+    resource through create, update, and delete actions.
+  release: v1.20
+  file: test/e2e/network/endpointslicemirroring.go
 - testname: Ingress API
   codename: '[sig-network] Ingress API should support creating Ingress API operations
     [Conformance]'

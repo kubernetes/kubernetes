@@ -39,7 +39,14 @@ var _ = SIGDescribe("EndpointSliceMirroring", func() {
 		cs = f.ClientSet
 	})
 
-	ginkgo.It("should mirror a custom Endpoints resource through create update and delete", func() {
+	/*
+		Release: v1.20
+		Testname: Network: EndpointSliceMirroring should mirror a custom
+		Endpoints resource through create update and delete
+		Description: EndpointSlice Mirroring controller should mirror a custom
+		Endpoitns resource through create, update, and delete actions.
+	*/
+	framework.ConformanceIt("should mirror a custom Endpoints resource through create update and delete", func() {
 		svc := createServiceReportErr(cs, f.Namespace.Name, &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-custom-endpoints",
