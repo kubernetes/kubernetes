@@ -121,7 +121,7 @@ var (
 	// Preconfigured image configs
 	imageConfigs = initImageConfigs()
 
-        microsoftRegistry = registry.Microsoft
+        microsoftRegistry = registry.MicrosoftRegistry
 )
 
 const (
