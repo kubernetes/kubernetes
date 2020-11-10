@@ -1,8 +1,7 @@
 ## Support for deploying and using Kubernetes
 
 Welcome to Kubernetes! We use GitHub for tracking bugs and feature requests.
-This isn't the right place to get support for using Kubernetes, but the following
-resources are available below, thanks for understanding.
+This isn't the right place to get support for using Kubernetes, but the following resources are available below, thanks for understanding.
 
 ### Stack Overflow
 
@@ -21,8 +20,7 @@ The Kubernetes Community is active on Stack Overflow, you can post your question
 ### Real-time Chat
 
 * [Slack](https://kubernetes.slack.com) ([registration](http://slack.k8s.io)):
-The `#kubernetes-users` and `#kubernetes-novice` channels are usual places where
-people offer support.
+The `#kubernetes-users` and `#kubernetes-novice` channels are usual places where people offer support.
 
 ### Forum
 
