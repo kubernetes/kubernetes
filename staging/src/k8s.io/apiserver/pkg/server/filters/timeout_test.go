@@ -244,8 +244,12 @@ func TestErrConnKilled(t *testing.T) {
 		t.Fatal("expected to receive an error")
 	}
 
+	// we should only get one line for this, not the big stack from before
 	capturedOutput := readStdErr()
-	if len(capturedOutput) > 0 {
+	if strings.Count(capturedOutput, "\n") != 1 {
+		t.Errorf("unexpected output captured actual = %v", capturedOutput)
+	}
+	if !strings.Contains(capturedOutput, `timeout or abort while handling: GET "/"`) {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
 }
@@ -330,8 +334,12 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 		t.Fatal("expected to receive an error")
 	}
 
+	// we should only get one line for this, not the big stack from before
 	capturedOutput := readStdErr()
-	if len(capturedOutput) > 0 {
+	if strings.Count(capturedOutput, "\n") != 1 {
+		t.Errorf("unexpected output captured actual = %v", capturedOutput)
+	}
+	if !strings.Contains(capturedOutput, `timeout or abort while handling: GET "/"`) {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
 
