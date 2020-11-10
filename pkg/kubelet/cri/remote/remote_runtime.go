@@ -24,12 +24,15 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
 
 	"k8s.io/component-base/logs/logreduction"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote/util"
+	"k8s.io/kubernetes/pkg/probe/exec"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -387,6 +390,12 @@ func (r *remoteRuntimeService) ExecSync(containerID string, cmd []string, timeou
 	resp, err := r.runtimeClient.ExecSync(ctx, req)
 	if err != nil {
 		klog.Errorf("ExecSync %s '%s' from runtime service failed: %v", containerID, strings.Join(cmd, " "), err)
+
+		// interpret DeadlineExceeded gRPC errors as timedout probes
+		if status.Code(err) == codes.DeadlineExceeded {
+			err = exec.NewTimeoutError(fmt.Errorf("command %q timed out", strings.Join(cmd, " ")), timeout)
+		}
+
 		return nil, nil, err
 	}
 
