@@ -9,7 +9,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "expansion.go",
+        "fake_lister.go",
         "lister.go",
+        "types.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/lister-gen/generators",
     importpath = "k8s.io/code-generator/cmd/lister-gen/generators",

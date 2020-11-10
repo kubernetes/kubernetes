@@ -59,6 +59,7 @@ filegroup(
         "//staging/src/k8s.io/sample-controller/pkg/generated/clientset/versioned:all-srcs",
         "//staging/src/k8s.io/sample-controller/pkg/generated/informers/externalversions:all-srcs",
         "//staging/src/k8s.io/sample-controller/pkg/generated/listers/samplecontroller/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/sample-controller/pkg/generated/listers/samplecontroller/v1alpha1_fakelister:all-srcs",
         "//staging/src/k8s.io/sample-controller/pkg/signals:all-srcs",
     ],
     tags = ["automanaged"],
