@@ -107,22 +107,6 @@ func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) error {
 func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(4).Infof(log("Mounter.SetUpAt(%s)", dir))
 
-	corruptedDir := false
-	mounted, err := isDirMounted(c.plugin, dir)
-	if err != nil {
-		if isCorruptedDir(dir) {
-			corruptedDir = true // leave to CSI driver to handle corrupted mount
-			klog.Warning(log("mounter.SetUpAt detected corrupted mount for dir [%s]", dir))
-		} else {
-			return errors.New(log("mounter.SetUpAt failed while checking mount status for dir [%s]: %v", dir, err))
-		}
-	}
-
-	if mounted && !corruptedDir {
-		klog.V(4).Info(log("mounter.SetUpAt skipping mount, dir already mounted [%s]", dir))
-		return nil
-	}
-
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get CSI client: %v", err))
@@ -219,10 +203,11 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	// create target_dir before call to NodePublish
-	if err := os.MkdirAll(dir, 0750); err != nil && !corruptedDir {
-		return errors.New(log("mounter.SetUpAt failed to create dir %#v:  %v", dir, err))
+	parentDir := filepath.Dir(dir)
+	if err := os.MkdirAll(parentDir, 0750); err != nil {
+		return errors.New(log("mounter.SetUpAt failed to create dir %#v:  %v", parentDir, err))
 	}
-	klog.V(4).Info(log("created target path successfully [%s]", dir))
+	klog.V(4).Info(log("created target path successfully [%s]", parentDir))
 
 	nodePublishSecrets = map[string]string{}
 	if secretRef != nil {

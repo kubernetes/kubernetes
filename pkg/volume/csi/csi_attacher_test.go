@@ -1257,6 +1257,18 @@ func TestAttacherMountDevice(t *testing.T) {
 					t.Errorf("expected mount options: %v, got: %v", tc.spec.PersistentVolume.Spec.MountOptions, vol.MountFlags)
 				}
 			}
+
+			// Verify the deviceMountPath was created by the plugin
+			if tc.stageUnstageSet {
+				s, err := os.Stat(tc.deviceMountPath)
+				if err != nil {
+					t.Errorf("expected staging directory %s to be created and be a directory, got error: %s", tc.deviceMountPath, err)
+				} else {
+					if !s.IsDir() {
+						t.Errorf("expected staging directory %s to be directory, got something else", tc.deviceMountPath)
+					}
+				}
+			}
 		})
 	}
 }
