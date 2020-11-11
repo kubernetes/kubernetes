@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -26,7 +27,6 @@ import (
 	"testing"
 
 	"github.com/prometheus/common/model"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -240,4 +240,256 @@ func TestApiserverMetricsLabels(t *testing.T) {
 			t.Errorf("No sample found for %#v", expectedMetric)
 		}
 	}
+}
+
+func TestApiserverMetricsPods(t *testing.T) {
+	callOrDie := func(_ interface{}, err error) {
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
+
+	makePod := func(labelValue string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"foo": labelValue},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "container",
+						Image: "image",
+					},
+				},
+			},
+		}
+	}
+
+	_, server, closeFn := framework.RunAMaster(framework.NewMasterConfig())
+	defer closeFn()
+
+	client, err := clientset.NewForConfig(&restclient.Config{Host: server.URL, QPS: -1})
+	if err != nil {
+		t.Fatalf("Error in create clientset: %v", err)
+	}
+
+	c := client.CoreV1().Pods(metav1.NamespaceDefault)
+
+	for _, tc := range []struct {
+		name     string
+		executor func()
+
+		want string
+	}{
+		{
+			name: "create pod",
+			executor: func() {
+				callOrDie(c.Create(context.TODO(), makePod("foo"), metav1.CreateOptions{}))
+			},
+			want: `apiserver_request_total{code="201", component="apiserver", contentType="application/json", dry_run="", group="", resource="pods", scope="resource", subresource="", verb="POST", version="v1"}`,
+		},
+		{
+			name: "update pod",
+			executor: func() {
+				callOrDie(c.Update(context.TODO(), makePod("bar"), metav1.UpdateOptions{}))
+			},
+			want: `apiserver_request_total{code="200", component="apiserver", contentType="application/json", dry_run="", group="", resource="pods", scope="resource", subresource="", verb="PUT", version="v1"}`,
+		},
+		{
+			name: "update pod status",
+			executor: func() {
+				callOrDie(c.UpdateStatus(context.TODO(), makePod("bar"), metav1.UpdateOptions{}))
+			},
+			want: `apiserver_request_total{code="200", component="apiserver", contentType="application/json", dry_run="", group="", resource="pods", scope="resource", subresource="status", verb="PUT", version="v1"}`,
+		},
+		{
+			name: "get pod",
+			executor: func() {
+				callOrDie(c.Get(context.TODO(), "foo", metav1.GetOptions{}))
+			},
+			want: `apiserver_request_total{code="200", component="apiserver", contentType="application/json", dry_run="", group="", resource="pods", scope="resource", subresource="", verb="GET", version="v1"}`,
+		},
+		{
+			name: "list pod",
+			executor: func() {
+				callOrDie(c.List(context.TODO(), metav1.ListOptions{}))
+			},
+			want: `apiserver_request_total{code="200", component="apiserver", contentType="application/json", dry_run="", group="", resource="pods", scope="namespace", subresource="", verb="LIST", version="v1"}`,
+		},
+		{
+			name: "delete pod",
+			executor: func() {
+				callOrDie(nil, c.Delete(context.TODO(), "foo", metav1.DeleteOptions{}))
+			},
+			want: `apiserver_request_total{code="200", component="apiserver", contentType="application/json", dry_run="", group="", resource="pods", scope="resource", subresource="", verb="DELETE", version="v1"}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+
+			baseSamples, err := getSamples(server)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			tc.executor()
+
+			updatedSamples, err := getSamples(server)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			newSamples := diffMetrics(updatedSamples, baseSamples)
+			found := false
+
+			for _, sample := range newSamples {
+				if sample.Metric.String() == tc.want {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				t.Fatalf("could not find metric for API call >%s< among samples >%+v<", tc.name, newSamples)
+			}
+		})
+	}
+}
+
+func TestApiserverMetricsNamespaces(t *testing.T) {
+	callOrDie := func(_ interface{}, err error) {
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
+
+	makeNamespace := func(labelValue string) *v1.Namespace {
+		return &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "foo",
+				Labels: map[string]string{"foo": labelValue},
+			},
+		}
+	}
+
+	_, server, closeFn := framework.RunAMaster(framework.NewMasterConfig())
+	defer closeFn()
+
+	client, err := clientset.NewForConfig(&restclient.Config{Host: server.URL, QPS: -1})
+	if err != nil {
+		t.Fatalf("Error in create clientset: %v", err)
+	}
+
+	c := client.CoreV1().Namespaces()
+
+	for _, tc := range []struct {
+		name     string
+		executor func()
+
+		want string
+	}{
+		{
+			name: "create namespace",
+			executor: func() {
+				callOrDie(c.Create(context.TODO(), makeNamespace("foo"), metav1.CreateOptions{}))
+			},
+			want: `apiserver_request_total{code="201", component="apiserver", contentType="application/json", dry_run="", group="", resource="namespaces", scope="resource", subresource="", verb="POST", version="v1"}`,
+		},
+		{
+			name: "update namespace",
+			executor: func() {
+				callOrDie(c.Update(context.TODO(), makeNamespace("bar"), metav1.UpdateOptions{}))
+			},
+			want: `apiserver_request_total{code="200", component="apiserver", contentType="application/json", dry_run="", group="", resource="namespaces", scope="resource", subresource="", verb="PUT", version="v1"}`,
+		},
+		{
+			name: "update namespace status",
+			executor: func() {
+				callOrDie(c.UpdateStatus(context.TODO(), makeNamespace("bar"), metav1.UpdateOptions{}))
+			},
+			want: `apiserver_request_total{code="200", component="apiserver", contentType="application/json", dry_run="", group="", resource="namespaces", scope="resource", subresource="status", verb="PUT", version="v1"}`,
+		},
+		{
+			name: "get namespace",
+			executor: func() {
+				callOrDie(c.Get(context.TODO(), "foo", metav1.GetOptions{}))
+			},
+			want: `apiserver_request_total{code="200", component="apiserver", contentType="application/json", dry_run="", group="", resource="namespaces", scope="resource", subresource="", verb="GET", version="v1"}`,
+		},
+		{
+			name: "list namespace",
+			executor: func() {
+				callOrDie(c.List(context.TODO(), metav1.ListOptions{}))
+			},
+			want: `apiserver_request_total{code="200", component="apiserver", contentType="application/json", dry_run="", group="", resource="namespaces", scope="cluster", subresource="", verb="LIST", version="v1"}`,
+		},
+		{
+			name: "delete namespace",
+			executor: func() {
+				callOrDie(nil, c.Delete(context.TODO(), "foo", metav1.DeleteOptions{}))
+			},
+			want: `apiserver_request_total{code="200", component="apiserver", contentType="application/json", dry_run="", group="", resource="namespaces", scope="resource", subresource="", verb="DELETE", version="v1"}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+
+			baseSamples, err := getSamples(server)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			tc.executor()
+
+			updatedSamples, err := getSamples(server)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			newSamples := diffMetrics(updatedSamples, baseSamples)
+			found := false
+
+			for _, sample := range newSamples {
+				if sample.Metric.String() == tc.want {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				t.Fatalf("could not find metric for API call >%s< among samples >%+v<", tc.name, newSamples)
+			}
+		})
+	}
+}
+
+func getSamples(s *httptest.Server) (model.Samples, error) {
+	metrics, err := scrapeMetrics(s)
+	if err != nil {
+		return nil, err
+	}
+
+	samples, ok := metrics["apiserver_request_total"]
+	if !ok {
+		return nil, errors.New("apiserver_request_total doesn't exist")
+	}
+	return samples, nil
+}
+
+func diffMetrics(newSamples model.Samples, oldSamples model.Samples) model.Samples {
+	samplesDiff := model.Samples{}
+	for _, sample := range newSamples {
+		if !sampleExistsInSamples(sample, oldSamples) {
+			samplesDiff = append(samplesDiff, sample)
+		}
+	}
+	return samplesDiff
+}
+
+func sampleExistsInSamples(s *model.Sample, samples model.Samples) bool {
+	for _, sample := range samples {
+		if sample.Equal(s) {
+			return true
+		}
+	}
+	return false
 }
