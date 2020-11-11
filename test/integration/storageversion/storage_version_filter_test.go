@@ -149,7 +149,8 @@ func TestStorageVersionBootstrap(t *testing.T) {
 	// Start server and create CRD
 	etcdConfig := framework.SharedEtcd()
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, etcdConfig)
-	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, etcd.GetCustomResourceDefinitionData()[0])
+	crd := etcd.GetCustomResourceDefinitionData()[0]
+	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, crd)
 	server.TearDownFn()
 
 	startUpdateSV := make(chan struct{})
@@ -181,6 +182,14 @@ func TestStorageVersionBootstrap(t *testing.T) {
 	defer server.TearDownFn()
 
 	cfg := rest.CopyConfig(server.ClientConfig)
+
+	// since we restarted the test server, wait until we see the CR appear in discovery again
+	crdClient := apiextensionsclientset.NewForConfigOrDie(cfg)
+	if err := wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		return etcd.CrdExistsInDiscovery(crdClient, crd), nil
+	}); err != nil {
+		t.Fatalf("Failed to see %s in discovery: %v", crd.Name, err)
+	}
 
 	t.Run("before storage version update", func(t *testing.T) {
 		t.Run("write to k8s native API object should be blocked", func(t *testing.T) {
