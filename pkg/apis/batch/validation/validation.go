@@ -17,6 +17,8 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
+
 	"github.com/robfig/cron"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -124,8 +126,14 @@ func validateJobSpec(spec *batch.JobSpec, fldPath *field.Path, opts apivalidatio
 	}
 
 	allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(&spec.Template, fldPath.Child("template"), opts)...)
-	if spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure &&
-		spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
+
+	// spec.Template.Spec.RestartPolicy can be defaulted as RestartPolicyAlways
+	// by SetDefaults_PodSpec function when the user does not explicitly specify a value for it,
+	// so we check both empty and RestartPolicyAlways cases here
+	if spec.Template.Spec.RestartPolicy == api.RestartPolicyAlways || spec.Template.Spec.RestartPolicy == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("template", "spec", "restartPolicy"),
+			fmt.Sprintf("valid values: %q, %q", api.RestartPolicyOnFailure, api.RestartPolicyNever)))
+	} else if spec.Template.Spec.RestartPolicy != api.RestartPolicyOnFailure && spec.Template.Spec.RestartPolicy != api.RestartPolicyNever {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("template", "spec", "restartPolicy"),
 			spec.Template.Spec.RestartPolicy, []string{string(api.RestartPolicyOnFailure), string(api.RestartPolicyNever)}))
 	}
