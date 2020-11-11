@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
-	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // rsStrategy implements verification logic for ReplicaSets.
@@ -109,9 +108,8 @@ func (rsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 // Validate validates a new ReplicaSet.
 func (rsStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	rs := obj.(*apps.ReplicaSet)
-	allErrs := validation.ValidateReplicaSet(rs)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&rs.Spec.Template, nil, field.NewPath("spec.template"))...)
-	return allErrs
+	opts := pod.GetValidationOptionsFromPodTemplate(&rs.Spec.Template, nil)
+	return validation.ValidateReplicaSet(rs, opts)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -128,9 +126,10 @@ func (rsStrategy) AllowCreateOnUpdate() bool {
 func (rsStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newReplicaSet := obj.(*apps.ReplicaSet)
 	oldReplicaSet := old.(*apps.ReplicaSet)
-	allErrs := validation.ValidateReplicaSet(obj.(*apps.ReplicaSet))
-	allErrs = append(allErrs, validation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet)...)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&newReplicaSet.Spec.Template, &oldReplicaSet.Spec.Template, field.NewPath("spec.template"))...)
+
+	opts := pod.GetValidationOptionsFromPodTemplate(&newReplicaSet.Spec.Template, &oldReplicaSet.Spec.Template)
+	allErrs := validation.ValidateReplicaSet(obj.(*apps.ReplicaSet), opts)
+	allErrs = append(allErrs, validation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet, opts)...)
 
 	// Update is not allowed to set Spec.Selector for all groups/versions except extensions/v1beta1.
 	// If RequestInfo is nil, it is better to revert to old behavior (i.e. allow update to set Spec.Selector)

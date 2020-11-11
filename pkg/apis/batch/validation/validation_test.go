@@ -26,6 +26,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -99,7 +100,7 @@ func TestValidateJob(t *testing.T) {
 		},
 	}
 	for k, v := range successCases {
-		if errs := ValidateJob(&v); len(errs) != 0 {
+		if errs := ValidateJob(&v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success for %s: %v", k, errs)
 		}
 	}
@@ -238,7 +239,7 @@ func TestValidateJob(t *testing.T) {
 		}
 
 		for k, v := range errorCases {
-			errs := ValidateJob(&v)
+			errs := ValidateJob(&v, corevalidation.PodValidationOptions{})
 			if len(errs) == 0 {
 				t.Errorf("expected failure for %s", k)
 			} else {
@@ -368,7 +369,7 @@ func TestValidateCronJob(t *testing.T) {
 		},
 	}
 	for k, v := range successCases {
-		if errs := ValidateCronJob(&v); len(errs) != 0 {
+		if errs := ValidateCronJob(&v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success for %s: %v", k, errs)
 		}
 
@@ -376,7 +377,7 @@ func TestValidateCronJob(t *testing.T) {
 		// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
 		v = *v.DeepCopy()
 		v.ResourceVersion = "1"
-		if errs := ValidateCronJobUpdate(&v, &v); len(errs) != 0 {
+		if errs := ValidateCronJobUpdate(&v, &v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success for %s: %v", k, errs)
 		}
 	}
@@ -629,7 +630,7 @@ func TestValidateCronJob(t *testing.T) {
 	}
 
 	for k, v := range errorCases {
-		errs := ValidateCronJob(&v)
+		errs := ValidateCronJob(&v, corevalidation.PodValidationOptions{})
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		} else {
@@ -644,7 +645,7 @@ func TestValidateCronJob(t *testing.T) {
 		// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
 		v = *v.DeepCopy()
 		v.ResourceVersion = "1"
-		errs = ValidateCronJobUpdate(&v, &v)
+		errs = ValidateCronJobUpdate(&v, &v, corevalidation.PodValidationOptions{})
 		if len(errs) == 0 {
 			if k == "metadata.name: must be no more than 52 characters" {
 				continue

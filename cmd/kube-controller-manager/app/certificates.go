@@ -193,7 +193,7 @@ func startCSRCleanerController(ctx ControllerContext) (http.Handler, bool, error
 }
 
 func startRootCACertPublisher(ctx ControllerContext) (http.Handler, bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RootCAConfigMap) {
 		return nil, false, nil
 	}
 

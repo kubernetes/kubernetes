@@ -372,6 +372,24 @@ func TestUpdateExternalLoadBalancer(t *testing.T) {
 		[]string{fmt.Sprintf("/zones/%s/instances/%s", vals.ZoneName, nodeName)},
 		pool.Instances,
 	)
+
+	anotherNewNodeName := "test-node-3"
+	newNodes, err = createAndInsertNodes(gce, []string{nodeName, newNodeName, anotherNewNodeName}, vals.ZoneName)
+	assert.NoError(t, err)
+
+	// delete one of the existing nodes, but include it in the list
+	err = gce.DeleteInstance(gce.ProjectID(), vals.ZoneName, nodeName)
+	require.NoError(t, err)
+
+	// The update should ignore the reference to non-existent node "test-node-1", but update target pool with rest of the valid nodes.
+	err = gce.updateExternalLoadBalancer(vals.ClusterName, svc, newNodes)
+	assert.NoError(t, err)
+
+	pool, err = gce.GetTargetPool(lbName, gce.region)
+	require.NoError(t, err)
+
+	namePrefix := fmt.Sprintf("/zones/%s/instances/", vals.ZoneName)
+	assert.ElementsMatch(t, pool.Instances, []string{namePrefix + newNodeName, namePrefix + anotherNewNodeName})
 }
 
 func TestEnsureExternalLoadBalancerDeleted(t *testing.T) {
@@ -641,7 +659,7 @@ func TestTargetPoolNeedsRecreation(t *testing.T) {
 	exists, needsRecreation, err := gce.targetPoolNeedsRecreation(lbName, vals.Region, v1.ServiceAffinityNone)
 	assert.True(t, exists)
 	assert.False(t, needsRecreation)
-	require.NotNil(t, err)
+	require.Error(t, err)
 	assert.True(t, strings.HasPrefix(err.Error(), errPrefixGetTargetPool))
 	c.MockTargetPools.GetHook = nil
 
@@ -934,7 +952,7 @@ func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {
 		ipnet,
 		svc.Spec.Ports,
 		hosts)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	msg := fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
 	checkEvent(t, recorder, msg, true)
@@ -947,7 +965,7 @@ func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {
 		ipnet,
 		svc.Spec.Ports,
 		hosts)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	msg = fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
 	checkEvent(t, recorder, msg, true)

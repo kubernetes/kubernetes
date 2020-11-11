@@ -18,7 +18,6 @@ package internalbootstrap
 
 import (
 	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
@@ -49,11 +48,10 @@ func NewAPFScheme() *runtime.Scheme {
 
 func internalizeFSes(exts []*fcv1a1.FlowSchema) map[string]*flowcontrol.FlowSchema {
 	ans := make(map[string]*flowcontrol.FlowSchema, len(exts))
-	converter := NewAPFScheme().Converter()
+	scheme := NewAPFScheme()
 	for _, ext := range exts {
 		var untyped flowcontrol.FlowSchema
-		err := converter.Convert(ext, &untyped, 0, &conversion.Meta{})
-		if err != nil {
+		if err := scheme.Convert(ext, &untyped, nil); err != nil {
 			panic(err)
 		}
 		ans[ext.Name] = &untyped
@@ -63,11 +61,10 @@ func internalizeFSes(exts []*fcv1a1.FlowSchema) map[string]*flowcontrol.FlowSche
 
 func internalizePLs(exts []*fcv1a1.PriorityLevelConfiguration) map[string]*flowcontrol.PriorityLevelConfiguration {
 	ans := make(map[string]*flowcontrol.PriorityLevelConfiguration, len(exts))
-	converter := NewAPFScheme().Converter()
+	scheme := NewAPFScheme()
 	for _, ext := range exts {
 		var untyped flowcontrol.PriorityLevelConfiguration
-		err := converter.Convert(ext, &untyped, 0, &conversion.Meta{})
-		if err != nil {
+		if err := scheme.Convert(ext, &untyped, nil); err != nil {
 			panic(err)
 		}
 		ans[ext.Name] = &untyped

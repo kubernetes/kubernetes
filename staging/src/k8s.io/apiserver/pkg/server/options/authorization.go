@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/authorization/path"
@@ -59,13 +60,24 @@ type DelegatingAuthorizationOptions struct {
 
 	// AlwaysAllowGroups are groups which are allowed to take any actions.  In kube, this is system:masters.
 	AlwaysAllowGroups []string
+
+	// ClientTimeout specifies a time limit for requests made by SubjectAccessReviews client.
+	// The default value is set to 10 seconds.
+	ClientTimeout time.Duration
+
+	// WebhookRetryBackoff specifies the backoff parameters for the authorization webhook retry logic.
+	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
+	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
+	WebhookRetryBackoff *wait.Backoff
 }
 
 func NewDelegatingAuthorizationOptions() *DelegatingAuthorizationOptions {
 	return &DelegatingAuthorizationOptions{
 		// very low for responsiveness, but high enough to handle storms
-		AllowCacheTTL: 10 * time.Second,
-		DenyCacheTTL:  10 * time.Second,
+		AllowCacheTTL:       10 * time.Second,
+		DenyCacheTTL:        10 * time.Second,
+		ClientTimeout:       10 * time.Second,
+		WebhookRetryBackoff: DefaultAuthWebhookRetryBackoff(),
 	}
 }
 
@@ -81,8 +93,23 @@ func (s *DelegatingAuthorizationOptions) WithAlwaysAllowPaths(paths ...string) *
 	return s
 }
 
+// WithClientTimeout sets the given timeout for SAR client used by this authorizer
+func (s *DelegatingAuthorizationOptions) WithClientTimeout(timeout time.Duration) {
+	s.ClientTimeout = timeout
+}
+
+// WithCustomRetryBackoff sets the custom backoff parameters for the authorization webhook retry logic.
+func (s *DelegatingAuthorizationOptions) WithCustomRetryBackoff(backoff wait.Backoff) {
+	s.WebhookRetryBackoff = &backoff
+}
+
 func (s *DelegatingAuthorizationOptions) Validate() []error {
 	allErrors := []error{}
+
+	if s.WebhookRetryBackoff != nil && s.WebhookRetryBackoff.Steps <= 0 {
+		allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 1, but is: %d", s.WebhookRetryBackoff.Steps))
+	}
+
 	return allErrors
 }
 
@@ -149,6 +176,7 @@ func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interfac
 			SubjectAccessReviewClient: client.AuthorizationV1().SubjectAccessReviews(),
 			AllowCacheTTL:             s.AllowCacheTTL,
 			DenyCacheTTL:              s.DenyCacheTTL,
+			WebhookRetryBackoff:       s.WebhookRetryBackoff,
 		}
 		delegatedAuthorizer, err := cfg.New()
 		if err != nil {
@@ -186,6 +214,7 @@ func (s *DelegatingAuthorizationOptions) getClient() (kubernetes.Interface, erro
 	// set high qps/burst limits since this will effectively limit API server responsiveness
 	clientConfig.QPS = 200
 	clientConfig.Burst = 400
+	clientConfig.Timeout = s.ClientTimeout
 
 	return kubernetes.NewForConfig(clientConfig)
 }

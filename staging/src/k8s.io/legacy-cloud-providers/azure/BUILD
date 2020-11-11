@@ -91,6 +91,7 @@ go_library(
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/vmssclient/mockvmssclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient/mockvmssvmclient:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/azure/metrics:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure/retry:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network:go_default_library",

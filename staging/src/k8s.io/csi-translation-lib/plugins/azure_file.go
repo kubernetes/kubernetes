@@ -119,8 +119,10 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 		accountName = azureSource.SecretName
 	}
 	resourceGroup := ""
-	if v, ok := pv.ObjectMeta.Annotations[resourceGroupAnnotation]; ok {
-		resourceGroup = v
+	if pv.ObjectMeta.Annotations != nil {
+		if v, ok := pv.ObjectMeta.Annotations[resourceGroupAnnotation]; ok {
+			resourceGroup = v
+		}
 	}
 	volumeID := fmt.Sprintf(volumeIDTemplate, resourceGroup, accountName, azureSource.ShareName, "")
 
@@ -183,6 +185,9 @@ func (t *azureFileCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume)
 	pv.Spec.CSI = nil
 	pv.Spec.AzureFile = azureSource
 	if resourceGroup != "" {
+		if pv.ObjectMeta.Annotations == nil {
+			pv.ObjectMeta.Annotations = map[string]string{}
+		}
 		pv.ObjectMeta.Annotations[resourceGroupAnnotation] = resourceGroup
 	}
 

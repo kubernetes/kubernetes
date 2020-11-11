@@ -194,8 +194,8 @@ run_non_native_resource_tests() {
   output_message=$(kubectl "${kube_flags[@]}" get kind.mygroup.example.com/myobj -o name)
   kube::test::if_has_string "${output_message}" 'kind.mygroup.example.com/myobj'
 
-  # Delete the resource with cascade.
-  kubectl "${kube_flags[@]}" delete resources myobj --cascade=true
+  # Delete the resource with cascading strategy background.
+  kubectl "${kube_flags[@]}" delete resources myobj --cascade=background
 
   # Make sure it's gone
   kube::test::wait_object_assert resources "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -275,8 +275,8 @@ run_non_native_resource_tests() {
   kubectl "${kube_flags[@]}" describe foos | grep listlabel=true
   kubectl "${kube_flags[@]}" describe foos | grep itemlabel=true
 
-  # Delete the resource with cascade.
-  kubectl "${kube_flags[@]}" delete foos test --cascade=true
+  # Delete the resource with cascading strategy background.
+  kubectl "${kube_flags[@]}" delete foos test --cascade=background
 
   # Make sure it's gone
   kube::test::wait_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -313,8 +313,8 @@ run_non_native_resource_tests() {
   kill -9 "${patch_pid}"
   kube::test::if_has_string "${watch_output}" 'bar.company.com/test'
 
-  # Delete the resource without cascade.
-  kubectl "${kube_flags[@]}" delete bars test --cascade=false
+  # Delete the resource with cascading strategy orphan.
+  kubectl "${kube_flags[@]}" delete bars test --cascade=orphan
 
   # Make sure it's gone
   kube::test::wait_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''

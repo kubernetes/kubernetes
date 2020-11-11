@@ -4,9 +4,6 @@
 "metadata": {
   "name":"kube-controller-manager",
   "namespace": "kube-system",
-  "annotations": {
-    "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
-  },
   "labels": {
     "tier": "control-plane",
     "component": "kube-controller-manager"
@@ -14,6 +11,9 @@
 },
 "spec":{
 "securityContext": {
+  "seccompProfile": {
+      "type": "RuntimeDefault"
+  },
   "runAsUser": {{runAsUser}},
   "runAsGroup": {{runAsGroup}}
 },

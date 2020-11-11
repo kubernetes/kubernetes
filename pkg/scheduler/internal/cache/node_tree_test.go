@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -36,7 +36,7 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-1",
 			Labels: map[string]string{
-				v1.LabelZoneRegion: "region-1",
+				v1.LabelFailureDomainBetaRegion: "region-1",
 			},
 		},
 	},
@@ -45,7 +45,7 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-2",
 			Labels: map[string]string{
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelFailureDomainBetaZone: "zone-2",
 			},
 		},
 	},
@@ -54,8 +54,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-3",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-1",
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelFailureDomainBetaRegion: "region-1",
+				v1.LabelFailureDomainBetaZone:   "zone-2",
 			},
 		},
 	},
@@ -64,8 +64,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-4",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-1",
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelFailureDomainBetaRegion: "region-1",
+				v1.LabelFailureDomainBetaZone:   "zone-2",
 			},
 		},
 	},
@@ -74,8 +74,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-5",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-1",
-				v1.LabelZoneFailureDomain: "zone-3",
+				v1.LabelFailureDomainBetaRegion: "region-1",
+				v1.LabelFailureDomainBetaZone:   "zone-3",
 			},
 		},
 	},
@@ -84,8 +84,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-6",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-2",
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelFailureDomainBetaRegion: "region-2",
+				v1.LabelFailureDomainBetaZone:   "zone-2",
 			},
 		},
 	},
@@ -94,8 +94,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-7",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-2",
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelFailureDomainBetaRegion: "region-2",
+				v1.LabelFailureDomainBetaZone:   "zone-2",
 			},
 		},
 	},
@@ -104,8 +104,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-8",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-2",
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelFailureDomainBetaRegion: "region-2",
+				v1.LabelFailureDomainBetaZone:   "zone-2",
 			},
 		},
 	},
@@ -114,10 +114,10 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-9",
 			Labels: map[string]string{
-				v1.LabelZoneRegionStable:        "region-2",
-				v1.LabelZoneFailureDomainStable: "zone-2",
-				v1.LabelZoneRegion:              "region-2",
-				v1.LabelZoneFailureDomain:       "zone-2",
+				v1.LabelTopologyRegion:          "region-2",
+				v1.LabelTopologyZone:            "zone-2",
+				v1.LabelFailureDomainBetaRegion: "region-2",
+				v1.LabelFailureDomainBetaZone:   "zone-2",
 			},
 		},
 	},
@@ -126,17 +126,17 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-10",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-2",
-				v1.LabelZoneFailureDomain: "zone-3",
+				v1.LabelFailureDomainBetaRegion: "region-2",
+				v1.LabelFailureDomainBetaZone:   "zone-3",
 			},
 		},
 	},
 }
 
-func verifyNodeTree(t *testing.T, nt *nodeTree, expectedTree map[string]*nodeArray) {
+func verifyNodeTree(t *testing.T, nt *nodeTree, expectedTree map[string][]string) {
 	expectedNumNodes := int(0)
 	for _, na := range expectedTree {
-		expectedNumNodes += len(na.nodes)
+		expectedNumNodes += len(na)
 	}
 	if numNodes := nt.numNodes; numNodes != expectedNumNodes {
 		t.Errorf("unexpected nodeTree.numNodes. Expected: %v, Got: %v", expectedNumNodes, numNodes)
@@ -158,41 +158,41 @@ func TestNodeTree_AddNode(t *testing.T) {
 	tests := []struct {
 		name         string
 		nodesToAdd   []*v1.Node
-		expectedTree map[string]*nodeArray
+		expectedTree map[string][]string
 	}{
 		{
 			name:         "single node no labels",
 			nodesToAdd:   allNodes[:1],
-			expectedTree: map[string]*nodeArray{"": {[]string{"node-0"}, 0}},
+			expectedTree: map[string][]string{"": {"node-0"}},
 		},
 		{
 			name:       "mix of nodes with and without proper labels",
 			nodesToAdd: allNodes[:4],
-			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 0},
-				"region-1:\x00:":       {[]string{"node-1"}, 0},
-				":\x00:zone-2":         {[]string{"node-2"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-3"}, 0},
+			expectedTree: map[string][]string{
+				"":                     {"node-0"},
+				"region-1:\x00:":       {"node-1"},
+				":\x00:zone-2":         {"node-2"},
+				"region-1:\x00:zone-2": {"node-3"},
 			},
 		},
 		{
 			name:       "mix of nodes with and without proper labels and some zones with multiple nodes",
 			nodesToAdd: allNodes[:7],
-			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 0},
-				"region-1:\x00:":       {[]string{"node-1"}, 0},
-				":\x00:zone-2":         {[]string{"node-2"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-3", "node-4"}, 0},
-				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
-				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
+			expectedTree: map[string][]string{
+				"":                     {"node-0"},
+				"region-1:\x00:":       {"node-1"},
+				":\x00:zone-2":         {"node-2"},
+				"region-1:\x00:zone-2": {"node-3", "node-4"},
+				"region-1:\x00:zone-3": {"node-5"},
+				"region-2:\x00:zone-2": {"node-6"},
 			},
 		},
 		{
 			name:       "nodes also using deprecated zone/region label",
 			nodesToAdd: allNodes[9:],
-			expectedTree: map[string]*nodeArray{
-				"region-2:\x00:zone-2": {[]string{"node-9"}, 0},
-				"region-2:\x00:zone-3": {[]string{"node-10"}, 0},
+			expectedTree: map[string][]string{
+				"region-2:\x00:zone-2": {"node-9"},
+				"region-2:\x00:zone-3": {"node-10"},
 			},
 		},
 	}
@@ -213,43 +213,43 @@ func TestNodeTree_RemoveNode(t *testing.T) {
 		name          string
 		existingNodes []*v1.Node
 		nodesToRemove []*v1.Node
-		expectedTree  map[string]*nodeArray
+		expectedTree  map[string][]string
 		expectError   bool
 	}{
 		{
 			name:          "remove a single node with no labels",
 			existingNodes: allNodes[:7],
 			nodesToRemove: allNodes[:1],
-			expectedTree: map[string]*nodeArray{
-				"region-1:\x00:":       {[]string{"node-1"}, 0},
-				":\x00:zone-2":         {[]string{"node-2"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-3", "node-4"}, 0},
-				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
-				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
+			expectedTree: map[string][]string{
+				"region-1:\x00:":       {"node-1"},
+				":\x00:zone-2":         {"node-2"},
+				"region-1:\x00:zone-2": {"node-3", "node-4"},
+				"region-1:\x00:zone-3": {"node-5"},
+				"region-2:\x00:zone-2": {"node-6"},
 			},
 		},
 		{
 			name:          "remove a few nodes including one from a zone with multiple nodes",
 			existingNodes: allNodes[:7],
 			nodesToRemove: allNodes[1:4],
-			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-4"}, 0},
-				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
-				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
+			expectedTree: map[string][]string{
+				"":                     {"node-0"},
+				"region-1:\x00:zone-2": {"node-4"},
+				"region-1:\x00:zone-3": {"node-5"},
+				"region-2:\x00:zone-2": {"node-6"},
 			},
 		},
 		{
 			name:          "remove all nodes",
 			existingNodes: allNodes[:7],
 			nodesToRemove: allNodes[:7],
-			expectedTree:  map[string]*nodeArray{},
+			expectedTree:  map[string][]string{},
 		},
 		{
 			name:          "remove non-existing node",
 			existingNodes: nil,
 			nodesToRemove: allNodes[:5],
-			expectedTree:  map[string]*nodeArray{},
+			expectedTree:  map[string][]string{},
 			expectError:   true,
 		},
 	}
@@ -273,7 +273,7 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 		name          string
 		existingNodes []*v1.Node
 		nodeToUpdate  *v1.Node
-		expectedTree  map[string]*nodeArray
+		expectedTree  map[string][]string
 	}{
 		{
 			name:          "update a node without label",
@@ -282,17 +282,17 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-0",
 					Labels: map[string]string{
-						v1.LabelZoneRegion:        "region-1",
-						v1.LabelZoneFailureDomain: "zone-2",
+						v1.LabelFailureDomainBetaRegion: "region-1",
+						v1.LabelFailureDomainBetaZone:   "zone-2",
 					},
 				},
 			},
-			expectedTree: map[string]*nodeArray{
-				"region-1:\x00:":       {[]string{"node-1"}, 0},
-				":\x00:zone-2":         {[]string{"node-2"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-3", "node-4", "node-0"}, 0},
-				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
-				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
+			expectedTree: map[string][]string{
+				"region-1:\x00:":       {"node-1"},
+				":\x00:zone-2":         {"node-2"},
+				"region-1:\x00:zone-2": {"node-3", "node-4", "node-0"},
+				"region-1:\x00:zone-3": {"node-5"},
+				"region-2:\x00:zone-2": {"node-6"},
 			},
 		},
 		{
@@ -302,13 +302,13 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-0",
 					Labels: map[string]string{
-						v1.LabelZoneRegion:        "region-1",
-						v1.LabelZoneFailureDomain: "zone-2",
+						v1.LabelFailureDomainBetaRegion: "region-1",
+						v1.LabelFailureDomainBetaZone:   "zone-2",
 					},
 				},
 			},
-			expectedTree: map[string]*nodeArray{
-				"region-1:\x00:zone-2": {[]string{"node-0"}, 0},
+			expectedTree: map[string][]string{
+				"region-1:\x00:zone-2": {"node-0"},
 			},
 		},
 		{
@@ -318,14 +318,14 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-new",
 					Labels: map[string]string{
-						v1.LabelZoneRegion:        "region-1",
-						v1.LabelZoneFailureDomain: "zone-2",
+						v1.LabelFailureDomainBetaRegion: "region-1",
+						v1.LabelFailureDomainBetaZone:   "zone-2",
 					},
 				},
 			},
-			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-new"}, 0},
+			expectedTree: map[string][]string{
+				"":                     {"node-0"},
+				"region-1:\x00:zone-2": {"node-new"},
 			},
 		},
 	}
@@ -349,36 +349,31 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 	}
 }
 
-func TestNodeTree_Next(t *testing.T) {
+func TestNodeTree_List(t *testing.T) {
 	tests := []struct {
 		name           string
 		nodesToAdd     []*v1.Node
-		numRuns        int // number of times to run Next()
 		expectedOutput []string
 	}{
 		{
 			name:           "empty tree",
 			nodesToAdd:     nil,
-			numRuns:        2,
-			expectedOutput: []string{"", ""},
+			expectedOutput: nil,
 		},
 		{
-			name:           "should go back to the first node after finishing a round",
+			name:           "one node",
 			nodesToAdd:     allNodes[:1],
-			numRuns:        2,
-			expectedOutput: []string{"node-0", "node-0"},
+			expectedOutput: []string{"node-0"},
 		},
 		{
-			name:           "should go back to the first node after going over all nodes",
+			name:           "four nodes",
 			nodesToAdd:     allNodes[:4],
-			numRuns:        5,
-			expectedOutput: []string{"node-0", "node-1", "node-2", "node-3", "node-0"},
+			expectedOutput: []string{"node-0", "node-1", "node-2", "node-3"},
 		},
 		{
-			name:           "should go to all zones before going to the second nodes in the same zone",
+			name:           "all nodes",
 			nodesToAdd:     allNodes[:9],
-			numRuns:        11,
-			expectedOutput: []string{"node-0", "node-1", "node-2", "node-3", "node-5", "node-6", "node-4", "node-7", "node-8", "node-0", "node-1"},
+			expectedOutput: []string{"node-0", "node-1", "node-2", "node-3", "node-5", "node-6", "node-4", "node-7", "node-8"},
 		},
 	}
 
@@ -386,14 +381,23 @@ func TestNodeTree_Next(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nt := newNodeTree(test.nodesToAdd)
 
-			var output []string
-			for i := 0; i < test.numRuns; i++ {
-				output = append(output, nt.next())
+			output, err := nt.list()
+			if err != nil {
+				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(output, test.expectedOutput) {
 				t.Errorf("unexpected output. Expected: %v, Got: %v", test.expectedOutput, output)
 			}
 		})
+	}
+}
+
+func TestNodeTree_List_Exhausted(t *testing.T) {
+	nt := newNodeTree(allNodes[:9])
+	nt.numNodes++
+	_, err := nt.list()
+	if err == nil {
+		t.Fatal("Expected an error from zone exhaustion")
 	}
 }
 
@@ -406,39 +410,39 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 		expectedOutput []string
 	}{
 		{
-			name:           "add and remove all nodes between two Next operations",
+			name:           "add and remove all nodes",
 			nodesToAdd:     allNodes[2:9],
 			nodesToRemove:  allNodes[2:9],
-			operations:     []string{"add", "add", "next", "add", "remove", "remove", "remove", "next"},
-			expectedOutput: []string{"node-2", ""},
+			operations:     []string{"add", "add", "add", "remove", "remove", "remove"},
+			expectedOutput: nil,
 		},
 		{
-			name:           "add and remove some nodes between two Next operations",
+			name:           "add and remove some nodes",
 			nodesToAdd:     allNodes[2:9],
 			nodesToRemove:  allNodes[2:9],
-			operations:     []string{"add", "add", "next", "add", "remove", "remove", "next"},
-			expectedOutput: []string{"node-2", "node-4"},
+			operations:     []string{"add", "add", "add", "remove"},
+			expectedOutput: []string{"node-3", "node-4"},
 		},
 		{
-			name:           "remove nodes already iterated on and add new nodes",
+			name:           "remove three nodes",
 			nodesToAdd:     allNodes[2:9],
 			nodesToRemove:  allNodes[2:9],
-			operations:     []string{"add", "add", "next", "next", "add", "remove", "remove", "next"},
-			expectedOutput: []string{"node-2", "node-3", "node-4"},
+			operations:     []string{"add", "add", "add", "remove", "remove", "remove", "add"},
+			expectedOutput: []string{"node-5"},
 		},
 		{
 			name:           "add more nodes to an exhausted zone",
 			nodesToAdd:     append(allNodes[4:9:9], allNodes[3]),
 			nodesToRemove:  nil,
-			operations:     []string{"add", "add", "add", "add", "add", "next", "next", "next", "next", "add", "next", "next", "next"},
-			expectedOutput: []string{"node-4", "node-5", "node-6", "node-7", "node-3", "node-8", "node-4"},
+			operations:     []string{"add", "add", "add", "add", "add", "add"},
+			expectedOutput: []string{"node-4", "node-5", "node-6", "node-3", "node-7", "node-8"},
 		},
 		{
-			name:           "remove zone and add new to ensure exhausted is reset correctly",
+			name:           "remove zone and add new",
 			nodesToAdd:     append(allNodes[3:5:5], allNodes[6:8]...),
 			nodesToRemove:  allNodes[3:5],
-			operations:     []string{"add", "add", "next", "next", "remove", "add", "add", "next", "next", "remove", "next", "next"},
-			expectedOutput: []string{"node-3", "node-4", "node-6", "node-7", "node-6", "node-7"},
+			operations:     []string{"add", "add", "remove", "add", "add", "remove"},
+			expectedOutput: []string{"node-6", "node-7"},
 		},
 	}
 
@@ -447,7 +451,6 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 			nt := newNodeTree(nil)
 			addIndex := 0
 			removeIndex := 0
-			var output []string
 			for _, op := range test.operations {
 				switch op {
 				case "add":
@@ -464,11 +467,13 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 						nt.removeNode(test.nodesToRemove[removeIndex])
 						removeIndex++
 					}
-				case "next":
-					output = append(output, nt.next())
 				default:
 					t.Errorf("unknow operation: %v", op)
 				}
+			}
+			output, err := nt.list()
+			if err != nil {
+				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(output, test.expectedOutput) {
 				t.Errorf("unexpected output. Expected: %v, Got: %v", test.expectedOutput, output)

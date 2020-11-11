@@ -55,6 +55,7 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		false,
 		5*time.Second,
 		DefaultTimerConfig,
+		nil, /* filteredDialOptions */
 	)
 
 	// Assert
@@ -175,7 +176,9 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		prober,
 		false,
 		1*time.Second,
-		DefaultTimerConfig)
+		DefaultTimerConfig,
+		nil, /* filteredDialOptions */
+	)
 
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)

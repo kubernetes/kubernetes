@@ -156,5 +156,13 @@ var _ = framework.KubeDescribe("Lease", func() {
 
 		_, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
 		framework.ExpectEqual(apierrors.IsNotFound(err), true)
+
+		leaseClient = f.ClientSet.CoordinationV1().Leases(metav1.NamespaceAll)
+		// Number of leases may be high in large clusters, as Lease object is
+		// created for every node by the corresponding Kubelet.
+		// That said, the objects themselves are small (~300B), so even with 5000
+		// of them, that gives ~1.5MB, which is acceptable.
+		_, err = leaseClient.List(context.TODO(), metav1.ListOptions{})
+		framework.ExpectNoError(err, "couldn't list Leases from all namespace")
 	})
 })

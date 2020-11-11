@@ -32,7 +32,7 @@ func NewCmdCreateSecret(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 	cmd := &cobra.Command{
 		Use:   "secret",
 		Short: i18n.T("Create a secret using specified subcommand"),
-		Long:  "Create a secret using specified subcommand.",
+		Long:  i18n.T("Create a secret using specified subcommand."),
 		Run:   cmdutil.DefaultSubCommandRun(ioStreams.ErrOut),
 	}
 	cmd.AddCommand(NewCmdCreateSecretDockerRegistry(f, ioStreams))

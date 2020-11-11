@@ -47,24 +47,24 @@ type MetricValueList struct {
 
 // a metric value for some object
 type MetricValue struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// a reference to the described object
-	DescribedObject ObjectReference `json:"describedObject"`
+	DescribedObject ObjectReference
 
 	Metric MetricIdentifier
 
 	// indicates the time at which the metrics were produced
-	Timestamp metav1.Time `json:"timestamp"`
+	Timestamp metav1.Time
 
 	// indicates the window ([Timestamp-Window, Timestamp]) from
 	// which these metrics were calculated, when returning rate
 	// metrics calculated from cumulative metrics (or zero for
 	// non-calculated instantaneous metrics).
-	WindowSeconds *int64 `json:"window,omitempty"`
+	WindowSeconds *int64
 
 	// the value of the metric for this
-	Value resource.Quantity `json:"value"`
+	Value resource.Quantity
 }
 
 // allObjects is a wildcard used to select metrics
@@ -75,16 +75,16 @@ const AllObjects = "*"
 
 // MetricListOptions is used to select metrics by their label selectors
 type MetricListOptions struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// A selector to restrict the list of returned objects by their labels.
 	// Defaults to everything.
 	// +optional
-	LabelSelector string `json:"labelSelector,omitempty" protobuf:"bytes,1,opt,name=labelSelector"`
+	LabelSelector string
 
 	// A selector to restrict the list of returned metrics by their labels
 	// +optional
-	MetricLabelSelector string `json:"metricLabelSelector,omitempty" protobuf:"bytes,2,opt,name=metricLabelSelector"`
+	MetricLabelSelector string
 }
 
 // NOTE: ObjectReference is copied from k8s.io/kubernetes/pkg/api/types.go. We

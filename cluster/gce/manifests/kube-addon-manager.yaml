@@ -3,12 +3,12 @@ kind: Pod
 metadata:
   name: kube-addon-manager
   namespace: kube-system
-  annotations:
-    seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
   labels:
     component: kube-addon-manager
 spec:
   securityContext:
+    seccompProfile:
+      type: RuntimeDefault
     runAsUser: {{runAsUser}}
     runAsGroup: {{runAsGroup}}
   priorityClassName: system-node-critical

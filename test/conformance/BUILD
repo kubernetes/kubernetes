@@ -9,7 +9,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/conformance",
     visibility = ["//visibility:private"],
     deps = [
-        "//test/conformance/behaviors:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
@@ -32,8 +31,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//test/conformance/behaviors:all-srcs",
-        "//test/conformance/kubeconform:all-srcs",
         "//test/conformance/testdata:all-srcs",
     ],
     tags = ["automanaged"],
@@ -45,11 +42,11 @@ genrule(
     srcs = [
         "//test/e2e:all-srcs",
         "//test/e2e_node:all-srcs",
-        "//test/e2e:e2e.test_binary",
+        "//test/e2e:e2e.test",
         "//vendor/github.com/onsi/ginkgo/ginkgo",
     ],
     outs = ["specsummaries.json"],
-    cmd = "$(location //vendor/github.com/onsi/ginkgo/ginkgo) --dryRun=true --focus=[Conformance] $(location //test/e2e:e2e.test_binary) -- --spec-dump $$(pwd)/$@ > /dev/null",
+    cmd = "$(location //vendor/github.com/onsi/ginkgo/ginkgo) --dryRun=true --focus=[Conformance] $(location //test/e2e:e2e.test) -- --spec-dump $$(pwd)/$@ > /dev/null",
     message = "Getting all conformance spec summaries.",
 )
 
@@ -79,7 +76,6 @@ go_test(
     srcs = ["walk_test.go"],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
-    deps = ["//test/conformance/behaviors:go_default_library"],
 )
 
 genrule(

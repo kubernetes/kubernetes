@@ -204,14 +204,14 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				}()
 				go controller.Run(stopCh)
 
-				ginkgo.By(fmt.Sprintf("Block traffic from node %s to the master", node.Name))
+				ginkgo.By(fmt.Sprintf("Block traffic from node %s to the control plane", node.Name))
 				host, err := e2enode.GetExternalIP(&node)
 				framework.ExpectNoError(err)
-				masterAddresses := framework.GetAllMasterAddresses(c)
+				controlPlaneAddresses := framework.GetControlPlaneAddresses(c)
 				defer func() {
-					ginkgo.By(fmt.Sprintf("Unblock traffic from node %s to the master", node.Name))
-					for _, masterAddress := range masterAddresses {
-						e2enetwork.UnblockNetwork(host, masterAddress)
+					ginkgo.By(fmt.Sprintf("Unblock traffic from node %s to the control plane", node.Name))
+					for _, instanceAddress := range controlPlaneAddresses {
+						e2enetwork.UnblockNetwork(host, instanceAddress)
 					}
 
 					if ginkgo.CurrentGinkgoTestDescription().Failed {
@@ -225,8 +225,8 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					}
 				}()
 
-				for _, masterAddress := range masterAddresses {
-					e2enetwork.BlockNetwork(host, masterAddress)
+				for _, instanceAddress := range controlPlaneAddresses {
+					e2enetwork.BlockNetwork(host, instanceAddress)
 				}
 
 				ginkgo.By("Expect to observe node and pod status change from Ready to NotReady after network partition")
@@ -592,14 +592,14 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				}()
 				go controller.Run(stopCh)
 
-				ginkgo.By(fmt.Sprintf("Block traffic from node %s to the master", node.Name))
+				ginkgo.By(fmt.Sprintf("Block traffic from node %s to the control plane", node.Name))
 				host, err := e2enode.GetExternalIP(&node)
 				framework.ExpectNoError(err)
-				masterAddresses := framework.GetAllMasterAddresses(c)
+				controlPlaneAddresses := framework.GetControlPlaneAddresses(c)
 				defer func() {
-					ginkgo.By(fmt.Sprintf("Unblock traffic from node %s to the master", node.Name))
-					for _, masterAddress := range masterAddresses {
-						e2enetwork.UnblockNetwork(host, masterAddress)
+					ginkgo.By(fmt.Sprintf("Unblock traffic from node %s to the control plane", node.Name))
+					for _, instanceAddress := range controlPlaneAddresses {
+						e2enetwork.UnblockNetwork(host, instanceAddress)
 					}
 
 					if ginkgo.CurrentGinkgoTestDescription().Failed {
@@ -610,8 +610,8 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					expectNodeReadiness(true, newNode)
 				}()
 
-				for _, masterAddress := range masterAddresses {
-					e2enetwork.BlockNetwork(host, masterAddress)
+				for _, instanceAddress := range controlPlaneAddresses {
+					e2enetwork.BlockNetwork(host, instanceAddress)
 				}
 
 				ginkgo.By("Expect to observe node and pod status change from Ready to NotReady after network partition")

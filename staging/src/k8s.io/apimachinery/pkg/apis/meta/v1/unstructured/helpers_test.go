@@ -80,7 +80,7 @@ func TestNestedFieldNoCopy(t *testing.T) {
 	// case 1: field exists and is non-nil
 	res, exists, err := NestedFieldNoCopy(obj, "a", "b")
 	assert.True(t, exists)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, target, res)
 	target["foo"] = "baz"
 	assert.Equal(t, target["foo"], res.(map[string]interface{})["foo"], "result should be a reference to the expected item")
@@ -88,39 +88,39 @@ func TestNestedFieldNoCopy(t *testing.T) {
 	// case 2: field exists and is nil
 	res, exists, err = NestedFieldNoCopy(obj, "a", "c")
 	assert.True(t, exists)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Nil(t, res)
 
 	// case 3: error traversing obj
 	res, exists, err = NestedFieldNoCopy(obj, "a", "d", "foo")
 	assert.False(t, exists)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 	assert.Nil(t, res)
 
 	// case 4: field does not exist
 	res, exists, err = NestedFieldNoCopy(obj, "a", "g")
 	assert.False(t, exists)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Nil(t, res)
 
 	// case 5: intermediate field does not exist
 	res, exists, err = NestedFieldNoCopy(obj, "a", "g", "f")
 	assert.False(t, exists)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Nil(t, res)
 
 	// case 6: intermediate field is null
 	//         (background: happens easily in YAML)
 	res, exists, err = NestedFieldNoCopy(obj, "a", "c", "f")
 	assert.False(t, exists)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Nil(t, res)
 
 	// case 7: array/slice syntax is not supported
 	//         (background: users may expect this to be supported)
 	res, exists, err = NestedFieldNoCopy(obj, "a", "e[0]")
 	assert.False(t, exists)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Nil(t, res)
 }
 
@@ -138,7 +138,7 @@ func TestNestedFieldCopy(t *testing.T) {
 	// case 1: field exists and is non-nil
 	res, exists, err := NestedFieldCopy(obj, "a", "b")
 	assert.True(t, exists)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, target, res)
 	target["foo"] = "baz"
 	assert.NotEqual(t, target["foo"], res.(map[string]interface{})["foo"], "result should be a copy of the expected item")
@@ -146,19 +146,19 @@ func TestNestedFieldCopy(t *testing.T) {
 	// case 2: field exists and is nil
 	res, exists, err = NestedFieldCopy(obj, "a", "c")
 	assert.True(t, exists)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Nil(t, res)
 
 	// case 3: error traversing obj
 	res, exists, err = NestedFieldCopy(obj, "a", "d", "foo")
 	assert.False(t, exists)
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 	assert.Nil(t, res)
 
 	// case 4: field does not exist
 	res, exists, err = NestedFieldCopy(obj, "a", "e")
 	assert.False(t, exists)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Nil(t, res)
 }
 

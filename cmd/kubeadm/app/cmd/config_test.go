@@ -56,7 +56,7 @@ var (
 func TestNewCmdConfigImagesList(t *testing.T) {
 	var output bytes.Buffer
 	mockK8sVersion := dummyKubernetesVersionStr
-	images := NewCmdConfigImagesList(&output, &mockK8sVersion)
+	images := newCmdConfigImagesList(&output, &mockK8sVersion)
 	if err := images.RunE(nil, nil); err != nil {
 		t.Fatalf("Error from running the images command: %v", err)
 	}
@@ -401,7 +401,7 @@ func TestMigrate(t *testing.T) {
 	defer cleanup()
 
 	var output bytes.Buffer
-	command := NewCmdConfigMigrate(&output)
+	command := newCmdConfigMigrate(&output)
 	if err := command.Flags().Set("old-config", configFile); err != nil {
 		t.Fatalf("failed to set old-config flag")
 	}
@@ -447,7 +447,7 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 				constants.ClusterConfigurationKind,
 				constants.InitConfigurationKind,
 			},
-			cmdProc: NewCmdConfigPrintInitDefaults,
+			cmdProc: newCmdConfigPrintInitDefaults,
 		},
 		{
 			name: "InitConfiguration: KubeProxyConfiguration",
@@ -457,7 +457,7 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 				"KubeProxyConfiguration",
 			},
 			componentConfigs: "KubeProxyConfiguration",
-			cmdProc:          NewCmdConfigPrintInitDefaults,
+			cmdProc:          newCmdConfigPrintInitDefaults,
 		},
 		{
 			name: "InitConfiguration: KubeProxyConfiguration and KubeletConfiguration",
@@ -468,14 +468,14 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 				"KubeletConfiguration",
 			},
 			componentConfigs: "KubeProxyConfiguration,KubeletConfiguration",
-			cmdProc:          NewCmdConfigPrintInitDefaults,
+			cmdProc:          newCmdConfigPrintInitDefaults,
 		},
 		{
 			name: "JoinConfiguration: No component configs",
 			expectedKinds: []string{
 				constants.JoinConfigurationKind,
 			},
-			cmdProc: NewCmdConfigPrintJoinDefaults,
+			cmdProc: newCmdConfigPrintJoinDefaults,
 		},
 		{
 			name: "JoinConfiguration: KubeProxyConfiguration",
@@ -484,7 +484,7 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 				"KubeProxyConfiguration",
 			},
 			componentConfigs: "KubeProxyConfiguration",
-			cmdProc:          NewCmdConfigPrintJoinDefaults,
+			cmdProc:          newCmdConfigPrintJoinDefaults,
 		},
 		{
 			name: "JoinConfiguration: KubeProxyConfiguration and KubeletConfiguration",
@@ -494,7 +494,7 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 				"KubeletConfiguration",
 			},
 			componentConfigs: "KubeProxyConfiguration,KubeletConfiguration",
-			cmdProc:          NewCmdConfigPrintJoinDefaults,
+			cmdProc:          newCmdConfigPrintJoinDefaults,
 		},
 	}
 

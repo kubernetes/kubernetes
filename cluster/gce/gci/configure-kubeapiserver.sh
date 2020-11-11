@@ -14,25 +14,34 @@
 # limitations under the License.
 
 
-# Configures etcd related flags of kube-apiserver.
+# Configures etcd related parameters of kube-apiserver.
 function configure-etcd-params {
   local -n params_ref=$1
 
+  local host_ip="127.0.0.1"
+  # If etcd is configured to listen on host IP,
+  # host_ip is set to the primary internal IP of host VM.
+  if [[ ${ETCD_LISTEN_ON_HOST_IP:-} == "true" ]] ; then
+      host_ip="${HOST_PRIMARY_IP:-$(hostname -i)}"
+  fi
+
+  # Configure the main etcd.
   if [[ -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
-      params_ref+=" --etcd-servers=${ETCD_SERVERS:-https://127.0.0.1:2379}"
+      params_ref+=" --etcd-servers=${ETCD_SERVERS:-https://${host_ip}:2379}"
       params_ref+=" --etcd-cafile=${ETCD_APISERVER_CA_CERT_PATH}"
       params_ref+=" --etcd-certfile=${ETCD_APISERVER_CLIENT_CERT_PATH}"
       params_ref+=" --etcd-keyfile=${ETCD_APISERVER_CLIENT_KEY_PATH}"
   elif [[ -z "${ETCD_APISERVER_CA_KEY:-}" && -z "${ETCD_APISERVER_CA_CERT:-}" && -z "${ETCD_APISERVER_SERVER_KEY:-}" && -z "${ETCD_APISERVER_SERVER_CERT:-}" && -z "${ETCD_APISERVER_CLIENT_KEY:-}" && -z "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
-      params_ref+=" --etcd-servers=${ETCD_SERVERS:-http://127.0.0.1:2379}"
+      params_ref+=" --etcd-servers=${ETCD_SERVERS:-http://${host_ip}:2379}"
       echo "WARNING: ALL of ETCD_APISERVER_CA_KEY, ETCD_APISERVER_CA_CERT, ETCD_APISERVER_SERVER_KEY, ETCD_APISERVER_SERVER_CERT, ETCD_APISERVER_CLIENT_KEY and ETCD_APISERVER_CLIENT_CERT are missing, mTLS between etcd server and kube-apiserver is not enabled."
   else
       echo "ERROR: Some of ETCD_APISERVER_CA_KEY, ETCD_APISERVER_CA_CERT, ETCD_APISERVER_SERVER_KEY, ETCD_APISERVER_SERVER_CERT, ETCD_APISERVER_CLIENT_KEY and ETCD_APISERVER_CLIENT_CERT are missing, mTLS between etcd server and kube-apiserver cannot be enabled. Please provide all mTLS credential."
       exit 1
   fi
 
+  # Configure the event log etcd.
   if [[ -z "${ETCD_SERVERS:-}" ]]; then
-    params_ref+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-/events#http://127.0.0.1:4002}"
+    params_ref+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-/events#http://${host_ip}:4002}"
   elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
     params_ref+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
   fi
@@ -332,16 +341,18 @@ function start-kube-apiserver {
   local csc_config_volume=""
   local default_konnectivity_socket_vol=""
   local default_konnectivity_socket_mnt=""
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${PREPARE_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     # Create the EgressSelectorConfiguration yaml file to control the Egress Selector.
     csc_config_mount="{\"name\": \"cscconfigmount\",\"mountPath\": \"/etc/srv/kubernetes/egress_selector_configuration.yaml\", \"readOnly\": false},"
     csc_config_volume="{\"name\": \"cscconfigmount\",\"hostPath\": {\"path\": \"/etc/srv/kubernetes/egress_selector_configuration.yaml\", \"type\": \"FileOrCreate\"}},"
-    params+=" --egress-selector-config-file=/etc/srv/kubernetes/egress_selector_configuration.yaml"
 
     # UDS socket for communication between apiserver and konnectivity-server
-    local default_konnectivity_socket_path="/etc/srv/kubernetes/konnectivity"
+    local default_konnectivity_socket_path="/etc/srv/kubernetes/konnectivity-server"
     default_konnectivity_socket_vol="{ \"name\": \"konnectivity-socket\", \"hostPath\": {\"path\": \"${default_konnectivity_socket_path}\", \"type\": \"DirectoryOrCreate\"}},"
     default_konnectivity_socket_mnt="{ \"name\": \"konnectivity-socket\", \"mountPath\": \"${default_konnectivity_socket_path}\", \"readOnly\": false},"
+  fi
+  if [[ "${EGRESS_VIA_KONNECTIVITY:-false}" == "true" ]]; then
+    params+=" --egress-selector-config-file=/etc/srv/kubernetes/egress_selector_configuration.yaml"
   fi
 
   local container_env=""
@@ -362,6 +373,11 @@ function start-kube-apiserver {
 
   # params is passed by reference, so no "$"
   setup-etcd-encryption "${src_file}" params
+
+  local healthcheck_ip="127.0.0.1"
+  if [[ ${KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP:-} == "true" ]]; then
+    healthcheck_ip=$(hostname -i)
+  fi
 
   params="$(convert-manifest-params "${params}")"
   # Evaluate variables.
@@ -393,6 +409,7 @@ function start-kube-apiserver {
   sed -i -e "s@{{webhook_exec_auth_plugin_volume}}@${webhook_exec_auth_plugin_volume}@g" "${src_file}"
   sed -i -e "s@{{konnectivity_socket_mount}}@${default_konnectivity_socket_mnt}@g" "${src_file}"
   sed -i -e "s@{{konnectivity_socket_volume}}@${default_konnectivity_socket_vol}@g" "${src_file}"
+  sed -i -e "s@{{healthcheck_ip}}@${healthcheck_ip}@g" "${src_file}"
 
   cp "${src_file}" "${ETC_MANIFESTS:-/etc/kubernetes/manifests}"
 }

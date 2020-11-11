@@ -26,7 +26,6 @@ import (
 	policy "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
@@ -81,7 +80,7 @@ func initDisruptionController(t *testing.T, testCtx *testutils.TestContext) *dis
 // initTest initializes a test environment and creates master and scheduler with default
 // configuration.
 func initTest(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testutils.TestContext {
-	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestMaster(t, nsPrefix, nil), true, nil, time.Second, opts...)
+	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestMaster(t, nsPrefix, nil), nil, time.Second, opts...)
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx
@@ -101,7 +100,7 @@ func initTestDisablePreemption(t *testing.T, nsPrefix string) *testutils.TestCon
 		},
 	}
 	testCtx := testutils.InitTestSchedulerWithOptions(
-		t, testutils.InitTestMaster(t, nsPrefix, nil), true, nil,
+		t, testutils.InitTestMaster(t, nsPrefix, nil), nil,
 		time.Second, scheduler.WithProfiles(prof))
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
@@ -112,7 +111,7 @@ func initTestDisablePreemption(t *testing.T, nsPrefix string) *testutils.TestCon
 // to see is in the store. Used to observe reflected events.
 func waitForReflection(t *testing.T, nodeLister corelisters.NodeLister, key string,
 	passFunc func(n interface{}) bool) error {
-	nodes := []*v1.Node{}
+	var nodes []*v1.Node
 	err := wait.Poll(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
 		n, err := nodeLister.Get(key)
 
@@ -144,6 +143,9 @@ func createNode(cs clientset.Interface, node *v1.Node) (*v1.Node, error) {
 
 // createNodes creates `numNodes` nodes. The created node names will be in the
 // form of "`prefix`-X" where X is an ordinal.
+// DEPRECATED
+// use createAndWaitForNodesInCache instead, which ensures the created nodes
+// to be present in scheduler cache.
 func createNodes(cs clientset.Interface, prefix string, wrapper *st.NodeWrapper, numNodes int) ([]*v1.Node, error) {
 	nodes := make([]*v1.Node, numNodes)
 	for i := 0; i < numNodes; i++ {
@@ -155,6 +157,29 @@ func createNodes(cs clientset.Interface, prefix string, wrapper *st.NodeWrapper,
 		nodes[i] = node
 	}
 	return nodes[:], nil
+}
+
+// createAndWaitForNodesInCache calls createNodes(), and wait for the created
+// nodes to be present in scheduler cache.
+func createAndWaitForNodesInCache(testCtx *testutils.TestContext, prefix string, wrapper *st.NodeWrapper, numNodes int) ([]*v1.Node, error) {
+	existingNodes := testCtx.Scheduler.SchedulerCache.NodeCount()
+	nodes, err := createNodes(testCtx.ClientSet, prefix, wrapper, numNodes)
+	if err != nil {
+		return nodes, fmt.Errorf("cannot create nodes: %v", err)
+	}
+	return nodes, waitForNodesInCache(testCtx.Scheduler, numNodes+existingNodes)
+}
+
+// waitForNodesInCache ensures at least <nodeCount> nodes are present in scheduler cache
+// within 30 seconds; otherwise returns false.
+func waitForNodesInCache(sched *scheduler.Scheduler, nodeCount int) error {
+	err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		return sched.SchedulerCache.NodeCount() >= nodeCount, nil
+	})
+	if err != nil {
+		return fmt.Errorf("cannot obtain available nodes in scheduler cache: %v", err)
+	}
+	return nil
 }
 
 type pausePodConfig struct {
@@ -401,11 +426,11 @@ func waitForPDBsStable(testCtx *testutils.TestContext, pdbs []*policy.PodDisrupt
 // waitCachedPodsStable waits until scheduler cache has the given pods.
 func waitCachedPodsStable(testCtx *testutils.TestContext, pods []*v1.Pod) error {
 	return wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
-		cachedPods, err := testCtx.Scheduler.SchedulerCache.ListPods(labels.Everything())
+		cachedPods, err := testCtx.Scheduler.SchedulerCache.PodCount()
 		if err != nil {
 			return false, err
 		}
-		if len(pods) != len(cachedPods) {
+		if len(pods) != cachedPods {
 			return false, nil
 		}
 		for _, p := range pods {

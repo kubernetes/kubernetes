@@ -196,6 +196,7 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 	}
 	for i := range in.Spec.Template.Spec.EphemeralContainers {
 		a := &in.Spec.Template.Spec.EphemeralContainers[i]
+		v1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
 			v1.SetDefaults_ContainerPort(b)
@@ -410,6 +411,7 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 	}
 	for i := range in.Spec.Template.Spec.EphemeralContainers {
 		a := &in.Spec.Template.Spec.EphemeralContainers[i]
+		v1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
 			v1.SetDefaults_ContainerPort(b)

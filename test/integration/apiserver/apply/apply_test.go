@@ -45,7 +45,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -54,7 +54,7 @@ func setup(t testing.TB, groupVersions ...schema.GroupVersion) (*httptest.Server
 	opts.EtcdOptions.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
 	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(&opts)
 	if len(groupVersions) > 0 {
-		resourceConfig := master.DefaultAPIResourceConfigSource()
+		resourceConfig := controlplane.DefaultAPIResourceConfigSource()
 		resourceConfig.EnableVersions(groupVersions...)
 		masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 	}
@@ -686,11 +686,16 @@ func TestApplyManagedFields(t *testing.T) {
 		t.Fatalf("Failed to marshal object: %v", err)
 	}
 
+	selfLink := ""
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.RemoveSelfLink) {
+		selfLink = `
+			"selfLink": "` + accessor.GetSelfLink() + `",`
+	}
+
 	expected := []byte(`{
 		"metadata": {
 			"name": "test-cm",
-			"namespace": "default",
-			"selfLink": "` + accessor.GetSelfLink() + `",
+			"namespace": "default",` + selfLink + `
 			"uid": "` + string(accessor.GetUID()) + `",
 			"resourceVersion": "` + accessor.GetResourceVersion() + `",
 			"creationTimestamp": "` + accessor.GetCreationTimestamp().UTC().Format(time.RFC3339) + `",
@@ -1577,7 +1582,108 @@ func TestErrorsDontFailPatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to patch object with empty FieldsType: %v", err)
 	}
+}
 
+func TestApplyDoesNotChangeManagedFieldsViaSubresources(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	podBytes := []byte(`{
+		"apiVersion": "v1",
+		"kind": "Pod",
+		"metadata": {
+			"name": "just-a-pod"
+		},
+		"spec": {
+			"containers": [{
+				"name":  "test-container-a",
+				"image": "test-image-one"
+			}]
+		}
+	}`)
+
+	liveObj, err := client.CoreV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("pods").
+		Name("just-a-pod").
+		Body(podBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	updateBytes := []byte(`{
+		"metadata": {
+			"managedFields": [{
+				"manager":"testing",
+				"operation":"Update",
+				"apiVersion":"v1",
+				"fieldsType":"FieldsV1",
+				"fieldsV1":{
+					"f:spec":{
+						"f:containers":{
+							"k:{\"name\":\"testing\"}":{
+								".":{},
+								"f:image":{},
+								"f:name":{}
+							}
+						}
+					}
+				}
+			}]
+		},
+		"status": {
+			"conditions": [{"type": "MyStatus", "status":"true"}]
+		}
+	}`)
+
+	updateActor := "update_managedfields_test"
+	newObj, err := client.CoreV1().RESTClient().
+		Patch(types.MergePatchType).
+		Namespace("default").
+		Param("fieldManager", updateActor).
+		Name("just-a-pod").
+		Resource("pods").
+		SubResource("status").
+		Body(updateBytes).
+		Do(context.TODO()).
+		Get()
+
+	if err != nil {
+		t.Fatalf("Error updating subresource: %v ", err)
+	}
+
+	liveAccessor, err := meta.Accessor(liveObj)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor for live object: %v", err)
+	}
+	newAccessor, err := meta.Accessor(newObj)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor for new object: %v", err)
+	}
+
+	liveManagedFields := liveAccessor.GetManagedFields()
+	if len(liveManagedFields) != 1 {
+		t.Fatalf("Expected managedFields in the live object to have exactly one entry, got %d: %v", len(liveManagedFields), liveManagedFields)
+	}
+
+	newManagedFields := newAccessor.GetManagedFields()
+	if len(newManagedFields) != 2 {
+		t.Fatalf("Expected managedFields in the new object to have exactly two entries, got %d: %v", len(newManagedFields), newManagedFields)
+	}
+
+	if !reflect.DeepEqual(liveManagedFields[0], newManagedFields[0]) {
+		t.Fatalf("managedFields updated via subresource:\n\nlive managedFields: %v\nnew managedFields: %v\n\n", liveManagedFields, newManagedFields)
+	}
+
+	if newManagedFields[1].Manager != updateActor {
+		t.Fatalf(`Expected managerFields to have an entry with manager set to %q`, updateActor)
+	}
 }
 
 // TestClearManagedFieldsWithUpdateEmptyList verifies it's possible to clear the managedFields by sending an empty list.
@@ -1635,6 +1741,16 @@ func TestClearManagedFieldsWithUpdateEmptyList(t *testing.T) {
 		t.Fatalf("Failed to patch object: %v", err)
 	}
 
+	_, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
+		Namespace("default").
+		Resource("configmaps").
+		Name("test-cm").
+		Body([]byte(`{"metadata":{"labels": { "test-label": "v1" }}}`)).Do(context.TODO()).Get()
+
+	if err != nil {
+		t.Fatalf("Failed to patch object: %v", err)
+	}
+
 	object, err := client.CoreV1().RESTClient().Get().Namespace("default").Resource("configmaps").Name("test-cm").Do(context.TODO()).Get()
 	if err != nil {
 		t.Fatalf("Failed to retrieve object: %v", err)
@@ -1646,7 +1762,7 @@ func TestClearManagedFieldsWithUpdateEmptyList(t *testing.T) {
 	}
 
 	if managedFields := accessor.GetManagedFields(); len(managedFields) != 0 {
-		t.Fatalf("Failed to clear managedFields, got: %v", managedFields)
+		t.Fatalf("Failed to stop tracking managedFields, got: %v", managedFields)
 	}
 
 	if labels := accessor.GetLabels(); len(labels) < 1 {
@@ -2593,5 +2709,105 @@ spec:
 	}
 	if deploymentObj.Spec.Template.Spec.Containers[0].Image != "my-image-new" {
 		t.Fatalf("expected to get obj with image %s, but got %s", "my-image-new", deploymentObj.Spec.Template.Spec.Containers[0].Image)
+	}
+}
+
+func TestStopTrackingManagedFieldsOnFeatureDisabled(t *testing.T) {
+	sharedEtcd := framework.DefaultEtcdOptions()
+	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(&framework.MasterConfigOptions{
+		EtcdOptions: sharedEtcd,
+	})
+	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+	_, master, closeFn := framework.RunAMaster(masterConfig)
+	client, err := clientset.NewForConfig(&restclient.Config{Host: master.URL, QPS: -1})
+	if err != nil {
+		t.Fatalf("Error in create clientset: %v", err)
+	}
+
+	obj := []byte(`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: my-c
+        image: my-image
+`)
+
+	deployment, err := yamlutil.ToJSON(obj)
+	if err != nil {
+		t.Fatalf("Failed marshal yaml: %v", err)
+	}
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("my-deployment").
+		Param("fieldManager", "kubectl").
+		Body(deployment).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to apply object: %v", err)
+	}
+
+	deploymentObj, err := client.AppsV1().Deployments("default").Get(context.TODO(), "my-deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get object: %v", err)
+	}
+	if managed := deploymentObj.GetManagedFields(); managed == nil {
+		t.Errorf("object doesn't have managedFields")
+	}
+
+	// Restart server with server-side apply disabled
+	closeFn()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, false)()
+	_, master, closeFn = framework.RunAMaster(masterConfig)
+	client, err = clientset.NewForConfig(&restclient.Config{Host: master.URL, QPS: -1})
+	if err != nil {
+		t.Fatalf("Error in create clientset: %v", err)
+	}
+	defer closeFn()
+
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("my-deployment").
+		Param("fieldManager", "kubectl").
+		Body(deployment).
+		Do(context.TODO()).
+		Get()
+	if err == nil {
+		t.Errorf("expected to fail to apply object, but succeeded")
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("my-deployment").
+		Body([]byte(`{"metadata":{"labels": { "app": "v1" }}}`)).Do(context.TODO()).Get()
+	if err != nil {
+		t.Errorf("failed to update object: %v", err)
+	}
+
+	deploymentObj, err = client.AppsV1().Deployments("default").Get(context.TODO(), "my-deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get object: %v", err)
+	}
+	if managed := deploymentObj.GetManagedFields(); managed != nil {
+		t.Errorf("object has unexpected managedFields: %v", managed)
 	}
 }

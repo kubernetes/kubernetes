@@ -136,7 +136,7 @@ func BenchmarkSchedulingWaitForFirstConsumerPVs(b *testing.B) {
 	}
 	basePod := makeBasePod()
 	testStrategy := testutils.NewCreatePodWithPersistentVolumeWithFirstConsumerStrategy(gceVolumeFactory, basePod)
-	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
+	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelFailureDomainBetaZone, "zone1")
 	for _, test := range tests {
 		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
 		b.Run(name, func(b *testing.B) {
@@ -218,7 +218,7 @@ func BenchmarkSchedulingPodAffinity(b *testing.B) {
 	)
 	// The test strategy creates pods with affinity for each other.
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
-	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
+	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelFailureDomainBetaZone, "zone1")
 	for _, test := range defaultTests {
 		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
 		b.Run(name, func(b *testing.B) {
@@ -278,10 +278,10 @@ func BenchmarkSchedulingPreferredPodAntiAffinity(b *testing.B) {
 // NodeAffinity rules when the cluster has various quantities of nodes and
 // scheduled pods.
 func BenchmarkSchedulingNodeAffinity(b *testing.B) {
-	testBasePod := makeBasePodWithNodeAffinity(v1.LabelZoneFailureDomain, []string{"zone1", "zone2"})
+	testBasePod := makeBasePodWithNodeAffinity(v1.LabelFailureDomainBetaZone, []string{"zone1", "zone2"})
 	// The test strategy creates pods with node-affinity for each other.
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
-	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
+	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelFailureDomainBetaZone, "zone1")
 	for _, test := range defaultTests {
 		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
 		b.Run(name, func(b *testing.B) {
@@ -392,7 +392,7 @@ func makeBasePodWithPodAffinity(podLabels, affinityZoneLabels map[string]string)
 					LabelSelector: &metav1.LabelSelector{
 						MatchLabels: affinityZoneLabels,
 					},
-					TopologyKey: v1.LabelZoneFailureDomain,
+					TopologyKey: v1.LabelFailureDomainBetaZone,
 					Namespaces:  []string{testNamespace, setupNamespace},
 				},
 			},
@@ -448,7 +448,7 @@ func benchmarkScheduling(numExistingPods, minPods int,
 		clientset,
 		nodeStrategies,
 		"scheduler-perf-")
-	if err := nodePreparer.PrepareNodes(); err != nil {
+	if err := nodePreparer.PrepareNodes(0); err != nil {
 		klog.Fatalf("%v", err)
 	}
 	defer nodePreparer.CleanupNodes()
@@ -587,7 +587,7 @@ func gceVolumeFactory(id int) *v1.PersistentVolume {
 						{
 							MatchExpressions: []v1.NodeSelectorRequirement{
 								{
-									Key:      v1.LabelZoneFailureDomain,
+									Key:      v1.LabelFailureDomainBetaZone,
 									Operator: v1.NodeSelectorOpIn,
 									Values:   []string{"zone1"},
 								},

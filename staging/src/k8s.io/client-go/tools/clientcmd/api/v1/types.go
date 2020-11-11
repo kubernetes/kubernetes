@@ -214,6 +214,13 @@ type ExecConfig struct {
 	// present. For example, `brew install foo-cli` might be a good InstallHint for
 	// foo-cli on Mac OS systems.
 	InstallHint string `json:"installHint,omitempty"`
+
+	// ProvideClusterInfo determines whether or not to provide cluster information,
+	// which could potentially contain very large CA data, to this exec plugin as a
+	// part of the KUBERNETES_EXEC_INFO environment variable. By default, it is set
+	// to false. Package k8s.io/client-go/tools/auth/exec provides helper methods for
+	// reading this environment variable.
+	ProvideClusterInfo bool `json:"provideClusterInfo"`
 }
 
 // ExecEnvVar is used for setting environment variables when executing an exec-based

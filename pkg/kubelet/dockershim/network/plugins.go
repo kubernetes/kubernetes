@@ -382,17 +382,25 @@ func (pm *PluginManager) podUnlock(fullPodName string) {
 
 // recordOperation records operation and duration
 func recordOperation(operation string, start time.Time) {
+	metrics.NetworkPluginOperations.WithLabelValues(operation).Inc()
 	metrics.NetworkPluginOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInSeconds(start))
 }
 
+// recordError records errors for metric.
+func recordError(operation string) {
+	metrics.NetworkPluginOperationsErrors.WithLabelValues(operation).Inc()
+}
+
 func (pm *PluginManager) GetPodNetworkStatus(podNamespace, podName string, id kubecontainer.ContainerID) (*PodNetworkStatus, error) {
-	defer recordOperation("get_pod_network_status", time.Now())
+	const operation = "get_pod_network_status"
+	defer recordOperation(operation, time.Now())
 	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
 	pm.podLock(fullPodName).Lock()
 	defer pm.podUnlock(fullPodName)
 
 	netStatus, err := pm.plugin.GetPodNetworkStatus(podNamespace, podName, id)
 	if err != nil {
+		recordError(operation)
 		return nil, fmt.Errorf("networkPlugin %s failed on the status hook for pod %q: %v", pm.plugin.Name(), fullPodName, err)
 	}
 
@@ -400,13 +408,15 @@ func (pm *PluginManager) GetPodNetworkStatus(podNamespace, podName string, id ku
 }
 
 func (pm *PluginManager) SetUpPod(podNamespace, podName string, id kubecontainer.ContainerID, annotations, options map[string]string) error {
-	defer recordOperation("set_up_pod", time.Now())
+	const operation = "set_up_pod"
+	defer recordOperation(operation, time.Now())
 	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
 	pm.podLock(fullPodName).Lock()
 	defer pm.podUnlock(fullPodName)
 
 	klog.V(3).Infof("Calling network plugin %s to set up pod %q", pm.plugin.Name(), fullPodName)
 	if err := pm.plugin.SetUpPod(podNamespace, podName, id, annotations, options); err != nil {
+		recordError(operation)
 		return fmt.Errorf("networkPlugin %s failed to set up pod %q network: %v", pm.plugin.Name(), fullPodName, err)
 	}
 
@@ -414,13 +424,15 @@ func (pm *PluginManager) SetUpPod(podNamespace, podName string, id kubecontainer
 }
 
 func (pm *PluginManager) TearDownPod(podNamespace, podName string, id kubecontainer.ContainerID) error {
-	defer recordOperation("tear_down_pod", time.Now())
+	const operation = "tear_down_pod"
+	defer recordOperation(operation, time.Now())
 	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
 	pm.podLock(fullPodName).Lock()
 	defer pm.podUnlock(fullPodName)
 
 	klog.V(3).Infof("Calling network plugin %s to tear down pod %q", pm.plugin.Name(), fullPodName)
 	if err := pm.plugin.TearDownPod(podNamespace, podName, id); err != nil {
+		recordError(operation)
 		return fmt.Errorf("networkPlugin %s failed to teardown pod %q network: %v", pm.plugin.Name(), fullPodName, err)
 	}
 

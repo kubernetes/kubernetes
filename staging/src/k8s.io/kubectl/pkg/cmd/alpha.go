@@ -36,7 +36,7 @@ func NewCmdAlpha(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 
 	// Alpha commands should be added here. As features graduate from alpha they should move
 	// from here to the CommandGroups defined by NewKubeletCommand() in cmd.go.
-	cmd.AddCommand(debug.NewCmdDebug(f, streams))
+	cmd.AddCommand(debug.NewCmdDebug(f, streams, true))
 
 	// NewKubeletCommand() will hide the alpha command if it has no subcommands. Overriding
 	// the help function ensures a reasonable message if someone types the hidden command anyway.

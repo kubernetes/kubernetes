@@ -13,7 +13,6 @@ go_test(
         "helper_test.go",
     ],
     embed = [":go_default_library"],
-    deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
 
 go_library(

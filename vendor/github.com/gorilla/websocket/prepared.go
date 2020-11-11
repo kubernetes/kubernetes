@@ -73,8 +73,8 @@ func (pm *PreparedMessage) frame(key prepareKey) (int, []byte, error) {
 		// Prepare a frame using a 'fake' connection.
 		// TODO: Refactor code in conn.go to allow more direct construction of
 		// the frame.
-		mu := make(chan bool, 1)
-		mu <- true
+		mu := make(chan struct{}, 1)
+		mu <- struct{}{}
 		var nc prepareConn
 		c := &Conn{
 			conn:                   &nc,

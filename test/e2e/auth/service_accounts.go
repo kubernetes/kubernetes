@@ -41,6 +41,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	utilptr "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
 )
@@ -419,6 +420,59 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	})
 
 	/*
+	  Release : v1.20
+	  Testname: TokenRequestProjection should mount a projected volume with token using TokenRequest API.
+	  Description: Ensure that projected service account token is mounted.
+	*/
+	ginkgo.It("should mount projected service account token when requested", func() {
+
+		var (
+			podName         = "test-pod-" + string(uuid.NewUUID())
+			volumeName      = "test-volume"
+			volumeMountPath = "/test-volume"
+			tokenVolumePath = "/test-volume/token"
+		)
+
+		volumes := []v1.Volume{
+			{
+				Name: volumeName,
+				VolumeSource: v1.VolumeSource{
+					Projected: &v1.ProjectedVolumeSource{
+						Sources: []v1.VolumeProjection{
+							{
+								ServiceAccountToken: &v1.ServiceAccountTokenProjection{
+									Path:              "token",
+									ExpirationSeconds: utilptr.Int64Ptr(60 * 60),
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		volumeMounts := []v1.VolumeMount{
+			{
+				Name:      volumeName,
+				MountPath: volumeMountPath,
+				ReadOnly:  true,
+			},
+		}
+		mounttestArgs := []string{
+			"mounttest",
+			fmt.Sprintf("--file_content=%v", tokenVolumePath),
+		}
+
+		pod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, volumes, volumeMounts, nil, mounttestArgs...)
+		pod.Spec.RestartPolicy = v1.RestartPolicyNever
+
+		output := []string{
+			fmt.Sprintf("content of file \"%v\": %s", tokenVolumePath, `[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*`),
+		}
+
+		f.TestContainerOutputRegexp("service account token: ", pod, 0, output)
+	})
+
+	/*
 	   Testname: Projected service account token file ownership and permission.
 	   Description: Ensure that Projected Service Account Token is mounted with
 	               correct file ownership and permission mounted. We test the
@@ -431,61 +485,49 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	   Containers MUST verify that the projected service account token can be
 	   read and has correct file mode set including ownership and permission.
 	*/
-	ginkgo.It("should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly] [NodeFeature:FSGroup] [Feature:TokenRequestProjection]", func() {
+	ginkgo.It("should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly] [NodeFeature:FSGroup]", func() {
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		var (
 			podName         = "test-pod-" + string(uuid.NewUUID())
-			containerName   = "test-container"
 			volumeName      = "test-volume"
 			volumeMountPath = "/test-volume"
 			tokenVolumePath = "/test-volume/token"
-			int64p          = func(i int64) *int64 { return &i }
 		)
 
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: podName,
-			},
-			Spec: v1.PodSpec{
-				Volumes: []v1.Volume{
-					{
-						Name: volumeName,
-						VolumeSource: v1.VolumeSource{
-							Projected: &v1.ProjectedVolumeSource{
-								Sources: []v1.VolumeProjection{
-									{
-										ServiceAccountToken: &v1.ServiceAccountTokenProjection{
-											Path:              "token",
-											ExpirationSeconds: int64p(60 * 60),
-										},
-									},
+		volumes := []v1.Volume{
+			{
+				Name: volumeName,
+				VolumeSource: v1.VolumeSource{
+					Projected: &v1.ProjectedVolumeSource{
+						Sources: []v1.VolumeProjection{
+							{
+								ServiceAccountToken: &v1.ServiceAccountTokenProjection{
+									Path:              "token",
+									ExpirationSeconds: utilptr.Int64Ptr(60 * 60),
 								},
 							},
 						},
 					},
 				},
-				Containers: []v1.Container{
-					{
-						Name:  containerName,
-						Image: imageutils.GetE2EImage(imageutils.Agnhost),
-						Args: []string{
-							"mounttest",
-							fmt.Sprintf("--file_perm=%v", tokenVolumePath),
-							fmt.Sprintf("--file_owner=%v", tokenVolumePath),
-							fmt.Sprintf("--file_content=%v", tokenVolumePath),
-						},
-						VolumeMounts: []v1.VolumeMount{
-							{
-								Name:      volumeName,
-								MountPath: volumeMountPath,
-							},
-						},
-					},
-				},
-				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
+		volumeMounts := []v1.VolumeMount{
+			{
+				Name:      volumeName,
+				MountPath: volumeMountPath,
+				ReadOnly:  true,
+			},
+		}
+		mounttestArgs := []string{
+			"mounttest",
+			fmt.Sprintf("--file_perm=%v", tokenVolumePath),
+			fmt.Sprintf("--file_owner=%v", tokenVolumePath),
+			fmt.Sprintf("--file_content=%v", tokenVolumePath),
+		}
+
+		pod := e2epod.NewAgnhostPod(f.Namespace.Name, podName, volumes, volumeMounts, nil, mounttestArgs...)
+		pod.Spec.RestartPolicy = v1.RestartPolicyNever
 
 		testcases := []struct {
 			runAsUser bool
@@ -531,7 +573,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 			output := []string{
 				fmt.Sprintf("perms of file \"%v\": %s", tokenVolumePath, tc.wantPerm),
-				fmt.Sprintf("content of file \"%v\": %s", tokenVolumePath, ".+"),
+				fmt.Sprintf("content of file \"%v\": %s", tokenVolumePath, `[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*`),
 				fmt.Sprintf("owner UID of \"%v\": %d", tokenVolumePath, tc.wantUID),
 				fmt.Sprintf("owner GID of \"%v\": %d", tokenVolumePath, tc.wantGID),
 			}
@@ -539,21 +581,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 	})
 
-	ginkgo.It("should support InClusterConfig with token rotation [Slow] [Feature:TokenRequestProjection]", func() {
-		cfg, err := framework.LoadConfig()
-		framework.ExpectNoError(err)
-
-		if _, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), &v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "kube-root-ca.crt",
-			},
-			Data: map[string]string{
-				"ca.crt": string(cfg.TLSClientConfig.CAData),
-			},
-		}, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
-			framework.Failf("Unexpected err creating kube-ca-crt: %v", err)
-		}
-
+	ginkgo.It("should support InClusterConfig with token rotation [Slow]", func() {
 		tenMin := int64(10 * 60)
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "inclusterclient"},
@@ -613,7 +641,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				}},
 			},
 		}
-		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		framework.Logf("created pod")
@@ -631,7 +659,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				framework.Logf("Error pulling logs: %v", err)
 				return false, nil
 			}
-			tokenCount, err := parseInClusterClientLogs(logs)
+			tokenCount, err := ParseInClusterClientLogs(logs)
 			if err != nil {
 				return false, fmt.Errorf("inclusterclient reported an error: %v", err)
 			}
@@ -828,11 +856,75 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 		framework.ExpectEqual(eventFound, true, "failed to find %v event", watch.Deleted)
 	})
+
+	ginkgo.It("should guarantee kube-root-ca.crt exist in any namespace", func() {
+		const rootCAConfigMapName = "kube-root-ca.crt"
+
+		framework.ExpectNoError(wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+			_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), rootCAConfigMapName, metav1.GetOptions{})
+			if err == nil {
+				return true, nil
+			}
+			if apierrors.IsNotFound(err) {
+				ginkgo.By("root ca configmap not found, retrying")
+				return false, nil
+			}
+			return false, err
+		}))
+		framework.Logf("Got root ca configmap in namespace %q", f.Namespace.Name)
+
+		framework.ExpectNoError(f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), rootCAConfigMapName, metav1.DeleteOptions{GracePeriodSeconds: utilptr.Int64Ptr(0)}))
+		framework.Logf("Deleted root ca configmap in namespace %q", f.Namespace.Name)
+
+		framework.ExpectNoError(wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+			ginkgo.By("waiting for a new root ca configmap created")
+			_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), rootCAConfigMapName, metav1.GetOptions{})
+			if err == nil {
+				return true, nil
+			}
+			if apierrors.IsNotFound(err) {
+				ginkgo.By("root ca configmap not found, retrying")
+				return false, nil
+			}
+			return false, err
+		}))
+		framework.Logf("Recreated root ca configmap in namespace %q", f.Namespace.Name)
+
+		_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(context.TODO(), &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: rootCAConfigMapName,
+			},
+			Data: map[string]string{
+				"ca.crt": "",
+			},
+		}, metav1.UpdateOptions{})
+		framework.ExpectNoError(err)
+		framework.Logf("Updated root ca configmap in namespace %q", f.Namespace.Name)
+
+		framework.ExpectNoError(wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+			ginkgo.By("waiting for the root ca configmap reconciled")
+			cm, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(context.TODO(), rootCAConfigMapName, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					ginkgo.By("root ca configmap not found, retrying")
+					return false, nil
+				}
+				return false, err
+			}
+			if value, ok := cm.Data["ca.crt"]; !ok || value == "" {
+				ginkgo.By("root ca configmap is not reconciled yet, retrying")
+				return false, nil
+			}
+			return true, nil
+		}))
+		framework.Logf("Reconciled root ca configmap in namespace %q", f.Namespace.Name)
+	})
 })
 
 var reportLogsParser = regexp.MustCompile("([a-zA-Z0-9-_]*)=([a-zA-Z0-9-_]*)$")
 
-func parseInClusterClientLogs(logs string) (int, error) {
+// ParseInClusterClientLogs parses logs of pods using inclusterclient.
+func ParseInClusterClientLogs(logs string) (int, error) {
 	seenTokens := map[string]struct{}{}
 
 	lines := strings.Split(logs, "\n")

@@ -193,9 +193,6 @@ func waitForDaemonSets(c clientset.Interface, ns string, allowedNotReadyNodes in
 		dsList, err := c.AppsV1().DaemonSets(ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			framework.Logf("Error getting daemonsets in namespace: '%s': %v", ns, err)
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		var notReadyDaemonSets []string

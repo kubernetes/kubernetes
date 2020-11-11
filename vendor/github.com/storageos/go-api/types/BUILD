@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "auth.go",
         "capacity_stats.go",
+        "cluster.go",
         "connectivity.go",
         "delete_options.go",
         "deployment.go",
@@ -12,6 +13,7 @@ go_library(
         "error_response.go",
         "events.go",
         "health.go",
+        "licence.go",
         "list_options.go",
         "logger.go",
         "namespace.go",

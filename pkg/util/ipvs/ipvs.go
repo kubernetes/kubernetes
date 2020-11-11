@@ -69,8 +69,6 @@ const (
 	FlagPersistent = 0x1
 	// FlagHashed specify IPVS service hash flag
 	FlagHashed = 0x2
-	// IPVSProxyMode is match set up cluster with ipvs proxy model
-	IPVSProxyMode = "ipvs"
 )
 
 // IPVS required kernel modules.

@@ -18,8 +18,8 @@ package testing
 
 import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // NewFramework creates a Framework from the register functions and options.
@@ -50,6 +50,21 @@ func RegisterPreFilterPlugin(pluginName string, pluginNewFunc runtime.PluginFact
 // RegisterFilterPlugin returns a function to register a Filter Plugin to a given registry.
 func RegisterFilterPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
 	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Filter")
+}
+
+// RegisterReservePlugin returns a function to register a Reserve Plugin to a given registry.
+func RegisterReservePlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Reserve")
+}
+
+// RegisterPermitPlugin returns a function to register a Permit Plugin to a given registry.
+func RegisterPermitPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "Permit")
+}
+
+// RegisterPreBindPlugin returns a function to register a PreBind Plugin to a given registry.
+func RegisterPreBindPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
+	return RegisterPluginAsExtensions(pluginName, pluginNewFunc, "PreBind")
 }
 
 // RegisterScorePlugin returns a function to register a Score Plugin to a given registry.

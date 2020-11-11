@@ -57,7 +57,7 @@ func TestAddGlobalFlags(t *testing.T) {
 	}{
 		{
 			// Happy case
-			expectedFlag:  []string{"add-dir-header", "alsologtostderr", "help", "log-backtrace-at", "log-dir", "log-file", "log-file-max-size", "log-flush-frequency", "logtostderr", "skip-headers", "skip-log-headers", "stderrthreshold", "v", "vmodule"},
+			expectedFlag:  []string{"add-dir-header", "alsologtostderr", "help", "log-backtrace-at", "log-dir", "log-file", "log-file-max-size", "log-flush-frequency", "logtostderr", "one-output", "skip-headers", "skip-log-headers", "stderrthreshold", "v", "vmodule"},
 			matchExpected: false,
 		},
 		{

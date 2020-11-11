@@ -54,8 +54,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
-// NewCmdToken returns cobra.Command for token management
-func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
+// newCmdToken returns cobra.Command for token management
+func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	var kubeConfigFile string
 	var dryRun bool
 	tokenCmd := &cobra.Command{
@@ -149,7 +149,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	bto.AddDescriptionFlag(createCmd.Flags())
 
 	tokenCmd.AddCommand(createCmd)
-	tokenCmd.AddCommand(NewCmdTokenGenerate(out))
+	tokenCmd.AddCommand(newCmdTokenGenerate(out))
 
 	outputFlags := output.NewOutputFlags(&tokenTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(output.TextOutput)
 
@@ -208,8 +208,8 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	return tokenCmd
 }
 
-// NewCmdTokenGenerate returns cobra.Command to generate new token
-func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
+// newCmdTokenGenerate returns cobra.Command to generate new token
+func newCmdTokenGenerate(out io.Writer) *cobra.Command {
 	return &cobra.Command{
 		Use:   "generate",
 		Short: "Generate and print a bootstrap token, but do not create it on the server",
@@ -420,13 +420,13 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 	for _, tokenIDOrToken := range tokenIDsOrTokens {
 		// Assume this is a token id and try to parse it
 		tokenID := tokenIDOrToken
-		klog.V(1).Infof("[token] parsing token %q", tokenIDOrToken)
+		klog.V(1).Info("[token] parsing token")
 		if !bootstraputil.IsValidBootstrapTokenID(tokenIDOrToken) {
 			// Okay, the full token with both id and secret was probably passed. Parse it and extract the ID only
 			bts, err := kubeadmapiv1beta2.NewBootstrapTokenString(tokenIDOrToken)
 			if err != nil {
-				return errors.Errorf("given token %q didn't match pattern %q or %q",
-					tokenIDOrToken, bootstrapapi.BootstrapTokenIDPattern, bootstrapapi.BootstrapTokenIDPattern)
+				return errors.Errorf("given token didn't match pattern %q or %q",
+					bootstrapapi.BootstrapTokenIDPattern, bootstrapapi.BootstrapTokenIDPattern)
 			}
 			tokenID = bts.ID
 		}

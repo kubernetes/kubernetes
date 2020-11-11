@@ -1,14 +1,12 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- abrarshivani
 - baludontu
 - divyenpatel
 - frapposelli
 - dougm
 - SandeepPissay
 reviewers:
-- abrarshivani
 - baludontu
 - divyenpatel
 - frapposelli
@@ -16,3 +14,4 @@ reviewers:
 - SandeepPissay
 emeritus_approvers:
 - imkin
+- abrarshivani

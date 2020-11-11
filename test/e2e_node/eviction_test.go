@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -51,7 +51,7 @@ import (
 const (
 	postTestConditionMonitoringPeriod = 1 * time.Minute
 	evictionPollInterval              = 2 * time.Second
-	pressureDissapearTimeout          = 1 * time.Minute
+	pressureDisappearTimeout          = 1 * time.Minute
 	// pressure conditions often surface after evictions because the kubelet only updates
 	// node conditions periodically.
 	// we wait this period after evictions to make sure that we wait out this delay
@@ -464,7 +464,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			// Nodes do not immediately report local storage capacity
 			// Sleep so that pods requesting local storage do not fail to schedule
 			time.Sleep(30 * time.Second)
-			ginkgo.By("seting up pods to be used by tests")
+			ginkgo.By("setting up pods to be used by tests")
 			pods := []*v1.Pod{}
 			for _, spec := range testSpecs {
 				pods = append(pods, spec.pod)
@@ -507,15 +507,15 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				logFunc()
 				logKubeletLatencyMetrics(kubeletmetrics.EvictionStatsAgeKey)
 				if expectedNodeCondition != noPressure && hasNodeCondition(f, expectedNodeCondition) {
-					return fmt.Errorf("Conditions havent returned to normal, node still has %s", expectedNodeCondition)
+					return fmt.Errorf("Conditions haven't returned to normal, node still has %s", expectedNodeCondition)
 				}
 				return nil
-			}, pressureDissapearTimeout, evictionPollInterval).Should(gomega.BeNil())
+			}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.BeNil())
 
 			ginkgo.By("checking for stable, pressure-free condition without unexpected pod failures")
 			gomega.Consistently(func() error {
 				if expectedNodeCondition != noPressure && hasNodeCondition(f, expectedNodeCondition) {
-					return fmt.Errorf("%s dissappeared and then reappeared", expectedNodeCondition)
+					return fmt.Errorf("%s disappeared and then reappeared", expectedNodeCondition)
 				}
 				logFunc()
 				logKubeletLatencyMetrics(kubeletmetrics.EvictionStatsAgeKey)
@@ -548,10 +548,10 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			ginkgo.By(fmt.Sprintf("making sure NodeCondition %s no longer exist on the node", expectedNodeCondition))
 			gomega.Eventually(func() error {
 				if expectedNodeCondition != noPressure && hasNodeCondition(f, expectedNodeCondition) {
-					return fmt.Errorf("Conditions havent returned to normal, node still has %s", expectedNodeCondition)
+					return fmt.Errorf("Conditions haven't returned to normal, node still has %s", expectedNodeCondition)
 				}
 				return nil
-			}, pressureDissapearTimeout, evictionPollInterval).Should(gomega.BeNil())
+			}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.BeNil())
 
 			reduceAllocatableMemoryUsage()
 			ginkgo.By("making sure we have all the required images for testing")

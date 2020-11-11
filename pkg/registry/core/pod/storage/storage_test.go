@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -251,7 +252,7 @@ func TestCreateSetsFields(t *testing.T) {
 
 func TestResourceLocation(t *testing.T) {
 	expectedIP := "1.2.3.4"
-	expectedIP6 := "2001:db8::"
+	expectedIP6 := "fd00:10:244:0:2::6b"
 	testCases := []struct {
 		pod      api.Pod
 		query    string
@@ -285,6 +286,19 @@ func TestResourceLocation(t *testing.T) {
 			},
 			query:    "foo",
 			location: expectedIP,
+		},
+		{
+			pod: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "ctr"},
+					},
+				},
+				Status: api.PodStatus{PodIPs: []api.PodIP{{IP: expectedIP6}}},
+			},
+			query:    "foo",
+			location: "[" + expectedIP6 + "]",
 		},
 		{
 			pod: api.Pod{
@@ -354,6 +368,20 @@ func TestResourceLocation(t *testing.T) {
 			query:    "foo",
 			location: expectedIP + ":9376",
 		},
+		{
+			pod: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "ctr1", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
+						{Name: "ctr2", Ports: []api.ContainerPort{{ContainerPort: 1234}}},
+					},
+				},
+				Status: api.PodStatus{PodIPs: []api.PodIP{{IP: expectedIP6}, {IP: expectedIP}}},
+			},
+			query:    "foo",
+			location: "[" + expectedIP6 + "]:9376",
+		},
 	}
 
 	ctx := genericapirequest.NewDefaultContext()
@@ -379,6 +407,10 @@ func TestResourceLocation(t *testing.T) {
 		if location.Host != tc.location {
 			t.Errorf("Expected %v, but got %v", tc.location, location.Host)
 		}
+		if _, err := url.Parse(location.String()); err != nil {
+			t.Errorf("could not parse returned location %s: %v", location.String(), err)
+		}
+
 		server.Terminate(t)
 	}
 }

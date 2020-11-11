@@ -1,5 +1,6 @@
 # CHANGELOGs
 
+- [CHANGELOG-1.20.md](./CHANGELOG-1.20.md)
 - [CHANGELOG-1.19.md](./CHANGELOG-1.19.md)
 - [CHANGELOG-1.18.md](./CHANGELOG-1.18.md)
 - [CHANGELOG-1.17.md](./CHANGELOG-1.17.md)
@@ -18,5 +19,3 @@
 - [CHANGELOG-1.4.md](./CHANGELOG-1.4.md)
 - [CHANGELOG-1.3.md](./CHANGELOG-1.3.md)
 - [CHANGELOG-1.2.md](./CHANGELOG-1.2.md)
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/CHANGELOG.md?pixel)]()

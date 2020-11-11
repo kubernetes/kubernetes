@@ -57,7 +57,7 @@ const (
 type Setter func(node *v1.Node) error
 
 // NodeAddress returns a Setter that updates address-related information on the node.
-func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
+func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 	validateNodeIPFunc func(net.IP) error, // typically Kubelet.nodeIPValidator
 	hostname string, // typically Kubelet.hostname
 	hostnameOverridden bool, // was the hostname force set?
@@ -65,9 +65,18 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 	cloud cloudprovider.Interface, // typically Kubelet.cloud
 	nodeAddressesFunc func() ([]v1.NodeAddress, error), // typically Kubelet.cloudResourceSyncManager.NodeAddresses
 ) Setter {
+	var nodeIP, secondaryNodeIP net.IP
+	if len(nodeIPs) > 0 {
+		nodeIP = nodeIPs[0]
+	}
 	preferIPv4 := nodeIP == nil || nodeIP.To4() != nil
 	isPreferredIPFamily := func(ip net.IP) bool { return (ip.To4() != nil) == preferIPv4 }
 	nodeIPSpecified := nodeIP != nil && !nodeIP.IsUnspecified()
+
+	if len(nodeIPs) > 1 {
+		secondaryNodeIP = nodeIPs[1]
+	}
+	secondaryNodeIPSpecified := secondaryNodeIP != nil && !secondaryNodeIP.IsUnspecified()
 
 	return func(node *v1.Node) error {
 		if nodeIPSpecified {
@@ -75,6 +84,12 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 				return fmt.Errorf("failed to validate nodeIP: %v", err)
 			}
 			klog.V(2).Infof("Using node IP: %q", nodeIP.String())
+		}
+		if secondaryNodeIPSpecified {
+			if err := validateNodeIPFunc(secondaryNodeIP); err != nil {
+				return fmt.Errorf("failed to validate secondaryNodeIP: %v", err)
+			}
+			klog.V(2).Infof("Using secondary node IP: %q", secondaryNodeIP.String())
 		}
 
 		if externalCloudProvider {
@@ -185,6 +200,12 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 				}
 			}
 			node.Status.Addresses = nodeAddresses
+		} else if nodeIPSpecified && secondaryNodeIPSpecified {
+			node.Status.Addresses = []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: nodeIP.String()},
+				{Type: v1.NodeInternalIP, Address: secondaryNodeIP.String()},
+				{Type: v1.NodeHostName, Address: hostname},
+			}
 		} else {
 			var ipAddr net.IP
 			var err error
