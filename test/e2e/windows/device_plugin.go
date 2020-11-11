@@ -89,6 +89,12 @@ var _ = SIGDescribe("Device Plugin", func() {
 										MountPath: mountPath,
 									},
 								},
+								Env: []v1.EnvVar{
+									{
+										Name: "DIRECTX_GPU_MATCH_NAME",
+										Value: " ",
+									},
+								},
 							},
 						},
 						Volumes: []v1.Volume{
