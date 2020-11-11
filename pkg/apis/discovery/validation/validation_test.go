@@ -596,22 +596,22 @@ func TestValidateEndpointSliceUpdate(t *testing.T) {
 	testCases := map[string]struct {
 		expectedErrors      int
 		nodeNameGateEnabled bool
-		newEndpointSlice    *discovery.EndpointSlice
 		oldEndpointSlice    *discovery.EndpointSlice
+		newEndpointSlice    *discovery.EndpointSlice
 	}{
 		"valid and identical slices": {
-			newEndpointSlice: &discovery.EndpointSlice{
+			oldEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv6,
 			},
-			oldEndpointSlice: &discovery.EndpointSlice{
+			newEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv6,
 			},
 			expectedErrors: 0,
 		},
 		"node name set before + after, gate disabled": {
-			newEndpointSlice: &discovery.EndpointSlice{
+			oldEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
 				Endpoints: []discovery.Endpoint{{
@@ -619,7 +619,7 @@ func TestValidateEndpointSliceUpdate(t *testing.T) {
 					NodeName:  utilpointer.StringPtr("foo"),
 				}},
 			},
-			oldEndpointSlice: &discovery.EndpointSlice{
+			newEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
 				Endpoints: []discovery.Endpoint{{
@@ -631,14 +631,14 @@ func TestValidateEndpointSliceUpdate(t *testing.T) {
 		},
 		"node name set after, gate enabled": {
 			nodeNameGateEnabled: true,
-			newEndpointSlice: &discovery.EndpointSlice{
+			oldEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
 				Endpoints: []discovery.Endpoint{{
 					Addresses: []string{"10.1.2.3"},
 				}},
 			},
-			oldEndpointSlice: &discovery.EndpointSlice{
+			newEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
 				Endpoints: []discovery.Endpoint{{
@@ -652,6 +652,13 @@ func TestValidateEndpointSliceUpdate(t *testing.T) {
 		// expected errors
 		"invalide node name set after, gate enabled": {
 			nodeNameGateEnabled: true,
+			oldEndpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"10.1.2.3"},
+				}},
+			},
 			newEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
@@ -660,25 +667,18 @@ func TestValidateEndpointSliceUpdate(t *testing.T) {
 					NodeName:  utilpointer.StringPtr("INVALID foo"),
 				}},
 			},
-			oldEndpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressTypeIPv4,
-				Endpoints: []discovery.Endpoint{{
-					Addresses: []string{"10.1.2.3"},
-				}},
-			},
 			expectedErrors: 1,
 		},
 		"node name set after, gate disabled": {
 			nodeNameGateEnabled: false,
-			newEndpointSlice: &discovery.EndpointSlice{
+			oldEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
 				Endpoints: []discovery.Endpoint{{
 					Addresses: []string{"10.1.2.3"},
 				}},
 			},
-			oldEndpointSlice: &discovery.EndpointSlice{
+			newEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
 				Endpoints: []discovery.Endpoint{{
@@ -686,31 +686,35 @@ func TestValidateEndpointSliceUpdate(t *testing.T) {
 					NodeName:  utilpointer.StringPtr("foo"),
 				}},
 			},
-			expectedErrors: 0,
+			expectedErrors: 1,
 		},
 		"deprecated address type": {
 			expectedErrors: 1,
-			newEndpointSlice: &discovery.EndpointSlice{
+			oldEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressType("IP"),
 			},
-			oldEndpointSlice: &discovery.EndpointSlice{
+			newEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressType("IP"),
 			},
 		},
 		"valid and identical slices with different address types": {
-			newEndpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressTypeIPv4,
-			},
 			oldEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressType("other"),
 			},
+			newEndpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+			},
 			expectedErrors: 1,
 		},
 		"invalid slices with valid address types": {
+			oldEndpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+			},
 			newEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
@@ -718,10 +722,6 @@ func TestValidateEndpointSliceUpdate(t *testing.T) {
 					Name:     utilpointer.StringPtr(""),
 					Protocol: protocolPtr(api.Protocol("invalid")),
 				}},
-			},
-			oldEndpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressTypeIPv4,
 			},
 			expectedErrors: 1,
 		},
