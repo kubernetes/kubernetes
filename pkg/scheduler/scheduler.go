@@ -379,9 +379,8 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 // The precedence for binding is: (1) extenders and (2) framework plugins.
 // We expect this to run asynchronously, so we handle binding metrics internally.
 func (sched *Scheduler) bind(ctx context.Context, fwk framework.Framework, assumed *v1.Pod, targetNode string, state *framework.CycleState) (err error) {
-	start := time.Now()
 	defer func() {
-		sched.finishBinding(fwk, assumed, targetNode, start, err)
+		sched.finishBinding(fwk, assumed, targetNode, err)
 	}()
 
 	bound, err := sched.extendersBinding(assumed, targetNode)
@@ -412,7 +411,7 @@ func (sched *Scheduler) extendersBinding(pod *v1.Pod, node string) (bool, error)
 	return false, nil
 }
 
-func (sched *Scheduler) finishBinding(fwk framework.Framework, assumed *v1.Pod, targetNode string, start time.Time, err error) {
+func (sched *Scheduler) finishBinding(fwk framework.Framework, assumed *v1.Pod, targetNode string, err error) {
 	if finErr := sched.SchedulerCache.FinishBinding(assumed); finErr != nil {
 		klog.Errorf("scheduler cache FinishBinding failed: %v", finErr)
 	}
@@ -421,7 +420,6 @@ func (sched *Scheduler) finishBinding(fwk framework.Framework, assumed *v1.Pod, 
 		return
 	}
 
-	metrics.DeprecatedBindingLatency.Observe(metrics.SinceInSeconds(start))
 	fwk.EventRecorder().Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
 }
 
