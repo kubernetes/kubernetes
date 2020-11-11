@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "conflict.go",
         "update.go",
+        "wipe_fields.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/structured-merge-diff/v4/merge",
     importpath = "sigs.k8s.io/structured-merge-diff/v4/merge",
