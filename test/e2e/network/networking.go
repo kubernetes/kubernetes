@@ -508,18 +508,6 @@ var _ = SIGDescribe("Networking", func() {
 
 	})
 
-	// Once basic tests checking for the sctp module not to be loaded are implemented, this
-	// needs to be marked as [Disruptive]
-	ginkgo.It("should function for pod-pod: sctp [Feature:SCTPConnectivity][Disruptive]", func() {
-		config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
-		ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterSCTPPort))
-		message := "hello"
-		err := config.DialEchoFromTestContainer("sctp", config.TestContainerPod.Status.PodIP, e2enetwork.EndpointSCTPPort, config.MaxTries, 0, message)
-		if err != nil {
-			framework.Failf("failed dialing endpoint, %v", err)
-		}
-	})
-
 	ginkgo.It("should recreate its iptables rules if they are deleted [Disruptive]", func() {
 		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		e2eskipper.SkipUnlessSSHKeyPresent()
