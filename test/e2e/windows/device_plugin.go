@@ -46,7 +46,7 @@ var _ = SIGDescribe("Device Plugin", func() {
 		ginkgo.By("creating Windows device plugin daemonset")
 		dsName := "directx-device-plugin"
 		daemonsetNameLabel := "daemonset-name"
-		image := "k8sprow.azurecr.io/kubernetes-e2e-test-images/k8s-directx-device-plugin:1.0-1809"
+		image := "e2eteam/k8s-directx-device-plugin:1.0-1809"
 		mountName := "device-plugin"
 		mountPath := "/var/lib/kubelet/device-plugins"
 		privileged := true
