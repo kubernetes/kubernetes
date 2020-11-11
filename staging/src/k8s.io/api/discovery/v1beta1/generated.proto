@@ -67,8 +67,14 @@ message Endpoint {
   //   endpoint is located. This should match the corresponding node label.
   // * topology.kubernetes.io/region: the value indicates the region where the
   //   endpoint is located. This should match the corresponding node label.
+  // this field will be deprecated in an upcoming release.
   // +optional
   map<string, string> topology = 5;
+
+  // nodeName represents the name of the Node hosting this endpoint. This can
+  // be used to determine endpoints local to a Node.
+  // +optional
+  optional string nodeName = 6;
 }
 
 // EndpointConditions represents the current condition of an endpoint.

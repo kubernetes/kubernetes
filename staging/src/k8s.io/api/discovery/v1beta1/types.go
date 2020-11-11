@@ -60,12 +60,6 @@ type EndpointSlice struct {
 type AddressType string
 
 const (
-	// AddressTypeIP represents an IP Address.
-	// This address type has been deprecated and has been replaced by the IPv4
-	// and IPv6 adddress types. New resources with this address type will be
-	// considered invalid. This will be fully removed in 1.18.
-	// +deprecated
-	AddressTypeIP = AddressType("IP")
 	// AddressTypeIPv4 represents an IPv4 Address.
 	AddressTypeIPv4 = AddressType(v1.IPv4Protocol)
 	// AddressTypeIPv6 represents an IPv6 Address.
@@ -108,8 +102,13 @@ type Endpoint struct {
 	//   endpoint is located. This should match the corresponding node label.
 	// * topology.kubernetes.io/region: the value indicates the region where the
 	//   endpoint is located. This should match the corresponding node label.
+	// this field will be deprecated in an upcoming release.
 	// +optional
 	Topology map[string]string `json:"topology,omitempty" protobuf:"bytes,5,opt,name=topology"`
+	// nodeName represents the name of the Node hosting this endpoint. This can
+	// be used to determine endpoints local to a Node.
+	// +optional
+	NodeName *string `json:"nodeName,omitempty" protobuf:"bytes,6,opt,name=nodeName"`
 }
 
 // EndpointConditions represents the current condition of an endpoint.

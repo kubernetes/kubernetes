@@ -51,6 +51,11 @@ func (in *Endpoint) DeepCopyInto(out *Endpoint) {
 			(*out)[key] = val
 		}
 	}
+	if in.NodeName != nil {
+		in, out := &in.NodeName, &out.NodeName
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 
