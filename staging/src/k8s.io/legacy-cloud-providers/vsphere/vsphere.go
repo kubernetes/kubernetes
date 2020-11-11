@@ -766,11 +766,14 @@ func (vs *VSphere) InstanceExistsByProviderID(ctx context.Context, providerID st
 		return false, err
 	}
 	_, err = vs.InstanceID(ctx, convertToK8sType(nodeName))
-	if err == nil {
-		return true, nil
+	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			return false, nil
+		}
+		return false, err
 	}
 
-	return false, err
+	return true, nil
 }
 
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
@@ -832,15 +835,17 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 			klog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
 			return "", err
 		}
-		isActive, err := vm.IsActive(ctx)
+
+		exists, err := vm.Exists(ctx)
 		if err != nil {
-			klog.Errorf("Failed to check whether node %q is active. err: %+v.", convertToString(nodeName), err)
+			klog.Errorf("Failed to check whether node %q still exists. err: %+v.", convertToString(nodeName), err)
 			return "", err
 		}
-		if isActive {
+		if exists {
 			return vs.vmUUID, nil
 		}
-		klog.Warningf("The VM: %s is not in %s state", convertToString(nodeName), vclib.ActivePowerState)
+
+		klog.Warningf("The VM: %s doesn't exist", convertToString(nodeName))
 		return "", cloudprovider.InstanceNotFound
 	}
 
