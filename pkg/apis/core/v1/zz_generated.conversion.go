@@ -2879,15 +2879,7 @@ func autoConvert_v1_Container_To_core_Container(in *v1.Container, out *core.Cont
 	out.TerminationMessagePath = in.TerminationMessagePath
 	out.TerminationMessagePolicy = core.TerminationMessagePolicy(in.TerminationMessagePolicy)
 	out.ImagePullPolicy = core.PullPolicy(in.ImagePullPolicy)
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(core.SecurityContext)
-		if err := Convert_v1_SecurityContext_To_core_SecurityContext(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.SecurityContext = nil
-	}
+	out.SecurityContext = (*core.SecurityContext)(unsafe.Pointer(in.SecurityContext))
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
@@ -2920,15 +2912,7 @@ func autoConvert_core_Container_To_v1_Container(in *core.Container, out *v1.Cont
 	out.TerminationMessagePath = in.TerminationMessagePath
 	out.TerminationMessagePolicy = v1.TerminationMessagePolicy(in.TerminationMessagePolicy)
 	out.ImagePullPolicy = v1.PullPolicy(in.ImagePullPolicy)
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(v1.SecurityContext)
-		if err := Convert_core_SecurityContext_To_v1_SecurityContext(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.SecurityContext = nil
-	}
+	out.SecurityContext = (*v1.SecurityContext)(unsafe.Pointer(in.SecurityContext))
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
@@ -3483,15 +3467,7 @@ func autoConvert_v1_EphemeralContainerCommon_To_core_EphemeralContainerCommon(in
 	out.TerminationMessagePath = in.TerminationMessagePath
 	out.TerminationMessagePolicy = core.TerminationMessagePolicy(in.TerminationMessagePolicy)
 	out.ImagePullPolicy = core.PullPolicy(in.ImagePullPolicy)
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(core.SecurityContext)
-		if err := Convert_v1_SecurityContext_To_core_SecurityContext(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.SecurityContext = nil
-	}
+	out.SecurityContext = (*core.SecurityContext)(unsafe.Pointer(in.SecurityContext))
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
@@ -3524,15 +3500,7 @@ func autoConvert_core_EphemeralContainerCommon_To_v1_EphemeralContainerCommon(in
 	out.TerminationMessagePath = in.TerminationMessagePath
 	out.TerminationMessagePolicy = v1.TerminationMessagePolicy(in.TerminationMessagePolicy)
 	out.ImagePullPolicy = v1.PullPolicy(in.ImagePullPolicy)
-	if in.SecurityContext != nil {
-		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(v1.SecurityContext)
-		if err := Convert_core_SecurityContext_To_v1_SecurityContext(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.SecurityContext = nil
-	}
+	out.SecurityContext = (*v1.SecurityContext)(unsafe.Pointer(in.SecurityContext))
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
@@ -3546,17 +3514,7 @@ func Convert_core_EphemeralContainerCommon_To_v1_EphemeralContainerCommon(in *co
 
 func autoConvert_v1_EphemeralContainers_To_core_EphemeralContainers(in *v1.EphemeralContainers, out *core.EphemeralContainers, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if in.EphemeralContainers != nil {
-		in, out := &in.EphemeralContainers, &out.EphemeralContainers
-		*out = make([]core.EphemeralContainer, len(*in))
-		for i := range *in {
-			if err := Convert_v1_EphemeralContainer_To_core_EphemeralContainer(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.EphemeralContainers = nil
-	}
+	out.EphemeralContainers = *(*[]core.EphemeralContainer)(unsafe.Pointer(&in.EphemeralContainers))
 	return nil
 }
 
@@ -3567,17 +3525,7 @@ func Convert_v1_EphemeralContainers_To_core_EphemeralContainers(in *v1.Ephemeral
 
 func autoConvert_core_EphemeralContainers_To_v1_EphemeralContainers(in *core.EphemeralContainers, out *v1.EphemeralContainers, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if in.EphemeralContainers != nil {
-		in, out := &in.EphemeralContainers, &out.EphemeralContainers
-		*out = make([]v1.EphemeralContainer, len(*in))
-		for i := range *in {
-			if err := Convert_core_EphemeralContainer_To_v1_EphemeralContainer(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.EphemeralContainers = nil
-	}
+	out.EphemeralContainers = *(*[]v1.EphemeralContainer)(unsafe.Pointer(&in.EphemeralContainers))
 	return nil
 }
 
@@ -6064,15 +6012,7 @@ func Convert_core_PodReadinessGate_To_v1_PodReadinessGate(in *core.PodReadinessG
 
 func autoConvert_v1_PodSecurityContext_To_core_PodSecurityContext(in *v1.PodSecurityContext, out *core.PodSecurityContext, s conversion.Scope) error {
 	out.SELinuxOptions = (*core.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
-	if in.WindowsOptions != nil {
-		in, out := &in.WindowsOptions, &out.WindowsOptions
-		*out = new(core.WindowsSecurityContextOptions)
-		if err := Convert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContextOptions(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.WindowsOptions = nil
-	}
+	out.WindowsOptions = (*core.WindowsSecurityContextOptions)(unsafe.Pointer(in.WindowsOptions))
 	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
 	out.RunAsGroup = (*int64)(unsafe.Pointer(in.RunAsGroup))
 	out.RunAsNonRoot = (*bool)(unsafe.Pointer(in.RunAsNonRoot))
@@ -6095,15 +6035,7 @@ func autoConvert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSe
 	// INFO: in.HostIPC opted out of conversion generation
 	// INFO: in.ShareProcessNamespace opted out of conversion generation
 	out.SELinuxOptions = (*v1.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
-	if in.WindowsOptions != nil {
-		in, out := &in.WindowsOptions, &out.WindowsOptions
-		*out = new(v1.WindowsSecurityContextOptions)
-		if err := Convert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContextOptions(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.WindowsOptions = nil
-	}
+	out.WindowsOptions = (*v1.WindowsSecurityContextOptions)(unsafe.Pointer(in.WindowsOptions))
 	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
 	out.RunAsGroup = (*int64)(unsafe.Pointer(in.RunAsGroup))
 	out.RunAsNonRoot = (*bool)(unsafe.Pointer(in.RunAsNonRoot))
@@ -6152,39 +6084,9 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s
 	} else {
 		out.Volumes = nil
 	}
-	if in.InitContainers != nil {
-		in, out := &in.InitContainers, &out.InitContainers
-		*out = make([]core.Container, len(*in))
-		for i := range *in {
-			if err := Convert_v1_Container_To_core_Container(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.InitContainers = nil
-	}
-	if in.Containers != nil {
-		in, out := &in.Containers, &out.Containers
-		*out = make([]core.Container, len(*in))
-		for i := range *in {
-			if err := Convert_v1_Container_To_core_Container(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Containers = nil
-	}
-	if in.EphemeralContainers != nil {
-		in, out := &in.EphemeralContainers, &out.EphemeralContainers
-		*out = make([]core.EphemeralContainer, len(*in))
-		for i := range *in {
-			if err := Convert_v1_EphemeralContainer_To_core_EphemeralContainer(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.EphemeralContainers = nil
-	}
+	out.InitContainers = *(*[]core.Container)(unsafe.Pointer(&in.InitContainers))
+	out.Containers = *(*[]core.Container)(unsafe.Pointer(&in.Containers))
+	out.EphemeralContainers = *(*[]core.EphemeralContainer)(unsafe.Pointer(&in.EphemeralContainers))
 	out.RestartPolicy = core.RestartPolicy(in.RestartPolicy)
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
@@ -6239,39 +6141,9 @@ func autoConvert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s
 	} else {
 		out.Volumes = nil
 	}
-	if in.InitContainers != nil {
-		in, out := &in.InitContainers, &out.InitContainers
-		*out = make([]v1.Container, len(*in))
-		for i := range *in {
-			if err := Convert_core_Container_To_v1_Container(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.InitContainers = nil
-	}
-	if in.Containers != nil {
-		in, out := &in.Containers, &out.Containers
-		*out = make([]v1.Container, len(*in))
-		for i := range *in {
-			if err := Convert_core_Container_To_v1_Container(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Containers = nil
-	}
-	if in.EphemeralContainers != nil {
-		in, out := &in.EphemeralContainers, &out.EphemeralContainers
-		*out = make([]v1.EphemeralContainer, len(*in))
-		for i := range *in {
-			if err := Convert_core_EphemeralContainer_To_v1_EphemeralContainer(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.EphemeralContainers = nil
-	}
+	out.InitContainers = *(*[]v1.Container)(unsafe.Pointer(&in.InitContainers))
+	out.Containers = *(*[]v1.Container)(unsafe.Pointer(&in.Containers))
+	out.EphemeralContainers = *(*[]v1.EphemeralContainer)(unsafe.Pointer(&in.EphemeralContainers))
 	out.RestartPolicy = v1.RestartPolicy(in.RestartPolicy)
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
@@ -7430,15 +7302,7 @@ func autoConvert_v1_SecurityContext_To_core_SecurityContext(in *v1.SecurityConte
 	out.Capabilities = (*core.Capabilities)(unsafe.Pointer(in.Capabilities))
 	out.Privileged = (*bool)(unsafe.Pointer(in.Privileged))
 	out.SELinuxOptions = (*core.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
-	if in.WindowsOptions != nil {
-		in, out := &in.WindowsOptions, &out.WindowsOptions
-		*out = new(core.WindowsSecurityContextOptions)
-		if err := Convert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContextOptions(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.WindowsOptions = nil
-	}
+	out.WindowsOptions = (*core.WindowsSecurityContextOptions)(unsafe.Pointer(in.WindowsOptions))
 	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
 	out.RunAsGroup = (*int64)(unsafe.Pointer(in.RunAsGroup))
 	out.RunAsNonRoot = (*bool)(unsafe.Pointer(in.RunAsNonRoot))
@@ -7458,15 +7322,7 @@ func autoConvert_core_SecurityContext_To_v1_SecurityContext(in *core.SecurityCon
 	out.Capabilities = (*v1.Capabilities)(unsafe.Pointer(in.Capabilities))
 	out.Privileged = (*bool)(unsafe.Pointer(in.Privileged))
 	out.SELinuxOptions = (*v1.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
-	if in.WindowsOptions != nil {
-		in, out := &in.WindowsOptions, &out.WindowsOptions
-		*out = new(v1.WindowsSecurityContextOptions)
-		if err := Convert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContextOptions(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.WindowsOptions = nil
-	}
+	out.WindowsOptions = (*v1.WindowsSecurityContextOptions)(unsafe.Pointer(in.WindowsOptions))
 	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
 	out.RunAsGroup = (*int64)(unsafe.Pointer(in.RunAsGroup))
 	out.RunAsNonRoot = (*bool)(unsafe.Pointer(in.RunAsNonRoot))
@@ -8341,6 +8197,9 @@ func Convert_core_WeightedPodAffinityTerm_To_v1_WeightedPodAffinityTerm(in *core
 }
 
 func autoConvert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContextOptions(in *v1.WindowsSecurityContextOptions, out *core.WindowsSecurityContextOptions, s conversion.Scope) error {
+	out.GMSACredentialSpecName = (*string)(unsafe.Pointer(in.GMSACredentialSpecName))
+	out.GMSACredentialSpec = (*string)(unsafe.Pointer(in.GMSACredentialSpec))
+	out.RunAsUserName = (*string)(unsafe.Pointer(in.RunAsUserName))
 	return nil
 }
 
@@ -8350,8 +8209,13 @@ func Convert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContextOpti
 }
 
 func autoConvert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContextOptions(in *core.WindowsSecurityContextOptions, out *v1.WindowsSecurityContextOptions, s conversion.Scope) error {
-	// WARNING: in.GMSACredentialSpecName requires manual conversion: does not exist in peer-type
-	// WARNING: in.GMSACredentialSpec requires manual conversion: does not exist in peer-type
-	// WARNING: in.RunAsUserName requires manual conversion: does not exist in peer-type
+	out.GMSACredentialSpecName = (*string)(unsafe.Pointer(in.GMSACredentialSpecName))
+	out.GMSACredentialSpec = (*string)(unsafe.Pointer(in.GMSACredentialSpec))
+	out.RunAsUserName = (*string)(unsafe.Pointer(in.RunAsUserName))
 	return nil
+}
+
+// Convert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContextOptions is an autogenerated conversion function.
+func Convert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContextOptions(in *core.WindowsSecurityContextOptions, out *v1.WindowsSecurityContextOptions, s conversion.Scope) error {
+	return autoConvert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContextOptions(in, out, s)
 }
