@@ -36,6 +36,7 @@ go_library(
         "//pkg/apis/rbac/install:go_default_library",
         "//pkg/apis/scheduling/install:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
+        "//pkg/controlplane/controller/apiserverleasegc:go_default_library",
         "//pkg/controlplane/controller/clusterauthenticationtrust:go_default_library",
         "//pkg/controlplane/reconcilers:go_default_library",
         "//pkg/controlplane/tunneler:go_default_library",
@@ -202,6 +203,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/controlplane/controller/apiserverleasegc:all-srcs",
         "//pkg/controlplane/controller/clusterauthenticationtrust:all-srcs",
         "//pkg/controlplane/controller/crdregistration:all-srcs",
         "//pkg/controlplane/reconcilers:all-srcs",
