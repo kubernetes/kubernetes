@@ -123,7 +123,7 @@ var _ = SIGDescribe("Device Plugin", func() {
 
 		ginkgo.By("verifying device access in Windows testing Pod")
 		dxdiagCommand := []string{"cmd.exe", "/c", "dxdiag", "/t", "dxdiag_output.txt", "&", "type", "dxdiag_output.txt"}
-		dxdiagDirectxVersion := "Todo: DirectX Version: DirectX 12"
+		dxdiagDirectxVersion := "DirectX Version: DirectX 12"
 		_, dxdiagDirectxVersionErr := framework.LookForStringInPodExec(ns, windowsPod.Name, dxdiagCommand, dxdiagDirectxVersion, time.Minute)
 		framework.ExpectNoError(dxdiagDirectxVersionErr, "failed: didn't find directX version dxdiag output.")
 
