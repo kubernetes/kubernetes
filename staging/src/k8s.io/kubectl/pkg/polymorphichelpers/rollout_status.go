@@ -102,7 +102,7 @@ func (s *DaemonSetStatusViewer) Status(obj runtime.Unstructured, revision int64)
 	}
 
 	if daemon.Spec.UpdateStrategy.Type != appsv1.RollingUpdateDaemonSetStrategyType {
-		return "", true, fmt.Errorf("rollout status is only available for %s strategy type", appsv1.RollingUpdateStatefulSetStrategyType)
+		return "", true, fmt.Errorf("rollout status is only available for %s strategy type", appsv1.RollingUpdateDaemonSetStrategyType)
 	}
 	if daemon.Generation <= daemon.Status.ObservedGeneration {
 		if daemon.Status.UpdatedNumberScheduled < daemon.Status.DesiredNumberScheduled {
