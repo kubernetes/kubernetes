@@ -24,8 +24,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -51,7 +49,6 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/openapi"
-	openapitesting "k8s.io/kubectl/pkg/util/openapi/testing"
 )
 
 var (
@@ -88,12 +85,9 @@ func testComponentStatusData() *corev1.ComponentStatusList {
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetUnknownSchemaObject(t *testing.T) {
-	t.Skip("This test is completely broken.  The first thing it does is add the object to the scheme!")
-	var openapiSchemaPath = filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json")
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	_, _, codec := cmdtesting.NewExternalScheme()
-	tf.OpenAPISchemaFunc = openapitesting.CreateOpenAPISchemaFunc(openapiSchemaPath)
 
 	obj := &cmdtesting.ExternalType{
 		Kind:       "Type",
@@ -115,28 +109,11 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"type", "foo"})
 
-	expected := []runtime.Object{cmdtesting.NewInternalType("", "", "foo")}
-	actual := []runtime.Object{}
-	if len(actual) != len(expected) {
-		t.Fatalf("expected: %#v, but actual: %#v", expected, actual)
-	}
-	t.Logf("actual: %#v", actual[0])
-	for i, obj := range actual {
-		expectedJSON := runtime.EncodeOrDie(codec, expected[i])
-		expectedMap := map[string]interface{}{}
-		if err := encjson.Unmarshal([]byte(expectedJSON), &expectedMap); err != nil {
-			t.Fatal(err)
-		}
-
-		actualJSON := runtime.EncodeOrDie(codec, obj)
-		actualMap := map[string]interface{}{}
-		if err := encjson.Unmarshal([]byte(actualJSON), &actualMap); err != nil {
-			t.Fatal(err)
-		}
-
-		if !reflect.DeepEqual(expectedMap, actualMap) {
-			t.Errorf("expectedMap: %#v, but actualMap: %#v", expectedMap, actualMap)
-		}
+	expected := `NAME   AGE
+       <unknown>
+`
+	if actual := buf.String(); expected != actual {
+		t.Errorf("expected\n%v\ngot\n%v", expected, actual)
 	}
 }
 
