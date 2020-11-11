@@ -108,7 +108,8 @@ func (rcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 // Validate validates a new replication controller.
 func (rcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	controller := obj.(*api.ReplicationController)
-	return validation.ValidateReplicationController(controller)
+	opts := pod.GetValidationOptionsFromPodTemplate(controller.Spec.Template, nil)
+	return validation.ValidateReplicationController(controller, opts)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -126,8 +127,9 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	oldRc := old.(*api.ReplicationController)
 	newRc := obj.(*api.ReplicationController)
 
-	validationErrorList := validation.ValidateReplicationController(newRc)
-	updateErrorList := validation.ValidateReplicationControllerUpdate(newRc, oldRc)
+	opts := pod.GetValidationOptionsFromPodTemplate(newRc.Spec.Template, oldRc.Spec.Template)
+	validationErrorList := validation.ValidateReplicationController(newRc, opts)
+	updateErrorList := validation.ValidateReplicationControllerUpdate(newRc, oldRc, opts)
 	errs := append(validationErrorList, updateErrorList...)
 
 	for key, value := range helper.NonConvertibleFields(oldRc.Annotations) {

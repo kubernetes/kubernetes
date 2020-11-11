@@ -30,6 +30,7 @@ go_test(
     deps = [
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/validation:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",

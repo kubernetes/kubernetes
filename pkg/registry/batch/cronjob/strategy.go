@@ -83,7 +83,8 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 // Validate validates a new scheduled job.
 func (cronJobStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	cronJob := obj.(*batch.CronJob)
-	return validation.ValidateCronJob(cronJob)
+	opts := pod.GetValidationOptionsFromPodTemplate(&cronJob.Spec.JobTemplate.Spec.Template, nil)
+	return validation.ValidateCronJob(cronJob, opts)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -103,7 +104,9 @@ func (cronJobStrategy) AllowCreateOnUpdate() bool {
 func (cronJobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newCronJob := obj.(*batch.CronJob)
 	oldCronJob := old.(*batch.CronJob)
-	return validation.ValidateCronJobUpdate(newCronJob, oldCronJob)
+
+	opts := pod.GetValidationOptionsFromPodTemplate(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
+	return validation.ValidateCronJobUpdate(newCronJob, oldCronJob, opts)
 }
 
 type cronJobStatusStrategy struct {
