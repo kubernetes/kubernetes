@@ -1890,69 +1890,68 @@ var _ = SIGDescribe("NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disrupt
 })
 
 func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, service *v1.Service, targetPort int) {
-	testCanConnectProtocol(f, ns, podName, service, targetPort, v1.ProtocolTCP)
+	testConnectProtocol(f, ns, podName, service, targetPort, v1.ProtocolTCP, false)
 }
 
 func testCannotConnect(f *framework.Framework, ns *v1.Namespace, podName string, service *v1.Service, targetPort int) {
-	testCannotConnectProtocol(f, ns, podName, service, targetPort, v1.ProtocolTCP)
+	testConnectProtocol(f, ns, podName, service, targetPort, v1.ProtocolTCP, true)
 }
 
 func testCanConnectProtocol(f *framework.Framework, ns *v1.Namespace, podName string, service *v1.Service, targetPort int, protocol v1.Protocol) {
-	ginkgo.By(fmt.Sprintf("Creating client pod %s that should successfully connect to %s.", podName, service.Name))
-	podClient := createNetworkClientPod(f, ns, podName, service, targetPort, protocol)
-	defer func() {
-		ginkgo.By(fmt.Sprintf("Cleaning up the pod %s", podClient.Name))
-		if err := f.ClientSet.CoreV1().Pods(ns.Name).Delete(context.TODO(), podClient.Name, metav1.DeleteOptions{}); err != nil {
-			framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
-		}
-	}()
-	checkConnectivity(f, ns, podClient, service)
+	testConnectProtocol(f, ns, podName, service, targetPort, protocol, false)
 }
 
 func testCannotConnectProtocol(f *framework.Framework, ns *v1.Namespace, podName string, service *v1.Service, targetPort int, protocol v1.Protocol) {
-	ginkgo.By(fmt.Sprintf("Creating client pod %s that should not be able to connect to %s.", podName, service.Name))
-	podClient := createNetworkClientPod(f, ns, podName, service, targetPort, protocol)
+	testConnectProtocol(f, ns, podName, service, targetPort, protocol, true)
+}
+func testConnectProtocol(f *framework.Framework, ns *v1.Namespace, podName string, service *v1.Service, targetPort int, protocol v1.Protocol, expectErr bool) {
+	tryCount := 3
+	pods := make([]*v1.Pod, 0, tryCount)
+	var conErr error
+	var pod *v1.Pod
+	connString := "should"
+	if expectErr {
+		connString = "should not"
+	}
+
+	// Network policy can take some time to program, especially in scaled/busy environments. Let's allow some retries to
+	// account for that, until we have status field available on network policy object
+
+	ginkgo.By(fmt.Sprintf("Creating client pod %s that %s successfully connect to %s.", podName, connString, service.Name))
+	for i := 0; i < tryCount; i++ {
+		framework.Logf(fmt.Sprintf("Count: %d of tryCount: %d - Creating client pod %s that %s successfully connect to %s.", i+1, tryCount, podName, connString, service.Name))
+		pod = createNetworkClientPod(f, ns, podName, service, targetPort, protocol)
+		pods = append(pods, pod)
+		conErr = checkConnectivity(f, ns, pod, service)
+		if (conErr != nil && expectErr) || (conErr == nil && !expectErr) {
+			// got the expected result, stop trying
+			break
+		}
+	}
+
+	// Cleanup any allocated pod(s)
 	defer func() {
-		ginkgo.By(fmt.Sprintf("Cleaning up the pod %s", podClient.Name))
-		if err := f.ClientSet.CoreV1().Pods(ns.Name).Delete(context.TODO(), podClient.Name, metav1.DeleteOptions{}); err != nil {
-			framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
+		for _, p := range pods {
+			ginkgo.By(fmt.Sprintf("Cleaning up pod %s", p.Name))
+			if err := f.ClientSet.CoreV1().Pods(ns.Name).Delete(context.TODO(), p.Name, metav1.DeleteOptions{}); err != nil {
+				framework.Failf("unable to cleanup pod %v: %v", p.Name, err)
+			}
 		}
 	}()
 
-	checkNoConnectivity(f, ns, podClient, service)
-}
-
-func checkConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1.Pod, service *v1.Service) {
-	framework.Logf("Waiting for %s to complete.", podClient.Name)
-	err := e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, podClient.Name, ns.Name)
-	framework.ExpectNoError(err, "Pod did not finish as expected.")
-
-	framework.Logf("Waiting for %s to complete.", podClient.Name)
-	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
-	if err != nil {
-		// Dump debug information for the test namespace.
+	if (conErr != nil && !expectErr) || (conErr == nil && expectErr) {
+		// Test failed, dump debug information for the test namespace.
 		framework.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
 
-		pods, policies, logs := collectPodsAndNetworkPolicies(f, podClient)
-		framework.Failf("Pod %s should be able to connect to service %s, but was not able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t%v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
-
+		// Collect logs from the pod
+		podsInNs, policies, logs := collectPodsAndNetworkPolicies(f, pod)
+		framework.Failf("Pod %s %s be able to connect to service %s, but failed.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t%v\n\n", pod.Name, connString, service.Name, logs, policies.Items, podsInNs)
 	}
 }
 
-func checkNoConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1.Pod, service *v1.Service) {
+func checkConnectivity(f *framework.Framework, ns *v1.Namespace, podClient *v1.Pod, service *v1.Service) error {
 	framework.Logf("Waiting for %s to complete.", podClient.Name)
-	err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
-
-	// We expect an error here since it's a cannot connect test.
-	// Dump debug information if the error was nil.
-	if err == nil {
-		// Dump debug information for the test namespace.
-		framework.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
-
-		pods, policies, logs := collectPodsAndNetworkPolicies(f, podClient)
-		framework.Failf("Pod %s should not be able to connect to service %s, but was able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t %v\n\n", podClient.Name, service.Name, logs, policies.Items, pods)
-
-	}
+	return e2epod.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
 }
 
 func checkNoConnectivityByExitCode(f *framework.Framework, ns *v1.Namespace, podClient *v1.Pod, service *v1.Service) {
