@@ -30,6 +30,60 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v2beta1";
 
+// ContainerResourceMetricSource indicates how to scale on a resource metric known to
+// Kubernetes, as specified in requests and limits, describing each pod in the
+// current scale target (e.g. CPU or memory).  The values will be averaged
+// together before being compared to the target.  Such metrics are built in to
+// Kubernetes, and have special scaling options on top of those available to
+// normal per-pod metrics using the "pods" source.  Only one "target" type
+// should be set.
+message ContainerResourceMetricSource {
+  // name is the name of the resource in question.
+  optional string name = 1;
+
+  // targetAverageUtilization is the target value of the average of the
+  // resource metric across all relevant pods, represented as a percentage of
+  // the requested value of the resource for the pods.
+  // +optional
+  optional int32 targetAverageUtilization = 2;
+
+  // targetAverageValue is the target value of the average of the
+  // resource metric across all relevant pods, as a raw value (instead of as
+  // a percentage of the request), similar to the "pods" metric source type.
+  // +optional
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity targetAverageValue = 3;
+
+  // container is the name of the container in the pods of the scaling target
+  optional string container = 4;
+}
+
+// ContainerResourceMetricStatus indicates the current value of a resource metric known to
+// Kubernetes, as specified in requests and limits, describing a single container in each pod in the
+// current scale target (e.g. CPU or memory).  Such metrics are built in to
+// Kubernetes, and have special scaling options on top of those available to
+// normal per-pod metrics using the "pods" source.
+message ContainerResourceMetricStatus {
+  // name is the name of the resource in question.
+  optional string name = 1;
+
+  // currentAverageUtilization is the current value of the average of the
+  // resource metric across all relevant pods, represented as a percentage of
+  // the requested value of the resource for the pods.  It will only be
+  // present if `targetAverageValue` was set in the corresponding metric
+  // specification.
+  // +optional
+  optional int32 currentAverageUtilization = 2;
+
+  // currentAverageValue is the current value of the average of the
+  // resource metric across all relevant pods, as a raw value (instead of as
+  // a percentage of the request), similar to the "pods" metric source type.
+  // It will always be set, regardless of the corresponding metric specification.
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity currentAverageValue = 3;
+
+  // container is the name of the container in the pods of the scaling target
+  optional string container = 4;
+}
+
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 message CrossVersionObjectReference {
   // Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
@@ -200,8 +254,10 @@ message HorizontalPodAutoscalerStatus {
 // MetricSpec specifies how to scale based on a single metric
 // (only `type` and one other matching field should be set at once).
 message MetricSpec {
-  // type is the type of metric source.  It should be one of "Object",
-  // "Pods", "Resource" or "External", each mapping to a matching field in the object.
+  // type is the type of metric source.  It should be one of "ContainerResource",
+  // "External", "Object", "Pods" or "Resource", each mapping to a matching field in the object.
+  // Note: "ContainerResource" type is available on when the feature-gate
+  // HPAContainerMetrics is enabled
   optional string type = 1;
 
   // object refers to a metric describing a single kubernetes object
@@ -223,6 +279,15 @@ message MetricSpec {
   // +optional
   optional ResourceMetricSource resource = 4;
 
+  // container resource refers to a resource metric (such as those specified in
+  // requests and limits) known to Kubernetes describing a single container in
+  // each pod of the current scale target (e.g. CPU or memory). Such metrics are
+  // built in to Kubernetes, and have special scaling options on top of those
+  // available to normal per-pod metrics using the "pods" source.
+  // This is an alpha feature and can be enabled by the HPAContainerMetrics feature flag.
+  // +optional
+  optional ContainerResourceMetricSource containerResource = 7;
+
   // external refers to a global metric that is not associated
   // with any Kubernetes object. It allows autoscaling based on information
   // coming from components running outside of cluster
@@ -234,8 +299,10 @@ message MetricSpec {
 
 // MetricStatus describes the last-read state of a single metric.
 message MetricStatus {
-  // type is the type of metric source.  It will be one of "Object",
-  // "Pods" or "Resource", each corresponds to a matching field in the object.
+  // type is the type of metric source.  It will be one of "ContainerResource",
+  // "External", "Object", "Pods" or "Resource", each corresponds to a matching field in the object.
+  // Note: "ContainerResource" type is available on when the feature-gate
+  // HPAContainerMetrics is enabled
   optional string type = 1;
 
   // object refers to a metric describing a single kubernetes object
@@ -256,6 +323,14 @@ message MetricStatus {
   // to normal per-pod metrics using the "pods" source.
   // +optional
   optional ResourceMetricStatus resource = 4;
+
+  // container resource refers to a resource metric (such as those specified in
+  // requests and limits) known to Kubernetes describing a single container in each pod in the
+  // current scale target (e.g. CPU or memory). Such metrics are built in to
+  // Kubernetes, and have special scaling options on top of those available
+  // to normal per-pod metrics using the "pods" source.
+  // +optional
+  optional ContainerResourceMetricStatus containerResource = 7;
 
   // external refers to a global metric that is not associated
   // with any Kubernetes object. It allows autoscaling based on information

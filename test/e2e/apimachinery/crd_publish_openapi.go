@@ -29,6 +29,7 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/onsi/ginkgo"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
+	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 
@@ -683,10 +684,15 @@ func convertJSONSchemaProps(in []byte, out *spec.Schema) error {
 	if err := apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&external, &internal, nil); err != nil {
 		return err
 	}
-	if err := validation.ConvertJSONSchemaPropsWithPostProcess(&internal, out, validation.StripUnsupportedFormatsPostProcess); err != nil {
+	kubeOut := kubeopenapispec.Schema{}
+	if err := validation.ConvertJSONSchemaPropsWithPostProcess(&internal, &kubeOut, validation.StripUnsupportedFormatsPostProcess); err != nil {
 		return err
 	}
-	return nil
+	bs, err := json.Marshal(kubeOut)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(bs, out)
 }
 
 // dropDefaults drops properties and extension that we added to a schema

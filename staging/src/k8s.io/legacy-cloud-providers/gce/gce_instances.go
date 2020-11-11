@@ -64,7 +64,7 @@ func splitNodesByZone(nodes []*v1.Node) map[string][]*v1.Node {
 }
 
 func getZone(n *v1.Node) string {
-	zone, ok := n.Labels[v1.LabelZoneFailureDomain]
+	zone, ok := n.Labels[v1.LabelFailureDomainBetaZone]
 	if !ok {
 		return defaultZone
 	}

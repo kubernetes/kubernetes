@@ -502,7 +502,7 @@ function ensure-local-ssds-ephemeral-storage() {
 function setup-logrotate() {
   mkdir -p /etc/logrotate.d/
 
-  if [[ "${ENABLE_LOGROTATE_FILES:-false}" = "true" ]]; then
+  if [[ "${ENABLE_LOGROTATE_FILES:-true}" = "true" ]]; then
     # Configure log rotation for all logs in /var/log, which is where k8s services
     # are configured to write their log files. Whenever logrotate is ran, this
     # config will:
@@ -922,7 +922,7 @@ contexts:
   name: webhook
 EOF
   fi
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${PREPARE_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'grpc' ]]; then
       cat <<EOF >/etc/srv/kubernetes/egress_selector_configuration.yaml
 apiVersion: apiserver.k8s.io/v1beta1
@@ -1265,11 +1265,18 @@ EOF
   fi
 }
 
+# Create kubeconfig files for control plane components.
 function create-kubeconfig {
   local component=$1
   local token=$2
   echo "Creating kubeconfig file for component ${component}"
   mkdir -p "/etc/srv/kubernetes/${component}"
+
+  local kube_apiserver="localhost"
+  if [[ ${KUBECONFIG_USE_HOST_IP:-} == "true" ]] ; then
+    kube_apiserver=$(hostname -i)
+  fi
+  
   cat <<EOF >"/etc/srv/kubernetes/${component}/kubeconfig"
 apiVersion: v1
 kind: Config
@@ -1281,7 +1288,7 @@ clusters:
 - name: local
   cluster:
     insecure-skip-tls-verify: true
-    server: https://localhost:443
+    server: https://${kube_apiserver}:443
 contexts:
 - context:
     cluster: local
@@ -1606,11 +1613,17 @@ EOF
 #
 # $1 is the file to create.
 # $2: the log owner uid to set for the log file.
-# $3: the log owner gid to set for the log file.
+# $3: the log owner gid to set for the log file. If $KUBE_POD_LOG_READERS_GROUP
+# is set then this value will not be used.
 function prepare-log-file {
   touch "$1"
-  chmod 644 "$1"
-  chown "${2:-${LOG_OWNER_USER:-root}}":"${3:-${LOG_OWNER_GROUP:-root}}" "$1"
+  if [[ -n "${KUBE_POD_LOG_READERS_GROUP:-}" ]]; then
+    chmod 640 "$1"
+    chown "${2:-root}":"${KUBE_POD_LOG_READERS_GROUP}" "$1"
+  else
+    chmod 644 "$1"
+    chown "${2:-${LOG_OWNER_USER:-root}}":"${3:-${LOG_OWNER_GROUP:-root}}" "$1"
+  fi
 }
 
 # Prepares parameters for kube-proxy manifest.
@@ -1649,6 +1662,9 @@ function prepare-kube-proxy-manifest-variables {
   params+=" --iptables-sync-period=1m --iptables-min-sync-period=10s --ipvs-sync-period=1m --ipvs-min-sync-period=10s"
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
     params+=" ${KUBEPROXY_TEST_ARGS}"
+  fi
+  if [[ -n "${DETECT_LOCAL_MODE:-}" ]]; then
+    params+=" --detect-local-mode=${DETECT_LOCAL_MODE}"
   fi
   local container_env=""
   local kube_cache_mutation_detector_env_name=""
@@ -1730,6 +1746,10 @@ function prepare-etcd-manifest {
       etcd_listen_metrics_urls+=",http://${host_primary_ip}:${etcd_livenessprobe_port}"
     fi
     etcd_extra_args+=" --listen-metrics-urls=${etcd_listen_metrics_urls} "
+  fi
+
+  if [[ -n "${ETCD_PROGRESS_NOTIFY_INTERVAL:-}" ]]; then
+    etcd_extra_args+=" --experimental-watch-progress-notify-interval=${ETCD_PROGRESS_NOTIFY_INTERVAL}"
   fi
 
   # If etcd is configured to listen on host IP, an additional client listening URL is added.
@@ -1965,7 +1985,7 @@ function update-node-label() {
 # User and group should never contain characters that need to be quoted
 # shellcheck disable=SC2086
 function run-kube-controller-manager-as-non-root {
-  prepare-log-file /var/log/kube-controller-manager.log ${KUBE_CONTROLLER_MANAGER_RUNASUSER} ${KUBE_CONTROLLER_MANAGER_RUNASGROUP}
+  prepare-log-file /var/log/kube-controller-manager.log ${KUBE_CONTROLLER_MANAGER_RUNASUSER}
   setfacl -m u:${KUBE_CONTROLLER_MANAGER_RUNASUSER}:r "${CA_CERT_BUNDLE_PATH}"
   setfacl -m u:${KUBE_CONTROLLER_MANAGER_RUNASUSER}:r "${SERVICEACCOUNT_CERT_PATH}"
   setfacl -m u:${KUBE_CONTROLLER_MANAGER_RUNASUSER}:r "${SERVICEACCOUNT_KEY_PATH}"
@@ -2093,7 +2113,7 @@ function start-kube-scheduler {
   create-kubeconfig "kube-scheduler" "${KUBE_SCHEDULER_TOKEN}"
   # User and group should never contain characters that need to be quoted
   # shellcheck disable=SC2086
-  prepare-log-file /var/log/kube-scheduler.log ${KUBE_SCHEDULER_RUNASUSER:-2001} ${KUBE_SCHEDULER_RUNASGROUP:-2001}
+  prepare-log-file /var/log/kube-scheduler.log ${KUBE_SCHEDULER_RUNASUSER:-2001}
 
   # Calculate variables and set them in the manifest.
   params=("${SCHEDULER_TEST_LOG_LEVEL:-"--v=2"}" "${SCHEDULER_TEST_ARGS:-}")
@@ -2148,12 +2168,14 @@ function start-cluster-autoscaler {
     # Remove salt comments and replace variables with values
     local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/cluster-autoscaler.manifest"
 
-    local params=("${AUTOSCALER_MIG_CONFIG}" "${CLOUD_CONFIG_OPT}" "${AUTOSCALER_EXPANDER_CONFIG:---expander=price}")
+    local params
+    read -r -a params <<< "${AUTOSCALER_MIG_CONFIG}"
+    params+=("${CLOUD_CONFIG_OPT}" "${AUTOSCALER_EXPANDER_CONFIG:---expander=price}")
     params+=("--kubeconfig=/etc/srv/kubernetes/cluster-autoscaler/kubeconfig")
 
     # split the params into separate arguments passed to binary
     local params_split
-    params_split=$(eval 'for param in "${params[@]}"; do echo -n "$param",; done')
+    params_split=$(eval 'for param in "${params[@]}"; do echo -n \""$param"\",; done')
     params_split=${params_split%?}
 
     sed -i -e "s@{{params}}@${params_split}@g" "${src_file}"
@@ -2531,7 +2553,7 @@ function start-kube-addons {
   create-kubeconfig "addon-manager" "${ADDON_MANAGER_TOKEN}"
   # User and group should never contain characters that need to be quoted
   # shellcheck disable=SC2086
-  prepare-log-file /var/log/kube-addon-manager.log ${KUBE_ADDON_MANAGER_RUNASUSER:-2002} ${KUBE_ADDON_MANAGER_RUNASGROUP:-2002}
+  prepare-log-file /var/log/kube-addon-manager.log ${KUBE_ADDON_MANAGER_RUNASUSER:-2002}
 
   # prep addition kube-up specific rbac objects
   setup-addon-manifests "addons" "rbac/kubelet-api-auth"
@@ -2599,7 +2621,7 @@ EOF
       setup-node-termination-handler-manifest ''
   fi
   # Setting up the konnectivity-agent daemonset
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${RUN_KONNECTIVITY_PODS:-false}" == "true" ]]; then
     setup-addon-manifests "addons" "konnectivity-agent"
     setup-konnectivity-agent-manifest
   fi
@@ -3028,7 +3050,7 @@ function main() {
   if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
     KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
   fi
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${PREPARE_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     KONNECTIVITY_SERVER_TOKEN="$(secure_random 32)"
   fi
   if [[ "${ENABLE_MONITORING_TOKEN:-false}" == "true" ]]; then
@@ -3080,6 +3102,13 @@ function main() {
     systemctl stop docker || echo "unable to stop docker"
     setup-containerd
   fi
+
+  if [[ -n "${KUBE_POD_LOG_READERS_GROUP:-}" ]]; then
+     mkdir -p /var/log/pods/
+     chgrp -R "${KUBE_POD_LOG_READERS_GROUP:-}" /var/log/pods/
+     chmod -R g+s /var/log/pods/
+  fi
+
   start-kubelet
 
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
@@ -3089,7 +3118,7 @@ function main() {
     fi
     source ${KUBE_BIN}/configure-kubeapiserver.sh
     start-kube-apiserver
-    if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+    if [[ "${RUN_KONNECTIVITY_PODS:-false}" == "true" ]]; then
       start-konnectivity-server
     fi
     start-kube-controller-manager

@@ -115,7 +115,7 @@ var (
 	nodeLabelValue = "node1"
 
 	// node topology for CSI migration
-	zone1Labels = map[string]string{v1.LabelZoneFailureDomain: "us-east-1", v1.LabelZoneRegion: "us-east-1a"}
+	zone1Labels = map[string]string{v1.LabelFailureDomainBetaZone: "us-east-1", v1.LabelFailureDomainBetaRegion: "us-east-1a"}
 )
 
 func init() {
@@ -880,7 +880,8 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		},
 		"bound-pvc,pv-not-exists": {
 			podPVCs:    []*v1.PersistentVolumeClaim{boundPVC},
-			shouldFail: true,
+			shouldFail: false,
+			reasons:    ConflictReasons{ErrReasonPVNotExist},
 		},
 		"prebound-pvc": {
 			podPVCs:    []*v1.PersistentVolumeClaim{preboundPVC},

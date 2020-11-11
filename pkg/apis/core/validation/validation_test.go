@@ -1307,7 +1307,8 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 						},
 					},
 				}
-				_, errs = ValidateVolumes(volumes, nil, field.NewPath(""))
+				opts := PodValidationOptions{}
+				_, errs = ValidateVolumes(volumes, nil, field.NewPath(""), opts)
 			} else {
 				errs = ValidatePersistentVolumeClaim(scenario.claim)
 			}
@@ -2199,6 +2200,7 @@ func TestValidateVolumes(t *testing.T) {
 		name string
 		vol  core.Volume
 		errs []verr
+		opts PodValidationOptions
 	}{
 		// EmptyDir and basic volume names
 		{
@@ -3295,6 +3297,79 @@ func TestValidateVolumes(t *testing.T) {
 			},
 		},
 		{
+			name: "hugepages-downwardAPI-enabled",
+			vol: core.Volume{
+				Name: "downwardapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						Items: []core.DownwardAPIVolumeFile{
+							{
+								Path: "hugepages_request",
+								ResourceFieldRef: &core.ResourceFieldSelector{
+									ContainerName: "test-container",
+									Resource:      "requests.hugepages-2Mi",
+								},
+							},
+							{
+								Path: "hugepages_limit",
+								ResourceFieldRef: &core.ResourceFieldSelector{
+									ContainerName: "test-container",
+									Resource:      "limits.hugepages-2Mi",
+								},
+							},
+						},
+					},
+				},
+			},
+			opts: PodValidationOptions{AllowDownwardAPIHugePages: true},
+		},
+		{
+			name: "hugepages-downwardAPI-requests-disabled",
+			vol: core.Volume{
+				Name: "downwardapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						Items: []core.DownwardAPIVolumeFile{
+							{
+								Path: "hugepages_request",
+								ResourceFieldRef: &core.ResourceFieldSelector{
+									ContainerName: "test-container",
+									Resource:      "requests.hugepages-2Mi",
+								},
+							},
+						},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeNotSupported,
+				field: "downwardAPI.resourceFieldRef.resource",
+			}},
+		},
+		{
+			name: "hugepages-downwardAPI-limits-disabled",
+			vol: core.Volume{
+				Name: "downwardapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						Items: []core.DownwardAPIVolumeFile{
+							{
+								Path: "hugepages_limit",
+								ResourceFieldRef: &core.ResourceFieldSelector{
+									ContainerName: "test-container",
+									Resource:      "limits.hugepages-2Mi",
+								},
+							},
+						},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeNotSupported,
+				field: "downwardAPI.resourceFieldRef.resource",
+			}},
+		},
+		{
 			name: "downapi valid defaultMode",
 			vol: core.Volume{
 				Name: "downapi",
@@ -3990,7 +4065,7 @@ func TestValidateVolumes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			names, errs := ValidateVolumes([]core.Volume{tc.vol}, nil, field.NewPath("field"))
+			names, errs := ValidateVolumes([]core.Volume{tc.vol}, nil, field.NewPath("field"), tc.opts)
 			if len(errs) != len(tc.errs) {
 				t.Fatalf("unexpected error(s): got %d, want %d: %v", len(tc.errs), len(errs), errs)
 			}
@@ -4016,7 +4091,7 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "abc", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
 		{Name: "abc", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
 	}
-	_, errs := ValidateVolumes(dupsCase, nil, field.NewPath("field"))
+	_, errs := ValidateVolumes(dupsCase, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(errs) == 0 {
 		t.Errorf("expected error")
 	} else if len(errs) != 1 {
@@ -4029,7 +4104,7 @@ func TestValidateVolumes(t *testing.T) {
 	hugePagesCase := core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumHugePages}}
 
 	// Enable HugePages
-	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "working", nil); len(errs) != 0 {
+	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "working", nil, PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("Unexpected error when HugePages feature is enabled.")
 	}
 
@@ -4208,7 +4283,7 @@ func TestHugePagesIsolation(t *testing.T) {
 	for tcName, tc := range testCases {
 		t.Run(tcName, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePageStorageMediumSize, tc.enableHugePageStorageMediumSize)()
-			errs := ValidatePodCreate(tc.pod, PodValidationOptions{tc.enableHugePageStorageMediumSize})
+			errs := ValidatePodCreate(tc.pod, PodValidationOptions{AllowMultipleHugePageResources: tc.enableHugePageStorageMediumSize})
 			if tc.expectError && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}
@@ -4359,7 +4434,7 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if errs := validateVolumeSource(&tc, field.NewPath("spec"), "tmpvol", nil); len(errs) != 0 {
+		if errs := validateVolumeSource(&tc, field.NewPath("spec"), "tmpvol", nil, PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -4529,9 +4604,52 @@ func TestLocalStorageEnvWithFeatureGate(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		if errs := validateEnvVarValueFrom(testCase, field.NewPath("field")); len(errs) != 0 {
+		if errs := validateEnvVarValueFrom(testCase, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success, got: %v", errs)
 		}
+	}
+}
+
+func TestHugePagesEnv(t *testing.T) {
+	testCases := []core.EnvVar{
+		{
+			Name: "hugepages-limits",
+			ValueFrom: &core.EnvVarSource{
+				ResourceFieldRef: &core.ResourceFieldSelector{
+					ContainerName: "test-container",
+					Resource:      "limits.hugepages-2Mi",
+				},
+			},
+		},
+		{
+			Name: "hugepages-requests",
+			ValueFrom: &core.EnvVarSource{
+				ResourceFieldRef: &core.ResourceFieldSelector{
+					ContainerName: "test-container",
+					Resource:      "requests.hugepages-2Mi",
+				},
+			},
+		},
+	}
+	// enable gate
+	for _, testCase := range testCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DownwardAPIHugePages, true)()
+			opts := PodValidationOptions{AllowDownwardAPIHugePages: true}
+			if errs := validateEnvVarValueFrom(testCase, field.NewPath("field"), opts); len(errs) != 0 {
+				t.Errorf("expected success, got: %v", errs)
+			}
+		})
+	}
+	// disable gate
+	for _, testCase := range testCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DownwardAPIHugePages, false)()
+			opts := PodValidationOptions{AllowDownwardAPIHugePages: false}
+			if errs := validateEnvVarValueFrom(testCase, field.NewPath("field"), opts); len(errs) == 0 {
+				t.Errorf("expected failure")
+			}
+		})
 	}
 }
 
@@ -4656,7 +4774,7 @@ func TestValidateEnv(t *testing.T) {
 			},
 		},
 	}
-	if errs := ValidateEnv(successCase, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateEnv(successCase, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success, got: %v", errs)
 	}
 
@@ -4920,7 +5038,7 @@ func TestValidateEnv(t *testing.T) {
 		},
 	}
 	for _, tc := range errorCases {
-		if errs := ValidateEnv(tc.envs, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateEnv(tc.envs, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %s", tc.name)
 		} else {
 			for i := range errs {
@@ -5101,7 +5219,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
 		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"))
+	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)
 		return
@@ -5164,7 +5282,7 @@ func TestValidateDisabledSubpath(t *testing.T) {
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
 		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"))
+	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)
 		return
@@ -5226,7 +5344,7 @@ func TestValidateSubpathMutuallyExclusive(t *testing.T) {
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
 		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"))
+	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)
 		return
@@ -5307,7 +5425,7 @@ func TestValidateDisabledSubpathExpr(t *testing.T) {
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
 		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"))
+	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)
 		return
@@ -5501,7 +5619,7 @@ func TestValidateMountPropagation(t *testing.T) {
 	volumes := []core.Volume{
 		{Name: "foo", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
-	vols2, v2err := ValidateVolumes(volumes, nil, field.NewPath("field"))
+	vols2, v2err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v2err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v2err)
 		return
@@ -5524,7 +5642,7 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 		{Name: "def", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
 
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"))
+	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volumes - expected success %v", v1err)
 		return
@@ -5737,7 +5855,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			},
 		},
 	} {
-		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, field.NewPath("ephemeralContainers")); len(errs) != 0 {
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, field.NewPath("ephemeralContainers"), PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 	}
@@ -5901,7 +6019,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, field.NewPath("ephemeralContainers"))
+		errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, field.NewPath("ephemeralContainers"), PodValidationOptions{})
 
 		if len(errs) == 0 {
 			t.Errorf("for test %q, expected error but received none", tc.title)
@@ -6070,7 +6188,7 @@ func TestValidateContainers(t *testing.T) {
 		},
 		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: fakeValidSecurityContext(true)},
 	}
-	if errs := validateContainers(successCase, false, volumeDevices, field.NewPath("field")); len(errs) != 0 {
+	if errs := validateContainers(successCase, false, volumeDevices, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -6310,7 +6428,7 @@ func TestValidateContainers(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		if errs := validateContainers(v, false, volumeDevices, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateContainers(v, false, volumeDevices, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -6344,7 +6462,7 @@ func TestValidateInitContainers(t *testing.T) {
 			TerminationMessagePolicy: "File",
 		},
 	}
-	if errs := validateContainers(successCase, true, volumeDevices, field.NewPath("field")); len(errs) != 0 {
+	if errs := validateContainers(successCase, true, volumeDevices, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -6370,7 +6488,7 @@ func TestValidateInitContainers(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		if errs := validateContainers(v, true, volumeDevices, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateContainers(v, true, volumeDevices, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -6881,7 +6999,7 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
-			if errs := ValidatePodSpec(&v, nil, field.NewPath("field")); len(errs) != 0 {
+			if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -7085,7 +7203,7 @@ func TestValidatePodSpec(t *testing.T) {
 		},
 	}
 	for k, v := range failureCases {
-		if errs := ValidatePodSpec(&v, nil, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
 	}
@@ -9609,7 +9727,6 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 }
 
 func makeValidService() core.Service {
-	serviceIPFamily := core.IPv4Protocol
 	return core.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "valid",
@@ -9623,7 +9740,6 @@ func makeValidService() core.Service {
 			SessionAffinity: "None",
 			Type:            core.ServiceTypeClusterIP,
 			Ports:           []core.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675, TargetPort: intstr.FromInt(8675)}},
-			IPFamily:        &serviceIPFamily,
 		},
 	}
 }
@@ -9877,7 +9993,7 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 	for _, test := range tests {
 		new := core.Pod{Spec: core.PodSpec{EphemeralContainers: test.new}}
 		old := core.Pod{Spec: core.PodSpec{EphemeralContainers: test.old}}
-		errs := ValidatePodEphemeralContainersUpdate(&new, &old)
+		errs := ValidatePodEphemeralContainersUpdate(&new, &old, PodValidationOptions{})
 		if test.err == "" {
 			if len(errs) != 0 {
 				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
@@ -9894,6 +10010,10 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 
 func TestValidateServiceCreate(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTopology, true)()
+
+	requireDualStack := core.IPFamilyPolicyRequireDualStack
+	singleStack := core.IPFamilyPolicySingleStack
+	preferDualStack := core.IPFamilyPolicyPreferDualStack
 
 	testCases := []struct {
 		name               string
@@ -10004,6 +10124,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Ports = nil
 				s.Spec.ClusterIP = core.ClusterIPNone
+				s.Spec.ClusterIPs = []string{core.ClusterIPNone}
 			},
 			numErrs: 0,
 		},
@@ -10054,6 +10175,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid cluster ip",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.ClusterIP = "invalid"
+				s.Spec.ClusterIPs = []string{"invalid"}
 			},
 			numErrs: 1,
 		},
@@ -10084,6 +10206,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.Ports[0].Port = 11722
 				s.Spec.Ports[0].TargetPort = intstr.FromInt(11722)
 				s.Spec.ClusterIP = core.ClusterIPNone
+				s.Spec.ClusterIPs = []string{core.ClusterIPNone}
 			},
 			numErrs: 0,
 		},
@@ -10093,6 +10216,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.Ports[0].Port = 11722
 				s.Spec.Ports[0].TargetPort = intstr.FromInt(11721)
 				s.Spec.ClusterIP = core.ClusterIPNone
+				s.Spec.ClusterIPs = []string{core.ClusterIPNone}
 			},
 			// in the v1 API, targetPorts on headless services were tolerated.
 			// once we have version-specific validation, we can reject this on newer API versions, but until then, we have to tolerate it for compatibility.
@@ -10105,6 +10229,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.Ports[0].Port = 11722
 				s.Spec.Ports[0].TargetPort = intstr.FromString("target")
 				s.Spec.ClusterIP = core.ClusterIPNone
+				s.Spec.ClusterIPs = []string{core.ClusterIPNone}
 			},
 			// in the v1 API, targetPorts on headless services were tolerated.
 			// once we have version-specific validation, we can reject this on newer API versions, but until then, we have to tolerate it for compatibility.
@@ -10196,20 +10321,21 @@ func TestValidateServiceCreate(t *testing.T) {
 		{
 			name: "valid cluster ip - none ",
 			tweakSvc: func(s *core.Service) {
-				s.Spec.ClusterIP = "None"
+				s.Spec.ClusterIP = core.ClusterIPNone
+				s.Spec.ClusterIPs = []string{core.ClusterIPNone}
 			},
 			numErrs: 0,
 		},
 		{
 			name: "valid cluster ip - empty",
 			tweakSvc: func(s *core.Service) {
-				s.Spec.ClusterIP = ""
+				s.Spec.ClusterIPs = nil
 				s.Spec.Ports[0].TargetPort = intstr.FromString("http")
 			},
 			numErrs: 0,
 		},
 		{
-			name: "valid type - cluster",
+			name: "valid type - clusterIP",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeClusterIP
 			},
@@ -10438,7 +10564,6 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid ExternalName",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeExternalName
-				s.Spec.ClusterIP = ""
 				s.Spec.ExternalName = "foo.bar.example.com"
 			},
 			numErrs: 0,
@@ -10447,7 +10572,6 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "valid ExternalName (trailing dot)",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeExternalName
-				s.Spec.ClusterIP = ""
 				s.Spec.ExternalName = "foo.bar.example.com."
 			},
 			numErrs: 0,
@@ -10457,6 +10581,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeExternalName
 				s.Spec.ClusterIP = "1.2.3.4"
+				s.Spec.ClusterIPs = []string{"1.2.3.4"}
 				s.Spec.ExternalName = "foo.bar.example.com"
 			},
 			numErrs: 1,
@@ -10466,6 +10591,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeExternalName
 				s.Spec.ClusterIP = "None"
+				s.Spec.ClusterIPs = []string{"None"}
 				s.Spec.ExternalName = "foo.bar.example.com"
 			},
 			numErrs: 1,
@@ -10474,7 +10600,6 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid ExternalName (not a DNS name)",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeExternalName
-				s.Spec.ClusterIP = ""
 				s.Spec.ExternalName = "-123"
 			},
 			numErrs: 1,
@@ -10483,6 +10608,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "LoadBalancer type cannot have None ClusterIP",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.ClusterIP = "None"
+				s.Spec.ClusterIPs = []string{"None"}
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 			},
 			numErrs: 1,
@@ -10493,6 +10619,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.Type = core.ServiceTypeNodePort
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
 				s.Spec.ClusterIP = "None"
+				s.Spec.ClusterIPs = []string{"None"}
 			},
 			numErrs: 1,
 		},
@@ -10550,29 +10677,385 @@ func TestValidateServiceCreate(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+		/* ip families validation */
 		{
-			name: "valid, nil service IPFamily",
-			tweakSvc: func(s *core.Service) {
-				s.Spec.IPFamily = nil
-			},
-			numErrs: 0,
-		},
-		{
-			name: "valid, service with valid IPFamily",
-			tweakSvc: func(s *core.Service) {
-				ipv4Service := core.IPv4Protocol
-				s.Spec.IPFamily = &ipv4Service
-			},
-			numErrs: 0,
-		},
-		{
-			name: "allowed valid, service with invalid IPFamily is ignored (tested in conditional validation)",
+			name: "invalid, service with invalid ipFamilies",
 			tweakSvc: func(s *core.Service) {
 				invalidServiceIPFamily := core.IPFamily("not-a-valid-ip-family")
-				s.Spec.IPFamily = &invalidServiceIPFamily
+				s.Spec.IPFamilies = []core.IPFamily{invalidServiceIPFamily}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid, service with invalid ipFamilies (2nd)",
+			tweakSvc: func(s *core.Service) {
+				invalidServiceIPFamily := core.IPFamily("not-a-valid-ip-family")
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, invalidServiceIPFamily}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "IPFamilyPolicy(singleStack) is set for two families",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &singleStack
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 0, // this validated in alloc code.
+		},
+		{
+			name: "valid, IPFamilyPolicy(preferDualStack) is set for two families (note: alloc sets families)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &preferDualStack
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
 			},
 			numErrs: 0,
 		},
+
+		{
+			name: "invalid, service with 2+ ipFamilies",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol, core.IPv4Protocol}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid, service with same ip families",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol, core.IPv6Protocol}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "valid, nil service ipFamilies",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilies = nil
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, service with valid ipFamilies (v4)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, service with valid ipFamilies (v6)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, service with valid ipFamilies(v4,v6)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, service with valid ipFamilies(v6,v4)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol, core.IPv4Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, service preferred dual stack with single family",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &preferDualStack
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+			},
+			numErrs: 0,
+		},
+		/* cluster IPs. some tests are reduntant */
+		{
+			name: "invalid, garbage single ip",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.ClusterIP = "garbage-ip"
+				s.Spec.ClusterIPs = []string{"garbage-ip"}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid, garbage ips",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "garbage-ip"
+				s.Spec.ClusterIPs = []string{"garbage-ip", "garbage-second-ip"}
+			},
+			numErrs: 2,
+		},
+		{
+			name: "invalid, garbage first ip",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "garbage-ip"
+				s.Spec.ClusterIPs = []string{"garbage-ip", "2001::1"}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid, garbage second ip",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "2001::1"
+				s.Spec.ClusterIPs = []string{"2001::1", "garbage-ip"}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid, NONE + IP",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "None"
+				s.Spec.ClusterIPs = []string{"None", "2001::1"}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid, IP + NONE",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "2001::1"
+				s.Spec.ClusterIPs = []string{"2001::1", "None"}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid, EMPTY STRING + IP",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = ""
+				s.Spec.ClusterIPs = []string{"", "2001::1"}
+			},
+			numErrs: 2,
+		},
+		{
+			name: "invalid, IP + EMPTY STRING",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "2001::1"
+				s.Spec.ClusterIPs = []string{"2001::1", ""}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid, same ip family (v6)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "2001::1"
+				s.Spec.ClusterIPs = []string{"2001::1", "2001::4"}
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 2,
+		},
+		{
+			name: "invalid, same ip family (v4)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "10.0.0.1"
+				s.Spec.ClusterIPs = []string{"10.0.0.1", "10.0.0.10"}
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+
+			},
+			numErrs: 2,
+		},
+		{
+			name: "invalid, more than two ips",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "10.0.0.1"
+				s.Spec.ClusterIPs = []string{"10.0.0.1", "2001::1", "10.0.0.10"}
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 1,
+		},
+		{
+			name: " multi ip, dualstack not set (request for downgrade)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &singleStack
+				s.Spec.ClusterIP = "10.0.0.1"
+				s.Spec.ClusterIPs = []string{"10.0.0.1", "2001::1"}
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, headless-no-selector + multi family + gate off",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "None"
+				s.Spec.ClusterIPs = []string{"None"}
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+				s.Spec.Selector = nil
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, multi ip, single ipfamilies preferDualStack",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &preferDualStack
+				s.Spec.ClusterIP = "10.0.0.1"
+				s.Spec.ClusterIPs = []string{"10.0.0.1", "2001::1"}
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+			},
+			numErrs: 0,
+		},
+
+		{
+			name: "valid, multi ip, single ipfamilies (must match when provided) + requireDualStack",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "10.0.0.1"
+				s.Spec.ClusterIPs = []string{"10.0.0.1", "2001::1"}
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid, families don't match (v4=>v6)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.ClusterIP = "10.0.0.1"
+				s.Spec.ClusterIPs = []string{"10.0.0.1"}
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid, families don't match (v6=>v4)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.ClusterIP = "2001::1"
+				s.Spec.ClusterIPs = []string{"2001::1"}
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "valid. no field set",
+			tweakSvc: func(s *core.Service) {
+			},
+			numErrs: 0,
+		},
+
+		{
+			name: "valid, single ip",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &singleStack
+				s.Spec.ClusterIP = "10.0.0.1"
+				s.Spec.ClusterIPs = []string{"10.0.0.1"}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, single family",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &singleStack
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, single ip + single family",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &singleStack
+				s.Spec.ClusterIP = "2001::1"
+				s.Spec.ClusterIPs = []string{"2001::1"}
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, single ip + single family (dual stack requested)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &preferDualStack
+				s.Spec.ClusterIP = "2001::1"
+				s.Spec.ClusterIPs = []string{"2001::1"}
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, single ip, multi ipfamilies",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "10.0.0.1"
+				s.Spec.ClusterIPs = []string{"10.0.0.1"}
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, multi ips, multi ipfamilies (4,6)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "10.0.0.1"
+				s.Spec.ClusterIPs = []string{"10.0.0.1", "2001::1"}
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, ips, multi ipfamilies (6,4)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "2001::1"
+				s.Spec.ClusterIPs = []string{"2001::1", "10.0.0.1"}
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol, core.IPv4Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, multi ips (6,4)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "2001::1"
+				s.Spec.ClusterIPs = []string{"2001::1", "10.0.0.1"}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, multi ipfamilies (6,4)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol, core.IPv4Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, multi ips (4,6)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "10.0.0.1"
+				s.Spec.ClusterIPs = []string{"10.0.0.1", "2001::1"}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid,  multi ipfamilies (4,6)",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid, dual stack",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+			},
+			numErrs: 0,
+		},
+
+		/* toplogy keys */
 		{
 			name: "valid topology keys",
 			tweakSvc: func(s *core.Service) {
@@ -10672,16 +11155,119 @@ func TestValidateServiceCreate(t *testing.T) {
 			appProtocolEnabled: true,
 			numErrs:            1,
 		},
+
+		{
+			name: "invalid cluster ip != clusterIP in multi ip service",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.IPFamilyPolicy = &requireDualStack
+				s.Spec.ClusterIP = "10.0.0.10"
+				s.Spec.ClusterIPs = []string{"10.0.0.1", "2001::1"}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid cluster ip != clusterIP in single ip service",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.ClusterIP = "10.0.0.10"
+				s.Spec.ClusterIPs = []string{"10.0.0.1"}
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, true)()
+
 			svc := makeValidService()
 			tc.tweakSvc(&svc)
 			errs := ValidateServiceCreate(&svc)
 			if len(errs) != tc.numErrs {
-				t.Errorf("Unexpected error list for case %q: %v", tc.name, errs.ToAggregate())
+				t.Errorf("Unexpected error list for case %q(expected:%v got %v) - Errors:\n %v", tc.name, tc.numErrs, len(errs), errs.ToAggregate())
+			}
+		})
+	}
+}
+
+func TestValidateLoadBalancerStatus(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, true)()
+
+	ipModeVIP := core.LoadBalancerIPModeVIP
+	ipModeProxy := core.LoadBalancerIPModeProxy
+	ipModeDummy := core.LoadBalancerIPMode("dummy")
+
+	testCases := []struct {
+		name          string
+		tweakLBStatus func(s *core.LoadBalancerStatus)
+		numErrs       int
+	}{
+		/* LoadBalancerIPMode*/
+		{
+			name: `valid vip ipMode`,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{
+					{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeVIP,
+					},
+				}
+			},
+			numErrs: 0,
+		},
+		{
+			name: `valid proxy ipMode`,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{
+					{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeProxy,
+					},
+				}
+			},
+			numErrs: 0,
+		},
+		{
+			name: `invalid ipMode`,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{
+					{
+						IP:     "1.2.3.4",
+						IPMode: &ipModeDummy,
+					},
+				}
+			},
+			numErrs: 1,
+		},
+		{
+			name: `missing ipMode`,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{
+					{
+						IP: "1.2.3.4",
+					},
+				}
+			},
+			numErrs: 1,
+		},
+		{
+			name: `missing ip with ipMode present`,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{
+					{
+						IPMode: &ipModeProxy,
+					},
+				}
+			},
+			numErrs: 1,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := core.LoadBalancerStatus{}
+			tc.tweakLBStatus(&s)
+			errs := ValidateLoadBalancerStatus(&s, field.NewPath("status"))
+			if len(errs) != tc.numErrs {
+				t.Errorf("Unexpected error list for case %q(expected:%v got %v) - Errors:\n %v", tc.name, tc.numErrs, len(errs), errs.ToAggregate())
 			}
 		})
 	}
@@ -11040,7 +11626,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 	for _, successCase := range successCases {
 		successCase.old.ObjectMeta.ResourceVersion = "1"
 		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateReplicationControllerUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
+		if errs := ValidateReplicationControllerUpdate(&successCase.update, &successCase.old, PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -11115,7 +11701,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 		},
 	}
 	for testName, errorCase := range errorCases {
-		if errs := ValidateReplicationControllerUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
+		if errs := ValidateReplicationControllerUpdate(&errorCase.update, &errorCase.old, PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}
@@ -11185,7 +11771,7 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateReplicationController(&successCase); len(errs) != 0 {
+		if errs := ValidateReplicationController(&successCase, PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -11335,7 +11921,7 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateReplicationController(&v)
+		errs := ValidateReplicationController(&v, PodValidationOptions{})
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -12152,6 +12738,9 @@ func TestValidateNodeUpdate(t *testing.T) {
 }
 
 func TestValidateServiceUpdate(t *testing.T) {
+	requireDualStack := core.IPFamilyPolicyRequireDualStack
+	preferDualStack := core.IPFamilyPolicyPreferDualStack
+	singleStack := core.IPFamilyPolicySingleStack
 	testCases := []struct {
 		name               string
 		tweakSvc           func(oldSvc, newSvc *core.Service) // given basic valid services, each test case can customize them
@@ -12197,7 +12786,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "change cluster IP",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+
 				newSvc.Spec.ClusterIP = "8.6.7.5"
+				newSvc.Spec.ClusterIPs = []string{"8.6.7.5"}
 			},
 			numErrs: 1,
 		},
@@ -12205,7 +12797,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "remove cluster IP",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+
 				newSvc.Spec.ClusterIP = ""
+				newSvc.Spec.ClusterIPs = nil
 			},
 			numErrs: 1,
 		},
@@ -12272,26 +12867,48 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "LoadBalancer type cannot have None ClusterIP",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				newSvc.Spec.ClusterIP = "None"
+				newSvc.Spec.ClusterIPs = []string{"None"}
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 			},
 			numErrs: 1,
 		},
 		{
-			name: "`None` ClusterIP cannot be changed",
+			name: "`None` ClusterIP can NOT be changed",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+
 				oldSvc.Spec.ClusterIP = "None"
+				oldSvc.Spec.ClusterIPs = []string{"None"}
+
 				newSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
 			},
 			numErrs: 1,
 		},
 		{
-			name: "`None` ClusterIP cannot be removed",
+			name: "`None` ClusterIP can NOT be removed",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.ClusterIP = "None"
+				oldSvc.Spec.ClusterIPs = []string{"None"}
+
 				newSvc.Spec.ClusterIP = ""
+				newSvc.Spec.ClusterIPs = nil
 			},
 			numErrs: 1,
 		},
+		{
+			name: "ClusterIP can NOT be changed to None",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+
+				newSvc.Spec.ClusterIP = "None"
+				newSvc.Spec.ClusterIPs = []string{"None"}
+			},
+			numErrs: 1,
+		},
+
 		{
 			name: "Service with ClusterIP type cannot change its set ClusterIP",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
@@ -12299,7 +12916,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 1,
 		},
@@ -12310,7 +12930,9 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				oldSvc.Spec.ClusterIP = ""
+				oldSvc.Spec.ClusterIPs = nil
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 0,
 		},
@@ -12321,7 +12943,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeNodePort
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 1,
 		},
@@ -12332,7 +12957,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeNodePort
 
 				oldSvc.Spec.ClusterIP = ""
+				oldSvc.Spec.ClusterIPs = nil
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 0,
 		},
@@ -12343,7 +12971,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 1,
 		},
@@ -12354,7 +12985,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 
 				oldSvc.Spec.ClusterIP = ""
+				oldSvc.Spec.ClusterIPs = nil
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 0,
 		},
@@ -12365,7 +12999,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeNodePort
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 1,
 		},
@@ -12376,7 +13013,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeNodePort
 
 				oldSvc.Spec.ClusterIP = ""
+				oldSvc.Spec.ClusterIPs = nil
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 0,
 		},
@@ -12387,7 +13027,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 1,
 		},
@@ -12398,7 +13041,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				oldSvc.Spec.ClusterIP = ""
+				oldSvc.Spec.ClusterIPs = nil
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 0,
 		},
@@ -12409,7 +13055,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 1,
 		},
@@ -12420,7 +13069,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 
 				oldSvc.Spec.ClusterIP = ""
+				oldSvc.Spec.ClusterIPs = nil
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 0,
 		},
@@ -12431,7 +13083,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 1,
 		},
@@ -12442,7 +13097,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 
 				oldSvc.Spec.ClusterIP = ""
+				oldSvc.Spec.ClusterIPs = nil
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 0,
 		},
@@ -12453,7 +13111,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 1,
 		},
@@ -12464,7 +13125,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				oldSvc.Spec.ClusterIP = ""
+				oldSvc.Spec.ClusterIPs = nil
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 0,
 		},
@@ -12475,7 +13139,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeNodePort
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 1,
 		},
@@ -12486,7 +13153,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeNodePort
 
 				oldSvc.Spec.ClusterIP = ""
+				oldSvc.Spec.ClusterIPs = nil
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 0,
 		},
@@ -12497,7 +13167,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				oldSvc.Spec.ClusterIP = ""
+				oldSvc.Spec.ClusterIPs = nil
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 0,
 		},
@@ -12508,7 +13181,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+
 				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
 			},
 			numErrs: 0,
 		},
@@ -12522,84 +13198,423 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Ports = append(newSvc.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
 
 				oldSvc.Spec.ClusterIP = ""
+				oldSvc.Spec.ClusterIPs = nil
+
 				newSvc.Spec.ClusterIP = "None"
+				newSvc.Spec.ClusterIPs = []string{"None"}
 			},
 			numErrs: 1,
 		},
 		/* Service IP Family */
 		{
-			name: "same ServiceIPFamily",
+			name: "convert from ExternalName",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				ipv4Service := core.IPv4Protocol
-				oldSvc.Spec.Type = core.ServiceTypeClusterIP
-				oldSvc.Spec.IPFamily = &ipv4Service
-
+				oldSvc.Spec.Type = core.ServiceTypeExternalName
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
-				newSvc.Spec.IPFamily = &ipv4Service
 			},
 			numErrs: 0,
 		},
 		{
+			name: "invalid: convert to ExternalName",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				singleStack := core.IPFamilyPolicySingleStack
+
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.ClusterIP = "10.0.0.10"
+				oldSvc.Spec.ClusterIPs = []string{"10.0.0.10"}
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				oldSvc.Spec.IPFamilyPolicy = &singleStack
+
+				newSvc.Spec.Type = core.ServiceTypeExternalName
+				newSvc.Spec.ExternalName = "foo"
+				/*
+					not removing these fields is a validation error
+					strategy takes care of resetting Families & Policy if ClusterIPs
+					were reset. But it does not get called in validation testing.
+				*/
+				newSvc.Spec.ClusterIP = "10.0.0.10"
+				newSvc.Spec.ClusterIPs = []string{"10.0.0.10"}
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				newSvc.Spec.IPFamilyPolicy = &singleStack
+
+			},
+			numErrs: 3,
+		},
+		{
+			name: "valid: convert to ExternalName",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				singleStack := core.IPFamilyPolicySingleStack
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.ClusterIP = "10.0.0.10"
+				oldSvc.Spec.ClusterIPs = []string{"10.0.0.10"}
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+				oldSvc.Spec.IPFamilyPolicy = &singleStack
+
+				newSvc.Spec.Type = core.ServiceTypeExternalName
+				newSvc.Spec.ExternalName = "foo"
+			},
+			numErrs: 0,
+		},
+
+		{
+			name: "same ServiceIPFamily",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "same ServiceIPFamily, change IPFamilyPolicy to singleStack",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = nil
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+
+				newSvc.Spec.IPFamilyPolicy = &singleStack
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "same ServiceIPFamily, change IPFamilyPolicy singleStack => requireDualStack",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = &singleStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+
+				newSvc.Spec.IPFamilyPolicy = &requireDualStack
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+			},
+			numErrs: 0,
+		},
+
+		{
+			name: "add a new ServiceIPFamily",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+
+				newSvc.Spec.IPFamilyPolicy = &requireDualStack
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 0,
+		},
+
+		{
 			name: "ExternalName while changing Service IPFamily",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				ipv4Service := core.IPv4Protocol
 				oldSvc.Spec.ExternalName = "somename"
 				oldSvc.Spec.Type = core.ServiceTypeExternalName
-				oldSvc.Spec.IPFamily = &ipv4Service
 
-				ipv6Service := core.IPv6Protocol
 				newSvc.Spec.ExternalName = "somename"
 				newSvc.Spec.Type = core.ServiceTypeExternalName
-				newSvc.Spec.IPFamily = &ipv6Service
 			},
 			numErrs: 0,
 		},
 		{
 			name: "setting ipfamily from nil to v4",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				oldSvc.Spec.IPFamily = nil
+				oldSvc.Spec.IPFamilies = nil
 
-				ipv4Service := core.IPv4Protocol
 				newSvc.Spec.ExternalName = "somename"
-				newSvc.Spec.IPFamily = &ipv4Service
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
 			},
 			numErrs: 0,
 		},
 		{
 			name: "setting ipfamily from nil to v6",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				oldSvc.Spec.IPFamily = nil
+				oldSvc.Spec.IPFamilies = nil
 
-				ipv6Service := core.IPv6Protocol
 				newSvc.Spec.ExternalName = "somename"
-				newSvc.Spec.IPFamily = &ipv6Service
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
 			},
 			numErrs: 0,
 		},
 		{
-			name: "remove ipfamily (covered by conditional validation)",
+			name: "change primary ServiceIPFamily",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				ipv6Service := core.IPv6Protocol
-				oldSvc.Spec.IPFamily = &ipv6Service
-
-				newSvc.Spec.IPFamily = nil
-			},
-			numErrs: 0,
-		},
-
-		{
-			name: "change ServiceIPFamily (covered by conditional validation)",
-			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				ipv4Service := core.IPv4Protocol
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
-				oldSvc.Spec.IPFamily = &ipv4Service
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
 
-				ipv6Service := core.IPv6Protocol
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
-				newSvc.Spec.IPFamily = &ipv6Service
+				newSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+			},
+			numErrs: 2,
+		},
+		/* upgrade + downgrade from/to dualstack tests */
+		{
+			name: "valid: upgrade to dual stack with requiredDualStack",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = &singleStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
 			},
 			numErrs: 0,
 		},
+		{
+			name: "valid: upgrade to dual stack with preferDualStack",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = &singleStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+				newSvc.Spec.IPFamilyPolicy = &preferDualStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+			},
+			numErrs: 0,
+		},
+
+		{
+			name: "valid: upgrade to dual stack, no specific secondary ip",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = &singleStack
+
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+				newSvc.Spec.IPFamilyPolicy = &requireDualStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid: upgrade to dual stack, with specific secondary ip",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = &singleStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
+				newSvc.Spec.IPFamilyPolicy = &requireDualStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid: downgrade from dual to single",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+				newSvc.Spec.IPFamilyPolicy = &singleStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid: change families for a headless service",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "None"
+				oldSvc.Spec.ClusterIPs = []string{"None"}
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.ClusterIP = "None"
+				newSvc.Spec.ClusterIPs = []string{"None"}
+				newSvc.Spec.IPFamilyPolicy = &requireDualStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol, core.IPv4Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid: upgrade a headless service",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "None"
+				oldSvc.Spec.ClusterIPs = []string{"None"}
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = &singleStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.ClusterIP = "None"
+				newSvc.Spec.ClusterIPs = []string{"None"}
+				newSvc.Spec.IPFamilyPolicy = &requireDualStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol, core.IPv4Protocol}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid: downgrade a headless service",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "None"
+				oldSvc.Spec.ClusterIPs = []string{"None"}
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.ClusterIP = "None"
+				newSvc.Spec.ClusterIPs = []string{"None"}
+				newSvc.Spec.IPFamilyPolicy = &singleStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol}
+			},
+			numErrs: 0,
+		},
+
+		{
+			name: "invalid flip families",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.40"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.ClusterIP = "2001::1"
+				newSvc.Spec.ClusterIPs = []string{"2001::1", "1.2.3.5"}
+				newSvc.Spec.IPFamilyPolicy = &requireDualStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv6Protocol, core.IPv4Protocol}
+			},
+			numErrs: 4,
+		},
+		{
+			name: "invalid change first ip, in dualstack service",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5", "2001::1"}
+				newSvc.Spec.IPFamilyPolicy = &requireDualStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid, change second ip in dualstack service",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2002::1"}
+				newSvc.Spec.IPFamilyPolicy = &requireDualStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "downgrade keeping the families",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+				newSvc.Spec.IPFamilyPolicy = &singleStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 0, // families and ips are trimmed in strategy
+		},
+		{
+			name: "invalid, downgrade without changing to singleStack",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.ClusterIP = "1.2.3.4"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+				newSvc.Spec.IPFamilyPolicy = &requireDualStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+			},
+			numErrs: 2,
+		},
+		{
+			name: "invalid, downgrade and change primary ip",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4", "2001::1"}
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
+				newSvc.Spec.IPFamilyPolicy = &singleStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid: upgrade to dual stack and change primary",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.4"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
+				oldSvc.Spec.Type = core.ServiceTypeClusterIP
+				oldSvc.Spec.IPFamilyPolicy = &singleStack
+
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Spec.ClusterIP = "1.2.3.5"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
+				newSvc.Spec.IPFamilyPolicy = &requireDualStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 1,
+		},
+
 		{
 			name: "update with valid app protocol, field unset, gate disabled",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
@@ -16022,7 +17037,7 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		err := ValidatePodTemplateSpec(test.spec, rootFld)
+		err := ValidatePodTemplateSpec(test.spec, rootFld, PodValidationOptions{})
 		asserttestify.Equal(t, test.expectedErr, err, "TestCase[%d]: %s", i, test.description)
 	}
 }

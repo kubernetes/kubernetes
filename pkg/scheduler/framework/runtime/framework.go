@@ -1027,3 +1027,8 @@ func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) map[string]config
 func (f *frameworkImpl) PreemptHandle() framework.PreemptHandle {
 	return f.preemptHandle
 }
+
+// ProfileName returns the profile name associated to this framework.
+func (f *frameworkImpl) ProfileName() string {
+	return f.profileName
+}

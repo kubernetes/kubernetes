@@ -910,7 +910,7 @@ metadata:
 		/*
 			Release: v1.19
 			Testname: Kubectl, server-side dry-run Pod
-			Description: The command 'kubectl run' must create a pod with the specified image name. After, the command 'kubectl replace --dry-run=server' should update the Pod with the new image name and server-side dry-run enabled. The image name must not change.
+			Description: The command 'kubectl run' must create a pod with the specified image name. After, the command 'kubectl patch pod -p {...} --dry-run=server' should update the Pod with the new image name and server-side dry-run enabled. The image name must not change.
 		*/
 		framework.ConformanceIt("should check if kubectl can dry-run update Pods", func() {
 			ginkgo.By("running the image " + httpdImage)
@@ -918,12 +918,8 @@ metadata:
 			framework.RunKubectlOrDie(ns, "run", podName, "--image="+httpdImage, "--labels=run="+podName)
 
 			ginkgo.By("replace the image in the pod with server-side dry-run")
-			podJSON := framework.RunKubectlOrDie(ns, "get", "pod", podName, "-o", "json")
-			podJSON = strings.Replace(podJSON, httpdImage, busyboxImage, 1)
-			if !strings.Contains(podJSON, busyboxImage) {
-				framework.Failf("Failed replacing image from %s to %s in:\n%s\n", httpdImage, busyboxImage, podJSON)
-			}
-			framework.RunKubectlOrDieInput(ns, podJSON, "replace", "-f", "-", "--dry-run", "server")
+			specImage := fmt.Sprintf(`{"spec":{"containers":[{"name": "%s","image": "%s"}]}}`, podName, busyboxImage)
+			framework.RunKubectlOrDie(ns, "patch", "pod", podName, "-p", specImage, "--dry-run=server")
 
 			ginkgo.By("verifying the pod " + podName + " has the right image " + httpdImage)
 			pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
@@ -1507,11 +1503,12 @@ metadata:
 			Description: The command 'kubectl version' MUST return the major, minor versions,  GitCommit, etc of the Client and the Server that the kubectl is configured to connect to.
 		*/
 		framework.ConformanceIt("should check is all data is printed ", func() {
-			version := framework.RunKubectlOrDie(ns, "version")
-			requiredItems := []string{"Client Version:", "Server Version:", "Major:", "Minor:", "GitCommit:"}
+			versionString := framework.RunKubectlOrDie(ns, "version")
+			// we expect following values for: Major -> digit, Minor -> numeric followed by an optional '+',  GitCommit -> alphanumeric
+			requiredItems := []string{"Client Version: ", "Server Version: "}
 			for _, item := range requiredItems {
-				if !strings.Contains(version, item) {
-					framework.Failf("Required item %s not found in %s", item, version)
+				if matched, _ := regexp.MatchString(item+`version.Info\{Major:"\d", Minor:"\d+\+?", GitVersion:"v\d\.\d+\.[\d\w\-\.\+]+", GitCommit:"[0-9a-f]+"`, versionString); !matched {
+					framework.Failf("Item %s value is not valid in %s\n", item, versionString)
 				}
 			}
 		})

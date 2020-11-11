@@ -188,15 +188,15 @@ func GetZoneKey(node *v1.Node) string {
 	}
 
 	// TODO: prefer stable labels for zone in v1.18
-	zone, ok := labels[v1.LabelZoneFailureDomain]
+	zone, ok := labels[v1.LabelFailureDomainBetaZone]
 	if !ok {
-		zone, _ = labels[v1.LabelZoneFailureDomainStable]
+		zone, _ = labels[v1.LabelTopologyZone]
 	}
 
 	// TODO: prefer stable labels for region in v1.18
-	region, ok := labels[v1.LabelZoneRegion]
+	region, ok := labels[v1.LabelFailureDomainBetaRegion]
 	if !ok {
-		region, _ = labels[v1.LabelZoneRegionStable]
+		region, _ = labels[v1.LabelTopologyRegion]
 	}
 
 	if region == "" && zone == "" {

@@ -18,7 +18,6 @@ package runtime
 
 import (
 	"fmt"
-	"net/url"
 	"reflect"
 	"strings"
 
@@ -105,9 +104,6 @@ func NewScheme() *Scheme {
 	// Enable couple default conversions by default.
 	utilruntime.Must(RegisterEmbeddedConversions(s))
 	utilruntime.Must(RegisterStringConversions(s))
-
-	utilruntime.Must(s.RegisterInputDefaults(&map[string][]string{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields))
-	utilruntime.Must(s.RegisterInputDefaults(&url.Values{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields))
 	return s
 }
 
@@ -337,14 +333,6 @@ func (s *Scheme) AddFieldLabelConversionFunc(gvk schema.GroupVersionKind, conver
 	return nil
 }
 
-// RegisterInputDefaults sets the provided field mapping function and field matching
-// as the defaults for the provided input type.  The fn may be nil, in which case no
-// mapping will happen by default. Use this method to register a mechanism for handling
-// a specific input type in conversion, such as a map[string]string to structs.
-func (s *Scheme) RegisterInputDefaults(in interface{}, fn conversion.FieldMappingFunc, defaultFlags conversion.FieldMatchingFlags) error {
-	return s.converter.RegisterInputDefaults(in, fn, defaultFlags)
-}
-
 // AddTypeDefaultingFunc registers a function that is passed a pointer to an
 // object and can default fields on the object. These functions will be invoked
 // when Default() is called. The function will never be called unless the
@@ -428,12 +416,9 @@ func (s *Scheme) Convert(in, out interface{}, context interface{}) error {
 		in = typed
 	}
 
-	flags, meta := s.generateConvertMeta(in)
+	meta := s.generateConvertMeta(in)
 	meta.Context = context
-	if flags == 0 {
-		flags = conversion.AllowDifferentFieldTypeNames
-	}
-	return s.converter.Convert(in, out, flags, meta)
+	return s.converter.Convert(in, out, meta)
 }
 
 // ConvertFieldLabel alters the given field label and value for an kind field selector from
@@ -530,9 +515,9 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 		in = in.DeepCopyObject()
 	}
 
-	flags, meta := s.generateConvertMeta(in)
+	meta := s.generateConvertMeta(in)
 	meta.Context = target
-	if err := s.converter.Convert(in, out, flags, meta); err != nil {
+	if err := s.converter.Convert(in, out, meta); err != nil {
 		return nil, err
 	}
 
@@ -560,7 +545,7 @@ func (s *Scheme) unstructuredToTyped(in Unstructured) (Object, error) {
 }
 
 // generateConvertMeta constructs the meta value we pass to Convert.
-func (s *Scheme) generateConvertMeta(in interface{}) (conversion.FieldMatchingFlags, *conversion.Meta) {
+func (s *Scheme) generateConvertMeta(in interface{}) *conversion.Meta {
 	return s.converter.DefaultMeta(reflect.TypeOf(in))
 }
 

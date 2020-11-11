@@ -118,6 +118,7 @@ type serviceInfo struct {
 	remoteEndpoint         *endpointsInfo
 	hns                    HostNetworkService
 	preserveDIP            bool
+	localTrafficDSR        bool
 }
 
 type hnsNetworkInfo struct {
@@ -350,9 +351,11 @@ func (refCountMap endPointsReferenceCountMap) getRefCount(hnsID string) *uint16 
 func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.BaseServiceInfo) proxy.ServicePort {
 	info := &serviceInfo{BaseServiceInfo: baseInfo}
 	preserveDIP := service.Annotations["preserve-destination"] == "true"
+	localTrafficDSR := service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
 	err := hcn.DSRSupported()
 	if err != nil {
 		preserveDIP = false
+		localTrafficDSR = false
 	}
 	// targetPort is zero if it is specified as a name in port.TargetPort.
 	// Its real value would be got later from endpoints.
@@ -364,6 +367,7 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	info.preserveDIP = preserveDIP
 	info.targetPort = targetPort
 	info.hns = proxier.hns
+	info.localTrafficDSR = localTrafficDSR
 
 	for _, eip := range service.Spec.ExternalIPs {
 		info.externalIPs = append(info.externalIPs, &externalIPInfo{ip: eip})
@@ -604,8 +608,12 @@ func NewProxier(
 		isIPv6Mode:          isIPv6,
 	}
 
-	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, &isIPv6, recorder, proxier.serviceMapChange)
-	endPointChangeTracker := proxy.NewEndpointChangeTracker(hostname, proxier.newEndpointInfo, &isIPv6, recorder, endpointSlicesEnabled, proxier.endpointsMapChange)
+	ipFamily := v1.IPv4Protocol
+	if isIPv6 {
+		ipFamily = v1.IPv6Protocol
+	}
+	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, ipFamily, recorder, proxier.serviceMapChange)
+	endPointChangeTracker := proxy.NewEndpointChangeTracker(hostname, proxier.newEndpointInfo, ipFamily, recorder, endpointSlicesEnabled, proxier.endpointsMapChange)
 	proxier.endpointsChanges = endPointChangeTracker
 	proxier.serviceChanges = serviceChanges
 
@@ -1153,12 +1161,12 @@ func (proxier *Proxier) syncProxyRules() {
 			// If the preserve-destination service annotation is present, we will disable routing mesh for NodePort.
 			// This means that health services can use Node Port without falsely getting results from a different node.
 			nodePortEndpoints := hnsEndpoints
-			if svcInfo.preserveDIP {
+			if svcInfo.preserveDIP || svcInfo.localTrafficDSR {
 				nodePortEndpoints = hnsLocalEndpoints
 			}
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				nodePortEndpoints,
-				loadBalancerFlags{localRoutedVIP: true, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
+				loadBalancerFlags{isDSR: svcInfo.localTrafficDSR, localRoutedVIP: true, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
 				sourceVip,
 				"",
 				Enum(svcInfo.Protocol()),
@@ -1176,10 +1184,15 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Create a Load Balancer Policy for each external IP
 		for _, externalIP := range svcInfo.externalIPs {
+			// Disable routing mesh if ExternalTrafficPolicy is set to local
+			externalIPEndpoints := hnsEndpoints
+			if svcInfo.localTrafficDSR {
+				externalIPEndpoints = hnsLocalEndpoints
+			}
 			// Try loading existing policies, if already available
 			hnsLoadBalancer, err = hns.getLoadBalancer(
-				hnsEndpoints,
-				loadBalancerFlags{sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
+				externalIPEndpoints,
+				loadBalancerFlags{isDSR: svcInfo.localTrafficDSR, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
 				sourceVip,
 				externalIP.ip,
 				Enum(svcInfo.Protocol()),
@@ -1197,12 +1210,12 @@ func (proxier *Proxier) syncProxyRules() {
 		for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
 			// Try loading existing policies, if already available
 			lbIngressEndpoints := hnsEndpoints
-			if svcInfo.preserveDIP {
+			if svcInfo.preserveDIP || svcInfo.localTrafficDSR {
 				lbIngressEndpoints = hnsLocalEndpoints
 			}
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				lbIngressEndpoints,
-				loadBalancerFlags{isDSR: svcInfo.preserveDIP || proxier.isDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
+				loadBalancerFlags{isDSR: svcInfo.preserveDIP || proxier.isDSR || svcInfo.localTrafficDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
 				sourceVip,
 				lbIngressIP.ip,
 				Enum(svcInfo.Protocol()),

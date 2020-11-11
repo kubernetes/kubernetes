@@ -21,13 +21,17 @@ package dockershim
 import (
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
 	"k8s.io/klog/v2"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/probe/exec"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
@@ -110,29 +114,48 @@ func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container 
 		return err
 	}
 
+	// if ExecProbeTimeout feature gate is disabled, preserve existing behavior to ignore exec timeouts
+	var execTimeout <-chan time.Time
+	if timeout > 0 && utilfeature.DefaultFeatureGate.Enabled(features.ExecProbeTimeout) {
+		execTimeout = time.After(timeout)
+	} else {
+		// skip exec timeout if provided timeout is 0
+		execTimeout = nil
+	}
+
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	count := 0
 	for {
-		inspect, err2 := client.InspectExec(execObj.ID)
-		if err2 != nil {
-			return err2
-		}
-		if !inspect.Running {
-			if inspect.ExitCode != 0 {
-				err = &dockerExitError{inspect}
+		select {
+		case <-execTimeout:
+			return exec.NewTimeoutError(fmt.Errorf("command %q timed out", strings.Join(cmd, " ")), timeout)
+		// need to use "default" here instead of <-ticker.C, otherwise we delay the initial InspectExec by 2 seconds.
+		default:
+			inspect, inspectErr := client.InspectExec(execObj.ID)
+			if inspectErr != nil {
+				return inspectErr
 			}
-			break
-		}
 
-		count++
-		if count == 5 {
-			klog.Errorf("Exec session %s in container %s terminated but process still running!", execObj.ID, container.ID)
-			break
-		}
+			if !inspect.Running {
+				if inspect.ExitCode != 0 {
+					return &dockerExitError{inspect}
+				}
 
-		<-ticker.C
+				return nil
+			}
+
+			// Only limit the amount of InspectExec calls if the exec timeout was not set.
+			// When a timeout is not set, we stop polling the exec session after 5 attempts and allow the process to continue running.
+			if execTimeout == nil {
+				count++
+				if count == 5 {
+					klog.Errorf("Exec session %s in container %s terminated but process still running!", execObj.ID, container.ID)
+					return nil
+				}
+			}
+
+			<-ticker.C
+		}
 	}
-
-	return err
 }

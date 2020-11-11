@@ -181,7 +181,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 				nodes = append(nodes, &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   fmt.Sprintf("node-%d", i),
-						Labels: map[string]string{v1.LabelZoneRegion: "region1", v1.LabelZoneFailureDomain: "zone1"},
+						Labels: map[string]string{v1.LabelFailureDomainBetaRegion: "region1", v1.LabelFailureDomainBetaZone: "zone1"},
 					},
 					Spec: v1.NodeSpec{},
 					Status: v1.NodeStatus{

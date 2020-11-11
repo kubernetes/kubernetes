@@ -52,12 +52,9 @@ func runDockershim(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		ImagePullProgressDeadline: kubeDeps.DockerOptions.ImagePullProgressDeadline,
 	}
 	ds, err := dockershim.NewDockerService(dockerClientConfig, crOptions.PodSandboxImage, streamingConfig,
-		&pluginSettings, runtimeCgroups, kubeCfg.CgroupDriver, crOptions.DockershimRootDirectory, !crOptions.RedirectContainerStreaming)
+		&pluginSettings, runtimeCgroups, kubeCfg.CgroupDriver, crOptions.DockershimRootDirectory)
 	if err != nil {
 		return err
-	}
-	if crOptions.RedirectContainerStreaming {
-		kubeDeps.criHandler = ds
 	}
 
 	// The unix socket for kubelet <-> dockershim communication, dockershim start before runtime service init.

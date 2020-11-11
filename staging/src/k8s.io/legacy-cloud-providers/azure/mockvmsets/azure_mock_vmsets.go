@@ -293,12 +293,13 @@ func (mr *MockVMSetMockRecorder) GetPrivateIPsByNodeName(name interface{}) *gomo
 }
 
 // GetNodeNameByIPConfigurationID mocks base method
-func (m *MockVMSet) GetNodeNameByIPConfigurationID(ipConfigurationID string) (string, error) {
+func (m *MockVMSet) GetNodeNameByIPConfigurationID(ipConfigurationID string) (string, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetNodeNameByIPConfigurationID", ipConfigurationID)
 	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // GetNodeNameByIPConfigurationID indicates an expected call of GetNodeNameByIPConfigurationID

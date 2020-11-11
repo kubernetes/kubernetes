@@ -243,6 +243,7 @@ aliases:
     - vishh
     - yujuhong
     - sjenning
+    - mrunalp
   # emeretus:
   # - dashpole
   sig-node-reviewers:
@@ -259,10 +260,10 @@ aliases:
     - yifan-gu
     - yujuhong
     - krmayankk
-    - mattjmcnaughton
     - matthyx
     - odinuge
     - andrewsykim
+    - mrunalp
   sig-network-driver-approvers:
     - dcbw
     - freehan

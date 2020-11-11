@@ -156,7 +156,7 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 		return zones, err
 	}
 	for _, node := range nodes.Items {
-		if zone, ok := node.Labels[v1.LabelZoneFailureDomain]; ok {
+		if zone, ok := node.Labels[v1.LabelFailureDomainBetaZone]; ok {
 			zones.Insert(zone)
 		}
 	}
@@ -229,10 +229,10 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, al
 	volumeLabels = make(map[string]string)
 	if IgnoreVolumeAZ == false {
 		if volumeAZ != "" {
-			volumeLabels[v1.LabelZoneFailureDomain] = volumeAZ
+			volumeLabels[v1.LabelFailureDomainBetaZone] = volumeAZ
 		}
 		if volumeRegion != "" {
-			volumeLabels[v1.LabelZoneRegion] = volumeRegion
+			volumeLabels[v1.LabelFailureDomainBetaRegion] = volumeRegion
 		}
 	}
 	return volumeID, volSizeGiB, volumeLabels, fstype, nil

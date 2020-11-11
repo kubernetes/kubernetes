@@ -79,7 +79,8 @@ func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 // Validate validates a new deployment.
 func (deploymentStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	deployment := obj.(*apps.Deployment)
-	return validation.ValidateDeployment(deployment)
+	opts := pod.GetValidationOptionsFromPodTemplate(&deployment.Spec.Template, nil)
+	return validation.ValidateDeployment(deployment, opts)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -112,7 +113,9 @@ func (deploymentStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 func (deploymentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newDeployment := obj.(*apps.Deployment)
 	oldDeployment := old.(*apps.Deployment)
-	allErrs := validation.ValidateDeploymentUpdate(newDeployment, oldDeployment)
+
+	opts := pod.GetValidationOptionsFromPodTemplate(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
+	allErrs := validation.ValidateDeploymentUpdate(newDeployment, oldDeployment, opts)
 
 	// Update is not allowed to set Spec.Selector for all groups/versions except extensions/v1beta1.
 	// If RequestInfo is nil, it is better to revert to old behavior (i.e. allow update to set Spec.Selector)

@@ -39,18 +39,18 @@ const (
 	maxAllowableNUMANodes = 8
 )
 
-//Manager interface provides methods for Kubelet to manage pod topology hints
+// Manager interface provides methods for Kubelet to manage pod topology hints
 type Manager interface {
-	//Manager implements pod admit handler interface
+	// PodAdmitHandler is implemented by Manager
 	lifecycle.PodAdmitHandler
-	//Adds a hint provider to manager to indicate the hint provider
-	//wants to be consoluted when making topology hints
+	// AddHintProvider adds a hint provider to manager to indicate the hint provider
+	// wants to be consulted with when making topology hints
 	AddHintProvider(HintProvider)
-	//Adds pod to Manager for tracking
+	// AddContainer adds pod to Manager for tracking
 	AddContainer(pod *v1.Pod, containerID string) error
-	//Removes pod from Manager tracking
+	// RemoveContainer removes pod from Manager tracking
 	RemoveContainer(containerID string) error
-	//Interface for storing pod topology hints
+	// Store is the interface for storing pod topology hints
 	Store
 }
 
@@ -90,7 +90,7 @@ type Store interface {
 	GetAffinity(podUID string, containerName string) TopologyHint
 }
 
-//TopologyHint is a struct containing the NUMANodeAffinity for a Container
+// TopologyHint is a struct containing the NUMANodeAffinity for a Container
 type TopologyHint struct {
 	NUMANodeAffinity bitmask.BitMask
 	// Preferred is set to true when the NUMANodeAffinity encodes a preferred
@@ -121,7 +121,7 @@ func (th *TopologyHint) LessThan(other TopologyHint) bool {
 
 var _ Manager = &manager{}
 
-//NewManager creates a new TopologyManager based on provided policy
+// NewManager creates a new TopologyManager based on provided policy
 func NewManager(topology []cadvisorapi.Node, topologyPolicyName string) (Manager, error) {
 	klog.Infof("[topologymanager] Creating topology manager with %s policy", topologyPolicyName)
 

@@ -18,7 +18,7 @@ package options
 
 import (
 	"github.com/spf13/pflag"
-	cpconfig "k8s.io/cloud-provider/app/apis/config"
+	cpconfig "k8s.io/cloud-provider/config"
 )
 
 // KubeCloudSharedOptions holds the options shared between kube-controller-manager

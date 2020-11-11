@@ -75,7 +75,7 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, na
 		framework.Logf("http requesting node kubelet /configz")
 		endpoint = fmt.Sprintf("http://127.0.0.1:%d/api/v1/nodes/%s/proxy/configz", port, nodeName)
 	} else {
-		endpoint = fmt.Sprintf("http://127.0.0.1:8080/api/v1/nodes/%s/proxy/configz", framework.TestContext.NodeName)
+		endpoint = fmt.Sprintf("%s/api/v1/nodes/%s/proxy/configz", framework.TestContext.Host, framework.TestContext.NodeName)
 	}
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -83,10 +83,13 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, na
 	client := &http.Client{Transport: tr}
 	req, err := http.NewRequest("GET", endpoint, nil)
 	framework.ExpectNoError(err)
+	if !useProxy {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))
+	}
 	req.Header.Add("Accept", "application/json")
 
 	var resp *http.Response
-	wait.PollImmediate(pollInterval, timeout, func() (bool, error) {
+	err = wait.PollImmediate(pollInterval, timeout, func() (bool, error) {
 		resp, err = client.Do(req)
 		if err != nil {
 			framework.Logf("Failed to get /configz, retrying. Error: %v", err)
@@ -99,6 +102,7 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, na
 
 		return true, nil
 	})
+	framework.ExpectNoError(err, "Failed to get successful response from /configz")
 	return resp
 }
 

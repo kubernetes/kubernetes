@@ -19,6 +19,10 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
+
+	"golang.org/x/sys/windows"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/windows/service"
 )
 
@@ -26,7 +30,33 @@ const (
 	serviceName = "kubelet"
 )
 
-func initForOS(windowsService bool) error {
+// getPriorityValue returns the value associated with a Windows process priorityClass
+// Ref: https://docs.microsoft.com/en-us/windows/win32/cimwin32prov/setpriority-method-in-class-win32-process
+func getPriorityValue(priorityClassName string) uint32 {
+	var priorityClassMap = map[string]uint32{
+		"IDLE_PRIORITY_CLASS":         uint32(64),
+		"BELOW_NORMAL_PRIORITY_CLASS": uint32(16384),
+		"NORMAL_PRIORITY_CLASS":       uint32(32),
+		"ABOVE_NORMAL_PRIORITY_CLASS": uint32(32768),
+		"HIGH_PRIORITY_CLASS":         uint32(128),
+		"REALTIME_PRIORITY_CLASS":     uint32(256),
+	}
+	return priorityClassMap[priorityClassName]
+}
+
+func initForOS(windowsService bool, windowsPriorityClass string) error {
+	priority := getPriorityValue(windowsPriorityClass)
+	if priority == 0 {
+		return fmt.Errorf("unknown priority class %s, valid ones are available at "+
+			"https://docs.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities", windowsPriorityClass)
+	}
+	kubeletProcessHandle := windows.CurrentProcess()
+	// Set the priority of the kubelet process to given priority
+	klog.Infof("Setting the priority of kubelet process to %s", windowsPriorityClass)
+	if err := windows.SetPriorityClass(kubeletProcessHandle, priority); err != nil {
+		return err
+	}
+
 	if windowsService {
 		return service.InitService(serviceName)
 	}

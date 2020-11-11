@@ -158,7 +158,7 @@ type Config struct {
 		AuthURL         string `gcfg:"auth-url"`
 		Username        string
 		UserID          string `gcfg:"user-id"`
-		Password        string
+		Password        string `datapolicy:"password"`
 		TenantID        string `gcfg:"tenant-id"`
 		TenantName      string `gcfg:"tenant-name"`
 		TrustID         string `gcfg:"trust-id"`

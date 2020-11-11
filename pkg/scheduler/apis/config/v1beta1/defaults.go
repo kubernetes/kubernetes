@@ -44,6 +44,11 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults
 func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfiguration) {
+
+	if obj.Parallelism == nil {
+		obj.Parallelism = pointer.Int32Ptr(16)
+	}
+
 	if len(obj.Profiles) == 0 {
 		obj.Profiles = append(obj.Profiles, v1beta1.KubeSchedulerProfile{})
 	}
@@ -155,6 +160,15 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 	if *obj.EnableProfiling && obj.EnableContentionProfiling == nil {
 		enableContentionProfiling := true
 		obj.EnableContentionProfiling = &enableContentionProfiling
+	}
+}
+
+func SetDefaults_DefaultPreemptionArgs(obj *v1beta1.DefaultPreemptionArgs) {
+	if obj.MinCandidateNodesPercentage == nil {
+		obj.MinCandidateNodesPercentage = pointer.Int32Ptr(10)
+	}
+	if obj.MinCandidateNodesAbsolute == nil {
+		obj.MinCandidateNodesAbsolute = pointer.Int32Ptr(100)
 	}
 }
 

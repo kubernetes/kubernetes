@@ -22,6 +22,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
@@ -55,7 +57,10 @@ var (
 		Output is always YAML.
 
 		KUBECTL_EXTERNAL_DIFF environment variable can be used to select your own
-		diff command. By default, the "diff" command available in your path will be
+		diff command. Users can use external commands with params too, example:
+		KUBECTL_EXTERNAL_DIFF="colordiff -N -u"
+
+		By default, the "diff" command available in your path will be
 		run with "-u" (unified diff) and "-N" (treat absent files as empty) options.
 
 		Exit status:
@@ -168,7 +173,18 @@ type DiffProgram struct {
 func (d *DiffProgram) getCommand(args ...string) (string, exec.Cmd) {
 	diff := ""
 	if envDiff := os.Getenv("KUBECTL_EXTERNAL_DIFF"); envDiff != "" {
-		diff = envDiff
+		diffCommand := strings.Split(envDiff, " ")
+		diff = diffCommand[0]
+
+		if len(diffCommand) > 1 {
+			// Regex accepts: Alphanumeric (case-insensitive) and dash
+			isValidChar := regexp.MustCompile(`^[a-zA-Z0-9-]+$`).MatchString
+			for i := 1; i < len(diffCommand); i++ {
+				if isValidChar(diffCommand[i]) {
+					args = append(args, diffCommand[i])
+				}
+			}
+		}
 	} else {
 		diff = "diff"
 		args = append([]string{"-u", "-N"}, args...)
@@ -548,6 +564,9 @@ func (o *DiffOptions) Run() error {
 				break
 			}
 		}
+
+		apply.WarnIfDeleting(info.Object, o.Diff.ErrOut)
+
 		return err
 	})
 	if err != nil {

@@ -30,7 +30,7 @@ run_authorization_tests() {
   kubectl create -f test/fixtures/pkg/kubectl/cmd/create/sar-v1beta1.json --validate=false
 
   SAR_RESULT_FILE="${KUBE_TEMP}/sar-result.json"
-  curl -k -H "Content-Type:" http://localhost:8080/apis/authorization.k8s.io/v1beta1/subjectaccessreviews -XPOST -d @test/fixtures/pkg/kubectl/cmd/create/sar-v1beta1.json > "${SAR_RESULT_FILE}"
+  curl -kfsS -H "Content-Type:" -H 'Authorization: Bearer admin-token' "https://localhost:${SECURE_API_PORT}/apis/authorization.k8s.io/v1beta1/subjectaccessreviews" -XPOST -d @test/fixtures/pkg/kubectl/cmd/create/sar-v1beta1.json > "${SAR_RESULT_FILE}"
   if grep -q '"allowed": true' "${SAR_RESULT_FILE}"; then
     kube::log::status "\"authorization.k8s.io/subjectaccessreviews\" returns as expected: $(cat "${SAR_RESULT_FILE}")"
   else
@@ -40,7 +40,7 @@ run_authorization_tests() {
   rm "${SAR_RESULT_FILE}"
 
   SAR_RESULT_FILE="${KUBE_TEMP}/sar-result.json"
-  curl -k -H "Content-Type:" http://localhost:8080/apis/authorization.k8s.io/v1/subjectaccessreviews -XPOST -d @test/fixtures/pkg/kubectl/cmd/create/sar-v1.json > "${SAR_RESULT_FILE}"
+  curl -kfsS -H "Content-Type:" -H 'Authorization: Bearer admin-token' "https://localhost:${SECURE_API_PORT}/apis/authorization.k8s.io/v1/subjectaccessreviews" -XPOST -d @test/fixtures/pkg/kubectl/cmd/create/sar-v1.json > "${SAR_RESULT_FILE}"
   if grep -q '"allowed": true' "${SAR_RESULT_FILE}"; then
     kube::log::status "\"authorization.k8s.io/subjectaccessreviews\" returns as expected: $(cat "${SAR_RESULT_FILE}")"
   else

@@ -125,6 +125,9 @@ var SchemaSchemaYAML = `types:
     - name: type
       type:
         namedType: typeRef
+    - name: default
+      type:
+        namedType: __untyped_atomic_
 - name: list
   map:
     fields:
@@ -145,4 +148,14 @@ var SchemaSchemaYAML = `types:
     - name: elementRelationship
       type:
         scalar: string
+- name: __untyped_atomic_
+  scalar: untyped
+  list:
+    elementType:
+      namedType: __untyped_atomic_
+    elementRelationship: atomic
+  map:
+    elementType:
+      namedType: __untyped_atomic_
+    elementRelationship: atomic
 `

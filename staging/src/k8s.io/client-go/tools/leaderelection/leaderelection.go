@@ -290,8 +290,12 @@ func (le *LeaderElector) release() bool {
 	if !le.IsLeader() {
 		return true
 	}
+	now := metav1.Now()
 	leaderElectionRecord := rl.LeaderElectionRecord{
-		LeaderTransitions: le.observedRecord.LeaderTransitions,
+		LeaderTransitions:    le.observedRecord.LeaderTransitions,
+		LeaseDurationSeconds: 1,
+		RenewTime:            now,
+		AcquireTime:          now,
 	}
 	if err := le.config.Lock.Update(context.TODO(), leaderElectionRecord); err != nil {
 		klog.Errorf("Failed to release lock: %v", err)

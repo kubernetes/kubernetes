@@ -189,7 +189,7 @@ type cephfs struct {
 	mon        []string
 	path       string
 	id         string
-	secret     string
+	secret     string `datapolicy:"token"`
 	secretFile string
 	readonly   bool
 	mounter    mount.Interface

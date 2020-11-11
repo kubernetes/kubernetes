@@ -1071,7 +1071,7 @@ func InitCinderDriver() testsuites.TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			TopologyKeys: []string{v1.LabelZoneFailureDomain},
+			TopologyKeys: []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
@@ -1251,7 +1251,7 @@ func InitGcePdDriver() testsuites.TestDriver {
 			},
 			SupportedFsType:      supportedTypes,
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
-			TopologyKeys:         []string{v1.LabelZoneFailureDomain},
+			TopologyKeys:         []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence:         true,
 				testsuites.CapFsGroup:             true,
@@ -1348,7 +1348,7 @@ func (g *gcePdDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelZoneFailureDomain: zone,
+				v1.LabelFailureDomainBetaZone: zone,
 			},
 		}
 	}
@@ -1394,7 +1394,7 @@ func InitVSphereDriver() testsuites.TestDriver {
 				"", // Default fsType
 				"ext4",
 			),
-			TopologyKeys: []string{v1.LabelZoneFailureDomain},
+			TopologyKeys: []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
@@ -1519,7 +1519,7 @@ func InitAzureDiskDriver() testsuites.TestDriver {
 				"ext4",
 				"xfs",
 			),
-			TopologyKeys: []string{v1.LabelZoneFailureDomain},
+			TopologyKeys: []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
@@ -1613,7 +1613,7 @@ func (a *azureDiskDriver) CreateVolume(config *testsuites.PerTestConfig, volType
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelZoneFailureDomain: zone,
+				v1.LabelFailureDomainBetaZone: zone,
 			},
 		}
 	}
@@ -1661,7 +1661,7 @@ func InitAwsDriver() testsuites.TestDriver {
 				"ntfs",
 			),
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
-			TopologyKeys:         []string{v1.LabelZoneFailureDomain},
+			TopologyKeys:         []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence:         true,
 				testsuites.CapFsGroup:             true,
@@ -1754,7 +1754,7 @@ func (a *awsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelZoneFailureDomain: zone,
+				v1.LabelFailureDomainBetaZone: zone,
 			},
 		}
 	}
@@ -1967,7 +1967,7 @@ func getInlineVolumeZone(f *framework.Framework) string {
 	// if zone is not specified we will randomly pick a zone from schedulable nodes for inline tests
 	node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
 	framework.ExpectNoError(err)
-	zone, ok := node.Labels[v1.LabelZoneFailureDomain]
+	zone, ok := node.Labels[v1.LabelFailureDomainBetaZone]
 	if ok {
 		return zone
 	}

@@ -150,12 +150,12 @@ func translateTopology(pv *v1.PersistentVolume, topologyKey string) error {
 		return nil
 	}
 
-	zones := getTopologyZones(pv, v1.LabelZoneFailureDomain)
+	zones := getTopologyZones(pv, v1.LabelFailureDomainBetaZone)
 	if len(zones) > 0 {
-		return replaceTopology(pv, v1.LabelZoneFailureDomain, topologyKey)
+		return replaceTopology(pv, v1.LabelFailureDomainBetaZone, topologyKey)
 	}
 
-	if label, ok := pv.Labels[v1.LabelZoneFailureDomain]; ok {
+	if label, ok := pv.Labels[v1.LabelFailureDomainBetaZone]; ok {
 		zones = strings.Split(label, labelMultiZoneDelimiter)
 		if len(zones) > 0 {
 			return addTopology(pv, topologyKey, zones)
@@ -177,7 +177,7 @@ func translateAllowedTopologies(terms []v1.TopologySelectorTerm, key string) ([]
 		newTerm := v1.TopologySelectorTerm{}
 		for _, exp := range term.MatchLabelExpressions {
 			var newExp v1.TopologySelectorLabelRequirement
-			if exp.Key == v1.LabelZoneFailureDomain {
+			if exp.Key == v1.LabelFailureDomainBetaZone {
 				newExp = v1.TopologySelectorLabelRequirement{
 					Key:    key,
 					Values: exp.Values,

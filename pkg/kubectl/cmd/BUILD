@@ -9,7 +9,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubectl/cmd/auth:go_default_library",
         "//pkg/kubectl/cmd/convert:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
@@ -20,6 +19,7 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/cmd/apiresources:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/apply:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/attach:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/auth:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/autoscale:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/certificates:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo:go_default_library",
@@ -27,6 +27,7 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/cmd/config:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/cp:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/create:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/debug:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/delete:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/describe:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/diff:go_default_library",
@@ -84,7 +85,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubectl/cmd/auth:all-srcs",
         "//pkg/kubectl/cmd/convert:all-srcs",
         "//pkg/kubectl/cmd/plugin/testdata:all-srcs",
     ],

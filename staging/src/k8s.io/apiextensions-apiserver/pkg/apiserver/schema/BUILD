@@ -6,6 +6,7 @@ go_library(
         "complete.go",
         "convert.go",
         "goopenapi.go",
+        "kubeopenapi.go",
         "skeleton.go",
         "structural.go",
         "unfold.go",
@@ -21,6 +22,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/validation/spec:go_default_library",
     ],
 )
 
@@ -49,6 +51,7 @@ go_test(
     srcs = [
         "convert_test.go",
         "goopenapi_test.go",
+        "kubeopenapi_test.go",
         "unfold_test.go",
         "validation_test.go",
     ],

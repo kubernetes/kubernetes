@@ -47,6 +47,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 )
 
+func init() {
+	klog.InitFlags(nil)
+}
+
 // This is a unit test framework for persistent volume controller.
 // It fills the controller with test claims/volumes and can simulate these
 // scenarios:
@@ -90,6 +94,11 @@ type controllerTest struct {
 	// Function to call as the test.
 	test testCall
 }
+
+// annSkipLocalStore can be used to mark initial PVs or PVCs that are meant to be added only
+// to the fake apiserver (i.e. available via Get) but not to the local store (i.e. the controller
+// won't have them in its cache).
+const annSkipLocalStore = "pv-testing-skip-local-store"
 
 type testCall func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error
 
@@ -628,9 +637,7 @@ func evaluateTestResults(ctrl *PersistentVolumeController, reactor *pvtesting.Vo
 //    controllerTest.testCall *once*.
 // 3. Compare resulting volumes and claims with expected volumes and claims.
 func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storage.StorageClass, pods []*v1.Pod) {
-	for _, test := range tests {
-		klog.V(4).Infof("starting test %q", test.name)
-
+	doit := func(t *testing.T, test controllerTest) {
 		// Initialize the controller
 		client := &fake.Clientset{}
 		ctrl, err := newTestController(client, nil, true)
@@ -639,9 +646,15 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 		}
 		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
+			if metav1.HasAnnotation(claim.ObjectMeta, annSkipLocalStore) {
+				continue
+			}
 			ctrl.claims.Add(claim)
 		}
 		for _, volume := range test.initialVolumes {
+			if metav1.HasAnnotation(volume.ObjectMeta, annSkipLocalStore) {
+				continue
+			}
 			ctrl.volumes.store.Add(volume)
 		}
 		reactor.AddClaims(test.initialClaims)
@@ -674,6 +687,13 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 		}
 
 		evaluateTestResults(ctrl, reactor.VolumeReactor, test, t)
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			doit(t, test)
+		})
 	}
 }
 

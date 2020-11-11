@@ -63,12 +63,10 @@ func TestCreatePriorityClass(t *testing.T) {
 	printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
 	printFlags.OutputFormat = &outputFormat
 
-	options := &PriorityClassOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: printFlags,
-			Name:       pcName,
-			IOStreams:  ioStreams,
-		},
+	options := &PriorityClassOptions{
+		PrintFlags: printFlags,
+		Name:       pcName,
+		IOStreams:  ioStreams,
 	}
 	err := options.Complete(tf, cmd, []string{pcName})
 	if err != nil {

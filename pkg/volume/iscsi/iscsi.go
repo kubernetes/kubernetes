@@ -283,7 +283,7 @@ type iscsiDisk struct {
 	Iface         string
 	chapDiscovery bool
 	chapSession   bool
-	secret        map[string]string
+	secret        map[string]string `datapolicy:"token"`
 	InitiatorName string
 	plugin        *iscsiPlugin
 	// Utility interface that provides API calls to the provider to attach/detach disks.
@@ -345,7 +345,7 @@ func (b *iscsiDiskMounter) SetUp(mounterArgs volume.MounterArgs) error {
 
 func (b *iscsiDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
-	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, b.plugin)
 	if err != nil {
 		klog.Errorf("iscsi: failed to setup")
 	}

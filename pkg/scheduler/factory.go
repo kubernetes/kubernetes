@@ -84,24 +84,6 @@ type Configurator struct {
 	frameworkCapturer FrameworkCapturer
 }
 
-func (c *Configurator) buildFramework(p schedulerapi.KubeSchedulerProfile, opts ...frameworkruntime.Option) (framework.Framework, error) {
-	if c.frameworkCapturer != nil {
-		c.frameworkCapturer(p)
-	}
-	opts = append([]frameworkruntime.Option{
-		frameworkruntime.WithClientSet(c.client),
-		frameworkruntime.WithInformerFactory(c.informerFactory),
-		frameworkruntime.WithSnapshotSharedLister(c.nodeInfoSnapshot),
-		frameworkruntime.WithRunAllFilters(c.alwaysCheckAllPredicates),
-	}, opts...)
-	return frameworkruntime.NewFramework(
-		c.registry,
-		p.Plugins,
-		p.PluginConfig,
-		opts...,
-	)
-}
-
 // create a scheduler from a set of registered plugins.
 func (c *Configurator) create() (*Scheduler, error) {
 	var extenders []framework.Extender
@@ -149,8 +131,18 @@ func (c *Configurator) create() (*Scheduler, error) {
 
 	// The nominator will be passed all the way to framework instantiation.
 	nominator := internalqueue.NewPodNominator()
-	profiles, err := profile.NewMap(c.profiles, c.buildFramework, c.recorderFactory,
-		frameworkruntime.WithPodNominator(nominator))
+	profiles, err := profile.NewMap(c.profiles, c.registry, c.recorderFactory,
+		frameworkruntime.WithClientSet(c.client),
+		frameworkruntime.WithInformerFactory(c.informerFactory),
+		frameworkruntime.WithSnapshotSharedLister(c.nodeInfoSnapshot),
+		frameworkruntime.WithRunAllFilters(c.alwaysCheckAllPredicates),
+		frameworkruntime.WithPodNominator(nominator),
+	)
+	for _, p := range c.profiles {
+		if c.frameworkCapturer != nil {
+			c.frameworkCapturer(p)
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
 	}
@@ -158,7 +150,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		return nil, errors.New("at least one profile is required")
 	}
 	// Profiles are required to have equivalent queue sort plugins.
-	lessFn := profiles[c.profiles[0].SchedulerName].Framework.QueueSortFunc()
+	lessFn := profiles[c.profiles[0].SchedulerName].QueueSortFunc()
 	podQueue := internalqueue.NewSchedulingQueue(
 		lessFn,
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),

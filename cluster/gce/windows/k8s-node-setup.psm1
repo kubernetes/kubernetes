@@ -1544,6 +1544,11 @@ $LOGGINGEXPORTER_CMDLINE = '*flb-exporter.exe*'
 
 # Restart Logging agent or starts it if it is not currently running
 function Restart-LoggingAgent {
+  if (IsStackdriverAgentInstalled) {
+      Restart-StackdriverAgent
+      return
+  }
+
    Restart-LogService $LOGGINGEXPORTER_SERVICE $LOGGINGEXPORTER_CMDLINE
    Restart-LogService $LOGGINGAGENT_SERVICE $LOGGINGAGENT_CMDLINE
 }
@@ -1599,6 +1604,19 @@ function IsLoggingAgentInstalled {
 # Installs the logging agent according to https://docs.fluentbit.io/manual/installation/windows#
 # Also installs fluent bit stackdriver exporter
 function Install-LoggingAgent {
+  if (IsStackdriverAgentInstalled) {
+    # Remove the existing storage.json file if it exists. This is a workaround
+    # for the bug where the logging agent cannot start up if the file is
+    # corrupted.
+    Remove-Item `
+      -Force `
+      -ErrorAction Ignore `
+      ("$STACKDRIVER_ROOT\LoggingAgent\Main\pos\winevtlog.pos\worker0\" +
+       "storage.json")
+    Log-Output ("Skip: Stackdriver logging agent is already installed")
+    return
+  }
+
   if (IsLoggingAgentInstalled) {
     # Note: we should reinstall the agent if $REDO_STEPS is true
     # here, but we don't know how to run the installer without it prompting
@@ -1658,6 +1676,11 @@ function Create-LoggingAgentServices {
 # Writes the logging configuration file for Logging agent. Restart-LoggingAgent
 # should then be called to pick up the new configuration.
 function Configure-LoggingAgent {
+  if (IsStackdriverAgentInstalled) {
+      Configure-StackdriverAgent
+      return
+  }
+
   $fluentbit_config_file = "$LOGGINGAGENT_ROOT\conf\fluent-bit.conf"
   $FLUENTBIT_CONFIG | Out-File -FilePath $fluentbit_config_file -Encoding ASCII
   Log-Output "Wrote logging config to $fluentbit_config_file"
@@ -1942,6 +1965,261 @@ $PARSERS_CONFIG = @'
     Name    kube-custom
     Format  regex
     Regex   (?<tag>[^.]+)?\.?(?<pod_name>[a-z0-9](?:[-a-z0-9]*[a-z0-9])?(?:\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)_(?<namespace_name>[^_]+)_(?<container_name>.+)-(?<docker_id>[a-z0-9]{64})\.log$
+'@
+
+
+# ----------- Stackdriver logging setup --------------------------
+# This section would be deprecated soon
+#
+
+$STACKDRIVER_VERSION = 'v1-11'
+$STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
+
+# Restarts the Stackdriver logging agent, or starts it if it is not currently
+# running. A standard `Restart-Service StackdriverLogging` may fail because
+# StackdriverLogging sometimes is unstoppable, so this function works around it
+# by killing the processes.
+function Restart-StackdriverAgent {
+  Stop-Service -NoWait -ErrorAction Ignore StackdriverLogging
+
+  # Wait (if necessary) for service to stop.
+  $timeout = 10
+  $stopped = (Get-service StackdriverLogging).Status -eq 'Stopped'
+  for ($i = 0; $i -lt $timeout -and !($stopped); $i++) {
+      Start-Sleep 1
+      $stopped = (Get-service StackdriverLogging).Status -eq 'Stopped'
+  }
+
+  if ((Get-service StackdriverLogging).Status -ne 'Stopped') {
+    # Force kill the processes.
+    Stop-Process -Force -PassThru -Id (Get-WmiObject win32_process |
+      Where CommandLine -Like '*Stackdriver/logging*').ProcessId
+
+    # Wait until process has stopped.
+    $waited = 0
+    $log_period = 10
+    $timeout = 60
+    while ((Get-service StackdriverLogging).Status -ne 'Stopped' -and $waited -lt $timeout) {
+      Start-Sleep 1
+      $waited++
+
+      if ($waited % $log_period -eq 0) {
+        Log-Output "Waiting for StackdriverLogging service to stop"
+      }
+    }
+
+    # Timeout occurred
+    if ($waited -ge $timeout) {
+      Throw ("Timeout while waiting for StackdriverLogging service to stop")
+    }
+  }
+
+  Start-Service StackdriverLogging
+}
+
+# Check whether the logging agent is installed by whether it's registered as service
+function IsStackdriverAgentInstalled {
+  $stackdriver_status = (Get-Service StackdriverLogging -ErrorAction Ignore).Status
+  return -not [string]::IsNullOrEmpty($stackdriver_status)
+}
+
+# Writes the logging configuration file for Stackdriver. Restart-LoggingAgent
+# should then be called to pick up the new configuration.
+function Configure-StackdriverAgent {
+  $fluentd_config_dir = "$STACKDRIVER_ROOT\LoggingAgent\config.d"
+  $fluentd_config_file = "$fluentd_config_dir\k8s_containers.conf"
+
+  # Create a configuration file for kubernetes containers.
+  # The config.d directory should have already been created automatically, but
+  # try creating again just in case.
+  New-Item $fluentd_config_dir -ItemType 'directory' -Force | Out-Null
+
+  $config = $FLUENTD_CONFIG.replace('NODE_NAME', (hostname))
+  $config | Out-File -FilePath $fluentd_config_file -Encoding ASCII
+  Log-Output "Wrote fluentd logging config to $fluentd_config_file"
+}
+
+# The NODE_NAME placeholder must be replaced with the node's name (hostname).
+$FLUENTD_CONFIG = @'
+# This configuration file for Fluentd is used to watch changes to kubernetes
+# container logs in the directory /var/lib/docker/containers/ and submit the
+# log records to Google Cloud Logging using the cloud-logging plugin.
+#
+# Example
+# =======
+# A line in the Docker log file might look like this JSON:
+#
+# {"log":"2014/09/25 21:15:03 Got request with path wombat\\n",
+#  "stream":"stderr",
+#   "time":"2014-09-25T21:15:03.499185026Z"}
+#
+# The original tag is derived from the log file's location.
+# For example a Docker container's logs might be in the directory:
+#  /var/lib/docker/containers/997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b
+# and in the file:
+#  997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b-json.log
+# where 997599971ee6... is the Docker ID of the running container.
+# The Kubernetes kubelet makes a symbolic link to this file on the host
+# machine in the /var/log/containers directory which includes the pod name,
+# the namespace name and the Kubernetes container name:
+#    synthetic-logger-0.25lps-pod_default_synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
+#    ->
+#    /var/lib/docker/containers/997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b/997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b-json.log
+# The /var/log directory on the host is mapped to the /var/log directory in the container
+# running this instance of Fluentd and we end up collecting the file:
+#   /var/log/containers/synthetic-logger-0.25lps-pod_default_synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
+# This results in the tag:
+#  var.log.containers.synthetic-logger-0.25lps-pod_default_synth-lgr-997599971ee6366d4a5920d25b79286ad45ff37a74494f262e3bc98d909d0a7b.log
+# where 'synthetic-logger-0.25lps-pod' is the pod name, 'default' is the
+# namespace name, 'synth-lgr' is the container name and '997599971ee6..' is
+# the container ID.
+# The record reformer is used to extract pod_name, namespace_name and
+# container_name from the tag and set them in a local_resource_id in the
+# format of:
+# 'k8s_container.<NAMESPACE_NAME>.<POD_NAME>.<CONTAINER_NAME>'.
+# The reformer also changes the tags to 'stderr' or 'stdout' based on the
+# value of 'stream'.
+# local_resource_id is later used by google_cloud plugin to determine the
+# monitored resource to ingest logs against.
+# Json Log Example:
+# {"log":"[info:2016-02-16T16:04:05.930-08:00] Some log text here\n","stream":"stdout","time":"2016-02-17T00:04:05.931087621Z"}
+# CRI Log Example:
+# 2016-02-17T00:04:05.931087621Z stdout F [info:2016-02-16T16:04:05.930-08:00] Some log text here
+<source>
+  @type tail
+  path /var/log/containers/*.log
+  pos_file /var/log/gcp-containers.log.pos
+  # Tags at this point are in the format of:
+  # reform.var.log.containers.<POD_NAME>_<NAMESPACE_NAME>_<CONTAINER_NAME>-<CONTAINER_ID>.log
+  tag reform.*
+  read_from_head true
+  <parse>
+    @type multi_format
+    <pattern>
+      format json
+      time_key time
+      time_format %Y-%m-%dT%H:%M:%S.%NZ
+    </pattern>
+    <pattern>
+      format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
+      time_format %Y-%m-%dT%H:%M:%S.%N%:z
+    </pattern>
+  </parse>
+</source>
+# Example:
+# I0204 07:32:30.020537    3368 server.go:1048] POST /stats/container/: (13.972191ms) 200 [[Go-http-client/1.1] 10.244.1.3:40537]
+<source>
+  @type tail
+  format multiline
+  multiline_flush_interval 5s
+  format_firstline /^\w\d{4}/
+  format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+  time_format %m%d %H:%M:%S.%N
+  path /etc/kubernetes/logs/kubelet.log
+  pos_file /etc/kubernetes/logs/gcp-kubelet.log.pos
+  tag kubelet
+</source>
+# Example:
+# I1118 21:26:53.975789       6 proxier.go:1096] Port "nodePort for kube-system/default-http-backend:http" (:31429/tcp) was open before and is still needed
+<source>
+  @type tail
+  format multiline
+  multiline_flush_interval 5s
+  format_firstline /^\w\d{4}/
+  format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+  time_format %m%d %H:%M:%S.%N
+  path /etc/kubernetes/logs/kube-proxy.log
+  pos_file /etc/kubernetes/logs/gcp-kube-proxy.log.pos
+  tag kube-proxy
+</source>
+# Example:
+# I0928 03:15:50.440223    4880 main.go:51] Starting CSI-Proxy Server ...
+<source>
+  @type tail
+  format multiline
+  multiline_flush_interval 5s
+  format_firstline /^\w\d{4}/
+  format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+  time_format %m%d %H:%M:%S.%N
+  path /etc/kubernetes/logs/csi-proxy.log
+  pos_file /etc/kubernetes/logs/gcp-csi-proxy.log.pos
+  tag csi-proxy
+</source>
+# Example:
+# time="2019-12-10T21:27:59.836946700Z" level=info msg="loading plugin \"io.containerd.grpc.v1.cri\"..." type=io.containerd.grpc.v1
+<source>
+  @type tail
+  format multiline
+  multiline_flush_interval 5s
+  format_firstline /^time=/
+  format1 /^time="(?<time>[^ ]*)" level=(?<severity>\w*) (?<message>.*)/
+  time_format %Y-%m-%dT%H:%M:%S.%N%z
+  path /etc/kubernetes/logs/containerd.log
+  pos_file /etc/kubernetes/logs/gcp-containerd.log.pos
+  tag container-runtime
+</source>
+<match reform.**>
+  @type record_reformer
+  enable_ruby true
+  <record>
+    # Extract local_resource_id from tag for 'k8s_container' monitored
+    # resource. The format is:
+    # 'k8s_container.<namespace_name>.<pod_name>.<container_name>'.
+    "logging.googleapis.com/local_resource_id" ${"k8s_container.#{tag_suffix[4].rpartition('.')[0].split('_')[1]}.#{tag_suffix[4].rpartition('.')[0].split('_')[0]}.#{tag_suffix[4].rpartition('.')[0].split('_')[2].rpartition('-')[0]}"}
+    # Rename the field 'log' to a more generic field 'message'. This way the
+    # fluent-plugin-google-cloud knows to flatten the field as textPayload
+    # instead of jsonPayload after extracting 'time', 'severity' and
+    # 'stream' from the record.
+    message ${record['log']}
+    # If 'severity' is not set, assume stderr is ERROR and stdout is INFO.
+    severity ${record['severity'] || if record['stream'] == 'stderr' then 'ERROR' else 'INFO' end}
+  </record>
+  tag ${if record['stream'] == 'stderr' then 'raw.stderr' else 'raw.stdout' end}
+  remove_keys stream,log
+</match>
+# TODO: detect exceptions and forward them as one log entry using the
+# detect_exceptions plugin
+# This section is exclusive for k8s_container logs. These logs come with
+# 'raw.stderr' or 'raw.stdout' tags.
+<match {raw.stderr,raw.stdout}>
+  @type google_cloud
+  # Try to detect JSON formatted log entries.
+  detect_json true
+  # Allow log entries from multiple containers to be sent in the same request.
+  split_logs_by_tag false
+  # Set the buffer type to file to improve the reliability and reduce the memory consumption
+  buffer_type file
+  buffer_path /var/log/fluentd-buffers/kubernetes.containers.buffer
+  # Set queue_full action to block because we want to pause gracefully
+  # in case of the off-the-limits load instead of throwing an exception
+  buffer_queue_full_action block
+  # Set the chunk limit conservatively to avoid exceeding the recommended
+  # chunk size of 5MB per write request.
+  buffer_chunk_limit 512k
+  # Cap the combined memory usage of this buffer and the one below to
+  # 512KiB/chunk * (6 + 2) chunks = 4 MiB
+  buffer_queue_limit 6
+  # Never wait more than 5 seconds before flushing logs in the non-error case.
+  flush_interval 5s
+  # Never wait longer than 30 seconds between retries.
+  max_retry_wait 30
+  # Disable the limit on the number of retries (retry forever).
+  disable_retry_limit
+  # Use multiple threads for processing.
+  num_threads 2
+  use_grpc true
+  # Skip timestamp adjustment as this is in a controlled environment with
+  # known timestamp format. This helps with CPU usage.
+  adjust_invalid_timestamps false
+</match>
+# Attach local_resource_id for 'k8s_node' monitored resource.
+<filter **>
+  @type record_transformer
+  enable_ruby true
+  <record>
+    "logging.googleapis.com/local_resource_id" ${"k8s_node.NODE_NAME"}
+  </record>
+</filter>
 '@
 
 # Export all public functions:

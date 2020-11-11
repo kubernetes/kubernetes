@@ -46,6 +46,10 @@ apiVersion: kubescheduler.config.k8s.io/v1beta1
 kind: KubeSchedulerConfiguration
 profiles:
 - pluginConfig:
+  - name: DefaultPreemption
+    args:
+      minCandidateNodesPercentage: 50
+      minCandidateNodesAbsolute: 500
   - name: InterPodAffinity
     args:
       hardPodAffinityWeight: 5
@@ -83,11 +87,24 @@ profiles:
   - name: VolumeBinding
     args:
       bindTimeoutSeconds: 300
+  - name: NodeAffinity
+    args:
+      addedAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: foo
+              operator: In
+              values: ["bar"]
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
 					SchedulerName: "default-scheduler",
 					PluginConfig: []config.PluginConfig{
+						{
+							Name: "DefaultPreemption",
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 500},
+						},
 						{
 							Name: "InterPodAffinity",
 							Args: &config.InterPodAffinityArgs{HardPodAffinityWeight: 5},
@@ -138,6 +155,26 @@ profiles:
 							Name: "VolumeBinding",
 							Args: &config.VolumeBindingArgs{
 								BindTimeoutSeconds: 300,
+							},
+						},
+						{
+							Name: "NodeAffinity",
+							Args: &config.NodeAffinityArgs{
+								AddedAffinity: &corev1.NodeAffinity{
+									RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+										NodeSelectorTerms: []corev1.NodeSelectorTerm{
+											{
+												MatchExpressions: []corev1.NodeSelectorRequirement{
+													{
+														Key:      "foo",
+														Operator: corev1.NodeSelectorOpIn,
+														Values:   []string{"bar"},
+													},
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -249,6 +286,8 @@ apiVersion: kubescheduler.config.k8s.io/v1beta1
 kind: KubeSchedulerConfiguration
 profiles:
 - pluginConfig:
+  - name: DefaultPreemption
+    args:
   - name: InterPodAffinity
     args:
   - name: NodeResourcesFit
@@ -261,11 +300,16 @@ profiles:
   - name: VolumeBinding
     args:
   - name: PodTopologySpread
+  - name: NodeAffinity
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
 					SchedulerName: "default-scheduler",
 					PluginConfig: []config.PluginConfig{
+						{
+							Name: "DefaultPreemption",
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+						},
 						{
 							Name: "InterPodAffinity",
 							Args: &config.InterPodAffinityArgs{
@@ -300,6 +344,10 @@ profiles:
 							Args: &config.PodTopologySpreadArgs{
 								DefaultingType: config.SystemDefaulting,
 							},
+						},
+						{
+							Name: "NodeAffinity",
+							Args: &config.NodeAffinityArgs{},
 						},
 					},
 				},
@@ -459,6 +507,7 @@ profiles:
 			name:    "v1beta1 in-tree and out-of-tree plugins from internal",
 			version: v1beta1.SchemeGroupVersion,
 			obj: &config.KubeSchedulerConfiguration{
+				Parallelism: 8,
 				Profiles: []config.KubeSchedulerProfile{
 					{
 						PluginConfig: []config.PluginConfig{
@@ -514,6 +563,7 @@ leaderElection:
   resourceNamespace: ""
   retryPeriod: 0s
 metricsBindAddress: ""
+parallelism: 8
 percentageOfNodesToScore: 0
 podInitialBackoffSeconds: 0
 podMaxBackoffSeconds: 0

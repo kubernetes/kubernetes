@@ -338,6 +338,7 @@ func TestResultIntoWithNoBodyReturnsErr(t *testing.T) {
 
 func TestURLTemplate(t *testing.T) {
 	uri, _ := url.Parse("http://localhost/some/base/url/path")
+	uriSingleSlash, _ := url.Parse("http://localhost/")
 	testCases := []struct {
 		Request          *Request
 		ExpectedFullURL  string
@@ -484,6 +485,38 @@ func TestURLTemplate(t *testing.T) {
 				Prefix("/pre1/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces/finalize"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/pre1/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces/finalize",
 			ExpectedFinalURL: "http://localhost/%7Bprefix%7D",
+		},
+		{
+			// dynamic client with core group + namespace + resourceResource (with name) where baseURL is a single /
+			// /api/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uriSingleSlash, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/api/v1/namespaces/ns/r2/name1"),
+			ExpectedFullURL:  "http://localhost/api/v1/namespaces/ns/r2/name1",
+			ExpectedFinalURL: "http://localhost/api/v1/namespaces/%7Bnamespace%7D/r2/%7Bname%7D",
+		},
+		{
+			// dynamic client with core group + namespace + resourceResource (with name) where baseURL is 'some/base/url/path'
+			// /api/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/api/v1/namespaces/ns/r3/name1"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/api/v1/namespaces/ns/r3/name1",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/api/v1/namespaces/%7Bnamespace%7D/r3/%7Bname%7D",
+		},
+		{
+			// dynamic client where baseURL is a single /
+			// /
+			Request: NewRequestWithClient(uriSingleSlash, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/"),
+			ExpectedFullURL:  "http://localhost/",
+			ExpectedFinalURL: "http://localhost/",
+		},
+		{
+			// dynamic client where baseURL is a single /
+			// /version
+			Request: NewRequestWithClient(uriSingleSlash, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/version"),
+			ExpectedFullURL:  "http://localhost/version",
+			ExpectedFinalURL: "http://localhost/version",
 		},
 	}
 	for i, testCase := range testCases {

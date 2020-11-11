@@ -18,6 +18,7 @@ package corev1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 )
 
 // PodPriority returns priority of the given pod.
@@ -29,4 +30,16 @@ func PodPriority(pod *v1.Pod) int32 {
 	// that there was no global default priority class and the priority class
 	// name of the pod was empty. So, we resolve to the static default priority.
 	return 0
+}
+
+// MatchNodeSelectorTerms checks whether the node labels and fields match node selector terms in ORed;
+// nil or empty term matches no objects.
+func MatchNodeSelectorTerms(
+	node *v1.Node,
+	nodeSelector *v1.NodeSelector,
+) (bool, error) {
+	if node == nil {
+		return false, nil
+	}
+	return nodeaffinity.NewLazyErrorNodeSelector(nodeSelector).Match(node)
 }

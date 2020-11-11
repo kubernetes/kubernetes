@@ -2739,12 +2739,12 @@ func (c *Cloud) GetVolumeLabels(volumeName KubernetesVolumeID) (map[string]strin
 		return nil, fmt.Errorf("volume did not have AZ information: %q", aws.StringValue(info.VolumeId))
 	}
 
-	labels[v1.LabelZoneFailureDomain] = az
+	labels[v1.LabelFailureDomainBetaZone] = az
 	region, err := azToRegion(az)
 	if err != nil {
 		return nil, err
 	}
-	labels[v1.LabelZoneRegion] = region
+	labels[v1.LabelFailureDomainBetaRegion] = region
 
 	return labels, nil
 }
@@ -3769,14 +3769,6 @@ func (c *Cloud) buildNLBHealthCheckConfiguration(svc *v1.Service) (healthCheckCo
 	}
 	if _, err := parseInt64Annotation(svc.Annotations, ServiceAnnotationLoadBalancerHCUnhealthyThreshold, &hc.UnhealthyThreshold); err != nil {
 		return healthCheckConfig{}, err
-	}
-
-	if hc.HealthyThreshold != hc.UnhealthyThreshold {
-		return healthCheckConfig{}, fmt.Errorf("Health check healthy threshold and unhealthy threshold must be equal")
-	}
-
-	if hc.Interval != 10 && hc.Interval != 30 {
-		return healthCheckConfig{}, fmt.Errorf("Invalid health check interval '%v', must be either 10 or 30", hc.Interval)
 	}
 
 	if hc.Port != defaultHealthCheckPort {

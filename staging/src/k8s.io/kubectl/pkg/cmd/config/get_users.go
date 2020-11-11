@@ -58,7 +58,7 @@ func NewCmdConfigGetUsers(streams genericclioptions.IOStreams, configAccess clie
 	cmd := &cobra.Command{
 		Use:     "get-users",
 		Short:   i18n.T("Display users defined in the kubeconfig"),
-		Long:    "Display users defined in the kubeconfig.",
+		Long:    i18n.T("Display users defined in the kubeconfig."),
 		Example: getUsersExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Run())

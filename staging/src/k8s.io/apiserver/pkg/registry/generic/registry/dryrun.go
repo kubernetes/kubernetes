@@ -78,7 +78,7 @@ func (s *DryRunnableStorage) List(ctx context.Context, key string, opts storage.
 
 func (s *DryRunnableStorage) GuaranteedUpdate(
 	ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
-	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, dryRun bool, suggestion ...runtime.Object) error {
+	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, dryRun bool, suggestion runtime.Object) error {
 	if dryRun {
 		err := s.Storage.Get(ctx, key, storage.GetOptions{IgnoreNotFound: ignoreNotFound}, ptrToType)
 		if err != nil {
@@ -98,7 +98,7 @@ func (s *DryRunnableStorage) GuaranteedUpdate(
 		}
 		return s.copyInto(out, ptrToType)
 	}
-	return s.Storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, suggestion...)
+	return s.Storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, suggestion)
 }
 
 func (s *DryRunnableStorage) Count(key string) (int64, error) {
