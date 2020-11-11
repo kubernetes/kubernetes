@@ -25,11 +25,8 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
-	"k8s.io/kubernetes/pkg/features"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
@@ -103,8 +100,6 @@ func TestGeneratePodSandboxLinuxConfigSeccomp(t *testing.T) {
 
 // TestCreatePodSandbox_RuntimeClass tests creating sandbox with RuntimeClasses enabled.
 func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, true)()
-
 	rcm := runtimeclass.NewManager(rctest.NewPopulatedClient())
 	defer rctest.StartManagerSync(rcm)()
 

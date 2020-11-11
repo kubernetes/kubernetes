@@ -566,7 +566,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.dockerLegacyService = kubeDeps.dockerLegacyService
 	klet.runtimeService = kubeDeps.RemoteRuntimeService
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && kubeDeps.KubeClient != nil {
+	if kubeDeps.KubeClient != nil {
 		klet.runtimeClassManager = runtimeclass.NewManager(kubeDeps.KubeClient)
 	}
 

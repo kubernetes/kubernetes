@@ -21,8 +21,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -276,57 +274,5 @@ func TestDropSysctls(t *testing.T) {
 				})
 			}
 		}
-	}
-}
-
-func TestDropRuntimeClass(t *testing.T) {
-	type testcase struct {
-		name                string
-		featureEnabled      bool
-		pspSpec, oldPSPSpec *policy.PodSecurityPolicySpec
-		expectRuntimeClass  bool
-	}
-	tests := []testcase{}
-	pspGenerator := func(withRuntimeClass bool) *policy.PodSecurityPolicySpec {
-		psp := &policy.PodSecurityPolicySpec{}
-		if withRuntimeClass {
-			psp.RuntimeClass = &policy.RuntimeClassStrategyOptions{
-				AllowedRuntimeClassNames: []string{policy.AllowAllRuntimeClassNames},
-			}
-		}
-		return psp
-	}
-	for _, enabled := range []bool{true, false} {
-		for _, hasRuntimeClass := range []bool{true, false} {
-			tests = append(tests, testcase{
-				name:               fmt.Sprintf("create feature:%t hasRC:%t", enabled, hasRuntimeClass),
-				featureEnabled:     enabled,
-				pspSpec:            pspGenerator(hasRuntimeClass),
-				expectRuntimeClass: enabled && hasRuntimeClass,
-			})
-			for _, hadRuntimeClass := range []bool{true, false} {
-				tests = append(tests, testcase{
-					name:               fmt.Sprintf("update feature:%t hasRC:%t hadRC:%t", enabled, hasRuntimeClass, hadRuntimeClass),
-					featureEnabled:     enabled,
-					pspSpec:            pspGenerator(hasRuntimeClass),
-					oldPSPSpec:         pspGenerator(hadRuntimeClass),
-					expectRuntimeClass: hasRuntimeClass && (enabled || hadRuntimeClass),
-				})
-			}
-		}
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, test.featureEnabled)()
-
-			DropDisabledFields(test.pspSpec, test.oldPSPSpec)
-
-			if test.expectRuntimeClass {
-				assert.NotNil(t, test.pspSpec.RuntimeClass)
-			} else {
-				assert.Nil(t, test.pspSpec.RuntimeClass)
-			}
-		})
 	}
 }

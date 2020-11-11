@@ -306,6 +306,7 @@ const (
 	// owner: @tallclair
 	// alpha: v1.12
 	// beta:  v1.14
+	// GA: v1.20
 	//
 	// Enables RuntimeClass, for selecting between multiple runtimes to run a pod.
 	RuntimeClass featuregate.Feature = "RuntimeClass"
@@ -738,7 +739,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIStorageCapacity:             {Default: false, PreRelease: featuregate.Alpha},
 	GenericEphemeralVolume:         {Default: false, PreRelease: featuregate.Alpha},
 	CSIVolumeFSGroupPolicy:         {Default: false, PreRelease: featuregate.Alpha},
-	RuntimeClass:                   {Default: true, PreRelease: featuregate.Beta},
+	RuntimeClass:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	NodeLease:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	SCTPSupport:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	VolumeSnapshotDataSource:       {Default: true, PreRelease: featuregate.Beta},

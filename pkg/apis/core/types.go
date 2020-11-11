@@ -2823,8 +2823,7 @@ type PodSpec struct {
 	// to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run.
 	// If unset or empty, the "legacy" RuntimeClass will be used, which is an implicit class with an
 	// empty definition that uses the default runtime handler.
-	// More info: https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
-	// This is a beta feature as of Kubernetes v1.14.
+	// More info: https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class/README.md
 	// +optional
 	RuntimeClassName *string
 	// Overhead represents the resource overhead associated with running a pod for a given RuntimeClass.
