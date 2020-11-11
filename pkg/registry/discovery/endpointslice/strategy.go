@@ -50,7 +50,7 @@ func (endpointSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	endpointSlice.Generation = 1
 
-	dropDisabledConditionsOnCreate(endpointSlice)
+	dropDisabledFieldsOnCreate(endpointSlice)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -72,7 +72,7 @@ func (endpointSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	newEPS.ObjectMeta = ogNewMeta
 	oldEPS.ObjectMeta = ogOldMeta
 
-	dropDisabledConditionsOnUpdate(oldEPS, newEPS)
+	dropDisabledFieldsOnUpdate(oldEPS, newEPS)
 }
 
 // Validate validates a new EndpointSlice.
@@ -103,41 +103,56 @@ func (endpointSliceStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-// dropDisabledConditionsOnCreate will drop the terminating condition if the
-// EndpointSliceTerminatingCondition is disabled. Otherwise the field is left untouched.
-func dropDisabledConditionsOnCreate(endpointSlice *discovery.EndpointSlice) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition) {
-		return
-	}
+// dropDisabledConditionsOnCreate will drop any fields that are disabled.
+func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {
+	dropNodeName := !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceNodeName)
+	dropTerminating := !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition)
 
-	// Always drop the serving/terminating conditions on create when feature gate is disabled.
-	for i := range endpointSlice.Endpoints {
-		endpointSlice.Endpoints[i].Conditions.Serving = nil
-		endpointSlice.Endpoints[i].Conditions.Terminating = nil
+	if dropNodeName || dropTerminating {
+		for i := range endpointSlice.Endpoints {
+			if dropNodeName {
+				endpointSlice.Endpoints[i].NodeName = nil
+			}
+			if dropTerminating {
+				endpointSlice.Endpoints[i].Conditions.Serving = nil
+				endpointSlice.Endpoints[i].Conditions.Terminating = nil
+			}
+		}
 	}
 }
 
-// dropDisabledConditionsOnUpdate will drop the terminating condition field if the EndpointSliceTerminatingCondition
-// feature gate is disabled unless an existing EndpointSlice object has the field already set. This ensures
-// the field is not dropped on rollback.
-func dropDisabledConditionsOnUpdate(oldEPS, newEPS *discovery.EndpointSlice) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition) {
-		return
-	}
-
-	// Only drop the serving/terminating condition if the existing EndpointSlice doesn't have it set.
-	dropConditions := true
-	for _, ep := range oldEPS.Endpoints {
-		if ep.Conditions.Serving != nil || ep.Conditions.Terminating != nil {
-			dropConditions = false
-			break
+// dropDisabledFieldsOnUpdate will drop any disable fields that have not already
+// been set on the EndpointSlice.
+func dropDisabledFieldsOnUpdate(oldEPS, newEPS *discovery.EndpointSlice) {
+	dropNodeName := !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceNodeName)
+	if dropNodeName {
+		for _, ep := range oldEPS.Endpoints {
+			if ep.NodeName != nil {
+				dropNodeName = false
+				break
+			}
 		}
 	}
 
-	if dropConditions {
+	dropTerminating := !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition)
+	if dropTerminating {
+		for _, ep := range oldEPS.Endpoints {
+			if ep.Conditions.Serving != nil || ep.Conditions.Terminating != nil {
+				dropTerminating = false
+				break
+			}
+		}
+	}
+
+	if dropNodeName || dropTerminating {
 		for i := range newEPS.Endpoints {
-			newEPS.Endpoints[i].Conditions.Serving = nil
-			newEPS.Endpoints[i].Conditions.Terminating = nil
+			if dropNodeName {
+				newEPS.Endpoints[i].NodeName = nil
+			}
+			if dropTerminating {
+				newEPS.Endpoints[i].Conditions.Serving = nil
+				newEPS.Endpoints[i].Conditions.Terminating = nil
+			}
 		}
 	}
 }
