@@ -86,10 +86,10 @@ func DefaultBehaviorOnFatal() {
 	fatalErrHandler = fatal
 }
 
-// fatal prints the message (if provided) and then exits. If V(2) or greater,
+// fatal prints the message (if provided) and then exits. If V(6) or greater,
 // klog.Fatal is invoked for extended information.
 func fatal(msg string, code int) {
-	if klog.V(2).Enabled() {
+	if klog.V(6).Enabled() {
 		klog.FatalDepth(2, msg)
 	}
 	if len(msg) > 0 {
