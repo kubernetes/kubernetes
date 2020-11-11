@@ -20,10 +20,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	netutil "k8s.io/utils/net"
 	"net"
 	"strings"
 	"time"
+
+	netutil "k8s.io/utils/net"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -247,6 +248,17 @@ func GetInternalIP(node *v1.Node) (string, error) {
 		return "", fmt.Errorf("Couldn't get the internal IP of host %s with addresses %v", node.Name, node.Status.Addresses)
 	}
 	return host, nil
+}
+
+// FirstAddressByTypeAndFamily returns the first address of the given type and family of each node.
+func FirstAddressByTypeAndFamily(nodelist *v1.NodeList, addrType v1.NodeAddressType, family v1.IPFamily) string {
+	for _, n := range nodelist.Items {
+		addresses := GetAddressesByTypeAndFamily(&n, addrType, family)
+		if len(addresses) > 0 {
+			return addresses[0]
+		}
+	}
+	return ""
 }
 
 // GetAddressesByTypeAndFamily returns a list of addresses of the given addressType for the given node
