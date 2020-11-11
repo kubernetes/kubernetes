@@ -70,6 +70,7 @@ type httpProber struct {
 
 // Probe returns a ProbeRunner capable of running an HTTP check.
 func (pr httpProber) Probe(url *url.URL, headers http.Header, timeout time.Duration) (probe.Result, string, error) {
+	pr.transport.DisableCompression = true // removes Accept-Encoding header
 	client := &http.Client{
 		Timeout:       timeout,
 		Transport:     pr.transport,
@@ -104,15 +105,12 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (pr
 	if _, ok := headers["Accept"]; !ok {
 		// Accept header was not defined. accept all
 		headers.Set("Accept", "*/*")
-	}
-	if headers.Get("Accept") == "" {
+	} else if headers.Get("Accept") == "" {
 		// Accept header was overridden but is empty. removing
 		headers.Del("Accept")
 	}
 	req.Header = headers
-	if headers.Get("Host") != "" {
-		req.Host = headers.Get("Host")
-	}
+	req.Host = headers.Get("Host")
 	res, err := client.Do(req)
 	if err != nil {
 		// Convert errors into failures to catch timeouts.

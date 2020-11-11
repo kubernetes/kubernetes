@@ -158,13 +158,37 @@ func TestHTTPProbeChecker(t *testing.T) {
 			handler:    headerCounterHandler,
 			reqHeaders: http.Header{},
 			health:     probe.Success,
-			accBody:    "4",
+			accBody:    "3",
 		},
 		{
 			handler:    headerKeysNamesHandler,
 			reqHeaders: http.Header{},
 			health:     probe.Success,
-			accBody:    "Accept\nAccept-Encoding\nConnection\nUser-Agent",
+			accBody:    "Accept\nConnection\nUser-Agent",
+		},
+		{
+			handler: headerEchoHandler,
+			reqHeaders: http.Header{
+				"Accept-Encoding": {"gzip"},
+			},
+			health:  probe.Success,
+			accBody: "Accept-Encoding: gzip",
+		},
+		{
+			handler: headerEchoHandler,
+			reqHeaders: http.Header{
+				"Accept-Encoding": {"foo"},
+			},
+			health:  probe.Success,
+			accBody: "Accept-Encoding: foo",
+		},
+		{
+			handler: headerEchoHandler,
+			reqHeaders: http.Header{
+				"Accept-Encoding": {""},
+			},
+			health:  probe.Success,
+			accBody: "Accept-Encoding: \n",
 		},
 		{
 			handler: headerEchoHandler,
