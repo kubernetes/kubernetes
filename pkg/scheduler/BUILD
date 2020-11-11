@@ -66,6 +66,7 @@ go_test(
         "//pkg/scheduler/framework/plugins:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultbinder:go_default_library",
         "//pkg/scheduler/framework/plugins/interpodaffinity:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodeaffinity:go_default_library",
         "//pkg/scheduler/framework/plugins/nodelabel:go_default_library",
         "//pkg/scheduler/framework/plugins/nodeports:go_default_library",
         "//pkg/scheduler/framework/plugins/noderesources:go_default_library",
