@@ -115,8 +115,8 @@ var _ = SIGDescribe("Device Plugin", func() {
 			},
 		}
 
-		ns := "kube-system"
-		ds, err := cs.AppsV1().DaemonSets(ns).Create(context.TODO(), ds, metav1.CreateOptions{})
+		sysNs := "kube-system"
+		ds, err := cs.AppsV1().DaemonSets(sysNs).Create(context.TODO(), ds, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("creating Windows testing Pod")
@@ -130,20 +130,21 @@ var _ = SIGDescribe("Device Plugin", func() {
 		ginkgo.By("verifying device access in Windows testing Pod")
 		dxdiagCommand := []string{"cmd.exe", "/c", "dxdiag", "/t", "dxdiag_output.txt", "&", "type", "dxdiag_output.txt"}
 		dxdiagDirectxVersion := "DirectX Version: DirectX 12"
-		_, dxdiagDirectxVersionErr := framework.LookForStringInPodExec(ns, windowsPod.Name, dxdiagCommand, dxdiagDirectxVersion, time.Minute)
+		defaultNs := f.Namespace.Name
+		_, dxdiagDirectxVersionErr := framework.LookForStringInPodExec(defaultNs, windowsPod.Name, dxdiagCommand, dxdiagDirectxVersion, time.Minute)
 		framework.ExpectNoError(dxdiagDirectxVersionErr, "failed: didn't find directX version dxdiag output.")
 
 		dxdiagDdiVersion := "DDI Version: 12"
-		_, dxdiagDdiVersionErr := framework.LookForStringInPodExec(ns, windowsPod.Name, dxdiagCommand, dxdiagDdiVersion, time.Minute)
+		_, dxdiagDdiVersionErr := framework.LookForStringInPodExec(defaultNs, windowsPod.Name, dxdiagCommand, dxdiagDdiVersion, time.Minute)
 		framework.ExpectNoError(dxdiagDdiVersionErr, "failed: didn't find DDI version in dxdiag output.")
 
 		dxdiagVendorID := "Vendor ID: 0x10DE"
-		_, dxdiagVendorIdErr := framework.LookForStringInPodExec(ns, windowsPod.Name, dxdiagCommand, dxdiagVendorID, time.Minute)
+		_, dxdiagVendorIdErr := framework.LookForStringInPodExec(defaultNs, windowsPod.Name, dxdiagCommand, dxdiagVendorID, time.Minute)
 		framework.ExpectNoError(dxdiagVendorIdErr, "failed: didn't find vendorID in dxdiag output.")
 
 		envVarCommand := []string{"cmd.exe", "/c", "set", "DIRECTX_GPU_Name"}
 		envVarDirectxGpuName := "DIRECTX_GPU_Name="
-		_, envVarDirectxGpuNameErr := framework.LookForStringInPodExec(ns, windowsPod.Name, envVarCommand, envVarDirectxGpuName, time.Minute)
+		_, envVarDirectxGpuNameErr := framework.LookForStringInPodExec(defaultNs, windowsPod.Name, envVarCommand, envVarDirectxGpuName, time.Minute)
 		framework.ExpectNoError(envVarDirectxGpuNameErr, "failed: didn't find expected environment variable.")
 	})
 })
