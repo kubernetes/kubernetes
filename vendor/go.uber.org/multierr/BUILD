@@ -2,7 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["error.go"],
+    srcs = [
+        "error.go",
+        "go113.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/go.uber.org/multierr",
     importpath = "go.uber.org/multierr",
     visibility = ["//visibility:public"],

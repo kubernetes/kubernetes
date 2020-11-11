@@ -282,6 +282,8 @@ TEXT ·libc_getfsstat_trampoline(SB),NOSPLIT,$0-0
 	JMP	libc_getfsstat(SB)
 TEXT ·libc_lstat_trampoline(SB),NOSPLIT,$0-0
 	JMP	libc_lstat(SB)
+TEXT ·libc_ptrace_trampoline(SB),NOSPLIT,$0-0
+	JMP	libc_ptrace(SB)
 TEXT ·libc_stat_trampoline(SB),NOSPLIT,$0-0
 	JMP	libc_stat(SB)
 TEXT ·libc_statfs_trampoline(SB),NOSPLIT,$0-0

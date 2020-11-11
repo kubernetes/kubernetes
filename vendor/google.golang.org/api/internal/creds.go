@@ -90,3 +90,16 @@ func selfSignedJWTTokenSource(data []byte, endpoint string, audiences []string) 
 	}
 	return google.JWTAccessTokenSourceFromJSON(data, audience)
 }
+
+// QuotaProjectFromCreds returns the quota project from the JSON blob in the provided credentials.
+//
+// NOTE(cbro): consider promoting this to a field on google.Credentials.
+func QuotaProjectFromCreds(cred *google.Credentials) string {
+	var v struct {
+		QuotaProject string `json:"quota_project_id"`
+	}
+	if err := json.Unmarshal(cred.JSON, &v); err != nil {
+		return ""
+	}
+	return v.QuotaProject
+}

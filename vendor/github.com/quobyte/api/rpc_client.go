@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"math/rand"
@@ -113,12 +112,7 @@ func (client QuobyteClient) sendRequest(method string, request interface{}, resp
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		log.Printf("Warning: HTTP status code for request is %s\n",
-			strconv.Itoa(resp.StatusCode))
-		if resp.StatusCode == 401 {
-			return errors.New("Unable to authenticate with Quobyte API service")
-		}
-		return fmt.Errorf("JsonRPC failed with error code %d", resp.StatusCode)
+		log.Printf("Warning: HTTP status code for request is %s\n", strconv.Itoa(resp.StatusCode))
 	}
 	return decodeResponse(resp.Body, &response)
 }

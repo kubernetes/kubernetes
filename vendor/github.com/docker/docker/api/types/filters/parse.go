@@ -66,7 +66,7 @@ func ToJSON(a Args) (string, error) {
 // then the encoded format will use an older legacy format where the values are a
 // list of strings, instead of a set.
 //
-// Deprecated: do not use in any new code; use ToJSON instead
+// Deprecated: Use ToJSON
 func ToParamWithVersion(version string, a Args) (string, error) {
 	if a.Len() == 0 {
 		return "", nil
@@ -154,7 +154,7 @@ func (args Args) Len() int {
 func (args Args) MatchKVList(key string, sources map[string]string) bool {
 	fieldValues := args.fields[key]
 
-	// do not filter if there is no filter set or cannot determine filter
+	//do not filter if there is no filter set or cannot determine filter
 	if len(fieldValues) == 0 {
 		return true
 	}
@@ -200,7 +200,7 @@ func (args Args) Match(field, source string) bool {
 // ExactMatch returns true if the source matches exactly one of the values.
 func (args Args) ExactMatch(key, source string) bool {
 	fieldValues, ok := args.fields[key]
-	// do not filter if there is no filter set or cannot determine filter
+	//do not filter if there is no filter set or cannot determine filter
 	if !ok || len(fieldValues) == 0 {
 		return true
 	}
@@ -213,7 +213,7 @@ func (args Args) ExactMatch(key, source string) bool {
 // matches exactly the value.
 func (args Args) UniqueExactMatch(key, source string) bool {
 	fieldValues := args.fields[key]
-	// do not filter if there is no filter set or cannot determine filter
+	//do not filter if there is no filter set or cannot determine filter
 	if len(fieldValues) == 0 {
 		return true
 	}

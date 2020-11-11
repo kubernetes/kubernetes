@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net"
 
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // ServiceConfig stores daemon registry services configuration.

@@ -181,77 +181,77 @@ func (d *Duration) Type() string {
 	return "duration"
 }
 
-var durationRE = regexp.MustCompile("^([0-9]+)(y|w|d|h|m|s|ms)$")
+var durationRE = regexp.MustCompile("^(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?$")
 
 // ParseDuration parses a string into a time.Duration, assuming that a year
 // always has 365d, a week always has 7d, and a day always has 24h.
 func ParseDuration(durationStr string) (Duration, error) {
-	// Allow 0 without a unit.
-	if durationStr == "0" {
+	switch durationStr {
+	case "0":
+		// Allow 0 without a unit.
 		return 0, nil
+	case "":
+		return 0, fmt.Errorf("empty duration string")
 	}
 	matches := durationRE.FindStringSubmatch(durationStr)
-	if len(matches) != 3 {
+	if matches == nil {
 		return 0, fmt.Errorf("not a valid duration string: %q", durationStr)
 	}
-	var (
-		n, _ = strconv.Atoi(matches[1])
-		dur  = time.Duration(n) * time.Millisecond
-	)
-	switch unit := matches[2]; unit {
-	case "y":
-		dur *= 1000 * 60 * 60 * 24 * 365
-	case "w":
-		dur *= 1000 * 60 * 60 * 24 * 7
-	case "d":
-		dur *= 1000 * 60 * 60 * 24
-	case "h":
-		dur *= 1000 * 60 * 60
-	case "m":
-		dur *= 1000 * 60
-	case "s":
-		dur *= 1000
-	case "ms":
-		// Value already correct
-	default:
-		return 0, fmt.Errorf("invalid time unit in duration string: %q", unit)
+	var dur time.Duration
+
+	// Parse the match at pos `pos` in the regex and use `mult` to turn that
+	// into ms, then add that value to the total parsed duration.
+	m := func(pos int, mult time.Duration) {
+		if matches[pos] == "" {
+			return
+		}
+		n, _ := strconv.Atoi(matches[pos])
+		d := time.Duration(n) * time.Millisecond
+		dur += d * mult
 	}
+
+	m(2, 1000*60*60*24*365) // y
+	m(4, 1000*60*60*24*7)   // w
+	m(6, 1000*60*60*24)     // d
+	m(8, 1000*60*60)        // h
+	m(10, 1000*60)          // m
+	m(12, 1000)             // s
+	m(14, 1)                // ms
+
 	return Duration(dur), nil
 }
 
 func (d Duration) String() string {
 	var (
-		ms   = int64(time.Duration(d) / time.Millisecond)
-		unit = "ms"
+		ms = int64(time.Duration(d) / time.Millisecond)
+		r  = ""
 	)
 	if ms == 0 {
 		return "0s"
 	}
-	factors := map[string]int64{
-		"y":  1000 * 60 * 60 * 24 * 365,
-		"w":  1000 * 60 * 60 * 24 * 7,
-		"d":  1000 * 60 * 60 * 24,
-		"h":  1000 * 60 * 60,
-		"m":  1000 * 60,
-		"s":  1000,
-		"ms": 1,
+
+	f := func(unit string, mult int64, exact bool) {
+		if exact && ms%mult != 0 {
+			return
+		}
+		if v := ms / mult; v > 0 {
+			r += fmt.Sprintf("%d%s", v, unit)
+			ms -= v * mult
+		}
 	}
 
-	switch int64(0) {
-	case ms % factors["y"]:
-		unit = "y"
-	case ms % factors["w"]:
-		unit = "w"
-	case ms % factors["d"]:
-		unit = "d"
-	case ms % factors["h"]:
-		unit = "h"
-	case ms % factors["m"]:
-		unit = "m"
-	case ms % factors["s"]:
-		unit = "s"
-	}
-	return fmt.Sprintf("%v%v", ms/factors[unit], unit)
+	// Only format years and weeks if the remainder is zero, as it is often
+	// easier to read 90d than 12w6d.
+	f("y", 1000*60*60*24*365, true)
+	f("w", 1000*60*60*24*7, true)
+
+	f("d", 1000*60*60*24, false)
+	f("h", 1000*60*60, false)
+	f("m", 1000*60, false)
+	f("s", 1000, false)
+	f("ms", 1, false)
+
+	return r
 }
 
 // MarshalYAML implements the yaml.Marshaler interface.

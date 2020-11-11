@@ -5,8 +5,6 @@ go_library(
     srcs = [
         "doc.go",
         "errors.go",
-        "go1_0.go",
-        "go1_2.go",
         "read.go",
         "set.go",
     ],

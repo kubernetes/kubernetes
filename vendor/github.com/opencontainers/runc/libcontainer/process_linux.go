@@ -19,7 +19,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/logs"
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/opencontainers/runc/libcontainer/utils"
-
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
@@ -400,7 +400,7 @@ func (p *initProcess) start() (retErr error) {
 					}
 					// initProcessStartTime hasn't been set yet.
 					s.Pid = p.cmd.Process.Pid
-					s.Status = configs.Creating
+					s.Status = specs.StateCreating
 					hooks := p.config.Config.Hooks
 
 					if err := hooks[configs.Prestart].RunHooks(s); err != nil {
@@ -433,7 +433,7 @@ func (p *initProcess) start() (retErr error) {
 				}
 				// initProcessStartTime hasn't been set yet.
 				s.Pid = p.cmd.Process.Pid
-				s.Status = configs.Creating
+				s.Status = specs.StateCreating
 				hooks := p.config.Config.Hooks
 
 				if err := hooks[configs.Prestart].RunHooks(s); err != nil {

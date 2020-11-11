@@ -3,9 +3,22 @@
 Simple wrappers for primitive types to enforce atomic access.
 
 ## Installation
-`go get -u go.uber.org/atomic`
+
+```shell
+$ go get -u go.uber.org/atomic@v1
+```
+
+Note: If you are using Go modules, this package will fail to compile with the
+import path `github.com/uber-go/atomic`. To continue using that import path,
+you will have to add a `replace` directive to your `go.mod`, replacing
+`github.com/uber-go/atomic` with `go.uber.org/atomic`.
+
+```shell
+$ go mod edit -replace github.com/uber-go/atomic=go.uber.org/atomic@v1
+```
 
 ## Usage
+
 The standard library's `sync/atomic` is powerful, but it's easy to forget which
 variables must be accessed atomically. `go.uber.org/atomic` preserves all the
 functionality of the standard library, but wraps the primitive types to
@@ -21,9 +34,11 @@ atom.CAS(40, 11)
 See the [documentation][doc] for a complete API specification.
 
 ## Development Status
+
 Stable.
 
-___
+---
+
 Released under the [MIT License](LICENSE.txt).
 
 [doc-img]: https://godoc.org/github.com/uber-go/atomic?status.svg

@@ -1,4 +1,4 @@
-// +build linux freebsd openbsd darwin solaris illumos
+// +build linux freebsd openbsd netbsd darwin dragonfly
 
 package client // import "github.com/docker/docker/client"
 

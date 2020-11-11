@@ -11,6 +11,7 @@ go_library(
         "params.go",
         "resumable.go",
         "send.go",
+        "version.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/google.golang.org/api/internal/gensupport",
     importpath = "google.golang.org/api/internal/gensupport",

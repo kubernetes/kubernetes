@@ -9,7 +9,6 @@ message PluginSpec {
 	string remote = 2;
 	repeated PluginPrivilege privileges = 3;
 	bool disabled = 4;
-	repeated string env = 5;
 }
 
 // PluginPrivilege describes a permission the user has to accept

@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.13.0 (13 Nov 2019)
+
+Enhancements:
+* [#758][]: Add `Intp`, `Stringp`, and other similar `*p` field constructors
+  to log pointers to primitives with support for `nil` values.
+
+Thanks to @jbizzle for their contributions to this release.
+
+## 1.12.0 (29 Oct 2019)
+
+Enhancements:
+* [#751][]: Migrate to Go modules.
+
+## 1.11.0 (21 Oct 2019)
+
+Enhancements:
+* [#725][]: Add `zapcore.OmitKey` to omit keys in an `EncoderConfig`.
+* [#736][]: Add `RFC3339` and `RFC3339Nano` time encoders.
+
+Thanks to @juicemia, @uhthomas for their contributions to this release.
+
 ## 1.10.0 (29 Apr 2019)
 
 Bugfixes:
@@ -325,3 +346,7 @@ upgrade to the upcoming stable release.
 [#610]: https://github.com/uber-go/zap/pull/610
 [#675]: https://github.com/uber-go/zap/pull/675
 [#704]: https://github.com/uber-go/zap/pull/704
+[#725]: https://github.com/uber-go/zap/pull/725
+[#736]: https://github.com/uber-go/zap/pull/736
+[#751]: https://github.com/uber-go/zap/pull/751
+[#758]: https://github.com/uber-go/zap/pull/758

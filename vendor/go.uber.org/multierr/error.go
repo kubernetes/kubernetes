@@ -33,7 +33,7 @@
 // If only two errors are being combined, the Append function may be used
 // instead.
 //
-// 	err = multierr.Combine(reader.Close(), writer.Close())
+// 	err = multierr.Append(reader.Close(), writer.Close())
 //
 // This makes it possible to record resource cleanup failures from deferred
 // blocks with the help of named return values.
@@ -98,8 +98,6 @@ import (
 var (
 	// Separator for single-line error messages.
 	_singlelineSeparator = []byte("; ")
-
-	_newline = []byte("\n")
 
 	// Prefix for multi-line messages
 	_multilinePrefix = []byte("the following errors occurred:")
