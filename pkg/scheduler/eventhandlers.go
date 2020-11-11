@@ -435,8 +435,7 @@ func addAllEventHandlers(
 		)
 	}
 
-	// On add and delete of PVs, it will affect equivalence cache items
-	// related to persistent volume
+	// On add and update of PVs.
 	informerFactory.Core().V1().PersistentVolumes().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			// MaxPDVolumeCountPredicate: since it relies on the counts of PV.
@@ -445,7 +444,7 @@ func addAllEventHandlers(
 		},
 	)
 
-	// This is for MaxPDVolumeCountPredicate: add/delete PVC will affect counts of PV when it is bound.
+	// This is for MaxPDVolumeCountPredicate: add/update PVC will affect counts of PV when it is bound.
 	informerFactory.Core().V1().PersistentVolumeClaims().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    sched.onPvcAdd,
