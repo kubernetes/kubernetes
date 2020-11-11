@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
@@ -112,6 +113,11 @@ func TestCreateFromConfig(t *testing.T) {
 	wantQueuePls := []schedulerapi.Plugin{{Name: queuesort.Name}}
 	if diff := cmp.Diff(wantQueuePls, queueSortPls); diff != "" {
 		t.Errorf("Unexpected QueueSort plugins (-want, +got): %s", diff)
+	}
+	postFilterPls := prof.ListPlugins()["PostFilterPlugin"]
+	wantPostFilterPls := []schedulerapi.Plugin{{Name: defaultpreemption.Name}}
+	if diff := cmp.Diff(wantPostFilterPls, postFilterPls); diff != "" {
+		t.Errorf("Unexpected PostFilter plugins (-want, +got): %s", diff)
 	}
 	bindPls := prof.ListPlugins()["BindPlugin"]
 	wantBindPls := []schedulerapi.Plugin{{Name: defaultbinder.Name}}
