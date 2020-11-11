@@ -530,6 +530,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			ginkgo.By(fmt.Sprintf("Creating %v pods periodically", numConcurrentPods))
 			stop := make(chan struct{})
 			go wait.Until(func() {
+				defer ginkgo.GinkgoRecover()
 				podsLock.Lock()
 				defer podsLock.Unlock()
 
