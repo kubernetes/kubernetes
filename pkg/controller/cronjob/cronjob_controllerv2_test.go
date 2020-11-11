@@ -164,7 +164,7 @@ func Test_syncOne2(t *testing.T) {
 				job *batchv1.Job
 				err error
 			)
-			js := []batchv1.Job{}
+			js := []*batchv1.Job{}
 			if tc.ranPreviously {
 				cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: justBeforeThePriorHour()}
 				cj.Status.LastScheduleTime = &metav1.Time{Time: justAfterThePriorHour()}
@@ -181,7 +181,7 @@ func Test_syncOne2(t *testing.T) {
 					}
 					cj.Status.Active = []v1.ObjectReference{*ref}
 					if !tc.jobStillNotFoundInLister {
-						js = append(js, *job)
+						js = append(js, job)
 					}
 				}
 			} else {
@@ -458,7 +458,7 @@ func TestControllerV2_getJobList(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    []batchv1.Job
+		want    []*batchv1.Job
 		wantErr bool
 	}{
 		{
@@ -476,7 +476,7 @@ func TestControllerV2_getJobList(t *testing.T) {
 					},
 				}}},
 			args: args{cronJob: &batchv1beta1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}}},
-			want: []batchv1.Job{},
+			want: []*batchv1.Job{},
 		},
 		{
 			name: "test getting jobs in namespace with a controller reference",
@@ -499,7 +499,7 @@ func TestControllerV2_getJobList(t *testing.T) {
 					},
 				}}},
 			args: args{cronJob: &batchv1beta1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}}},
-			want: []batchv1.Job{{
+			want: []*batchv1.Job{{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
 					OwnerReferences: []metav1.OwnerReference{
 						{
@@ -524,7 +524,7 @@ func TestControllerV2_getJobList(t *testing.T) {
 					},
 				}}},
 			args: args{cronJob: &batchv1beta1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}}},
-			want: []batchv1.Job{},
+			want: []*batchv1.Job{},
 		},
 	}
 	for _, tt := range tests {
