@@ -21,6 +21,9 @@ set -o pipefail
 TASK=$1
 WHAT=$2
 
+# docker buildx command is still experimental as of Docker 19.03.0
+export DOCKER_CLI_EXPERIMENTAL="enabled"
+
 # Connecting to a Remote Docker requires certificates for authentication, which can be found
 # at this path. By default, they can be found in the ${HOME} folder. We're expecting to find
 # here ".docker-${os_version}" folders which contains the necessary certificates.
@@ -189,8 +192,6 @@ push() {
 
   kube::util::ensure-gnu-sed
 
-  # The manifest command is still experimental as of Docker 18.09.2
-  export DOCKER_CLI_EXPERIMENTAL="enabled"
   # reset manifest list; needed in case multiple images are being built / pushed.
   manifest=()
   # Make os_archs list into image manifest. Eg: 'linux/amd64 linux/ppc64le' to '${REGISTRY}/${image}:${TAG}-linux-amd64 ${REGISTRY}/${image}:${TAG}-linux-ppc64le'
