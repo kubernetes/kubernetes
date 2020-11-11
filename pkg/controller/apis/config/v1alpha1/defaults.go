@@ -22,6 +22,7 @@ import (
 	cmconfigv1alpha1 "k8s.io/controller-manager/config/v1alpha1"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	csrsigningconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/certificates/signer/config/v1alpha1"
+	cronjobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/cronjob/config/v1alpha1"
 	daemonconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/daemon/config/v1alpha1"
 	deploymentconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/deployment/config/v1alpha1"
 	endpointconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpoint/config/v1alpha1"
@@ -84,6 +85,8 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 	garbagecollectorconfigv1alpha1.RecommendedDefaultGarbageCollectorControllerConfiguration(&obj.GarbageCollectorController)
 	// Use the default RecommendedDefaultJobControllerConfiguration options
 	jobconfigv1alpha1.RecommendedDefaultJobControllerConfiguration(&obj.JobController)
+	// Use the default RecommendedDefaultCronJobControllerConfiguration options
+	cronjobconfigv1alpha1.RecommendedDefaultCronJobControllerConfiguration(&obj.CronJobController)
 	// Use the default RecommendedDefaultNamespaceControllerConfiguration options
 	namespaceconfigv1alpha1.RecommendedDefaultNamespaceControllerConfiguration(&obj.NamespaceController)
 	// Use the default RecommendedDefaultNodeIPAMControllerConfiguration options

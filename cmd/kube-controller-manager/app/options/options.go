@@ -72,6 +72,7 @@ type KubeControllerManagerOptions struct {
 	GarbageCollectorController       *GarbageCollectorControllerOptions
 	HPAController                    *HPAControllerOptions
 	JobController                    *JobControllerOptions
+	CronJobController                *CronJobControllerOptions
 	NamespaceController              *NamespaceControllerOptions
 	NodeIPAMController               *NodeIPAMControllerOptions
 	NodeLifecycleController          *NodeLifecycleControllerOptions
@@ -144,6 +145,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		},
 		JobController: &JobControllerOptions{
 			&componentConfig.JobController,
+		},
+		CronJobController: &CronJobControllerOptions{
+			&componentConfig.CronJobController,
 		},
 		NamespaceController: &NamespaceControllerOptions{
 			&componentConfig.NamespaceController,
@@ -245,6 +249,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.GarbageCollectorController.AddFlags(fss.FlagSet("garbagecollector controller"))
 	s.HPAController.AddFlags(fss.FlagSet("horizontalpodautoscaling controller"))
 	s.JobController.AddFlags(fss.FlagSet("job controller"))
+	s.CronJobController.AddFlags(fss.FlagSet("cronjob controller"))
 	s.NamespaceController.AddFlags(fss.FlagSet("namespace controller"))
 	s.NodeIPAMController.AddFlags(fss.FlagSet("nodeipam controller"))
 	s.NodeLifecycleController.AddFlags(fss.FlagSet("nodelifecycle controller"))
@@ -308,6 +313,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 		return err
 	}
 	if err := s.JobController.ApplyTo(&c.ComponentConfig.JobController); err != nil {
+		return err
+	}
+	if err := s.CronJobController.ApplyTo(&c.ComponentConfig.CronJobController); err != nil {
 		return err
 	}
 	if err := s.NamespaceController.ApplyTo(&c.ComponentConfig.NamespaceController); err != nil {
@@ -384,6 +392,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.GarbageCollectorController.Validate()...)
 	errs = append(errs, s.HPAController.Validate()...)
 	errs = append(errs, s.JobController.Validate()...)
+	errs = append(errs, s.CronJobController.Validate()...)
 	errs = append(errs, s.NamespaceController.Validate()...)
 	errs = append(errs, s.NodeIPAMController.Validate()...)
 	errs = append(errs, s.NodeLifecycleController.Validate()...)

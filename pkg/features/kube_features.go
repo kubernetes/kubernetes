@@ -560,6 +560,16 @@ const (
 	// Enable all logic related to the PodDisruptionBudget API object in policy
 	PodDisruptionBudget featuregate.Feature = "PodDisruptionBudget"
 
+	// owner: @alaypatel07, @soltysh
+	// alpha: v1.20
+	// beta: v1.21
+	//
+	// CronJobControllerV2 controls whether the controller manager starts old cronjob
+	// controller or new one which is implemented with informers and delaying queue
+	//
+	// This feature is deprecated, and will be removed in v1.22.
+	CronJobControllerV2 featuregate.Feature = "CronJobControllerV2"
+
 	// owner: @m1093782566
 	// alpha: v1.17
 	//
@@ -760,6 +770,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StartupProbe:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
+	CronJobControllerV2:                            {Default: false, PreRelease: featuregate.Alpha},
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
 	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.Beta},
 	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.Beta},
