@@ -2036,15 +2036,6 @@ message LoadBalancerIngress {
   // (typically AWS load-balancers)
   // +optional
   optional string hostname = 2;
-
-  // IPMode specifies how the load-balancer's IP behaves.
-  // Setting this to "VIP" indicates that the traffic passing through
-  // this load-balancer is delivered with the destination IP and port set to the load-balancer's IP and port.
-  // Setting this to "Proxy" indicates that the load-balancer acts like a proxy,
-  // delivering traffic with the destination IP and port set to the node's IP and nodePort or to the pod's IP and targetPort.
-  // This field can only be set when the ip field is also set, and defaults to "VIP" if not specified.
-  // +optional
-  optional string ipMode = 3;
 }
 
 // LoadBalancerStatus represents the status of a load-balancer.

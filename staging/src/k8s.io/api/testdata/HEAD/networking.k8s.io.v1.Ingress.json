@@ -97,8 +97,7 @@
       "ingress": [
         {
           "ip": "34",
-          "hostname": "35",
-          "ipMode": "ɑ"
+          "hostname": "35"
         }
       ]
     }

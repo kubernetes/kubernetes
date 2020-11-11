@@ -66,4 +66,3 @@ status:
     ingress:
     - hostname: "35"
       ip: "34"
-      ipMode: ɑ
