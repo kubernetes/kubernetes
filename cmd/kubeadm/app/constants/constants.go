@@ -225,9 +225,12 @@ const (
 	// CertificateKeySize specifies the size of the key used to encrypt certificates on uploadcerts phase
 	CertificateKeySize = 32
 
-	// LabelNodeRoleMaster specifies that a node is a control-plane
-	// This is a duplicate definition of the constant in pkg/controller/service/controller.go
-	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
+	// LabelNodeRoleOldControlPlane specifies that a node hosts control-plane components
+	// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
+	LabelNodeRoleOldControlPlane = "node-role.kubernetes.io/master"
+
+	// LabelNodeRoleControlPlane specifies that a node hosts control-plane components
+	LabelNodeRoleControlPlane = "node-role.kubernetes.io/control-plane"
 
 	// AnnotationKubeadmCRISocket specifies the annotation kubeadm uses to preserve the crisocket information given to kubeadm at
 	// init/join time for use later. kubeadm annotates the node object with this information
@@ -414,15 +417,29 @@ const (
 )
 
 var (
+	// OldControlPlaneTaint is the taint to apply on the PodSpec for being able to run that Pod on the control-plane
+	// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
+	OldControlPlaneTaint = v1.Taint{
+		Key:    LabelNodeRoleOldControlPlane,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+
+	// OldControlPlaneToleration is the toleration to apply on the PodSpec for being able to run that Pod on the control-plane
+	// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
+	OldControlPlaneToleration = v1.Toleration{
+		Key:    LabelNodeRoleOldControlPlane,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+
 	// ControlPlaneTaint is the taint to apply on the PodSpec for being able to run that Pod on the control-plane
 	ControlPlaneTaint = v1.Taint{
-		Key:    LabelNodeRoleMaster,
+		Key:    LabelNodeRoleControlPlane,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
 	// ControlPlaneToleration is the toleration to apply on the PodSpec for being able to run that Pod on the control-plane
 	ControlPlaneToleration = v1.Toleration{
-		Key:    LabelNodeRoleMaster,
+		Key:    LabelNodeRoleControlPlane,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 

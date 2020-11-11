@@ -28,6 +28,7 @@ import (
 	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -161,6 +162,13 @@ func runApply(flags *applyFlags, args []string) error {
 	klog.V(1).Infoln("[upgrade/apply] performing upgrade")
 	if err := PerformControlPlaneUpgrade(flags, client, waiter, cfg); err != nil {
 		return errors.Wrap(err, "[upgrade/apply] FATAL")
+	}
+
+	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
+	fmt.Printf("[upgrade/postupgrade] Applying label %s='' to Nodes with label %s='' (deprecated)\n",
+		kubeadmconstants.LabelNodeRoleControlPlane, kubeadmconstants.LabelNodeRoleOldControlPlane)
+	if err := upgrade.LabelOldControlPlaneNodes(client); err != nil {
+		return err
 	}
 
 	// Upgrade RBAC rules and addons.
