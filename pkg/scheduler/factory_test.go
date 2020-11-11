@@ -38,11 +38,14 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -106,8 +109,44 @@ func TestCreateFromConfig(t *testing.T) {
 			}`),
 			wantPluginConfig: []schedulerapi.PluginConfig{
 				{
+					Name: defaultpreemption.Name,
+					Args: &schedulerapi.DefaultPreemptionArgs{
+						MinCandidateNodesPercentage: 10,
+						MinCandidateNodesAbsolute:   100,
+					},
+				},
+				{
+					Name: interpodaffinity.Name,
+					Args: &schedulerapi.InterPodAffinityArgs{
+						HardPodAffinityWeight: 1,
+					},
+				},
+				{
+					Name: nodeaffinity.Name,
+					Args: &schedulerapi.NodeAffinityArgs{},
+				},
+				{
+					Name: noderesources.FitName,
+					Args: &schedulerapi.NodeResourcesFitArgs{},
+				},
+				{
+					Name: noderesources.LeastAllocatedName,
+					Args: &schedulerapi.NodeResourcesLeastAllocatedArgs{
+						Resources: []schedulerapi.ResourceSpec{
+							{Name: "cpu", Weight: 1},
+							{Name: "memory", Weight: 1},
+						},
+					},
+				},
+				{
 					Name: podtopologyspread.Name,
 					Args: &schedulerapi.PodTopologySpreadArgs{DefaultingType: schedulerapi.SystemDefaulting},
+				},
+				{
+					Name: volumebinding.Name,
+					Args: &schedulerapi.VolumeBindingArgs{
+						BindTimeoutSeconds: 600,
+					},
 				},
 			},
 			wantPlugins: &schedulerapi.Plugins{
@@ -201,19 +240,29 @@ func TestCreateFromConfig(t *testing.T) {
 			}`),
 			wantPluginConfig: []schedulerapi.PluginConfig{
 				{
+					Name: defaultpreemption.Name,
+					Args: &schedulerapi.DefaultPreemptionArgs{
+						MinCandidateNodesPercentage: 10,
+						MinCandidateNodesAbsolute:   100,
+					},
+				},
+				{
+					Name: interpodaffinity.Name,
+					Args: &schedulerapi.InterPodAffinityArgs{
+						HardPodAffinityWeight: 1,
+					},
+				},
+				{
+					Name: nodeaffinity.Name,
+					Args: &schedulerapi.NodeAffinityArgs{},
+				},
+				{
 					Name: nodelabel.Name,
 					Args: &schedulerapi.NodeLabelArgs{
 						PresentLabels:           []string{"zone"},
 						AbsentLabels:            []string{"foo"},
 						PresentLabelsPreference: []string{"l1"},
 						AbsentLabelsPreference:  []string{"l2"},
-					},
-				},
-				{
-					Name: serviceaffinity.Name,
-					Args: &schedulerapi.ServiceAffinityArgs{
-						AffinityLabels:               []string{"zone", "foo"},
-						AntiAffinityLabelsPreference: []string{"rack", "zone"},
 					},
 				},
 				{
@@ -224,6 +273,13 @@ func TestCreateFromConfig(t *testing.T) {
 							{Utilization: 50, Score: 7},
 						},
 						Resources: []schedulerapi.ResourceSpec{},
+					},
+				},
+				{
+					Name: serviceaffinity.Name,
+					Args: &schedulerapi.ServiceAffinityArgs{
+						AffinityLabels:               []string{"zone", "foo"},
+						AntiAffinityLabelsPreference: []string{"rack", "zone"},
 					},
 				},
 			},
@@ -262,31 +318,20 @@ func TestCreateFromConfig(t *testing.T) {
 				"kind" : "Policy",
 				"apiVersion" : "v1",
 				"predicates" : [
-					{"name" : "TestZoneAffinity", "argument" : {"serviceAffinity" : {"labels" : ["zone"]}}},
-					{"name" : "TestRequireZone", "argument" : {"labelsPresence" : {"labels" : ["zone"], "presence" : true}}},
 					{"name" : "PodFitsResources"},
 					{"name" : "PodFitsHostPorts"}
 				],
 				"priorities" : [
-					{"name" : "RackSpread", "weight" : 3, "argument" : {"serviceAntiAffinity" : {"label" : "rack"}}},
-					{"name" : "NodeAffinityPriority", "weight" : 2},
-					{"name" : "ImageLocalityPriority", "weight" : 1},
 					{"name" : "InterPodAffinityPriority", "weight" : 1}
 				],
 				"hardPodAffinitySymmetricWeight" : 10
 			}`),
 			wantPluginConfig: []schedulerapi.PluginConfig{
 				{
-					Name: nodelabel.Name,
-					Args: &schedulerapi.NodeLabelArgs{
-						PresentLabels: []string{"zone"},
-					},
-				},
-				{
-					Name: serviceaffinity.Name,
-					Args: &schedulerapi.ServiceAffinityArgs{
-						AffinityLabels:               []string{"zone"},
-						AntiAffinityLabelsPreference: []string{"rack"},
+					Name: defaultpreemption.Name,
+					Args: &schedulerapi.DefaultPreemptionArgs{
+						MinCandidateNodesPercentage: 10,
+						MinCandidateNodesAbsolute:   100,
 					},
 				},
 				{
@@ -295,13 +340,16 @@ func TestCreateFromConfig(t *testing.T) {
 						HardPodAffinityWeight: 10,
 					},
 				},
+				{
+					Name: "NodeResourcesFit",
+					Args: &schedulerapi.NodeResourcesFitArgs{},
+				},
 			},
 			wantPlugins: &schedulerapi.Plugins{
 				QueueSort: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
 				PreFilter: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{
 					{Name: "NodePorts"},
 					{Name: "NodeResourcesFit"},
-					{Name: "ServiceAffinity"},
 				}},
 				Filter: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
@@ -309,18 +357,13 @@ func TestCreateFromConfig(t *testing.T) {
 						{Name: "NodePorts"},
 						{Name: "NodeResourcesFit"},
 						{Name: "TaintToleration"},
-						{Name: "NodeLabel"},
-						{Name: "ServiceAffinity"},
 					},
 				},
 				PostFilter: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultPreemption"}}},
 				PreScore:   &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "InterPodAffinity"}}},
 				Score: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
-						{Name: "ImageLocality", Weight: 1},
 						{Name: "InterPodAffinity", Weight: 1},
-						{Name: "NodeAffinity", Weight: 2},
-						{Name: "ServiceAffinity", Weight: 3},
 					},
 				},
 				Reserve:  &schedulerapi.PluginSet{},
