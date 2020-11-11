@@ -31,7 +31,7 @@ func TestCreateServiceAccount(t *testing.T) {
 	}{
 		"service account": {
 			options: &ServiceAccountOpts{
-				Name:   "my-service-account",
+				Name: "my-service-account",
 			},
 			expected: &corev1.ServiceAccount{
 				TypeMeta: metav1.TypeMeta{
@@ -58,4 +58,3 @@ func TestCreateServiceAccount(t *testing.T) {
 		})
 	}
 }
-

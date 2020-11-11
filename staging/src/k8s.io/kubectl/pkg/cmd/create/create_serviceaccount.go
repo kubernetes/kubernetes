@@ -26,9 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	resourcecli "k8s.io/cli-runtime/pkg/resource"
+	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
@@ -49,7 +49,7 @@ var (
 type ServiceAccountOpts struct {
 	// PrintFlags holds options necessary for obtaining a printer
 	PrintFlags *genericclioptions.PrintFlags
-	PrintObj func(obj runtime.Object) error
+	PrintObj   func(obj runtime.Object) error
 	// Name of resource being created
 	Name             string
 	DryRunStrategy   cmdutil.DryRunStrategy
