@@ -381,9 +381,12 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 	// Test for pv controller metrics, concretely: bound/unbound pv/pvc count.
 	ginkgo.Describe("PVController", func() {
 		const (
-			classKey     = "storage_class"
-			namespaceKey = "namespace"
+			classKey      = "storage_class"
+			namespaceKey  = "namespace"
+			pluginNameKey = "plugin_name"
+			volumeModeKey = "volume_mode"
 
+			totalPVKey    = "pv_collector_total_pv_count"
 			boundPVKey    = "pv_collector_bound_pv_count"
 			unboundPVKey  = "pv_collector_unbound_pv_count"
 			boundPVCKey   = "pv_collector_bound_pvc_count"
@@ -505,6 +508,18 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 				waitForPVControllerSync(metricsGrabber, boundPVCKey, namespaceKey)
 				validator([]map[string]int64{{className: 1}, nil, {ns: 1}, nil})
 
+			})
+		ginkgo.It("should create total pv count metrics for with plugin and volume mode labels after creating pv",
+			func() {
+				var err error
+				dimensions := []string{pluginNameKey, volumeModeKey}
+				pv, err = e2epv.CreatePV(c, pv)
+				framework.ExpectNoError(err, "Error creating pv: %v", err)
+				waitForPVControllerSync(metricsGrabber, totalPVKey, pluginNameKey)
+				controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
+				framework.ExpectNoError(err, "Error getting c-m metricValues: %v", err)
+				err = testutil.ValidateMetrics(testutil.Metrics(controllerMetrics), totalPVKey, dimensions...)
+				framework.ExpectNoError(err, "Invalid metric in Controller Manager metrics: %q", totalPVKey)
 			})
 	})
 })
