@@ -90,6 +90,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "NodeResourcesFit"},
 					{Name: "TaintToleration"},
 				},
+				"PostFilterPlugin": {{Name: "DefaultPreemption"}},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 1},
 				},
@@ -127,6 +128,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 				},
+				"PostFilterPlugin": {{Name: "DefaultPreemption"}},
 				"PreScorePlugin": {
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
@@ -160,7 +162,8 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "NodeUnschedulable"},
 					{Name: "TaintToleration"},
 				},
-				"BindPlugin": {{Name: "DefaultBinder"}},
+				"PostFilterPlugin": {{Name: "DefaultPreemption"}},
+				"BindPlugin":       {{Name: "DefaultBinder"}},
 			},
 		},
 		{
@@ -182,6 +185,7 @@ priorities:
 					{Name: "NodeResourcesFit"},
 					{Name: "TaintToleration"},
 				},
+				"PostFilterPlugin": {{Name: "DefaultPreemption"}},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 1},
 				},
@@ -218,6 +222,7 @@ kind: Policy
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 				},
+				"PostFilterPlugin": {{Name: "DefaultPreemption"}},
 				"PreScorePlugin": {
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
@@ -250,7 +255,8 @@ priorities: []
 					{Name: "NodeUnschedulable"},
 					{Name: "TaintToleration"},
 				},
-				"BindPlugin": {{Name: "DefaultBinder"}},
+				"PostFilterPlugin": {{Name: "DefaultPreemption"}},
+				"BindPlugin":       {{Name: "DefaultBinder"}},
 			},
 		},
 	} {
