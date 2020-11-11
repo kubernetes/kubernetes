@@ -36,7 +36,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1:go_default_library",
         "//staging/src/k8s.io/kubelet/pkg/apis/pluginregistration/v1:go_default_library",
-        "//staging/src/k8s.io/kubelet/pkg/apis/podresources/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/kubelet/pkg/apis/podresources/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
@@ -48,11 +48,13 @@ go_test(
     srcs = [
         "endpoint_test.go",
         "manager_test.go",
+        "pod_devices_test.go",
         "topology_hints_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/checkpointmanager:go_default_library",
+        "//pkg/kubelet/cm/devicemanager/checkpoint:go_default_library",
         "//pkg/kubelet/cm/topologymanager:go_default_library",
         "//pkg/kubelet/cm/topologymanager/bitmask:go_default_library",
         "//pkg/kubelet/config:go_default_library",

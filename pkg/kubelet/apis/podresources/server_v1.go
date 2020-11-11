@@ -22,32 +22,23 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 
 	"k8s.io/kubelet/pkg/apis/podresources/v1"
-	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 )
 
 // podResourcesServerV1alpha1 implements PodResourcesListerServer
 type v1PodResourcesServer struct {
 	podsProvider    PodsProvider
 	devicesProvider DevicesProvider
+	cpusProvider    CPUsProvider
 }
 
 // NewV1PodResourcesServer returns a PodResourcesListerServer which lists pods provided by the PodsProvider
 // with device information provided by the DevicesProvider
-func NewV1PodResourcesServer(podsProvider PodsProvider, devicesProvider DevicesProvider) v1.PodResourcesListerServer {
+func NewV1PodResourcesServer(podsProvider PodsProvider, devicesProvider DevicesProvider, cpusProvider CPUsProvider) v1.PodResourcesListerServer {
 	return &v1PodResourcesServer{
 		podsProvider:    podsProvider,
 		devicesProvider: devicesProvider,
+		cpusProvider:    cpusProvider,
 	}
-}
-
-func alphaDevicesToV1(alphaDevs []*v1alpha1.ContainerDevices) []*v1.ContainerDevices {
-	var devs []*v1.ContainerDevices
-	for _, alphaDev := range alphaDevs {
-		dev := v1.ContainerDevices(*alphaDev)
-		devs = append(devs, &dev)
-	}
-
-	return devs
 }
 
 // List returns information about the resources assigned to pods on the node
@@ -68,7 +59,8 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *v1.ListPodResource
 		for j, container := range pod.Spec.Containers {
 			pRes.Containers[j] = &v1.ContainerResources{
 				Name:    container.Name,
-				Devices: alphaDevicesToV1(p.devicesProvider.GetDevices(string(pod.UID), container.Name)),
+				Devices: p.devicesProvider.GetDevices(string(pod.UID), container.Name),
+				CpuIds:  p.cpusProvider.GetCPUs(string(pod.UID), container.Name),
 			}
 		}
 		podResources[i] = &pRes

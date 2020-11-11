@@ -64,6 +64,11 @@ func (m *fakeManager) State() state.Reader {
 	return m.state
 }
 
+func (m *fakeManager) GetCPUs(podUID, containerName string) []int64 {
+	klog.Infof("[fake cpumanager] GetCPUs(podUID: %s, containerName: %s)", podUID, containerName)
+	return nil
+}
+
 // NewFakeManager creates empty/fake cpu manager
 func NewFakeManager() Manager {
 	return &fakeManager{

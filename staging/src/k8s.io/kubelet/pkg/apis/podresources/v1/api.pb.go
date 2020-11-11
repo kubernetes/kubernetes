@@ -195,6 +195,7 @@ func (m *PodResources) GetContainers() []*ContainerResources {
 type ContainerResources struct {
 	Name                 string              `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Devices              []*ContainerDevices `protobuf:"bytes,2,rep,name=devices,proto3" json:"devices,omitempty"`
+	CpuIds               []int64             `protobuf:"varint,3,rep,packed,name=cpu_ids,json=cpuIds,proto3" json:"cpu_ids,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
 	XXX_sizecache        int32               `json:"-"`
 }
@@ -245,12 +246,20 @@ func (m *ContainerResources) GetDevices() []*ContainerDevices {
 	return nil
 }
 
+func (m *ContainerResources) GetCpuIds() []int64 {
+	if m != nil {
+		return m.CpuIds
+	}
+	return nil
+}
+
 // ContainerDevices contains information about the devices assigned to a container
 type ContainerDevices struct {
-	ResourceName         string   `protobuf:"bytes,1,opt,name=resource_name,json=resourceName,proto3" json:"resource_name,omitempty"`
-	DeviceIds            []string `protobuf:"bytes,2,rep,name=device_ids,json=deviceIds,proto3" json:"device_ids,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
+	ResourceName         string        `protobuf:"bytes,1,opt,name=resource_name,json=resourceName,proto3" json:"resource_name,omitempty"`
+	DeviceIds            []string      `protobuf:"bytes,2,rep,name=device_ids,json=deviceIds,proto3" json:"device_ids,omitempty"`
+	Topology             *TopologyInfo `protobuf:"bytes,3,opt,name=topology,proto3" json:"topology,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}      `json:"-"`
+	XXX_sizecache        int32         `json:"-"`
 }
 
 func (m *ContainerDevices) Reset()      { *m = ContainerDevices{} }
@@ -299,40 +308,146 @@ func (m *ContainerDevices) GetDeviceIds() []string {
 	return nil
 }
 
+func (m *ContainerDevices) GetTopology() *TopologyInfo {
+	if m != nil {
+		return m.Topology
+	}
+	return nil
+}
+
+// Topology describes hardware topology of the resource
+type TopologyInfo struct {
+	Nodes                []*NUMANode `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
+	XXX_sizecache        int32       `json:"-"`
+}
+
+func (m *TopologyInfo) Reset()      { *m = TopologyInfo{} }
+func (*TopologyInfo) ProtoMessage() {}
+func (*TopologyInfo) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{5}
+}
+func (m *TopologyInfo) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *TopologyInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_TopologyInfo.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *TopologyInfo) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TopologyInfo.Merge(m, src)
+}
+func (m *TopologyInfo) XXX_Size() int {
+	return m.Size()
+}
+func (m *TopologyInfo) XXX_DiscardUnknown() {
+	xxx_messageInfo_TopologyInfo.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_TopologyInfo proto.InternalMessageInfo
+
+func (m *TopologyInfo) GetNodes() []*NUMANode {
+	if m != nil {
+		return m.Nodes
+	}
+	return nil
+}
+
+// NUMA representation of NUMA node
+type NUMANode struct {
+	ID                   int64    `protobuf:"varint,1,opt,name=ID,json=iD,proto3" json:"ID,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *NUMANode) Reset()      { *m = NUMANode{} }
+func (*NUMANode) ProtoMessage() {}
+func (*NUMANode) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{6}
+}
+func (m *NUMANode) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *NUMANode) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_NUMANode.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *NUMANode) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NUMANode.Merge(m, src)
+}
+func (m *NUMANode) XXX_Size() int {
+	return m.Size()
+}
+func (m *NUMANode) XXX_DiscardUnknown() {
+	xxx_messageInfo_NUMANode.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_NUMANode proto.InternalMessageInfo
+
+func (m *NUMANode) GetID() int64 {
+	if m != nil {
+		return m.ID
+	}
+	return 0
+}
+
 func init() {
 	proto.RegisterType((*ListPodResourcesRequest)(nil), "v1.ListPodResourcesRequest")
 	proto.RegisterType((*ListPodResourcesResponse)(nil), "v1.ListPodResourcesResponse")
 	proto.RegisterType((*PodResources)(nil), "v1.PodResources")
 	proto.RegisterType((*ContainerResources)(nil), "v1.ContainerResources")
 	proto.RegisterType((*ContainerDevices)(nil), "v1.ContainerDevices")
+	proto.RegisterType((*TopologyInfo)(nil), "v1.TopologyInfo")
+	proto.RegisterType((*NUMANode)(nil), "v1.NUMANode")
 }
 
 func init() { proto.RegisterFile("api.proto", fileDescriptor_00212fb1f9d3bf1c) }
 
 var fileDescriptor_00212fb1f9d3bf1c = []byte{
-	// 339 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x74, 0x92, 0xc1, 0x4e, 0xf2, 0x40,
-	0x10, 0xc7, 0x59, 0x20, 0xdf, 0x97, 0x8e, 0x90, 0x90, 0x8d, 0xd1, 0x8a, 0xb8, 0x21, 0xeb, 0x85,
-	0x8b, 0x25, 0x60, 0xf4, 0x01, 0xc4, 0x8b, 0x89, 0x31, 0xda, 0x83, 0xd1, 0x13, 0x29, 0xed, 0x8a,
-	0x7b, 0xa0, 0xbb, 0x76, 0x5b, 0xe2, 0xd1, 0x47, 0xf0, 0xb1, 0x38, 0x7a, 0xf4, 0x28, 0xf5, 0x45,
-	0xcc, 0xee, 0xa6, 0xa1, 0x08, 0x9e, 0x3a, 0xf3, 0xff, 0xcd, 0xcc, 0xbf, 0x9d, 0x29, 0x38, 0x81,
-	0xe4, 0x9e, 0x4c, 0x44, 0x2a, 0x70, 0x75, 0x3e, 0x68, 0x9f, 0x4c, 0x79, 0xfa, 0x9c, 0x4d, 0xbc,
-	0x50, 0xcc, 0xfa, 0x53, 0x31, 0x15, 0x7d, 0x83, 0x26, 0xd9, 0x93, 0xc9, 0x4c, 0x62, 0x22, 0xdb,
-	0x42, 0x0f, 0x60, 0xff, 0x9a, 0xab, 0xf4, 0x56, 0x44, 0x3e, 0x53, 0x22, 0x4b, 0x42, 0xa6, 0x7c,
-	0xf6, 0x92, 0x31, 0x95, 0xd2, 0x3b, 0x70, 0x37, 0x91, 0x92, 0x22, 0x56, 0x0c, 0x9f, 0x41, 0x53,
-	0x8a, 0x68, 0x9c, 0x14, 0xc0, 0x45, 0xdd, 0x5a, 0x6f, 0x67, 0xd8, 0xf2, 0xe6, 0x03, 0x6f, 0xad,
-	0xa1, 0x21, 0x4b, 0x19, 0x7d, 0x85, 0x46, 0x99, 0x62, 0x0c, 0xf5, 0x38, 0x98, 0x31, 0x17, 0x75,
-	0x51, 0xcf, 0xf1, 0x4d, 0x8c, 0x3b, 0xe0, 0xe8, 0xa7, 0x92, 0x41, 0xc8, 0xdc, 0xaa, 0x01, 0x2b,
-	0x01, 0x9f, 0x03, 0x84, 0x22, 0x4e, 0x03, 0x1e, 0xb3, 0x44, 0xb9, 0x35, 0xe3, 0xba, 0xa7, 0x5d,
-	0x47, 0x85, 0xba, 0xf2, 0x2e, 0x55, 0xd2, 0x07, 0xc0, 0x9b, 0x15, 0x5b, 0xfd, 0x3d, 0xf8, 0x1f,
-	0xb1, 0x39, 0xd7, 0x1f, 0x55, 0x35, 0xe3, 0x77, 0xd7, 0xc6, 0x5f, 0x5a, 0xe6, 0x17, 0x45, 0xf4,
-	0x1e, 0x5a, 0xbf, 0x21, 0x3e, 0x86, 0x66, 0xb1, 0x9a, 0x71, 0xc9, 0xa0, 0x51, 0x88, 0x37, 0xda,
-	0xe8, 0x08, 0xc0, 0xce, 0x18, 0xf3, 0xc8, 0x7a, 0x39, 0xbe, 0x63, 0x95, 0xab, 0x48, 0x0d, 0x1f,
-	0x01, 0x97, 0x77, 0xa5, 0x4f, 0xc1, 0x12, 0x3c, 0x82, 0xba, 0x8e, 0xf0, 0xa1, 0x7e, 0xa9, 0x3f,
-	0x2e, 0xd7, 0xee, 0x6c, 0x87, 0xf6, 0x76, 0xb4, 0x72, 0xd1, 0x59, 0x2c, 0x09, 0xfa, 0x5c, 0x92,
-	0xca, 0x5b, 0x4e, 0xd0, 0x22, 0x27, 0xe8, 0x23, 0x27, 0xe8, 0x2b, 0x27, 0xe8, 0xfd, 0x9b, 0x54,
-	0x26, 0xff, 0xcc, 0x9f, 0x71, 0xfa, 0x13, 0x00, 0x00, 0xff, 0xff, 0x1c, 0x28, 0xb2, 0xaa, 0x59,
-	0x02, 0x00, 0x00,
+	// 424 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x74, 0x52, 0xc1, 0x6e, 0xd3, 0x40,
+	0x10, 0xcd, 0xda, 0xa5, 0xad, 0x07, 0x17, 0x55, 0x2b, 0x44, 0x4d, 0x08, 0x56, 0xb4, 0x5c, 0x7a,
+	0x00, 0x57, 0x0d, 0x82, 0x3b, 0x34, 0x17, 0x4b, 0x10, 0xc1, 0x0a, 0x0e, 0x9c, 0x22, 0xc7, 0xbb,
+	0x35, 0x96, 0xa8, 0x67, 0xeb, 0xb5, 0x23, 0xb8, 0x71, 0xe0, 0x03, 0xf8, 0xac, 0x1e, 0x39, 0x72,
+	0xa4, 0xe6, 0x47, 0xd0, 0xae, 0x71, 0xe3, 0x90, 0x70, 0xf2, 0xcc, 0x7b, 0x33, 0xef, 0x8d, 0x77,
+	0x06, 0xbc, 0x44, 0xe5, 0x91, 0x2a, 0xb1, 0x42, 0xea, 0x2c, 0x4f, 0x87, 0x4f, 0xb2, 0xbc, 0xfa,
+	0x58, 0x2f, 0xa2, 0x14, 0x2f, 0x4e, 0x32, 0xcc, 0xf0, 0xc4, 0x52, 0x8b, 0xfa, 0xdc, 0x66, 0x36,
+	0xb1, 0x51, 0xdb, 0xc2, 0xee, 0xc3, 0xd1, 0xab, 0x5c, 0x57, 0x6f, 0x50, 0x70, 0xa9, 0xb1, 0x2e,
+	0x53, 0xa9, 0xb9, 0xbc, 0xac, 0xa5, 0xae, 0xd8, 0x5b, 0x08, 0x36, 0x29, 0xad, 0xb0, 0xd0, 0x92,
+	0x3e, 0x83, 0x03, 0x85, 0x62, 0x5e, 0x76, 0x44, 0x40, 0xc6, 0xee, 0xf1, 0xed, 0xc9, 0x61, 0xb4,
+	0x3c, 0x8d, 0xd6, 0x1a, 0x7c, 0xd5, 0xcb, 0xd8, 0x67, 0xf0, 0xfb, 0x2c, 0xa5, 0xb0, 0x53, 0x24,
+	0x17, 0x32, 0x20, 0x63, 0x72, 0xec, 0x71, 0x1b, 0xd3, 0x11, 0x78, 0xe6, 0xab, 0x55, 0x92, 0xca,
+	0xc0, 0xb1, 0xc4, 0x0a, 0xa0, 0xcf, 0x01, 0x52, 0x2c, 0xaa, 0x24, 0x2f, 0x64, 0xa9, 0x03, 0xd7,
+	0xba, 0xde, 0x33, 0xae, 0x67, 0x1d, 0xba, 0xf2, 0xee, 0x55, 0xb2, 0x4b, 0xa0, 0x9b, 0x15, 0x5b,
+	0xfd, 0x23, 0xd8, 0x13, 0x72, 0x99, 0x9b, 0x9f, 0x72, 0xac, 0xfc, 0xdd, 0x35, 0xf9, 0x69, 0xcb,
+	0xf1, 0xae, 0x88, 0x1e, 0xc1, 0x5e, 0xaa, 0xea, 0x79, 0x2e, 0xda, 0x71, 0x5c, 0xbe, 0x9b, 0xaa,
+	0x3a, 0x16, 0x9a, 0x7d, 0x23, 0x70, 0xf8, 0x6f, 0x1b, 0x7d, 0x04, 0x07, 0xdd, 0xa3, 0xcd, 0x7b,
+	0xd6, 0x7e, 0x07, 0xce, 0xcc, 0x08, 0x0f, 0x01, 0x5a, 0x75, 0xab, 0x6a, 0xa6, 0xf0, 0xb8, 0xd7,
+	0x22, 0xb1, 0xd0, 0xf4, 0x31, 0xec, 0x57, 0xa8, 0xf0, 0x13, 0x66, 0x5f, 0x02, 0x77, 0x4c, 0xba,
+	0x77, 0x7f, 0xf7, 0x17, 0x8b, 0x8b, 0x73, 0xe4, 0x37, 0x15, 0x6c, 0x02, 0x7e, 0x9f, 0xa1, 0x0c,
+	0x6e, 0x15, 0x28, 0x6e, 0x56, 0xe6, 0x9b, 0xd6, 0xd9, 0xfb, 0xd7, 0x2f, 0x66, 0x28, 0x24, 0x6f,
+	0x29, 0x36, 0x84, 0xfd, 0x0e, 0xa2, 0x77, 0xc0, 0x89, 0xa7, 0x76, 0x4c, 0x97, 0x3b, 0xf9, 0x74,
+	0xf2, 0x01, 0x68, 0x7f, 0x87, 0xe6, 0x44, 0x64, 0x49, 0xcf, 0x60, 0xc7, 0x44, 0xf4, 0x81, 0x91,
+	0xfb, 0xcf, 0x45, 0x0d, 0x47, 0xdb, 0xc9, 0xf6, 0xa6, 0xd8, 0xe0, 0xe5, 0xe8, 0xea, 0x3a, 0x24,
+	0x3f, 0xaf, 0xc3, 0xc1, 0xd7, 0x26, 0x24, 0x57, 0x4d, 0x48, 0x7e, 0x34, 0x21, 0xf9, 0xd5, 0x84,
+	0xe4, 0xfb, 0xef, 0x70, 0xb0, 0xd8, 0xb5, 0x17, 0xfb, 0xf4, 0x4f, 0x00, 0x00, 0x00, 0xff, 0xff,
+	0x34, 0x5b, 0xe8, 0xc9, 0xf1, 0x02, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -546,6 +661,25 @@ func (m *ContainerResources) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.CpuIds) > 0 {
+		dAtA2 := make([]byte, len(m.CpuIds)*10)
+		var j1 int
+		for _, num1 := range m.CpuIds {
+			num := uint64(num1)
+			for num >= 1<<7 {
+				dAtA2[j1] = uint8(uint64(num)&0x7f | 0x80)
+				num >>= 7
+				j1++
+			}
+			dAtA2[j1] = uint8(num)
+			j1++
+		}
+		i -= j1
+		copy(dAtA[i:], dAtA2[:j1])
+		i = encodeVarintApi(dAtA, i, uint64(j1))
+		i--
+		dAtA[i] = 0x1a
+	}
 	if len(m.Devices) > 0 {
 		for iNdEx := len(m.Devices) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -590,6 +724,18 @@ func (m *ContainerDevices) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Topology != nil {
+		{
+			size, err := m.Topology.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintApi(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
 	if len(m.DeviceIds) > 0 {
 		for iNdEx := len(m.DeviceIds) - 1; iNdEx >= 0; iNdEx-- {
 			i -= len(m.DeviceIds[iNdEx])
@@ -605,6 +751,71 @@ func (m *ContainerDevices) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i = encodeVarintApi(dAtA, i, uint64(len(m.ResourceName)))
 		i--
 		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *TopologyInfo) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TopologyInfo) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *TopologyInfo) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Nodes) > 0 {
+		for iNdEx := len(m.Nodes) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Nodes[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintApi(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *NUMANode) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *NUMANode) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *NUMANode) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.ID != 0 {
+		i = encodeVarintApi(dAtA, i, uint64(m.ID))
+		i--
+		dAtA[i] = 0x8
 	}
 	return len(dAtA) - i, nil
 }
@@ -683,6 +894,13 @@ func (m *ContainerResources) Size() (n int) {
 			n += 1 + l + sovApi(uint64(l))
 		}
 	}
+	if len(m.CpuIds) > 0 {
+		l = 0
+		for _, e := range m.CpuIds {
+			l += sovApi(uint64(e))
+		}
+		n += 1 + sovApi(uint64(l)) + l
+	}
 	return n
 }
 
@@ -701,6 +919,37 @@ func (m *ContainerDevices) Size() (n int) {
 			l = len(s)
 			n += 1 + l + sovApi(uint64(l))
 		}
+	}
+	if m.Topology != nil {
+		l = m.Topology.Size()
+		n += 1 + l + sovApi(uint64(l))
+	}
+	return n
+}
+
+func (m *TopologyInfo) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Nodes) > 0 {
+		for _, e := range m.Nodes {
+			l = e.Size()
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *NUMANode) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ID != 0 {
+		n += 1 + sovApi(uint64(m.ID))
 	}
 	return n
 }
@@ -764,6 +1013,7 @@ func (this *ContainerResources) String() string {
 	s := strings.Join([]string{`&ContainerResources{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Devices:` + repeatedStringForDevices + `,`,
+		`CpuIds:` + fmt.Sprintf("%v", this.CpuIds) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -775,6 +1025,32 @@ func (this *ContainerDevices) String() string {
 	s := strings.Join([]string{`&ContainerDevices{`,
 		`ResourceName:` + fmt.Sprintf("%v", this.ResourceName) + `,`,
 		`DeviceIds:` + fmt.Sprintf("%v", this.DeviceIds) + `,`,
+		`Topology:` + strings.Replace(this.Topology.String(), "TopologyInfo", "TopologyInfo", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *TopologyInfo) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForNodes := "[]*NUMANode{"
+	for _, f := range this.Nodes {
+		repeatedStringForNodes += strings.Replace(f.String(), "NUMANode", "NUMANode", 1) + ","
+	}
+	repeatedStringForNodes += "}"
+	s := strings.Join([]string{`&TopologyInfo{`,
+		`Nodes:` + repeatedStringForNodes + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *NUMANode) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&NUMANode{`,
+		`ID:` + fmt.Sprintf("%v", this.ID) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1173,6 +1449,82 @@ func (m *ContainerResources) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 3:
+			if wireType == 0 {
+				var v int64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowApi
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					v |= int64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				m.CpuIds = append(m.CpuIds, v)
+			} else if wireType == 2 {
+				var packedLen int
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowApi
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					packedLen |= int(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				if packedLen < 0 {
+					return ErrInvalidLengthApi
+				}
+				postIndex := iNdEx + packedLen
+				if postIndex < 0 {
+					return ErrInvalidLengthApi
+				}
+				if postIndex > l {
+					return io.ErrUnexpectedEOF
+				}
+				var elementCount int
+				var count int
+				for _, integer := range dAtA[iNdEx:postIndex] {
+					if integer < 128 {
+						count++
+					}
+				}
+				elementCount = count
+				if elementCount != 0 && len(m.CpuIds) == 0 {
+					m.CpuIds = make([]int64, 0, elementCount)
+				}
+				for iNdEx < postIndex {
+					var v int64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowApi
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						v |= int64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					m.CpuIds = append(m.CpuIds, v)
+				}
+			} else {
+				return fmt.Errorf("proto: wrong wireType = %d for field CpuIds", wireType)
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipApi(dAtA[iNdEx:])
@@ -1290,6 +1642,201 @@ func (m *ContainerDevices) Unmarshal(dAtA []byte) error {
 			}
 			m.DeviceIds = append(m.DeviceIds, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Topology", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Topology == nil {
+				m.Topology = &TopologyInfo{}
+			}
+			if err := m.Topology.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TopologyInfo) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TopologyInfo: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TopologyInfo: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Nodes", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Nodes = append(m.Nodes, &NUMANode{})
+			if err := m.Nodes[len(m.Nodes)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *NUMANode) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NUMANode: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NUMANode: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+			}
+			m.ID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ID |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipApi(dAtA[iNdEx:])
