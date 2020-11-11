@@ -20,6 +20,7 @@ go_library(
         "//pkg/scheduler/framework:go_default_library",
         "//pkg/scheduler/framework/plugins:go_default_library",
         "//pkg/scheduler/framework/plugins/defaultbinder:go_default_library",
+        "//pkg/scheduler/framework/plugins/defaultpreemption:go_default_library",
         "//pkg/scheduler/framework/plugins/noderesources:go_default_library",
         "//pkg/scheduler/framework/plugins/queuesort:go_default_library",
         "//pkg/scheduler/framework/runtime:go_default_library",

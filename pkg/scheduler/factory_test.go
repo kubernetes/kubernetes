@@ -140,7 +140,7 @@ func TestCreateFromConfig(t *testing.T) {
 						{Name: "InterPodAffinity"},
 					},
 				},
-				PostFilter: &schedulerapi.PluginSet{},
+				PostFilter: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultPreemption"}}},
 				PreScore: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "PodTopologySpread"},
@@ -238,7 +238,7 @@ func TestCreateFromConfig(t *testing.T) {
 						{Name: "ServiceAffinity"},
 					},
 				},
-				PostFilter: &schedulerapi.PluginSet{},
+				PostFilter: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultPreemption"}}},
 				PreScore:   &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "InterPodAffinity"}}},
 				Score: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
@@ -313,7 +313,7 @@ func TestCreateFromConfig(t *testing.T) {
 						{Name: "ServiceAffinity"},
 					},
 				},
-				PostFilter: &schedulerapi.PluginSet{},
+				PostFilter: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultPreemption"}}},
 				PreScore:   &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "InterPodAffinity"}}},
 				Score: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
