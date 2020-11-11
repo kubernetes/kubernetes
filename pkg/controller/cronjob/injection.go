@@ -19,6 +19,8 @@ package cronjob
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sync"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -56,11 +58,18 @@ func (c *realCJControl) UpdateStatus(cj *batchv1beta1.CronJob) (*batchv1beta1.Cr
 
 // fakeCJControl is the default implementation of cjControlInterface.
 type fakeCJControl struct {
+	CronJob *batchv1beta1.CronJob
 	Updates []batchv1beta1.CronJob
 }
 
 func (c *fakeCJControl) GetCronJob(namespace, name string) (*batchv1beta1.CronJob, error) {
-	panic("implement me")
+	if name == c.CronJob.Name && namespace == c.CronJob.Namespace {
+		return c.CronJob, nil
+	}
+	return nil, errors.NewNotFound(schema.GroupResource{
+		Group:    "v1beta1",
+		Resource: "cronjobs",
+	}, name)
 }
 
 var _ cjControlInterface = &fakeCJControl{}

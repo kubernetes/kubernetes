@@ -182,13 +182,13 @@ func (jm *ControllerV2) sync(cronJobKey string) (*time.Duration, error) {
 		return nil, err
 	}
 
-	cj, requeueAfter, err := jm.syncCronJob(cronJob, jobsToBeReconciled)
+	cronJobCopy, requeueAfter, err := jm.syncCronJob(cronJob, jobsToBeReconciled)
 	if err != nil {
 		klog.V(2).InfoS("error reconciling cronjob", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()), "err", err)
 		return nil, err
 	}
 
-	err = jm.cleanupFinishedJobs(cj, jobsToBeReconciled)
+	err = jm.cleanupFinishedJobs(cronJobCopy, jobsToBeReconciled)
 	if err != nil {
 		klog.V(2).InfoS("error cleaning up jobs", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()), "resourceVersion", cronJob.GetResourceVersion(), "err", err)
 		return nil, err
@@ -408,6 +408,14 @@ func (jm *ControllerV2) syncCronJob(
 		childrenJobs[j.ObjectMeta.UID] = true
 		found := inActiveList(*cj, j.ObjectMeta.UID)
 		if !found && !IsJobFinished(j) {
+			cjCopy, err := jm.cronJobControl.GetCronJob(cj.Namespace, cj.Name)
+			if err != nil {
+				return nil, nil, err
+			}
+			if inActiveList(*cjCopy, j.ObjectMeta.UID) {
+				cj = cjCopy
+				continue
+			}
 			jm.recorder.Eventf(cj, corev1.EventTypeWarning, "UnexpectedJob", "Saw a job that the controller did not create or forgot: %s", j.Name)
 			// We found an unfinished job that has us as the parent, but it is not in our Active list.
 			// This could happen if we crashed right after creating the Job and before updating the status,
