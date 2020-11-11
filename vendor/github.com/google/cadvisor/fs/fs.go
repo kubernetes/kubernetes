@@ -35,7 +35,7 @@ import (
 	zfs "github.com/mistifyio/go-zfs"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	mount "k8s.io/mount-utils"
 )
 
 const (

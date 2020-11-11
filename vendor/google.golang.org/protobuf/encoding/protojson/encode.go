@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/internal/encoding/messageset"
 	"google.golang.org/protobuf/internal/errors"
 	"google.golang.org/protobuf/internal/flags"
+	"google.golang.org/protobuf/internal/genid"
 	"google.golang.org/protobuf/internal/pragma"
 	"google.golang.org/protobuf/proto"
 	pref "google.golang.org/protobuf/reflect/protoreflect"
@@ -146,8 +147,8 @@ type encoder struct {
 
 // marshalMessage marshals the given protoreflect.Message.
 func (e encoder) marshalMessage(m pref.Message) error {
-	if isCustomType(m.Descriptor().FullName()) {
-		return e.marshalCustomType(m)
+	if marshal := wellKnownTypeMarshaler(m.Descriptor().FullName()); marshal != nil {
+		return marshal(e, m)
 	}
 
 	e.StartObject()
@@ -268,7 +269,7 @@ func (e encoder) marshalSingular(val pref.Value, fd pref.FieldDescriptor) error 
 		e.WriteString(base64.StdEncoding.EncodeToString(val.Bytes()))
 
 	case pref.EnumKind:
-		if fd.Enum().FullName() == "google.protobuf.NullValue" {
+		if fd.Enum().FullName() == genid.NullValue_enum_fullname {
 			e.WriteNull()
 		} else {
 			desc := fd.Enum().Values().ByNumber(val.Enum())

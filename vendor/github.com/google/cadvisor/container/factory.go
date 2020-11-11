@@ -47,6 +47,7 @@ const (
 	ProcessSchedulerMetrics        MetricKind = "sched"
 	PerCpuUsageMetrics             MetricKind = "percpu"
 	MemoryUsageMetrics             MetricKind = "memory"
+	MemoryNumaMetrics              MetricKind = "memory_numa"
 	CpuLoadMetrics                 MetricKind = "cpuLoad"
 	DiskIOMetrics                  MetricKind = "diskIO"
 	DiskUsageMetrics               MetricKind = "disk"
@@ -70,6 +71,7 @@ var AllMetrics = MetricSet{
 	ProcessSchedulerMetrics:        struct{}{},
 	PerCpuUsageMetrics:             struct{}{},
 	MemoryUsageMetrics:             struct{}{},
+	MemoryNumaMetrics:              struct{}{},
 	CpuLoadMetrics:                 struct{}{},
 	DiskIOMetrics:                  struct{}{},
 	AcceleratorUsageMetrics:        struct{}{},

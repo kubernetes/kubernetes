@@ -58,9 +58,10 @@ type goCollector struct {
 // collector will use the memstats from a previous collection if
 // runtime.ReadMemStats takes more than 1s. However, if there are no previously
 // collected memstats, or their collection is more than 5m ago, the collection
-// will block until runtime.ReadMemStats succeeds. (The problem might be solved
-// in Go1.13, see https://github.com/golang/go/issues/19812 for the related Go
-// issue.)
+// will block until runtime.ReadMemStats succeeds.
+//
+// NOTE: The problem is solved in Go 1.15, see
+// https://github.com/golang/go/issues/19812 for the related Go issue.
 func NewGoCollector() Collector {
 	return &goCollector{
 		goroutinesDesc: NewDesc(

@@ -467,7 +467,7 @@ Pid:	26231
 PPid:	1
 TracerPid:	0
 Uid:	1000	1000	1000	0
-Gid:	0	0	0	0
+Gid:	1001	1001	1001	0
 FDSize:	128
 Groups:
 NStgid:	1
@@ -1966,7 +1966,7 @@ Lines: 1
 Mode: 444
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Path: fixtures/proc/mdstat
-Lines: 56
+Lines: 60
 Personalities : [linear] [multipath] [raid0] [raid1] [raid6] [raid5] [raid4] [raid10]
 
 md3 : active raid6 sda1[8] sdh1[7] sdg1[6] sdf1[5] sde1[11] sdd1[3] sdc1[10] sdb1[9] sdd1[10](S) sdd2[11](S)
@@ -1988,6 +1988,10 @@ md6 : active raid1 sdb2[2](F) sdc[1](S) sda2[0]
 md8 : active raid1 sdb1[1] sda1[0] sdc[2](S) sde[3](S)
       195310144 blocks [2/2] [UU]
       [=>...................]  resync =  8.5% (16775552/195310144) finish=17.0min speed=259783K/sec
+
+md201 : active raid1 sda3[0] sdb3[1]
+      1993728 blocks super 1.2 [2/2] [UU]
+      [=>...................]  check =  5.7% (114176/1993728) finish=0.2min speed=114176K/sec
 
 md7 : active raid6 sdb1[0] sde1[3] sdd1[2] sdc1[1](F)
       7813735424 blocks super 1.2 level 6, 512k chunk, algorithm 2 [4/3] [U_UU]
@@ -3751,6 +3755,73 @@ core
 Mode: 444
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 Path: fixtures/sys/class/powercap/intel-rapl:0:0/uevent
+Lines: 0
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Directory: fixtures/sys/class/powercap/intel-rapl:a
+Mode: 755
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:a/constraint_0_max_power_uw
+Lines: 1
+95000000
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:a/constraint_0_name
+Lines: 1
+long_term
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:a/constraint_0_power_limit_uw
+Lines: 1
+4090000000
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:a/constraint_0_time_window_us
+Lines: 1
+999424
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:a/constraint_1_max_power_uw
+Lines: 1
+0
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:a/constraint_1_name
+Lines: 1
+short_term
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:a/constraint_1_power_limit_uw
+Lines: 1
+4090000000
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:a/constraint_1_time_window_us
+Lines: 1
+2440
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:a/enabled
+Lines: 1
+1
+Mode: 644
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:a/energy_uj
+Lines: 1
+240422366267
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:a/max_energy_range_uj
+Lines: 1
+262143328850
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:a/name
+Lines: 1
+package-10
+Mode: 444
+# ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Path: fixtures/sys/class/powercap/intel-rapl:a/uevent
 Lines: 0
 Mode: 644
 # ttar - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

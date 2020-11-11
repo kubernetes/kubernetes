@@ -11,18 +11,18 @@ go_library(
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:android": [
+            "//staging/src/k8s.io/mount-utils:go_default_library",
             "//vendor/github.com/google/cadvisor/devicemapper:go_default_library",
             "//vendor/github.com/google/cadvisor/utils:go_default_library",
             "//vendor/github.com/mistifyio/go-zfs:go_default_library",
             "//vendor/k8s.io/klog/v2:go_default_library",
-            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
+            "//staging/src/k8s.io/mount-utils:go_default_library",
             "//vendor/github.com/google/cadvisor/devicemapper:go_default_library",
             "//vendor/github.com/google/cadvisor/utils:go_default_library",
             "//vendor/github.com/mistifyio/go-zfs:go_default_library",
             "//vendor/k8s.io/klog/v2:go_default_library",
-            "//vendor/k8s.io/utils/mount:go_default_library",
         ],
         "//conditions:default": [],
     }),

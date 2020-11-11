@@ -219,7 +219,7 @@ func readUInt64(dirpath string, file string) uint64 {
 
 // Lists all directories under "path" and outputs the results as children of "parent".
 func ListDirectories(dirpath string, parent string, recursive bool, output map[string]struct{}) error {
-	buf := make([]byte, godirwalk.DefaultScratchBufferSize)
+	buf := make([]byte, godirwalk.MinimumScratchBufferSize)
 	return listDirectories(dirpath, parent, recursive, output, buf)
 }
 

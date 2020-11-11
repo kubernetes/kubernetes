@@ -1,6 +1,19 @@
 Releases
 ========
 
+v1.3.0 (2019-10-29)
+===================
+
+-   Switch to Go modules.
+
+
+v1.2.0 (2019-09-26)
+===================
+
+-   Support extracting and matching against wrapped errors with `errors.As`
+    and `errors.Is`.
+
+
 v1.1.0 (2017-06-30)
 ===================
 

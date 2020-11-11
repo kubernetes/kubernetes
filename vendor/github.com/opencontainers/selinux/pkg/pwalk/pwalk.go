@@ -48,7 +48,11 @@ func WalkN(root string, walkFn WalkFunc, num int) error {
 	errCh := make(chan error, 1) // get the first error, ignore others
 
 	// Start walking a tree asap
-	var err error
+	var (
+		err error
+		wg  sync.WaitGroup
+	)
+	wg.Add(1)
 	go func() {
 		err = filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -68,9 +72,9 @@ func WalkN(root string, walkFn WalkFunc, num int) error {
 		if err == nil {
 			close(files)
 		}
+		wg.Done()
 	}()
 
-	var wg sync.WaitGroup
 	wg.Add(num)
 	for i := 0; i < num; i++ {
 		go func() {

@@ -24,10 +24,6 @@ func main() {
         RootUserID:        "root",
         RootGroupID:       "root",
         ConfigurationName: "BASE",
-        Labels: []quobyte_api.Label{
-            {Name: "label1", Value: "value1"},
-            {Name: "label2", Value: "value2"},
-        },
     }
 
     volumeUUID, err := client.CreateVolume(req)

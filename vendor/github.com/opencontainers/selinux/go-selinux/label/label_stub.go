@@ -30,7 +30,6 @@ func Relabel(path string, fileLabel string, shared bool) error {
 // DisableSecOpt returns a security opt that can disable labeling
 // support for future container processes
 func DisableSecOpt() []string {
-	// TODO the selinux.DisableSecOpt stub returns []string{"disable"} instead of "nil"
 	return nil
 }
 

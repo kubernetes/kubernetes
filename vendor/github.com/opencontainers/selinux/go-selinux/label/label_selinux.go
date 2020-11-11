@@ -73,9 +73,9 @@ func InitLabels(options []string) (plabel string, mlabel string, Err error) {
 				selinux.ReleaseLabel(processLabel)
 			}
 			processLabel = pcon.Get()
-			mountLabel = mcon.Get()
 			selinux.ReserveLabel(processLabel)
 		}
+		mountLabel = mcon.Get()
 	}
 	return processLabel, mountLabel, nil
 }

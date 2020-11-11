@@ -23,10 +23,6 @@ func (cli *Client) ServiceList(ctx context.Context, options types.ServiceListOpt
 		query.Set("filters", filterJSON)
 	}
 
-	if options.Status {
-		query.Set("status", "true")
-	}
-
 	resp, err := cli.get(ctx, "/services", query, nil)
 	defer ensureReaderClosed(resp)
 	if err != nil {
