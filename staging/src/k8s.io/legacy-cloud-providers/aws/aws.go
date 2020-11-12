@@ -3234,7 +3234,7 @@ func (c *Cloud) removeSecurityGroupIngress(securityGroupID string, removePermiss
 	}
 
 	if group == nil {
-		klog.Warning("Security group not found: ", securityGroupID)
+		klog.Warningf("Security group not found: %s", securityGroupID)
 		return false, nil
 	}
 
@@ -4388,7 +4388,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 	for _, actualGroup := range actualGroups {
 		actualGroupID := aws.StringValue(actualGroup.GroupId)
 		if actualGroupID == "" {
-			klog.Warning("Ignoring group without ID: ", actualGroup)
+			klog.Warningf("Ignoring group without ID: %v", actualGroup)
 			continue
 		}
 
@@ -4425,7 +4425,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 				return err
 			}
 			if !changed {
-				klog.Warning("Allowing ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
+				klog.Warningf("Allowing ingress was not needed; concurrent change? groupId= %s", instanceSecurityGroupID)
 			}
 		} else {
 			changed, err := c.removeSecurityGroupIngress(instanceSecurityGroupID, permissions)
@@ -4433,7 +4433,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 				return err
 			}
 			if !changed {
-				klog.Warning("Revoking ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
+				klog.Warningf("Revoking ingress was not needed; concurrent change? groupId= %s", instanceSecurityGroupID)
 			}
 		}
 	}
@@ -4454,7 +4454,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 			return err
 		}
 		if lb == nil {
-			klog.Info("Load balancer already deleted: ", loadBalancerName)
+			klog.Infof("Load balancer already deleted: %v", loadBalancerName)
 			return nil
 		}
 
@@ -4503,7 +4503,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 	}
 
 	if lb == nil {
-		klog.Info("Load balancer already deleted: ", loadBalancerName)
+		klog.Infof("Load balancer already deleted: %v", loadBalancerName)
 		return nil
 	}
 
@@ -4606,7 +4606,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 			}
 
 			if len(securityGroupIDs) == 0 {
-				klog.V(2).Info("Deleted all security groups for load balancer: ", service.Name)
+				klog.V(2).Infof("Deleted all security groups for load balancer: %s", service.Name)
 				break
 			}
 
@@ -4619,7 +4619,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 				return fmt.Errorf("timed out deleting ELB: %s. Could not delete security groups %v", service.Name, strings.Join(ids, ","))
 			}
 
-			klog.V(2).Info("Waiting for load-balancer to delete so we can delete security groups: ", service.Name)
+			klog.V(2).Infof("Waiting for load-balancer to delete so we can delete security groups: %s", service.Name)
 
 			time.Sleep(10 * time.Second)
 		}
