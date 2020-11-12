@@ -22,11 +22,8 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/discovery"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -461,7 +458,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateEndpointSlice(testCase.endpointSlice, true)
+			errs := ValidateEndpointSlice(testCase.endpointSlice)
 			if len(errs) != testCase.expectedErrors {
 				t.Errorf("Expected %d errors, got %d errors: %v", testCase.expectedErrors, len(errs), errs)
 			}
@@ -496,8 +493,7 @@ func TestValidateEndpointSliceCreate(t *testing.T) {
 			},
 		},
 		"good-slice-node-name": {
-			expectedErrors:      0,
-			nodeNameGateEnabled: true,
+			expectedErrors: 0,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
@@ -515,8 +511,7 @@ func TestValidateEndpointSliceCreate(t *testing.T) {
 
 		// expected failures
 		"bad-node-name": {
-			expectedErrors:      1,
-			nodeNameGateEnabled: true,
+			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
@@ -528,23 +523,6 @@ func TestValidateEndpointSliceCreate(t *testing.T) {
 					Addresses: generateIPAddresses(1),
 					Hostname:  utilpointer.StringPtr("valid-123"),
 					NodeName:  utilpointer.StringPtr("INvalid-node-name"),
-				}},
-			},
-		},
-		"node-name-disabled": {
-			expectedErrors:      1,
-			nodeNameGateEnabled: false,
-			endpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressTypeIPv4,
-				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr("http"),
-					Protocol: protocolPtr(api.ProtocolTCP),
-				}},
-				Endpoints: []discovery.Endpoint{{
-					Addresses: generateIPAddresses(1),
-					Hostname:  utilpointer.StringPtr("valid-123"),
-					NodeName:  utilpointer.StringPtr("valid-node-name"),
 				}},
 			},
 		},
@@ -579,8 +557,6 @@ func TestValidateEndpointSliceCreate(t *testing.T) {
 	}
 
 	for name, testCase := range testCases {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceNodeName, testCase.nodeNameGateEnabled)()
-
 		t.Run(name, func(t *testing.T) {
 			errs := ValidateEndpointSliceCreate(testCase.endpointSlice)
 			if len(errs) != testCase.expectedErrors {
@@ -610,48 +586,9 @@ func TestValidateEndpointSliceUpdate(t *testing.T) {
 			},
 			expectedErrors: 0,
 		},
-		"node name set before + after, gate disabled": {
-			oldEndpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressTypeIPv4,
-				Endpoints: []discovery.Endpoint{{
-					Addresses: []string{"10.1.2.3"},
-					NodeName:  utilpointer.StringPtr("foo"),
-				}},
-			},
-			newEndpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressTypeIPv4,
-				Endpoints: []discovery.Endpoint{{
-					Addresses: []string{"10.1.2.3"},
-					NodeName:  utilpointer.StringPtr("foo"),
-				}},
-			},
-			expectedErrors: 0,
-		},
-		"node name set after, gate enabled": {
-			nodeNameGateEnabled: true,
-			oldEndpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressTypeIPv4,
-				Endpoints: []discovery.Endpoint{{
-					Addresses: []string{"10.1.2.3"},
-				}},
-			},
-			newEndpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressTypeIPv4,
-				Endpoints: []discovery.Endpoint{{
-					Addresses: []string{"10.1.2.3"},
-					NodeName:  utilpointer.StringPtr("foo"),
-				}},
-			},
-			expectedErrors: 0,
-		},
 
 		// expected errors
-		"invalide node name set after, gate enabled": {
-			nodeNameGateEnabled: true,
+		"invalide node name set": {
 			oldEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
@@ -669,25 +606,7 @@ func TestValidateEndpointSliceUpdate(t *testing.T) {
 			},
 			expectedErrors: 1,
 		},
-		"node name set after, gate disabled": {
-			nodeNameGateEnabled: false,
-			oldEndpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressTypeIPv4,
-				Endpoints: []discovery.Endpoint{{
-					Addresses: []string{"10.1.2.3"},
-				}},
-			},
-			newEndpointSlice: &discovery.EndpointSlice{
-				ObjectMeta:  standardMeta,
-				AddressType: discovery.AddressTypeIPv4,
-				Endpoints: []discovery.Endpoint{{
-					Addresses: []string{"10.1.2.3"},
-					NodeName:  utilpointer.StringPtr("foo"),
-				}},
-			},
-			expectedErrors: 1,
-		},
+
 		"deprecated address type": {
 			expectedErrors: 1,
 			oldEndpointSlice: &discovery.EndpointSlice{
@@ -729,8 +648,6 @@ func TestValidateEndpointSliceUpdate(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceNodeName, testCase.nodeNameGateEnabled)()
-
 			errs := ValidateEndpointSliceUpdate(testCase.newEndpointSlice, testCase.oldEndpointSlice)
 			if len(errs) != testCase.expectedErrors {
 				t.Errorf("Expected %d errors, got %d errors: %v", testCase.expectedErrors, len(errs), errs)

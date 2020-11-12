@@ -22,11 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/discovery"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -52,10 +50,10 @@ var (
 var ValidateEndpointSliceName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateEndpointSlice validates an EndpointSlice.
-func ValidateEndpointSlice(endpointSlice *discovery.EndpointSlice, allowNodeName bool) field.ErrorList {
+func ValidateEndpointSlice(endpointSlice *discovery.EndpointSlice) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&endpointSlice.ObjectMeta, true, ValidateEndpointSliceName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateAddressType(endpointSlice.AddressType)...)
-	allErrs = append(allErrs, validateEndpoints(endpointSlice.Endpoints, endpointSlice.AddressType, allowNodeName, field.NewPath("endpoints"))...)
+	allErrs = append(allErrs, validateEndpoints(endpointSlice.Endpoints, endpointSlice.AddressType, field.NewPath("endpoints"))...)
 	allErrs = append(allErrs, validatePorts(endpointSlice.Ports, field.NewPath("ports"))...)
 
 	return allErrs
@@ -63,33 +61,18 @@ func ValidateEndpointSlice(endpointSlice *discovery.EndpointSlice, allowNodeName
 
 // ValidateEndpointSliceCreate validates an EndpointSlice when it is created.
 func ValidateEndpointSliceCreate(endpointSlice *discovery.EndpointSlice) field.ErrorList {
-	// allow NodeName value if the feature gate is set.
-	allowNodeName := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceNodeName)
-
-	return ValidateEndpointSlice(endpointSlice, allowNodeName)
+	return ValidateEndpointSlice(endpointSlice)
 }
 
 // ValidateEndpointSliceUpdate validates an EndpointSlice when it is updated.
 func ValidateEndpointSliceUpdate(newEndpointSlice, oldEndpointSlice *discovery.EndpointSlice) field.ErrorList {
-	// allow NodeName value if the feature gate is set.
-	allowNodeName := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceNodeName)
-
-	if !allowNodeName {
-		for _, ep := range oldEndpointSlice.Endpoints {
-			if ep.NodeName != nil {
-				allowNodeName = true
-				break
-			}
-		}
-	}
-
-	allErrs := ValidateEndpointSlice(newEndpointSlice, allowNodeName)
+	allErrs := ValidateEndpointSlice(newEndpointSlice)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newEndpointSlice.AddressType, oldEndpointSlice.AddressType, field.NewPath("addressType"))...)
 
 	return allErrs
 }
 
-func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.AddressType, allowNodeName bool, fldPath *field.Path) field.ErrorList {
+func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.AddressType, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(endpoints) > maxEndpoints {
@@ -122,12 +105,8 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 
 		if endpoint.NodeName != nil {
 			nnPath := idxPath.Child("nodeName")
-			if allowNodeName {
-				for _, msg := range apivalidation.ValidateNodeName(*endpoint.NodeName, false) {
-					allErrs = append(allErrs, field.Invalid(nnPath, *endpoint.NodeName, msg))
-				}
-			} else {
-				allErrs = append(allErrs, field.Forbidden(nnPath, "may not be set unless EndpointSliceNodeName feature gate is enabled"))
+			for _, msg := range apivalidation.ValidateNodeName(*endpoint.NodeName, false) {
+				allErrs = append(allErrs, field.Invalid(nnPath, *endpoint.NodeName, msg))
 			}
 		}
 

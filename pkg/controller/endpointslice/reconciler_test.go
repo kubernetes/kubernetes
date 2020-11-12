@@ -917,6 +917,7 @@ func TestReconcileEndpointSlicesReplaceDeprecated(t *testing.T) {
 	namespace := "test"
 
 	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
+	// "IP" is a deprecated address type, ensuring that it is handled properly.
 	endpointMeta.AddressType = discovery.AddressType("IP")
 
 	existingSlices := []*discovery.EndpointSlice{}

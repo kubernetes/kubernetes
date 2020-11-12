@@ -99,11 +99,12 @@ type Endpoint struct {
 	//   endpoint is located. This should match the corresponding node label.
 	// * topology.kubernetes.io/region: the value indicates the region where the
 	//   endpoint is located. This should match the corresponding node label.
-	// this field will be deprecated in an upcoming release.
+	// This field is deprecated and will be removed in future api versions.
 	// +optional
 	Topology map[string]string
 	// nodeName represents the name of the Node hosting this endpoint. This can
-	// be used to determine endpoints local to a Node.
+	// be used to determine endpoints local to a Node. This field can be enabled
+	// with the EndpointSliceNodeName feature gate.
 	// +optional
 	NodeName *string
 }
@@ -117,15 +118,18 @@ type EndpointConditions struct {
 	// "true" for terminating endpoints.
 	Ready *bool
 
-	// serving is identical to ready except that it is set regardless of the terminating
-	// state of endpoints. This condition should be set to true for a ready endpoint that
-	// is terminating. If nil, consumers should defer to the ready condition.
+	// serving is identical to ready except that it is set regardless of the
+	// terminating state of endpoints. This condition should be set to true for
+	// a ready endpoint that is terminating. If nil, consumers should defer to
+	// the ready condition. This field can be enabled with the
+	// EndpointSliceTerminatingCondition feature gate.
 	// +optional
 	Serving *bool
 
-	// terminating indicates that this endpoint is terminating. A nil value indicates an
-	// unknown state. Consumers should interpret this unknown state to mean that the
-	// endpoint is not terminating.
+	// terminating indicates that this endpoint is terminating. A nil value
+	// indicates an unknown state. Consumers should interpret this unknown state
+	// to mean that the endpoint is not terminating. This field can be enabled
+	// with the EndpointSliceTerminatingCondition feature gate.
 	// +optional
 	Terminating *bool
 }

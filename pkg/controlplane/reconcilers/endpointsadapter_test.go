@@ -232,6 +232,7 @@ func TestEndpointsAdapterUpdate(t *testing.T) {
 	// with one that has an IPv4 address type.
 	endpoints4, _ := generateEndpointsAndSlice("foo", "testing", []int{80}, []string{"10.1.2.7", "10.1.2.8"})
 	_, epSlice4IP := generateEndpointsAndSlice("foo", "testing", []int{80}, []string{"10.1.2.7", "10.1.2.8"})
+	// "IP" is a deprecated address type, ensuring that it is handled properly.
 	epSlice4IP.AddressType = discovery.AddressType("IP")
 	_, epSlice4IPv4 := generateEndpointsAndSlice("foo", "testing", []int{80}, []string{"10.1.2.7", "10.1.2.8"})
 
