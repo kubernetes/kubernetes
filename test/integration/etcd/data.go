@@ -502,6 +502,16 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/node/v1
+		gvr("node.k8s.io", "v1", "runtimeclasses"): {
+			Stub:             `{"metadata": {"name": "rc3"}, "handler": "h3"}`,
+			ExpectedEtcdPath: "/registry/runtimeclasses/rc3",
+			// TODO (SergeyKanzhelev): in 1.21 this should be switched to v1. See https://github.com/kubernetes/kubernetes/pull/95718/files#r520967927
+			// this has to stay at v1beta1 for a release, otherwise a 1.19 API server won't be able to read the data persisted in etcd and will break during a multi-server upgrade
+			ExpectedGVK: gvkP("node.k8s.io", "v1beta1", "RuntimeClass"),
+		},
+		// --
+
 		// k8s.io/apiserver/pkg/apis/apiserverinternal/v1alpha1
 		gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"): {
 			Stub:             `{"metadata":{"name":"sv1.test"},"spec":{}}`,
