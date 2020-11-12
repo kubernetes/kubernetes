@@ -54,6 +54,7 @@ go_library(
         "cors.go",
         "doc.go",
         "goaway.go",
+        "hsts.go",
         "longrunning.go",
         "maxinflight.go",
         "priority-and-fairness.go",
