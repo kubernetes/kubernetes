@@ -57,7 +57,6 @@ const createVerb = "create"
 
 func (p preparator) Prepare(ctx context.Context, newObj, liveObj runtime.Object) {
 	isCreate := false
-	// TODO(kwiesmueller): check if this even works. Looks like the requestInfo might not be in ctx yet
 	if requestInfo, hasRequestInfo := request.RequestInfoFrom(ctx); hasRequestInfo {
 		isCreate = requestInfo.Verb == createVerb
 	}
