@@ -17,6 +17,7 @@ limitations under the License.
 package fieldmanager
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v4/merge"
+	"sigs.k8s.io/structured-merge-diff/v4/typed"
 )
 
 type structuredMergeManager struct {
@@ -35,13 +37,14 @@ type structuredMergeManager struct {
 	groupVersion    schema.GroupVersion
 	hubVersion      schema.GroupVersion
 	updater         merge.Updater
+	preparator      Preparator
 }
 
 var _ Manager = &structuredMergeManager{}
 
 // NewStructuredMergeManager creates a new Manager that merges apply requests
 // and update managed fields for other types of requests.
-func NewStructuredMergeManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (Manager, error) {
+func NewStructuredMergeManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, preparator Preparator) (Manager, error) {
 	return &structuredMergeManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
@@ -51,13 +54,14 @@ func NewStructuredMergeManager(typeConverter TypeConverter, objectConverter runt
 		updater: merge.Updater{
 			Converter: newVersionConverter(typeConverter, objectConverter, hub), // This is the converter provided to SMD from k8s
 		},
+		preparator: preparator,
 	}, nil
 }
 
 // NewCRDStructuredMergeManager creates a new Manager specifically for
 // CRDs. This allows for the possibility of fields which are not defined
 // in models, as well as having no models defined at all.
-func NewCRDStructuredMergeManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (_ Manager, err error) {
+func NewCRDStructuredMergeManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, preparator Preparator) (_ Manager, err error) {
 	return &structuredMergeManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
@@ -67,6 +71,7 @@ func NewCRDStructuredMergeManager(typeConverter TypeConverter, objectConverter r
 		updater: merge.Updater{
 			Converter: newCRDVersionConverter(typeConverter, objectConverter, hub),
 		},
+		preparator: preparator,
 	}, nil
 }
 
@@ -90,11 +95,23 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
 
+	liveManagedFields := managed.Fields()
 	// TODO(apelisse) use the first return value when unions are implemented
 	_, managedFields, err := f.updater.Update(liveObjTyped, newObjTyped, apiVersion, managed.Fields(), manager)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to update ManagedFields: %v", err)
 	}
+
+	preparedPatchTyped, err := f.preparedPatchTyped(context.TODO(), liveObj, newObj)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get preparedPatchTyped: %v", err)
+	}
+
+	managedFields, err = merge.WipeManagedFields(liveManagedFields, managedFields, manager, liveObjTyped, preparedPatchTyped)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to wipe managedFields: %w", err)
+	}
+
 	managed = internal.NewManaged(managedFields, managed.Times())
 
 	return newObj, managed, nil
@@ -133,11 +150,23 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 		return nil, nil, fmt.Errorf("failed to create typed live object: %v", err)
 	}
 
+	liveManagedFields := managed.Fields()
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
 	newObjTyped, managedFields, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed.Fields(), manager, force)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	preparedPatchTyped, err := f.preparedPatchTyped(context.TODO(), liveObj, patchObj)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get preparedPatchTyped: %v", err)
+	}
+
+	managedFields, err = merge.WipeManagedFields(liveManagedFields, managedFields, manager, liveObjTyped, preparedPatchTyped)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to wipe managedFields: %w", err)
+	}
+
 	managed = internal.NewManaged(managedFields, managed.Times())
 
 	if newObjTyped == nil {
@@ -168,4 +197,28 @@ func (f *structuredMergeManager) toVersioned(obj runtime.Object) (runtime.Object
 
 func (f *structuredMergeManager) toUnversioned(obj runtime.Object) (runtime.Object, error) {
 	return f.objectConverter.ConvertToVersion(obj, f.hubVersion)
+}
+
+func (f *structuredMergeManager) preparedPatchTyped(ctx context.Context, liveObj, patchObj runtime.Object) (*typed.TypedValue, error) {
+	liveObjUnversioned, err := f.toUnversioned(liveObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert live object to unversioned: %w", err)
+	}
+	patchObjUnversioned, err := f.toUnversioned(patchObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert patch object to unversioned: %w", err)
+	}
+
+	f.preparator.Prepare(ctx, patchObjUnversioned, liveObjUnversioned)
+
+	preparedPatchObjVersioned, err := f.toVersioned(patchObjUnversioned)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert prepared patch object to proper version: %w", err)
+	}
+	preparedPatchObjTyped, err := f.typeConverter.ObjectToTyped(preparedPatchObjVersioned)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create typed patch object: %v", err)
+	}
+
+	return preparedPatchObjTyped, nil
 }

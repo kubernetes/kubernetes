@@ -850,6 +850,10 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 			reqScope := *requestScopes[v.Name]
+
+			genericStore := storages[v.Name].CustomResource
+			preparator := fieldmanager.NewPreparator(genericStore.GetCreateStrategy(), genericStore.GetUpdateStrategy())
+
 			reqScope.FieldManager, err = fieldmanager.NewDefaultCRDFieldManager(
 				typeConverter,
 				reqScope.Convertor,
@@ -858,6 +862,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				reqScope.Kind,
 				reqScope.HubGroupVersion,
 				false,
+				preparator,
 			)
 			if err != nil {
 				return nil, err
@@ -886,6 +891,10 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		// shallow copy
 		statusScope := *requestScopes[v.Name]
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+
+			genericStore := storages[v.Name].Status
+			preparator := fieldmanager.NewPreparator(genericStore.GetCreateStrategy(), genericStore.GetUpdateStrategy())
+
 			statusScope.FieldManager, err = fieldmanager.NewDefaultCRDFieldManager(
 				typeConverter,
 				statusScope.Convertor,
@@ -894,6 +903,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				statusScope.Kind,
 				statusScope.HubGroupVersion,
 				true,
+				preparator,
 			)
 			if err != nil {
 				return nil, err

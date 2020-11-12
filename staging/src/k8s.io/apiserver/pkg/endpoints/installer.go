@@ -42,10 +42,13 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	utilwarning "k8s.io/apiserver/pkg/endpoints/warning"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versioninfo "k8s.io/component-base/version"
+
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -265,6 +268,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	if isNamedCreater {
 		isCreater = true
+	}
+
+	var preparator fieldmanager.Preparator
+	if genericStore, isGenericStore := storage.(registry.GenericStore); isGenericStore {
+		preparator = fieldmanager.NewPreparator(genericStore.GetCreateStrategy(), genericStore.GetUpdateStrategy())
+	} else {
+		preparator = fieldmanager.NewPreparator(nil, nil)
+		// TODO(kwiesmueller): remove debug logging
+		klog.Infof("---- !GenericStore: %v %v %v", a.group.GroupVersion.Group, a.group.GroupVersion.Version, path)
 	}
 
 	var versionedList interface{}
@@ -600,6 +612,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			fqKindToRegister,
 			reqScope.HubGroupVersion,
 			isSubresource,
+			preparator,
 		)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create field manager: %v", err)

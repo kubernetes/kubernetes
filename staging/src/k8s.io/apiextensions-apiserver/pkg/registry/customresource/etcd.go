@@ -199,6 +199,26 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
+// GetCreateStrategy implements GenericStore.
+func (r *StatusREST) GetCreateStrategy() rest.RESTCreateStrategy {
+	return r.store.CreateStrategy
+}
+
+// GetUpdateStrategy implements GenericStore.
+func (r *StatusREST) GetUpdateStrategy() rest.RESTUpdateStrategy {
+	return r.store.UpdateStrategy
+}
+
+// GetDeleteStrategy implements GenericStore.
+func (r *StatusREST) GetDeleteStrategy() rest.RESTDeleteStrategy {
+	return r.store.DeleteStrategy
+}
+
+// GetExportStrategy implements GenericStore.
+func (r *StatusREST) GetExportStrategy() rest.RESTExportStrategy {
+	return r.store.ExportStrategy
+}
+
 type ScaleREST struct {
 	store              *genericregistry.Store
 	specReplicasPath   string
