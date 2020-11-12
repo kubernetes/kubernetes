@@ -261,22 +261,22 @@ func TestValidateCustomResource(t *testing.T) {
 			},
 			failingObjects: []failingObject{
 				{object: map[string]interface{}{"field": true}, expectErrs: []string{
-					`: Invalid value: "": "field" must validate at least one schema (anyOf)`,
+					`<nil>: Invalid value: "": "field" must validate at least one schema (anyOf)`,
 					`field: Invalid value: "boolean": field in body must be of type integer,string: "boolean"`,
 					`field: Invalid value: "boolean": field in body must be of type integer: "boolean"`,
 				}},
 				{object: map[string]interface{}{"field": 1.2}, expectErrs: []string{
-					`: Invalid value: "": "field" must validate at least one schema (anyOf)`,
+					`<nil>: Invalid value: "": "field" must validate at least one schema (anyOf)`,
 					`field: Invalid value: "number": field in body must be of type integer,string: "number"`,
 					`field: Invalid value: "number": field in body must be of type integer: "number"`,
 				}},
 				{object: map[string]interface{}{"field": map[string]interface{}{}}, expectErrs: []string{
-					`: Invalid value: "": "field" must validate at least one schema (anyOf)`,
+					`<nil>: Invalid value: "": "field" must validate at least one schema (anyOf)`,
 					`field: Invalid value: "object": field in body must be of type integer,string: "object"`,
 					`field: Invalid value: "object": field in body must be of type integer: "object"`,
 				}},
 				{object: map[string]interface{}{"field": []interface{}{}}, expectErrs: []string{
-					`: Invalid value: "": "field" must validate at least one schema (anyOf)`,
+					`<nil>: Invalid value: "": "field" must validate at least one schema (anyOf)`,
 					`field: Invalid value: "array": field in body must be of type integer,string: "array"`,
 					`field: Invalid value: "array": field in body must be of type integer: "array"`,
 				}},
@@ -307,26 +307,26 @@ func TestValidateCustomResource(t *testing.T) {
 			},
 			failingObjects: []failingObject{
 				{object: map[string]interface{}{"field": true}, expectErrs: []string{
-					`: Invalid value: "": "field" must validate all the schemas (allOf). None validated`,
-					`: Invalid value: "": "field" must validate at least one schema (anyOf)`,
+					`<nil>: Invalid value: "": "field" must validate all the schemas (allOf). None validated`,
+					`<nil>: Invalid value: "": "field" must validate at least one schema (anyOf)`,
 					`field: Invalid value: "boolean": field in body must be of type integer,string: "boolean"`,
 					`field: Invalid value: "boolean": field in body must be of type integer: "boolean"`,
 				}},
 				{object: map[string]interface{}{"field": 1.2}, expectErrs: []string{
-					`: Invalid value: "": "field" must validate all the schemas (allOf). None validated`,
-					`: Invalid value: "": "field" must validate at least one schema (anyOf)`,
+					`<nil>: Invalid value: "": "field" must validate all the schemas (allOf). None validated`,
+					`<nil>: Invalid value: "": "field" must validate at least one schema (anyOf)`,
 					`field: Invalid value: "number": field in body must be of type integer,string: "number"`,
 					`field: Invalid value: "number": field in body must be of type integer: "number"`,
 				}},
 				{object: map[string]interface{}{"field": map[string]interface{}{}}, expectErrs: []string{
-					`: Invalid value: "": "field" must validate all the schemas (allOf). None validated`,
-					`: Invalid value: "": "field" must validate at least one schema (anyOf)`,
+					`<nil>: Invalid value: "": "field" must validate all the schemas (allOf). None validated`,
+					`<nil>: Invalid value: "": "field" must validate at least one schema (anyOf)`,
 					`field: Invalid value: "object": field in body must be of type integer,string: "object"`,
 					`field: Invalid value: "object": field in body must be of type integer: "object"`,
 				}},
 				{object: map[string]interface{}{"field": []interface{}{}}, expectErrs: []string{
-					`: Invalid value: "": "field" must validate all the schemas (allOf). None validated`,
-					`: Invalid value: "": "field" must validate at least one schema (anyOf)`,
+					`<nil>: Invalid value: "": "field" must validate all the schemas (allOf). None validated`,
+					`<nil>: Invalid value: "": "field" must validate at least one schema (anyOf)`,
 					`field: Invalid value: "array": field in body must be of type integer,string: "array"`,
 					`field: Invalid value: "array": field in body must be of type integer: "array"`,
 				}},
