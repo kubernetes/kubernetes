@@ -152,7 +152,15 @@ var _ = SIGDescribe("Deployment", func() {
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 	// See https://github.com/kubernetes/kubernetes/issues/29229
 
-	ginkgo.It("should run the lifecycle of a Deployment", func() {
+	/*
+		Release: v1.20
+		Testname: Deployment, completes the lifecycle of a Deployment
+		Description: When a Deployment is created it MUST succeed with the required number of replicas.
+		It MUST succeed when the Deployment is patched. When scaling the deployment is MUST succeed.
+		When fetching and patching the DeploymentStatus it MUST succeed. It MUST succeed when deleting
+		the Deployment.
+	*/
+	framework.ConformanceIt("should run the lifecycle of a Deployment", func() {
 		zero := int64(0)
 		deploymentResource := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
 		testNamespaceName := f.Namespace.Name
