@@ -63,7 +63,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 
 	ginkgo.It("should reject a Pod requesting a deleted RuntimeClass [NodeFeature:RuntimeHandler]", func() {
 		rcName := createRuntimeClass(f, "delete-me", "runc")
-		rcClient := f.ClientSet.NodeV1beta1().RuntimeClasses()
+		rcClient := f.ClientSet.NodeV1().RuntimeClasses()
 
 		ginkgo.By("Deleting RuntimeClass "+rcName, func() {
 			err := rcClient.Delete(context.TODO(), rcName, metav1.DeleteOptions{})
@@ -91,7 +91,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 func createRuntimeClass(f *framework.Framework, name, handler string) string {
 	uniqueName := fmt.Sprintf("%s-%s", f.Namespace.Name, name)
 	rc := runtimeclasstest.NewRuntimeClass(uniqueName, handler)
-	rc, err := f.ClientSet.NodeV1beta1().RuntimeClasses().Create(context.TODO(), rc, metav1.CreateOptions{})
+	rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), rc, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 	return rc.GetName()
 }

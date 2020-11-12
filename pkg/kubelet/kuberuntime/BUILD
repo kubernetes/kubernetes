@@ -35,6 +35,7 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/credentialprovider:go_default_library",
+        "//pkg/credentialprovider/plugin:go_default_library",
         "//pkg/credentialprovider/secrets:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/cm:go_default_library",

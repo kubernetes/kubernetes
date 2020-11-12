@@ -77,6 +77,10 @@ type Manager interface {
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
 	GetTopologyHints(*v1.Pod, *v1.Container) map[string][]topologymanager.TopologyHint
+
+	// GetCPUs implements the podresources.CPUsProvider interface to provide allocated
+	// cpus for the container
+	GetCPUs(podUID, containerName string) []int64
 }
 
 type manager struct {
@@ -460,4 +464,13 @@ func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) 
 		&runtimeapi.LinuxContainerResources{
 			CpusetCpus: cpus.String(),
 		})
+}
+
+func (m *manager) GetCPUs(podUID, containerName string) []int64 {
+	cpus := m.state.GetCPUSetOrDefault(string(podUID), containerName)
+	result := []int64{}
+	for _, cpu := range cpus.ToSliceNoSort() {
+		result = append(result, int64(cpu))
+	}
+	return result
 }

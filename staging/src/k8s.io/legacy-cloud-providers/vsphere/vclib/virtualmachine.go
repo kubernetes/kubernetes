@@ -213,6 +213,29 @@ func (vm *VirtualMachine) IsActive(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
+// Exists checks if VM exists and is not terminated
+func (vm *VirtualMachine) Exists(ctx context.Context) (bool, error) {
+	vmMoList, err := vm.Datacenter.GetVMMoList(ctx, []*VirtualMachine{vm}, []string{"summary.runtime.powerState"})
+	if err != nil {
+		klog.Errorf("Failed to get VM Managed object with property summary. err: +%v", err)
+		return false, err
+	}
+	// We check for VMs which are still available in vcenter and has not been terminated/removed from
+	// disk and hence we consider PoweredOn,PoweredOff and Suspended as alive states.
+	aliveStates := []types.VirtualMachinePowerState{
+		types.VirtualMachinePowerStatePoweredOff,
+		types.VirtualMachinePowerStatePoweredOn,
+		types.VirtualMachinePowerStateSuspended,
+	}
+	currentState := vmMoList[0].Summary.Runtime.PowerState
+	for _, state := range aliveStates {
+		if state == currentState {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // GetAllAccessibleDatastores gets the list of accessible Datastores for the given Virtual Machine
 func (vm *VirtualMachine) GetAllAccessibleDatastores(ctx context.Context) ([]*DatastoreInfo, error) {
 	host, err := vm.HostSystem(ctx)

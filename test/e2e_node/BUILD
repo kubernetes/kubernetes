@@ -177,7 +177,7 @@ go_test(
         "//pkg/volume/util/fsquota:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/node/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/node/v1:go_default_library",
         "//staging/src/k8s.io/api/scheduling/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

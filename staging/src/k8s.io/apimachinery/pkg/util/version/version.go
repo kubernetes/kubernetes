@@ -195,6 +195,9 @@ func (v *Version) WithBuildMetadata(buildMetadata string) *Version {
 // ParseGeneric, this will not include the trailing uninterpreted portion of the version
 // number.
 func (v *Version) String() string {
+	if v == nil {
+		return "<nil>"
+	}
 	var buffer bytes.Buffer
 
 	for i, comp := range v.components {

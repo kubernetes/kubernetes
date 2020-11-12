@@ -12,6 +12,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/controller/certificates/signer/config:go_default_library",
+        "//pkg/controller/cronjob/config:go_default_library",
         "//pkg/controller/daemon/config:go_default_library",
         "//pkg/controller/deployment/config:go_default_library",
         "//pkg/controller/endpoint/config:go_default_library",

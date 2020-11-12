@@ -38,6 +38,7 @@ import (
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
+	cronjobconfig "k8s.io/kubernetes/pkg/controller/cronjob/config"
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
@@ -314,6 +315,11 @@ func TestAddFlags(t *testing.T) {
 				ConcurrentJobSyncs: 5,
 			},
 		},
+		CronJobController: &CronJobControllerOptions{
+			&cronjobconfig.CronJobControllerConfiguration{
+				ConcurrentCronJobSyncs: 5,
+			},
+		},
 		NamespaceController: &NamespaceControllerOptions{
 			&namespaceconfig.NamespaceControllerConfiguration{
 				NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
@@ -565,6 +571,9 @@ func TestApplyTo(t *testing.T) {
 			},
 			JobController: jobconfig.JobControllerConfiguration{
 				ConcurrentJobSyncs: 5,
+			},
+			CronJobController: cronjobconfig.CronJobControllerConfiguration{
+				ConcurrentCronJobSyncs: 5,
 			},
 			NamespaceController: namespaceconfig.NamespaceControllerConfiguration{
 				NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},

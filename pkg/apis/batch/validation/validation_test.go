@@ -195,7 +195,7 @@ func TestValidateJob(t *testing.T) {
 				},
 			},
 		},
-		"spec.template.spec.restartPolicy: Unsupported value": {
+		"spec.template.spec.restartPolicy: Required value": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myjob",
 				Namespace: metav1.NamespaceDefault,
@@ -210,6 +210,27 @@ func TestValidateJob(t *testing.T) {
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyAlways,
+						DNSPolicy:     api.DNSClusterFirst,
+						Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+					},
+				},
+			},
+		},
+		"spec.template.spec.restartPolicy: Unsupported value": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "myjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.JobSpec{
+				Selector:       validManualSelector,
+				ManualSelector: newBool(true),
+				Template: api.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: validManualSelector.MatchLabels,
+					},
+					Spec: api.PodSpec{
+						RestartPolicy: "Invalid",
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 					},
@@ -586,7 +607,7 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
-		"spec.jobTemplate.spec.template.spec.restartPolicy: Unsupported value": {
+		"spec.jobTemplate.spec.template.spec.restartPolicy: Required value": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: metav1.NamespaceDefault,
@@ -600,6 +621,28 @@ func TestValidateCronJob(t *testing.T) {
 						Template: api.PodTemplateSpec{
 							Spec: api.PodSpec{
 								RestartPolicy: api.RestartPolicyAlways,
+								DNSPolicy:     api.DNSClusterFirst,
+								Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+							},
+						},
+					},
+				},
+			},
+		},
+		"spec.jobTemplate.spec.template.spec.restartPolicy: Unsupported value": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: api.PodTemplateSpec{
+							Spec: api.PodSpec{
+								RestartPolicy: "Invalid",
 								DNSPolicy:     api.DNSClusterFirst,
 								Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 							},

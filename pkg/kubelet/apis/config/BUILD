@@ -38,6 +38,7 @@ filegroup(
         ":package-srcs",
         "//pkg/kubelet/apis/config/fuzzer:all-srcs",
         "//pkg/kubelet/apis/config/scheme:all-srcs",
+        "//pkg/kubelet/apis/config/v1alpha1:all-srcs",
         "//pkg/kubelet/apis/config/v1beta1:all-srcs",
         "//pkg/kubelet/apis/config/validation:all-srcs",
     ],

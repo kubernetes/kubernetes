@@ -306,6 +306,7 @@ const (
 	// owner: @tallclair
 	// alpha: v1.12
 	// beta:  v1.14
+	// GA: v1.20
 	//
 	// Enables RuntimeClass, for selecting between multiple runtimes to run a pod.
 	RuntimeClass featuregate.Feature = "RuntimeClass"
@@ -330,6 +331,7 @@ const (
 	// owner: @xing-yang
 	// alpha: v1.12
 	// beta: v1.17
+	// GA: v1.20
 	//
 	// Enable volume snapshot data source support.
 	VolumeSnapshotDataSource featuregate.Feature = "VolumeSnapshotDataSource"
@@ -560,6 +562,16 @@ const (
 	// Enable all logic related to the PodDisruptionBudget API object in policy
 	PodDisruptionBudget featuregate.Feature = "PodDisruptionBudget"
 
+	// owner: @alaypatel07, @soltysh
+	// alpha: v1.20
+	// beta: v1.21
+	//
+	// CronJobControllerV2 controls whether the controller manager starts old cronjob
+	// controller or new one which is implemented with informers and delaying queue
+	//
+	// This feature is deprecated, and will be removed in v1.22.
+	CronJobControllerV2 featuregate.Feature = "CronJobControllerV2"
+
 	// owner: @m1093782566
 	// alpha: v1.17
 	//
@@ -675,6 +687,12 @@ const (
 	// may depend on old behavior where exec probe timeouts were ignored.
 	// Lock to default in v1.21 and remove in v1.22.
 	ExecProbeTimeout featuregate.Feature = "ExecProbeTimeout"
+
+	// owner: @andrewsykim
+	// alpha: v1.20
+	//
+	// Enable kubelet exec plugins for image pull credentials.
+	KubeletCredentialProviders featuregate.Feature = "KubeletCredentialProviders"
 )
 
 func init() {
@@ -738,10 +756,10 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIStorageCapacity:             {Default: false, PreRelease: featuregate.Alpha},
 	GenericEphemeralVolume:         {Default: false, PreRelease: featuregate.Alpha},
 	CSIVolumeFSGroupPolicy:         {Default: false, PreRelease: featuregate.Alpha},
-	RuntimeClass:                   {Default: true, PreRelease: featuregate.Beta},
+	RuntimeClass:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	NodeLease:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	SCTPSupport:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
-	VolumeSnapshotDataSource:       {Default: true, PreRelease: featuregate.Beta},
+	VolumeSnapshotDataSource:       {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	ProcMountType:                  {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:               {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:            {Default: true, PreRelease: featuregate.Beta},
@@ -760,6 +778,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StartupProbe:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
+	CronJobControllerV2:                            {Default: false, PreRelease: featuregate.Alpha},
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
 	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.Beta},
 	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.Beta},
@@ -777,6 +796,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SizeMemoryBackedVolumes:                        {Default: false, PreRelease: featuregate.Alpha},
 	LoadBalancerIPMode:                             {Default: false, PreRelease: featuregate.Alpha},
 	ExecProbeTimeout:                               {Default: true, PreRelease: featuregate.GA}, // lock to default in v1.21 and remove in v1.22
+	KubeletCredentialProviders:                     {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

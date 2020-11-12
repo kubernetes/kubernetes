@@ -15,6 +15,7 @@ go_library(
     deps = [
         "//pkg/controller/apis/config:go_default_library",
         "//pkg/controller/certificates/signer/config/v1alpha1:go_default_library",
+        "//pkg/controller/cronjob/config/v1alpha1:go_default_library",
         "//pkg/controller/daemon/config/v1alpha1:go_default_library",
         "//pkg/controller/deployment/config/v1alpha1:go_default_library",
         "//pkg/controller/endpoint/config/v1alpha1:go_default_library",

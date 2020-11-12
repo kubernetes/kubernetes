@@ -488,11 +488,6 @@ func dropDisabledFields(
 
 	dropDisabledFSGroupFields(podSpec, oldPodSpec)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && !runtimeClassInUse(oldPodSpec) {
-		// Set RuntimeClassName to nil only if feature is disabled and it is not used
-		podSpec.RuntimeClassName = nil
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) && !overheadInUse(oldPodSpec) {
 		// Set Overhead to nil only if the feature is disabled and it is not used
 		podSpec.Overhead = nil
@@ -616,17 +611,6 @@ func subpathInUse(podSpec *api.PodSpec) bool {
 	})
 
 	return inUse
-}
-
-// runtimeClassInUse returns true if the pod spec is non-nil and has a RuntimeClassName set
-func runtimeClassInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.RuntimeClassName != nil {
-		return true
-	}
-	return false
 }
 
 // overheadInUse returns true if the pod spec is non-nil and has Overhead set
