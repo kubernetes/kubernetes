@@ -2181,6 +2181,7 @@ k8s.io/cloud-provider/controllers/route
 k8s.io/cloud-provider/controllers/service
 k8s.io/cloud-provider/controllers/service/config
 k8s.io/cloud-provider/controllers/service/config/v1alpha1
+k8s.io/cloud-provider/credentialconfig
 k8s.io/cloud-provider/fake
 k8s.io/cloud-provider/node/helpers
 k8s.io/cloud-provider/options
@@ -2490,6 +2491,7 @@ k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient/mockvmssvmclient
 k8s.io/legacy-cloud-providers/azure/metrics
 k8s.io/legacy-cloud-providers/azure/retry
 k8s.io/legacy-cloud-providers/gce
+k8s.io/legacy-cloud-providers/gce/gcpcredential
 k8s.io/legacy-cloud-providers/openstack
 k8s.io/legacy-cloud-providers/vsphere
 k8s.io/legacy-cloud-providers/vsphere/testing
