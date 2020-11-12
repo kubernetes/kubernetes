@@ -30,7 +30,6 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -230,14 +229,21 @@ type Config struct {
 
 	// DisableAvailabilitySetNodes disables VMAS nodes support when "VMType" is set to "vmss".
 	DisableAvailabilitySetNodes bool `json:"disableAvailabilitySetNodes,omitempty" yaml:"disableAvailabilitySetNodes,omitempty"`
+
+	// Tags determines what tags shall be applied to the shared resources managed by controller manager, which
+	// includes load balancer, security group and route table. The supported format is `a=b,c=d,...`. After updated
+	// this config, the old tags would be replaced by the new ones.
+	Tags string `json:"tags,omitempty" yaml:"tags,omitempty"`
 }
 
-var _ cloudprovider.Interface = (*Cloud)(nil)
-var _ cloudprovider.Instances = (*Cloud)(nil)
-var _ cloudprovider.LoadBalancer = (*Cloud)(nil)
-var _ cloudprovider.Routes = (*Cloud)(nil)
-var _ cloudprovider.Zones = (*Cloud)(nil)
-var _ cloudprovider.PVLabeler = (*Cloud)(nil)
+var (
+	_ cloudprovider.Interface    = (*Cloud)(nil)
+	_ cloudprovider.Instances    = (*Cloud)(nil)
+	_ cloudprovider.LoadBalancer = (*Cloud)(nil)
+	_ cloudprovider.Routes       = (*Cloud)(nil)
+	_ cloudprovider.Zones        = (*Cloud)(nil)
+	_ cloudprovider.PVLabeler    = (*Cloud)(nil)
+)
 
 // Cloud holds the config and clients
 type Cloud struct {

@@ -3557,3 +3557,41 @@ func buildDefaultTestLB(name string, backendIPConfigs []string) network.LoadBala
 	(*expectedLB.BackendAddressPools)[0].BackendIPConfigurations = &backendIPConfigurations
 	return expectedLB
 }
+
+func TestEnsurePIPTagged(t *testing.T) {
+	t.Run("ensurePIPTagged should ensure the pip is tagged as configured", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		cloud := GetTestCloud(ctrl)
+		cloud.Tags = "a=x,y=z"
+
+		service := v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					ServiceAnnotationAzurePIPTags: "a=b,c=d,e=,=f,ghi",
+				},
+			},
+		}
+		pip := network.PublicIPAddress{
+			Tags: map[string]*string{
+				clusterNameKey: to.StringPtr("testCluster"),
+				serviceTagKey:  to.StringPtr("default/svc1,default/svc2"),
+				"foo":          to.StringPtr("bar"),
+				"a":            to.StringPtr("j"),
+			},
+		}
+		expectedPIP := network.PublicIPAddress{
+			Tags: map[string]*string{
+				clusterNameKey: to.StringPtr("testCluster"),
+				serviceTagKey:  to.StringPtr("default/svc1,default/svc2"),
+				"foo":          to.StringPtr("bar"),
+				"a":            to.StringPtr("b"),
+				"c":            to.StringPtr("d"),
+				"y":            to.StringPtr("z"),
+			},
+		}
+		changed := cloud.ensurePIPTagged(&service, &pip)
+		assert.True(t, changed)
+		assert.Equal(t, expectedPIP, pip)
+	})
+}

@@ -113,6 +113,11 @@ const (
 	// `/healthz` would be configured by default.
 	ServiceAnnotationLoadBalancerHealthProbeRequestPath = "service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path"
 
+	// ServiceAnnotationAzurePIPTags determines what tags should be applied to the public IP of the service. The cluster name
+	// and service names tags (which is managed by controller manager itself) would keep unchanged. The supported format
+	// is `a=b,c=d,...`. After updated, the old user-assigned tags would not be replaced by the new ones.
+	ServiceAnnotationAzurePIPTags = "service.beta.kubernetes.io/azure-pip-tags"
+
 	// serviceTagKey is the service key applied for public IP tags.
 	serviceTagKey = "service"
 	// clusterNameKey is the cluster name key applied for public IP tags.
@@ -209,13 +214,13 @@ func (az *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, ser
 	}
 
 	// lb is not reused here because the ETAG may be changed in above operations, hence reconcilePublicIP() would get lb again from cache.
+	klog.V(2).Infof("EnsureLoadBalancer: reconciling pip")
 	if _, err := az.reconcilePublicIP(clusterName, updateService, to.String(lb.Name), true /* wantLb */); err != nil {
 		klog.Errorf("reconcilePublicIP(%s) failed: %#v", serviceName, err)
 		return nil, err
 	}
 
 	isOperationSucceeded = true
-
 	return lbStatus, nil
 }
 
@@ -1408,6 +1413,11 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 		lb.LoadBalancingRules = &updatedRules
 	}
 
+	changed := az.ensureLoadBalancerTagged(lb)
+	if changed {
+		dirtyLb = true
+	}
+
 	// We don't care if the LB exists or not
 	// We only care about if there is any change in the LB, which means dirtyLB
 	// If it is not exist, and no change to that, we don't CreateOrUpdate LB
@@ -1910,16 +1920,22 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		klog.V(10).Infof("Updated security rule while processing %s: %s:%s -> %s:%s", service.Name, logSafe(r.SourceAddressPrefix), logSafe(r.SourcePortRange), logSafeCollection(r.DestinationAddressPrefix, r.DestinationAddressPrefixes), logSafe(r.DestinationPortRange))
 	}
 
+	changed := az.ensureSecurityGroupTagged(&sg)
+	if changed {
+		dirtySg = true
+	}
+
 	if dirtySg {
 		sg.SecurityRules = &updatedRules
 		klog.V(2).Infof("reconcileSecurityGroup for service(%s): sg(%s) - updating", serviceName, *sg.Name)
 		klog.V(10).Infof("CreateOrUpdateSecurityGroup(%q): start", *sg.Name)
-		err := az.CreateOrUpdateSecurityGroup(service, sg)
+		err := az.CreateOrUpdateSecurityGroup(sg)
 		if err != nil {
 			klog.V(2).Infof("ensure(%s) abort backoff: sg(%s) - updating", serviceName, *sg.Name)
 			return nil, err
 		}
 		klog.V(10).Infof("CreateOrUpdateSecurityGroup(%q): end", *sg.Name)
+		az.nsgCache.Delete(to.String(sg.Name))
 	}
 	return &sg, nil
 }
@@ -2104,6 +2120,40 @@ func shouldReleaseExistingOwnedPublicIP(existingPip *network.PublicIPAddress, lb
 		(ipTagRequest.IPTagsRequestedByAnnotation && !areIPTagsEquivalent(currentIPTags, ipTagRequest.IPTags))
 }
 
+//  ensurePIPTagged ensures the public IP of the service is tagged as configured
+func (az *Cloud) ensurePIPTagged(service *v1.Service, pip *network.PublicIPAddress) bool {
+	changed := false
+	configTags := parseTags(az.Tags)
+	annotationTags := make(map[string]*string)
+	if _, ok := service.Annotations[ServiceAnnotationAzurePIPTags]; ok {
+		annotationTags = parseTags(service.Annotations[ServiceAnnotationAzurePIPTags])
+	}
+	for k, v := range annotationTags {
+		configTags[k] = v
+	}
+	// include the cluster name and service names tags when comparing
+	var clusterName, serviceNames *string
+	if v, ok := pip.Tags[clusterNameKey]; ok {
+		clusterName = v
+	}
+	if v, ok := pip.Tags[serviceTagKey]; ok {
+		serviceNames = v
+	}
+	if clusterName != nil {
+		configTags[clusterNameKey] = clusterName
+	}
+	if serviceNames != nil {
+		configTags[serviceTagKey] = serviceNames
+	}
+	for k, v := range configTags {
+		if vv, ok := pip.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
+			pip.Tags[k] = v
+			changed = true
+		}
+	}
+	return changed
+}
+
 // This reconciles the PublicIP resources similar to how the LB is reconciled.
 func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lbName string, wantLb bool) (*network.PublicIPAddress, error) {
 	isInternal := requiresInternalLoadBalancer(service)
@@ -2158,13 +2208,17 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lbNa
 		// Now, let's perform additional analysis to determine if we should release the public ips we have found.
 		// We can only let them go if (a) they are owned by this service and (b) they meet the criteria for deletion.
 		if serviceOwnsPublicIP(&pip, clusterName, serviceName) {
-			var dirtyPIP bool
+			var dirtyPIP, toBeDeleted bool
 			if !wantLb {
 				klog.V(2).Infof("reconcilePublicIP for service(%s): unbinding the service from pip %s", serviceName, *pip.Name)
 				err = unbindServiceFromPIP(&pip, serviceName)
 				if err != nil {
 					return nil, err
 				}
+				dirtyPIP = true
+			}
+			changed := az.ensurePIPTagged(service, &pip)
+			if changed {
 				dirtyPIP = true
 			}
 			if shouldReleaseExistingOwnedPublicIP(&pip, wantLb, isInternal, desiredPipName, serviceName, serviceIPTagRequest) {
@@ -2177,10 +2231,13 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lbNa
 				// An aside: It would be unusual, but possible, for us to delete a public ip referred to explicitly by name
 				// in Service annotations (which is usually reserved for non-service-owned externals), if that IP is tagged as
 				// having been owned by a particular Kubernetes cluster.
+
+				// If the pip is going to be deleted, we do not need to update it
+				toBeDeleted = true
 			}
 
 			// Update tags of PIP only instead of deleting it.
-			if dirtyPIP {
+			if !toBeDeleted && dirtyPIP {
 				pipsToBeUpdated = append(pipsToBeUpdated, &pip)
 			}
 		}
@@ -2618,4 +2675,42 @@ func unbindServiceFromPIP(pip *network.PublicIPAddress, serviceName string) erro
 	}
 
 	return nil
+}
+
+// ensureLoadBalancerTagged ensures every load balancer in the resource group is tagged as configured
+func (az *Cloud) ensureLoadBalancerTagged(lb *network.LoadBalancer) bool {
+	changed := false
+	if az.Tags == "" {
+		return false
+	}
+	tags := parseTags(az.Tags)
+	if lb.Tags == nil {
+		lb.Tags = make(map[string]*string)
+	}
+	for k, v := range tags {
+		if vv, ok := lb.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
+			lb.Tags[k] = v
+			changed = true
+		}
+	}
+	return changed
+}
+
+// ensureSecurityGroupTagged ensures the security group is tagged as configured
+func (az *Cloud) ensureSecurityGroupTagged(sg *network.SecurityGroup) bool {
+	changed := false
+	if az.Tags == "" {
+		return false
+	}
+	tags := parseTags(az.Tags)
+	if sg.Tags == nil {
+		sg.Tags = make(map[string]*string)
+	}
+	for k, v := range tags {
+		if vv, ok := sg.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
+			sg.Tags[k] = v
+			changed = true
+		}
+	}
+	return changed
 }

@@ -156,7 +156,7 @@ func (az *Cloud) GetIPForMachineWithRetry(name types.NodeName) (string, string, 
 }
 
 // CreateOrUpdateSecurityGroup invokes az.SecurityGroupsClient.CreateOrUpdate with exponential backoff retry
-func (az *Cloud) CreateOrUpdateSecurityGroup(service *v1.Service, sg network.SecurityGroup) error {
+func (az *Cloud) CreateOrUpdateSecurityGroup(sg network.SecurityGroup) error {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
