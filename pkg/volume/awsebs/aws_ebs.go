@@ -87,7 +87,7 @@ func (plugin *awsElasticBlockStorePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil)
 }
 
-func (plugin *awsElasticBlockStorePlugin) RequiresRemount() bool {
+func (plugin *awsElasticBlockStorePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

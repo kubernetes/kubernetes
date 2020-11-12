@@ -693,6 +693,13 @@ const (
 	//
 	// Enable kubelet exec plugins for image pull credentials.
 	KubeletCredentialProviders featuregate.Feature = "KubeletCredentialProviders"
+
+	// owner: @zshihang
+	// alpha: v1.20
+	//
+	// Enable kubelet to pass pod's service account token to NodePublishVolume
+	// call of CSI driver which is mounting volumes for that pod.
+	CSIServiceAccountToken featuregate.Feature = "CSIServiceAccountToken"
 )
 
 func init() {
@@ -754,6 +761,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIBlockVolume:                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	CSIInlineVolume:                {Default: true, PreRelease: featuregate.Beta},
 	CSIStorageCapacity:             {Default: false, PreRelease: featuregate.Alpha},
+	CSIServiceAccountToken:         {Default: false, PreRelease: featuregate.Alpha},
 	GenericEphemeralVolume:         {Default: false, PreRelease: featuregate.Alpha},
 	CSIVolumeFSGroupPolicy:         {Default: false, PreRelease: featuregate.Alpha},
 	RuntimeClass:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23

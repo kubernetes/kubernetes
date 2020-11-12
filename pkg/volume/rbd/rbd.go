@@ -107,7 +107,7 @@ func (plugin *rbdPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.RBD != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD != nil)
 }
 
-func (plugin *rbdPlugin) RequiresRemount() bool {
+func (plugin *rbdPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

@@ -19,6 +19,7 @@ package csi
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -27,6 +28,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -224,14 +226,15 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	if err != nil {
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to assemble volume attributes: %v", err))
 	}
-	if podAttrs != nil {
-		if volAttribs == nil {
-			volAttribs = podAttrs
-		} else {
-			for k, v := range podAttrs {
-				volAttribs[k] = v
-			}
+	volAttribs = mergeMap(volAttribs, podAttrs)
+
+	// Inject pod service account token into volume attributes
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
+		serviceAccountTokenAttrs, err := c.podServiceAccountTokenAttrs()
+		if err != nil {
+			return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get service accoount token attributes: %v", err))
 		}
+		volAttribs = mergeMap(volAttribs, serviceAccountTokenAttrs)
 	}
 
 	err = csi.NodePublishVolume(
@@ -317,6 +320,57 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 
 	klog.V(4).Infof(log("CSIDriver %q requires pod information", c.driverName))
 	return attrs, nil
+}
+
+func (c *csiMountMgr) podServiceAccountTokenAttrs() (map[string]string, error) {
+	if c.plugin.serviceAccountTokenGetter == nil {
+		return nil, errors.New("ServiceAccountTokenGetter is nil")
+	}
+
+	csiDriver, err := c.plugin.csiDriverLister.Get(string(c.driverName))
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			klog.V(5).Infof(log("CSIDriver %q not found, not adding service account token information", c.driverName))
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if len(csiDriver.Spec.TokenRequests) == 0 {
+		return nil, nil
+	}
+
+	outputs := map[string]authenticationv1.TokenRequestStatus{}
+	for _, tokenRequest := range csiDriver.Spec.TokenRequests {
+		audience := tokenRequest.Audience
+		audiences := []string{audience}
+		if audience == "" {
+			audiences = []string{}
+		}
+		tr, err := c.plugin.serviceAccountTokenGetter(c.pod.Namespace, c.pod.Spec.ServiceAccountName, &authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences:         audiences,
+				ExpirationSeconds: tokenRequest.ExpirationSeconds,
+				BoundObjectRef: &authenticationv1.BoundObjectReference{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       c.pod.Name,
+					UID:        c.pod.UID,
+				},
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		outputs[audience] = tr.Status
+	}
+
+	klog.V(4).Infof(log("Fetched service account token attrs for CSIDriver %q", c.driverName))
+	tokens, _ := json.Marshal(outputs)
+	return map[string]string{
+		"csi.storage.k8s.io/serviceAccount.tokens": string(tokens),
+	}, nil
 }
 
 func (c *csiMountMgr) GetAttributes() volume.Attributes {
@@ -433,4 +487,14 @@ func removeMountDir(plug *csiPlugin, mountPath string) error {
 func makeVolumeHandle(podUID, volSourceSpecName string) string {
 	result := sha256.Sum256([]byte(fmt.Sprintf("%s%s", podUID, volSourceSpecName)))
 	return fmt.Sprintf("csi-%x", result)
+}
+
+func mergeMap(first, second map[string]string) map[string]string {
+	if first == nil && second != nil {
+		return second
+	}
+	for k, v := range second {
+		first[k] = v
+	}
+	return first
 }

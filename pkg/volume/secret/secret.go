@@ -81,7 +81,7 @@ func (plugin *secretPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.Secret != nil
 }
 
-func (plugin *secretPlugin) RequiresRemount() bool {
+func (plugin *secretPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return true
 }
 

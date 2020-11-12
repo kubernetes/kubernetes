@@ -94,7 +94,7 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	return false
 }
 
-func (plugin *emptyDirPlugin) RequiresRemount() bool {
+func (plugin *emptyDirPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

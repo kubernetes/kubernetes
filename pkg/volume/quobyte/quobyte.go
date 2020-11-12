@@ -116,7 +116,7 @@ func (plugin *quobytePlugin) CanSupport(spec *volume.Spec) bool {
 	return false
 }
 
-func (plugin *quobytePlugin) RequiresRemount() bool {
+func (plugin *quobytePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

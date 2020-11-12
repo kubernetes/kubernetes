@@ -98,7 +98,7 @@ func (plugin *gcePersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil)
 }
 
-func (plugin *gcePersistentDiskPlugin) RequiresRemount() bool {
+func (plugin *gcePersistentDiskPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	utilptr "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -111,6 +112,8 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		disableResizingOnDriver bool
 		enableSnapshot          bool
 		javascriptHooks         map[string]string
+		tokenRequests           []storagev1.TokenRequest
+		requiresRepublish       *bool
 	}
 
 	type mockDriverSetup struct {
@@ -150,6 +153,8 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			EnableNodeExpansion: tp.enableNodeExpansion,
 			EnableSnapshot:      tp.enableSnapshot,
 			JavascriptHooks:     tp.javascriptHooks,
+			TokenRequests:       tp.tokenRequests,
+			RequiresRepublish:   tp.requiresRepublish,
 		}
 
 		// this just disable resizing on driver, keeping resizing on SC enabled.
@@ -471,7 +476,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				framework.ExpectNoError(err, "while deleting")
 
 				ginkgo.By("Checking CSI driver logs")
-				err = checkPodLogs(m.cs, m.config.DriverNamespace.Name, driverPodName, driverContainerName, pod, test.expectPodInfo, test.expectEphemeral, csiInlineVolumesEnabled)
+				err = checkPodLogs(m.cs, m.config.DriverNamespace.Name, driverPodName, driverContainerName, pod, test.expectPodInfo, test.expectEphemeral, csiInlineVolumesEnabled, false, 1)
 				framework.ExpectNoError(err)
 			})
 		}
@@ -1176,6 +1181,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			})
 		}
 	})
+
 	ginkgo.Context("CSI Volume Snapshots [Feature:VolumeSnapshotDataSource]", func() {
 		// Global variable in all scripts (called before each test)
 		globalScript := `counter=0; console.log("globals loaded", OK, DEADLINEEXCEEDED)`
@@ -1298,6 +1304,68 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				ginkgo.By(fmt.Sprintf("Wait for VolumeSnapshotContent %s to be deleted", volumeSnapshotContentName))
 				err = utils.WaitForGVRDeletion(m.config.Framework.DynamicClient, testsuites.SnapshotContentGVR, volumeSnapshotContentName, framework.Poll, framework.SnapshotDeleteTimeout)
 				framework.ExpectNoError(err, fmt.Sprintf("failed to delete VolumeSnapshotContent %s", volumeSnapshotContentName))
+			})
+		}
+	})
+
+	ginkgo.Context("CSIServiceAccountToken [Feature:CSIServiceAccountToken]", func() {
+		var (
+			err error
+		)
+		tests := []struct {
+			desc                  string
+			deployCSIDriverObject bool
+			tokenRequests         []storagev1.TokenRequest
+		}{
+			{
+				desc:                  "token should not be plumbed down when csiServiceAccountTokenEnabled=false",
+				deployCSIDriverObject: true,
+				tokenRequests:         nil,
+			},
+			{
+				desc:                  "token should not be plumbed down when CSIDriver is not deployed",
+				deployCSIDriverObject: false,
+				tokenRequests:         []storagev1.TokenRequest{{}},
+			},
+			{
+				desc:                  "token should be plumbed down when csiServiceAccountTokenEnabled=true",
+				deployCSIDriverObject: true,
+				tokenRequests:         []storagev1.TokenRequest{{ExpirationSeconds: utilptr.Int64Ptr(60 * 10)}},
+			},
+		}
+		for _, test := range tests {
+			test := test
+			csiServiceAccountTokenEnabled := test.tokenRequests != nil
+			ginkgo.It(test.desc, func() {
+				init(testParameters{
+					registerDriver:    test.deployCSIDriverObject,
+					tokenRequests:     test.tokenRequests,
+					requiresRepublish: &csiServiceAccountTokenEnabled,
+				})
+
+				defer cleanup()
+
+				_, _, pod := createPod(false)
+				if pod == nil {
+					return
+				}
+				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				framework.ExpectNoError(err, "Failed to start pod: %v", err)
+
+				// sleep to make sure RequiresRepublish triggers more than 1 NodePublishVolume
+				numNodePublishVolume := 1
+				if test.deployCSIDriverObject && csiServiceAccountTokenEnabled {
+					time.Sleep(time.Second)
+					numNodePublishVolume = 2
+				}
+
+				ginkgo.By("Deleting the previously created pod")
+				err = e2epod.DeletePodWithWait(m.cs, pod)
+				framework.ExpectNoError(err, "while deleting")
+
+				ginkgo.By("Checking CSI driver logs")
+				err = checkPodLogs(m.cs, m.config.DriverNamespace.Name, driverPodName, driverContainerName, pod, false, false, false, test.deployCSIDriverObject && csiServiceAccountTokenEnabled, numNodePublishVolume)
+				framework.ExpectNoError(err)
 			})
 		}
 	})
@@ -1545,16 +1613,22 @@ type mockCSICall struct {
 
 // checkPodLogs tests that NodePublish was called with expected volume_context and (for ephemeral inline volumes)
 // has the matching NodeUnpublish
-func checkPodLogs(cs clientset.Interface, namespace, driverPodName, driverContainerName string, pod *v1.Pod, expectPodInfo, ephemeralVolume, csiInlineVolumesEnabled bool) error {
-	expectedAttributes := map[string]string{
-		"csi.storage.k8s.io/pod.name":            pod.Name,
-		"csi.storage.k8s.io/pod.namespace":       pod.Namespace,
-		"csi.storage.k8s.io/pod.uid":             string(pod.UID),
-		"csi.storage.k8s.io/serviceAccount.name": "default",
+func checkPodLogs(cs clientset.Interface, namespace, driverPodName, driverContainerName string, pod *v1.Pod, expectPodInfo, ephemeralVolume, csiInlineVolumesEnabled, csiServiceAccountTokenEnabled bool, expectedNumNodePublish int) error {
+	expectedAttributes := map[string]string{}
+	if expectPodInfo {
+		expectedAttributes["csi.storage.k8s.io/pod.name"] = pod.Name
+		expectedAttributes["csi.storage.k8s.io/pod.namespace"] = pod.Namespace
+		expectedAttributes["csi.storage.k8s.io/pod.uid"] = string(pod.UID)
+		expectedAttributes["csi.storage.k8s.io/serviceAccount.name"] = "default"
+
 	}
 	if csiInlineVolumesEnabled {
 		// This is only passed in 1.15 when the CSIInlineVolume feature gate is set.
 		expectedAttributes["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(ephemeralVolume)
+	}
+
+	if csiServiceAccountTokenEnabled {
+		expectedAttributes["csi.storage.k8s.io/serviceAccount.tokens"] = "<nonempty>"
 	}
 
 	// Find NodePublish in the GRPC calls.
@@ -1573,9 +1647,9 @@ func checkPodLogs(cs clientset.Interface, namespace, driverPodName, driverContai
 				// Check that NodePublish had expected attributes for first volume
 				for k, v := range expectedAttributes {
 					vv, found := call.Request.VolumeContext[k]
-					if found && v == vv {
+					if found && (v == vv || (v == "<nonempty>" && len(vv) != 0)) {
 						foundAttributes.Insert(k)
-						framework.Logf("Found volume attribute %s: %s", k, v)
+						framework.Logf("Found volume attribute %s: %s", k, vv)
 					}
 				}
 			}
@@ -1584,23 +1658,16 @@ func checkPodLogs(cs clientset.Interface, namespace, driverPodName, driverContai
 			numNodeUnpublishVolume++
 		}
 	}
-	if numNodePublishVolume == 0 {
-		return fmt.Errorf("NodePublish was never called")
+	if numNodePublishVolume < expectedNumNodePublish {
+		return fmt.Errorf("NodePublish should be called at least %d", expectedNumNodePublish)
 	}
 
 	if numNodeUnpublishVolume == 0 {
 		return fmt.Errorf("NodeUnpublish was never called")
 	}
-	if expectPodInfo {
-		if foundAttributes.Len() != len(expectedAttributes) {
-			return fmt.Errorf("number of found volume attributes does not match, expected %d, got %d", len(expectedAttributes), foundAttributes.Len())
-		}
-		return nil
+	if foundAttributes.Len() != len(expectedAttributes) {
+		return fmt.Errorf("number of found volume attributes does not match, expected %d, got %d", len(expectedAttributes), foundAttributes.Len())
 	}
-	if foundAttributes.Len() != 0 {
-		return fmt.Errorf("some unexpected volume attributes were found: %+v", foundAttributes.List())
-	}
-
 	return nil
 }
 

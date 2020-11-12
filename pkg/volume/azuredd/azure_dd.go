@@ -121,7 +121,7 @@ func (plugin *azureDataDiskPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.AzureDisk != nil)
 }
 
-func (plugin *azureDataDiskPlugin) RequiresRemount() bool {
+func (plugin *azureDataDiskPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

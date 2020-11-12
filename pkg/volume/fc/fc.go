@@ -86,7 +86,7 @@ func (plugin *fcPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.FC != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FC != nil)
 }
 
-func (plugin *fcPlugin) RequiresRemount() bool {
+func (plugin *fcPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
