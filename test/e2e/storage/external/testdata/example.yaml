@@ -1,0 +1,19 @@
+StorageClass:
+  FromExistingClassName: example
+DriverInfo:
+  Name: example
+  RequiredAccessModes:
+  - ReadWriteOnce
+  Capabilities:
+    persistence: true
+    multipods: true
+    exec: true
+    block: true
+    fsGroup: true
+    topology: true
+    controllerExpansion: true
+    nodeExpansion: true
+    volumeLimits: false
+  StressTestOptions:
+    NumPods: 10
+    NumRestarts: 20

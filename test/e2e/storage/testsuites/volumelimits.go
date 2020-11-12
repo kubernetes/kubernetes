@@ -38,11 +38,12 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
+	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 type volumeLimitsTestSuite struct {
-	tsInfo TestSuiteInfo
+	tsInfo storageapi.TestSuiteInfo
 }
 
 const (
@@ -55,36 +56,44 @@ const (
 	csiNodeInfoTimeout = 1 * time.Minute
 )
 
-var _ TestSuite = &volumeLimitsTestSuite{}
+var _ storageapi.TestSuite = &volumeLimitsTestSuite{}
 
-// InitVolumeLimitsTestSuite returns volumeLimitsTestSuite that implements TestSuite interface
-func InitVolumeLimitsTestSuite() TestSuite {
+// InitCustomVolumeLimitsTestSuite returns volumeLimitsTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomVolumeLimitsTestSuite(patterns []storageapi.TestPattern) storageapi.TestSuite {
 	return &volumeLimitsTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "volumeLimits",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.FsVolModeDynamicPV,
-			},
+		tsInfo: storageapi.TestSuiteInfo{
+			Name:         "volumeLimits",
+			TestPatterns: patterns,
 		},
 	}
 }
 
-func (t *volumeLimitsTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitVolumeLimitsTestSuite returns volumeLimitsTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitVolumeLimitsTestSuite() storageapi.TestSuite {
+	patterns := []storageapi.TestPattern{
+		storageapi.FsVolModeDynamicPV,
+	}
+	return InitCustomVolumeLimitsTestSuite(patterns)
+}
+
+func (t *volumeLimitsTestSuite) GetTestSuiteInfo() storageapi.TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeLimitsTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeLimitsTestSuite) SkipUnsupportedTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
 }
 
-func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeLimitsTestSuite) DefineTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
 	type local struct {
-		config      *PerTestConfig
+		config      *storageapi.PerTestConfig
 		testCleanup func()
 
 		cs clientset.Interface
 		ns *v1.Namespace
 		// VolumeResource contains pv, pvc, sc, etc. of the first pod created
-		resource *VolumeResource
+		resource *storageapi.VolumeResource
 
 		// All created PVCs, incl. the one in resource
 		pvcs []*v1.PersistentVolumeClaim
@@ -99,7 +108,8 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		l local
 	)
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
+	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("volumelimits")
 
 	// This checks that CSIMaxVolumeLimitChecker works as expected.
@@ -112,11 +122,11 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 	// BEWARE: the test may create lot of volumes and it's really slow.
 	ginkgo.It("should support volume limits [Serial]", func() {
 		driverInfo := driver.GetDriverInfo()
-		if !driverInfo.Capabilities[CapVolumeLimits] {
+		if !driverInfo.Capabilities[storageapi.CapVolumeLimits] {
 			ginkgo.Skip(fmt.Sprintf("driver %s does not support volume limits", driverInfo.Name))
 		}
-		var dDriver DynamicPVTestDriver
-		if dDriver = driver.(DynamicPVTestDriver); dDriver == nil {
+		var dDriver storageapi.DynamicPVTestDriver
+		if dDriver = driver.(storageapi.DynamicPVTestDriver); dDriver == nil {
 			framework.Failf("Test driver does not provide dynamically created volumes")
 		}
 
@@ -144,10 +154,10 @@ func (t *volumeLimitsTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		// Create a storage class and generate a PVC. Do not instantiate the PVC yet, keep it for the last pod.
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
-		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+		claimSize, err := storageutils.GetSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, dDriver)
 
-		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+		l.resource = storageapi.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		defer func() {
 			err := l.resource.CleanupResource()
 			framework.ExpectNoError(err, "while cleaning up resource")
@@ -305,14 +315,14 @@ func waitForAllPVCsBound(cs clientset.Interface, timeout time.Duration, pvcs []*
 	return pvNames, nil
 }
 
-func getNodeLimits(cs clientset.Interface, config *PerTestConfig, nodeName string, driverInfo *DriverInfo) (int, error) {
+func getNodeLimits(cs clientset.Interface, config *storageapi.PerTestConfig, nodeName string, driverInfo *storageapi.DriverInfo) (int, error) {
 	if len(driverInfo.InTreePluginName) == 0 {
 		return getCSINodeLimits(cs, config, nodeName, driverInfo)
 	}
 	return getInTreeNodeLimits(cs, nodeName, driverInfo)
 }
 
-func getInTreeNodeLimits(cs clientset.Interface, nodeName string, driverInfo *DriverInfo) (int, error) {
+func getInTreeNodeLimits(cs clientset.Interface, nodeName string, driverInfo *storageapi.DriverInfo) (int, error) {
 	node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil {
 		return 0, err
@@ -339,7 +349,7 @@ func getInTreeNodeLimits(cs clientset.Interface, nodeName string, driverInfo *Dr
 	return int(limit.Value()), nil
 }
 
-func getCSINodeLimits(cs clientset.Interface, config *PerTestConfig, nodeName string, driverInfo *DriverInfo) (int, error) {
+func getCSINodeLimits(cs clientset.Interface, config *storageapi.PerTestConfig, nodeName string, driverInfo *storageapi.DriverInfo) (int, error) {
 	// Retry with a timeout, the driver might just have been installed and kubelet takes a while to publish everything.
 	var limit int
 	err := wait.PollImmediate(2*time.Second, csiNodeInfoTimeout, func() (bool, error) {

@@ -34,84 +34,85 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
+	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 type topologyTestSuite struct {
-	tsInfo TestSuiteInfo
+	tsInfo storageapi.TestSuiteInfo
 }
 
 type topologyTest struct {
-	config        *PerTestConfig
+	config        *storageapi.PerTestConfig
 	driverCleanup func()
 
 	migrationCheck *migrationOpCheck
 
-	resource      VolumeResource
+	resource      storageapi.VolumeResource
 	pod           *v1.Pod
 	allTopologies []topology
 }
 
 type topology map[string]string
 
-var _ TestSuite = &topologyTestSuite{}
-
-// InitTopologyTestSuite returns topologyTestSuite that implements TestSuite interface
-func InitTopologyTestSuite() TestSuite {
+// InitCustomTopologyTestSuite returns topologyTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomTopologyTestSuite(patterns []storageapi.TestPattern) storageapi.TestSuite {
 	return &topologyTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "topology",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.TopologyImmediate,
-				testpatterns.TopologyDelayed,
-			},
+		tsInfo: storageapi.TestSuiteInfo{
+			Name:         "topology",
+			TestPatterns: patterns,
 		},
 	}
 }
 
-func (t *topologyTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitTopologyTestSuite returns topologyTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitTopologyTestSuite() storageapi.TestSuite {
+	patterns := []storageapi.TestPattern{
+		storageapi.TopologyImmediate,
+		storageapi.TopologyDelayed,
+	}
+	return InitCustomTopologyTestSuite(patterns)
+}
+
+func (t *topologyTestSuite) GetTestSuiteInfo() storageapi.TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *topologyTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *topologyTestSuite) SkipUnsupportedTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+	dInfo := driver.GetDriverInfo()
+	var ok bool
+	_, ok = driver.(storageapi.DynamicPVTestDriver)
+	if !ok {
+		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+	}
+
+	if !dInfo.Capabilities[storageapi.CapTopology] {
+		e2eskipper.Skipf("Driver %q does not support topology - skipping", dInfo.Name)
+	}
 }
 
-func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *topologyTestSuite) DefineTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
 	var (
 		dInfo   = driver.GetDriverInfo()
-		dDriver DynamicPVTestDriver
+		dDriver storageapi.DynamicPVTestDriver
 		cs      clientset.Interface
 		err     error
 	)
 
-	ginkgo.BeforeEach(func() {
-		// Check preconditions.
-		ok := false
-		dDriver, ok = driver.(DynamicPVTestDriver)
-		if !ok {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
-		}
-
-		if !dInfo.Capabilities[CapTopology] {
-			e2eskipper.Skipf("Driver %q does not support topology - skipping", dInfo.Name)
-		}
-
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("topology")
 
 	init := func() topologyTest {
-
+		dDriver, _ = driver.(storageapi.DynamicPVTestDriver)
 		l := topologyTest{}
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 
-		l.resource = VolumeResource{
+		l.resource = storageapi.VolumeResource{
 			Config:  l.config,
 			Pattern: pattern,
 		}
@@ -140,7 +141,7 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
-		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+		claimSize, err := storageutils.GetSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
 		l.resource.Pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:        claimSize,
@@ -153,7 +154,7 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 
 	cleanup := func(l topologyTest) {
 		t.CleanupResources(cs, &l)
-		err := tryFunc(l.driverCleanup)
+		err := storageutils.TryFunc(l.driverCleanup)
 		l.driverCleanup = nil
 		framework.ExpectNoError(err, "while cleaning up driver")
 

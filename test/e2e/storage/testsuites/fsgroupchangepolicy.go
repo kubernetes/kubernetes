@@ -27,7 +27,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -42,19 +42,17 @@ const (
 )
 
 type fsGroupChangePolicyTestSuite struct {
-	tsInfo TestSuiteInfo
+	tsInfo storageapi.TestSuiteInfo
 }
 
-var _ TestSuite = &fsGroupChangePolicyTestSuite{}
+var _ storageapi.TestSuite = &fsGroupChangePolicyTestSuite{}
 
-// InitFsGroupChangePolicyTestSuite returns fsGroupChangePolicyTestSuite that implements TestSuite interface
-func InitFsGroupChangePolicyTestSuite() TestSuite {
+// InitCustomFsGroupChangePolicyTestSuite returns fsGroupChangePolicyTestSuite that implements TestSuite interface
+func InitCustomFsGroupChangePolicyTestSuite(patterns []storageapi.TestPattern) storageapi.TestSuite {
 	return &fsGroupChangePolicyTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "fsgroupchangepolicy",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsDynamicPV,
-			},
+		tsInfo: storageapi.TestSuiteInfo{
+			Name:         "fsgroupchangepolicy",
+			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
@@ -62,45 +60,49 @@ func InitFsGroupChangePolicyTestSuite() TestSuite {
 	}
 }
 
-func (s *fsGroupChangePolicyTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitFsGroupChangePolicyTestSuite returns fsGroupChangePolicyTestSuite that implements TestSuite interface
+func InitFsGroupChangePolicyTestSuite() storageapi.TestSuite {
+	patterns := []storageapi.TestPattern{
+		storageapi.DefaultFsDynamicPV,
+	}
+	return InitCustomFsGroupChangePolicyTestSuite(patterns)
+}
+
+func (s *fsGroupChangePolicyTestSuite) GetTestSuiteInfo() storageapi.TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *fsGroupChangePolicyTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
-	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(testpatterns.CSIInlineVolume, testpatterns.GenericEphemeralVolume))
+func (s *fsGroupChangePolicyTestSuite) SkipUnsupportedTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+	skipVolTypePatterns(pattern, driver, storageapi.NewVolTypeMap(storageapi.CSIInlineVolume, storageapi.GenericEphemeralVolume))
+	dInfo := driver.GetDriverInfo()
+	if !dInfo.Capabilities[storageapi.CapFsGroup] {
+		e2eskipper.Skipf("Driver %q does not support FsGroup - skipping", dInfo.Name)
+	}
+
+	if pattern.VolMode == v1.PersistentVolumeBlock {
+		e2eskipper.Skipf("Test does not support non-filesystem volume mode - skipping")
+	}
+
+	if pattern.VolType != storageapi.DynamicPV {
+		e2eskipper.Skipf("Suite %q does not support %v", s.tsInfo.Name, pattern.VolType)
+	}
+
+	_, ok := driver.(storageapi.DynamicPVTestDriver)
+	if !ok {
+		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+	}
 }
 
-func (s *fsGroupChangePolicyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
 	type local struct {
-		config        *PerTestConfig
+		config        *storageapi.PerTestConfig
 		driverCleanup func()
-		driver        TestDriver
-		resource      *VolumeResource
+		driver        storageapi.TestDriver
+		resource      *storageapi.VolumeResource
 	}
 	var l local
-	ginkgo.BeforeEach(func() {
-		dInfo := driver.GetDriverInfo()
-		if !dInfo.Capabilities[CapFsGroup] {
-			e2eskipper.Skipf("Driver %q does not support FsGroup - skipping", dInfo.Name)
-		}
 
-		if pattern.VolMode == v1.PersistentVolumeBlock {
-			e2eskipper.Skipf("Test does not support non-filesystem volume mode - skipping")
-		}
-
-		if pattern.VolType != testpatterns.DynamicPV {
-			e2eskipper.Skipf("Suite %q does not support %v", s.tsInfo.Name, pattern.VolType)
-		}
-
-		_, ok := driver.(DynamicPVTestDriver)
-		if !ok {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
-		}
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("fsgroupchangepolicy")
 
@@ -110,7 +112,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver TestDriver, pattern te
 		l.driver = driver
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
-		l.resource = CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
+		l.resource = storageapi.CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
 	}
 
 	cleanup := func() {
@@ -123,7 +125,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver TestDriver, pattern te
 		}
 
 		if l.driverCleanup != nil {
-			errs = append(errs, tryFunc(l.driverCleanup))
+			errs = append(errs, storageutils.TryFunc(l.driverCleanup))
 			l.driverCleanup = nil
 		}
 
@@ -252,15 +254,15 @@ func createPodAndVerifyContentGid(f *framework.Framework, podConfig *e2epod.Conf
 		ginkgo.By(fmt.Sprintf("Creating a sub-directory and file, and verifying their ownership is %s", podFsGroup))
 		cmd := fmt.Sprintf("touch %s", rootDirFilePath)
 		var err error
-		_, _, err = storageutils.PodExec(f, pod, cmd)
+		_, _, err = e2evolume.PodExec(f, pod, cmd)
 		framework.ExpectNoError(err)
 		storageutils.VerifyFilePathGidInPod(f, rootDirFilePath, podFsGroup, pod)
 
 		cmd = fmt.Sprintf("mkdir %s", subdir)
-		_, _, err = storageutils.PodExec(f, pod, cmd)
+		_, _, err = e2evolume.PodExec(f, pod, cmd)
 		framework.ExpectNoError(err)
 		cmd = fmt.Sprintf("touch %s", subDirFilePath)
-		_, _, err = storageutils.PodExec(f, pod, cmd)
+		_, _, err = e2evolume.PodExec(f, pod, cmd)
 		framework.ExpectNoError(err)
 		storageutils.VerifyFilePathGidInPod(f, subDirFilePath, podFsGroup, pod)
 		return pod

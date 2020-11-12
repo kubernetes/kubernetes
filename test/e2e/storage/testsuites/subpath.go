@@ -39,8 +39,9 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -55,22 +56,16 @@ var (
 )
 
 type subPathTestSuite struct {
-	tsInfo TestSuiteInfo
+	tsInfo storageapi.TestSuiteInfo
 }
 
-var _ TestSuite = &subPathTestSuite{}
-
-// InitSubPathTestSuite returns subPathTestSuite that implements TestSuite interface
-func InitSubPathTestSuite() TestSuite {
+// InitCustomSubPathTestSuite returns subPathTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomSubPathTestSuite(patterns []storageapi.TestPattern) storageapi.TestSuite {
 	return &subPathTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "subPath",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsInlineVolume,
-				testpatterns.DefaultFsPreprovisionedPV,
-				testpatterns.DefaultFsDynamicPV,
-				testpatterns.NtfsDynamicPV,
-			},
+		tsInfo: storageapi.TestSuiteInfo{
+			Name:         "subPath",
+			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
@@ -78,23 +73,35 @@ func InitSubPathTestSuite() TestSuite {
 	}
 }
 
-func (s *subPathTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitSubPathTestSuite returns subPathTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitSubPathTestSuite() storageapi.TestSuite {
+	patterns := []storageapi.TestPattern{
+		storageapi.DefaultFsInlineVolume,
+		storageapi.DefaultFsPreprovisionedPV,
+		storageapi.DefaultFsDynamicPV,
+		storageapi.NtfsDynamicPV,
+	}
+	return InitCustomSubPathTestSuite(patterns)
+}
+
+func (s *subPathTestSuite) GetTestSuiteInfo() storageapi.TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *subPathTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
-	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(
-		testpatterns.PreprovisionedPV,
-		testpatterns.InlineVolume))
+func (s *subPathTestSuite) SkipUnsupportedTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+	skipVolTypePatterns(pattern, driver, storageapi.NewVolTypeMap(
+		storageapi.PreprovisionedPV,
+		storageapi.InlineVolume))
 }
 
-func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *subPathTestSuite) DefineTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
 	type local struct {
-		config        *PerTestConfig
+		config        *storageapi.PerTestConfig
 		driverCleanup func()
 
 		hostExec          utils.HostExec
-		resource          *VolumeResource
+		resource          *storageapi.VolumeResource
 		roVolSource       *v1.VolumeSource
 		pod               *v1.Pod
 		formatPod         *v1.Pod
@@ -106,11 +113,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 	}
 	var l local
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("provisioning")
 
@@ -121,24 +124,24 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
 		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
-		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+		l.resource = storageapi.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		l.hostExec = utils.NewHostExec(f)
 
 		// Setup subPath test dependent resource
 		volType := pattern.VolType
 		switch volType {
-		case testpatterns.InlineVolume:
-			if iDriver, ok := driver.(InlineVolumeTestDriver); ok {
+		case storageapi.InlineVolume:
+			if iDriver, ok := driver.(storageapi.InlineVolumeTestDriver); ok {
 				l.roVolSource = iDriver.GetVolumeSource(true, pattern.FsType, l.resource.Volume)
 			}
-		case testpatterns.PreprovisionedPV:
+		case storageapi.PreprovisionedPV:
 			l.roVolSource = &v1.VolumeSource{
 				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
 					ClaimName: l.resource.Pvc.Name,
 					ReadOnly:  true,
 				},
 			}
-		case testpatterns.DynamicPV:
+		case storageapi.DynamicPV:
 			l.roVolSource = &v1.VolumeSource{
 				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
 					ClaimName: l.resource.Pvc.Name,
@@ -175,7 +178,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 			l.resource = nil
 		}
 
-		errs = append(errs, tryFunc(l.driverCleanup))
+		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
 		l.driverCleanup = nil
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 

@@ -34,7 +34,8 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
+	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 const (
@@ -52,24 +53,16 @@ const (
 )
 
 type volumeExpandTestSuite struct {
-	tsInfo TestSuiteInfo
+	tsInfo storageapi.TestSuiteInfo
 }
 
-var _ TestSuite = &volumeExpandTestSuite{}
-
-// InitVolumeExpandTestSuite returns volumeExpandTestSuite that implements TestSuite interface
-func InitVolumeExpandTestSuite() TestSuite {
+// InitCustomVolumeExpandTestSuite returns volumeExpandTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomVolumeExpandTestSuite(patterns []storageapi.TestPattern) storageapi.TestSuite {
 	return &volumeExpandTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "volume-expand",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsDynamicPV,
-				testpatterns.BlockVolModeDynamicPV,
-				testpatterns.DefaultFsDynamicPVAllowExpansion,
-				testpatterns.BlockVolModeDynamicPVAllowExpansion,
-				testpatterns.NtfsDynamicPV,
-				testpatterns.NtfsDynamicPVAllowExpansion,
-			},
+		tsInfo: storageapi.TestSuiteInfo{
+			Name:         "volume-expand",
+			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Gi",
 			},
@@ -77,19 +70,41 @@ func InitVolumeExpandTestSuite() TestSuite {
 	}
 }
 
-func (v *volumeExpandTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitVolumeExpandTestSuite returns volumeExpandTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitVolumeExpandTestSuite() storageapi.TestSuite {
+	patterns := []storageapi.TestPattern{
+		storageapi.DefaultFsDynamicPV,
+		storageapi.BlockVolModeDynamicPV,
+		storageapi.DefaultFsDynamicPVAllowExpansion,
+		storageapi.BlockVolModeDynamicPVAllowExpansion,
+		storageapi.NtfsDynamicPV,
+		storageapi.NtfsDynamicPVAllowExpansion,
+	}
+	return InitCustomVolumeExpandTestSuite(patterns)
+}
+
+func (v *volumeExpandTestSuite) GetTestSuiteInfo() storageapi.TestSuiteInfo {
 	return v.tsInfo
 }
 
-func (v *volumeExpandTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (v *volumeExpandTestSuite) SkipUnsupportedTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
+	// Check preconditions.
+	if !driver.GetDriverInfo().Capabilities[storageapi.CapControllerExpansion] {
+		e2eskipper.Skipf("Driver %q does not support volume expansion - skipping", driver.GetDriverInfo().Name)
+	}
+	// Check preconditions.
+	if !driver.GetDriverInfo().Capabilities[storageapi.CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
+		e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", driver.GetDriverInfo().Name)
+	}
 }
 
-func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (v *volumeExpandTestSuite) DefineTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
 	type local struct {
-		config        *PerTestConfig
+		config        *storageapi.PerTestConfig
 		driverCleanup func()
 
-		resource *VolumeResource
+		resource *storageapi.VolumeResource
 		pod      *v1.Pod
 		pod2     *v1.Pod
 
@@ -97,19 +112,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 	}
 	var l local
 
-	ginkgo.BeforeEach(func() {
-		// Check preconditions.
-		if !driver.GetDriverInfo().Capabilities[CapBlock] && pattern.VolMode == v1.PersistentVolumeBlock {
-			e2eskipper.Skipf("Driver %q does not support block volume mode - skipping", driver.GetDriverInfo().Name)
-		}
-		if !driver.GetDriverInfo().Capabilities[CapControllerExpansion] {
-			e2eskipper.Skipf("Driver %q does not support volume expansion - skipping", driver.GetDriverInfo().Name)
-		}
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("volume-expand")
 
@@ -120,7 +123,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
 		testVolumeSizeRange := v.GetTestSuiteInfo().SupportedSizeRange
-		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+		l.resource = storageapi.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 	}
 
 	cleanup := func() {
@@ -144,7 +147,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver TestDriver, pattern testpatte
 			l.resource = nil
 		}
 
-		errs = append(errs, tryFunc(l.driverCleanup))
+		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
 		l.driverCleanup = nil
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 		l.migrationCheck.validateMigrationVolumeOpCounts()
