@@ -7,3 +7,4 @@ approvers:
 - api-approvers
 reviewers:
 - sig-node-api-reviewers
+- sig-auth-api-reviewers

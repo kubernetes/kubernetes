@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,32 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package config
+package credentialprovider
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// GroupName is the group name used in this package
-const GroupName = "kubelet.config.k8s.io"
+// GroupName is the group name use in this package
+const GroupName = "credentialprovider.kubelet.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
 
 var (
-	// SchemeBuilder is the scheme builder with scheme init functions to run for this API package
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	// AddToScheme is a global function that registers this API group & version to a scheme
-	AddToScheme = SchemeBuilder.AddToScheme
+	AddToScheme   = SchemeBuilder.AddToScheme
 )
 
-// addKnownTypes registers known types to the given scheme
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&KubeletConfiguration{},
-		&SerializedNodeConfigSource{},
-		&CredentialProviderConfig{},
+		&CredentialProviderRequest{},
+		&CredentialProviderResponse{},
 	)
 	return nil
 }

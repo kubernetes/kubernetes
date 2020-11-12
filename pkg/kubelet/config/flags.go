@@ -65,6 +65,20 @@ type ContainerRuntimeOptions struct {
 	// CNICacheDir is the full path of the directory in which CNI should store
 	// cache files
 	CNICacheDir string
+
+	// Image credential provider plugin options
+
+	// ImageCredentialProviderConfigFile is the path to the credential provider plugin config file.
+	// This config file is a specification for what credential providers are enabled and invokved
+	// by the kubelet. The plugin config should contain information about what plugin binary
+	// to execute and what container images the plugin should be called for.
+	// +optional
+	ImageCredentialProviderConfigFile string
+	// ImageCredentialProviderBinDir is the path to the directory where credential provider plugin
+	// binaries exist. The name of each plugin binary is expected to match the name of the plugin
+	// specified in imageCredentialProviderConfigFile.
+	// +optional
+	ImageCredentialProviderBinDir string
 }
 
 // AddFlags adds flags to the container runtime, according to ContainerRuntimeOptions.
@@ -90,4 +104,8 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CNIBinDir, "cni-bin-dir", s.CNIBinDir, fmt.Sprintf("A comma-separated list of full paths of directories in which to search for CNI plugin binaries. %s", dockerOnlyWarning))
 	fs.StringVar(&s.CNICacheDir, "cni-cache-dir", s.CNICacheDir, fmt.Sprintf("The full path of the directory in which CNI should store cache files. %s", dockerOnlyWarning))
 	fs.Int32Var(&s.NetworkPluginMTU, "network-plugin-mtu", s.NetworkPluginMTU, fmt.Sprintf("The MTU to be passed to the network plugin, to override the default. Set to 0 to use the default 1460 MTU. %s", dockerOnlyWarning))
+
+	// Image credential provider settings.
+	fs.StringVar(&s.ImageCredentialProviderConfigFile, "image-credential-provider-config", s.ImageCredentialProviderConfigFile, "The path to the credential provider plugin config file.")
+	fs.StringVar(&s.ImageCredentialProviderBinDir, "image-credential-provider-bin-dir", s.ImageCredentialProviderBinDir, "The path to the directory where credential provider plugin binaries are located.")
 }
