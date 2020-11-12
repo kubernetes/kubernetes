@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,24 +17,13 @@ limitations under the License.
 package topologymanager
 
 import (
-	"reflect"
-	"testing"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"reflect"
+	"testing"
 )
 
-func TestNewFakeManager(t *testing.T) {
-	fm := NewFakeManager()
-
-	if _, ok := fm.(Manager); !ok {
-		t.Errorf("Result is not Manager type")
-
-	}
-}
-
-func TestFakeGetAffinity(t *testing.T) {
+func TestGetAffinity(t *testing.T) {
 	tcases := []struct {
 		name          string
 		containerName string
@@ -42,22 +31,22 @@ func TestFakeGetAffinity(t *testing.T) {
 		expected      TopologyHint
 	}{
 		{
-			name:          "Case1",
+			name:          "case1",
 			containerName: "nginx",
 			podUID:        "0aafa4c4-38e8-11e9-bcb1-a4bf01040474",
 			expected:      TopologyHint{},
 		},
 	}
 	for _, tc := range tcases {
-		fm := fakeManager{}
-		actual := fm.GetAffinity(tc.podUID, tc.containerName)
+		scope := scope{}
+		actual := scope.GetAffinity(tc.podUID, tc.containerName)
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("Expected Affinity in result to be %v, got %v", tc.expected, actual)
 		}
 	}
 }
 
-func TestFakeAddContainer(t *testing.T) {
+func TestAddContainer(t *testing.T) {
 	testCases := []struct {
 		name        string
 		containerID string
@@ -74,24 +63,30 @@ func TestFakeAddContainer(t *testing.T) {
 			podUID:      "b3ee37fc-39a5-11e9-bcb1-a4bf01040474",
 		},
 	}
-	fm := fakeManager{}
+	scope := scope{}
+	scope.podMap = make(map[string]string)
 	for _, tc := range testCases {
 		pod := v1.Pod{}
 		pod.UID = tc.podUID
-		err := fm.AddContainer(&pod, tc.containerID)
+		err := scope.AddContainer(&pod, tc.containerID)
 		if err != nil {
 			t.Errorf("Expected error to be nil but got: %v", err)
-
 		}
-
+		if val, ok := scope.podMap[tc.containerID]; ok {
+			if reflect.DeepEqual(val, pod.UID) {
+				t.Errorf("Error occurred")
+			}
+		} else {
+			t.Errorf("Error occurred, Pod not added to podMap")
+		}
 	}
 }
 
-func TestFakeRemoveContainer(t *testing.T) {
+func TestRemoveContainer(t *testing.T) {
 	testCases := []struct {
 		name        string
 		containerID string
-		podUID      string
+		podUID      types.UID
 	}{
 		{
 			name:        "Case1",
@@ -104,52 +99,20 @@ func TestFakeRemoveContainer(t *testing.T) {
 			podUID:      "b3ee37fc-39a5-11e9-bcb1-a4bf01040474",
 		},
 	}
-	fm := fakeManager{}
+	var len1, len2 int
+	scope := scope{}
+	scope.podMap = make(map[string]string)
 	for _, tc := range testCases {
-		err := fm.RemoveContainer(tc.containerID)
+		scope.podMap[tc.containerID] = string(tc.podUID)
+		len1 = len(scope.podMap)
+		err := scope.RemoveContainer(tc.containerID)
+		len2 = len(scope.podMap)
 		if err != nil {
 			t.Errorf("Expected error to be nil but got: %v", err)
 		}
-
-	}
-
-}
-
-func TestFakeAdmit(t *testing.T) {
-	tcases := []struct {
-		name     string
-		result   lifecycle.PodAdmitResult
-		qosClass v1.PodQOSClass
-		expected bool
-	}{
-		{
-			name:     "QOSClass set as Guaranteed",
-			result:   lifecycle.PodAdmitResult{},
-			qosClass: v1.PodQOSGuaranteed,
-			expected: true,
-		},
-		{
-			name:     "QOSClass set as Burstable",
-			result:   lifecycle.PodAdmitResult{},
-			qosClass: v1.PodQOSBurstable,
-			expected: true,
-		},
-		{
-			name:     "QOSClass set as BestEffort",
-			result:   lifecycle.PodAdmitResult{},
-			qosClass: v1.PodQOSBestEffort,
-			expected: true,
-		},
-	}
-	fm := fakeManager{}
-	for _, tc := range tcases {
-		podAttr := lifecycle.PodAdmitAttributes{}
-		pod := v1.Pod{}
-		pod.Status.QOSClass = tc.qosClass
-		podAttr.Pod = &pod
-		actual := fm.Admit(&podAttr)
-		if reflect.DeepEqual(actual, tc.result) {
-			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.result, actual.Admit)
+		if len1-len2 != 1 {
+			t.Errorf("Remove Pod resulted in error")
 		}
 	}
+
 }

@@ -123,8 +123,23 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: serverTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
 	}
 	if kc.TopologyManagerPolicy != kubeletconfig.NoneTopologyManagerPolicy && !localFeatureGate.Enabled(features.TopologyManager) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManager %v requires feature gate TopologyManager", kc.TopologyManagerPolicy))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerPolicy %v requires feature gate TopologyManager", kc.TopologyManagerPolicy))
 	}
+	switch kc.TopologyManagerPolicy {
+	case kubeletconfig.NoneTopologyManagerPolicy:
+	case kubeletconfig.BestEffortTopologyManagerPolicy:
+	case kubeletconfig.RestrictedTopologyManagerPolicy:
+	case kubeletconfig.SingleNumaNodeTopologyManagerPolicy:
+	default:
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerPolicy non-allowable value: %v", kc.TopologyManagerPolicy))
+	}
+	if kc.TopologyManagerScope != kubeletconfig.ContainerTopologyManagerScope && !localFeatureGate.Enabled(features.TopologyManager) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerScope %v requires feature gate TopologyManager", kc.TopologyManagerScope))
+	}
+	if kc.TopologyManagerScope != kubeletconfig.ContainerTopologyManagerScope && kc.TopologyManagerScope != kubeletconfig.PodTopologyManagerScope {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerScope non-allowable value: %v", kc.TopologyManagerScope))
+	}
+
 	for _, val := range kc.EnforceNodeAllocatable {
 		switch val {
 		case kubetypes.NodeAllocatableEnforcementKey:
