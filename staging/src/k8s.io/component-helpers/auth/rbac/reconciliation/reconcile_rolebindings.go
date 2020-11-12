@@ -176,7 +176,7 @@ func (o *ReconcileRoleBindingOptions) run(attempts int) (*ReconcileClusterRoleBi
 func computeReconciledRoleBinding(existing, expected RoleBinding, removeExtraSubjects bool) (*ReconcileClusterRoleBindingResult, error) {
 	result := &ReconcileClusterRoleBindingResult{Operation: ReconcileNone}
 
-	result.Protected = (existing.GetAnnotations()[rbacv1.AutoUpdateAnnotationKey] == "false")
+	result.Protected = existing.GetAnnotations()[rbacv1.AutoUpdateAnnotationKey] == "false"
 
 	// Reset the binding completely if the roleRef is different
 	if expected.GetRoleRef() != existing.GetRoleRef() {
