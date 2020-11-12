@@ -23,10 +23,8 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cloud-provider/credentialconfig"
+	"k8s.io/klog/v2"
 )
 
 // DockerKeyring tracks a set of docker registry credentials, maintaining a
@@ -49,7 +47,7 @@ type BasicDockerKeyring struct {
 // providersDockerKeyring is an implementation of DockerKeyring that
 // materializes its dockercfg based on a set of dockerConfigProviders.
 type providersDockerKeyring struct {
-	Providers []credentialconfig.DockerConfigProvider
+	Providers []DockerConfigProvider
 }
 
 // AuthConfig contains authorization information for connecting to a Registry
@@ -75,7 +73,7 @@ type AuthConfig struct {
 }
 
 // Add add some docker config in basic docker keyring
-func (dk *BasicDockerKeyring) Add(cfg credentialconfig.DockerConfig) {
+func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 	if dk.index == nil {
 		dk.index = make([]string, 0)
 		dk.creds = make(map[string][]AuthConfig)

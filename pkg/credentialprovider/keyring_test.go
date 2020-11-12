@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-
-	"k8s.io/cloud-provider/credentialconfig"
 )
 
 func TestURLsMatch(t *testing.T) {
@@ -205,7 +203,7 @@ func TestDockerKeyringForGlob(t *testing.T) {
 }`, test.globURL, email, auth)
 
 		keyring := &BasicDockerKeyring{}
-		if cfg, err := credentialconfig.ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+		if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 			t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 		} else {
 			keyring.Add(cfg)
@@ -273,7 +271,7 @@ func TestKeyringMiss(t *testing.T) {
 }`, test.globURL, email, auth)
 
 		keyring := &BasicDockerKeyring{}
-		if cfg, err := credentialconfig.ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+		if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 			t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 		} else {
 			keyring.Add(cfg)
@@ -301,7 +299,7 @@ func TestKeyringMissWithDockerHubCredentials(t *testing.T) {
 }`, url, email, auth)
 
 	keyring := &BasicDockerKeyring{}
-	if cfg, err := credentialconfig.ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+	if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
 		keyring.Add(cfg)
@@ -327,7 +325,7 @@ func TestKeyringHitWithUnqualifiedDockerHub(t *testing.T) {
 }`, url, email, auth)
 
 	keyring := &BasicDockerKeyring{}
-	if cfg, err := credentialconfig.ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+	if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
 		keyring.Add(cfg)
@@ -368,7 +366,7 @@ func TestKeyringHitWithUnqualifiedLibraryDockerHub(t *testing.T) {
 }`, url, email, auth)
 
 	keyring := &BasicDockerKeyring{}
-	if cfg, err := credentialconfig.ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+	if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
 		keyring.Add(cfg)
@@ -409,7 +407,7 @@ func TestKeyringHitWithQualifiedDockerHub(t *testing.T) {
 }`, url, email, auth)
 
 	keyring := &BasicDockerKeyring{}
-	if cfg, err := credentialconfig.ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+	if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
 		keyring.Add(cfg)
@@ -456,27 +454,12 @@ func TestIsDefaultRegistryMatch(t *testing.T) {
 	}
 }
 
-type testProvider struct {
-	Count int
-}
-
-// Enabled implements dockerConfigProvider
-func (d *testProvider) Enabled() bool {
-	return true
-}
-
-// Provide implements dockerConfigProvider
-func (d *testProvider) Provide(image string) credentialconfig.DockerConfig {
-	d.Count++
-	return credentialconfig.DockerConfig{}
-}
-
 func TestProvidersDockerKeyring(t *testing.T) {
 	provider := &testProvider{
 		Count: 0,
 	}
 	keyring := &providersDockerKeyring{
-		Providers: []credentialconfig.DockerConfigProvider{
+		Providers: []DockerConfigProvider{
 			provider,
 		},
 	}
@@ -512,13 +495,13 @@ func TestDockerKeyringLookup(t *testing.T) {
 	}
 
 	dk := &BasicDockerKeyring{}
-	dk.Add(credentialconfig.DockerConfig{
-		"bar.example.com/pong": credentialconfig.DockerConfigEntry{
+	dk.Add(DockerConfig{
+		"bar.example.com/pong": DockerConfigEntry{
 			Username: grace.Username,
 			Password: grace.Password,
 			Email:    grace.Email,
 		},
-		"bar.example.com": credentialconfig.DockerConfigEntry{
+		"bar.example.com": DockerConfigEntry{
 			Username: ada.Username,
 			Password: ada.Password,
 			Email:    ada.Email,
@@ -573,8 +556,8 @@ func TestIssue3797(t *testing.T) {
 	}
 
 	dk := &BasicDockerKeyring{}
-	dk.Add(credentialconfig.DockerConfig{
-		"https://quay.io/v1/": credentialconfig.DockerConfigEntry{
+	dk.Add(DockerConfig{
+		"https://quay.io/v1/": DockerConfigEntry{
 			Username: rex.Username,
 			Password: rex.Password,
 			Email:    rex.Email,

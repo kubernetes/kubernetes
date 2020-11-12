@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,12 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package credentialconfig
+package credentialprovider
 
 import (
 	"testing"
 	"time"
 )
+
+type testProvider struct {
+	Count int
+}
+
+// Enabled implements dockerConfigProvider
+func (d *testProvider) Enabled() bool {
+	return true
+}
+
+// Provide implements dockerConfigProvider
+func (d *testProvider) Provide(image string) DockerConfig {
+	d.Count++
+	return DockerConfig{}
+}
 
 func TestCachingProvider(t *testing.T) {
 	provider := &testProvider{

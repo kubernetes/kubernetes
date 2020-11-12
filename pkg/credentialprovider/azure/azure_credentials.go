@@ -35,7 +35,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/cloud-provider/credentialconfig"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/legacy-cloud-providers/azure/auth"
@@ -66,7 +65,7 @@ func init() {
 
 type cacheEntry struct {
 	expiresAt   time.Time
-	credentials credentialconfig.DockerConfigEntry
+	credentials credentialprovider.DockerConfigEntry
 	registry    string
 }
 
@@ -123,7 +122,7 @@ func (az *azRegistriesClient) List(ctx context.Context) ([]containerregistry.Reg
 }
 
 // NewACRProvider parses the specified configFile and returns a DockerConfigProvider
-func NewACRProvider(configFile *string) credentialconfig.DockerConfigProvider {
+func NewACRProvider(configFile *string) credentialprovider.DockerConfigProvider {
 	return &acrProvider{
 		file:  configFile,
 		cache: cache.NewExpirationStore(stringKeyFunc, &acrExpirationPolicy{}),
@@ -208,8 +207,8 @@ func (a *acrProvider) Enabled() bool {
 }
 
 // getFromCache attempts to get credentials from the cache
-func (a *acrProvider) getFromCache(loginServer string) (credentialconfig.DockerConfig, bool) {
-	cfg := credentialconfig.DockerConfig{}
+func (a *acrProvider) getFromCache(loginServer string) (credentialprovider.DockerConfig, bool) {
+	cfg := credentialprovider.DockerConfig{}
 	obj, exists, err := a.cache.GetByKey(loginServer)
 	if err != nil {
 		klog.Errorf("error getting ACR credentials from cache: %v", err)
@@ -225,8 +224,8 @@ func (a *acrProvider) getFromCache(loginServer string) (credentialconfig.DockerC
 }
 
 // getFromACR gets credentials from ACR since they are not in the cache
-func (a *acrProvider) getFromACR(loginServer string) (credentialconfig.DockerConfig, error) {
-	cfg := credentialconfig.DockerConfig{}
+func (a *acrProvider) getFromACR(loginServer string) (credentialprovider.DockerConfig, error) {
+	cfg := credentialprovider.DockerConfig{}
 	cred, err := getACRDockerEntryFromARMToken(a, loginServer)
 	if err != nil {
 		return cfg, err
@@ -244,14 +243,14 @@ func (a *acrProvider) getFromACR(loginServer string) (credentialconfig.DockerCon
 	return cfg, nil
 }
 
-func (a *acrProvider) Provide(image string) credentialconfig.DockerConfig {
+func (a *acrProvider) Provide(image string) credentialprovider.DockerConfig {
 	loginServer := a.parseACRLoginServerFromImage(image)
 	if loginServer == "" {
 		klog.V(2).Infof("image(%s) is not from ACR, return empty authentication", image)
-		return credentialconfig.DockerConfig{}
+		return credentialprovider.DockerConfig{}
 	}
 
-	cfg := credentialconfig.DockerConfig{}
+	cfg := credentialprovider.DockerConfig{}
 	if a.config != nil && a.config.UseManagedIdentityExtension {
 		var exists bool
 		cfg, exists = a.getFromCache(loginServer)
@@ -268,7 +267,7 @@ func (a *acrProvider) Provide(image string) credentialconfig.DockerConfig {
 	} else {
 		// Add our entry for each of the supported container registry URLs
 		for _, url := range containerRegistryUrls {
-			cred := &credentialconfig.DockerConfigEntry{
+			cred := &credentialprovider.DockerConfigEntry{
 				Username: a.config.AADClientID,
 				Password: a.config.AADClientSecret,
 				Email:    dummyRegistryEmail,
@@ -289,7 +288,7 @@ func (a *acrProvider) Provide(image string) credentialconfig.DockerConfig {
 			}
 
 			if !hasBeenAdded {
-				cred := &credentialconfig.DockerConfigEntry{
+				cred := &credentialprovider.DockerConfigEntry{
 					Username: a.config.AADClientID,
 					Password: a.config.AADClientSecret,
 					Email:    dummyRegistryEmail,
@@ -300,7 +299,7 @@ func (a *acrProvider) Provide(image string) credentialconfig.DockerConfig {
 	}
 
 	// add ACR anonymous repo support: use empty username and password for anonymous access
-	defaultConfigEntry := credentialconfig.DockerConfigEntry{
+	defaultConfigEntry := credentialprovider.DockerConfigEntry{
 		Username: "",
 		Password: "",
 		Email:    dummyRegistryEmail,
@@ -313,7 +312,7 @@ func getLoginServer(registry containerregistry.Registry) string {
 	return *(*registry.RegistryProperties).LoginServer
 }
 
-func getACRDockerEntryFromARMToken(a *acrProvider, loginServer string) (*credentialconfig.DockerConfigEntry, error) {
+func getACRDockerEntryFromARMToken(a *acrProvider, loginServer string) (*credentialprovider.DockerConfigEntry, error) {
 	// Run EnsureFresh to make sure the token is valid and does not expire
 	if err := a.servicePrincipalToken.EnsureFresh(); err != nil {
 		klog.Errorf("Failed to ensure fresh service principal token: %v", err)
@@ -337,7 +336,7 @@ func getACRDockerEntryFromARMToken(a *acrProvider, loginServer string) (*credent
 	}
 
 	klog.V(4).Infof("adding ACR docker config entry for: %s", loginServer)
-	return &credentialconfig.DockerConfigEntry{
+	return &credentialprovider.DockerConfigEntry{
 		Username: dockerTokenLoginUsernameGUID,
 		Password: registryRefreshToken,
 		Email:    dummyRegistryEmail,

@@ -33,7 +33,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/cloud-provider/credentialconfig"
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -55,7 +54,7 @@ type ecrProvider struct {
 	getterFactory tokenGetterFactory
 }
 
-var _ credentialconfig.DockerConfigProvider = &ecrProvider{}
+var _ credentialprovider.DockerConfigProvider = &ecrProvider{}
 
 func newECRProvider(getterFactory tokenGetterFactory) *ecrProvider {
 	return &ecrProvider{
@@ -83,11 +82,11 @@ func (p *ecrProvider) Enabled() bool {
 
 // Provide returns a DockerConfig with credentials from the cache if they are
 // found, or from ECR
-func (p *ecrProvider) Provide(image string) credentialconfig.DockerConfig {
+func (p *ecrProvider) Provide(image string) credentialprovider.DockerConfig {
 	parsed, err := parseRepoURL(image)
 	if err != nil {
 		klog.V(3).Info(err)
-		return credentialconfig.DockerConfig{}
+		return credentialprovider.DockerConfig{}
 	}
 
 	if cfg, exists := p.getFromCache(parsed); exists {
@@ -99,15 +98,15 @@ func (p *ecrProvider) Provide(image string) credentialconfig.DockerConfig {
 	cfg, err := p.getFromECR(parsed)
 	if err != nil {
 		klog.Errorf("error getting credentials from ECR for %s %v", parsed.registry, err)
-		return credentialconfig.DockerConfig{}
+		return credentialprovider.DockerConfig{}
 	}
 	klog.V(3).Infof("Got ECR credentials from ECR API for %s", parsed.registry)
 	return cfg
 }
 
 // getFromCache attempts to get credentials from the cache
-func (p *ecrProvider) getFromCache(parsed *parsedURL) (credentialconfig.DockerConfig, bool) {
-	cfg := credentialconfig.DockerConfig{}
+func (p *ecrProvider) getFromCache(parsed *parsedURL) (credentialprovider.DockerConfig, bool) {
+	cfg := credentialprovider.DockerConfig{}
 
 	obj, exists, err := p.cache.GetByKey(parsed.registry)
 	if err != nil {
@@ -125,8 +124,8 @@ func (p *ecrProvider) getFromCache(parsed *parsedURL) (credentialconfig.DockerCo
 }
 
 // getFromECR gets credentials from ECR since they are not in the cache
-func (p *ecrProvider) getFromECR(parsed *parsedURL) (credentialconfig.DockerConfig, error) {
-	cfg := credentialconfig.DockerConfig{}
+func (p *ecrProvider) getFromECR(parsed *parsedURL) (credentialprovider.DockerConfig, error) {
+	cfg := credentialprovider.DockerConfig{}
 	getter, err := p.getterFactory.GetTokenGetterForRegion(parsed.region)
 	if err != nil {
 		return cfg, err
@@ -261,7 +260,7 @@ func (p *ecrTokenGetter) GetAuthorizationToken(input *ecr.GetAuthorizationTokenI
 
 type cacheEntry struct {
 	expiresAt   time.Time
-	credentials credentialconfig.DockerConfigEntry
+	credentials credentialprovider.DockerConfigEntry
 	registry    string
 }
 
@@ -276,7 +275,7 @@ func makeCacheEntry(data *ecr.AuthorizationData, registry string) (*cacheEntry, 
 	if len(parts) < 2 {
 		return nil, errors.New("error getting username and password from authorization token")
 	}
-	creds := credentialconfig.DockerConfigEntry{
+	creds := credentialprovider.DockerConfigEntry{
 		Username: parts[0],
 		Password: parts[1],
 		Email:    "not@val.id", // ECR doesn't care and Docker is about to obsolete it

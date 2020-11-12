@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package credentialconfig
+package credentialprovider
 
 import (
+	"os"
 	"reflect"
 	"sync"
 	"time"
@@ -38,6 +39,18 @@ type DockerConfigProvider interface {
 	Provide(image string) DockerConfig
 }
 
+// A DockerConfigProvider that simply reads the .dockercfg file
+type defaultDockerConfigProvider struct{}
+
+// init registers our default provider, which simply reads the .dockercfg file.
+func init() {
+	RegisterCredentialProvider(".dockercfg",
+		&CachingDockerConfigProvider{
+			Provider: &defaultDockerConfigProvider{},
+			Lifetime: 5 * time.Minute,
+		})
+}
+
 // CachingDockerConfigProvider implements DockerConfigProvider by composing
 // with another DockerConfigProvider and caching the DockerConfig it provides
 // for a pre-specified lifetime.
@@ -53,6 +66,22 @@ type CachingDockerConfigProvider struct {
 	cacheDockerConfig DockerConfig
 	expiration        time.Time
 	mu                sync.Mutex
+}
+
+// Enabled implements dockerConfigProvider
+func (d *defaultDockerConfigProvider) Enabled() bool {
+	return true
+}
+
+// Provide implements dockerConfigProvider
+func (d *defaultDockerConfigProvider) Provide(image string) DockerConfig {
+	// Read the standard Docker credentials from .dockercfg
+	if cfg, err := ReadDockerConfigFile(); err == nil {
+		return cfg
+	} else if !os.IsNotExist(err) {
+		klog.V(2).Infof("Docker config file not found: %v", err)
+	}
+	return DockerConfig{}
 }
 
 // Enabled implements dockerConfigProvider

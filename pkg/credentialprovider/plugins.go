@@ -21,20 +21,19 @@ import (
 	"sort"
 	"sync"
 
-	"k8s.io/cloud-provider/credentialconfig"
 	"k8s.io/klog/v2"
 )
 
 // All registered credential providers.
 var providersMutex sync.Mutex
-var providers = make(map[string]credentialconfig.DockerConfigProvider)
+var providers = make(map[string]DockerConfigProvider)
 
 // RegisterCredentialProvider is called by provider implementations on
 // initialization to register themselves, like so:
 //   func init() {
 //    	RegisterCredentialProvider("name", &myProvider{...})
 //   }
-func RegisterCredentialProvider(name string, provider credentialconfig.DockerConfigProvider) {
+func RegisterCredentialProvider(name string, provider DockerConfigProvider) {
 	providersMutex.Lock()
 	defer providersMutex.Unlock()
 	_, found := providers[name]
@@ -49,7 +48,7 @@ func RegisterCredentialProvider(name string, provider credentialconfig.DockerCon
 // which draws from the set of registered credential providers.
 func NewDockerKeyring() DockerKeyring {
 	keyring := &providersDockerKeyring{
-		Providers: make([]credentialconfig.DockerConfigProvider, 0),
+		Providers: make([]DockerConfigProvider, 0),
 	}
 
 	keys := reflect.ValueOf(providers).MapKeys()

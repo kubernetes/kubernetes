@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package credentialconfig
+package credentialprovider
 
 import (
 	"encoding/base64"
@@ -232,6 +232,7 @@ func ReadDockerConfigFileFromURL(url string, client *http.Client, header *http.H
 	return nil, err
 }
 
+// ReadDockerConfigFileFromBytes read a docker config file from the given bytes
 func ReadDockerConfigFileFromBytes(contents []byte) (cfg DockerConfig, err error) {
 	if err = json.Unmarshal(contents, &cfg); err != nil {
 		return nil, errors.New("error occurred while trying to unmarshal json")

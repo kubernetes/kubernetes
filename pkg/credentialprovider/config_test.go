@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package credentialconfig
+package credentialprovider
 
 import (
 	"encoding/base64"
