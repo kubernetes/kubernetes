@@ -925,15 +925,21 @@ func TestValidateNodeAffinityArgs(t *testing.T) {
 				},
 			},
 			wantErr: field.ErrorList{
-				field.Invalid(field.NewPath("addedAffinity", "requiredDuringSchedulingIgnoredDuringExecution"), nil, ""),
-				field.Invalid(field.NewPath("addedAffinity", "preferredDuringSchedulingIgnoredDuringExecution"), nil, ""),
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "addedAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0]",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "addedAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].matchFields[0].values",
+				},
 			}.ToAggregate(),
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := ValidateNodeAffinityArgs(&tc.args)
-			if diff := cmp.Diff(err, tc.wantErr, ignoreBadValueDetail); diff != "" {
+			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
 				t.Fatalf("ValidatedNodeAffinityArgs returned err (-want,+got):\n%s", diff)
 			}
 		})

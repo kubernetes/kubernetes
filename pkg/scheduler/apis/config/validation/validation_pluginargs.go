@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
@@ -280,22 +281,20 @@ func ValidateNodeAffinityArgs(args *config.NodeAffinityArgs) error {
 		return nil
 	}
 	affinity := args.AddedAffinity
-	f := field.NewPath("addedAffinity")
-	var allErrs field.ErrorList
+	path := field.NewPath("addedAffinity")
+	var errs []error
 	if ns := affinity.RequiredDuringSchedulingIgnoredDuringExecution; ns != nil {
-		_, err := nodeaffinity.NewNodeSelector(ns)
+		_, err := nodeaffinity.NewNodeSelector(ns, nodeaffinity.WithPath(path.Child("requiredDuringSchedulingIgnoredDuringExecution")))
 		if err != nil {
-			// TODO(#96167): Expand all field.Error(s) returned once constructor use them.
-			allErrs = append(allErrs, field.Invalid(f.Child("requiredDuringSchedulingIgnoredDuringExecution"), affinity.RequiredDuringSchedulingIgnoredDuringExecution, err.Error()))
+			errs = append(errs, err)
 		}
 	}
 	// TODO: Add validation for requiredDuringSchedulingRequiredDuringExecution when it gets added to the API.
 	if terms := affinity.PreferredDuringSchedulingIgnoredDuringExecution; len(terms) != 0 {
-		_, err := nodeaffinity.NewPreferredSchedulingTerms(terms)
+		_, err := nodeaffinity.NewPreferredSchedulingTerms(terms, nodeaffinity.WithPath(path.Child("preferredDuringSchedulingIgnoredDuringExecution")))
 		if err != nil {
-			// TODO(#96167): Expand all field.Error(s) returned once constructor use them.
-			allErrs = append(allErrs, field.Invalid(f.Child("preferredDuringSchedulingIgnoredDuringExecution"), affinity.PreferredDuringSchedulingIgnoredDuringExecution, err.Error()))
+			errs = append(errs, err)
 		}
 	}
-	return allErrs.ToAggregate()
+	return errors.Flatten(errors.NewAggregate(errs))
 }
