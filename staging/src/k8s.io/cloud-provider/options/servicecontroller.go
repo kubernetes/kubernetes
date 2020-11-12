@@ -18,7 +18,7 @@ package options
 
 import (
 	"github.com/spf13/pflag"
-	serviceconfig "k8s.io/cloud-provider/service/config"
+	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
 )
 
 // ServiceControllerOptions holds the ServiceController options.
