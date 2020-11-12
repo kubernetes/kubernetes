@@ -20,7 +20,12 @@ package winkernel
 
 import (
 	"fmt"
-	"k8s.io/api/core/v1"
+	"net"
+	"strings"
+	"testing"
+	"time"
+
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -28,10 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilpointer "k8s.io/utils/pointer"
-	"net"
-	"strings"
-	"testing"
-	"time"
 )
 
 const (
@@ -67,6 +68,10 @@ func (hns fakeHNS) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 }
 
 func (hns fakeHNS) getEndpointByID(id string) (*endpointsInfo, error) {
+	return nil, nil
+}
+
+func (hns fakeHNS) getEndpointByName(id string) (*endpointsInfo, error) {
 	return nil, nil
 }
 
@@ -703,7 +708,6 @@ func TestCreateLoadBalancer(t *testing.T) {
 			t.Errorf("%v does not match %v", svcInfo.hnsID, guid)
 		}
 	}
-
 }
 
 func TestCreateDsrLoadBalancer(t *testing.T) {
@@ -764,6 +768,11 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 		}
 		if svcInfo.localTrafficDSR != true {
 			t.Errorf("Failed to create DSR loadbalancer with local traffic policy")
+		}
+		if len(svcInfo.loadBalancerIngressIPs) == 0 {
+			t.Errorf("svcInfo does not have any loadBalancerIngressIPs, %+v", svcInfo)
+		} else if svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID != guid {
+			t.Errorf("The Hns Loadbalancer HealthCheck Id %v does not match %v. ServicePortName %q", svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID, guid, svcPortName.String())
 		}
 	}
 }

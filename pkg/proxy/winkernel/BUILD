@@ -72,6 +72,7 @@ go_test(
             "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
             "//vendor/github.com/Microsoft/hcsshim/hcn:go_default_library",
+            "//vendor/github.com/google/go-cmp/cmp:go_default_library",
             "//vendor/k8s.io/utils/pointer:go_default_library",
         ],
         "//conditions:default": [],

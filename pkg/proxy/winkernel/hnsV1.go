@@ -21,16 +21,18 @@ package winkernel
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Microsoft/hcsshim"
-	"k8s.io/klog/v2"
 	"net"
 	"strings"
+
+	"github.com/Microsoft/hcsshim"
+	"k8s.io/klog/v2"
 )
 
 type HostNetworkService interface {
 	getNetworkByName(name string) (*hnsNetworkInfo, error)
 	getEndpointByID(id string) (*endpointsInfo, error)
 	getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error)
+	getEndpointByName(id string) (*endpointsInfo, error)
 	createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error)
 	deleteEndpoint(hnsID string) error
 	getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error)
@@ -106,6 +108,22 @@ func (hns hnsV1) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 
 	return nil, fmt.Errorf("Endpoint %v not found on network %s", ip, networkName)
 }
+
+func (hns hnsV1) getEndpointByName(name string) (*endpointsInfo, error) {
+	hnsendpoint, err := hcsshim.GetHNSEndpointByName(name)
+	if err != nil {
+		klog.Errorf("%v", err)
+		return nil, err
+	}
+	return &endpointsInfo{
+		ip:         hnsendpoint.IPAddress.String(),
+		isLocal:    !hnsendpoint.IsRemoteEndpoint, //TODO: Change isLocal to isRemote
+		macAddress: hnsendpoint.MacAddress,
+		hnsID:      hnsendpoint.Id,
+		hns:        hns,
+	}, nil
+}
+
 func (hns hnsV1) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
 	hnsNetwork, err := hcsshim.GetHNSNetworkByName(networkName)
 	if err != nil {
