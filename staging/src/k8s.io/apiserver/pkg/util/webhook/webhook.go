@@ -103,6 +103,11 @@ func newGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFact
 	// Rate limiting should happen when deciding how many requests to serve.
 	clientConfig.QPS = -1
 
+	// Use http/1.1 instead of http/2.
+	// This is a workaround for http/2-enabled clients not load-balancing concurrent requests to multiple backends.
+	// See http://issue.k8s.io/75791 for details.
+	clientConfig.NextProtos = []string{"http/1.1"}
+
 	codec := codecFactory.LegacyCodec(groupVersions...)
 	clientConfig.ContentConfig.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 

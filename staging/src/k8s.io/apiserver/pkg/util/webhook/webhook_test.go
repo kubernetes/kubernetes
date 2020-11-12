@@ -24,12 +24,15 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -360,7 +363,7 @@ func TestTLSConfig(t *testing.T) {
 		// Use a closure so defer statements trigger between loop iterations.
 		func() {
 			// Create and start a simple HTTPS server
-			server, err := newTestServer(tt.serverCert, tt.serverKey, tt.serverCA, nil)
+			server, err := newTestServer(tt.serverCert, tt.serverKey, tt.serverCA, nil, nil)
 
 			if err != nil {
 				t.Errorf("%s: failed to create server: %v", tt.test, err)
@@ -426,7 +429,7 @@ func TestRequestTimeout(t *testing.T) {
 	}
 
 	// Create and start a simple HTTPS server
-	server, err := newTestServer(clientCert, clientKey, caCert, handler)
+	server, err := newTestServer(clientCert, clientKey, caCert, handler, nil)
 	if err != nil {
 		t.Errorf("failed to create server: %v", err)
 		return
@@ -511,7 +514,7 @@ func TestWithExponentialBackoff(t *testing.T) {
 	}
 
 	// Create and start a simple HTTPS server
-	server, err := newTestServer(clientCert, clientKey, caCert, ebHandler)
+	server, err := newTestServer(clientCert, clientKey, caCert, ebHandler, nil)
 
 	if err != nil {
 		t.Errorf("failed to create server: %v", err)
@@ -614,7 +617,7 @@ func newKubeConfigFile(config v1.Config) (string, error) {
 	return configFile.Name(), nil
 }
 
-func newTestServer(clientCert, clientKey, caCert []byte, handler func(http.ResponseWriter, *http.Request)) (*httptest.Server, error) {
+func newTestServer(clientCert, clientKey, caCert []byte, handler func(http.ResponseWriter, *http.Request), l net.Listener) (*httptest.Server, error) {
 	var tlsConfig *tls.Config
 
 	if clientCert != nil {
@@ -648,7 +651,16 @@ func newTestServer(clientCert, clientKey, caCert []byte, handler func(http.Respo
 		}
 	}
 
-	server := httptest.NewUnstartedServer(http.HandlerFunc(handler))
+	var server *httptest.Server
+
+	if l == nil {
+		server = httptest.NewUnstartedServer(http.HandlerFunc(handler))
+	} else {
+		server = &httptest.Server{
+			Listener: l,
+			Config:   &http.Server{Handler: http.HandlerFunc(handler)},
+		}
+	}
 
 	server.TLS = tlsConfig
 	server.StartTLS()
@@ -763,4 +775,131 @@ func TestGenericWebhookWithExponentialBackoff(t *testing.T) {
 	if totalAttemptsExpected != attemptsGot {
 		t.Errorf("expected a total of %d webhook attempts but got: %d", totalAttemptsExpected, attemptsGot)
 	}
+}
+
+// TestWebhookHTTP1Client ensures that the webhook http/1.1 client opens and re-use multiple connections to backends to satisfy concurrent requests
+func TestWebhookHTTP1Client(t *testing.T) {
+	localListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		if localListener, err = net.Listen("tcp6", "[::1]:0"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	trackingListener := &connectionTrackingListener{delegate: localListener}
+
+	const (
+		// maxKeepAliveConnections must less than 25 which is a magic number defined as idleConnsPerHost in
+		// file k8s.io/client-go/transport/cache.go
+		maxKeepAliveConnections = 20
+	)
+
+	var (
+		requests           int64 = 0
+		maxConnectionsDone       = make(chan struct{})
+	)
+
+	// Create and start a simple HTTPS server
+	server, err := newTestServer(clientCert, clientKey, caCert, func(writer http.ResponseWriter, request *http.Request) {
+		if count := atomic.AddInt64(&requests, 1); count == maxKeepAliveConnections {
+			close(maxConnectionsDone)
+		}
+
+		<-maxConnectionsDone
+
+		fmt.Fprint(writer, "OK")
+	}, trackingListener)
+	if err != nil {
+		t.Errorf("failed to create server: %v", err)
+		return
+	}
+	defer server.Close()
+
+	// Create a Kubernetes client configuration file
+	configFile, err := newKubeConfigFile(v1.Config{
+		Clusters: []v1.NamedCluster{
+			{
+				Cluster: v1.Cluster{
+					Server:                   server.URL,
+					CertificateAuthorityData: caCert,
+				},
+			},
+		},
+		AuthInfos: []v1.NamedAuthInfo{
+			{
+				AuthInfo: v1.AuthInfo{
+					ClientCertificateData: clientCert,
+					ClientKeyData:         clientKey,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("failed to create the client config file: %v", err)
+		return
+	}
+	defer os.Remove(configFile)
+
+	wh, err := NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, configFile, groupVersions, retryBackoff, nil)
+
+	if err != nil {
+		t.Fatalf("failed to create the webhook: %v", err)
+	}
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < maxKeepAliveConnections; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := wh.RestClient.Get().Do(context.Background()).Error()
+			if err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if actual := atomic.LoadInt64(&trackingListener.connections); actual < maxKeepAliveConnections {
+		t.Fatalf("expected at least %d connections, got %d", maxKeepAliveConnections, actual)
+	}
+	trackingListener.Reset()
+
+	wg = sync.WaitGroup{}
+	for i := 0; i < maxKeepAliveConnections; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := wh.RestClient.Get().Do(context.Background()).Error()
+			if err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if actual := atomic.LoadInt64(&trackingListener.connections); actual > 0 {
+		t.Errorf("expected no additional connections (reusing kept-alive connections), got %d", actual)
+	}
+}
+
+type connectionTrackingListener struct {
+	connections int64
+	delegate    net.Listener
+}
+
+func (c *connectionTrackingListener) Reset() {
+	atomic.StoreInt64(&c.connections, 0)
+}
+
+func (c *connectionTrackingListener) Accept() (net.Conn, error) {
+	conn, err := c.delegate.Accept()
+	if err == nil {
+		atomic.AddInt64(&c.connections, 1)
+	}
+	return conn, err
+}
+func (c *connectionTrackingListener) Close() error {
+	return c.delegate.Close()
+}
+func (c *connectionTrackingListener) Addr() net.Addr {
+	return c.delegate.Addr()
 }
