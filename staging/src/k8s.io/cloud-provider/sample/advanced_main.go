@@ -15,7 +15,9 @@ limitations under the License.
 */
 
 // This file should be written by each cloud provider.
-// This is an minimal example. For more details, please refer to k8s.io/kubernetes/cmd/cloud-controller-manager/controller-manager.go
+// For an minimal working example, please refer to k8s.io/cloud-provider/sample/basic_main.go
+// For an advanced example, please refer to k8s.io/cloud-provider/sample/advanced_main.go
+// For more details, please refer to k8s.io/kubernetes/cmd/cloud-controller-manager/main.go
 
 package sample
 
@@ -34,14 +36,18 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugins
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
 	"k8s.io/klog/v2"
+	// For existing cloud providers, the option to import legacy providers is still available.
+	// e.g. _"k8s.io/legacy-cloud-providers/<provider>"
 )
 
 const (
+	// The variables below are samples, please edit the value for your case.
+
 	// cloudProviderName shows an sample of using hard coded parameter
 	cloudProviderName = "SampleCloudProviderName"
 )
 
-func main() {
+func advancedMain() {
 	rand.Seed(time.Now().UnixNano())
 
 	// cloudProviderConfigFile shows an sample of parse config file from flag option

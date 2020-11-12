@@ -38,6 +38,13 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
+const (
+	// defaultNodeMaskCIDRIPv4 is default mask size for IPv4 node cidr
+	defaultNodeMaskCIDRIPv4 = 24
+	// defaultNodeMaskCIDRIPv6 is default mask size for IPv6 node cidr
+	defaultNodeMaskCIDRIPv6 = 64
+)
+
 func startNodeIpamController(ccmconfig *cloudcontrollerconfig.CompletedConfig, nodeipamconfig nodeipamconfig.NodeIPAMControllerConfiguration, ctx genericcontrollermanager.ControllerContext, cloud cloudprovider.Interface) (http.Handler, bool, error) {
 	var serviceCIDR *net.IPNet
 	var secondaryServiceCIDR *net.IPNet

@@ -17,7 +17,7 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = [
-        "controller-manager.go",
+        "main.go",
         "nodeipamcontroller.go",
         "providers.go",
     ],
