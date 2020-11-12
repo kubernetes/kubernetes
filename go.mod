@@ -526,7 +526,7 @@ replace (
 	modernc.org/strutil => modernc.org/strutil v1.0.0
 	modernc.org/xc => modernc.org/xc v1.0.0
 	rsc.io/pdf => rsc.io/pdf v0.1.1
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.12
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.14
 	sigs.k8s.io/kustomize => sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.0.2
 	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
