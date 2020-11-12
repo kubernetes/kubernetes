@@ -311,12 +311,6 @@ func AddOrUpdateTolerationInPodSpec(spec *v1.PodSpec, toleration *v1.Toleration)
 	return true
 }
 
-// AddOrUpdateTolerationInPod tries to add a toleration to the pod's toleration list.
-// Returns true if something was updated, false otherwise.
-func AddOrUpdateTolerationInPod(pod *v1.Pod, toleration *v1.Toleration) bool {
-	return AddOrUpdateTolerationInPodSpec(&pod.Spec, toleration)
-}
-
 // TolerationsTolerateTaint checks if taint is tolerated by any of the tolerations.
 func TolerationsTolerateTaint(tolerations []v1.Toleration, taint *v1.Taint) bool {
 	for i := range tolerations {
