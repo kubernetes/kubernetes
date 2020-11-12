@@ -10016,10 +10016,9 @@ func TestValidateServiceCreate(t *testing.T) {
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
 
 	testCases := []struct {
-		name               string
-		tweakSvc           func(svc *core.Service) // given a basic valid service, each test case can customize it
-		numErrs            int
-		appProtocolEnabled bool
+		name     string
+		tweakSvc func(svc *core.Service) // given a basic valid service, each test case can customize it
+		numErrs  int
 	}{
 		{
 			name: "missing namespace",
@@ -11126,8 +11125,7 @@ func TestValidateServiceCreate(t *testing.T) {
 					AppProtocol: utilpointer.StringPtr("HTTP"),
 				}}
 			},
-			appProtocolEnabled: true,
-			numErrs:            0,
+			numErrs: 0,
 		},
 		{
 			name: `valid custom appProtocol`,
@@ -11139,8 +11137,7 @@ func TestValidateServiceCreate(t *testing.T) {
 					AppProtocol: utilpointer.StringPtr("example.com/protocol"),
 				}}
 			},
-			appProtocolEnabled: true,
-			numErrs:            0,
+			numErrs: 0,
 		},
 		{
 			name: `invalid appProtocol`,
@@ -11152,8 +11149,7 @@ func TestValidateServiceCreate(t *testing.T) {
 					AppProtocol: utilpointer.StringPtr("example.com/protocol_with{invalid}[characters]"),
 				}}
 			},
-			appProtocolEnabled: true,
-			numErrs:            1,
+			numErrs: 1,
 		},
 
 		{
@@ -11177,8 +11173,6 @@ func TestValidateServiceCreate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, true)()
-
 			svc := makeValidService()
 			tc.tweakSvc(&svc)
 			errs := ValidateServiceCreate(&svc)
@@ -12742,10 +12736,9 @@ func TestValidateServiceUpdate(t *testing.T) {
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
 	singleStack := core.IPFamilyPolicySingleStack
 	testCases := []struct {
-		name               string
-		tweakSvc           func(oldSvc, newSvc *core.Service) // given basic valid services, each test case can customize them
-		numErrs            int
-		appProtocolEnabled bool
+		name     string
+		tweakSvc func(oldSvc, newSvc *core.Service) // given basic valid services, each test case can customize them
+		numErrs  int
 	}{
 		{
 			name: "no change",
@@ -13614,47 +13607,26 @@ func TestValidateServiceUpdate(t *testing.T) {
 			},
 			numErrs: 1,
 		},
-
 		{
-			name: "update with valid app protocol, field unset, gate disabled",
+			name: "update to valid app protocol",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP"}}
-				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
-			},
-			numErrs: 1,
-		},
-		{
-			name: "update to valid app protocol, field set, gate disabled",
-			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.StringPtr("http")}}
 				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
 			},
 			numErrs: 0,
 		},
 		{
-			name: "update to valid app protocol, gate enabled",
-			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP"}}
-				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
-			},
-			appProtocolEnabled: true,
-			numErrs:            0,
-		},
-		{
-			name: "update to invalid app protocol, gate enabled",
+			name: "update to invalid app protocol",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP"}}
 				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.StringPtr("~https")}}
 			},
-			appProtocolEnabled: true,
-			numErrs:            1,
+			numErrs: 1,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.appProtocolEnabled)()
-
 			oldSvc := makeValidService()
 			newSvc := makeValidService()
 			tc.tweakSvc(&oldSvc, &newSvc)
@@ -14951,8 +14923,7 @@ func TestValidateSSHAuthSecret(t *testing.T) {
 
 func TestValidateEndpointsCreate(t *testing.T) {
 	successCases := map[string]struct {
-		endpoints          core.Endpoints
-		appProtocolEnabled bool
+		endpoints core.Endpoints
 	}{
 		"simple endpoint": {
 			endpoints: core.Endpoints{
@@ -14995,7 +14966,6 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					},
 				},
 			},
-			appProtocolEnabled: true,
 		},
 		"empty ports": {
 			endpoints: core.Endpoints{
@@ -15011,7 +14981,6 @@ func TestValidateEndpointsCreate(t *testing.T) {
 
 	for name, tc := range successCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.appProtocolEnabled)()
 			errs := ValidateEndpointsCreate(&tc.endpoints)
 			if len(errs) != 0 {
 				t.Errorf("Expected no validation errors, got %v", errs)
@@ -15021,10 +14990,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 	}
 
 	errorCases := map[string]struct {
-		endpoints          core.Endpoints
-		appProtocolEnabled bool
-		errorType          field.ErrorType
-		errorDetail        string
+		endpoints   core.Endpoints
+		errorType   field.ErrorType
+		errorDetail string
 	}{
 		"missing namespace": {
 			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "mysvc"}},
@@ -15192,15 +15160,13 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					},
 				},
 			},
-			appProtocolEnabled: true,
-			errorType:          "FieldValueInvalid",
-			errorDetail:        "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character",
+			errorType:   "FieldValueInvalid",
+			errorDetail: "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character",
 		},
 	}
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, v.appProtocolEnabled)()
 			if errs := ValidateEndpointsCreate(&v.endpoints); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
 				t.Errorf("Expected error type %s with detail %q, got %v", v.errorType, v.errorDetail, errs)
 			}
@@ -15217,54 +15183,32 @@ func TestValidateEndpointsUpdate(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		tweakOldEndpoints  func(ep *core.Endpoints)
-		tweakNewEndpoints  func(ep *core.Endpoints)
-		appProtocolEnabled bool
-		numExpectedErrors  int
+		tweakOldEndpoints func(ep *core.Endpoints)
+		tweakNewEndpoints func(ep *core.Endpoints)
+		numExpectedErrors int
 	}{
-		"update with valid app protocol, field unset, gate not enabled": {
+		"update to valid app protocol": {
 			tweakOldEndpoints: func(ep *core.Endpoints) {
 				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}}
-			},
-			tweakNewEndpoints: func(ep *core.Endpoints) {
-				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
-			},
-			numExpectedErrors: 1,
-		},
-		"update with valid app protocol, field set, gate not enabled": {
-			tweakOldEndpoints: func(ep *core.Endpoints) {
-				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("http")}}
 			},
 			tweakNewEndpoints: func(ep *core.Endpoints) {
 				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
 			},
 			numExpectedErrors: 0,
 		},
-		"update to valid app protocol, gate enabled": {
-			tweakOldEndpoints: func(ep *core.Endpoints) {
-				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}}
-			},
-			tweakNewEndpoints: func(ep *core.Endpoints) {
-				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
-			},
-			appProtocolEnabled: true,
-			numExpectedErrors:  0,
-		},
-		"update to invalid app protocol, gate enabled": {
+		"update to invalid app protocol": {
 			tweakOldEndpoints: func(ep *core.Endpoints) {
 				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}}
 			},
 			tweakNewEndpoints: func(ep *core.Endpoints) {
 				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("~https")}}
 			},
-			appProtocolEnabled: true,
-			numExpectedErrors:  1,
+			numExpectedErrors: 1,
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.appProtocolEnabled)()
 			oldEndpoints := baseEndpoints.DeepCopy()
 			tc.tweakOldEndpoints(oldEndpoints)
 			newEndpoints := baseEndpoints.DeepCopy()
@@ -15814,7 +15758,7 @@ func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
 	updatedEndpoint := newNodeNameEndpoint("kubernetes-changed-nodename")
 	// Check that NodeName can be changed during update, this is to accommodate the case where nodeIP or PodCIDR is reused.
 	// The same ip will now have a different nodeName.
-	errList := ValidateEndpoints(updatedEndpoint, false)
+	errList := ValidateEndpoints(updatedEndpoint)
 	errList = append(errList, ValidateEndpointsUpdate(updatedEndpoint, oldEndpoint)...)
 	if len(errList) != 0 {
 		t.Error("Endpoint should allow changing of Subset.Addresses.NodeName on update")
@@ -15824,7 +15768,7 @@ func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
 func TestEndpointAddressNodeNameInvalidDNSSubdomain(t *testing.T) {
 	// Check NodeName DNS validation
 	endpoint := newNodeNameEndpoint("illegal*.nodename")
-	errList := ValidateEndpoints(endpoint, false)
+	errList := ValidateEndpoints(endpoint)
 	if len(errList) == 0 {
 		t.Error("Endpoint should reject invalid NodeName")
 	}
@@ -15832,7 +15776,7 @@ func TestEndpointAddressNodeNameInvalidDNSSubdomain(t *testing.T) {
 
 func TestEndpointAddressNodeNameCanBeAnIPAddress(t *testing.T) {
 	endpoint := newNodeNameEndpoint("10.10.1.1")
-	errList := ValidateEndpoints(endpoint, false)
+	errList := ValidateEndpoints(endpoint)
 	if len(errList) != 0 {
 		t.Error("Endpoint should accept a NodeName that is an IP address")
 	}
