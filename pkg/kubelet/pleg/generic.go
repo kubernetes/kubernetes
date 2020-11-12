@@ -18,6 +18,9 @@ package pleg
 
 import (
 	"fmt"
+	"os"
+	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -64,6 +67,8 @@ type GenericPLEG struct {
 	// Pods that failed to have their status retrieved during a relist. These pods will be
 	// retried during the next relisting.
 	podsToReinspect map[types.UID]*kubecontainer.Pod
+	// The parallel num for update cache num
+	parallelUpdateCacheNum int
 }
 
 // plegContainerState has a one-to-one mapping to the
@@ -110,12 +115,13 @@ type podRecords map[types.UID]*podRecord
 func NewGenericPLEG(runtime kubecontainer.Runtime, channelCapacity int,
 	relistPeriod time.Duration, cache kubecontainer.Cache, clock clock.Clock) PodLifecycleEventGenerator {
 	return &GenericPLEG{
-		relistPeriod: relistPeriod,
-		runtime:      runtime,
-		eventChannel: make(chan *PodLifecycleEvent, channelCapacity),
-		podRecords:   make(podRecords),
-		cache:        cache,
-		clock:        clock,
+		relistPeriod:           relistPeriod,
+		runtime:                runtime,
+		eventChannel:           make(chan *PodLifecycleEvent, channelCapacity),
+		podRecords:             make(podRecords),
+		cache:                  cache,
+		clock:                  clock,
+		parallelUpdateCacheNum: readParallelUpdateCacheNum(),
 	}
 }
 
@@ -233,44 +239,80 @@ func (g *GenericPLEG) relist() {
 		needsReinspection = make(map[types.UID]*kubecontainer.Pod)
 	}
 
-	// If there are events associated with a pod, we should update the
-	// podCache.
-	for pid, events := range eventsByPodID {
-		pod := g.podRecords.getCurrent(pid)
-		if g.cacheEnabled() {
-			// updateCache() will inspect the pod and update the cache. If an
-			// error occurs during the inspection, we want PLEG to retry again
-			// in the next relist. To achieve this, we do not update the
-			// associated podRecord of the pod, so that the change will be
-			// detect again in the next relist.
-			// TODO: If many pods changed during the same relist period,
-			// inspecting the pod and getting the PodStatus to update the cache
-			// serially may take a while. We should be aware of this and
-			// parallelize if needed.
-			if err := g.updateCache(pod, pid); err != nil {
-				// Rely on updateCache calling GetPodStatus to log the actual error.
-				klog.V(4).Infof("PLEG: Ignoring events for pod %s/%s: %v", pod.Name, pod.Namespace, err)
+	updateFunc := func(pid types.UID, pod *kubecontainer.Pod, wg *sync.WaitGroup, needRespectCh chan<- types.UID, needSendCh chan<- types.UID, limitCh chan struct{}) {
+		defer wg.Done()
 
-				// make sure we try to reinspect the pod during the next relisting
-				needsReinspection[pid] = pod
-
-				continue
-			} else {
-				// this pod was in the list to reinspect and we did so because it had events, so remove it
-				// from the list (we don't want the reinspection code below to inspect it a second time in
-				// this relist execution)
-				delete(g.podsToReinspect, pid)
-			}
+		if !g.cacheEnabled() {
+			needSendCh <- pid
+			return
 		}
+
+		// limit update cache
+		limitCh <- struct{}{}
+		defer func() {
+			<-limitCh
+		}()
+
+		// updateCache() will inspect the pod and update the cache. If an
+		// error occurs during the inspection, we want PLEG to retry again
+		// in the next relist. To achieve this, we do not update the
+		// associated podRecord of the pod, so that the change will be
+		// detect again in the next relist.
+		if err := g.updateCache(pod, pid); err != nil {
+			// Rely on updateCache calling GetPodStatus to log the actual error.
+			klog.V(4).Infof("PLEG: Ignoring events for pod %s/%s: %v", pod.Name, pod.Namespace, err)
+
+			// this pod need to reinspect
+			needRespectCh <- pid
+			return
+		}
+
+		// this pod' event needs to be send out
+		needSendCh <- pid
+	}
+
+	// help to limit processes update cache
+	limitCh := make(chan struct{}, g.parallelUpdateCacheNum)
+	// chan store pid of the pod which need to respect
+	podsNeedRespectCh := make(chan types.UID, len(eventsByPodID))
+	// chan store pid of the pod whose event need to be send out
+	eventsNeedSendCh := make(chan types.UID, len(eventsByPodID))
+
+	var wg sync.WaitGroup
+	wg.Add(len(eventsByPodID))
+	for pid := range eventsByPodID {
+		pod := g.podRecords.getCurrent(pid)
+		go updateFunc(pid, pod, &wg, podsNeedRespectCh, eventsNeedSendCh, limitCh)
+	}
+	wg.Wait()
+
+	close(podsNeedRespectCh)
+	close(eventsNeedSendCh)
+
+	for pid := range podsNeedRespectCh {
+		pod := g.podRecords.getCurrent(pid)
+		// make sure we try to reinspect the pod during the next relisting
+		needsReinspection[pid] = pod
+	}
+
+	for pid := range eventsNeedSendCh {
+		if _, found := g.podsToReinspect[pid]; found {
+			// this pod was in the list to reinspect and we did so because it had events, so remove it
+			// from the list (we don't want the reinspection code below to inspect it a second time in
+			// this relist execution)
+			delete(g.podsToReinspect, pid)
+		}
+
+		podEvents := eventsByPodID[pid]
 		// Update the internal storage and send out the events.
 		g.podRecords.update(pid)
-		for i := range events {
+		for i := range podEvents {
 			// Filter out events that are not reliable and no other components use yet.
-			if events[i].Type == ContainerChanged {
+			if podEvents[i].Type == ContainerChanged {
 				continue
 			}
 			select {
-			case g.eventChannel <- events[i]:
+			case g.eventChannel <- podEvents[i]:
 			default:
 				metrics.PLEGDiscardEvents.Inc()
 				klog.Error("event channel is full, discard this relist() cycle event")
@@ -450,6 +492,24 @@ func updateRunningPodAndContainerMetrics(pods []*kubecontainer.Pod) {
 
 	// Set the number of running pods in the parameter
 	metrics.RunningPodCount.Set(float64(runningSandboxNum))
+}
+
+// Too many pods in node scene, relist take long time to update pod cache
+// which result in node not ready.
+// readParallelUpdateCacheNum get parallel num to update pod cache.
+// You can set env variable PARALLEL_UPDATE_CACHE_NUM to control it.
+func readParallelUpdateCacheNum() int {
+	num := 1
+	if s := os.Getenv("PLEG_PARALLEL_UPDATE_CACHE_NUM"); len(s) > 0 {
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			klog.Warningf("Illegal PLEG_PARALLEL_UPDATE_CACHE_NUM(%q), err:%v. "+
+				"Default value is %d", s, err, num)
+			return num
+		}
+		num = i
+	}
+	return num
 }
 
 func (pr podRecords) getOld(id types.UID) *kubecontainer.Pod {

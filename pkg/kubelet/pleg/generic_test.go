@@ -58,11 +58,12 @@ func newTestGenericPLEGWithChannelSize(eventChannelCap int) *TestGenericPLEG {
 	// The channel capacity should be large enough to hold all events in a
 	// single test.
 	pleg := &GenericPLEG{
-		relistPeriod: time.Hour,
-		runtime:      fakeRuntime,
-		eventChannel: make(chan *PodLifecycleEvent, eventChannelCap),
-		podRecords:   make(podRecords),
-		clock:        clock,
+		relistPeriod:           time.Hour,
+		runtime:                fakeRuntime,
+		eventChannel:           make(chan *PodLifecycleEvent, eventChannelCap),
+		podRecords:             make(podRecords),
+		clock:                  clock,
+		parallelUpdateCacheNum: 1,
 	}
 	return &TestGenericPLEG{pleg: pleg, runtime: fakeRuntime, clock: clock}
 }
@@ -313,12 +314,13 @@ func testReportMissingPods(t *testing.T, numRelists int) {
 func newTestGenericPLEGWithRuntimeMock() (*GenericPLEG, *containertest.Mock) {
 	runtimeMock := &containertest.Mock{}
 	pleg := &GenericPLEG{
-		relistPeriod: time.Hour,
-		runtime:      runtimeMock,
-		eventChannel: make(chan *PodLifecycleEvent, 100),
-		podRecords:   make(podRecords),
-		cache:        kubecontainer.NewCache(),
-		clock:        clock.RealClock{},
+		relistPeriod:           time.Hour,
+		runtime:                runtimeMock,
+		eventChannel:           make(chan *PodLifecycleEvent, 100),
+		podRecords:             make(podRecords),
+		cache:                  kubecontainer.NewCache(),
+		clock:                  clock.RealClock{},
+		parallelUpdateCacheNum: 1,
 	}
 	return pleg, runtimeMock
 }
