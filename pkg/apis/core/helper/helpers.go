@@ -375,7 +375,7 @@ func NodeSelectorRequirementsAsSelector(nsm []core.NodeSelectorRequirement) (lab
 
 // NodeSelectorRequirementsAsFieldSelector converts the []NodeSelectorRequirement core type into a struct that implements
 // fields.Selector.
-func NodeSelectorRequirementsAsFieldSelector(nsm []core.NodeSelectorRequirement) (fields.Selector, error) {	
+func NodeSelectorRequirementsAsFieldSelector(nsm []core.NodeSelectorRequirement) (fields.Selector, error) {
 	if len(nsm) == 0 {
 		return fields.Nothing(), nil
 	}
