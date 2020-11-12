@@ -62,7 +62,7 @@ spec:
             description: spec defines properties of a VolumeSnapshotContent created by the underlying storage system. Required.
             properties:
               deletionPolicy:
-                description: deletionPolicy determines whether this VolumeSnapshotContent and its physical snapshot on the underlying storage system should be deleted when its bound VolumeSnapshot is deleted. Supported values are "Retain" and "Delete". "Retain" means that the VolumeSnapshotContent and its physical snapshot on underlying storage system are kept. "Delete" means that the VolumeSnapshotContent and its physical snapshot on underlying storage system are deleted. In dynamic snapshot creation case, this field will be filled in by the CSI snapshotter sidecar with the "DeletionPolicy" field defined in the VolumeSnapshotClass the VolumeSnapshot refers to. For pre-existing snapshots, users MUST specify this field when creating the VolumeSnapshotContent object. Required.
+                description: deletionPolicy determines whether this VolumeSnapshotContent and its physical snapshot on the underlying storage system should be deleted when its bound VolumeSnapshot is deleted. Supported values are "Retain" and "Delete". "Retain" means that the VolumeSnapshotContent and its physical snapshot on underlying storage system are kept. "Delete" means that the VolumeSnapshotContent and its physical snapshot on underlying storage system are deleted. For dynamically provisioned snapshots, this field will automatically be filled in by the CSI snapshotter sidecar with the "DeletionPolicy" field defined in the corresponding VolumeSnapshotClass. For pre-existing snapshots, users MUST specify this field when creating the  VolumeSnapshotContent object. Required.
                 enum:
                 - Delete
                 - Retain
@@ -71,10 +71,10 @@ spec:
                 description: driver is the name of the CSI driver used to create the physical snapshot on the underlying storage system. This MUST be the same as the name returned by the CSI GetPluginName() call for that driver. Required.
                 type: string
               source:
-                description: source specifies from where a snapshot will be created. This field is immutable after creation. Required.
+                description: source specifies whether the snapshot is (or should be) dynamically provisioned or already exists, and just requires a Kubernetes object representation. This field is immutable after creation. Required.
                 properties:
                   snapshotHandle:
-                    description: snapshotHandle specifies the CSI "snapshot_id" of a pre-existing snapshot on the underlying storage system. This field is immutable.
+                    description: snapshotHandle specifies the CSI "snapshot_id" of a pre-existing snapshot on the underlying storage system for which a Kubernetes object representation was (or should be) created. This field is immutable.
                     type: string
                   volumeHandle:
                     description: volumeHandle specifies the CSI "volume_id" of the volume from which a snapshot should be dynamically taken from. This field is immutable.
@@ -84,7 +84,7 @@ spec:
                 - required: ["snapshotHandle"]
                 - required: ["volumeHandle"]
               volumeSnapshotClassName:
-                description: name of the VolumeSnapshotClass to which this snapshot belongs.
+                description: name of the VolumeSnapshotClass from which this snapshot was (or will be) created. Note that after provisioning, the VolumeSnapshotClass may be deleted or recreated with different set of values, and as such, should not be referenced post-snapshot creation.
                 type: string
               volumeSnapshotRef:
                 description: volumeSnapshotRef specifies the VolumeSnapshot object to which this VolumeSnapshotContent object is bound. VolumeSnapshot.Spec.VolumeSnapshotContentName field must reference to this VolumeSnapshotContent's name for the bidirectional binding to be valid. For a pre-existing VolumeSnapshotContent object, name and namespace of the VolumeSnapshot object MUST be provided for binding to happen. This field is immutable after creation. Required.
@@ -125,7 +125,7 @@ spec:
                 format: int64
                 type: integer
               error:
-                description: error is the latest observed error during snapshot creation, if any.
+                description: error is the last observed error during snapshot creation, if any. Upon success after retry, this error field will be cleared.
                 properties:
                   message:
                     description: 'message is a string detailing the encountered error during snapshot creation if specified. NOTE: message may be logged, and it should not contain sensitive information.'
@@ -197,7 +197,7 @@ spec:
             description: spec defines properties of a VolumeSnapshotContent created by the underlying storage system. Required.
             properties:
               deletionPolicy:
-                description: deletionPolicy determines whether this VolumeSnapshotContent and its physical snapshot on the underlying storage system should be deleted when its bound VolumeSnapshot is deleted. Supported values are "Retain" and "Delete". "Retain" means that the VolumeSnapshotContent and its physical snapshot on underlying storage system are kept. "Delete" means that the VolumeSnapshotContent and its physical snapshot on underlying storage system are deleted. In dynamic snapshot creation case, this field will be filled in by the CSI snapshotter sidecar with the "DeletionPolicy" field defined in the VolumeSnapshotClass the VolumeSnapshot refers to. For pre-existing snapshots, users MUST specify this field when creating the VolumeSnapshotContent object. Required.
+                description: deletionPolicy determines whether this VolumeSnapshotContent and its physical snapshot on the underlying storage system should be deleted when its bound VolumeSnapshot is deleted. Supported values are "Retain" and "Delete". "Retain" means that the VolumeSnapshotContent and its physical snapshot on underlying storage system are kept. "Delete" means that the VolumeSnapshotContent and its physical snapshot on underlying storage system are deleted. For dynamically provisioned snapshots, this field will automatically be filled in by the CSI snapshotter sidecar with the "DeletionPolicy" field defined in the corresponding VolumeSnapshotClass. For pre-existing snapshots, users MUST specify this field when creating the  VolumeSnapshotContent object. Required.
                 enum:
                 - Delete
                 - Retain
@@ -206,17 +206,17 @@ spec:
                 description: driver is the name of the CSI driver used to create the physical snapshot on the underlying storage system. This MUST be the same as the name returned by the CSI GetPluginName() call for that driver. Required.
                 type: string
               source:
-                description: source specifies from where a snapshot will be created. This field is immutable after creation. Required.
+                description: source specifies whether the snapshot is (or should be) dynamically provisioned or already exists, and just requires a Kubernetes object representation. This field is immutable after creation. Required.
                 properties:
                   snapshotHandle:
-                    description: snapshotHandle specifies the CSI "snapshot_id" of a pre-existing snapshot on the underlying storage system. This field is immutable.
+                    description: snapshotHandle specifies the CSI "snapshot_id" of a pre-existing snapshot on the underlying storage system for which a Kubernetes object representation was (or should be) created. This field is immutable.
                     type: string
                   volumeHandle:
                     description: volumeHandle specifies the CSI "volume_id" of the volume from which a snapshot should be dynamically taken from. This field is immutable.
                     type: string
                 type: object
               volumeSnapshotClassName:
-                description: name of the VolumeSnapshotClass to which this snapshot belongs.
+                description: name of the VolumeSnapshotClass from which this snapshot was (or will be) created. Note that after provisioning, the VolumeSnapshotClass may be deleted or recreated with different set of values, and as such, should not be referenced post-snapshot creation.
                 type: string
               volumeSnapshotRef:
                 description: volumeSnapshotRef specifies the VolumeSnapshot object to which this VolumeSnapshotContent object is bound. VolumeSnapshot.Spec.VolumeSnapshotContentName field must reference to this VolumeSnapshotContent's name for the bidirectional binding to be valid. For a pre-existing VolumeSnapshotContent object, name and namespace of the VolumeSnapshot object MUST be provided for binding to happen. This field is immutable after creation. Required.
@@ -257,7 +257,7 @@ spec:
                 format: int64
                 type: integer
               error:
-                description: error is the latest observed error during snapshot creation, if any.
+                description: error is the last observed error during snapshot creation, if any. Upon success after retry, this error field will be cleared.
                 properties:
                   message:
                     description: 'message is a string detailing the encountered error during snapshot creation if specified. NOTE: message may be logged, and it should not contain sensitive information.'
