@@ -138,6 +138,7 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 		}
 		if o.RequiresRepublish != nil {
 			object.Spec.RequiresRepublish = o.RequiresRepublish
+		}
 		if o.FSGroupPolicy != nil {
 			object.Spec.FSGroupPolicy = o.FSGroupPolicy
 		}

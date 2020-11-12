@@ -1403,6 +1403,9 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				ginkgo.By("Checking CSI driver logs")
 				err = checkPodLogs(m.cs, m.config.DriverNamespace.Name, driverPodName, driverContainerName, pod, false, false, false, test.deployCSIDriverObject && csiServiceAccountTokenEnabled, numNodePublishVolume)
 				framework.ExpectNoError(err)
+			})
+		}
+	})
 	// These tests *only* work on a cluster which has the CSIVolumeFSGroupPolicy feature enabled.
 	ginkgo.Context("CSI FSGroupPolicy [LinuxOnly]", func() {
 		tests := []struct {
