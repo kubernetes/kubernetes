@@ -178,7 +178,7 @@ func (o *ReconcileRoleOptions) run(attempts int) (*ReconcileClusterRoleResult, e
 func computeReconciledRole(existing, expected RuleOwner, removeExtraPermissions bool) (*ReconcileClusterRoleResult, error) {
 	result := &ReconcileClusterRoleResult{Operation: ReconcileNone}
 
-	result.Protected = (existing.GetAnnotations()[rbacv1.AutoUpdateAnnotationKey] == "false")
+	result.Protected = existing.GetAnnotations()[rbacv1.AutoUpdateAnnotationKey] == "false"
 
 	// Start with a copy of the existing object
 	result.Role = existing.DeepCopyRuleOwner()
