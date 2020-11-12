@@ -261,7 +261,7 @@ func TestPodVolumesExistWithMount(t *testing.T) {
 				}
 			}
 
-			exist := kubelet.podVolumesExist(poduid)
+			exist := kubelet.podMountedVolumesExistInCacheOrDisk(poduid)
 			if tc.expected != exist {
 				t.Errorf("%s failed: expected %t, got %t", name, tc.expected, exist)
 			}
