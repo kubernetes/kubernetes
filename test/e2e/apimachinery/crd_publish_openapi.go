@@ -231,7 +231,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
 
 		ginkgo.By("client-side validation (kubectl create and apply) allows request with any unknown properties")
-		randomCR := fmt.Sprintf(`{%s,"spec":{"b":[{"c":"d"}]}}`, meta)
+		randomCR := fmt.Sprintf(`{%s,"spec":{"a":null,"b":[{"c":"d"}]}}`, meta)
 		if _, err := framework.RunKubectlInput(f.Namespace.Name, randomCR, ns, "create", "-f", "-"); err != nil {
 			framework.Failf("failed to create random CR %s for CRD that allows unknown properties in a nested object: %v", randomCR, err)
 		}
