@@ -30,7 +30,9 @@ import (
 	"testing"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/cloud-provider/credentialconfig"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/legacy-cloud-providers/gce/gcpcredential"
 )
 
 func createProductNameFile() (string, error) {
@@ -55,17 +57,17 @@ func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
 }`, registryURL, email, auth)
 
 	var err error
-	gceProductNameFile, err = createProductNameFile()
+	gcpcredential.GCEProductNameFile, err = createProductNameFile()
 	if err != nil {
 		t.Errorf("failed to create gce product name file: %v", err)
 	}
-	defer os.Remove(gceProductNameFile)
+	defer os.Remove(gcpcredential.GCEProductNameFile)
 	const probeEndpoint = "/computeMetadata/v1/"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Only serve the one metadata key.
 		if probeEndpoint == r.URL.Path {
 			w.WriteHeader(http.StatusOK)
-		} else if strings.HasSuffix(dockerConfigKey, r.URL.Path) {
+		} else if strings.HasSuffix(gcpcredential.DockerConfigKey, r.URL.Path) {
 			w.WriteHeader(http.StatusOK)
 			w.Header().Set("Content-Type", "application/json")
 			fmt.Fprintln(w, sampleDockerConfig)
@@ -83,8 +85,8 @@ func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
 	})
 
 	keyring := &credentialprovider.BasicDockerKeyring{}
-	provider := &dockerConfigKeyProvider{
-		metadataProvider{Client: &http.Client{Transport: transport}},
+	provider := &gcpcredential.DockerConfigKeyProvider{
+		gcpcredential.MetadataProvider{Client: &http.Client{Transport: transport}},
 	}
 
 	if !provider.Enabled() {
@@ -128,11 +130,11 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
 }`, registryURL, email, auth)
 
 	var err error
-	gceProductNameFile, err = createProductNameFile()
+	gcpcredential.GCEProductNameFile, err = createProductNameFile()
 	if err != nil {
 		t.Errorf("failed to create gce product name file: %v", err)
 	}
-	defer os.Remove(gceProductNameFile)
+	defer os.Remove(gcpcredential.GCEProductNameFile)
 	const probeEndpoint = "/computeMetadata/v1/"
 	const valueEndpoint = "/my/value"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -143,7 +145,7 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			w.Header().Set("Content-Type", "application/json")
 			fmt.Fprintln(w, sampleDockerConfig)
-		} else if strings.HasSuffix(dockerConfigURLKey, r.URL.Path) {
+		} else if strings.HasSuffix(gcpcredential.DockerConfigURLKey, r.URL.Path) {
 			w.WriteHeader(http.StatusOK)
 			w.Header().Set("Content-Type", "application/text")
 			fmt.Fprint(w, "http://foo.bar.com"+valueEndpoint)
@@ -161,8 +163,8 @@ func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
 	})
 
 	keyring := &credentialprovider.BasicDockerKeyring{}
-	provider := &dockerConfigURLKeyProvider{
-		metadataProvider{Client: &http.Client{Transport: transport}},
+	provider := &gcpcredential.DockerConfigURLKeyProvider{
+		gcpcredential.MetadataProvider{Client: &http.Client{Transport: transport}},
 	}
 
 	if !provider.Enabled() {
@@ -197,7 +199,7 @@ func TestContainerRegistryBasics(t *testing.T) {
 	for _, registryURL := range registryURLs {
 		t.Run(registryURL, func(t *testing.T) {
 			email := "1234@project.gserviceaccount.com"
-			token := &tokenBlob{AccessToken: "ya26.lots-of-indiscernible-garbage"} // Fake value for testing.
+			token := &gcpcredential.TokenBlob{AccessToken: "ya26.lots-of-indiscernible-garbage"} // Fake value for testing.
 
 			const (
 				serviceAccountsEndpoint = "/computeMetadata/v1/instance/service-accounts/"
@@ -207,18 +209,18 @@ func TestContainerRegistryBasics(t *testing.T) {
 				tokenEndpoint           = defaultEndpoint + "token"
 			)
 			var err error
-			gceProductNameFile, err = createProductNameFile()
+			gcpcredential.GCEProductNameFile, err = createProductNameFile()
 			if err != nil {
 				t.Errorf("failed to create gce product name file: %v", err)
 			}
-			defer os.Remove(gceProductNameFile)
+			defer os.Remove(gcpcredential.GCEProductNameFile)
 
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Only serve the URL key and the value endpoint
 				if scopeEndpoint == r.URL.Path {
 					w.WriteHeader(http.StatusOK)
 					w.Header().Set("Content-Type", "application/json")
-					fmt.Fprintf(w, `["%s.read_write"]`, storageScopePrefix)
+					fmt.Fprintf(w, `["%s.read_write"]`, gcpcredential.StorageScopePrefix)
 				} else if emailEndpoint == r.URL.Path {
 					w.WriteHeader(http.StatusOK)
 					fmt.Fprint(w, email)
@@ -247,8 +249,8 @@ func TestContainerRegistryBasics(t *testing.T) {
 			})
 
 			keyring := &credentialprovider.BasicDockerKeyring{}
-			provider := &containerRegistryProvider{
-				metadataProvider{Client: &http.Client{Transport: transport}},
+			provider := &gcpcredential.ContainerRegistryProvider{
+				gcpcredential.MetadataProvider{Client: &http.Client{Transport: transport}},
 			}
 
 			if !provider.Enabled() {
@@ -301,11 +303,11 @@ func TestContainerRegistryNoServiceAccount(t *testing.T) {
 	defer server.Close()
 
 	var err error
-	gceProductNameFile, err = createProductNameFile()
+	gcpcredential.GCEProductNameFile, err = createProductNameFile()
 	if err != nil {
 		t.Errorf("failed to create gce product name file: %v", err)
 	}
-	defer os.Remove(gceProductNameFile)
+	defer os.Remove(gcpcredential.GCEProductNameFile)
 
 	// Make a transport that reroutes all traffic to the example server
 	transport := utilnet.SetTransportDefaults(&http.Transport{
@@ -314,8 +316,8 @@ func TestContainerRegistryNoServiceAccount(t *testing.T) {
 		},
 	})
 
-	provider := &containerRegistryProvider{
-		metadataProvider{Client: &http.Client{Transport: transport}},
+	provider := &gcpcredential.ContainerRegistryProvider{
+		gcpcredential.MetadataProvider{Client: &http.Client{Transport: transport}},
 	}
 
 	if provider.Enabled() {
@@ -345,11 +347,11 @@ func TestContainerRegistryNoStorageScope(t *testing.T) {
 	defer server.Close()
 
 	var err error
-	gceProductNameFile, err = createProductNameFile()
+	gcpcredential.GCEProductNameFile, err = createProductNameFile()
 	if err != nil {
 		t.Errorf("failed to create gce product name file: %v", err)
 	}
-	defer os.Remove(gceProductNameFile)
+	defer os.Remove(gcpcredential.GCEProductNameFile)
 
 	// Make a transport that reroutes all traffic to the example server
 	transport := utilnet.SetTransportDefaults(&http.Transport{
@@ -358,8 +360,8 @@ func TestContainerRegistryNoStorageScope(t *testing.T) {
 		},
 	})
 
-	provider := &containerRegistryProvider{
-		metadataProvider{Client: &http.Client{Transport: transport}},
+	provider := &gcpcredential.ContainerRegistryProvider{
+		gcpcredential.MetadataProvider{Client: &http.Client{Transport: transport}},
 	}
 
 	if provider.Enabled() {
@@ -390,11 +392,11 @@ func TestComputePlatformScopeSubstitutesStorageScope(t *testing.T) {
 	defer server.Close()
 
 	var err error
-	gceProductNameFile, err = createProductNameFile()
+	gcpcredential.GCEProductNameFile, err = createProductNameFile()
 	if err != nil {
 		t.Errorf("failed to create gce product name file: %v", err)
 	}
-	defer os.Remove(gceProductNameFile)
+	defer os.Remove(gcpcredential.GCEProductNameFile)
 
 	// Make a transport that reroutes all traffic to the example server
 	transport := utilnet.SetTransportDefaults(&http.Transport{
@@ -403,8 +405,8 @@ func TestComputePlatformScopeSubstitutesStorageScope(t *testing.T) {
 		},
 	})
 
-	provider := &containerRegistryProvider{
-		metadataProvider{Client: &http.Client{Transport: transport}},
+	provider := &gcpcredential.ContainerRegistryProvider{
+		gcpcredential.MetadataProvider{Client: &http.Client{Transport: transport}},
 	}
 
 	if !provider.Enabled() {
@@ -425,15 +427,15 @@ func TestAllProvidersNoMetadata(t *testing.T) {
 		},
 	})
 
-	providers := []credentialprovider.DockerConfigProvider{
-		&dockerConfigKeyProvider{
-			metadataProvider{Client: &http.Client{Transport: transport}},
+	providers := []credentialconfig.DockerConfigProvider{
+		&gcpcredential.DockerConfigKeyProvider{
+			gcpcredential.MetadataProvider{Client: &http.Client{Transport: transport}},
 		},
-		&dockerConfigURLKeyProvider{
-			metadataProvider{Client: &http.Client{Transport: transport}},
+		&gcpcredential.DockerConfigURLKeyProvider{
+			gcpcredential.MetadataProvider{Client: &http.Client{Transport: transport}},
 		},
-		&containerRegistryProvider{
-			metadataProvider{Client: &http.Client{Transport: transport}},
+		&gcpcredential.ContainerRegistryProvider{
+			gcpcredential.MetadataProvider{Client: &http.Client{Transport: transport}},
 		},
 	}
 
