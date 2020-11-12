@@ -99,6 +99,10 @@ const (
 	// to create both TCP and UDP protocols when creating load balancer rules.
 	ServiceAnnotationLoadBalancerMixedProtocols = "service.beta.kubernetes.io/azure-load-balancer-mixed-protocols"
 
+	// ServiceAnnotationLoadBalancerEnableHighAvailabilityPorts is the annotation used on the service
+	// to enable the high availability ports on the standard internal load balancer.
+	ServiceAnnotationLoadBalancerEnableHighAvailabilityPorts = "service.beta.kubernetes.io/azure-load-balancer-enable-high-availability-ports"
+
 	// ServiceAnnotationLoadBalancerDisableTCPReset is the annotation used on the service
 	// to set enableTcpReset to false in load balancer rule. This only works for Azure standard load balancer backed service.
 	// TODO(feiskyer): disable-tcp-reset annotations has been depracated since v1.18, it would removed on v1.20.
@@ -1713,6 +1717,14 @@ func (az *Cloud) reconcileLoadBalancerRule(
 
 			if protocol == v1.ProtocolTCP {
 				expectedRule.LoadBalancingRulePropertiesFormat.IdleTimeoutInMinutes = lbIdleTimeout
+			}
+
+			if requiresInternalLoadBalancer(service) &&
+				strings.EqualFold(az.LoadBalancerSku, loadBalancerSkuStandard) &&
+				strings.EqualFold(service.Annotations[ServiceAnnotationLoadBalancerEnableHighAvailabilityPorts], "true") {
+				expectedRule.FrontendPort = to.Int32Ptr(0)
+				expectedRule.BackendPort = to.Int32Ptr(0)
+				expectedRule.Protocol = network.TransportProtocolAll
 			}
 
 			// we didn't construct the probe objects for UDP or SCTP because they're not allowed on Azure.
