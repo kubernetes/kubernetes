@@ -219,7 +219,7 @@ func recordToSink(sink EventSink, event *v1.Event, eventCorrelator *EventCorrela
 			break
 		}
 		// Randomize the first sleep so that various clients won't all be
-		// synced up if the master goes down.
+		// synced up if the control plane goes down.
 		if tries == 1 {
 			time.Sleep(time.Duration(float64(sleepDuration) * rand.Float64()))
 		} else {

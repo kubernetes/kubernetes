@@ -434,7 +434,7 @@ func (m *manager) rotateCerts() (bool, error) {
 	// new private key.
 	reqName, reqUID, err := csr.RequestCertificate(clientSet, csrPEM, "", m.signerName, m.usages, privateKey)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Failed while requesting a signed certificate from the master: %v", err))
+		utilruntime.HandleError(fmt.Errorf("Failed while requesting a signed certificate from the control plane: %v", err))
 		if m.certificateRenewFailure != nil {
 			m.certificateRenewFailure.Inc()
 		}
@@ -589,11 +589,11 @@ func (m *manager) updateServerError(err error) error {
 	defer m.certAccessLock.Unlock()
 	switch {
 	case errors.IsUnauthorized(err):
-		// SSL terminating proxies may report this error instead of the master
+		// SSL terminating proxies may report this error instead of the control plane
 		m.serverHealth = true
 	case errors.IsUnexpectedServerError(err):
 		// generally indicates a proxy or other load balancer problem, rather than a problem coming
-		// from the master
+		// from the control plane
 		m.serverHealth = false
 	default:
 		// Identify known errors that could be expected for a cert request that

@@ -37,7 +37,7 @@ limitations under the License.
 //
 // While not required, some method of clock synchronization between nodes in the
 // cluster is highly recommended. It's important to keep in mind when configuring
-// this client that the tolerance to skew rate varies inversely to master
+// this client that the tolerance to skew rate varies inversely to control plane
 // availability.
 //
 // Larger clusters often have a more lenient SLA for API latency. This should be
@@ -45,7 +45,7 @@ limitations under the License.
 // should be monitored and RetryPeriod and LeaseDuration should be increased
 // until the rate is stable and acceptably low. It's important to keep in mind
 // when configuring this client that the tolerance to API latency varies inversely
-// to master availability.
+// to control plane availability.
 //
 // DISCLAIMER: this is an alpha API. This library will likely change significantly
 // or even be removed entirely in subsequent releases. Depend on this API at
@@ -126,7 +126,7 @@ type LeaderElectionConfig struct {
 	//
 	// Core clients default this value to 15 seconds.
 	LeaseDuration time.Duration
-	// RenewDeadline is the duration that the acting master will retry
+	// RenewDeadline is the duration that the acting control plane will retry
 	// refreshing leadership before giving up.
 	//
 	// Core clients default this value to 10 seconds.

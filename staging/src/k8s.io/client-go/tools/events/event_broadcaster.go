@@ -213,7 +213,7 @@ func (e *eventBroadcasterImpl) attemptRecording(event *eventsv1.Event) *eventsv1
 			return nil
 		}
 		// Randomize sleep so that various clients won't all be
-		// synced up if the master goes down.
+		// synced up if the control plane goes down.
 		time.Sleep(wait.Jitter(e.sleepDuration, 0.25))
 	}
 }

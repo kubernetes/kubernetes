@@ -146,14 +146,14 @@ func (c *Controller) runWorker() {
 
 func main() {
 	var kubeconfig string
-	var master string
+	var controlplane string
 
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "absolute path to the kubeconfig file")
-	flag.StringVar(&master, "master", "", "master url")
+	flag.StringVar(&controlplane, "controlplane", "", "control plane url")
 	flag.Parse()
 
 	// creates the connection
-	config, err := clientcmd.BuildConfigFromFlags(master, kubeconfig)
+	config, err := clientcmd.BuildConfigFromFlags(controlplane, kubeconfig)
 	if err != nil {
 		klog.Fatal(err)
 	}

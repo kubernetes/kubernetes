@@ -30,7 +30,7 @@ import (
 
 var (
 	ErrNoContext   = errors.New("no context chosen")
-	ErrEmptyConfig = NewEmptyConfigError("no configuration has been provided, try setting KUBERNETES_MASTER environment variable")
+	ErrEmptyConfig = NewEmptyConfigError("no configuration has been provided, try setting KUBERNETES_CONTROL_PLANE environment variable")
 	// message is for consistency with old behavior
 	ErrEmptyCluster = errors.New("cluster has no server defined")
 )

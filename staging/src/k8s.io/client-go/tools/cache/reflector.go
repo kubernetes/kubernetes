@@ -288,7 +288,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 				//
 				// With ResourceVersion != "", we have a possibility to list from watch cache,
 				// but we do that (for ResourceVersion != "0") only if Limit is unset.
-				// To avoid thundering herd on etcd (e.g. on master upgrades), we explicitly
+				// To avoid thundering herd on etcd (e.g. on control plane upgrades), we explicitly
 				// switch off pagination to force listing from watch cache (if enabled).
 				// With the existing semantic of RV (result is at least as fresh as provided RV),
 				// this is correct and doesn't lead to going back in time.
