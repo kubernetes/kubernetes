@@ -653,7 +653,7 @@ func TestPodPriorityResolution(t *testing.T) {
 				Namespace:         metav1.NamespaceSystem,
 				PriorityClassName: "foo",
 			}),
-			ExpectedError: fmt.Errorf("Error creating pause pod: pods \"pod3-system-cluster-critical\" is forbidden: no PriorityClass with name foo was found"),
+			ExpectedError: fmt.Errorf("failed to create pause pod: pods \"pod3-system-cluster-critical\" is forbidden: no PriorityClass with name foo was found"),
 		},
 	}
 

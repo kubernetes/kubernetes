@@ -125,7 +125,7 @@ func getZoneNameForNode(node v1.Node) (string, error) {
 			return value, nil
 		}
 	}
-	return "", fmt.Errorf("Zone name for node %s not found. No label with key %s",
+	return "", fmt.Errorf("node %s doesn't have zone label %s",
 		node.Name, v1.LabelFailureDomainBetaZone)
 }
 
