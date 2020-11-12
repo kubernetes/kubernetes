@@ -459,6 +459,7 @@ github.com/go-ozzo/ozzo-validation/is
 github.com/go-stack/stack
 # github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
 # github.com/godbus/dbus/v5 v5.0.3 => github.com/godbus/dbus/v5 v5.0.3
+## explicit
 github.com/godbus/dbus/v5
 # github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.3
 # github.com/gogo/protobuf v1.3.1 => github.com/gogo/protobuf v1.3.1
