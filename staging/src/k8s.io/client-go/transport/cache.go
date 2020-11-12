@@ -44,7 +44,7 @@ type tlsCacheKey struct {
 	insecure           bool
 	caData             string
 	certData           string
-	keyData            string
+	keyData            string `datapolicy:"security-key"`
 	certFile           string
 	keyFile            string
 	serverName         string
