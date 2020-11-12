@@ -68,14 +68,6 @@ const (
 	// certificate as expiration approaches.
 	RotateKubeletServerCertificate featuregate.Feature = "RotateKubeletServerCertificate"
 
-	// owner: @mikedanese
-	// beta: v1.8
-	// ga: v1.19
-	//
-	// Automatically renews the client certificate used for communicating with
-	// the API server as the certificate approaches expiration.
-	RotateKubeletClientCertificate featuregate.Feature = "RotateKubeletClientCertificate"
-
 	// owner: @jinxu
 	// beta: v1.10
 	//
@@ -708,7 +700,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Beta},
 	DevicePlugins:                  {Default: true, PreRelease: featuregate.Beta},
 	RotateKubeletServerCertificate: {Default: true, PreRelease: featuregate.Beta},
-	RotateKubeletClientCertificate: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	LocalStorageCapacityIsolation:  {Default: true, PreRelease: featuregate.Beta},
 	Sysctls:                        {Default: true, PreRelease: featuregate.Beta},
 	EphemeralContainers:            {Default: false, PreRelease: featuregate.Alpha},
