@@ -410,6 +410,7 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) error {
 	logOption := logs.NewOptions()
 	logOption.LogFormat = s.Logging.Format
+	logOption.LogSanitization = s.Logging.Sanitization
 	logOption.Apply()
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
