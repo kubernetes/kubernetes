@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,10 +36,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
+	clientset "k8s.io/client-go/kubernetes"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
+	"k8s.io/kubernetes/pkg/controller/apis/config/scheme"
 
 	// import known versions
 	_ "k8s.io/client-go/kubernetes"
@@ -74,12 +79,19 @@ type GarbageCollector struct {
 
 // NewGarbageCollector creates a new GarbageCollector.
 func NewGarbageCollector(
+	kubeClient clientset.Interface,
 	metadataClient metadata.Interface,
 	mapper resettableRESTMapper,
 	ignoredResources map[schema.GroupResource]struct{},
 	sharedInformers informerfactory.InformerFactory,
 	informersStarted <-chan struct{},
 ) (*GarbageCollector, error) {
+
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartStructuredLogging(0)
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "garbage-collector-controller"})
+
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
 	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
 	absentOwnerCache := NewUIDCache(500)
@@ -91,6 +103,7 @@ func NewGarbageCollector(
 		absentOwnerCache: absentOwnerCache,
 	}
 	gc.dependencyGraphBuilder = &GraphBuilder{
+		eventRecorder:    eventRecorder,
 		metadataClient:   metadataClient,
 		informersStarted: informersStarted,
 		restMapper:       mapper,

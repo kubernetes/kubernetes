@@ -81,7 +81,7 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 	// construction will not fail.
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(metadataClient, rm, map[schema.GroupResource]struct{}{},
+	gc, err := NewGarbageCollector(client, metadataClient, rm, map[schema.GroupResource]struct{}{},
 		informerfactory.NewInformerFactory(sharedInformers, metadataInformers), alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
@@ -202,7 +202,7 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -829,7 +829,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}

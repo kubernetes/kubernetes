@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
@@ -88,6 +89,8 @@ type GraphBuilder struct {
 	// running tracks whether Run() has been called.
 	// it is protected by monitorLock.
 	running bool
+
+	eventRecorder record.EventRecorder
 
 	metadataClient metadata.Interface
 	// monitors are the producer of the graphChanges queue, graphBuilder alters
