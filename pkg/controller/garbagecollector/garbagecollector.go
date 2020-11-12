@@ -297,6 +297,8 @@ func (gc *GarbageCollector) runAttemptToDeleteWorker() {
 
 var enqueuedVirtualDeleteEventErr = goerrors.New("enqueued virtual delete event")
 
+var namespacedOwnerOfClusterScopedObjectErr = goerrors.New("cluster-scoped objects cannot refer to namespaced owners")
+
 func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 	item, quit := gc.attemptToDelete.Get()
 	gc.workerLock.RLock()
@@ -330,6 +332,9 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 	err := gc.attemptToDeleteItem(n)
 	if err == enqueuedVirtualDeleteEventErr {
 		// a virtual event was produced and will be handled by processGraphChanges, no need to requeue this node
+		return true
+	} else if err == namespacedOwnerOfClusterScopedObjectErr {
+		// a cluster-scoped object referring to a namespaced owner is an error that will not resolve on retry, no need to requeue this node
 		return true
 	} else if err != nil {
 		if _, ok := err.(*restMappingError); ok {
@@ -387,6 +392,13 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	}
 	if !namespaced {
 		absentOwnerCacheKey.Namespace = ""
+	}
+
+	if len(item.identity.Namespace) == 0 && namespaced {
+		// item is a cluster-scoped object referring to a namespace-scoped owner, which is not valid.
+		// return a marker error, rather than retrying on the lookup failure forever.
+		klog.V(2).Infof("object %s is cluster-scoped, but refers to a namespaced owner of type %s/%s", item.identity, reference.APIVersion, reference.Kind)
+		return false, nil, namespacedOwnerOfClusterScopedObjectErr
 	}
 
 	// TODO: It's only necessary to talk to the API server if the owner node
