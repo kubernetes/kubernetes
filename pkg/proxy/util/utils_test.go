@@ -163,6 +163,39 @@ func TestIsProxyableHostname(t *testing.T) {
 	}
 }
 
+func TestIsAllowedHost(t *testing.T) {
+	testCases := []struct {
+		ip     string
+		denied []string
+		want   error
+	}{
+		{"8.8.8.8", []string{}, nil},
+		{"169.254.169.254", []string{"169.0.0.0/8"}, ErrAddressNotAllowed},
+		{"169.254.169.254", []string{"fce8::/15", "169.254.169.0/24"}, ErrAddressNotAllowed},
+		{"fce9:beef::", []string{"fce8::/15", "169.254.169.0/24"}, ErrAddressNotAllowed},
+		{"127.0.0.1", []string{"127.0.0.1/32"}, ErrAddressNotAllowed},
+		{"34.107.204.206", []string{"fce8::/15"}, nil},
+		{"fce9:beef::", []string{"127.0.0.1/32"}, nil},
+		{"34.107.204.206", []string{"127.0.0.1/32"}, nil},
+		{"127.0.0.1", []string{}, nil},
+	}
+
+	for i := range testCases {
+		var denyList []*net.IPNet
+		for _, cidrStr := range testCases[i].denied {
+			_, ipNet, err := net.ParseCIDR(cidrStr)
+			if err != nil {
+				t.Fatalf("bad IP for test case: %v: %v", cidrStr, err)
+			}
+			denyList = append(denyList, ipNet)
+		}
+		got := IsAllowedHost(net.ParseIP(testCases[i].ip), denyList)
+		if testCases[i].want != got {
+			t.Errorf("case %d: expected %v, got %v", i, testCases[i].want, got)
+		}
+	}
+}
+
 func TestShouldSkipService(t *testing.T) {
 	testCases := []struct {
 		service    *v1.Service
@@ -616,12 +649,351 @@ func TestFilterIncorrectIPVersion(t *testing.T) {
 
 	for _, testcase := range testCases {
 		t.Run(testcase.desc, func(t *testing.T) {
-			correct, incorrect := FilterIncorrectIPVersion(testcase.ipString, testcase.wantIPv6)
+			ipFamily := v1.IPv4Protocol
+			if testcase.wantIPv6 {
+				ipFamily = v1.IPv6Protocol
+			}
+			correct, incorrect := FilterIncorrectIPVersion(testcase.ipString, ipFamily)
 			if !reflect.DeepEqual(testcase.expectCorrect, correct) {
 				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, correct)
 			}
 			if !reflect.DeepEqual(testcase.expectIncorrect, incorrect) {
 				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, incorrect)
+			}
+		})
+	}
+}
+
+func TestGetClusterIPByFamily(t *testing.T) {
+	testCases := []struct {
+		name           string
+		service        v1.Service
+		requestFamily  v1.IPFamily
+		expectedResult string
+	}{
+		{
+			name:           "old style service ipv4. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "10.0.0.10",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "10.0.0.10",
+				},
+			},
+		},
+
+		{
+			name:           "old style service ipv4. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "10.0.0.10",
+				},
+			},
+		},
+
+		{
+			name:           "old style service ipv6. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "2000::1",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "2000::1",
+				},
+			},
+		},
+
+		{
+			name:           "old style service ipv6. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIP: "2000::1",
+				},
+			},
+		},
+
+		{
+			name:           "service single stack ipv4. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "10.0.0.10",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"10.0.0.10"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service single stack ipv4. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"10.0.0.10"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service single stack ipv6. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "2000::1",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"2000::1"},
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service single stack ipv6. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"2000::1"},
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+				},
+			},
+		},
+		// dual stack
+		{
+			name:           "service dual stack ipv4,6. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "10.0.0.10",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"10.0.0.10", "2000::1"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service dual stack ipv4,6. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "2000::1",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"10.0.0.10", "2000::1"},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service dual stack ipv6,4. want ipv6",
+			requestFamily:  v1.IPv6Protocol,
+			expectedResult: "2000::1",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"2000::1", "10.0.0.10"},
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+				},
+			},
+		},
+
+		{
+			name:           "service dual stack ipv6,4. want ipv4",
+			requestFamily:  v1.IPv4Protocol,
+			expectedResult: "10.0.0.10",
+			service: v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"2000::1", "10.0.0.10"},
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ip := GetClusterIPByFamily(testCase.requestFamily, &testCase.service)
+			if ip != testCase.expectedResult {
+				t.Fatalf("expected ip:%v got %v", testCase.expectedResult, ip)
+			}
+		})
+	}
+
+}
+
+func TestFilterIncorrectLoadBalancerIngress(t *testing.T) {
+	ipModeVIP := v1.LoadBalancerIPModeVIP
+	testCases := []struct {
+		name              string
+		ingresses         []v1.LoadBalancerIngress
+		ipFamily          v1.IPFamily
+		expectedCorrect   []v1.LoadBalancerIngress
+		expectedIncorrect []v1.LoadBalancerIngress
+	}{
+		{
+			name:     "IPv4 only valid ingresses",
+			ipFamily: v1.IPv4Protocol,
+			ingresses: []v1.LoadBalancerIngress{
+				{
+					IP:     "1.2.3.4",
+					IPMode: &ipModeVIP,
+				},
+				{
+					IP: "1.2.3.5",
+				},
+			},
+			expectedCorrect: []v1.LoadBalancerIngress{
+				{
+					IP:     "1.2.3.4",
+					IPMode: &ipModeVIP,
+				},
+				{
+					IP: "1.2.3.5",
+				},
+			},
+			expectedIncorrect: nil,
+		},
+		{
+			name:     "IPv4 some invalid ingresses",
+			ipFamily: v1.IPv4Protocol,
+			ingresses: []v1.LoadBalancerIngress{
+				{
+					IP:     "1.2.3.4",
+					IPMode: &ipModeVIP,
+				},
+				{
+					IP: "2000::1",
+				},
+				{
+					Hostname: "dummy",
+				},
+			},
+			expectedCorrect: []v1.LoadBalancerIngress{
+				{
+					IP:     "1.2.3.4",
+					IPMode: &ipModeVIP,
+				},
+				{
+					Hostname: "dummy", // weirdly no IP is a valid IPv4 but invalid IPv6
+				},
+			},
+			expectedIncorrect: []v1.LoadBalancerIngress{
+				{
+					IP: "2000::1",
+				},
+			},
+		},
+		{
+			name:     "IPv4 only invalid ingresses",
+			ipFamily: v1.IPv4Protocol,
+			ingresses: []v1.LoadBalancerIngress{
+				{
+					IP: "2000::1",
+				},
+				{
+					IP:     "2000::1",
+					IPMode: &ipModeVIP,
+				},
+			},
+			expectedCorrect: nil,
+			expectedIncorrect: []v1.LoadBalancerIngress{
+				{
+					IP: "2000::1",
+				},
+				{
+					IP:     "2000::1",
+					IPMode: &ipModeVIP,
+				},
+			},
+		},
+		{
+			name:     "IPv6 only valid ingresses",
+			ipFamily: v1.IPv6Protocol,
+			ingresses: []v1.LoadBalancerIngress{
+				{
+					IP:     "2000::1",
+					IPMode: &ipModeVIP,
+				},
+				{
+					IP: "2000::2",
+				},
+			},
+			expectedCorrect: []v1.LoadBalancerIngress{
+				{
+					IP:     "2000::1",
+					IPMode: &ipModeVIP,
+				},
+				{
+					IP: "2000::2",
+				},
+			},
+			expectedIncorrect: nil,
+		},
+		{
+			name:     "IPv6 some invalid ingresses",
+			ipFamily: v1.IPv6Protocol,
+			ingresses: []v1.LoadBalancerIngress{
+				{
+					IP:     "2000::1",
+					IPMode: &ipModeVIP,
+				},
+				{
+					IP: "1.2.3.4",
+				},
+				{
+					Hostname: "dummy",
+				},
+			},
+			expectedCorrect: []v1.LoadBalancerIngress{
+				{
+					IP:     "2000::1",
+					IPMode: &ipModeVIP,
+				},
+			},
+			expectedIncorrect: []v1.LoadBalancerIngress{
+				{
+					IP: "1.2.3.4",
+				},
+				{
+					Hostname: "dummy", // weirdly no IP is a valid IPv4 but invalid IPv6
+				},
+			},
+		},
+		{
+			name:     "IPv6 only invalid ingresses",
+			ipFamily: v1.IPv6Protocol,
+			ingresses: []v1.LoadBalancerIngress{
+				{
+					IP: "1.2.3.4",
+				},
+				{
+					IP:     "1.2.3.5",
+					IPMode: &ipModeVIP,
+				},
+			},
+			expectedCorrect: nil,
+			expectedIncorrect: []v1.LoadBalancerIngress{
+				{
+					IP: "1.2.3.4",
+				},
+				{
+					IP:     "1.2.3.5",
+					IPMode: &ipModeVIP,
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			correctIngresses, incorrectIngresses := FilterIncorrectLoadBalancerIngress(testCase.ingresses, testCase.ipFamily)
+			if !reflect.DeepEqual(correctIngresses, testCase.expectedCorrect) {
+				t.Errorf("Test %v failed: expected %v, got %v", testCase.name, testCase.expectedCorrect, correctIngresses)
+			}
+			if !reflect.DeepEqual(incorrectIngresses, testCase.expectedIncorrect) {
+				t.Errorf("Test %v failed: expected %v, got %v", testCase.name, testCase.expectedIncorrect, incorrectIngresses)
 			}
 		})
 	}

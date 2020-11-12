@@ -18,7 +18,6 @@ go_library(
         "//pkg/registry/rbac/clusterrolebinding:go_default_library",
         "//pkg/registry/rbac/clusterrolebinding/policybased:go_default_library",
         "//pkg/registry/rbac/clusterrolebinding/storage:go_default_library",
-        "//pkg/registry/rbac/reconciliation:go_default_library",
         "//pkg/registry/rbac/role:go_default_library",
         "//pkg/registry/rbac/role/policybased:go_default_library",
         "//pkg/registry/rbac/role/storage:go_default_library",
@@ -43,6 +42,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
+        "//staging/src/k8s.io/component-helpers/auth/rbac/reconciliation:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
     ],
 )

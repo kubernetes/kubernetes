@@ -130,7 +130,7 @@ func (*PortRange) Type() string {
 }
 
 // ParsePortRange parses a string of the form "min-max", inclusive at both
-// ends, and initializs a new PortRange from it.
+// ends, and initializes a new PortRange from it.
 func ParsePortRange(value string) (*PortRange, error) {
 	pr := &PortRange{}
 	err := pr.Set(value)

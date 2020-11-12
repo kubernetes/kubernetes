@@ -34,7 +34,7 @@ func NewCmdCreateService(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 		Use:     "service",
 		Aliases: []string{"svc"},
 		Short:   i18n.T("Create a service using specified subcommand."),
-		Long:    "Create a service using specified subcommand.",
+		Long:    i18n.T("Create a service using specified subcommand."),
 		Run:     cmdutil.DefaultSubCommandRun(ioStreams.ErrOut),
 	}
 	cmd.AddCommand(NewCmdCreateServiceClusterIP(f, ioStreams))

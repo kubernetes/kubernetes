@@ -113,10 +113,10 @@ func TestForwardPorts(t *testing.T) {
 		serverSends map[int32]string
 	}{
 		"forward 1 port with no data either direction": {
-			ports: []string{"5000"},
+			ports: []string{":5000"},
 		},
 		"forward 2 ports with bidirectional data": {
-			ports: []string{"5001", "6000"},
+			ports: []string{":5001", ":6000"},
 			clientSends: map[int32]string{
 				5001: "abcd",
 				6000: "ghij",
@@ -152,8 +152,18 @@ func TestForwardPorts(t *testing.T) {
 		}()
 		<-pf.Ready
 
+		forwardedPorts, err := pf.GetPorts()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		remoteToLocalMap := map[int32]int32{}
+		for _, forwardedPort := range forwardedPorts {
+			remoteToLocalMap[int32(forwardedPort.Remote)] = int32(forwardedPort.Local)
+		}
+
 		for port, data := range test.clientSends {
-			clientConn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", port))
+			clientConn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", remoteToLocalMap[port]))
 			if err != nil {
 				t.Errorf("%s: error dialing %d: %s", testName, port, err)
 				server.Close()
@@ -213,16 +223,25 @@ func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 	defer close(stopChan1)
 	readyChan1 := make(chan struct{})
 
-	pf1, err := New(dialer, []string{"5555"}, stopChan1, readyChan1, os.Stdout, os.Stderr)
+	pf1, err := New(dialer, []string{":5555"}, stopChan1, readyChan1, os.Stdout, os.Stderr)
 	if err != nil {
 		t.Fatalf("error creating pf1: %v", err)
 	}
 	go pf1.ForwardPorts()
 	<-pf1.Ready
 
+	forwardedPorts, err := pf1.GetPorts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(forwardedPorts) != 1 {
+		t.Fatalf("expected 1 forwarded port, got %#v", forwardedPorts)
+	}
+	duplicateSpec := fmt.Sprintf("%d:%d", forwardedPorts[0].Local, forwardedPorts[0].Remote)
+
 	stopChan2 := make(chan struct{}, 1)
 	readyChan2 := make(chan struct{})
-	pf2, err := New(dialer, []string{"5555"}, stopChan2, readyChan2, os.Stdout, os.Stderr)
+	pf2, err := New(dialer, []string{duplicateSpec}, stopChan2, readyChan2, os.Stdout, os.Stderr)
 	if err != nil {
 		t.Fatalf("error creating pf2: %v", err)
 	}

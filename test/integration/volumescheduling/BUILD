@@ -59,8 +59,8 @@ go_library(
     importpath = "k8s.io/kubernetes/test/integration/volumescheduling",
     deps = [
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/controlplane:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/master:go_default_library",
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/profile:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

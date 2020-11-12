@@ -21,7 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // CommunicatingPlugin is an example of a plugin that implements two
@@ -92,6 +92,6 @@ func (mc CommunicatingPlugin) PreBind(ctx context.Context, state *framework.Cycl
 }
 
 // New initializes a new plugin and returns it.
-func New(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ *runtime.Unknown, _ framework.Handle) (framework.Plugin, error) {
 	return &CommunicatingPlugin{}, nil
 }

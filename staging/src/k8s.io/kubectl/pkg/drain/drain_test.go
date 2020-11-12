@@ -389,3 +389,72 @@ func TestDeleteOrEvict(t *testing.T) {
 		})
 	}
 }
+
+func mockFilterSkip(_ corev1.Pod) PodDeleteStatus {
+	return MakePodDeleteStatusSkip()
+}
+
+func mockFilterOkay(_ corev1.Pod) PodDeleteStatus {
+	return MakePodDeleteStatusOkay()
+}
+
+func TestFilterPods(t *testing.T) {
+	tCases := []struct {
+		description        string
+		expectedPodListLen int
+		additionalFilters  []PodFilter
+	}{
+		{
+			description:        "AdditionalFilter skip all",
+			expectedPodListLen: 0,
+			additionalFilters: []PodFilter{
+				mockFilterSkip,
+				mockFilterOkay,
+			},
+		},
+		{
+			description:        "AdditionalFilter okay all",
+			expectedPodListLen: 1,
+			additionalFilters: []PodFilter{
+				mockFilterOkay,
+			},
+		},
+		{
+			description:        "AdditionalFilter Skip after Okay all skip",
+			expectedPodListLen: 0,
+			additionalFilters: []PodFilter{
+				mockFilterOkay,
+				mockFilterSkip,
+			},
+		},
+		{
+			description:        "No additionalFilters okay all",
+			expectedPodListLen: 1,
+		},
+	}
+	for _, tc := range tCases {
+		t.Run(tc.description, func(t *testing.T) {
+			h := &Helper{
+				Force:             true,
+				AdditionalFilters: tc.additionalFilters,
+			}
+			pod := corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod",
+					Namespace: "default",
+				},
+			}
+			podList := corev1.PodList{
+				Items: []corev1.Pod{
+					pod,
+				},
+			}
+
+			list := filterPods(&podList, h.makeFilters())
+			podsLen := len(list.Pods())
+			if podsLen != tc.expectedPodListLen {
+				t.Errorf("%s: unexpected evictions; actual %v; expected %v", tc.description, podsLen, tc.expectedPodListLen)
+			}
+		})
+	}
+}

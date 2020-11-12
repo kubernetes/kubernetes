@@ -27,7 +27,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
-	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -177,11 +176,16 @@ func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
 }
 
 func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
-	pod := newObj.(*v1.Pod)
-	if sched.skipPodUpdate(pod) {
+	oldPod, newPod := oldObj.(*v1.Pod), newObj.(*v1.Pod)
+	// Bypass update event that carries identical objects; otherwise, a duplicated
+	// Pod may go through scheduling and cause unexpected behavior (see #96071).
+	if oldPod.ResourceVersion == newPod.ResourceVersion {
 		return
 	}
-	if err := sched.SchedulingQueue.Update(oldObj.(*v1.Pod), pod); err != nil {
+	if sched.skipPodUpdate(newPod) {
+		return
+	}
+	if err := sched.SchedulingQueue.Update(oldPod, newPod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to update %T: %v", newObj, err))
 	}
 }
@@ -206,14 +210,14 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 	if err := sched.SchedulingQueue.Delete(pod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
 	}
-	prof, err := sched.profileForPod(pod)
+	fwk, err := sched.frameworkForPod(pod)
 	if err != nil {
 		// This shouldn't happen, because we only accept for scheduling the pods
 		// which specify a scheduler name that matches one of the profiles.
 		klog.Error(err)
 		return
 	}
-	prof.Framework.RejectWaitingPod(pod.UID)
+	fwk.RejectWaitingPod(pod.UID)
 }
 
 func (sched *Scheduler) addPodToCache(obj interface{}) {
@@ -362,10 +366,9 @@ func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 func addAllEventHandlers(
 	sched *Scheduler,
 	informerFactory informers.SharedInformerFactory,
-	podInformer coreinformers.PodInformer,
 ) {
 	// scheduled pod cache
-	podInformer.Informer().AddEventHandler(
+	informerFactory.Core().V1().Pods().Informer().AddEventHandler(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
@@ -390,7 +393,7 @@ func addAllEventHandlers(
 		},
 	)
 	// unscheduled pod queue
-	podInformer.Informer().AddEventHandler(
+	informerFactory.Core().V1().Pods().Informer().AddEventHandler(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
@@ -432,8 +435,7 @@ func addAllEventHandlers(
 		)
 	}
 
-	// On add and delete of PVs, it will affect equivalence cache items
-	// related to persistent volume
+	// On add and update of PVs.
 	informerFactory.Core().V1().PersistentVolumes().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			// MaxPDVolumeCountPredicate: since it relies on the counts of PV.
@@ -442,7 +444,7 @@ func addAllEventHandlers(
 		},
 	)
 
-	// This is for MaxPDVolumeCountPredicate: add/delete PVC will affect counts of PV when it is bound.
+	// This is for MaxPDVolumeCountPredicate: add/update PVC will affect counts of PV when it is bound.
 	informerFactory.Core().V1().PersistentVolumeClaims().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    sched.onPvcAdd,

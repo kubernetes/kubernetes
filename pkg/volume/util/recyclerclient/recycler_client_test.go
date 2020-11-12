@@ -220,7 +220,7 @@ func (c *mockRecyclerClient) DeletePod(name, namespace string) error {
 }
 
 func (c *mockRecyclerClient) WatchPod(name, namespace string, stopChannel chan struct{}) (<-chan watch.Event, error) {
-	eventCh := make(chan watch.Event, 0)
+	eventCh := make(chan watch.Event)
 	go func() {
 		for _, e := range c.events {
 			eventCh <- e

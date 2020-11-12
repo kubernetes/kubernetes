@@ -438,7 +438,9 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 		nil, /* prober */
 		false,
 		5*time.Second,
-		timers)
+		timers,
+		nil, /* filteredDialOptions */
+	)
 
 	if err != nil {
 		t.Fatalf("Error creating AttachDetach : %v", err)

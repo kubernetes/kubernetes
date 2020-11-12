@@ -360,7 +360,6 @@ var _ = framework.KubeDescribe("GKE system requirements [NodeConformance][Featur
 		framework.ExpectNoError(checkDockerSeccomp())
 	})
 	ginkgo.It("The docker storage driver should work", func() {
-		e2eskipper.Skipf("GKE does not currently require overlay")
 		framework.ExpectNoError(checkDockerStorageDriver())
 	})
 })

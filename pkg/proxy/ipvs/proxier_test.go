@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -52,6 +51,10 @@ import (
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 	utilpointer "k8s.io/utils/pointer"
+
+	utilnet "k8s.io/utils/net"
+
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 const testHostname = "test-hostname"
@@ -105,7 +108,22 @@ func (fake *fakeIPSetVersioner) GetVersion() (string, error) {
 	return fake.version, fake.err
 }
 
-func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []net.IP, excludeCIDRs []*net.IPNet, endpointSlicesEnabled bool) *Proxier {
+func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []net.IP, excludeCIDRs []*net.IPNet, endpointSlicesEnabled bool, ipFamily v1.IPFamily) *Proxier {
+	// unlike actual proxier, this fake proxier does not filter node IPs per family requested
+	// which can lead to false postives.
+
+	// filter node IPs by proxier ipfamily
+	idx := 0
+	for _, nodeIP := range nodeIPs {
+		if (ipFamily == v1.IPv6Protocol) == utilnet.IsIPv6(nodeIP) {
+			nodeIPs[idx] = nodeIP
+			idx++
+		}
+	}
+
+	// reset slice to filtered entries
+	nodeIPs = nodeIPs[:idx]
+
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeAction{
 			func() ([]byte, []byte, error) { return []byte("dummy device have been created"), nil, nil },
@@ -127,9 +145,9 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 	p := &Proxier{
 		exec:                  fexec,
 		serviceMap:            make(proxy.ServiceMap),
-		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, nil, nil, nil),
+		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, nil, nil),
 		endpointsMap:          make(proxy.EndpointsMap),
-		endpointsChanges:      proxy.NewEndpointChangeTracker(testHostname, nil, nil, nil, endpointSlicesEnabled, nil),
+		endpointsChanges:      proxy.NewEndpointChangeTracker(testHostname, nil, ipFamily, nil, endpointSlicesEnabled, nil),
 		excludeCIDRs:          excludeCIDRs,
 		iptables:              ipt,
 		ipvs:                  ipvs,
@@ -153,6 +171,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		nodePortAddresses:     make([]string, 0),
 		networkInterfacer:     proxyutiltest.NewFakeNetwork(),
 		gracefuldeleteManager: NewGracefulTerminationManager(ipvs),
+		ipFamily:              ipFamily,
 	}
 	p.setInitialized(true)
 	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
@@ -212,7 +231,7 @@ func TestCleanupLeftovers(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -259,6 +278,7 @@ func TestCleanupLeftovers(t *testing.T) {
 func TestCanUseIPVSProxier(t *testing.T) {
 	testCases := []struct {
 		mods          []string
+		scheduler     string
 		kernelVersion string
 		kernelErr     error
 		ipsetVersion  string
@@ -268,6 +288,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		// case 0, kernel error
 		{
 			mods:          []string{"foo", "bar", "baz"},
+			scheduler:     "",
 			kernelVersion: "4.19",
 			kernelErr:     fmt.Errorf("oops"),
 			ipsetVersion:  "0.0",
@@ -276,6 +297,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		// case 1, ipset error
 		{
 			mods:          []string{"foo", "bar", "baz"},
+			scheduler:     "",
 			kernelVersion: "4.19",
 			ipsetVersion:  MinIPSetCheckVersion,
 			ipsetErr:      fmt.Errorf("oops"),
@@ -284,6 +306,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		// case 2, missing required kernel modules and ipset version too low
 		{
 			mods:          []string{"foo", "bar", "baz"},
+			scheduler:     "rr",
 			kernelVersion: "4.19",
 			ipsetVersion:  "1.1",
 			ok:            false,
@@ -291,6 +314,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		// case 3, missing required ip_vs_* kernel modules
 		{
 			mods:          []string{"ip_vs", "a", "bc", "def"},
+			scheduler:     "sed",
 			kernelVersion: "4.19",
 			ipsetVersion:  MinIPSetCheckVersion,
 			ok:            false,
@@ -298,6 +322,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		// case 4, ipset version too low
 		{
 			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack"},
+			scheduler:     "rr",
 			kernelVersion: "4.19",
 			ipsetVersion:  "4.3.0",
 			ok:            false,
@@ -305,6 +330,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		// case 5, ok for linux kernel 4.19
 		{
 			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack"},
+			scheduler:     "rr",
 			kernelVersion: "4.19",
 			ipsetVersion:  MinIPSetCheckVersion,
 			ok:            true,
@@ -312,6 +338,7 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		// case 6, ok for linux kernel 4.18
 		{
 			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack_ipv4"},
+			scheduler:     "rr",
 			kernelVersion: "4.18",
 			ipsetVersion:  MinIPSetCheckVersion,
 			ok:            true,
@@ -319,16 +346,41 @@ func TestCanUseIPVSProxier(t *testing.T) {
 		// case 7. ok when module list has extra modules
 		{
 			mods:          []string{"foo", "ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "bar"},
+			scheduler:     "rr",
 			kernelVersion: "4.19",
 			ipsetVersion:  "6.19",
 			ok:            true,
+		},
+		// case 8, not ok for sed based IPVS scheduling
+		{
+			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack"},
+			scheduler:     "sed",
+			kernelVersion: "4.19",
+			ipsetVersion:  MinIPSetCheckVersion,
+			ok:            false,
+		},
+		// case 9, ok for dh based IPVS scheduling
+		{
+			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "ip_vs_dh"},
+			scheduler:     "dh",
+			kernelVersion: "4.19",
+			ipsetVersion:  MinIPSetCheckVersion,
+			ok:            true,
+		},
+		// case 10, non-existent scheduler, error due to modules not existing
+		{
+			mods:          []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "ip_vs_dh"},
+			scheduler:     "foobar",
+			kernelVersion: "4.19",
+			ipsetVersion:  MinIPSetCheckVersion,
+			ok:            false,
 		},
 	}
 
 	for i := range testCases {
 		handle := &fakeKernelHandler{modules: testCases[i].mods, kernelVersion: testCases[i].kernelVersion}
 		versioner := &fakeIPSetVersioner{version: testCases[i].ipsetVersion, err: testCases[i].ipsetErr}
-		ok, err := CanUseIPVSProxier(handle, versioner)
+		ok, err := CanUseIPVSProxier(handle, versioner, testCases[i].scheduler)
 		if ok != testCases[i].ok {
 			t.Errorf("Case [%d], expect %v, got %v: err: %v", i, testCases[i].ok, ok, err)
 		}
@@ -412,7 +464,7 @@ func TestGetNodeIPs(t *testing.T) {
 	}
 }
 
-func TestNodePort(t *testing.T) {
+func TestNodePortIPv4(t *testing.T) {
 	tests := []struct {
 		name                   string
 		services               []*v1.Service
@@ -480,16 +532,6 @@ func TestNodePort(t *testing.T) {
 						Port:      uint16(3001),
 						Scheduler: "rr",
 					},
-					{
-						IP:       "2001:db8::1:1",
-						Port:     3001,
-						Protocol: "TCP",
-					}: {
-						Address:   net.ParseIP("2001:db8::1:1"),
-						Protocol:  "TCP",
-						Port:      uint16(3001),
-						Scheduler: "rr",
-					},
 				},
 				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{
 					{
@@ -502,11 +544,6 @@ func TestNodePort(t *testing.T) {
 							Port:    uint16(80),
 							Weight:  1,
 						},
-						{
-							Address: net.ParseIP("1002:ab8::2:10"),
-							Port:    uint16(80),
-							Weight:  1,
-						},
 					},
 					{
 						IP:       "100.101.102.103",
@@ -515,27 +552,6 @@ func TestNodePort(t *testing.T) {
 					}: {
 						{
 							Address: net.ParseIP("10.180.0.1"),
-							Port:    uint16(80),
-							Weight:  1,
-						},
-						{
-							Address: net.ParseIP("1002:ab8::2:10"),
-							Port:    uint16(80),
-							Weight:  1,
-						},
-					},
-					{
-						IP:       "2001:db8::1:1",
-						Port:     3001,
-						Protocol: "TCP",
-					}: {
-						{
-							Address: net.ParseIP("10.180.0.1"),
-							Port:    uint16(80),
-							Weight:  1,
-						},
-						{
-							Address: net.ParseIP("1002:ab8::2:10"),
 							Port:    uint16(80),
 							Weight:  1,
 						},
@@ -774,36 +790,6 @@ func TestNodePort(t *testing.T) {
 						Port:      uint16(3001),
 						Scheduler: "rr",
 					},
-					{
-						IP:       "2001:db8::1:1",
-						Port:     3001,
-						Protocol: "SCTP",
-					}: {
-						Address:   net.ParseIP("2001:db8::1:1"),
-						Protocol:  "SCTP",
-						Port:      uint16(3001),
-						Scheduler: "rr",
-					},
-					{
-						IP:       "2001:db8::1:2",
-						Port:     3001,
-						Protocol: "SCTP",
-					}: {
-						Address:   net.ParseIP("2001:db8::1:2"),
-						Protocol:  "SCTP",
-						Port:      uint16(3001),
-						Scheduler: "rr",
-					},
-					{
-						IP:       "2001:db8::1:3",
-						Port:     3001,
-						Protocol: "SCTP",
-					}: {
-						Address:   net.ParseIP("2001:db8::1:3"),
-						Protocol:  "SCTP",
-						Port:      uint16(3001),
-						Scheduler: "rr",
-					},
 				},
 				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{
 					{
@@ -850,39 +836,6 @@ func TestNodePort(t *testing.T) {
 							Weight:  1,
 						},
 					},
-					{
-						IP:       "2001:db8::1:1",
-						Port:     3001,
-						Protocol: "SCTP",
-					}: {
-						{
-							Address: net.ParseIP("10.180.0.1"),
-							Port:    uint16(80),
-							Weight:  1,
-						},
-					},
-					{
-						IP:       "2001:db8::1:2",
-						Port:     3001,
-						Protocol: "SCTP",
-					}: {
-						{
-							Address: net.ParseIP("10.180.0.1"),
-							Port:    uint16(80),
-							Weight:  1,
-						},
-					},
-					{
-						IP:       "2001:db8::1:3",
-						Port:     3001,
-						Protocol: "SCTP",
-					}: {
-						{
-							Address: net.ParseIP("10.180.0.1"),
-							Port:    uint16(80),
-							Weight:  1,
-						},
-					},
 				},
 			},
 			expectedIPSets: netlinktest.ExpectedIPSet{
@@ -905,24 +858,6 @@ func TestNodePort(t *testing.T) {
 						Protocol: strings.ToLower(string(v1.ProtocolSCTP)),
 						SetType:  utilipset.HashIPPort,
 					},
-					{
-						IP:       "2001:db8::1:1",
-						Port:     3001,
-						Protocol: strings.ToLower(string(v1.ProtocolSCTP)),
-						SetType:  utilipset.HashIPPort,
-					},
-					{
-						IP:       "2001:db8::1:2",
-						Port:     3001,
-						Protocol: strings.ToLower(string(v1.ProtocolSCTP)),
-						SetType:  utilipset.HashIPPort,
-					},
-					{
-						IP:       "2001:db8::1:3",
-						Port:     3001,
-						Protocol: strings.ToLower(string(v1.ProtocolSCTP)),
-						SetType:  utilipset.HashIPPort,
-					},
 				},
 			},
 		},
@@ -933,7 +868,7 @@ func TestNodePort(t *testing.T) {
 			ipt := iptablestest.NewFake()
 			ipvs := ipvstest.NewFake()
 			ipset := ipsettest.NewFake(testIPSetVersion)
-			fp := NewFakeProxier(ipt, ipvs, ipset, test.nodeIPs, nil, false)
+			fp := NewFakeProxier(ipt, ipvs, ipset, test.nodeIPs, nil, false, v1.IPv4Protocol)
 			fp.nodePortAddresses = test.nodePortAddresses
 
 			makeServiceMap(fp, test.services...)
@@ -942,8 +877,8 @@ func TestNodePort(t *testing.T) {
 			fp.syncProxyRules()
 
 			if !reflect.DeepEqual(ipvs, test.expectedIPVS) {
-				t.Logf("actual ipvs state: %v", ipvs)
-				t.Logf("expected ipvs state: %v", test.expectedIPVS)
+				t.Logf("actual ipvs state: %+v", ipvs)
+				t.Logf("expected ipvs state: %+v", test.expectedIPVS)
 				t.Errorf("unexpected IPVS state")
 			}
 
@@ -958,7 +893,354 @@ func TestNodePort(t *testing.T) {
 	}
 }
 
-func TestClusterIP(t *testing.T) {
+func TestNodePortIPv6(t *testing.T) {
+	tests := []struct {
+		name                   string
+		services               []*v1.Service
+		endpoints              []*v1.Endpoints
+		nodeIPs                []net.IP
+		nodePortAddresses      []string
+		expectedIPVS           *ipvstest.FakeIPVS
+		expectedIPSets         netlinktest.ExpectedIPSet
+		expectedIptablesChains netlinktest.ExpectedIptablesChain
+	}{
+		{
+			name: "1 service with node port, has 2 endpoints",
+			services: []*v1.Service{
+				makeTestService("ns1", "svc1", func(svc *v1.Service) {
+					svc.Spec.Type = "NodePort"
+					svc.Spec.ClusterIP = "2020::1"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p80",
+						Port:     int32(80),
+						Protocol: v1.ProtocolTCP,
+						NodePort: int32(3001),
+					}}
+				}),
+			},
+			endpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "svc1", func(ept *v1.Endpoints) {
+					ept.Subsets = []v1.EndpointSubset{{
+						Addresses: []v1.EndpointAddress{{
+							IP: "10.180.0.1",
+						}, {
+							IP: "1002:ab8::2:10",
+						}},
+						Ports: []v1.EndpointPort{{
+							Name:     "p80",
+							Port:     int32(80),
+							Protocol: v1.ProtocolTCP,
+						}},
+					}}
+				}),
+			},
+			nodeIPs: []net.IP{
+				net.ParseIP("100.101.102.103"),
+				net.ParseIP("2001:db8::1:1"),
+			},
+			nodePortAddresses: []string{},
+			expectedIPVS: &ipvstest.FakeIPVS{
+				Services: map[ipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "2001:db8::1:1",
+						Port:     3001,
+						Protocol: "TCP",
+					}: {
+						Address:   net.ParseIP("2001:db8::1:1"),
+						Protocol:  "TCP",
+						Port:      uint16(3001),
+						Scheduler: "rr",
+					},
+					{
+						IP:       "2020::1",
+						Port:     80,
+						Protocol: "TCP",
+					}: {
+						Address:   net.ParseIP("2020::1"),
+						Protocol:  "TCP",
+						Port:      uint16(80),
+						Scheduler: "rr",
+					},
+				},
+				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "2001:db8::1:1",
+						Port:     3001,
+						Protocol: "TCP",
+					}: {
+						{
+							Address: net.ParseIP("1002:ab8::2:10"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+
+					{
+						IP:       "2020::1",
+						Port:     80,
+						Protocol: "TCP",
+					}: {
+						{
+							Address: net.ParseIP("1002:ab8::2:10"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+				},
+			},
+		},
+
+		{
+			name: "1 UDP service with node port, has endpoints (no action on IPv6 Proxier)",
+			services: []*v1.Service{
+				makeTestService("ns1", "svc1", func(svc *v1.Service) {
+					svc.Spec.Type = "NodePort"
+					svc.Spec.ClusterIP = "10.20.30.41"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p80",
+						Port:     int32(80),
+						Protocol: v1.ProtocolUDP,
+						NodePort: int32(3001),
+					}}
+				}),
+			},
+			endpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "svc1", func(ept *v1.Endpoints) {
+					ept.Subsets = []v1.EndpointSubset{{
+						Addresses: []v1.EndpointAddress{{
+							IP: "10.180.0.1",
+						}},
+						Ports: []v1.EndpointPort{{
+							Name:     "p80",
+							Port:     int32(80),
+							Protocol: v1.ProtocolUDP,
+						}},
+					}}
+				}),
+			},
+			nodeIPs: []net.IP{
+				net.ParseIP("100.101.102.103"),
+			},
+			nodePortAddresses: []string{"0.0.0.0/0"},
+			/*since this is a node with only IPv4, proxier should not do anything */
+			expectedIPVS: &ipvstest.FakeIPVS{
+				Services:     map[ipvstest.ServiceKey]*utilipvs.VirtualServer{},
+				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{},
+			},
+			expectedIPSets:         nil,
+			expectedIptablesChains: nil,
+		},
+
+		{
+			name: "service has node port but no endpoints",
+			services: []*v1.Service{
+				makeTestService("ns1", "svc1", func(svc *v1.Service) {
+					svc.Spec.Type = "NodePort"
+					svc.Spec.ClusterIP = "2020::1"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p80",
+						Port:     int32(80),
+						Protocol: v1.ProtocolTCP,
+						NodePort: int32(3001),
+					}}
+				}),
+			},
+			endpoints: []*v1.Endpoints{},
+			nodeIPs: []net.IP{
+				net.ParseIP("100.101.102.103"),
+				net.ParseIP("2001:db8::1:1"),
+			},
+			nodePortAddresses: []string{},
+			expectedIPVS: &ipvstest.FakeIPVS{
+				Services: map[ipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "2001:db8::1:1",
+						Port:     3001,
+						Protocol: "TCP",
+					}: {
+						Address:   net.ParseIP("2001:db8::1:1"),
+						Protocol:  "TCP",
+						Port:      uint16(3001),
+						Scheduler: "rr",
+					},
+					{
+						IP:       "2020::1",
+						Port:     80,
+						Protocol: "TCP",
+					}: {
+						Address:   net.ParseIP("2020::1"),
+						Protocol:  "TCP",
+						Port:      uint16(80),
+						Scheduler: "rr",
+					},
+				},
+				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "2020::1",
+						Port:     80,
+						Protocol: "TCP",
+					}: {}, // no real servers corresponding to no endpoints
+					{
+						IP:       "2001:db8::1:1",
+						Port:     3001,
+						Protocol: "TCP",
+					}: {}, // no real servers corresponding to no endpoints
+				},
+			},
+		},
+
+		{
+			name: "node port service with protocol sctp on a node with multiple nodeIPs",
+			services: []*v1.Service{
+				makeTestService("ns1", "svc1", func(svc *v1.Service) {
+					svc.Spec.Type = "NodePort"
+					svc.Spec.ClusterIP = "2020::1"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p80",
+						Port:     int32(80),
+						Protocol: v1.ProtocolSCTP,
+						NodePort: int32(3001),
+					}}
+				}),
+			},
+			endpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "svc1", func(ept *v1.Endpoints) {
+					ept.Subsets = []v1.EndpointSubset{{
+						Addresses: []v1.EndpointAddress{{
+							IP: "2001::1",
+						}},
+						Ports: []v1.EndpointPort{{
+							Name:     "p80",
+							Port:     int32(80),
+							Protocol: v1.ProtocolSCTP,
+						}},
+					}}
+				}),
+			},
+			nodeIPs: []net.IP{
+				net.ParseIP("2001:db8::1:1"),
+				net.ParseIP("2001:db8::1:2"),
+			},
+			nodePortAddresses: []string{},
+			expectedIPVS: &ipvstest.FakeIPVS{
+				Services: map[ipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "2001:db8::1:1",
+						Port:     3001,
+						Protocol: "SCTP",
+					}: {
+						Address:   net.ParseIP("2001:db8::1:1"),
+						Protocol:  "SCTP",
+						Port:      uint16(3001),
+						Scheduler: "rr",
+					},
+					{
+						IP:       "2001:db8::1:2",
+						Port:     3001,
+						Protocol: "SCTP",
+					}: {
+						Address:   net.ParseIP("2001:db8::1:2"),
+						Protocol:  "SCTP",
+						Port:      uint16(3001),
+						Scheduler: "rr",
+					},
+					{
+						IP:       "2020::1",
+						Port:     80,
+						Protocol: "SCTP",
+					}: {
+						Address:   net.ParseIP("2020::1"),
+						Protocol:  "SCTP",
+						Port:      uint16(80),
+						Scheduler: "rr",
+					},
+				},
+				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "2001:db8::1:1",
+						Port:     3001,
+						Protocol: "SCTP",
+					}: {
+						{
+							Address: net.ParseIP("2001::1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+					{
+						IP:       "2001:db8::1:2",
+						Port:     3001,
+						Protocol: "SCTP",
+					}: {
+						{
+							Address: net.ParseIP("2001::1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+					{
+						IP:       "2020::1",
+						Port:     80,
+						Protocol: "SCTP",
+					}: {
+						{
+							Address: net.ParseIP("2001::1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+				},
+			},
+			expectedIPSets: netlinktest.ExpectedIPSet{
+				kubeNodePortSetSCTP: {
+					{
+						IP:       "2001:db8::1:1",
+						Port:     3001,
+						Protocol: strings.ToLower(string(v1.ProtocolSCTP)),
+						SetType:  utilipset.HashIPPort,
+					},
+					{
+						IP:       "2001:db8::1:2",
+						Port:     3001,
+						Protocol: strings.ToLower(string(v1.ProtocolSCTP)),
+						SetType:  utilipset.HashIPPort,
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ipt := iptablestest.NewFake()
+			ipvs := ipvstest.NewFake()
+			ipset := ipsettest.NewFake(testIPSetVersion)
+			fp := NewFakeProxier(ipt, ipvs, ipset, test.nodeIPs, nil, false, v1.IPv6Protocol)
+			fp.nodePortAddresses = test.nodePortAddresses
+
+			makeServiceMap(fp, test.services...)
+			makeEndpointsMap(fp, test.endpoints...)
+
+			fp.syncProxyRules()
+
+			if !reflect.DeepEqual(ipvs, test.expectedIPVS) {
+				t.Logf("actual ipvs state: %+v", ipvs)
+				t.Logf("expected ipvs state: %+v", test.expectedIPVS)
+				t.Errorf("unexpected IPVS state")
+			}
+
+			if test.expectedIPSets != nil {
+				checkIPSet(t, fp, test.expectedIPSets)
+			}
+
+			if test.expectedIptablesChains != nil {
+				checkIptables(t, ipt, test.expectedIptablesChains)
+			}
+		})
+	}
+}
+
+func TestIPv4Proxier(t *testing.T) {
 	tests := []struct {
 		name         string
 		services     []*v1.Service
@@ -1023,16 +1305,6 @@ func TestClusterIP(t *testing.T) {
 						Port:      uint16(80),
 						Scheduler: "rr",
 					},
-					{
-						IP:       "1002:ab8::2:1",
-						Port:     8080,
-						Protocol: "TCP",
-					}: {
-						Address:   net.ParseIP("1002:ab8::2:1"),
-						Protocol:  "TCP",
-						Port:      uint16(8080),
-						Scheduler: "rr",
-					},
 				},
 				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{
 					{
@@ -1043,17 +1315,6 @@ func TestClusterIP(t *testing.T) {
 						{
 							Address: net.ParseIP("10.180.0.1"),
 							Port:    uint16(80),
-							Weight:  1,
-						},
-					},
-					{
-						IP:       "1002:ab8::2:1",
-						Port:     8080,
-						Protocol: "TCP",
-					}: {
-						{
-							Address: net.ParseIP("1009:ab8::5:6"),
-							Port:    uint16(8080),
 							Weight:  1,
 						},
 					},
@@ -1102,7 +1363,146 @@ func TestClusterIP(t *testing.T) {
 			ipt := iptablestest.NewFake()
 			ipvs := ipvstest.NewFake()
 			ipset := ipsettest.NewFake(testIPSetVersion)
-			fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+			fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false, v1.IPv4Protocol)
+
+			makeServiceMap(fp, test.services...)
+			makeEndpointsMap(fp, test.endpoints...)
+
+			fp.syncProxyRules()
+
+			if !reflect.DeepEqual(ipvs, test.expectedIPVS) {
+				t.Logf("actual ipvs state: %v", ipvs)
+				t.Logf("expected ipvs state: %v", test.expectedIPVS)
+				t.Errorf("unexpected IPVS state")
+			}
+		})
+	}
+}
+
+func TestIPv6Proxier(t *testing.T) {
+	tests := []struct {
+		name         string
+		services     []*v1.Service
+		endpoints    []*v1.Endpoints
+		expectedIPVS *ipvstest.FakeIPVS
+	}{
+		{
+			name: "2 services with Cluster IP, each with endpoints",
+			services: []*v1.Service{
+				makeTestService("ns1", "svc1", func(svc *v1.Service) {
+					svc.Spec.ClusterIP = "10.20.30.41"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p80",
+						Port:     int32(80),
+						Protocol: v1.ProtocolTCP,
+					}}
+				}),
+				makeTestService("ns2", "svc2", func(svc *v1.Service) {
+					svc.Spec.ClusterIP = "1002:ab8::2:1"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p8080",
+						Port:     int32(8080),
+						Protocol: v1.ProtocolTCP,
+					}}
+				}),
+			},
+			endpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "svc1", func(ept *v1.Endpoints) {
+					ept.Subsets = []v1.EndpointSubset{{
+						Addresses: []v1.EndpointAddress{{
+							IP: "10.180.0.1",
+						}},
+						Ports: []v1.EndpointPort{{
+							Name:     "p80",
+							Port:     int32(80),
+							Protocol: v1.ProtocolTCP,
+						}},
+					}}
+				}),
+				makeTestEndpoints("ns2", "svc2", func(ept *v1.Endpoints) {
+					ept.Subsets = []v1.EndpointSubset{{
+						Addresses: []v1.EndpointAddress{{
+							IP: "1009:ab8::5:6",
+						}},
+						Ports: []v1.EndpointPort{{
+							Name:     "p8080",
+							Port:     int32(8080),
+							Protocol: v1.ProtocolTCP,
+						}},
+					}}
+				}),
+			},
+			expectedIPVS: &ipvstest.FakeIPVS{
+				Services: map[ipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "1002:ab8::2:1",
+						Port:     8080,
+						Protocol: "TCP",
+					}: {
+						Address:   net.ParseIP("1002:ab8::2:1"),
+						Protocol:  "TCP",
+						Port:      uint16(8080),
+						Scheduler: "rr",
+					},
+				},
+				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "1002:ab8::2:1",
+						Port:     8080,
+						Protocol: "TCP",
+					}: {
+						{
+							Address: net.ParseIP("1009:ab8::5:6"),
+							Port:    uint16(8080),
+							Weight:  1,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "cluster IP service with no endpoints",
+			services: []*v1.Service{
+				makeTestService("ns1", "svc1", func(svc *v1.Service) {
+					svc.Spec.ClusterIP = "2001::1"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p80",
+						Port:     int32(80),
+						Protocol: v1.ProtocolTCP,
+					}}
+				}),
+			},
+			endpoints: []*v1.Endpoints{},
+			expectedIPVS: &ipvstest.FakeIPVS{
+				Services: map[ipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "2001::1",
+						Port:     80,
+						Protocol: "TCP",
+					}: {
+						Address:   net.ParseIP("2001::1"),
+						Protocol:  "TCP",
+						Port:      uint16(80),
+						Scheduler: "rr",
+					},
+				},
+				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "2001::1",
+						Port:     80,
+						Protocol: "TCP",
+					}: {},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ipt := iptablestest.NewFake()
+			ipvs := ipvstest.NewFake()
+			ipset := ipsettest.NewFake(testIPSetVersion)
+			fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false, v1.IPv6Protocol)
 
 			makeServiceMap(fp, test.services...)
 			makeEndpointsMap(fp, test.endpoints...)
@@ -1123,7 +1523,7 @@ func TestMasqueradeRule(t *testing.T) {
 		ipt := iptablestest.NewFake().SetHasRandomFully(testcase)
 		ipvs := ipvstest.NewFake()
 		ipset := ipsettest.NewFake(testIPSetVersion)
-		fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+		fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false, v1.IPv4Protocol)
 		makeServiceMap(fp)
 		makeEndpointsMap(fp)
 		fp.syncProxyRules()
@@ -1143,7 +1543,7 @@ func TestExternalIPsNoEndpoint(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcExternalIPs := "50.60.70.81"
@@ -1198,7 +1598,7 @@ func TestExternalIPs(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcExternalIPs := sets.NewString("50.60.70.81", "2012::51", "127.0.0.1")
@@ -1243,8 +1643,8 @@ func TestExternalIPs(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get ipvs services, err: %v", err)
 	}
-	if len(services) != 4 {
-		t.Errorf("Expect 4 ipvs services, got %d", len(services))
+	if len(services) != 3 { // ipvs filters out by ipfamily
+		t.Errorf("Expect 3 ipvs services, got %d", len(services))
 	}
 	found := false
 	for _, svc := range services {
@@ -1265,13 +1665,10 @@ func TestExternalIPs(t *testing.T) {
 }
 
 func TestOnlyLocalExternalIPs(t *testing.T) {
-	// TODO(freehan): remove this in k8s 1.19
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalPolicyForExternalIP, true)()
-
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcExternalIPs := sets.NewString("50.60.70.81", "2012::51", "127.0.0.1")
@@ -1326,8 +1723,8 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get ipvs services, err: %v", err)
 	}
-	if len(services) != 4 {
-		t.Errorf("Expect 4 ipvs services, got %d", len(services))
+	if len(services) != 3 { // ipvs filters out by IPFamily
+		t.Errorf("Expect 3 ipvs services, got %d", len(services))
 	}
 	found := false
 	for _, svc := range services {
@@ -1493,9 +1890,9 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 
 	fp.syncProxyRules()
 
-	// Expect 3 services and 1 destination
+	// Expect 2 (matching ipvs IPFamily field)  services and 1 destination
 	epVS := &netlinktest.ExpectedVirtualServer{
-		VSNum: 3, IP: nodeIP.String(), Port: uint16(svcNodePort), Protocol: string(v1.ProtocolTCP),
+		VSNum: 2, IP: nodeIP.String(), Port: uint16(svcNodePort), Protocol: string(v1.ProtocolTCP),
 		RS: []netlinktest.ExpectedRealServer{{
 			IP: epIP, Port: uint16(svcPort),
 		}}}
@@ -1808,7 +2205,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false, v1.IPv4Protocol)
 
 	services := []*v1.Service{
 		makeTestService("somewhere-else", "cluster-ip", func(svc *v1.Service) {
@@ -1918,7 +2315,7 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false, v1.IPv4Protocol)
 
 	makeServiceMap(fp,
 		makeTestService("somewhere-else", "headless", func(svc *v1.Service) {
@@ -1957,7 +2354,7 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false, v1.IPv4Protocol)
 
 	makeServiceMap(fp,
 		makeTestService("somewhere-else", "external-name", func(svc *v1.Service) {
@@ -1985,7 +2382,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false, v1.IPv4Protocol)
 
 	servicev1 := makeTestService("somewhere", "some-service", func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeClusterIP
@@ -2069,7 +2466,7 @@ func TestSessionAffinity(t *testing.T) {
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
 	nodeIP := net.ParseIP("100.101.102.103")
-	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP}, nil, false)
+	fp := NewFakeProxier(ipt, ipvs, ipset, []net.IP{nodeIP}, nil, false, v1.IPv4Protocol)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -2964,7 +3361,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		ipt := iptablestest.NewFake()
 		ipvs := ipvstest.NewFake()
 		ipset := ipsettest.NewFake(testIPSetVersion)
-		fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+		fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false, v1.IPv4Protocol)
 		fp.hostname = nodeName
 
 		// First check that after adding all previous versions of endpoints,
@@ -3237,7 +3634,7 @@ func Test_syncService(t *testing.T) {
 		ipt := iptablestest.NewFake()
 		ipvs := ipvstest.NewFake()
 		ipset := ipsettest.NewFake(testIPSetVersion)
-		proxier := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+		proxier := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false, v1.IPv4Protocol)
 
 		proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
 		if testCases[i].oldVirtualServer != nil {
@@ -3267,7 +3664,7 @@ func buildFakeProxier() (*iptablestest.FakeIPTables, *Proxier) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	return ipt, NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+	return ipt, NewFakeProxier(ipt, ipvs, ipset, nil, nil, false, v1.IPv4Protocol)
 }
 
 func hasJump(rules []iptablestest.Rule, destChain, ipSet string) bool {
@@ -3327,6 +3724,7 @@ func checkIPSet(t *testing.T, fp *Proxier, ipSet netlinktest.ExpectedIPSet) {
 
 // checkIPVS to check expected ipvs service and destination
 func checkIPVS(t *testing.T, fp *Proxier, vs *netlinktest.ExpectedVirtualServer) {
+	t.Helper()
 	services, err := fp.ipvs.GetVirtualServers()
 	if err != nil {
 		t.Errorf("Failed to get ipvs services, err: %v", err)
@@ -3353,7 +3751,7 @@ func TestCleanLegacyService(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, parseExcludedCIDRs([]string{"3.3.3.0/24", "4.4.4.0/24"}), false)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, parseExcludedCIDRs([]string{"3.3.3.0/24", "4.4.4.0/24"}), false, v1.IPv4Protocol)
 
 	// All ipvs services that were processed in the latest sync loop.
 	activeServices := map[string]bool{"ipvs0": true, "ipvs1": true}
@@ -3459,7 +3857,7 @@ func TestCleanLegacyServiceWithRealServers(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false, v1.IPv4Protocol)
 
 	// all deleted expect ipvs2
 	activeServices := map[string]bool{"ipvs2": true}
@@ -3553,7 +3951,7 @@ func TestCleanLegacyRealServersExcludeCIDRs(t *testing.T) {
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
 	gtm := NewGracefulTerminationManager(ipvs)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, parseExcludedCIDRs([]string{"4.4.4.4/32"}), false)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, parseExcludedCIDRs([]string{"4.4.4.4/32"}), false, v1.IPv4Protocol)
 	fp.gracefuldeleteManager = gtm
 
 	vs := &utilipvs.VirtualServer{
@@ -3607,7 +4005,7 @@ func TestCleanLegacyService6(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, parseExcludedCIDRs([]string{"3000::/64", "4000::/64"}), false)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, parseExcludedCIDRs([]string{"3000::/64", "4000::/64"}), false, v1.IPv4Protocol)
 	fp.nodeIP = net.ParseIP("::1")
 
 	// All ipvs services that were processed in the latest sync loop.
@@ -3714,7 +4112,7 @@ func TestMultiPortServiceBindAddr(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, false, v1.IPv4Protocol)
 
 	service1 := makeTestService("ns1", "svc1", func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeClusterIP
@@ -3819,7 +4217,7 @@ func TestEndpointSliceE2E(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, true)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, true, v1.IPv4Protocol)
 	fp.servicesSynced = true
 	fp.endpointsSynced = true
 	fp.endpointSlicesSynced = true
@@ -3924,5 +4322,83 @@ func TestFilterCIDRs(t *testing.T) {
 	cidrs = filterCIDRs(false, cidrList)
 	if len(cidrs) > 0 {
 		t.Errorf("cidrs %v is not expected %v", cidrs, expected)
+	}
+}
+
+func TestLoadBalancerIngressRouteTypeProxy(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, true)()
+	ipModeProxy := v1.LoadBalancerIPModeProxy
+	ipModeVIP := v1.LoadBalancerIPModeVIP
+
+	testCases := []struct {
+		svcIP            string
+		svcLBIP          string
+		ipMode           *v1.LoadBalancerIPMode
+		expectedServices int
+	}{
+		{
+			svcIP:            "10.20.30.41",
+			svcLBIP:          "1.2.3.4",
+			ipMode:           &ipModeProxy,
+			expectedServices: 1,
+		},
+		{
+			svcIP:            "10.20.30.42",
+			svcLBIP:          "1.2.3.5",
+			ipMode:           &ipModeVIP,
+			expectedServices: 2,
+		},
+	}
+
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+
+	for _, testCase := range testCases {
+		_, fp := buildFakeProxier()
+		makeServiceMap(fp,
+			makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+				svc.Spec.Type = "LoadBalancer"
+				svc.Spec.ClusterIP = testCase.svcIP
+				svc.Spec.Ports = []v1.ServicePort{{
+					Name:     svcPortName.Port,
+					Port:     int32(svcPort),
+					Protocol: v1.ProtocolTCP,
+					NodePort: int32(svcNodePort),
+				}}
+				svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+					IP:     testCase.svcLBIP,
+					IPMode: testCase.ipMode,
+				}}
+			}),
+		)
+
+		epIP := "10.180.0.1"
+		makeEndpointsMap(fp,
+			makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *v1.Endpoints) {
+				ept.Subsets = []v1.EndpointSubset{{
+					Addresses: []v1.EndpointAddress{{
+						IP: epIP,
+					}},
+					Ports: []v1.EndpointPort{{
+						Name: svcPortName.Port,
+						Port: int32(svcPort),
+					}},
+				}}
+			}),
+		)
+
+		fp.syncProxyRules()
+
+		services, err := fp.ipvs.GetVirtualServers()
+		if err != nil {
+			t.Errorf("Failed to get ipvs services, err: %v", err)
+		}
+		if len(services) != testCase.expectedServices {
+			t.Errorf("Expected %d ipvs services, got %d", testCase.expectedServices, len(services))
+		}
 	}
 }

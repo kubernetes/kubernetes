@@ -17,107 +17,233 @@ limitations under the License.
 package plugins
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodepreferavoidpods"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/selectorspread"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 )
-
-func produceConfig(keys []string, producersMap map[string]ConfigProducer, args ConfigProducerArgs) (*config.Plugins, []config.PluginConfig, error) {
-	var plugins config.Plugins
-	var pluginConfig []config.PluginConfig
-	for _, k := range keys {
-		p, exist := producersMap[k]
-		if !exist {
-			return nil, nil, fmt.Errorf("finding key %q", k)
-		}
-		pl, plc := p(args)
-		plugins.Append(&pl)
-		pluginConfig = append(pluginConfig, plc...)
-	}
-	return &plugins, pluginConfig, nil
-}
 
 func TestRegisterConfigProducers(t *testing.T) {
 	registry := NewLegacyRegistry()
 	testPredicateName1 := "testPredicate1"
 	testFilterName1 := "testFilter1"
 	registry.registerPredicateConfigProducer(testPredicateName1,
-		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+		func(_ ConfigProducerArgs, plugins *config.Plugins, _ *[]config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, testFilterName1, nil)
-			return
 		})
 
 	testPredicateName2 := "testPredicate2"
 	testFilterName2 := "testFilter2"
 	registry.registerPredicateConfigProducer(testPredicateName2,
-		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+		func(_ ConfigProducerArgs, plugins *config.Plugins, _ *[]config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, testFilterName2, nil)
-			return
 		})
 
 	testPriorityName1 := "testPriority1"
 	testScoreName1 := "testScore1"
 	registry.registerPriorityConfigProducer(testPriorityName1,
-		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+		func(args ConfigProducerArgs, plugins *config.Plugins, _ *[]config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, testScoreName1, &args.Weight)
-			return
 		})
 
 	testPriorityName2 := "testPriority2"
 	testScoreName2 := "testScore2"
 	registry.registerPriorityConfigProducer(testPriorityName2,
-		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+		func(args ConfigProducerArgs, plugins *config.Plugins, _ *[]config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, testScoreName2, &args.Weight)
-			return
 		})
 
 	args := ConfigProducerArgs{Weight: 1}
-	predicatePlugins, _, err := produceConfig(
-		[]string{testPredicateName1, testPredicateName2}, registry.PredicateToConfigProducer, args)
-	if err != nil {
-		t.Fatalf("producing predicate framework configs: %v.", err)
-	}
-
-	priorityPlugins, _, err := produceConfig(
-		[]string{testPriorityName1, testPriorityName2}, registry.PriorityToConfigProducer, args)
-	if err != nil {
-		t.Fatalf("producing predicate framework configs: %v.", err)
-	}
-
-	// Verify that predicates and priorities are in the map and produce the expected score configurations.
 	var gotPlugins config.Plugins
-	gotPlugins.Append(predicatePlugins)
-	gotPlugins.Append(priorityPlugins)
+	gotPlugins, _, err := registry.AppendPredicateConfigs(sets.NewString(testPredicateName1, testPredicateName2), &args, gotPlugins, nil)
+	if err != nil {
+		t.Fatalf("producing predicate framework configs: %v.", err)
+	}
 
-	// Verify the aggregated configuration.
+	priorities := map[string]int64{
+		testPriorityName1: 1,
+		testPriorityName2: 1,
+	}
+	gotPlugins, _, err = registry.AppendPriorityConfigs(priorities, &args, gotPlugins, nil)
+	if err != nil {
+		t.Fatalf("producing priority framework configs: %v.", err)
+	}
+
 	wantPlugins := config.Plugins{
-		QueueSort: &config.PluginSet{},
-		PreFilter: &config.PluginSet{},
 		Filter: &config.PluginSet{
 			Enabled: []config.Plugin{
+				{Name: nodeunschedulable.Name},
+				{Name: tainttoleration.Name},
 				{Name: testFilterName1},
 				{Name: testFilterName2},
 			},
 		},
-		PostFilter: &config.PluginSet{},
-		PreScore:   &config.PluginSet{},
 		Score: &config.PluginSet{
 			Enabled: []config.Plugin{
 				{Name: testScoreName1, Weight: 1},
 				{Name: testScoreName2, Weight: 1},
 			},
 		},
-		Reserve:  &config.PluginSet{},
-		Permit:   &config.PluginSet{},
-		PreBind:  &config.PluginSet{},
-		Bind:     &config.PluginSet{},
-		PostBind: &config.PluginSet{},
 	}
 
 	if diff := cmp.Diff(wantPlugins, gotPlugins); diff != "" {
 		t.Errorf("unexpected plugin configuration (-want, +got): %s", diff)
+	}
+}
+
+func TestAppendPriorityConfigs(t *testing.T) {
+	cases := []struct {
+		name             string
+		features         map[featuregate.Feature]bool
+		keys             map[string]int64
+		args             ConfigProducerArgs
+		wantPlugins      config.Plugins
+		wantPluginConfig []config.PluginConfig
+	}{
+		{
+			name: "default priorities",
+			wantPlugins: config.Plugins{
+				PreScore: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: podtopologyspread.Name},
+						{Name: interpodaffinity.Name},
+						{Name: tainttoleration.Name},
+					},
+				},
+				Score: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: noderesources.BalancedAllocationName, Weight: 1},
+						{Name: podtopologyspread.Name, Weight: 2},
+						{Name: imagelocality.Name, Weight: 1},
+						{Name: interpodaffinity.Name, Weight: 1},
+						{Name: noderesources.LeastAllocatedName, Weight: 1},
+						{Name: nodeaffinity.Name, Weight: 1},
+						{Name: nodepreferavoidpods.Name, Weight: 10000},
+						{Name: tainttoleration.Name, Weight: 1},
+					},
+				},
+			},
+			wantPluginConfig: []config.PluginConfig{
+				{
+					Name: podtopologyspread.Name,
+					Args: &config.PodTopologySpreadArgs{
+						DefaultingType: config.SystemDefaulting,
+					},
+				},
+			},
+		},
+		{
+			name: "DefaultPodTopologySpread enabled, SelectorSpreadPriority only",
+			keys: map[string]int64{
+				SelectorSpreadPriority: 3,
+			},
+			wantPlugins: config.Plugins{
+				PreScore: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: podtopologyspread.Name},
+					},
+				},
+				Score: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: podtopologyspread.Name, Weight: 3},
+					},
+				},
+			},
+			wantPluginConfig: []config.PluginConfig{
+				{
+					Name: podtopologyspread.Name,
+					Args: &config.PodTopologySpreadArgs{
+						DefaultingType: config.SystemDefaulting,
+					},
+				},
+			},
+		},
+		{
+			name: "DefaultPodTopologySpread enabled, EvenPodsSpreadPriority only",
+			keys: map[string]int64{
+				EvenPodsSpreadPriority: 4,
+			},
+			wantPlugins: config.Plugins{
+				PreScore: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: podtopologyspread.Name},
+					},
+				},
+				Score: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: podtopologyspread.Name, Weight: 4},
+					},
+				},
+			},
+			wantPluginConfig: []config.PluginConfig{
+				{
+					Name: podtopologyspread.Name,
+					Args: &config.PodTopologySpreadArgs{
+						DefaultingType: config.ListDefaulting,
+					},
+				},
+			},
+		},
+		{
+			name: "DefaultPodTopologySpread disabled, SelectorSpreadPriority+EvenPodsSpreadPriority",
+			features: map[featuregate.Feature]bool{
+				features.DefaultPodTopologySpread: false,
+			},
+			keys: map[string]int64{
+				SelectorSpreadPriority: 1,
+				EvenPodsSpreadPriority: 2,
+			},
+			wantPlugins: config.Plugins{
+				PreScore: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: podtopologyspread.Name},
+						{Name: selectorspread.Name},
+					},
+				},
+				Score: &config.PluginSet{
+					Enabled: []config.Plugin{
+						{Name: podtopologyspread.Name, Weight: 2},
+						{Name: selectorspread.Name, Weight: 1},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for k, v := range tc.features {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
+			}
+
+			r := NewLegacyRegistry()
+			keys := tc.keys
+			if keys == nil {
+				keys = r.DefaultPriorities
+			}
+			plugins, pluginConfig, err := r.AppendPriorityConfigs(keys, &tc.args, config.Plugins{}, nil)
+			if err != nil {
+				t.Fatalf("Appending Priority Configs: %v", err)
+			}
+			if diff := cmp.Diff(tc.wantPlugins, plugins); diff != "" {
+				t.Errorf("Unexpected Plugin (-want,+got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.wantPluginConfig, pluginConfig); diff != "" {
+				t.Errorf("Unexpected PluginConfig (-want,+got):\n%s", diff)
+			}
+		})
 	}
 }

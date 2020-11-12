@@ -6,11 +6,11 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/server/stats/testing",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/volume:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/kubelet/pkg/apis/stats/v1alpha1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/github.com/stretchr/testify/mock:go_default_library",

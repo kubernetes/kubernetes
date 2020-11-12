@@ -169,7 +169,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 		pv, err := c.CoreV1().PersistentVolumes().Get(context.TODO(), claim.Spec.VolumeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
-		pvZone, ok := pv.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
+		pvZone, ok := pv.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone]
 		framework.ExpectEqual(ok, true, "PV has no LabelZone to be found")
 		pvZones.Insert(pvZone)
 	}

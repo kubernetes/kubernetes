@@ -125,7 +125,6 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 		name := "projected-configmap-test-upd-" + string(uuid.NewUUID())
 		volumeName := "projected-configmap-volume"
 		volumeMountPath := "/etc/projected-configmap-volume"
-		containerName := "projected-configmap-volume-test"
 		configMap := &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: f.Namespace.Name,
@@ -142,51 +141,14 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "pod-projected-configmaps-" + string(uuid.NewUUID()),
-			},
-			Spec: v1.PodSpec{
-				Volumes: []v1.Volume{
-					{
-						Name: volumeName,
-						VolumeSource: v1.VolumeSource{
-							Projected: &v1.ProjectedVolumeSource{
-								Sources: []v1.VolumeProjection{
-									{
-										ConfigMap: &v1.ConfigMapProjection{
-											LocalObjectReference: v1.LocalObjectReference{
-												Name: name,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				Containers: []v1.Container{
-					{
-						Name:  containerName,
-						Image: imageutils.GetE2EImage(imageutils.Agnhost),
-						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volume/data-1"},
-						VolumeMounts: []v1.VolumeMount{
-							{
-								Name:      volumeName,
-								MountPath: volumeMountPath,
-								ReadOnly:  true,
-							},
-						},
-					},
-				},
-				RestartPolicy: v1.RestartPolicyNever,
-			},
-		}
+		pod := createProjectedConfigMapMounttestPod(f.Namespace.Name, volumeName, name, volumeMountPath,
+			"--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volume/data-1")
+
 		ginkgo.By("Creating the pod")
 		f.PodClient().CreateSync(pod)
 
 		pollLogs := func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		}
 
 		gomega.Eventually(pollLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
@@ -529,49 +491,8 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, asUser bool,
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod-projected-configmaps-" + string(uuid.NewUUID()),
-		},
-		Spec: v1.PodSpec{
-			SecurityContext: &v1.PodSecurityContext{},
-			Volumes: []v1.Volume{
-				{
-					Name: volumeName,
-					VolumeSource: v1.VolumeSource{
-						Projected: &v1.ProjectedVolumeSource{
-							Sources: []v1.VolumeProjection{
-								{
-									ConfigMap: &v1.ConfigMapProjection{
-										LocalObjectReference: v1.LocalObjectReference{
-											Name: name,
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			Containers: []v1.Container{
-				{
-					Name:  "projected-configmap-volume-test",
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args: []string{
-						"mounttest",
-						"--file_content=/etc/projected-configmap-volume/data-1",
-						"--file_mode=/etc/projected-configmap-volume/data-1"},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      volumeName,
-							MountPath: volumeMountPath,
-						},
-					},
-				},
-			},
-			RestartPolicy: v1.RestartPolicyNever,
-		},
-	}
+	pod := createProjectedConfigMapMounttestPod(f.Namespace.Name, volumeName, name, volumeMountPath,
+		"--file_content=/etc/projected-configmap-volume/data-1", "--file_mode=/etc/projected-configmap-volume/data-1")
 
 	if asUser {
 		setPodNonRootUser(pod)
@@ -611,54 +532,12 @@ func doProjectedConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fs
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod-projected-configmaps-" + string(uuid.NewUUID()),
-		},
-		Spec: v1.PodSpec{
-			SecurityContext: &v1.PodSecurityContext{},
-			Volumes: []v1.Volume{
-				{
-					Name: volumeName,
-					VolumeSource: v1.VolumeSource{
-						Projected: &v1.ProjectedVolumeSource{
-							Sources: []v1.VolumeProjection{
-								{
-									ConfigMap: &v1.ConfigMapProjection{
-										LocalObjectReference: v1.LocalObjectReference{
-											Name: name,
-										},
-										Items: []v1.KeyToPath{
-											{
-												Key:  "data-2",
-												Path: "path/to/data-2",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			Containers: []v1.Container{
-				{
-					Name:  "projected-configmap-volume-test",
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args: []string{
-						"mounttest",
-						"--file_content=/etc/projected-configmap-volume/path/to/data-2",
-						"--file_mode=/etc/projected-configmap-volume/path/to/data-2"},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      volumeName,
-							MountPath: volumeMountPath,
-							ReadOnly:  true,
-						},
-					},
-				},
-			},
-			RestartPolicy: v1.RestartPolicyNever,
+	pod := createProjectedConfigMapMounttestPod(f.Namespace.Name, volumeName, name, volumeMountPath,
+		"--file_content=/etc/projected-configmap-volume/path/to/data-2", "--file_mode=/etc/projected-configmap-volume/path/to/data-2")
+	pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].ConfigMap.Items = []v1.KeyToPath{
+		{
+			Key:  "data-2",
+			Path: "path/to/data-2",
 		},
 	}
 
@@ -685,4 +564,30 @@ func doProjectedConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fs
 		output = append(output, fileModeRegexp)
 	}
 	f.TestContainerOutputRegexp("consume configMaps", pod, 0, output)
+}
+
+func createProjectedConfigMapMounttestPod(namespace, volumeName, referenceName, mountPath string, mounttestArgs ...string) *v1.Pod {
+	volumes := []v1.Volume{
+		{
+			Name: volumeName,
+			VolumeSource: v1.VolumeSource{
+				Projected: &v1.ProjectedVolumeSource{
+					Sources: []v1.VolumeProjection{
+						{
+							ConfigMap: &v1.ConfigMapProjection{
+								LocalObjectReference: v1.LocalObjectReference{
+									Name: referenceName,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	podName := "pod-projected-configmaps-" + string(uuid.NewUUID())
+	mounttestArgs = append([]string{"mounttest"}, mounttestArgs...)
+	pod := e2epod.NewAgnhostPod(namespace, podName, volumes, createMounts(volumeName, mountPath, true), nil, mounttestArgs...)
+	pod.Spec.RestartPolicy = v1.RestartPolicyNever
+	return pod
 }

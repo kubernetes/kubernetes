@@ -23,21 +23,36 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
-const parallelism = 16
+var (
+	parallelism = 16
+)
+
+// GetParallelism returns the currently set parallelism.
+func GetParallelism() int {
+	return parallelism
+}
+
+// SetParallelism sets the parallelism for all scheduler algorithms.
+// TODO(#95952): Remove global setter in favor of a struct that holds the configuration.
+func SetParallelism(p int) {
+	parallelism = p
+}
 
 // chunkSizeFor returns a chunk size for the given number of items to use for
 // parallel work. The size aims to produce good CPU utilization.
-func chunkSizeFor(n int) workqueue.Options {
+// returns max(1, min(sqrt(n), n/Parallelism))
+func chunkSizeFor(n int) int {
 	s := int(math.Sqrt(float64(n)))
+
 	if r := n/parallelism + 1; s > r {
 		s = r
 	} else if s < 1 {
 		s = 1
 	}
-	return workqueue.WithChunkSize(s)
+	return s
 }
 
 // Until is a wrapper around workqueue.ParallelizeUntil to use in scheduling algorithms.
 func Until(ctx context.Context, pieces int, doWorkPiece workqueue.DoWorkPieceFunc) {
-	workqueue.ParallelizeUntil(ctx, parallelism, pieces, doWorkPiece, chunkSizeFor(pieces))
+	workqueue.ParallelizeUntil(ctx, parallelism, pieces, doWorkPiece, workqueue.WithChunkSize(chunkSizeFor(pieces)))
 }

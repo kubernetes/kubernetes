@@ -9,9 +9,18 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/name: "Elasticsearch"
 spec:
+  clusterIP: None
   ports:
-  - port: 9200
-    protocol: TCP
-    targetPort: db
+    - name: db
+      port: 9200
+      protocol: TCP
+      targetPort: 9200
+    - name: transport
+      port: 9300
+      protocol: TCP
+      targetPort: 9300
+  publishNotReadyAddresses: true
   selector:
     k8s-app: elasticsearch-logging
+  sessionAffinity: None
+  type: ClusterIP

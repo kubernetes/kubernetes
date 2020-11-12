@@ -31,15 +31,19 @@ metadata:
   uid: "7"
 spec:
   clusterIP: "24"
-  externalIPs:
+  clusterIPs:
   - "25"
-  externalName: "28"
-  externalTrafficPolicy: ʤ脽ěĂ凗蓏Ŋ蛊ĉy緅縕>Ž
-  healthCheckNodePort: -1095807277
-  ipFamily: ³-Ǐ忄*齧獚敆ȎțêɘĲ斬
-  loadBalancerIP: "26"
+  externalIPs:
+  - "26"
+  externalName: "29"
+  externalTrafficPolicy: ƏS$+½H牗洝尿
+  healthCheckNodePort: -1965738697
+  ipFamilies:
+  - 斬³;Ơ歿:狞夌碕ʂɭîcP$Iņɖ
+  ipFamilyPolicy: 9ȫŚ
+  loadBalancerIP: "27"
   loadBalancerSourceRanges:
-  - "27"
+  - "28"
   ports:
   - appProtocol: "20"
     name: "19"
@@ -50,15 +54,16 @@ spec:
   publishNotReadyAddresses: true
   selector:
     "22": "23"
-  sessionAffinity: ɑ
+  sessionAffinity: 甞谐颋ǅS
   sessionAffinityConfig:
     clientIP:
-      timeoutSeconds: -1973740160
+      timeoutSeconds: 2072604405
   topologyKeys:
-  - "29"
-  type: .蘯6ċV夸
+  - "30"
+  type: 鮽ort昍řČ扷5ƗǸƢ6/ʕVŚ(Ŀ
 status:
   loadBalancer:
     ingress:
-    - hostname: "31"
-      ip: "30"
+    - hostname: "32"
+      ip: "31"
+      ipMode: ƕP喂ƈ

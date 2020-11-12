@@ -336,9 +336,18 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
+							Name: "container1",
 							Resources: v1.ResourceRequirements{
 								Requests: v1.ResourceList{
-									v1.ResourceCPU: reportedCPURequest,
+									v1.ResourceCPU: *resource.NewMilliQuantity(reportedCPURequest.MilliValue()/2, resource.DecimalSI),
+								},
+							},
+						},
+						{
+							Name: "container2",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: *resource.NewMilliQuantity(reportedCPURequest.MilliValue()/2, resource.DecimalSI),
 								},
 							},
 						},
@@ -509,13 +518,24 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 				Window:    metav1.Duration{Duration: time.Minute},
 				Containers: []metricsapi.ContainerMetrics{
 					{
-						Name: "container",
+						Name: "container1",
 						Usage: v1.ResourceList{
 							v1.ResourceCPU: *resource.NewMilliQuantity(
-								int64(cpu),
+								int64(cpu/2),
 								resource.DecimalSI),
 							v1.ResourceMemory: *resource.NewQuantity(
-								int64(1024*1024),
+								int64(1024*1024/2),
+								resource.BinarySI),
+						},
+					},
+					{
+						Name: "container2",
+						Usage: v1.ResourceList{
+							v1.ResourceCPU: *resource.NewMilliQuantity(
+								int64(cpu/2),
+								resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(
+								int64(1024*1024/2),
 								resource.BinarySI),
 						},
 					},
@@ -769,6 +789,31 @@ func TestScaleUp(t *testing.T) {
 		reportedLevels:          []uint64{300, 500, 700},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
+	}
+	tc.runTest(t)
+}
+
+func TestScaleUpContainer(t *testing.T) {
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 5,
+		metricsTarget: []autoscalingv2.MetricSpec{{
+			Type: autoscalingv2.ContainerResourceMetricSourceType,
+			ContainerResource: &autoscalingv2.ContainerResourceMetricSource{
+				Name: v1.ResourceCPU,
+				Target: autoscalingv2.MetricTarget{
+					Type:               autoscalingv2.UtilizationMetricType,
+					AverageUtilization: utilpointer.Int32Ptr(30),
+				},
+				Container: "container1",
+			},
+		}},
+		reportedLevels:      []uint64{300, 500, 700},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:       true,
 	}
 	tc.runTest(t)
 }
@@ -1265,6 +1310,32 @@ func TestScaleDown(t *testing.T) {
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
 		recommendations:         []timestampedRecommendation{},
+	}
+	tc.runTest(t)
+}
+
+func TestScaleDownContainerResource(t *testing.T) {
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            5,
+		statusReplicas:          5,
+		expectedDesiredReplicas: 3,
+		reportedLevels:          []uint64{100, 300, 500, 250, 250},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		metricsTarget: []autoscalingv2.MetricSpec{{
+			Type: autoscalingv2.ContainerResourceMetricSourceType,
+			ContainerResource: &autoscalingv2.ContainerResourceMetricSource{
+				Container: "container2",
+				Name:      v1.ResourceCPU,
+				Target: autoscalingv2.MetricTarget{
+					Type:               autoscalingv2.UtilizationMetricType,
+					AverageUtilization: utilpointer.Int32Ptr(50),
+				},
+			},
+		}},
+		useMetricsAPI:   true,
+		recommendations: []timestampedRecommendation{},
 	}
 	tc.runTest(t)
 }
@@ -2523,32 +2594,6 @@ func TestConditionFailedUpdateScale(t *testing.T) {
 	tc.runTest(t)
 }
 
-func NoTestBackoffUpscale(t *testing.T) {
-	time := metav1.Time{Time: time.Now()}
-	tc := testCase{
-		minReplicas:             1,
-		maxReplicas:             5,
-		specReplicas:            3,
-		statusReplicas:          3,
-		expectedDesiredReplicas: 3,
-		CPUTarget:               100,
-		reportedLevels:          []uint64{150, 150, 150},
-		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
-		useMetricsAPI:           true,
-		lastScaleTime:           &time,
-		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-			Type:   autoscalingv2.AbleToScale,
-			Status: v1.ConditionTrue,
-			Reason: "ReadyForNewScale",
-		}, autoscalingv2.HorizontalPodAutoscalerCondition{
-			Type:   autoscalingv2.AbleToScale,
-			Status: v1.ConditionTrue,
-			Reason: "SucceededRescale",
-		}),
-	}
-	tc.runTest(t)
-}
-
 func TestNoBackoffUpscaleCM(t *testing.T) {
 	averageValue := resource.MustParse("15.0")
 	time := metav1.Time{Time: time.Now()}
@@ -2809,7 +2854,7 @@ func TestScaleDownRCImmediately(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestAvoidUncessaryUpdates(t *testing.T) {
+func TestAvoidUnnecessaryUpdates(t *testing.T) {
 	now := metav1.Time{Time: time.Now().Add(-time.Hour)}
 	tc := testCase{
 		minReplicas:             2,
@@ -2991,6 +3036,50 @@ func TestConvertDesiredReplicasWithRules(t *testing.T) {
 			assert.Equal(t, ctc.expectedCondition, actualCondition, ctc.annotation)
 		})
 	}
+}
+
+func TestCalculateScaleUpLimitWithScalingRules(t *testing.T) {
+	policy := autoscalingv2.MinPolicySelect
+
+	calculated := calculateScaleUpLimitWithScalingRules(1, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
+		StabilizationWindowSeconds: utilpointer.Int32Ptr(300),
+		SelectPolicy:               &policy,
+		Policies: []autoscalingv2.HPAScalingPolicy{
+			{
+				Type:          autoscalingv2.PodsScalingPolicy,
+				Value:         2,
+				PeriodSeconds: 60,
+			},
+			{
+				Type:          autoscalingv2.PercentScalingPolicy,
+				Value:         50,
+				PeriodSeconds: 60,
+			},
+		},
+	})
+	assert.Equal(t, calculated, int32(2))
+}
+
+func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
+	policy := autoscalingv2.MinPolicySelect
+
+	calculated := calculateScaleDownLimitWithBehaviors(5, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
+		StabilizationWindowSeconds: utilpointer.Int32Ptr(300),
+		SelectPolicy:               &policy,
+		Policies: []autoscalingv2.HPAScalingPolicy{
+			{
+				Type:          autoscalingv2.PodsScalingPolicy,
+				Value:         2,
+				PeriodSeconds: 60,
+			},
+			{
+				Type:          autoscalingv2.PercentScalingPolicy,
+				Value:         50,
+				PeriodSeconds: 60,
+			},
+		},
+	})
+	assert.Equal(t, calculated, int32(3))
 }
 
 func generateScalingRules(pods, podsPeriod, percent, percentPeriod, stabilizationWindow int32) *autoscalingv2.HPAScalingRules {

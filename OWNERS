@@ -10,7 +10,6 @@ filters:
       - thockin
       - liggitt
     approvers:
-      - brendandburns
       - dchen1107
       - lavalamp
       - smarterclayton
@@ -18,6 +17,7 @@ filters:
       - wojtek-t
       - liggitt
     emeritus_approvers:
+      - brendandburns
       - bgrant0607
       - jbeda
 

@@ -18,9 +18,8 @@ package helper
 
 import (
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/component-helpers/scheduling/corev1"
 )
 
 // PodMatchesNodeSelectorAndAffinityTerms checks whether the pod is schedulable onto nodes according to
@@ -33,46 +32,40 @@ func PodMatchesNodeSelectorAndAffinityTerms(pod *v1.Pod, node *v1.Node) bool {
 			return false
 		}
 	}
+	if pod.Spec.Affinity == nil {
+		return true
+	}
+	return NodeMatchesNodeAffinity(pod.Spec.Affinity.NodeAffinity, node)
+}
 
+// NodeMatchesNodeAffinity checks whether the Node satisfy the given NodeAffinity.
+func NodeMatchesNodeAffinity(affinity *v1.NodeAffinity, node *v1.Node) bool {
 	// 1. nil NodeSelector matches all nodes (i.e. does not filter out any nodes)
 	// 2. nil []NodeSelectorTerm (equivalent to non-nil empty NodeSelector) matches no nodes
 	// 3. zero-length non-nil []NodeSelectorTerm matches no nodes also, just for simplicity
 	// 4. nil []NodeSelectorRequirement (equivalent to non-nil empty NodeSelectorTerm) matches no nodes
 	// 5. zero-length non-nil []NodeSelectorRequirement matches no nodes also, just for simplicity
 	// 6. non-nil empty NodeSelectorRequirement is not allowed
-	nodeAffinityMatches := true
-	affinity := pod.Spec.Affinity
-	if affinity != nil && affinity.NodeAffinity != nil {
-		nodeAffinity := affinity.NodeAffinity
-		// if no required NodeAffinity requirements, will do no-op, means select all nodes.
-		// TODO: Replace next line with subsequent commented-out line when implement RequiredDuringSchedulingRequiredDuringExecution.
-		if nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
-			// if nodeAffinity.RequiredDuringSchedulingRequiredDuringExecution == nil && nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
-			return true
-		}
-
-		// Match node selector for requiredDuringSchedulingRequiredDuringExecution.
-		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		// if nodeAffinity.RequiredDuringSchedulingRequiredDuringExecution != nil {
-		// 	nodeSelectorTerms := nodeAffinity.RequiredDuringSchedulingRequiredDuringExecution.NodeSelectorTerms
-		// 	klog.V(10).Infof("Match for RequiredDuringSchedulingRequiredDuringExecution node selector terms %+v", nodeSelectorTerms)
-		// 	nodeAffinityMatches = nodeMatchesNodeSelectorTerms(node, nodeSelectorTerms)
-		// }
-
-		// Match node selector for requiredDuringSchedulingIgnoredDuringExecution.
-		if nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-			nodeSelectorTerms := nodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
-			nodeAffinityMatches = nodeAffinityMatches && nodeMatchesNodeSelectorTerms(node, nodeSelectorTerms)
-		}
-
+	if affinity == nil {
+		return true
 	}
-	return nodeAffinityMatches
+	// Match node selector for requiredDuringSchedulingRequiredDuringExecution.
+	// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
+	// if affinity.RequiredDuringSchedulingRequiredDuringExecution != nil && !nodeMatchesNodeSelector(node, affinity.RequiredDuringSchedulingRequiredDuringExecution) {
+	// 	return false
+	// }
+
+	// Match node selector for requiredDuringSchedulingIgnoredDuringExecution.
+	if affinity.RequiredDuringSchedulingIgnoredDuringExecution != nil && !nodeMatchesNodeSelector(node, affinity.RequiredDuringSchedulingIgnoredDuringExecution) {
+		return false
+	}
+	return true
 }
 
-// nodeMatchesNodeSelectorTerms checks if a node's labels satisfy a list of node selector terms,
+// nodeMatchesNodeSelector checks if a node's labels satisfy a list of node selector terms,
 // terms are ORed, and an empty list of terms will match nothing.
-func nodeMatchesNodeSelectorTerms(node *v1.Node, nodeSelectorTerms []v1.NodeSelectorTerm) bool {
-	return v1helper.MatchNodeSelectorTerms(nodeSelectorTerms, node.Labels, fields.Set{
-		"metadata.name": node.Name,
-	})
+func nodeMatchesNodeSelector(node *v1.Node, nodeSelector *v1.NodeSelector) bool {
+	// TODO(#96164): parse this error earlier in the plugin so we only need to do it once per Pod.
+	matches, _ := corev1.MatchNodeSelectorTerms(node, nodeSelector)
+	return matches
 }

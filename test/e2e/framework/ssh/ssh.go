@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -112,8 +111,8 @@ func makePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
 	return signer, err
 }
 
-// NodeSSHHosts returns SSH-able host names for all schedulable nodes - this
-// excludes master node. If it can't find any external IPs, it falls back to
+// NodeSSHHosts returns SSH-able host names for all schedulable nodes.
+// If it can't find any external IPs, it falls back to
 // looking for internal IPs. If it can't find an internal IP for every node it
 // returns an error, though it still returns all hosts that it found in that
 // case.
@@ -393,9 +392,6 @@ func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		return true, nil

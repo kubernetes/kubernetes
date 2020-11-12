@@ -244,9 +244,6 @@
     Query for the Pod with the new value for the label MUST be successful.
   release: v1.9
   file: test/e2e/common/pods.go
-  behaviors:
-  - pod/spec/label/create
-  - pod/spec/label/patch
 - testname: Pods, service environment variables
   codename: '[k8s.io] Pods should contain environment variables for services [NodeConformance]
     [Conformance]'
@@ -484,8 +481,6 @@
     have QOSClass set to PodQOSGuaranteed.
   release: v1.9
   file: test/e2e/node/pods.go
-  behaviors:
-  - pod/spec/container/resources
 - testname: Pods, prestop hook
   codename: '[k8s.io] [sig-node] PreStop should call prestop when killing a pod  [Conformance]'
   description: Create a server pod with a rest endpoint '/write' that changes state.Received
@@ -820,7 +815,7 @@
   description: A set of events is created with a label selector which MUST be found
     when listed. The set of events is deleted and MUST NOT show up when listed by
     its label selector.
-  release: v1.19
+  release: v1.20
   file: test/e2e/apimachinery/events.go
 - testname: Event resource lifecycle
   codename: '[sig-api-machinery] Events should ensure that an event can be fetched,
@@ -828,7 +823,7 @@
   description: Create an event, the event MUST exist. The event is patched with a
     new message, the check MUST have the update message. The event is deleted and
     MUST NOT show up when listing all events.
-  release: v1.19
+  release: v1.20
   file: test/e2e/apimachinery/events.go
 - testname: Garbage Collector, delete deployment,  propagation policy background
   codename: '[sig-api-machinery] Garbage collector should delete RS created by deployment
@@ -1265,6 +1260,13 @@
     namespace quota. The creation MUST fail
   release: v1.15
   file: test/e2e/apps/rc.go
+- testname: Replication Controller, lifecycle
+  codename: '[sig-apps] ReplicationController should test the lifecycle of a ReplicationController
+    [Conformance]'
+  description: A Replication Controller (RC) is created, read, patched, and deleted
+    with verification.
+  release: v1.20
+  file: test/e2e/apps/rc.go
 - testname: StatefulSet, Burst Scaling
   codename: '[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic]
     Burst scaling should run to completion even with unhealthy pods [Slow] [Conformance]'
@@ -1391,9 +1393,9 @@
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, cluster info
   codename: '[sig-cli] Kubectl client Kubectl cluster-info should check if Kubernetes
-    master services is included in cluster-info  [Conformance]'
+    control plane services is included in cluster-info  [Conformance]'
   description: Call kubectl to get cluster-info, output MUST contain cluster-info
-    returned and Kubernetes Master SHOULD be running.
+    returned and Kubernetes control plane SHOULD be running.
   release: v1.9
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, describe pod or rc
@@ -1474,9 +1476,9 @@
   codename: '[sig-cli] Kubectl client Kubectl server-side dry-run should check if
     kubectl can dry-run update Pods [Conformance]'
   description: The command 'kubectl run' must create a pod with the specified image
-    name. After, the command 'kubectl replace --dry-run=server' should update the
-    Pod with the new image name and server-side dry-run enabled. The image name must
-    not change.
+    name. After, the command 'kubectl patch pod -p {...} --dry-run=server' should
+    update the Pod with the new image name and server-side dry-run enabled. The image
+    name must not change.
   release: v1.19
   file: test/e2e/kubectl/kubectl.go
 - testname: Kubectl, version
@@ -2011,6 +2013,14 @@
     followed by Priority 4 Pod. The ReplicaSets with Replicas MUST contain the expected
     number of Replicas.
   release: v1.19
+  file: test/e2e/scheduling/preemption.go
+- testname: Scheduler, Verify PriorityClass endpoints
+  codename: '[sig-scheduling] SchedulerPreemption [Serial] PriorityClass endpoints
+    verify PriorityClass endpoints can be operated with different HTTP methods [Conformance]'
+  description: Verify that PriorityClass endpoints can be listed. When any mutable
+    field is either patched or updated it MUST succeed. When any immutable field is
+    either patched or updated it MUST fail.
+  release: v1.20
   file: test/e2e/scheduling/preemption.go
 - testname: Scheduler, Basic Preemption
   codename: '[sig-scheduling] SchedulerPreemption [Serial] validates basic preemption

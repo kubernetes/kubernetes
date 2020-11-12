@@ -117,8 +117,14 @@ var iptablesChains = []struct {
 	{utiliptables.TableNAT, KubeNodePortChain},
 	{utiliptables.TableNAT, KubeLoadBalancerChain},
 	{utiliptables.TableNAT, KubeMarkMasqChain},
-	{utiliptables.TableNAT, KubeMarkDropChain},
 	{utiliptables.TableFilter, KubeForwardChain},
+}
+
+var iptablesEnsureChains = []struct {
+	table utiliptables.Table
+	chain utiliptables.Chain
+}{
+	{utiliptables.TableNAT, KubeMarkDropChain},
 }
 
 var iptablesCleanupChains = []struct {
@@ -196,6 +202,8 @@ const sysctlArpAnnounce = "net/ipv4/conf/all/arp_announce"
 // Proxier is an ipvs based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
 type Proxier struct {
+	// the ipfamily on which this proxy is operating on.
+	ipFamily v1.IPFamily
 	// endpointsChanges and serviceChanges contains all changes to endpoints and
 	// services that happened since last syncProxyRules call. For a single object,
 	// changes are accumulated, i.e. previous is state from before all of them,
@@ -426,9 +434,12 @@ func NewProxier(ipt utiliptables.Interface,
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x", masqueradeValue)
 
-	isIPv6 := utilnet.IsIPv6(nodeIP)
+	ipFamily := v1.IPv4Protocol
+	if ipt.IsIPv6() {
+		ipFamily = v1.IPv6Protocol
+	}
 
-	klog.V(2).Infof("nodeIP: %v, isIPv6: %v", nodeIP, isIPv6)
+	klog.V(2).Infof("nodeIP: %v, family: %v", nodeIP, ipFamily)
 
 	if len(scheduler) == 0 {
 		klog.Warningf("IPVS scheduler not specified, use %s by default", DefaultScheduler)
@@ -440,16 +451,17 @@ func NewProxier(ipt utiliptables.Interface,
 	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
 
 	var incorrectAddresses []string
-	nodePortAddresses, incorrectAddresses = utilproxy.FilterIncorrectCIDRVersion(nodePortAddresses, isIPv6)
+	nodePortAddresses, incorrectAddresses = utilproxy.FilterIncorrectCIDRVersion(nodePortAddresses, ipFamily)
 	if len(incorrectAddresses) > 0 {
-		klog.Warning("NodePortAddresses of wrong family; ", incorrectAddresses)
+		klog.Warningf("NodePortAddresses of wrong family; %s", incorrectAddresses)
 	}
 	proxier := &Proxier{
+		ipFamily:              ipFamily,
 		portsMap:              make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		serviceMap:            make(proxy.ServiceMap),
-		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, &isIPv6, recorder, nil),
+		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
 		endpointsMap:          make(proxy.EndpointsMap),
-		endpointsChanges:      proxy.NewEndpointChangeTracker(hostname, nil, &isIPv6, recorder, endpointSlicesEnabled, nil),
+		endpointsChanges:      proxy.NewEndpointChangeTracker(hostname, nil, ipFamily, recorder, endpointSlicesEnabled, nil),
 		syncPeriod:            syncPeriod,
 		minSyncPeriod:         minSyncPeriod,
 		excludeCIDRs:          parseExcludedCIDRs(excludeCIDRs),
@@ -466,14 +478,14 @@ func NewProxier(ipt utiliptables.Interface,
 		healthzServer:         healthzServer,
 		ipvs:                  ipvs,
 		ipvsScheduler:         scheduler,
-		ipGetter:              &realIPGetter{nl: NewNetLinkHandle(isIPv6)},
+		ipGetter:              &realIPGetter{nl: NewNetLinkHandle(ipFamily == v1.IPv6Protocol)},
 		iptablesData:          bytes.NewBuffer(nil),
 		filterChainsData:      bytes.NewBuffer(nil),
 		natChains:             bytes.NewBuffer(nil),
 		natRules:              bytes.NewBuffer(nil),
 		filterChains:          bytes.NewBuffer(nil),
 		filterRules:           bytes.NewBuffer(nil),
-		netlinkHandle:         NewNetLinkHandle(isIPv6),
+		netlinkHandle:         NewNetLinkHandle(ipFamily == v1.IPv6Protocol),
 		ipset:                 ipset,
 		nodePortAddresses:     nodePortAddresses,
 		networkInterfacer:     utilproxy.RealNetwork{},
@@ -482,7 +494,7 @@ func NewProxier(ipt utiliptables.Interface,
 	// initialize ipsetList with all sets we needed
 	proxier.ipsetList = make(map[string]*IPSet)
 	for _, is := range ipsetInfo {
-		proxier.ipsetList[is.name] = NewIPSet(ipset, is.name, is.setType, isIPv6, is.comment)
+		proxier.ipsetList[is.name] = NewIPSet(ipset, is.name, is.setType, (ipFamily == v1.IPv6Protocol), is.comment)
 	}
 	burstSyncs := 2
 	klog.V(2).Infof("ipvs(%s) sync params: minSyncPeriod=%v, syncPeriod=%v, burstSyncs=%d",
@@ -520,7 +532,7 @@ func NewDualStackProxier(
 
 	safeIpset := newSafeIpset(ipset)
 
-	nodePortAddresses4, nodePortAddresses6 := utilproxy.FilterIncorrectCIDRVersion(nodePortAddresses, false)
+	nodePortAddresses4, nodePortAddresses6 := utilproxy.FilterIncorrectCIDRVersion(nodePortAddresses, v1.IPv4Protocol)
 
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(ipt[0], ipvs, safeIpset, sysctl,
@@ -693,7 +705,7 @@ func (handle *LinuxKernelHandler) GetKernelVersion() (string, error) {
 // This is determined by checking if all the required kernel modules can be loaded. It may
 // return an error if it fails to get the kernel modules information without error, in which
 // case it will also return false.
-func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, error) {
+func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler string) (bool, error) {
 	mods, err := handle.GetModules()
 	if err != nil {
 		return false, fmt.Errorf("error getting installed ipvs required kernel modules: %v", err)
@@ -711,6 +723,12 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, err
 	}
 	mods = utilipvs.GetRequiredIPVSModules(kernelVersion)
 	wantModules := sets.NewString()
+	// We check for the existence of the scheduler mod and will trigger a missingMods error if not found
+	if scheduler == "" {
+		scheduler = DefaultScheduler
+	}
+	schedulerMod := "ip_vs_" + scheduler
+	mods = append(mods, schedulerMod)
 	wantModules.Insert(mods...)
 
 	modules := wantModules.Difference(loadModules).UnsortedList()
@@ -1137,6 +1155,17 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
+	// filter node IPs by proxier ipfamily
+	idx := 0
+	for _, nodeIP := range nodeIPs {
+		if (proxier.ipFamily == v1.IPv6Protocol) == utilnet.IsIPv6(nodeIP) {
+			nodeIPs[idx] = nodeIP
+			idx++
+		}
+	}
+	// reset slice to filtered entries
+	nodeIPs = nodeIPs[:idx]
+
 	// Build IPVS rules for each service.
 	for svcName, svc := range proxier.serviceMap {
 		svcInfo, ok := svc.(*serviceInfo)
@@ -1263,7 +1292,7 @@ func (proxier *Proxier) syncProxyRules() {
 				SetType:  utilipset.HashIPPort,
 			}
 
-			if utilfeature.DefaultFeatureGate.Enabled(features.ExternalPolicyForExternalIP) && svcInfo.OnlyNodeLocalEndpoints() {
+			if svcInfo.OnlyNodeLocalEndpoints() {
 				if valid := proxier.ipsetList[kubeExternalIPLocalSet].validateEntry(entry); !valid {
 					klog.Errorf("%s", fmt.Sprintf(EntryInvalidErr, entry, proxier.ipsetList[kubeExternalIPLocalSet].Name))
 					continue
@@ -1293,10 +1322,7 @@ func (proxier *Proxier) syncProxyRules() {
 				activeIPVSServices[serv.String()] = true
 				activeBindAddrs[serv.Address.String()] = true
 
-				onlyNodeLocalEndpoints := false
-				if utilfeature.DefaultFeatureGate.Enabled(features.ExternalPolicyForExternalIP) {
-					onlyNodeLocalEndpoints = svcInfo.OnlyNodeLocalEndpoints()
-				}
+				onlyNodeLocalEndpoints := svcInfo.OnlyNodeLocalEndpoints()
 				if err := proxier.syncEndpoint(svcName, onlyNodeLocalEndpoints, serv); err != nil {
 					klog.Errorf("Failed to sync endpoint for service: %v, err: %v", serv, err)
 				}
@@ -1306,11 +1332,11 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		for _, ingress := range svcInfo.LoadBalancerIPStrings() {
-			if ingress != "" {
+		for _, ingress := range svcInfo.LoadBalancerIngress() {
+			if ingress.IP != "" && (!utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) || *ingress.IPMode == v1.LoadBalancerIPModeVIP) {
 				// ipset call
 				entry = &utilipset.Entry{
-					IP:       ingress,
+					IP:       ingress.IP,
 					Port:     svcInfo.Port(),
 					Protocol: protocol,
 					SetType:  utilipset.HashIPPort,
@@ -1345,7 +1371,7 @@ func (proxier *Proxier) syncProxyRules() {
 					for _, src := range svcInfo.LoadBalancerSourceRanges() {
 						// ipset call
 						entry = &utilipset.Entry{
-							IP:       ingress,
+							IP:       ingress.IP,
 							Port:     svcInfo.Port(),
 							Protocol: protocol,
 							Net:      src,
@@ -1369,10 +1395,10 @@ func (proxier *Proxier) syncProxyRules() {
 					// Need to add the following rule to allow request on host.
 					if allowFromNode {
 						entry = &utilipset.Entry{
-							IP:       ingress,
+							IP:       ingress.IP,
 							Port:     svcInfo.Port(),
 							Protocol: protocol,
-							IP2:      ingress,
+							IP2:      ingress.IP,
 							SetType:  utilipset.HashIPPortIP,
 						}
 						// enumerate all white list source ip
@@ -1386,7 +1412,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 				// ipvs call
 				serv := &utilipvs.VirtualServer{
-					Address:   net.ParseIP(ingress),
+					Address:   net.ParseIP(ingress.IP),
 					Port:      uint16(svcInfo.Port()),
 					Protocol:  string(svcInfo.Protocol()),
 					Scheduler: proxier.ipvsScheduler,
@@ -1861,6 +1887,14 @@ func (proxier *Proxier) createAndLinkeKubeChain() {
 	existingFilterChains := proxier.getExistingChains(proxier.filterChainsData, utiliptables.TableFilter)
 	existingNATChains := proxier.getExistingChains(proxier.iptablesData, utiliptables.TableNAT)
 
+	// ensure KUBE-MARK-DROP chain exist but do not change any rules
+	for _, ch := range iptablesEnsureChains {
+		if _, err := proxier.iptables.EnsureChain(ch.table, ch.chain); err != nil {
+			klog.Errorf("Failed to ensure that %s chain %s exists: %v", ch.table, ch.chain, err)
+			return
+		}
+	}
+
 	// Make sure we keep stats for the top-level chains
 	for _, ch := range iptablesChains {
 		if _, err := proxier.iptables.EnsureChain(ch.table, ch.chain); err != nil {
@@ -1923,10 +1957,10 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 					klog.Errorf("Failed to delete %s endpoint connections for externalIP %s, error: %v", epSvcPair.ServicePortName.String(), extIP, err)
 				}
 			}
-			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, svcProto)
+			for _, lbIngress := range svcInfo.LoadBalancerIngress() {
+				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIngress.IP, endpointIP, svcProto)
 				if err != nil {
-					klog.Errorf("Failed to delete %s endpoint connections for LoadBalancerIP %s, error: %v", epSvcPair.ServicePortName.String(), lbIP, err)
+					klog.Errorf("Failed to delete %s endpoint connections for LoadBalancerIP %s, error: %v", epSvcPair.ServicePortName.String(), lbIngress.IP, err)
 				}
 			}
 		}

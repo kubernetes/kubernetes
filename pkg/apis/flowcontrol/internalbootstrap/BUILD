@@ -9,7 +9,6 @@ go_library(
         "//pkg/apis/flowcontrol:go_default_library",
         "//pkg/apis/flowcontrol/install:go_default_library",
         "//staging/src/k8s.io/api/flowcontrol/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap:go_default_library",
     ],

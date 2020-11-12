@@ -25,8 +25,8 @@ import (
 	dstrings "strings"
 
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -803,9 +803,9 @@ type rbdMounter struct {
 	Mon           []string
 	ID            string
 	Keyring       string
-	Secret        string
+	Secret        string `datapolicy:"token"`
 	fsType        string
-	adminSecret   string
+	adminSecret   string `datapolicy:"token"`
 	adminID       string
 	mountOptions  []string
 	imageFormat   string
@@ -837,7 +837,7 @@ func (b *rbdMounter) SetUp(mounterArgs volume.MounterArgs) error {
 func (b *rbdMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	klog.V(4).Infof("rbd: attempting to setup at %s", dir)
-	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, b.plugin)
 	if err != nil {
 		klog.Errorf("rbd: failed to setup at %s %v", dir, err)
 	}

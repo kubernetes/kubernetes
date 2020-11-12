@@ -38,6 +38,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -46,7 +47,7 @@ var (
 	envResources       = `
   	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs)`
 
-	envLong = templates.LongDesc(`
+	envLong = templates.LongDesc(i18n.T(`
 		Update environment variables on a pod template.
 
 		List environment variable definitions in one or more pods, pod templates.
@@ -59,7 +60,7 @@ var (
 		syntax.
 
 		Possible resources include (case insensitive):
-		` + envResources)
+		`) + envResources)
 
 	envExample = templates.Examples(`
           # Update deployment 'registry' with a new environment variable
@@ -150,7 +151,7 @@ func NewCmdEnv(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	cmd := &cobra.Command{
 		Use:                   "env RESOURCE/NAME KEY_1=VAL_1 ... KEY_N=VAL_N",
 		DisableFlagsInUseLine: true,
-		Short:                 "Update environment variables on a pod template",
+		Short:                 i18n.T("Update environment variables on a pod template"),
 		Long:                  envLong,
 		Example:               envExample,
 		Run: func(cmd *cobra.Command, args []string) {

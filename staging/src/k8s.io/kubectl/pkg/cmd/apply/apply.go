@@ -18,6 +18,7 @@ package apply
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/spf13/cobra"
@@ -132,7 +133,8 @@ var (
 		# Apply the configuration in manifest.yaml and delete all the other configmaps that are not in the file.
 		kubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap`))
 
-	warningNoLastAppliedConfigAnnotation = "Warning: %[1]s apply should be used on resource created by either %[1]s create --save-config or %[1]s apply\n"
+	warningNoLastAppliedConfigAnnotation = "Warning: resource %[1]s is missing the %[2]s annotation which is required by %[3]s apply. %[3]s apply should only be used on resources created declaratively by either %[3]s create --save-config or %[3]s apply. The missing annotation will be patched automatically.\n"
+	warningChangesOnDeletingResource     = "Warning: Detected changes to resource %[1]s which is currently being deleted.\n"
 )
 
 // NewApplyOptions creates new ApplyOptions for the `apply` command
@@ -244,7 +246,11 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.DeleteOptions = o.DeleteFlags.ToOptions(o.DynamicClient, o.IOStreams)
+	o.DeleteOptions, err = o.DeleteFlags.ToOptions(o.DynamicClient, o.IOStreams)
+	if err != nil {
+		return err
+	}
+
 	err = o.DeleteOptions.FilenameOptions.RequireFilenameOrKustomize()
 	if err != nil {
 		return err
@@ -465,6 +471,8 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 
 		info.Refresh(obj, true)
 
+		WarnIfDeleting(info.Object, o.ErrOut)
+
 		if err := o.MarkObjectVisited(info); err != nil {
 			return err
 		}
@@ -538,7 +546,7 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 		metadata, _ := meta.Accessor(info.Object)
 		annotationMap := metadata.GetAnnotations()
 		if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
-			fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
+			fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, info.ObjectName(), corev1.LastAppliedConfigAnnotation, o.cmdBaseName)
 		}
 
 		patcher, err := newPatcher(o, info, helper)
@@ -551,6 +559,8 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 		}
 
 		info.Refresh(patchedObject, true)
+
+		WarnIfDeleting(info.Object, o.ErrOut)
 
 		if string(patchBytes) == "{}" && !o.shouldPrintObject() {
 			printer, err := o.ToPrinter("unchanged")
@@ -703,4 +713,13 @@ func GetApplyFieldManagerFlag(cmd *cobra.Command, serverSide bool) string {
 	}
 
 	return FieldManagerClientSideApply
+}
+
+// WarnIfDeleting prints a warning if a resource is being deleted
+func WarnIfDeleting(obj runtime.Object, stderr io.Writer) {
+	metadata, _ := meta.Accessor(obj)
+	if metadata != nil && metadata.GetDeletionTimestamp() != nil {
+		// just warn the user about the conflict
+		fmt.Fprintf(stderr, warningChangesOnDeletingResource, metadata.GetName())
+	}
 }

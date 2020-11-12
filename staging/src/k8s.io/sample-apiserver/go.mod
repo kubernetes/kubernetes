@@ -7,14 +7,14 @@ go 1.15
 require (
 	github.com/go-openapi/spec v0.19.3
 	github.com/google/gofuzz v1.1.0
-	github.com/spf13/cobra v1.0.0
+	github.com/spf13/cobra v1.1.1
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0
 	k8s.io/client-go v0.0.0
 	k8s.io/code-generator v0.0.0
 	k8s.io/component-base v0.0.0
-	k8s.io/klog/v2 v2.2.0
-	k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
+	k8s.io/klog/v2 v2.4.0
+	k8s.io/kube-openapi v0.0.0-20201107163737-74b467f3a622
 )
 
 replace (

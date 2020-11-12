@@ -1,0 +1,4 @@
+linux/amd64/1809=mcr.microsoft.com/windows/servercore:ltsc2019
+linux/amd64/1903=mcr.microsoft.com/windows/servercore:1903
+linux/amd64/1909=mcr.microsoft.com/windows/servercore:1909
+linux/amd64/2004=mcr.microsoft.com/windows/servercore:2004

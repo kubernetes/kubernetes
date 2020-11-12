@@ -37,17 +37,19 @@ var (
 // Config is a struct containing all arguments for creating a pod.
 // SELinux testing requires to pass HostIPC and HostPID as boolean arguments.
 type Config struct {
-	NS                  string
-	PVCs                []*v1.PersistentVolumeClaim
-	PVCsReadOnly        bool
-	InlineVolumeSources []*v1.VolumeSource
-	IsPrivileged        bool
-	Command             string
-	HostIPC             bool
-	HostPID             bool
-	SeLinuxLabel        *v1.SELinuxOptions
-	FsGroup             *int64
-	NodeSelection       NodeSelection
+	NS                     string
+	PVCs                   []*v1.PersistentVolumeClaim
+	PVCsReadOnly           bool
+	InlineVolumeSources    []*v1.VolumeSource
+	IsPrivileged           bool
+	Command                string
+	HostIPC                bool
+	HostPID                bool
+	SeLinuxLabel           *v1.SELinuxOptions
+	FsGroup                *int64
+	NodeSelection          NodeSelection
+	ImageID                int
+	PodFSGroupChangePolicy *v1.PodFSGroupChangePolicy
 }
 
 // CreateUnschedulablePod with given claims based on node selector
@@ -185,6 +187,10 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 			return &i
 		}(1000)
 	}
+	image := imageutils.BusyBox
+	if podConfig.ImageID != imageutils.None {
+		image = podConfig.ImageID
+	}
 	podSpec := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -203,7 +209,7 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 			Containers: []v1.Container{
 				{
 					Name:    "write-pod",
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Image:   imageutils.GetE2EImage(image),
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", podConfig.Command},
 					SecurityContext: &v1.SecurityContext{
@@ -214,6 +220,10 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 			RestartPolicy: v1.RestartPolicyOnFailure,
 		},
 	}
+	if podConfig.PodFSGroupChangePolicy != nil {
+		podSpec.Spec.SecurityContext.FSGroupChangePolicy = podConfig.PodFSGroupChangePolicy
+	}
+
 	var volumeMounts = make([]v1.VolumeMount, 0)
 	var volumeDevices = make([]v1.VolumeDevice, 0)
 	var volumes = make([]v1.Volume, len(podConfig.PVCs)+len(podConfig.InlineVolumeSources))

@@ -222,7 +222,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		event, err := watchtools.Until(ctx, startedPod.ResourceVersion, w,
 			recordEvents(events, conditions.PodCompleted),
 		)
-		gomega.Expect(err).To(gomega.BeNil())
+		framework.ExpectNoError(err)
 
 		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
@@ -299,7 +299,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.PodStartTimeout)
 		defer cancel()
 		event, err := watchtools.Until(ctx, startedPod.ResourceVersion, w, recordEvents(events, conditions.PodRunning))
-		gomega.Expect(err).To(gomega.BeNil())
+		framework.ExpectNoError(err)
 
 		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
@@ -429,7 +429,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 				}
 			},
 		)
-		gomega.Expect(err).To(gomega.BeNil())
+		framework.ExpectNoError(err)
 
 		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)
@@ -544,7 +544,7 @@ var _ = framework.KubeDescribe("InitContainer [NodeConformance]", func() {
 				}),
 			recordEvents(events, conditions.PodCompleted),
 		)
-		gomega.Expect(err).To(gomega.BeNil())
+		framework.ExpectNoError(err)
 
 		checkInvariants(events, containerInitInvariant)
 		endPod := event.Object.(*v1.Pod)

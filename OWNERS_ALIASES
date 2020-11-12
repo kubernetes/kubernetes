@@ -9,7 +9,6 @@ aliases:
     - sttts
     - tallclair
   sig-auth-audit-reviewers:
-    - CaoShuFeng
     - hzxuzhonghu
     - lavalamp
     - sttts
@@ -128,13 +127,14 @@ aliases:
     - saschagrunert # SIG Technical Lead
     - tpepper # SIG Chair
   release-engineering-reviewers:
-    - cpanato # Branch Manager
-    - feiskyer # Patch Release Team
-    - hasheddan # Branch Manager
-    - hoegaarden # Patch Release Team
-    - justaugustus # SIG Chair
-    - saschagrunert # Branch Manager
-    - tpepper # SIG Chair / Patch Release Team
+    - cpanato # Release Manager
+    - feiskyer # Release Manager
+    - hasheddan # Release Manager
+    - hoegaarden # Release Manager
+    - justaugustus # SIG Chair / Release Manager
+    - saschagrunert # SIG Technical Lead / Release Manager
+    - tpepper # SIG Chair / Release Manager
+    - xmudrii # Release Manager
   build-image-approvers:
     - BenTheElder
     - cblecker
@@ -189,6 +189,7 @@ aliases:
     - alculquicondor
     - liu-cong
     - damemi
+    - chendave
 
   sig-cli-maintainers:
     - brendandburns
@@ -224,26 +225,29 @@ aliases:
     - bentheelder
     - cblecker
     - fejta
-    - krzyzacy
-    - ixdy
     - spiffxp
     - dims
   sig-testing-approvers:
     - bentheelder
     - cblecker
     - fejta
-    - krzyzacy
-    - ixdy
     - spiffxp
+    # emeritus
+    # - ixdy
+    # - krzyzacy
+
   sig-node-approvers:
     - Random-Liu
     - dchen1107
     - derekwaynecarr
     - vishh
     - yujuhong
+    - sjenning
+    - mrunalp
+  # emeretus:
+  # - dashpole
   sig-node-reviewers:
     - Random-Liu
-    - dashpole
     - dchen1107
     - derekwaynecarr
     - dims
@@ -256,9 +260,10 @@ aliases:
     - yifan-gu
     - yujuhong
     - krmayankk
-    - mattjmcnaughton
     - matthyx
     - odinuge
+    - andrewsykim
+    - mrunalp
   sig-network-driver-approvers:
     - dcbw
     - freehan
@@ -272,7 +277,6 @@ aliases:
     - freehan
     - johnbelamaric
     - mrhohn
-    - nicksardo
     - thockin
   sig-network-reviewers:
     - andrewsykim
@@ -286,7 +290,6 @@ aliases:
     - johnbelamaric
     - m1093782566
     - mrhohn
-    - nicksardo
     - rramkumar1
     - thockin
   sig-apps-approvers:

@@ -283,7 +283,7 @@ func TestGetWithExactMatch(t *testing.T) {
 	constructObject := func(s schema.GroupVersionResource, name, namespace string) (*unstructured.Unstructured, schema.GroupVersionResource) {
 		obj := getArbitraryResource(s, name, namespace)
 		gvks, _, err := scheme.ObjectKinds(obj)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		gvr, _ := meta.UnsafeGuessKindToResource(gvks[0])
 		return obj, gvr
 	}
@@ -298,11 +298,11 @@ func TestGetWithExactMatch(t *testing.T) {
 
 	// Exact match
 	_, err = o.Get(gvr, "", "node")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// Unexpected namespace provided
 	_, err = o.Get(gvr, "ns", "node")
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 	errNotFound := errors.NewNotFound(gvr.GroupResource(), "node")
 	assert.EqualError(t, err, errNotFound.Error())
 
@@ -314,11 +314,11 @@ func TestGetWithExactMatch(t *testing.T) {
 
 	// Exact match
 	_, err = o.Get(gvr, "default", "pod")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// Missing namespace
 	_, err = o.Get(gvr, "", "pod")
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 	errNotFound = errors.NewNotFound(gvr.GroupResource(), "pod")
 	assert.EqualError(t, err, errNotFound.Error())
 }

@@ -79,6 +79,20 @@ func (mr *MockInterfaceMockRecorder) CreateOrUpdate(ctx, resourceGroupName, disk
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrUpdate", reflect.TypeOf((*MockInterface)(nil).CreateOrUpdate), ctx, resourceGroupName, diskName, diskParameter)
 }
 
+// Update mocks base method
+func (m *MockInterface) Update(ctx context.Context, resourceGroupName, diskName string, diskParameter compute.DiskUpdate) *retry.Error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Update", ctx, resourceGroupName, diskName, diskParameter)
+	ret0, _ := ret[0].(*retry.Error)
+	return ret0
+}
+
+// Update indicates an expected call of Update
+func (mr *MockInterfaceMockRecorder) Update(ctx, resourceGroupName, diskName, diskParameter interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockInterface)(nil).Update), ctx, resourceGroupName, diskName, diskParameter)
+}
+
 // Delete mocks base method
 func (m *MockInterface) Delete(ctx context.Context, resourceGroupName, diskName string) *retry.Error {
 	m.ctrl.T.Helper()
@@ -91,4 +105,19 @@ func (m *MockInterface) Delete(ctx context.Context, resourceGroupName, diskName 
 func (mr *MockInterfaceMockRecorder) Delete(ctx, resourceGroupName, diskName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockInterface)(nil).Delete), ctx, resourceGroupName, diskName)
+}
+
+// ListByResourceGroup mocks base method
+func (m *MockInterface) ListByResourceGroup(ctx context.Context, resourceGroupName string) ([]compute.Disk, *retry.Error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListByResourceGroup", ctx, resourceGroupName)
+	ret0, _ := ret[0].([]compute.Disk)
+	ret1, _ := ret[1].(*retry.Error)
+	return ret0, ret1
+}
+
+// ListByResourceGroup indicates an expected call of ListByResourceGroup
+func (mr *MockInterfaceMockRecorder) ListByResourceGroup(ctx, resourceGroupName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListByResourceGroup", reflect.TypeOf((*MockInterface)(nil).Delete), ctx, resourceGroupName)
 }

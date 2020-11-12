@@ -96,7 +96,7 @@ func (v *toFieldSetWalker) doScalar(t *schema.Scalar) ValidationErrors {
 func (v *toFieldSetWalker) visitListItems(t *schema.List, list value.List) (errs ValidationErrors) {
 	for i := 0; i < list.Length(); i++ {
 		child := list.At(i)
-		pe, _ := listItemToPathElement(v.allocator, t, i, child)
+		pe, _ := listItemToPathElement(v.allocator, v.schema, t, i, child)
 		v2 := v.prepareDescent(pe, t.ElementType)
 		v2.value = child
 		errs = append(errs, v2.toFieldSet()...)

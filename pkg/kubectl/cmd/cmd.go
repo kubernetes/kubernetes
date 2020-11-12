@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/apiresources"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	"k8s.io/kubectl/pkg/cmd/attach"
+	"k8s.io/kubectl/pkg/cmd/auth"
 	"k8s.io/kubectl/pkg/cmd/autoscale"
 	"k8s.io/kubectl/pkg/cmd/certificates"
 	"k8s.io/kubectl/pkg/cmd/clusterinfo"
@@ -43,6 +44,7 @@ import (
 	cmdconfig "k8s.io/kubectl/pkg/cmd/config"
 	"k8s.io/kubectl/pkg/cmd/cp"
 	"k8s.io/kubectl/pkg/cmd/create"
+	"k8s.io/kubectl/pkg/cmd/debug"
 	"k8s.io/kubectl/pkg/cmd/delete"
 	"k8s.io/kubectl/pkg/cmd/describe"
 	"k8s.io/kubectl/pkg/cmd/diff"
@@ -72,7 +74,6 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/util/term"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/convert"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -270,7 +271,7 @@ __kubectl_custom_func() {
             __kubectl_get_resource_node
             return
             ;;
-        kubectl_config_use-context | kubectl_config_rename-context)
+        kubectl_config_use-context | kubectl_config_rename-context | kubectl_config_delete-context)
             __kubectl_config_get_contexts
             return
             ;;
@@ -318,7 +319,7 @@ func NewDefaultKubectlCommandWithArgs(pluginHandler PluginHandler, args []string
 		// the specified command does not already exist
 		if _, _, err := cmd.Find(cmdPathPieces); err != nil {
 			if err := HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
-				fmt.Fprintf(errout, "%v\n", err)
+				fmt.Fprintf(errout, "Error: %v\n", err)
 				os.Exit(1)
 			}
 		}
@@ -393,13 +394,17 @@ func (h *DefaultPluginHandler) Execute(executablePath string, cmdArgs, environme
 // HandlePluginCommand receives a pluginHandler and command-line arguments and attempts to find
 // a plugin executable on the PATH that satisfies the given arguments.
 func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) error {
-	remainingArgs := []string{} // all "non-flag" arguments
-
-	for idx := range cmdArgs {
-		if strings.HasPrefix(cmdArgs[idx], "-") {
+	var remainingArgs []string // all "non-flag" arguments
+	for _, arg := range cmdArgs {
+		if strings.HasPrefix(arg, "-") {
 			break
 		}
-		remainingArgs = append(remainingArgs, strings.Replace(cmdArgs[idx], "-", "_", -1))
+		remainingArgs = append(remainingArgs, strings.Replace(arg, "-", "_", -1))
+	}
+
+	if len(remainingArgs) == 0 {
+		// the length of cmdArgs is at least 1
+		return fmt.Errorf("flags cannot be placed before plugin name: %s", cmdArgs[0])
 	}
 
 	foundBinaryPath := ""
@@ -551,6 +556,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 				proxy.NewCmdProxy(f, ioStreams),
 				cp.NewCmdCp(f, ioStreams),
 				auth.NewCmdAuth(f, ioStreams),
+				debug.NewCmdDebug(f, ioStreams, false),
 			},
 		},
 		{

@@ -10,7 +10,7 @@ require (
 	github.com/go-openapi/spec v0.19.3
 	github.com/gogo/protobuf v1.3.1
 	github.com/json-iterator/go v1.1.10
-	github.com/spf13/cobra v1.0.0
+	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381
@@ -20,9 +20,9 @@ require (
 	k8s.io/client-go v0.0.0
 	k8s.io/code-generator v0.0.0
 	k8s.io/component-base v0.0.0
-	k8s.io/klog/v2 v2.2.0
-	k8s.io/kube-openapi v0.0.0-20200805222855-6aeccd4b50c6
-	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
+	k8s.io/klog/v2 v2.4.0
+	k8s.io/kube-openapi v0.0.0-20201107163737-74b467f3a622
+	k8s.io/utils v0.0.0-20201104234853-8146046b121e
 )
 
 replace (

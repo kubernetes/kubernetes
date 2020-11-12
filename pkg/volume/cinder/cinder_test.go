@@ -28,7 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -96,7 +96,7 @@ func (fake *fakePDManager) AttachDisk(b *cinderVolumeMounter, globalPDPath strin
 		}
 	}
 	if notmnt {
-		err = b.mounter.Mount(fakeDeviceName, globalPath, "", []string{"bind"})
+		err = b.mounter.MountSensitiveWithoutSystemd(fakeDeviceName, globalPath, "", []string{"bind"}, nil)
 		if err != nil {
 			return err
 		}
@@ -123,7 +123,7 @@ func (fake *fakePDManager) DetachDisk(c *cinderVolumeUnmounter) error {
 
 func (fake *fakePDManager) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
 	labels = make(map[string]string)
-	labels[v1.LabelZoneFailureDomain] = "nova"
+	labels[v1.LabelFailureDomainBetaZone] = "nova"
 	return "test-volume-name", 1, labels, "", nil
 }
 
@@ -241,7 +241,7 @@ func TestPlugin(t *testing.T) {
 
 	req := persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0]
 
-	if req.Key != v1.LabelZoneFailureDomain {
+	if req.Key != v1.LabelFailureDomainBetaZone {
 		t.Errorf("Provision() returned unexpected requirement key in NodeAffinity %v", req.Key)
 	}
 
@@ -316,7 +316,7 @@ func getOpenstackConfig() openstack.Config {
 			AuthURL         string `gcfg:"auth-url"`
 			Username        string
 			UserID          string `gcfg:"user-id"`
-			Password        string
+			Password        string `datapolicy:"password"`
 			TenantID        string `gcfg:"tenant-id"`
 			TenantName      string `gcfg:"tenant-name"`
 			TrustID         string `gcfg:"trust-id"`

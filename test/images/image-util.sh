@@ -33,6 +33,19 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 # Mapping of go ARCH to actual architectures shipped part of multiarch/qemu-user-static project
 declare -A QEMUARCHS=( ["amd64"]="x86_64" ["arm"]="arm" ["arm64"]="aarch64" ["ppc64le"]="ppc64le" ["s390x"]="s390x" )
 
+windows_os_versions=(1809 1903 1909 2004)
+declare -A WINDOWS_OS_VERSIONS_MAP
+
+initWindowsOsVersions() {
+  for os_version in "${windows_os_versions[@]}"; do
+    img_base="mcr.microsoft.com/windows/nanoserver:${os_version}"
+    full_version=$(docker manifest inspect "${img_base}" | grep "os.version" | head -n 1 | awk '{print $2}') || true
+    WINDOWS_OS_VERSIONS_MAP["${os_version}"]="${full_version}"
+  done
+}
+
+initWindowsOsVersions
+
 # Returns list of all supported architectures from BASEIMAGE file
 listOsArchs() {
   image=$1
@@ -50,15 +63,10 @@ splitOsArch() {
       arch=$(echo "$os_arch" | cut -d "/" -f 2)
       os_version=$(echo "$os_arch" | cut -d "/" -f 3)
       suffix="$os_name-$arch-$os_version"
-
-      # currently, GCE does not have Hyper-V support, which means that the same node cannot be used to build
-      # multiple versions of Windows images. Which is why we have $REMOTE_DOCKER_URL_$os_version URLs configured.
-      # TODO(claudiub): once Hyper-V support has been added to GCE, revert this to just $REMOTE_DOCKER_URL.
-      remote_docker_url_name="REMOTE_DOCKER_URL_$os_version"
-      REMOTE_DOCKER_URL=$(eval echo "\${${remote_docker_url_name}:-}")
     elif [[ $os_arch =~ .*/.* ]]; then
       os_name=$(echo "$os_arch" | cut -d "/" -f 1)
       arch=$(echo "$os_arch" | cut -d "/" -f 2)
+      os_version=""
       suffix="$os_name-$arch"
     else
       echo "The BASEIMAGE file for the ${image} image is not properly formatted. Expected entries to start with 'os/arch', found '${os_arch}' instead."
@@ -78,6 +86,9 @@ getBaseImage() {
 # arm64, ppc64le, s390x
 build() {
   image=$1
+  output_type=$2
+  docker_version_check
+
   if [[ -f ${image}/BASEIMAGE ]]; then
     os_archs=$(listOsArchs "$image")
   else
@@ -89,10 +100,8 @@ build() {
 
   for os_arch in ${os_archs}; do
     splitOsArch "${image}" "${os_arch}"
-    if [[ "${os_name}" == "windows" && -z "${REMOTE_DOCKER_URL}" ]]; then
-      # If we have a Windows os_arch entry but no Remote Docker Daemon for it,
-      # we should skip it, so we don't have to build any binaries for it.
-      echo "Cannot build the image '${image}' for ${os_arch}. REMOTE_DOCKER_URL_$os_version should be set, containing the URL to a Windows docker daemon."
+    if [[ "${os_name}" == "windows" && "${output_type}" == "docker" ]]; then
+      echo "Cannot build the image '${image}' for ${os_arch}. Built Windows container images need to be pushed to a registry."
       continue
     fi
 
@@ -148,28 +157,19 @@ build() {
       fi
     fi
 
-    if [[ "$os_name" = "linux" ]]; then
-      docker build --pull -t "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}" --build-arg BASEIMAGE="${BASEIMAGE}" .
-    elif [[ -n "${REMOTE_DOCKER_URL:-}" ]]; then
-      # NOTE(claudiub): We're using a remote Windows node to build the Windows Docker images.
-      # The node requires TLS authentication, and thus it is expected that the
-      # ca.pem, cert.pem, key.pem files can be found in the ${HOME}/.docker-${os_version} folder.
-      # TODO(claudiub): add "build --isolation=hyperv" once GCE introduces Hyper-V support.
-      docker --tlsverify --tlscacert "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/ca.pem" \
-        --tlscert "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/cert.pem" --tlskey "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/key.pem" \
-        -H "${REMOTE_DOCKER_URL}" build --pull -t "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}-${os_version}" \
-        --build-arg BASEIMAGE="${BASEIMAGE}" -f $dockerfile_name .
-    fi
+    docker buildx build --no-cache --pull --output=type="${output_type}" --platform "${os_name}/${arch}" \
+        --build-arg BASEIMAGE="${BASEIMAGE}" --build-arg REGISTRY="${REGISTRY}" --build-arg OS_VERSION="${os_version}" \
+        -t "${REGISTRY}/${image}:${TAG}-${suffix}" -f "${dockerfile_name}" .
+
     popd
   done
 }
 
 docker_version_check() {
-  # The reason for this version check is even though "docker manifest" command is available in 18.03, it does
-  # not work properly in that version. So we insist on 18.06.0 or higher.
+  # docker buildx has been introduced in 19.03, so we need to make sure we have it.
   docker_version=$(docker version --format '{{.Client.Version}}' | cut -d"-" -f1)
-  if [[ ${docker_version} != 18.06.0 && ${docker_version} < 18.06.0 ]]; then
-    echo "Minimum docker version 18.06.0 is required for creating and pushing manifest images[found: ${docker_version}]"
+  if [[ ${docker_version} != 19.03.0 && ${docker_version} < 19.03.0 ]]; then
+    echo "Minimum docker version 19.03.0 is required for using docker buildx: ${docker_version}]"
     exit 1
   fi
 }
@@ -178,34 +178,13 @@ docker_version_check() {
 push() {
   image=$1
   docker_version_check
+
   TAG=$(<"${image}"/VERSION)
   if [[ -f ${image}/BASEIMAGE ]]; then
     os_archs=$(listOsArchs "$image")
   else
     # prepend linux/ to the QEMUARCHS items.
     os_archs=$(printf 'linux/%s\n' "${!QEMUARCHS[*]}")
-  fi
-  for os_arch in ${os_archs}; do
-    splitOsArch "${image}" "${os_arch}"
-
-    if [[ "$os_name" = "linux" ]]; then
-      docker push "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}"
-    elif [[ -n "${REMOTE_DOCKER_URL:-}" ]]; then
-      # NOTE(claudiub): We're pushing the image we built on the remote Windows node.
-      docker --tlsverify --tlscacert "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/ca.pem" \
-        --tlscert "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/cert.pem" --tlskey "${DOCKER_CERT_BASE_PATH}/.docker-${os_version}/key.pem" \
-        -H "${REMOTE_DOCKER_URL}" push "${REGISTRY}/${image}:${TAG}-${os_name}-${arch}-${os_version}"
-    else
-      echo "Cannot push the image '${image}' for ${os_arch}. REMOTE_DOCKER_URL_${os_version} should be set, containing the URL to a Windows docker daemon."
-      # we should exclude this image from the manifest list as well, we couldn't build / push it.
-      os_archs=$(printf "%s\n" "$os_archs" | grep -v "$os_arch" || true)
-    fi
-  done
-
-  if test -z "${os_archs}"; then
-    # this can happen for Windows-only images if they have been skipped entirely.
-    echo "No image for the manifest list. Skipping ${image}."
-    return
   fi
 
   kube::util::ensure-gnu-sed
@@ -217,9 +196,31 @@ push() {
   # Make os_archs list into image manifest. Eg: 'linux/amd64 linux/ppc64le' to '${REGISTRY}/${image}:${TAG}-linux-amd64 ${REGISTRY}/${image}:${TAG}-linux-ppc64le'
   while IFS='' read -r line; do manifest+=("$line"); done < <(echo "$os_archs" | ${SED} "s~\/~-~g" | ${SED} -e "s~[^ ]*~$REGISTRY\/$image:$TAG\-&~g")
   docker manifest create --amend "${REGISTRY}/${image}:${TAG}" "${manifest[@]}"
+
+  # We will need the full registry name in order to set the "os.version" for Windows images.
+  # If the ${REGISTRY} dcesn't have any slashes, it means that it's on dockerhub.
+  registry_prefix=""
+  if [[ ! $REGISTRY =~ .*/.* ]]; then
+    registry_prefix="docker.io/"
+  fi
+  # The images in the manifest list are stored locally. The folder / file name is almost the same,
+  # with a few changes.
+  manifest_image_folder=$(echo "${registry_prefix}${REGISTRY}/${image}:${TAG}" | sed "s|/|_|g" | sed "s/:/-/")
+
   for os_arch in ${os_archs}; do
     splitOsArch "${image}" "${os_arch}"
     docker manifest annotate --os "${os_name}" --arch "${arch}" "${REGISTRY}/${image}:${TAG}" "${REGISTRY}/${image}:${TAG}-${suffix}"
+
+    # For Windows images, we also need to include the "os.version" in the manifest list, so the Windows node
+    # can pull the proper image it needs.
+    if [[ "$os_name" = "windows" ]]; then
+      full_version="${WINDOWS_OS_VERSIONS_MAP[$os_version]}"
+
+      # At the moment, docker manifest annotate doesn't allow us to set the os.version, so we'll have to
+      # it ourselves. The manifest list can be found locally as JSONs.
+      sed -i -r "s/(\"os\"\:\"windows\")/\0,\"os.version\":$full_version/" \
+        "${HOME}/.docker/manifests/${manifest_image_folder}/${manifest_image_folder}-${suffix}"
+    fi
   done
   docker manifest push --purge "${REGISTRY}/${image}:${TAG}"
 }
@@ -228,7 +229,7 @@ push() {
 # This will allow images to be pushed immediately after they've been built.
 build_and_push() {
   image=$1
-  build "${image}"
+  build "${image}" "registry"
   push "${image}"
 }
 
@@ -256,10 +257,10 @@ if [[ "${WHAT}" == "all-conformance" ]]; then
   # no point in rebuilding all of them every time. This will only build the Conformance-related images.
   # Discussed during Conformance Office Hours Meeting (2019.12.17):
   # https://docs.google.com/document/d/1W31nXh9RYAb_VaYkwuPLd1hFxuRX3iU0DmaQ4lkCsX8/edit#heading=h.l87lu17xm9bh
-  # echoserver image not included: https://github.com/kubernetes/kubernetes/issues/84158
-  conformance_images=("busybox" "agnhost" "jessie-dnsutils" "kitten" "nautilus" "nonewprivs" "resource-consumer" "sample-apiserver")
+  shift
+  conformance_images=("busybox" "agnhost" "echoserver" "jessie-dnsutils" "kitten" "nautilus" "nonewprivs" "resource-consumer" "sample-apiserver")
   for image in "${conformance_images[@]}"; do
-    eval "${TASK}" "${image}"
+    eval "${TASK}" "${image}" "$@"
   done
 else
   eval "${TASK}" "$@"

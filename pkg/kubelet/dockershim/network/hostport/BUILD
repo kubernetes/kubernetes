@@ -12,7 +12,6 @@ go_library(
         "fake_iptables.go",
         "hostport.go",
         "hostport_manager.go",
-        "hostport_syncer.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport",
     deps = [
@@ -33,7 +32,6 @@ go_test(
     srcs = [
         "fake_iptables_test.go",
         "hostport_manager_test.go",
-        "hostport_syncer_test.go",
         "hostport_test.go",
     ],
     embed = [":go_default_library"],
@@ -54,9 +52,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/kubelet/dockershim/network/hostport/testing:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )

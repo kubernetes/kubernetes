@@ -30,12 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	quota "k8s.io/apiserver/pkg/quota/v1"
+	"k8s.io/apiserver/pkg/quota/v1/generic"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	quota "k8s.io/kubernetes/pkg/quota/v1"
-	"k8s.io/kubernetes/pkg/quota/v1/generic"
 )
 
 // the name used for object count quota
@@ -57,7 +57,7 @@ var podResources = []corev1.ResourceName{
 }
 
 // podResourcePrefixes are the set of prefixes for resources (Hugepages, and other
-// potential extended reources with specific prefix) managed by quota associated with pods.
+// potential extended resources with specific prefix) managed by quota associated with pods.
 var podResourcePrefixes = []string{
 	corev1.ResourceHugePagesPrefix,
 	corev1.ResourceRequestsHugePagesPrefix,

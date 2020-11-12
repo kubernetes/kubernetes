@@ -131,7 +131,11 @@ func createAuditEventAndAttachToContext(req *http.Request, policy policy.Checker
 		return req, nil, nil, nil
 	}
 
-	ev, err := audit.NewEventFromRequest(req, level, attribs)
+	requestReceivedTimestamp, ok := request.ReceivedTimestampFrom(ctx)
+	if !ok {
+		requestReceivedTimestamp = time.Now()
+	}
+	ev, err := audit.NewEventFromRequest(req, requestReceivedTimestamp, level, attribs)
 	if err != nil {
 		return req, nil, nil, fmt.Errorf("failed to complete audit event from request: %v", err)
 	}

@@ -35,8 +35,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -105,22 +106,6 @@ func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) error {
 
 func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(4).Infof(log("Mounter.SetUpAt(%s)", dir))
-
-	corruptedDir := false
-	mounted, err := isDirMounted(c.plugin, dir)
-	if err != nil {
-		if isCorruptedDir(dir) {
-			corruptedDir = true // leave to CSI driver to handle corrupted mount
-			klog.Warning(log("mounter.SetUpAt detected corrupted mount for dir [%s]", dir))
-		} else {
-			return errors.New(log("mounter.SetUpAt failed while checking mount status for dir [%s]: %v", dir, err))
-		}
-	}
-
-	if mounted && !corruptedDir {
-		klog.V(4).Info(log("mounter.SetUpAt skipping mount, dir already mounted [%s]", dir))
-		return nil
-	}
 
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
@@ -218,10 +203,11 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	// create target_dir before call to NodePublish
-	if err := os.MkdirAll(dir, 0750); err != nil && !corruptedDir {
-		return errors.New(log("mounter.SetUpAt failed to create dir %#v:  %v", dir, err))
+	parentDir := filepath.Dir(dir)
+	if err := os.MkdirAll(parentDir, 0750); err != nil {
+		return errors.New(log("mounter.SetUpAt failed to create dir %#v:  %v", parentDir, err))
 	}
-	klog.V(4).Info(log("created target path successfully [%s]", dir))
+	klog.V(4).Info(log("created target path successfully [%s]", parentDir))
 
 	nodePublishSecrets = map[string]string{}
 	if secretRef != nil {
@@ -278,7 +264,8 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	if c.supportsFSGroup(fsType, mounterArgs.FsGroup, c.fsGroupPolicy) {
-		err := volume.SetVolumeOwnership(c, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+		// fullPluginName helps to distinguish different driver from csi plugin
+		err := volume.SetVolumeOwnership(c, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(c.plugin, c.spec))
 		if err != nil {
 			// At this point mount operation is successful:
 			//   1. Since volume can not be used by the pod because of invalid permissions, we must return error

@@ -28,10 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
@@ -92,7 +89,6 @@ func TestAddRemovePods(t *testing.T) {
 	}
 
 	m := newTestManager()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StartupProbe, true)()
 	defer cleanup(t, m)
 	if err := expectProbes(m, nil); err != nil {
 		t.Error(err)
@@ -139,7 +135,6 @@ func TestAddRemovePods(t *testing.T) {
 
 func TestCleanupPods(t *testing.T) {
 	m := newTestManager()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StartupProbe, true)()
 	defer cleanup(t, m)
 	podToCleanup := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -202,7 +197,6 @@ func TestCleanupPods(t *testing.T) {
 
 func TestCleanupRepeated(t *testing.T) {
 	m := newTestManager()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StartupProbe, true)()
 	defer cleanup(t, m)
 	podTemplate := v1.Pod{
 		Spec: v1.PodSpec{

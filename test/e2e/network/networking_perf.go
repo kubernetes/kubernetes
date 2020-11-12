@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -37,8 +36,8 @@ const (
 	smallClusterTimeout = 200 * time.Second
 )
 
-// networkingIPerf test runs iperf on a container in either IPv4 or IPv6 mode.
-func networkingIPerfTest(isIPv6 bool) {
+// Declared as Flakey since it has not been proven to run in parallel on small nodes or slow networks in CI
+var _ = SIGDescribe("Networking IPerf [Experimental] [Slow] [Feature:Networking-Performance]", func() {
 
 	f := framework.NewDefaultFramework("network-perf")
 
@@ -50,7 +49,7 @@ func networkingIPerfTest(isIPv6 bool) {
 	maxBandwidthBits := gceBandwidthBitsEstimate
 
 	familyStr := ""
-	if isIPv6 {
+	if framework.TestContext.ClusterIsIPv6() {
 		familyStr = "-V "
 	}
 
@@ -160,18 +159,4 @@ func networkingIPerfTest(isIPv6 bool) {
 			framework.Logf("%v had bandwidth %v.  Ratio to expected (%v) was %f", ipClient, bandwidth, expectedBandwidth, float64(bandwidth)/float64(expectedBandwidth))
 		}
 	})
-}
-
-// Declared as Flakey since it has not been proven to run in parallel on small nodes or slow networks in CI
-// TODO jayunit100 : Retag this test according to semantics from #22401
-var _ = SIGDescribe("Networking IPerf IPv4 [Experimental] [Feature:Networking-IPv4] [Slow] [Feature:Networking-Performance]", func() {
-	networkingIPerfTest(false)
-})
-
-// Declared as Flakey since it has not been proven to run in parallel on small nodes or slow networks in CI
-// TODO jayunit100 : Retag this test according to semantics from #22401
-var _ = SIGDescribe("Networking IPerf IPv6 [Experimental] [Feature:Networking-IPv6] [Slow] [Feature:Networking-Performance] [LinuxOnly]", func() {
-	// IPv6 is not supported on Windows.
-	e2eskipper.SkipIfNodeOSDistroIs("windows")
-	networkingIPerfTest(true)
 })

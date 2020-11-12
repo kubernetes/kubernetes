@@ -85,7 +85,7 @@ type GetOptions struct {
 }
 
 var (
-	getLong = templates.LongDesc(`
+	getLong = templates.LongDesc(i18n.T(`
 		Display one or many resources
 
 		Prints a table of the most important information about the specified resources.
@@ -96,7 +96,7 @@ var (
 		Uninitialized objects are not shown unless --include-uninitialized is passed.
 
 		By specifying the output as 'template' and providing a Go template as the value
-		of the --template flag, you can filter the attributes of the fetched resources.`)
+		of the --template flag, you can filter the attributes of the fetched resources.`))
 
 	getExample = templates.Examples(i18n.T(`
 		# List all pods in ps output format.
@@ -215,7 +215,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	// TODO (soltysh): currently we don't support custom columns
 	// with server side print. So in these cases force the old behavior.
 	outputOption := cmd.Flags().Lookup("output").Value.String()
-	if outputOption == "custom-columns" {
+	if strings.Contains(outputOption, "custom-columns") || outputOption == "yaml" || strings.Contains(outputOption, "json") {
 		o.ServerPrint = false
 	}
 
@@ -582,9 +582,9 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	if trackingWriter.Written == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
 		// if we wrote no output, and had no errors, and are not ignoring NotFound, be sure we output something
 		if allResourcesNamespaced {
-			fmt.Fprintln(o.ErrOut, fmt.Sprintf("No resources found in %s namespace.", o.Namespace))
+			fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
 		} else {
-			fmt.Fprintln(o.ErrOut, fmt.Sprintf("No resources found"))
+			fmt.Fprintln(o.ErrOut, "No resources found")
 		}
 	}
 	return utilerrors.NewAggregate(allErrs)

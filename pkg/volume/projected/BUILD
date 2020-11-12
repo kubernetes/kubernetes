@@ -36,7 +36,6 @@ go_library(
     srcs = ["projected.go"],
     importpath = "k8s.io/kubernetes/pkg/volume/projected",
     deps = [
-        "//pkg/features:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/configmap:go_default_library",
         "//pkg/volume/downwardapi:go_default_library",
@@ -48,7 +47,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/strings:go_default_library",
     ],

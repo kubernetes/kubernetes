@@ -7,6 +7,7 @@ go_library(
         "helpers.go",
         "merge.go",
         "parser.go",
+        "reconcile_schema.go",
         "remove.go",
         "tofieldset.go",
         "typed.go",

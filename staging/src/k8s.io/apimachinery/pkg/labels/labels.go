@@ -141,25 +141,6 @@ func Equals(labels1, labels2 Set) bool {
 	return true
 }
 
-// AreLabelsInWhiteList verifies if the provided label list
-// is in the provided whitelist and returns true, otherwise false.
-func AreLabelsInWhiteList(labels, whitelist Set) bool {
-	if len(whitelist) == 0 {
-		return true
-	}
-
-	for k, v := range labels {
-		value, ok := whitelist[k]
-		if !ok {
-			return false
-		}
-		if value != v {
-			return false
-		}
-	}
-	return true
-}
-
 // ConvertSelectorToLabelsMap converts selector string to labels map
 // and validates keys and values
 func ConvertSelectorToLabelsMap(selector string) (Set, error) {

@@ -13,7 +13,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/core/endpoint",
     deps = [
-        "//pkg/api/endpoints:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/validation:go_default_library",

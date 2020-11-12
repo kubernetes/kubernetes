@@ -18,19 +18,32 @@ go_library(
     name = "go_default_library",
     srcs = [
         "controller-manager.go",
+        "nodeipamcontroller.go",
         "providers.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager",
     deps = [
-        "//cmd/cloud-controller-manager/app:go_default_library",
+        "//pkg/controller/nodeipam:go_default_library",
+        "//pkg/controller/nodeipam/config:go_default_library",
+        "//pkg/controller/nodeipam/ipam:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/cloud-provider:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/app:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/app/config:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/options:go_default_library",
+        "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/prometheus/clientgo:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/prometheus/version:go_default_library",
+        "//staging/src/k8s.io/controller-manager/app:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/aws:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/gce:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/openstack:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/vsphere:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/klog/v2:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 
@@ -43,9 +56,6 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//cmd/cloud-controller-manager/app:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
