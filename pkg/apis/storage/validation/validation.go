@@ -393,9 +393,14 @@ func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets
 	return allErrs
 }
 
+// ValidateCSIDriverName checks that a name is appropriate for a
+// CSIDriver object.
+var ValidateCSIDriverName = apimachineryvalidation.NameIsDNSSubdomain
+
 // ValidateCSIDriver validates a CSIDriver.
 func ValidateCSIDriver(csiDriver *storage.CSIDriver) field.ErrorList {
-	allErrs := field.ErrorList{}
+	allErrs := apivalidation.ValidateObjectMeta(&csiDriver.ObjectMeta, false, ValidateCSIDriverName, field.NewPath("metadata"))
+	// We have an additional name check to verify the length and lowercase the name
 	allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(csiDriver.Name, field.NewPath("name"))...)
 
 	allErrs = append(allErrs, validateCSIDriverSpec(&csiDriver.Spec, field.NewPath("spec"))...)
