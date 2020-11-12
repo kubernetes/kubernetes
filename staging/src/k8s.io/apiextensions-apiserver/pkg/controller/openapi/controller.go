@@ -203,7 +203,7 @@ func buildVersionSpecs(crd *apiextensionsv1.CustomResourceDefinition, oldSpecs m
 			continue
 		}
 		// Defaults are not pruned here, but before being served.
-		spec, err := builder.BuildSwagger(crd, v.Name, builder.Options{V2: true, StripDefaults: false})
+		spec, err := builder.BuildSwagger(crd, v.Name, builder.Options{V2: true})
 		if err != nil {
 			return nil, false, err
 		}

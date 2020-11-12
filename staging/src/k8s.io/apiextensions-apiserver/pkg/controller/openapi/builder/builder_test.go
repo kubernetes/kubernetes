@@ -80,7 +80,7 @@ func TestNewBuilder(t *testing.T) {
 		{"with extensions",
 			`
 {
-  "type":"object", 
+  "type":"object",
   "properties": {
     "int-or-string-1": {
       "x-kubernetes-int-or-string": true,
@@ -183,7 +183,7 @@ func TestNewBuilder(t *testing.T) {
 		{"with extensions as v3 schema",
 			`
 {
-  "type":"object", 
+  "type":"object",
   "properties": {
     "int-or-string-1": {
       "x-kubernetes-int-or-string": true,
@@ -500,7 +500,7 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 				},
 			},
 		}
-		swagger, err := BuildSwagger(testNamespacedCRD, testCRDVersion, Options{V2: true, StripDefaults: true})
+		swagger, err := BuildSwagger(testNamespacedCRD, testCRDVersion, Options{V2: true})
 		require.NoError(t, err)
 		require.Equal(t, len(testCase.paths), len(swagger.Paths.Paths), testCase.scope)
 		for path, expected := range testCase.paths {
@@ -580,63 +580,49 @@ func TestBuildSwagger(t *testing.T) {
 			"",
 			nil,
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
-			Options{V2: true, StripDefaults: true},
+			Options{V2: true},
 		},
 		{
 			"with properties",
 			`{"type":"object","properties":{"spec":{"type":"object"},"status":{"type":"object"}}}`,
 			nil,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
-			Options{V2: true, StripDefaults: true},
+			Options{V2: true},
 		},
 		{
 			"with invalid-typed properties",
 			`{"type":"object","properties":{"spec":{"type":"bug"},"status":{"type":"object"}}}`,
 			nil,
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
-			Options{V2: true, StripDefaults: true},
+			Options{V2: true},
 		},
 		{
 			"with non-structural schema",
 			`{"type":"object","properties":{"foo":{"type":"array"}}}`,
 			nil,
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
-			Options{V2: true, StripDefaults: true},
+			Options{V2: true},
 		},
 		{
 			"with spec.preseveUnknownFields=true",
 			`{"type":"object","properties":{"foo":{"type":"string"}}}`,
 			utilpointer.BoolPtr(true),
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
-			Options{V2: true, StripDefaults: true},
-		},
-		{
-			"with stripped defaults",
-			`{"type":"object","properties":{"foo":{"type":"string","default":"bar"}}}`,
-			nil,
-			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
-			Options{V2: true, StripDefaults: true},
-		},
-		{
-			"with stripped defaults",
-			`{"type":"object","properties":{"foo":{"type":"string","default":"bar"}}}`,
-			nil,
-			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
-			Options{V2: true, StripDefaults: true},
+			Options{V2: true},
 		},
 		{
 			"v2",
 			`{"type":"object","properties":{"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}}}`,
 			nil,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
-			Options{V2: true, StripDefaults: true},
+			Options{V2: true},
 		},
 		{
 			"v3",
 			`{"type":"object","properties":{"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}}}`,
 			nil,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
-			Options{V2: false, StripDefaults: true},
+			Options{V2: false},
 		},
 	}
 	for _, tt := range tests {
