@@ -1869,16 +1869,10 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 	attachNotRequired := false
 	podInfoOnMount := true
 	notPodInfoOnMount := false
-<<<<<<< HEAD
 	notRequiresRepublish := false
-=======
 	resourceVersion := "1"
-<<<<<<< HEAD
->>>>>>> Relax validation for CSIVolumeFSGroupPolicy
-=======
 	invalidFSGroupPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
 	invalidFSGroupPolicy = "invalid-mode"
->>>>>>> Move CSIVolumeFSGroupPolicy to beta
 	old := storage.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{Name: driverName, ResourceVersion: resourceVersion},
 		Spec: storage.CSIDriverSpec{
