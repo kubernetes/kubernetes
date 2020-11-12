@@ -38,7 +38,7 @@ func WipeManagedFields(
 
 	liveManaged, exists := liveManagedFields[manager]
 	if !exists {
-		return newManagedFields, nil
+		liveManaged = fieldpath.NewVersionedSet(fieldpath.NewSet(), newManaged.APIVersion(), newManaged.Applied())
 	}
 
 	comparisonLivePrepared, err := liveObject.Compare(preparedObject)
