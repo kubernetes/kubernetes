@@ -19,7 +19,6 @@ package cm
 import (
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	v1 "k8s.io/api/core/v1"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 
 	"fmt"
@@ -137,7 +137,7 @@ type NodeConfig struct {
 	ExperimentalTopologyManagerScope        string
 	ExperimentalCPUManagerReconcilePeriod   time.Duration
 	ExperimentalMemoryManagerPolicy         string
-	ExperimentalMemoryManagerReservedMemory map[int]map[v1.ResourceName]resource.Quantity
+	ExperimentalMemoryManagerReservedMemory kubetypes.NUMANodeResources
 	ExperimentalPodPidsLimit                int64
 	EnforceCPULimits                        bool
 	CPUCFSQuotaPeriod                       time.Duration

@@ -1305,7 +1305,7 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 	return rl, nil
 }
 
-func parseReservedMemoryConfig(config []map[string]string) (map[int]map[v1.ResourceName]resource.Quantity, error) {
+func parseReservedMemoryConfig(config []map[string]string) (kubetypes.NUMANodeResources, error) {
 	if len(config) == 0 {
 		return nil, nil
 	}
@@ -1327,7 +1327,7 @@ func parseReservedMemoryConfig(config []map[string]string) (map[int]map[v1.Resou
 		}
 	}
 
-	parsed := make(map[int]map[v1.ResourceName]resource.Quantity, len(config))
+	parsed := make(kubetypes.NUMANodeResources, len(config))
 	for _, m := range config {
 		idxInString, _ := m[indexKey]
 		idx, err := strconv.Atoi(idxInString)

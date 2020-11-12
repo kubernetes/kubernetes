@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -58,7 +59,7 @@ type testMemoryManager struct {
 	nodeAllocatableReservation v1.ResourceList
 	policyName                 policyType
 	affinity                   topologymanager.Store
-	systemReservedMemory       map[int]map[v1.ResourceName]resource.Quantity
+	systemReservedMemory       kubetypes.NUMANodeResources
 	expectedHints              map[string][]topologymanager.TopologyHint
 	expectedReserved           systemReservedMemory
 	reserved                   systemReservedMemory
@@ -157,21 +158,21 @@ func TestValidateReservedMemory(t *testing.T) {
 		description                string
 		nodeAllocatableReservation v1.ResourceList
 		machineInfo                *cadvisorapi.MachineInfo
-		systemReservedMemory       map[int]map[v1.ResourceName]resource.Quantity
+		systemReservedMemory       kubetypes.NUMANodeResources
 		expectedError              string
 	}{
 		{
 			"Node Allocatable not set, reserved not set",
 			v1.ResourceList{},
 			machineInfo,
-			map[int]map[v1.ResourceName]resource.Quantity{},
+			kubetypes.NUMANodeResources{},
 			"",
 		},
 		{
 			"Node Allocatable set to zero, reserved set to zero",
 			v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(0, resource.DecimalSI)},
 			machineInfo,
-			map[int]map[v1.ResourceName]resource.Quantity{
+			kubetypes.NUMANodeResources{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(0, resource.DecimalSI)},
 			},
 			"",
@@ -180,7 +181,7 @@ func TestValidateReservedMemory(t *testing.T) {
 			"Node Allocatable not set (equal zero), reserved set",
 			v1.ResourceList{},
 			machineInfo,
-			map[int]map[v1.ResourceName]resource.Quantity{
+			kubetypes.NUMANodeResources{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(12, resource.DecimalSI)},
 			},
 			fmt.Sprintf(msgNotEqual, v1.ResourceMemory),
@@ -189,14 +190,14 @@ func TestValidateReservedMemory(t *testing.T) {
 			"Node Allocatable set, reserved not set",
 			v1.ResourceList{hugepages2M: *resource.NewQuantity(5, resource.DecimalSI)},
 			machineInfo,
-			map[int]map[v1.ResourceName]resource.Quantity{},
+			kubetypes.NUMANodeResources{},
 			fmt.Sprintf(msgNotEqual, hugepages2M),
 		},
 		{
 			"Reserved not equal to Node Allocatable",
 			v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(5, resource.DecimalSI)},
 			machineInfo,
-			map[int]map[v1.ResourceName]resource.Quantity{
+			kubetypes.NUMANodeResources{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(12, resource.DecimalSI)},
 			},
 			fmt.Sprintf(msgNotEqual, v1.ResourceMemory),
@@ -205,7 +206,7 @@ func TestValidateReservedMemory(t *testing.T) {
 			"Reserved contains the NUMA node that does not exist under the machine",
 			v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(17, resource.DecimalSI)},
 			machineInfo,
-			map[int]map[v1.ResourceName]resource.Quantity{
+			kubetypes.NUMANodeResources{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(12, resource.DecimalSI)},
 				2: nodeResources{v1.ResourceMemory: *resource.NewQuantity(5, resource.DecimalSI)},
 			},
@@ -217,7 +218,7 @@ func TestValidateReservedMemory(t *testing.T) {
 				hugepages2M: *resource.NewQuantity(77, resource.DecimalSI),
 				hugepages1G: *resource.NewQuantity(13, resource.DecimalSI)},
 			machineInfo,
-			map[int]map[v1.ResourceName]resource.Quantity{
+			kubetypes.NUMANodeResources{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(12, resource.DecimalSI),
 					hugepages2M: *resource.NewQuantity(70, resource.DecimalSI),
 					hugepages1G: *resource.NewQuantity(13, resource.DecimalSI)},
@@ -232,7 +233,7 @@ func TestValidateReservedMemory(t *testing.T) {
 				hugepages2M: *resource.NewQuantity(14, resource.DecimalSI),
 				hugepages1G: *resource.NewQuantity(13, resource.DecimalSI)},
 			machineInfo,
-			map[int]map[v1.ResourceName]resource.Quantity{
+			kubetypes.NUMANodeResources{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(12, resource.DecimalSI),
 					hugepages2M: *resource.NewQuantity(70, resource.DecimalSI),
 					hugepages1G: *resource.NewQuantity(13, resource.DecimalSI)},
@@ -265,13 +266,13 @@ func TestConvertPreReserved(t *testing.T) {
 
 	testCases := []struct {
 		description            string
-		systemReserved         map[int]map[v1.ResourceName]resource.Quantity
+		systemReserved         kubetypes.NUMANodeResources
 		systemReservedExpected systemReservedMemory
 		expectedError          string
 	}{
 		{
 			"Empty",
-			map[int]map[v1.ResourceName]resource.Quantity{},
+			kubetypes.NUMANodeResources{},
 			systemReservedMemory{
 				0: map[v1.ResourceName]uint64{},
 				1: map[v1.ResourceName]uint64{},
@@ -280,7 +281,7 @@ func TestConvertPreReserved(t *testing.T) {
 		},
 		{
 			"Single NUMA node is reserved",
-			map[int]map[v1.ResourceName]resource.Quantity{
+			kubetypes.NUMANodeResources{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(12, resource.DecimalSI),
 					hugepages2M: *resource.NewQuantity(70, resource.DecimalSI),
 					hugepages1G: *resource.NewQuantity(13, resource.DecimalSI)},
@@ -297,7 +298,7 @@ func TestConvertPreReserved(t *testing.T) {
 		},
 		{
 			"Both NUMA nodes are reserved",
-			map[int]map[v1.ResourceName]resource.Quantity{
+			kubetypes.NUMANodeResources{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(12, resource.DecimalSI),
 					hugepages2M: *resource.NewQuantity(70, resource.DecimalSI),
 					hugepages1G: *resource.NewQuantity(13, resource.DecimalSI)},
@@ -335,7 +336,7 @@ func TestGetSystemReservedMemory(t *testing.T) {
 		{
 			description:                "Should return empty map when reservation is not done",
 			nodeAllocatableReservation: v1.ResourceList{},
-			systemReservedMemory:       map[int]map[v1.ResourceName]resource.Quantity{},
+			systemReservedMemory:       kubetypes.NUMANodeResources{},
 			expectedReserved: systemReservedMemory{
 				0: {},
 				1: {},
@@ -346,7 +347,7 @@ func TestGetSystemReservedMemory(t *testing.T) {
 		{
 			description:                "Should return error when Allocatable reservation is not equal pre reserved memory",
 			nodeAllocatableReservation: v1.ResourceList{},
-			systemReservedMemory: map[int]map[v1.ResourceName]resource.Quantity{
+			systemReservedMemory: kubetypes.NUMANodeResources{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(gb, resource.BinarySI)},
 			},
 			expectedReserved: nil,
@@ -356,7 +357,7 @@ func TestGetSystemReservedMemory(t *testing.T) {
 		{
 			description:                "Reserved should be equal to systemReservedMemory",
 			nodeAllocatableReservation: v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI)},
-			systemReservedMemory: map[int]map[v1.ResourceName]resource.Quantity{
+			systemReservedMemory: kubetypes.NUMANodeResources{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(gb, resource.BinarySI)},
 				1: nodeResources{v1.ResourceMemory: *resource.NewQuantity(gb, resource.BinarySI)},
 			},
@@ -2062,7 +2063,7 @@ func TestNewManager(t *testing.T) {
 			policyName:                 policyTypeStatic,
 			machineInfo:                machineInfo,
 			nodeAllocatableReservation: v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI)},
-			systemReservedMemory: map[int]map[v1.ResourceName]resource.Quantity{
+			systemReservedMemory: kubetypes.NUMANodeResources{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(gb, resource.BinarySI)},
 				1: nodeResources{v1.ResourceMemory: *resource.NewQuantity(gb, resource.BinarySI)},
 			},
@@ -2075,7 +2076,7 @@ func TestNewManager(t *testing.T) {
 			policyName:                 policyTypeStatic,
 			machineInfo:                machineInfo,
 			nodeAllocatableReservation: v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI)},
-			systemReservedMemory: map[int]map[v1.ResourceName]resource.Quantity{
+			systemReservedMemory: kubetypes.NUMANodeResources{
 				0: nodeResources{v1.ResourceMemory: *resource.NewQuantity(gb, resource.BinarySI)},
 				1: nodeResources{v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI)},
 			},
@@ -2088,7 +2089,7 @@ func TestNewManager(t *testing.T) {
 			policyName:                 policyTypeStatic,
 			machineInfo:                machineInfo,
 			nodeAllocatableReservation: v1.ResourceList{},
-			systemReservedMemory:       map[int]map[v1.ResourceName]resource.Quantity{},
+			systemReservedMemory:       kubetypes.NUMANodeResources{},
 			affinity:                   topologymanager.NewFakeManager(),
 			expectedError:              fmt.Errorf("[memorymanager] you should specify the system reserved memory"),
 			expectedReserved:           expectedReserved,
@@ -2098,7 +2099,7 @@ func TestNewManager(t *testing.T) {
 			policyName:                 "fake",
 			machineInfo:                machineInfo,
 			nodeAllocatableReservation: v1.ResourceList{},
-			systemReservedMemory:       map[int]map[v1.ResourceName]resource.Quantity{},
+			systemReservedMemory:       kubetypes.NUMANodeResources{},
 			affinity:                   topologymanager.NewFakeManager(),
 			expectedError:              fmt.Errorf("unknown policy: \"fake\""),
 			expectedReserved:           expectedReserved,
@@ -2108,7 +2109,7 @@ func TestNewManager(t *testing.T) {
 			policyName:                 policyTypeNone,
 			machineInfo:                machineInfo,
 			nodeAllocatableReservation: v1.ResourceList{},
-			systemReservedMemory:       map[int]map[v1.ResourceName]resource.Quantity{},
+			systemReservedMemory:       kubetypes.NUMANodeResources{},
 			affinity:                   topologymanager.NewFakeManager(),
 			expectedError:              nil,
 			expectedReserved:           expectedReserved,

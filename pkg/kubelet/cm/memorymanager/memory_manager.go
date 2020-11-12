@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // memoryManagerStateFileName is the file name where memory manager stores its state
@@ -118,7 +119,7 @@ type manager struct {
 var _ Manager = &manager{}
 
 // NewManager returns new instance of the memory manager
-func NewManager(policyName string, machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory map[int]map[v1.ResourceName]resource.Quantity, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
+func NewManager(policyName string, machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory kubetypes.NUMANodeResources, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
 	var policy Policy
 
 	switch policyType(policyName) {
@@ -320,7 +321,7 @@ func (m *manager) policyRemoveContainerByRef(podUID string, containerName string
 	return err
 }
 
-func getTotalMemoryTypeReserved(machineInfo *cadvisorapi.MachineInfo, reservedMemory map[int]map[v1.ResourceName]resource.Quantity) map[v1.ResourceName]resource.Quantity {
+func getTotalMemoryTypeReserved(machineInfo *cadvisorapi.MachineInfo, reservedMemory kubetypes.NUMANodeResources) map[v1.ResourceName]resource.Quantity {
 	totalMemoryType := map[v1.ResourceName]resource.Quantity{}
 
 	numaNodes := map[int]bool{}
@@ -345,7 +346,7 @@ func getTotalMemoryTypeReserved(machineInfo *cadvisorapi.MachineInfo, reservedMe
 	return totalMemoryType
 }
 
-func validateReservedMemory(machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory map[int]map[v1.ResourceName]resource.Quantity) error {
+func validateReservedMemory(machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory kubetypes.NUMANodeResources) error {
 	totalMemoryType := getTotalMemoryTypeReserved(machineInfo, reservedMemory)
 
 	commonMemoryTypeSet := make(map[v1.ResourceName]bool)
@@ -381,7 +382,7 @@ func validateReservedMemory(machineInfo *cadvisorapi.MachineInfo, nodeAllocatabl
 	return nil
 }
 
-func convertReserved(machineInfo *cadvisorapi.MachineInfo, reservedMemory map[int]map[v1.ResourceName]resource.Quantity) (systemReservedMemory, error) {
+func convertReserved(machineInfo *cadvisorapi.MachineInfo, reservedMemory kubetypes.NUMANodeResources) (systemReservedMemory, error) {
 	preReservedMemoryConverted := make(map[int]map[v1.ResourceName]uint64)
 	for _, node := range machineInfo.Topology {
 		preReservedMemoryConverted[node.Id] = make(map[v1.ResourceName]uint64)
@@ -401,7 +402,7 @@ func convertReserved(machineInfo *cadvisorapi.MachineInfo, reservedMemory map[in
 	return preReservedMemoryConverted, nil
 }
 
-func getSystemReservedMemory(machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, preReservedMemory map[int]map[v1.ResourceName]resource.Quantity) (systemReservedMemory, error) {
+func getSystemReservedMemory(machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, preReservedMemory kubetypes.NUMANodeResources) (systemReservedMemory, error) {
 	if err := validateReservedMemory(machineInfo, nodeAllocatableReservation, preReservedMemory); err != nil {
 		return nil, err
 	}
