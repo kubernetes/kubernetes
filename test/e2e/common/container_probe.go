@@ -156,7 +156,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			InitialDelaySeconds: 15,
 			FailureThreshold:    1,
 		}
-		pod := livenessPodSpec(nil, livenessProbe)
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
 		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
 	})
 
@@ -171,7 +171,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			InitialDelaySeconds: 15,
 			FailureThreshold:    1,
 		}
-		pod := livenessPodSpec(nil, livenessProbe)
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
 		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
 	})
 
@@ -186,7 +186,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			InitialDelaySeconds: 5,
 			FailureThreshold:    1,
 		}
-		pod := livenessPodSpec(nil, livenessProbe)
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
 		RunLivenessTest(f, pod, 5, time.Minute*5)
 	})
 
@@ -251,7 +251,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			InitialDelaySeconds: 15,
 			FailureThreshold:    1,
 		}
-		pod := livenessPodSpec(nil, livenessProbe)
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
 		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
 	})
 
@@ -266,7 +266,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			InitialDelaySeconds: 15,
 			FailureThreshold:    1,
 		}
-		pod := livenessPodSpec(nil, livenessProbe)
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
 		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
 		// Expect an event of type "ProbeWarning".
 		expectedEvent := fields.Set{
@@ -486,24 +486,12 @@ func busyBoxPodSpec(readinessProbe, livenessProbe *v1.Probe, cmd []string) *v1.P
 	}
 }
 
-func livenessPodSpec(readinessProbe, livenessProbe *v1.Probe) *v1.Pod {
-	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "liveness-" + string(uuid.NewUUID()),
-			Labels: map[string]string{"test": "liveness"},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:           "liveness",
-					Image:          imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:           []string{"liveness"},
-					LivenessProbe:  livenessProbe,
-					ReadinessProbe: readinessProbe,
-				},
-			},
-		},
-	}
+func livenessPodSpec(namespace string, readinessProbe, livenessProbe *v1.Probe) *v1.Pod {
+	pod := e2epod.NewAgnhostPod(namespace, "liveness-"+string(uuid.NewUUID()), nil, nil, nil, "liveness")
+	pod.ObjectMeta.Labels = map[string]string{"test": "liveness"}
+	pod.Spec.Containers[0].LivenessProbe = livenessProbe
+	pod.Spec.Containers[0].ReadinessProbe = readinessProbe
+	return pod
 }
 
 func startupPodSpec(startupProbe, readinessProbe, livenessProbe *v1.Probe, cmd []string) *v1.Pod {
