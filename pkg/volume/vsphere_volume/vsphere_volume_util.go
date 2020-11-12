@@ -91,7 +91,13 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner, selectedN
 		return nil, err
 	}
 	volSizeKiB := volSizeMiB * 1024
-	name := volumeutil.GenerateVolumeName(v.options.ClusterName, v.options.PVName, 255)
+	// reduce number of characters in vsphere volume name. The reason for setting length smaller than 255 is because typically
+	// volume name also becomes part of mount path - /var/lib/kubelet/plugins/kubernetes.io/vsphere-volume/mounts/<name>
+	// and systemd has a limit of 256 chars in a unit name - https://github.com/systemd/systemd/pull/14294
+	// so if we subtract the kubelet path prefix from 256, we are left with 191 characters.
+	// Since datastore name is typically part of volumeName we are choosing a shorter length of 90
+	// and leaving room of certain characters being escaped etc.
+	name := volumeutil.GenerateVolumeName(v.options.ClusterName, v.options.PVName, 90)
 	volumeOptions := &vclib.VolumeOptions{
 		CapacityKB: volSizeKiB,
 		Tags:       *v.options.CloudTags,
