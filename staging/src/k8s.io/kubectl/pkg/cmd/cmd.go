@@ -31,7 +31,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
-	cmdpkg "k8s.io/kubectl/pkg/cmd"
 	"k8s.io/kubectl/pkg/cmd/annotate"
 	"k8s.io/kubectl/pkg/cmd/apiresources"
 	"k8s.io/kubectl/pkg/cmd/apply"
@@ -74,7 +73,6 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/util/term"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/convert"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/cmd/kustomize"
@@ -567,7 +565,6 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 				patch.NewCmdPatch(f, ioStreams),
 				replace.NewCmdReplace(f, ioStreams),
 				wait.NewCmdWait(f, ioStreams),
-				convert.NewCmdConvert(f, ioStreams),
 				kustomize.NewCmdKustomize(ioStreams),
 			},
 		},
@@ -585,7 +582,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	filters := []string{"options"}
 
 	// Hide the "alpha" subcommand if there are no alpha commands in this build.
-	alpha := cmdpkg.NewCmdAlpha(f, ioStreams)
+	alpha := NewCmdAlpha(f, ioStreams)
 	if !alpha.HasSubCommands() {
 		filters = append(filters, alpha.Name())
 	}

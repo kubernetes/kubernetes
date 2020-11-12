@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,24 +18,26 @@ package main
 
 import (
 	goflag "flag"
-	"math/rand"
 	"os"
-	"time"
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/kubectl/pkg/cmd"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/logs"
-
-	// Import to initialize client auth plugins.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/convert"
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
+	flags := pflag.NewFlagSet("kubectl-convert", pflag.ExitOnError)
+	pflag.CommandLine = flags
 
-	command := cmd.NewDefaultKubectlCommand()
+	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
+	kubeConfigFlags.AddFlags(flags)
+	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
+
+	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// cliflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
@@ -46,7 +48,10 @@ func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	if err := command.Execute(); err != nil {
+	cmd := convert.NewCmdConvert(f, genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr})
+	matchVersionKubeConfigFlags.AddFlags(cmd.PersistentFlags())
+	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+
 }
