@@ -17,6 +17,7 @@ limitations under the License.
 package fieldmanager
 
 import (
+	"context"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,10 +43,10 @@ func NewManagedFieldsUpdater(fieldManager Manager) Manager {
 }
 
 // Update implements Manager.
-func (f *managedFieldsUpdater) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
+func (f *managedFieldsUpdater) Update(ctx context.Context, liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
 	self := "current-operation"
 	formerSet := managed.Fields()[manager]
-	object, managed, err := f.fieldManager.Update(liveObj, newObj, managed, self)
+	object, managed, err := f.fieldManager.Update(ctx, liveObj, newObj, managed, self)
 	if err != nil {
 		return object, managed, err
 	}
@@ -70,9 +71,9 @@ func (f *managedFieldsUpdater) Update(liveObj, newObj runtime.Object, managed Ma
 }
 
 // Apply implements Manager.
-func (f *managedFieldsUpdater) Apply(liveObj, appliedObj runtime.Object, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error) {
+func (f *managedFieldsUpdater) Apply(ctx context.Context, liveObj, appliedObj runtime.Object, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error) {
 	formerManaged := managed.Fields().Copy()
-	object, managed, err := f.fieldManager.Apply(liveObj, appliedObj, managed, fieldManager, force)
+	object, managed, err := f.fieldManager.Apply(ctx, liveObj, appliedObj, managed, fieldManager, force)
 	if err != nil {
 		return object, managed, err
 	}

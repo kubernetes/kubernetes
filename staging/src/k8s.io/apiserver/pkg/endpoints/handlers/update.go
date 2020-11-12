@@ -131,7 +131,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 		if scope.FieldManager != nil {
 			transformers = append(transformers, func(_ context.Context, newObj, liveObj runtime.Object) (runtime.Object, error) {
 				if shouldUpdateManagedFields {
-					return scope.FieldManager.UpdateNoErrors(liveObj, newObj, managerOrUserAgent(options.FieldManager, req.UserAgent())), nil
+					return scope.FieldManager.UpdateNoErrors(ctx, liveObj, newObj, managerOrUserAgent(options.FieldManager, req.UserAgent())), nil
 				}
 				return newObj, nil
 			})

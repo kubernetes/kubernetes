@@ -17,6 +17,7 @@ limitations under the License.
 package fieldmanager
 
 import (
+	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -40,13 +41,13 @@ func NewLastAppliedUpdater(fieldManager Manager) Manager {
 }
 
 // Update implements Manager.
-func (f *lastAppliedUpdater) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
-	return f.fieldManager.Update(liveObj, newObj, managed, manager)
+func (f *lastAppliedUpdater) Update(ctx context.Context, liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
+	return f.fieldManager.Update(ctx, liveObj, newObj, managed, manager)
 }
 
 // server-side apply managed fields
-func (f *lastAppliedUpdater) Apply(liveObj, newObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
-	liveObj, managed, err := f.fieldManager.Apply(liveObj, newObj, managed, manager, force)
+func (f *lastAppliedUpdater) Apply(ctx context.Context, liveObj, newObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
+	liveObj, managed, err := f.fieldManager.Apply(ctx, liveObj, newObj, managed, manager, force)
 	if err != nil {
 		return liveObj, managed, err
 	}

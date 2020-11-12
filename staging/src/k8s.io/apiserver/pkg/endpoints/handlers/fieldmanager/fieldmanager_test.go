@@ -17,6 +17,7 @@ limitations under the License.
 package fieldmanager
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -103,6 +104,9 @@ func NewTestFieldManager(gvk schema.GroupVersionKind, ignoreManagedFieldsFromReq
 		&fakeObjectDefaulter{},
 		gvk.GroupVersion(),
 		gvk.GroupVersion(),
+		// TODO(kwiesmueller): having this non-nil (so not skipping the wipe) caused tests to fail
+		// This might indicate a problem in the wiping
+		nil,
 	)
 	if err != nil {
 		panic(err)
@@ -151,7 +155,7 @@ func (f *TestFieldManager) Reset() {
 }
 
 func (f *TestFieldManager) Apply(obj runtime.Object, manager string, force bool) error {
-	out, err := f.fieldManager.Apply(f.liveObj, obj, manager, force)
+	out, err := f.fieldManager.Apply(context.TODO(), f.liveObj, obj, manager, force)
 	if err == nil {
 		f.liveObj = out
 	}
@@ -159,7 +163,7 @@ func (f *TestFieldManager) Apply(obj runtime.Object, manager string, force bool)
 }
 
 func (f *TestFieldManager) Update(obj runtime.Object, manager string) error {
-	out, err := f.fieldManager.Update(f.liveObj, obj, manager)
+	out, err := f.fieldManager.Update(context.TODO(), f.liveObj, obj, manager)
 	if err == nil {
 		f.liveObj = out
 	}

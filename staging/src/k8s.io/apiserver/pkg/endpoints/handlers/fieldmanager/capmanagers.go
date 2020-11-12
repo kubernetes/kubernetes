@@ -17,6 +17,7 @@ limitations under the License.
 package fieldmanager
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
@@ -45,8 +46,8 @@ func NewCapManagersManager(fieldManager Manager, maxUpdateManagers int) Manager 
 }
 
 // Update implements Manager.
-func (f *capManagersManager) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
-	object, managed, err := f.fieldManager.Update(liveObj, newObj, managed, manager)
+func (f *capManagersManager) Update(ctx context.Context, liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
+	object, managed, err := f.fieldManager.Update(ctx, liveObj, newObj, managed, manager)
 	if err != nil {
 		return object, managed, err
 	}
@@ -57,8 +58,8 @@ func (f *capManagersManager) Update(liveObj, newObj runtime.Object, managed Mana
 }
 
 // Apply implements Manager.
-func (f *capManagersManager) Apply(liveObj, appliedObj runtime.Object, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error) {
-	return f.fieldManager.Apply(liveObj, appliedObj, managed, fieldManager, force)
+func (f *capManagersManager) Apply(ctx context.Context, liveObj, appliedObj runtime.Object, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error) {
+	return f.fieldManager.Apply(ctx, liveObj, appliedObj, managed, fieldManager, force)
 }
 
 // capUpdateManagers merges a number of the oldest update entries into versioned buckets,

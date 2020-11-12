@@ -17,6 +17,7 @@ limitations under the License.
 package fieldmanager
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,8 +55,8 @@ func NewStripMetaManager(fieldManager Manager) Manager {
 }
 
 // Update implements Manager.
-func (f *stripMetaManager) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
-	newObj, managed, err := f.fieldManager.Update(liveObj, newObj, managed, manager)
+func (f *stripMetaManager) Update(ctx context.Context, liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
+	newObj, managed, err := f.fieldManager.Update(ctx, liveObj, newObj, managed, manager)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -64,8 +65,8 @@ func (f *stripMetaManager) Update(liveObj, newObj runtime.Object, managed Manage
 }
 
 // Apply implements Manager.
-func (f *stripMetaManager) Apply(liveObj, appliedObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
-	newObj, managed, err := f.fieldManager.Apply(liveObj, appliedObj, managed, manager, force)
+func (f *stripMetaManager) Apply(ctx context.Context, liveObj, appliedObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
+	newObj, managed, err := f.fieldManager.Apply(ctx, liveObj, appliedObj, managed, manager, force)
 	if err != nil {
 		return nil, nil, err
 	}

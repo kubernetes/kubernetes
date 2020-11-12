@@ -161,7 +161,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 				if err != nil {
 					return nil, fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err)
 				}
-				obj = scope.FieldManager.UpdateNoErrors(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
+				obj = scope.FieldManager.UpdateNoErrors(ctx, liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
 			}
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
 				if err := mutatingAdmission.Admit(ctx, admissionAttributes, scope); err != nil {

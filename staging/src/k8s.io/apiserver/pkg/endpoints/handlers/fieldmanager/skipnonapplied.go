@@ -17,6 +17,7 @@ limitations under the License.
 package fieldmanager
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 
@@ -53,7 +54,7 @@ func NewProbabilisticSkipNonAppliedManager(fieldManager Manager, objectCreater r
 }
 
 // Update implements Manager.
-func (f *skipNonAppliedManager) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
+func (f *skipNonAppliedManager) Update(ctx context.Context, liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
 	accessor, err := meta.Accessor(liveObj)
 	if err != nil {
 		return newObj, managed, nil
@@ -72,20 +73,20 @@ func (f *skipNonAppliedManager) Update(liveObj, newObj runtime.Object, managed M
 			return newObj, managed, nil
 		}
 	}
-	return f.fieldManager.Update(liveObj, newObj, managed, manager)
+	return f.fieldManager.Update(ctx, liveObj, newObj, managed, manager)
 }
 
 // Apply implements Manager.
-func (f *skipNonAppliedManager) Apply(liveObj, appliedObj runtime.Object, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error) {
+func (f *skipNonAppliedManager) Apply(ctx context.Context, liveObj, appliedObj runtime.Object, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error) {
 	if len(managed.Fields()) == 0 {
 		emptyObj, err := f.objectCreater.New(f.gvk)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create empty object of type %v: %v", f.gvk, err)
 		}
-		liveObj, managed, err = f.fieldManager.Update(emptyObj, liveObj, managed, f.beforeApplyManagerName)
+		liveObj, managed, err = f.fieldManager.Update(ctx, emptyObj, liveObj, managed, f.beforeApplyManagerName)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create manager for existing fields: %v", err)
 		}
 	}
-	return f.fieldManager.Apply(liveObj, appliedObj, managed, fieldManager, force)
+	return f.fieldManager.Apply(ctx, liveObj, appliedObj, managed, fieldManager, force)
 }

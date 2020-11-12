@@ -17,6 +17,7 @@ limitations under the License.
 package fieldmanager
 
 import (
+	"context"
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,21 +43,21 @@ func NewBuildManagerInfoManager(f Manager, gv schema.GroupVersion) Manager {
 }
 
 // Update implements Manager.
-func (f *buildManagerInfoManager) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
+func (f *buildManagerInfoManager) Update(ctx context.Context, liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
 	manager, err := f.buildManagerInfo(manager, metav1.ManagedFieldsOperationUpdate)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to build manager identifier: %v", err)
 	}
-	return f.fieldManager.Update(liveObj, newObj, managed, manager)
+	return f.fieldManager.Update(ctx, liveObj, newObj, managed, manager)
 }
 
 // Apply implements Manager.
-func (f *buildManagerInfoManager) Apply(liveObj, appliedObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
+func (f *buildManagerInfoManager) Apply(ctx context.Context, liveObj, appliedObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
 	manager, err := f.buildManagerInfo(manager, metav1.ManagedFieldsOperationApply)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to build manager identifier: %v", err)
 	}
-	return f.fieldManager.Apply(liveObj, appliedObj, managed, manager, force)
+	return f.fieldManager.Apply(ctx, liveObj, appliedObj, managed, manager, force)
 }
 
 func (f *buildManagerInfoManager) buildManagerInfo(prefix string, operation metav1.ManagedFieldsOperationType) (string, error) {

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"testing"
 	"time"
+	"context"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -36,11 +37,11 @@ type fakeManager struct{}
 
 var _ Manager = &fakeManager{}
 
-func (*fakeManager) Update(_, newObj runtime.Object, managed Managed, _ string) (runtime.Object, Managed, error) {
+func (*fakeManager) Update(_ context.Context, _, newObj runtime.Object, managed Managed, _ string) (runtime.Object, Managed, error) {
 	return newObj, managed, nil
 }
 
-func (*fakeManager) Apply(_, _ runtime.Object, _ Managed, _ string, _ bool) (runtime.Object, Managed, error) {
+func (*fakeManager) Apply(_ context.Context, _, _ runtime.Object, _ Managed, _ string, _ bool) (runtime.Object, Managed, error) {
 	panic("not implemented")
 	return nil, nil, nil
 }

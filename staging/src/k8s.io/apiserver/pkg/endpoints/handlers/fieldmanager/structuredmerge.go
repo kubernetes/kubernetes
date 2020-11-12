@@ -76,7 +76,7 @@ func NewCRDStructuredMergeManager(typeConverter TypeConverter, objectConverter r
 }
 
 // Update implements Manager.
-func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
+func (f *structuredMergeManager) Update(ctx context.Context, liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
 	newObjVersioned, err := f.toVersioned(newObj)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert new object to proper version: %v", err)
@@ -102,14 +102,16 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 		return nil, nil, fmt.Errorf("failed to update ManagedFields: %v", err)
 	}
 
-	preparedPatchTyped, err := f.preparedPatchTyped(context.TODO(), liveObj, newObj)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get preparedPatchTyped: %v", err)
-	}
+	if f.preparator != nil {
+		preparedPatchTyped, err := f.preparedPatchTyped(ctx, liveObj, newObj)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get preparedPatchTyped: %v", err)
+		}
 
-	managedFields, err = merge.WipeManagedFields(liveManagedFields, managedFields, manager, liveObjTyped, preparedPatchTyped)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to wipe managedFields: %w", err)
+		managedFields, err = merge.WipeManagedFields(liveManagedFields, managedFields, manager, liveObjTyped, preparedPatchTyped)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to wipe managedFields: %w", err)
+		}
 	}
 
 	managed = internal.NewManaged(managedFields, managed.Times())
@@ -118,7 +120,7 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 }
 
 // Apply implements Manager.
-func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
+func (f *structuredMergeManager) Apply(ctx context.Context, liveObj, patchObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
 	// Check that the patch object has the same version as the live object
 	if patchVersion := patchObj.GetObjectKind().GroupVersionKind().GroupVersion(); patchVersion != f.groupVersion {
 		return nil, nil,
@@ -157,14 +159,16 @@ func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed
 		return nil, nil, err
 	}
 
-	preparedPatchTyped, err := f.preparedPatchTyped(context.TODO(), liveObj, patchObj)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get preparedPatchTyped: %v", err)
-	}
+	if f.preparator != nil {
+		preparedPatchTyped, err := f.preparedPatchTyped(ctx, liveObj, patchObj)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get preparedPatchTyped: %v", err)
+		}
 
-	managedFields, err = merge.WipeManagedFields(liveManagedFields, managedFields, manager, liveObjTyped, preparedPatchTyped)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to wipe managedFields: %w", err)
+		managedFields, err = merge.WipeManagedFields(liveManagedFields, managedFields, manager, liveObjTyped, preparedPatchTyped)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to wipe managedFields: %w", err)
+		}
 	}
 
 	managed = internal.NewManaged(managedFields, managed.Times())

@@ -17,6 +17,7 @@ limitations under the License.
 package fieldmanager
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -50,15 +51,15 @@ func NewLastAppliedManager(fieldManager Manager, typeConverter TypeConverter, ob
 }
 
 // Update implements Manager.
-func (f *lastAppliedManager) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
-	return f.fieldManager.Update(liveObj, newObj, managed, manager)
+func (f *lastAppliedManager) Update(ctx context.Context, liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
+	return f.fieldManager.Update(ctx, liveObj, newObj, managed, manager)
 }
 
 // Apply will consider the last-applied annotation
 // for upgrading an object managed by client-side apply to server-side apply
 // without conflicts.
-func (f *lastAppliedManager) Apply(liveObj, newObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
-	newLiveObj, newManaged, newErr := f.fieldManager.Apply(liveObj, newObj, managed, manager, force)
+func (f *lastAppliedManager) Apply(ctx context.Context, liveObj, newObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
+	newLiveObj, newManaged, newErr := f.fieldManager.Apply(ctx, liveObj, newObj, managed, manager, force)
 	// Upgrade the client-side apply annotation only from kubectl server-side-apply.
 	// To opt-out of this behavior, users may specify a different field manager.
 	if manager != "kubectl" {
@@ -86,7 +87,7 @@ func (f *lastAppliedManager) Apply(liveObj, newObj runtime.Object, managed Manag
 		return newLiveObj, newManaged, newConflicts
 	}
 
-	return f.fieldManager.Apply(liveObj, newObj, managed, manager, true)
+	return f.fieldManager.Apply(ctx, liveObj, newObj, managed, manager, true)
 }
 
 func (f *lastAppliedManager) allowedConflictsFromLastApplied(liveObj runtime.Object) (*fieldpath.Set, error) {
