@@ -26,7 +26,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	testutil "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state/testing"
 )
 
@@ -47,14 +46,12 @@ func TestCheckpointStateRestore(t *testing.T) {
 	testCases := []struct {
 		description       string
 		checkpointContent string
-		initialContainers containermap.ContainerMap
 		expectedError     string
 		expectedState     *stateMemory
 	}{
 		{
 			"Restore non-existing checkpoint",
 			"",
-			containermap.ContainerMap{},
 			"",
 			&stateMemory{},
 		},
@@ -66,7 +63,6 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"entries":{"pod":{"container1":[{"numaAffinity":[0],"type":"memory","size":512}]}},
 				"checksum": 4215593881
 			}`,
-			containermap.ContainerMap{},
 			"",
 			&stateMemory{
 				assignments: ContainerMemoryAssignments{
@@ -103,14 +99,12 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"entries":{"pod":{"container1":[{"affinity":[0],"type":"memory","size":512}]}},
 				"checksum": 101010
 			}`,
-			containermap.ContainerMap{},
 			"checkpoint is corrupted",
 			&stateMemory{},
 		},
 		{
 			"Restore checkpoint with invalid JSON",
 			`{`,
-			containermap.ContainerMap{},
 			"unexpected end of JSON input",
 			&stateMemory{},
 		},
@@ -138,7 +132,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 				assert.NoError(t, cpm.CreateCheckpoint(testingCheckpoint, checkpoint), "could not create testing checkpoint")
 			}
 
-			restoredState, err := NewCheckpointState(testingDir, testingCheckpoint, "static", tc.initialContainers)
+			restoredState, err := NewCheckpointState(testingDir, testingCheckpoint, "static")
 			if strings.TrimSpace(tc.expectedError) != "" {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "could not restore state from checkpoint: "+tc.expectedError)
@@ -191,7 +185,7 @@ func TestCheckpointStateStore(t *testing.T) {
 
 	assert.NoError(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove testing checkpoint")
 
-	cs1, err := NewCheckpointState(testingDir, testingCheckpoint, "static", nil)
+	cs1, err := NewCheckpointState(testingDir, testingCheckpoint, "static")
 	assert.NoError(t, err, "could not create testing checkpointState instance")
 
 	// set values of cs1 instance so they are stored in checkpoint and can be read by cs2
@@ -199,7 +193,7 @@ func TestCheckpointStateStore(t *testing.T) {
 	cs1.SetMemoryAssignments(expectedState.assignments)
 
 	// restore checkpoint with previously stored values
-	cs2, err := NewCheckpointState(testingDir, testingCheckpoint, "static", nil)
+	cs2, err := NewCheckpointState(testingDir, testingCheckpoint, "static")
 	assert.NoError(t, err, "could not create testing checkpointState instance")
 
 	assertStateEqual(t, cs2, expectedState)
@@ -313,7 +307,7 @@ func TestCheckpointStateHelpers(t *testing.T) {
 			// ensure there is no previous checkpoint
 			assert.NoError(t, cpm.RemoveCheckpoint(testingCheckpoint), "could not remove testing checkpoint")
 
-			state, err := NewCheckpointState(testingDir, testingCheckpoint, "static", nil)
+			state, err := NewCheckpointState(testingDir, testingCheckpoint, "static")
 			assert.NoError(t, err, "could not create testing checkpoint manager")
 
 			state.SetMachineState(tc.machineState)
@@ -376,7 +370,7 @@ func TestCheckpointStateClear(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			state, err := NewCheckpointState(testingDir, testingCheckpoint, "static", nil)
+			state, err := NewCheckpointState(testingDir, testingCheckpoint, "static")
 			assert.NoError(t, err, "could not create testing checkpoint manager")
 
 			state.SetMachineState(tc.machineState)

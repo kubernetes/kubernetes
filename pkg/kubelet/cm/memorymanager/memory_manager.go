@@ -97,7 +97,7 @@ type manager struct {
 	containerRuntime runtimeService
 
 	// activePods is a method for listing active pods on the node
-	// so all the containers can be updated in the reconciliation loop.
+	// so all the containers can be updated during call to the removeStaleState.
 	activePods ActivePodsFunc
 
 	// podStatusProvider provides a method for obtaining pod statuses
@@ -159,7 +159,7 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 	m.containerRuntime = containerRuntime
 	m.containerMap = initialContainers
 
-	stateImpl, err := state.NewCheckpointState(m.stateFileDirectory, memoryManagerStateFileName, m.policy.Name(), m.containerMap)
+	stateImpl, err := state.NewCheckpointState(m.stateFileDirectory, memoryManagerStateFileName, m.policy.Name())
 	if err != nil {
 		klog.Errorf("[memorymanager] could not initialize checkpoint manager: %v, please drain node and remove policy state file", err)
 		return err

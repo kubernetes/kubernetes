@@ -24,7 +24,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
-	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 )
 
 var _ State = &stateCheckpoint{}
@@ -35,11 +34,10 @@ type stateCheckpoint struct {
 	policyName        string
 	checkpointManager checkpointmanager.CheckpointManager
 	checkpointName    string
-	initialContainers containermap.ContainerMap
 }
 
 // NewCheckpointState creates new State for keeping track of memory/pod assignment with checkpoint backend
-func NewCheckpointState(stateDir, checkpointName, policyName string, initialContainers containermap.ContainerMap) (State, error) {
+func NewCheckpointState(stateDir, checkpointName, policyName string) (State, error) {
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(stateDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize checkpoint manager: %v", err)
@@ -49,7 +47,6 @@ func NewCheckpointState(stateDir, checkpointName, policyName string, initialCont
 		policyName:        policyName,
 		checkpointManager: checkpointManager,
 		checkpointName:    checkpointName,
-		initialContainers: initialContainers,
 	}
 
 	if err := stateCheckpoint.restoreState(); err != nil {
