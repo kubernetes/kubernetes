@@ -63,7 +63,18 @@ spec:
   - "30"
   type: 鮽ort昍řČ扷5ƗǸƢ6/ʕVŚ(Ŀ
 status:
+  conditions:
+  - lastTransitionTime: "2392-12-09T15:37:55Z"
+    message: "36"
+    observedGeneration: -2492120148461555858
+    reason: "35"
+    status: C
+    type: "34"
   loadBalancer:
     ingress:
     - hostname: "32"
       ip: "31"
+      ports:
+      - error: "33"
+        port: -907310967
+        protocol: 喂ƈ斎AO6

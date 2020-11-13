@@ -66,3 +66,7 @@ status:
     ingress:
     - hostname: "35"
       ip: "34"
+      ports:
+      - error: "36"
+        port: -8441701
+        protocol: ""

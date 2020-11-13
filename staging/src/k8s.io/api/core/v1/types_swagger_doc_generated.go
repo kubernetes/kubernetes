@@ -953,6 +953,7 @@ var map_LoadBalancerIngress = map[string]string{
 	"":         "LoadBalancerIngress represents the status of a load-balancer ingress point: traffic intended for the service should be sent to an ingress point.",
 	"ip":       "IP is set for load-balancer ingress points that are IP based (typically GCE or OpenStack load-balancers)",
 	"hostname": "Hostname is set for load-balancer ingress points that are DNS based (typically AWS load-balancers)",
+	"ports":    "Ports is a list of records of service ports If used, every port defined in the service should have an entry in it",
 }
 
 func (LoadBalancerIngress) SwaggerDoc() map[string]string {
@@ -1723,6 +1724,16 @@ func (PodTemplateSpec) SwaggerDoc() map[string]string {
 	return map_PodTemplateSpec
 }
 
+var map_PortStatus = map[string]string{
+	"port":     "Port is the port number of the service port of which status is recorded here",
+	"protocol": "Protocol is the protocol of the service port of which status is recorded here The supported values are: \"TCP\", \"UDP\", \"SCTP\"",
+	"error":    "Error is to record the problem with the service port The format of the error shall comply with the following rules: - built-in error values shall be specified in this file and those shall use\n  CamelCase names\n- cloud provider specific error values must have names that comply with the\n  format foo.example.com/CamelCase.",
+}
+
+func (PortStatus) SwaggerDoc() map[string]string {
+	return map_PortStatus
+}
+
 var map_PortworxVolumeSource = map[string]string{
 	"":         "PortworxVolumeSource represents a Portworx volume resource.",
 	"volumeID": "VolumeID uniquely identifies a Portworx volume",
@@ -2254,6 +2265,7 @@ func (ServiceSpec) SwaggerDoc() map[string]string {
 var map_ServiceStatus = map[string]string{
 	"":             "ServiceStatus represents the current status of a service.",
 	"loadBalancer": "LoadBalancer contains the current status of the load-balancer, if one is present.",
+	"conditions":   "Current service state",
 }
 
 func (ServiceStatus) SwaggerDoc() map[string]string {
