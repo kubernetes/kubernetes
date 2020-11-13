@@ -41,7 +41,7 @@ const (
 	requestConcurrencyLimitMetricLabelName = "priorityLevel"
 )
 
-var _ = SIGDescribe("API priority and fairness", func() {
+var _ = SIGDescribe("[Feature:APIPriorityAndFairness]", func() {
 	f := framework.NewDefaultFramework("flowschemas")
 
 	ginkgo.It("should ensure that requests can be classified by testing flow-schemas/priority-levels", func() {

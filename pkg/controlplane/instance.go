@@ -687,7 +687,6 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		storageapiv1beta1.SchemeGroupVersion,
 		schedulingapiv1beta1.SchemeGroupVersion,
 		schedulingapiv1.SchemeGroupVersion,
-		flowcontrolv1beta1.SchemeGroupVersion,
 	)
 	// enable non-deprecated beta resources in extensions/v1beta1 explicitly so we have a full list of what's possible to serve
 	ret.EnableResources(
@@ -702,6 +701,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		schedulingv1alpha1.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
 		flowcontrolv1alpha1.SchemeGroupVersion,
+		flowcontrolv1beta1.SchemeGroupVersion,
 	)
 
 	return ret
