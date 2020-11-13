@@ -128,14 +128,6 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 		return err
 	}
 
-	if len(opts.WriteConfigTo) > 0 {
-		if err := options.WriteConfigFile(opts.WriteConfigTo, &cc.ComponentConfig); err != nil {
-			return err
-		}
-		klog.Infof("Wrote configuration to: %s\n", opts.WriteConfigTo)
-		return nil
-	}
-
 	return Run(ctx, cc, sched)
 }
 
@@ -310,6 +302,7 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 	}
 
 	recorderFactory := getRecorderFactory(&cc)
+	completedProfiles := make([]kubeschedulerconfig.KubeSchedulerProfile, 0)
 	// Create the scheduler.
 	sched, err := scheduler.New(cc.Client,
 		cc.InformerFactory,
@@ -323,8 +316,15 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 		scheduler.WithPodInitialBackoffSeconds(cc.ComponentConfig.PodInitialBackoffSeconds),
 		scheduler.WithExtenders(cc.ComponentConfig.Extenders...),
 		scheduler.WithParallelism(cc.ComponentConfig.Parallelism),
+		scheduler.WithBuildFrameworkCapturer(func(profile kubeschedulerconfig.KubeSchedulerProfile) {
+			// Profiles are processed during Framework instantiation to set default plugins and configurations. Capturing them for logging
+			completedProfiles = append(completedProfiles, profile)
+		}),
 	)
 	if err != nil {
+		return nil, nil, err
+	}
+	if err := options.LogOrWriteConfig(opts.WriteConfigTo, &cc.ComponentConfig, completedProfiles); err != nil {
 		return nil, nil, err
 	}
 

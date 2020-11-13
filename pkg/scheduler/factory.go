@@ -138,12 +138,8 @@ func (c *Configurator) create() (*Scheduler, error) {
 		frameworkruntime.WithSnapshotSharedLister(c.nodeInfoSnapshot),
 		frameworkruntime.WithRunAllFilters(c.alwaysCheckAllPredicates),
 		frameworkruntime.WithPodNominator(nominator),
+		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(c.frameworkCapturer)),
 	)
-	for _, p := range c.profiles {
-		if c.frameworkCapturer != nil {
-			c.frameworkCapturer(p)
-		}
-	}
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
 	}
