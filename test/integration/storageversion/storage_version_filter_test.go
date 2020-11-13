@@ -82,7 +82,7 @@ func assertBlocking(name string, t *testing.T, err error, shouldBlock bool) {
 
 func testBuiltinResourceWrite(t *testing.T, cfg *rest.Config, shouldBlock bool) {
 	client := clientset.NewForConfigOrDie(cfg)
-	_, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test"}}, metav1.CreateOptions{})
+	_, err := client.CoreV1().ConfigMaps("default").Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test"}}, metav1.CreateOptions{})
 	assertBlocking("writes to built in resources", t, err, shouldBlock)
 }
 

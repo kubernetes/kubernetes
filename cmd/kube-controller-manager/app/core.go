@@ -56,6 +56,7 @@ import (
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
+	"k8s.io/kubernetes/pkg/controller/storageversiongc"
 	ttlcontroller "k8s.io/kubernetes/pkg/controller/ttl"
 	"k8s.io/kubernetes/pkg/controller/ttlafterfinished"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
@@ -673,4 +674,13 @@ func getNodeCIDRMaskSizes(clusterCIDRs []*net.IPNet, maskSizeIPv4, maskSizeIPv6 
 		}
 	}
 	return nodeMaskCIDRs
+}
+
+func startStorageVersionGCController(ctx ControllerContext) (http.Handler, bool, error) {
+	go storageversiongc.NewStorageVersionGC(
+		ctx.ClientBuilder.ClientOrDie("storage-version-garbage-collector"),
+		ctx.InformerFactory.Coordination().V1().Leases(),
+		ctx.InformerFactory.Internal().V1alpha1().StorageVersions(),
+	).Run(ctx.Stop)
+	return nil, true, nil
 }
