@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -439,6 +440,36 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 		number, exponent := rounded.AsCanonicalBase1024Bytes(out)
 		suffix, _ := quantitySuffixer.constructBytes(2, exponent*10, format)
 		return number, suffix
+	}
+}
+
+// AsApproximateFloat64 returns a float64 representation of the quantity which may
+// lose precision. If the value of the quantity is outside the range of a float64
+// +Inf/-Inf will be returned.
+func (q *Quantity) AsApproximateFloat64() float64 {
+	var base float64
+	var exponent int
+	if q.d.Dec != nil {
+		base, _ = big.NewFloat(0).SetInt(q.d.Dec.UnscaledBig()).Float64()
+		exponent = int(-q.d.Dec.Scale())
+	} else {
+		base = float64(q.i.value)
+		exponent = int(q.i.scale)
+	}
+	if exponent == 0 {
+		return base
+	}
+
+	// multiply by the appropriate exponential scale
+	switch q.Format {
+	case DecimalExponent, DecimalSI:
+		return base * math.Pow10(exponent)
+	default:
+		// fast path for exponents that can fit in 64 bits
+		if exponent > 0 && exponent < 7 {
+			return base * float64(int64(1)<<(exponent*10))
+		}
+		return base * math.Pow(2, float64(exponent*10))
 	}
 }
 
