@@ -34,7 +34,6 @@ import (
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -126,9 +125,10 @@ func newNonCSILimitsWithInformerFactory(
 ) framework.Plugin {
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
+	csiNodesLister := informerFactory.Storage().V1().CSINodes().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 
-	return newNonCSILimits(filterName, getCSINodeListerIfEnabled(informerFactory), scLister, pvLister, pvcLister)
+	return newNonCSILimits(filterName, csiNodesLister, scLister, pvLister, pvcLister)
 }
 
 // newNonCSILimits creates a plugin which evaluates whether a pod can fit based on the
@@ -510,12 +510,4 @@ func getMaxEBSVolume(nodeInstanceType string) int {
 		return volumeutil.DefaultMaxEBSNitroVolumeLimit
 	}
 	return volumeutil.DefaultMaxEBSVolumes
-}
-
-// getCSINodeListerIfEnabled returns the CSINode lister or nil if the feature is disabled
-func getCSINodeListerIfEnabled(factory informers.SharedInformerFactory) storagelisters.CSINodeLister {
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CSINodeInfo) {
-		return nil
-	}
-	return factory.Storage().V1().CSINodes().Lister()
 }

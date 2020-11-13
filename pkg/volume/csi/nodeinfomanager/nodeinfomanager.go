@@ -37,10 +37,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -115,10 +113,7 @@ func (nim *nodeInfoManager) InstallCSIDriver(driverName string, driverNodeID str
 
 	nodeUpdateFuncs := []nodeUpdateFunc{
 		updateNodeIDInNode(driverName, driverNodeID),
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		nodeUpdateFuncs = append(nodeUpdateFuncs, updateTopologyLabels(topology))
+		updateTopologyLabels(topology),
 	}
 
 	err := nim.updateNode(nodeUpdateFuncs...)
@@ -126,28 +121,25 @@ func (nim *nodeInfoManager) InstallCSIDriver(driverName string, driverNodeID str
 		return fmt.Errorf("error updating Node object with CSI driver node info: %v", err)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		err = nim.updateCSINode(driverName, driverNodeID, maxAttachLimit, topology)
-		if err != nil {
-			return fmt.Errorf("error updating CSINode object with CSI driver node info: %v", err)
-		}
+	err = nim.updateCSINode(driverName, driverNodeID, maxAttachLimit, topology)
+	if err != nil {
+		return fmt.Errorf("error updating CSINode object with CSI driver node info: %v", err)
 	}
+
 	return nil
 }
 
 // UninstallCSIDriver removes the node ID annotation from the Node object and CSIDrivers field from the
-// CSINode object. If the CSINOdeInfo object contains no CSIDrivers, it will be deleted.
+// CSINode object. If the CSINodeInfo object contains no CSIDrivers, it will be deleted.
 // If multiple calls to UninstallCSIDriver() are made in parallel, some calls might receive Node or
 // CSINode update conflicts, which causes the function to retry the corresponding update.
 func (nim *nodeInfoManager) UninstallCSIDriver(driverName string) error {
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		err := nim.uninstallDriverFromCSINode(driverName)
-		if err != nil {
-			return fmt.Errorf("error uninstalling CSI driver from CSINode object %v", err)
-		}
+	err := nim.uninstallDriverFromCSINode(driverName)
+	if err != nil {
+		return fmt.Errorf("error uninstalling CSI driver from CSINode object %v", err)
 	}
 
-	err := nim.updateNode(
+	err = nim.updateNode(
 		removeMaxAttachLimit(driverName),
 		removeNodeIDFromNode(driverName),
 	)

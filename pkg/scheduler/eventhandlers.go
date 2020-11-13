@@ -25,10 +25,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 )
@@ -426,14 +424,12 @@ func addAllEventHandlers(
 		},
 	)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
-			cache.ResourceEventHandlerFuncs{
-				AddFunc:    sched.onCSINodeAdd,
-				UpdateFunc: sched.onCSINodeUpdate,
-			},
-		)
-	}
+	informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    sched.onCSINodeAdd,
+			UpdateFunc: sched.onCSINodeUpdate,
+		},
+	)
 
 	// On add and update of PVs.
 	informerFactory.Core().V1().PersistentVolumes().Informer().AddEventHandler(

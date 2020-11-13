@@ -169,10 +169,8 @@ func NodeRules() []rbacv1.PolicyRule {
 	// CSI
 	csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csidrivers").RuleOrDie()
 	nodePolicyRules = append(nodePolicyRules, csiDriverRule)
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie()
-		nodePolicyRules = append(nodePolicyRules, csiNodeInfoRule)
-	}
+	csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie()
+	nodePolicyRules = append(nodePolicyRules, csiNodeInfoRule)
 
 	// RuntimeClass
 	nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch").Groups("node.k8s.io").Resources("runtimeclasses").RuleOrDie())
