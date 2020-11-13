@@ -52,15 +52,17 @@ const (
 	routeNameSeparator = "____"
 
 	// Route operations.
-	routeOperationAdd    routeOperation = "add"
-	routeOperationDelete routeOperation = "delete"
+	routeOperationAdd             routeOperation = "add"
+	routeOperationDelete          routeOperation = "delete"
+	routeTableOperationUpdateTags routeOperation = "updateRouteTableTags"
 )
 
 // delayedRouteOperation defines a delayed route operation which is used in delayedRouteUpdater.
 type delayedRouteOperation struct {
-	route     network.Route
-	operation routeOperation
-	result    chan error
+	route          network.Route
+	routeTableTags map[string]*string
+	operation      routeOperation
+	result         chan error
 }
 
 // wait waits for the operation completion and returns the result.
@@ -121,8 +123,10 @@ func (d *delayedRouteUpdater) updateRoutes() {
 		d.routesToUpdate = make([]*delayedRouteOperation, 0)
 	}()
 
-	var routeTable network.RouteTable
-	var existsRouteTable bool
+	var (
+		routeTable       network.RouteTable
+		existsRouteTable bool
+	)
 	routeTable, existsRouteTable, err = d.az.getRouteTable(azcache.CacheReadTypeDefault)
 	if err != nil {
 		klog.Errorf("getRouteTable() failed with error: %v", err)
@@ -150,8 +154,16 @@ func (d *delayedRouteUpdater) updateRoutes() {
 	if routeTable.Routes != nil {
 		routes = *routeTable.Routes
 	}
+	onlyUpdateTags := true
 	for _, rt := range d.routesToUpdate {
+		if rt.operation == routeTableOperationUpdateTags {
+			routeTable.Tags = rt.routeTableTags
+			dirty = true
+			continue
+		}
+
 		routeMatch := false
+		onlyUpdateTags = false
 		for i, existingRoute := range routes {
 			if strings.EqualFold(to.String(existingRoute.Name), to.String(rt.route.Name)) {
 				// delete the name-matched routes here (missing routes would be added later if the operation is add).
@@ -179,19 +191,16 @@ func (d *delayedRouteUpdater) updateRoutes() {
 		}
 	}
 
-	changed := d.az.ensureRouteTableTagged(&routeTable)
-	if changed {
-		dirty = true
-	}
-
 	if dirty {
-		routeTable.Routes = &routes
+		if !onlyUpdateTags {
+			klog.V(2).Infof("updateRoutes: updating routes")
+			routeTable.Routes = &routes
+		}
 		err = d.az.CreateOrUpdateRouteTable(routeTable)
 		if err != nil {
 			klog.Errorf("CreateOrUpdateRouteTable() failed with error: %v", err)
 			return
 		}
-		d.az.rtCache.Delete(to.String(routeTable.Name))
 	}
 }
 
@@ -204,6 +213,20 @@ func (d *delayedRouteUpdater) addRouteOperation(operation routeOperation, route 
 		route:     route,
 		operation: operation,
 		result:    make(chan error),
+	}
+	d.routesToUpdate = append(d.routesToUpdate, op)
+	return op, nil
+}
+
+// addUpdateRouteTableTagsOperation adds a update route table tags operation to delayedRouteUpdater and returns a delayedRouteOperation.
+func (d *delayedRouteUpdater) addUpdateRouteTableTagsOperation(operation routeOperation, tags map[string]*string) (*delayedRouteOperation, error) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	op := &delayedRouteOperation{
+		routeTableTags: tags,
+		operation:      operation,
+		result:         make(chan error),
 	}
 	d.routesToUpdate = append(d.routesToUpdate, op)
 	return op, nil
@@ -232,6 +255,24 @@ func (az *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudpr
 				TargetNode:      mapRouteNameToNodeName(az.ipv6DualStackEnabled, nodeName),
 				DestinationCIDR: cidr,
 			})
+		}
+	}
+
+	// ensure the route table is tagged as configured
+	tags, changed := az.ensureRouteTableTagged(&routeTable)
+	if changed {
+		klog.V(2).Infof("ListRoutes: updating tags on route table %s", to.String(routeTable.Name))
+		op, err := az.routeUpdater.addUpdateRouteTableTagsOperation(routeTableOperationUpdateTags, tags)
+		if err != nil {
+			klog.Errorf("ListRoutes: failed to add route table operation with error: %v", err)
+			return nil, err
+		}
+
+		// Wait for operation complete.
+		err = op.wait()
+		if err != nil {
+			klog.Errorf("ListRoutes: failed to update route table tags with error: %v", err)
+			return nil, err
 		}
 	}
 
@@ -463,9 +504,9 @@ func cidrtoRfc1035(cidr string) string {
 }
 
 //  ensureRouteTableTagged ensures the route table is tagged as configured
-func (az *Cloud) ensureRouteTableTagged(rt *network.RouteTable) bool {
+func (az *Cloud) ensureRouteTableTagged(rt *network.RouteTable) (map[string]*string, bool) {
 	if az.Tags == "" {
-		return false
+		return nil, false
 	}
 	changed := false
 	tags := parseTags(az.Tags)
@@ -478,5 +519,5 @@ func (az *Cloud) ensureRouteTableTagged(rt *network.RouteTable) bool {
 			changed = true
 		}
 	}
-	return changed
+	return rt.Tags, changed
 }
