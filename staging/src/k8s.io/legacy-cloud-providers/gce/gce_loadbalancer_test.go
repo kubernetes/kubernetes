@@ -21,6 +21,7 @@ package gce
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -192,4 +193,14 @@ func TestProjectsBasePath(t *testing.T) {
 	if gce.projectsBasePath != expectProjectsBasePath && gce.projectsBasePath != expectMtlsProjectsBasePath {
 		t.Errorf("Compute projectsBasePath has changed. Got %q, want %q or %q", gce.projectsBasePath, expectProjectsBasePath, expectMtlsProjectsBasePath)
 	}
+}
+
+func TestMarshalForwardingFirewallDescription(t *testing.T) {
+	clusterID := "test-cluster-id"
+	description := forwardingFirewallDescription{
+		ClusterID: clusterID,
+	}
+	desc, _ := description.marshal()
+	expectedDesc := fmt.Sprintf(`{"kubernetes.io/cluster-id":"%s"}`, clusterID)
+	assert.Equal(t, expectedDesc, desc)
 }
