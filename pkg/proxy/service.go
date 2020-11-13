@@ -184,8 +184,8 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	}
 
 	if len(ips) > 0 {
-		isCIDR := false
-		ipFamilyIPMap := utilproxy.MapIPsToIPFamily(ips, isCIDR)
+		isCIDR = false
+		ipFamilyIPMap = utilproxy.MapIPsToIPFamily(ips, isCIDR)
 
 		for ipFam, ipList := range ipFamilyIPMap {
 			if ipFam != sct.ipFamily && len(ipList) > 0 {
