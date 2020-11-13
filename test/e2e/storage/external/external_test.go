@@ -23,12 +23,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/testsuites"
+	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
 )
 
 func TestDriverParameter(t *testing.T) {
 	expected := &driverDefinition{
-		DriverInfo: testsuites.DriverInfo{
+		DriverInfo: storageapi.DriverInfo{
 			Name: "foo.example.com",
 			SupportedFsType: sets.NewString(
 				"", // Default fsType

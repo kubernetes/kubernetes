@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testsuites
+package api
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // GetDriverNameWithFeatureTags returns driver name with feature tags
@@ -38,15 +38,13 @@ func GetDriverNameWithFeatureTags(driver TestDriver) string {
 }
 
 // CreateVolume creates volume for test unless dynamicPV or CSI ephemeral inline volume test
-func CreateVolume(driver TestDriver, config *PerTestConfig, volType testpatterns.TestVolType) TestVolume {
+func CreateVolume(driver TestDriver, config *PerTestConfig, volType TestVolType) TestVolume {
 	switch volType {
-	case testpatterns.InlineVolume, testpatterns.PreprovisionedPV:
+	case InlineVolume, PreprovisionedPV:
 		if pDriver, ok := driver.(PreprovisionedVolumeTestDriver); ok {
 			return pDriver.CreateVolume(config, volType)
 		}
-	case testpatterns.CSIInlineVolume,
-		testpatterns.GenericEphemeralVolume,
-		testpatterns.DynamicPV:
+	case CSIInlineVolume, GenericEphemeralVolume, DynamicPV:
 		// No need to create volume
 	default:
 		framework.Failf("Invalid volType specified: %v", volType)
@@ -103,7 +101,7 @@ func GetSnapshotClass(
 	snapshotClass := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       "VolumeSnapshotClass",
-			"apiVersion": snapshotAPIVersion,
+			"apiVersion": utils.SnapshotAPIVersion,
 			"metadata": map[string]interface{}{
 				// Name must be unique, so let's base it on namespace name and use GenerateName
 				// TODO(#96234): Remove unnecessary suffix.

@@ -32,22 +32,23 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 type multiVolumeTestSuite struct {
-	tsInfo TestSuiteInfo
+	tsInfo storageapi.TestSuiteInfo
 }
 
-var _ TestSuite = &multiVolumeTestSuite{}
+var _ storageapi.TestSuite = &multiVolumeTestSuite{}
 
 // InitCustomMultiVolumeTestSuite returns multiVolumeTestSuite that implements TestSuite interface
 // using custom test patterns
-func InitCustomMultiVolumeTestSuite(patterns []testpatterns.TestPattern) TestSuite {
+func InitCustomMultiVolumeTestSuite(patterns []storageapi.TestPattern) storageapi.TestSuite {
 	return &multiVolumeTestSuite{
-		tsInfo: TestSuiteInfo{
+		tsInfo: storageapi.TestSuiteInfo{
 			Name:         "multiVolume [Slow]",
 			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
@@ -59,37 +60,37 @@ func InitCustomMultiVolumeTestSuite(patterns []testpatterns.TestPattern) TestSui
 
 // InitMultiVolumeTestSuite returns multiVolumeTestSuite that implements TestSuite interface
 // using test suite default patterns
-func InitMultiVolumeTestSuite() TestSuite {
-	patterns := []testpatterns.TestPattern{
-		testpatterns.FsVolModePreprovisionedPV,
-		testpatterns.FsVolModeDynamicPV,
-		testpatterns.BlockVolModePreprovisionedPV,
-		testpatterns.BlockVolModeDynamicPV,
+func InitMultiVolumeTestSuite() storageapi.TestSuite {
+	patterns := []storageapi.TestPattern{
+		storageapi.FsVolModePreprovisionedPV,
+		storageapi.FsVolModeDynamicPV,
+		storageapi.BlockVolModePreprovisionedPV,
+		storageapi.BlockVolModeDynamicPV,
 	}
 	return InitCustomMultiVolumeTestSuite(patterns)
 }
 
-func (t *multiVolumeTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+func (t *multiVolumeTestSuite) GetTestSuiteInfo() storageapi.TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *multiVolumeTestSuite) SkipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *multiVolumeTestSuite) SkipUnsupportedTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
 	dInfo := driver.GetDriverInfo()
-	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(testpatterns.PreprovisionedPV))
-	if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[CapBlock] {
+	skipVolTypePatterns(pattern, driver, storageapi.NewVolTypeMap(storageapi.PreprovisionedPV))
+	if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[storageapi.CapBlock] {
 		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolMode)
 	}
 }
 
-func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *multiVolumeTestSuite) DefineTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
 	type local struct {
-		config        *PerTestConfig
+		config        *storageapi.PerTestConfig
 		driverCleanup func()
 
 		cs        clientset.Interface
 		ns        *v1.Namespace
-		driver    TestDriver
-		resources []*VolumeResource
+		driver    storageapi.TestDriver
+		resources []*storageapi.VolumeResource
 
 		migrationCheck *migrationOpCheck
 	}
@@ -100,7 +101,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewFrameworkWithCustomTimeouts("multivolume", getDriverTimeouts(driver))
+	f := framework.NewFrameworkWithCustomTimeouts("multivolume", storageapi.GetDriverTimeouts(driver))
 
 	init := func() {
 		l = local{}
@@ -119,7 +120,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 			errs = append(errs, resource.CleanupResource())
 		}
 
-		errs = append(errs, tryFunc(l.driverCleanup))
+		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
 		l.driverCleanup = nil
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleanup resource")
 		l.migrationCheck.validateMigrationVolumeOpCounts()
@@ -134,7 +135,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		// Currently, multiple volumes are not generally available for pre-provisoined volume,
 		// because containerized storage servers, such as iSCSI and rbd, are just returning
 		// a static volume inside container, not actually creating a new volume per request.
-		if pattern.VolType == testpatterns.PreprovisionedPV {
+		if pattern.VolType == storageapi.PreprovisionedPV {
 			e2eskipper.Skipf("This test doesn't work with pre-provisioned volume -- skipping")
 		}
 
@@ -146,7 +147,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 
 		for i := 0; i < numVols; i++ {
 			testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
-			resource := CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+			resource := storageapi.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
 			pvcs = append(pvcs, resource.Pvc)
 		}
@@ -164,7 +165,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		// Currently, multiple volumes are not generally available for pre-provisoined volume,
 		// because containerized storage servers, such as iSCSI and rbd, are just returning
 		// a static volume inside container, not actually creating a new volume per request.
-		if pattern.VolType == testpatterns.PreprovisionedPV {
+		if pattern.VolType == storageapi.PreprovisionedPV {
 			e2eskipper.Skipf("This test doesn't work with pre-provisioned volume -- skipping")
 		}
 
@@ -172,8 +173,8 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		defer cleanup()
 
 		// Check different-node test requirement
-		if l.driver.GetDriverInfo().Capabilities[CapSingleNodeVolume] {
-			e2eskipper.Skipf("Driver %s only supports %v -- skipping", l.driver.GetDriverInfo().Name, CapSingleNodeVolume)
+		if l.driver.GetDriverInfo().Capabilities[storageapi.CapSingleNodeVolume] {
+			e2eskipper.Skipf("Driver %s only supports %v -- skipping", l.driver.GetDriverInfo().Name, storageapi.CapSingleNodeVolume)
 		}
 		nodes, err := e2enode.GetReadySchedulableNodes(l.cs)
 		framework.ExpectNoError(err)
@@ -196,7 +197,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 
 		for i := 0; i < numVols; i++ {
 			testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
-			resource := CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+			resource := storageapi.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
 			pvcs = append(pvcs, resource.Pvc)
 		}
@@ -218,7 +219,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		// Currently, multiple volumes are not generally available for pre-provisoined volume,
 		// because containerized storage servers, such as iSCSI and rbd, are just returning
 		// a static volume inside container, not actually creating a new volume per request.
-		if pattern.VolType == testpatterns.PreprovisionedPV {
+		if pattern.VolType == storageapi.PreprovisionedPV {
 			e2eskipper.Skipf("This test doesn't work with pre-provisioned volume -- skipping")
 		}
 
@@ -235,7 +236,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 				curPattern.VolMode = v1.PersistentVolumeFilesystem
 			}
 			testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
-			resource := CreateVolumeResource(driver, l.config, curPattern, testVolumeSizeRange)
+			resource := storageapi.CreateVolumeResource(driver, l.config, curPattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
 			pvcs = append(pvcs, resource.Pvc)
 		}
@@ -257,7 +258,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		// Currently, multiple volumes are not generally available for pre-provisoined volume,
 		// because containerized storage servers, such as iSCSI and rbd, are just returning
 		// a static volume inside container, not actually creating a new volume per request.
-		if pattern.VolType == testpatterns.PreprovisionedPV {
+		if pattern.VolType == storageapi.PreprovisionedPV {
 			e2eskipper.Skipf("This test doesn't work with pre-provisioned volume -- skipping")
 		}
 
@@ -265,8 +266,8 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 		defer cleanup()
 
 		// Check different-node test requirement
-		if l.driver.GetDriverInfo().Capabilities[CapSingleNodeVolume] {
-			e2eskipper.Skipf("Driver %s only supports %v -- skipping", l.driver.GetDriverInfo().Name, CapSingleNodeVolume)
+		if l.driver.GetDriverInfo().Capabilities[storageapi.CapSingleNodeVolume] {
+			e2eskipper.Skipf("Driver %s only supports %v -- skipping", l.driver.GetDriverInfo().Name, storageapi.CapSingleNodeVolume)
 		}
 		nodes, err := e2enode.GetReadySchedulableNodes(l.cs)
 		framework.ExpectNoError(err)
@@ -294,7 +295,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 				curPattern.VolMode = v1.PersistentVolumeFilesystem
 			}
 			testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
-			resource := CreateVolumeResource(driver, l.config, curPattern, testVolumeSizeRange)
+			resource := storageapi.CreateVolumeResource(driver, l.config, curPattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
 			pvcs = append(pvcs, resource.Pvc)
 		}
@@ -314,13 +315,13 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 
 		numPods := 2
 
-		if !l.driver.GetDriverInfo().Capabilities[CapMultiPODs] {
+		if !l.driver.GetDriverInfo().Capabilities[storageapi.CapMultiPODs] {
 			e2eskipper.Skipf("Driver %q does not support multiple concurrent pods - skipping", dInfo.Name)
 		}
 
 		// Create volume
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
-		resource := CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
+		resource := storageapi.CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
 		l.resources = append(l.resources, resource)
 
 		// Test access to the volume from pods on different node
@@ -339,13 +340,13 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 
 		numPods := 2
 
-		if !l.driver.GetDriverInfo().Capabilities[CapMultiPODs] {
+		if !l.driver.GetDriverInfo().Capabilities[storageapi.CapMultiPODs] {
 			e2eskipper.Skipf("Driver %q does not support multiple concurrent pods - skipping", dInfo.Name)
 		}
 
 		// Create volume
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
-		resource := CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
+		resource := storageapi.CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
 		l.resources = append(l.resources, resource)
 
 		// Initialize the volume with a filesystem - it's going to be mounted as read-only below.
@@ -367,8 +368,8 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 
 		numPods := 2
 
-		if !l.driver.GetDriverInfo().Capabilities[CapRWX] {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", l.driver.GetDriverInfo().Name, CapRWX)
+		if !l.driver.GetDriverInfo().Capabilities[storageapi.CapRWX] {
+			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", l.driver.GetDriverInfo().Name, storageapi.CapRWX)
 		}
 
 		// Check different-node test requirement
@@ -390,7 +391,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver TestDriver, pattern testpatter
 
 		// Create volume
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
-		resource := CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
+		resource := storageapi.CreateVolumeResource(l.driver, l.config, pattern, testVolumeSizeRange)
 		l.resources = append(l.resources, resource)
 
 		// Test access to the volume from pods on different node
@@ -423,7 +424,7 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 		index := i + 1
 		path := fmt.Sprintf("/mnt/volume%d", index)
 		ginkgo.By(fmt.Sprintf("Checking if the volume%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
-		utils.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, path)
+		e2evolume.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, path)
 
 		if readSeedBase > 0 {
 			ginkgo.By(fmt.Sprintf("Checking if read from the volume%d works properly", index))
@@ -524,7 +525,7 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 	for i, pod := range pods {
 		index := i + 1
 		ginkgo.By(fmt.Sprintf("Checking if the volume in pod%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
-		utils.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, path)
+		e2evolume.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, path)
 
 		if readOnly {
 			ginkgo.By("Skipping volume content checks, volume is read-only")
@@ -560,7 +561,7 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		index := i + 1
 		// index of pod and index of pvc match, because pods are created above way
 		ginkgo.By(fmt.Sprintf("Rechecking if the volume in pod%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
-		utils.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, "/mnt/volume1")
+		e2evolume.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, "/mnt/volume1")
 
 		if readOnly {
 			ginkgo.By("Skipping volume content checks, volume is read-only")

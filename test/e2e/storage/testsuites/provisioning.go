@@ -38,7 +38,8 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	storageapi "k8s.io/kubernetes/test/e2e/storage/api"
+	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // StorageClassTest represents parameters to be used by provisioning tests.
@@ -62,14 +63,14 @@ type StorageClassTest struct {
 }
 
 type provisioningTestSuite struct {
-	tsInfo TestSuiteInfo
+	tsInfo storageapi.TestSuiteInfo
 }
 
 // InitCustomProvisioningTestSuite returns provisioningTestSuite that implements TestSuite interface
 // using custom test patterns
-func InitCustomProvisioningTestSuite(patterns []testpatterns.TestPattern) TestSuite {
+func InitCustomProvisioningTestSuite(patterns []storageapi.TestPattern) storageapi.TestSuite {
 	return &provisioningTestSuite{
-		tsInfo: TestSuiteInfo{
+		tsInfo: storageapi.TestSuiteInfo{
 			Name:         "provisioning",
 			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
@@ -81,33 +82,33 @@ func InitCustomProvisioningTestSuite(patterns []testpatterns.TestPattern) TestSu
 
 // InitProvisioningTestSuite returns provisioningTestSuite that implements TestSuite interface\
 // using test suite default patterns
-func InitProvisioningTestSuite() TestSuite {
-	patterns := []testpatterns.TestPattern{
-		testpatterns.DefaultFsDynamicPV,
-		testpatterns.BlockVolModeDynamicPV,
-		testpatterns.NtfsDynamicPV,
+func InitProvisioningTestSuite() storageapi.TestSuite {
+	patterns := []storageapi.TestPattern{
+		storageapi.DefaultFsDynamicPV,
+		storageapi.BlockVolModeDynamicPV,
+		storageapi.NtfsDynamicPV,
 	}
 	return InitCustomProvisioningTestSuite(patterns)
 }
 
-func (p *provisioningTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+func (p *provisioningTestSuite) GetTestSuiteInfo() storageapi.TestSuiteInfo {
 	return p.tsInfo
 }
 
-func (p *provisioningTestSuite) SkipUnsupportedTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (p *provisioningTestSuite) SkipUnsupportedTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
 	// Check preconditions.
-	if pattern.VolType != testpatterns.DynamicPV {
+	if pattern.VolType != storageapi.DynamicPV {
 		e2eskipper.Skipf("Suite %q does not support %v", p.tsInfo.Name, pattern.VolType)
 	}
 	dInfo := driver.GetDriverInfo()
-	if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[CapBlock] {
+	if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[storageapi.CapBlock] {
 		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolMode)
 	}
 }
 
-func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (p *provisioningTestSuite) DefineTests(driver storageapi.TestDriver, pattern storageapi.TestPattern) {
 	type local struct {
-		config        *PerTestConfig
+		config        *storageapi.PerTestConfig
 		driverCleanup func()
 
 		testCase  *StorageClassTest
@@ -120,24 +121,24 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 	}
 	var (
 		dInfo   = driver.GetDriverInfo()
-		dDriver DynamicPVTestDriver
+		dDriver storageapi.DynamicPVTestDriver
 		l       local
 	)
 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewFrameworkWithCustomTimeouts("provisioning", getDriverTimeouts(driver))
+	f := framework.NewFrameworkWithCustomTimeouts("provisioning", storageapi.GetDriverTimeouts(driver))
 
 	init := func() {
 		l = local{}
-		dDriver, _ = driver.(DynamicPVTestDriver)
+		dDriver, _ = driver.(storageapi.DynamicPVTestDriver)
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
 		l.cs = l.config.Framework.ClientSet
 		testVolumeSizeRange := p.GetTestSuiteInfo().SupportedSizeRange
 		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
-		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+		claimSize, err := storageutils.GetSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
 
 		l.sc = dDriver.GetDynamicProvisionStorageClass(l.config, pattern.FsType)
@@ -168,7 +169,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 	}
 
 	cleanup := func() {
-		err := tryFunc(l.driverCleanup)
+		err := storageutils.TryFunc(l.driverCleanup)
 		l.driverCleanup = nil
 		framework.ExpectNoError(err, "while cleaning up driver")
 
@@ -194,14 +195,14 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 	})
 
 	ginkgo.It("should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]", func() {
-		if !dInfo.Capabilities[CapSnapshotDataSource] {
+		if !dInfo.Capabilities[storageapi.CapSnapshotDataSource] {
 			e2eskipper.Skipf("Driver %q does not support populate data from snapshot - skipping", dInfo.Name)
 		}
 		if !dInfo.SupportedFsType.Has(pattern.FsType) {
 			e2eskipper.Skipf("Driver %q does not support %q fs type - skipping", dInfo.Name, pattern.FsType)
 		}
 
-		sDriver, ok := driver.(SnapshottableTestDriver)
+		sDriver, ok := driver.(storageapi.SnapshottableTestDriver)
 		if !ok {
 			framework.Failf("Driver %q has CapSnapshotDataSource but does not implement SnapshottableTestDriver", dInfo.Name)
 		}
@@ -210,7 +211,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 		defer cleanup()
 
 		dc := l.config.Framework.DynamicClient
-		testConfig := convertTestConfig(l.config)
+		testConfig := storageapi.ConvertTestConfig(l.config)
 		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
 		dataSource, cleanupFunc := prepareSnapshotDataSourceForProvisioning(f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, expectedContent)
 		defer cleanupFunc()
@@ -220,7 +221,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 			ginkgo.By("checking whether the created volume has the pre-populated data")
 			tests := []e2evolume.Test{
 				{
-					Volume:          *createVolumeSource(claim.Name, false /* readOnly */),
+					Volume:          *storageutils.CreateVolumeSource(claim.Name, false /* readOnly */),
 					Mode:            pattern.VolMode,
 					File:            "index.html",
 					ExpectedContent: expectedContent,
@@ -232,13 +233,13 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 	})
 
 	ginkgo.It("should provision storage with pvc data source", func() {
-		if !dInfo.Capabilities[CapPVCDataSource] {
+		if !dInfo.Capabilities[storageapi.CapPVCDataSource] {
 			e2eskipper.Skipf("Driver %q does not support cloning - skipping", dInfo.Name)
 		}
 		init()
 		defer cleanup()
 
-		testConfig := convertTestConfig(l.config)
+		testConfig := storageapi.ConvertTestConfig(l.config)
 		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
 		dataSource, dataSourceCleanup := preparePVCDataSourceForProvisioning(f, testConfig, l.cs, l.sourcePVC, l.sc, pattern.VolMode, expectedContent)
 		defer dataSourceCleanup()
@@ -248,7 +249,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 			ginkgo.By("checking whether the created volume has the pre-populated data")
 			tests := []e2evolume.Test{
 				{
-					Volume:          *createVolumeSource(claim.Name, false /* readOnly */),
+					Volume:          *storageutils.CreateVolumeSource(claim.Name, false /* readOnly */),
 					Mode:            pattern.VolMode,
 					File:            "index.html",
 					ExpectedContent: expectedContent,
@@ -261,17 +262,17 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 
 	ginkgo.It("should provision storage with pvc data source in parallel [Slow]", func() {
 		// Test cloning a single volume multiple times.
-		if !dInfo.Capabilities[CapPVCDataSource] {
+		if !dInfo.Capabilities[storageapi.CapPVCDataSource] {
 			e2eskipper.Skipf("Driver %q does not support cloning - skipping", dInfo.Name)
 		}
-		if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[CapBlock] {
+		if pattern.VolMode == v1.PersistentVolumeBlock && !dInfo.Capabilities[storageapi.CapBlock] {
 			e2eskipper.Skipf("Driver %q does not support block volumes - skipping", dInfo.Name)
 		}
 
 		init()
 		defer cleanup()
 
-		testConfig := convertTestConfig(l.config)
+		testConfig := storageapi.ConvertTestConfig(l.config)
 		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
 		dataSource, dataSourceCleanup := preparePVCDataSourceForProvisioning(f, testConfig, l.cs, l.sourcePVC, l.sc, pattern.VolMode, expectedContent)
 		defer dataSourceCleanup()
@@ -296,7 +297,7 @@ func (p *provisioningTestSuite) DefineTests(driver TestDriver, pattern testpatte
 					ginkgo.By(fmt.Sprintf("checking whether the created volume %d has the pre-populated data", i))
 					tests := []e2evolume.Test{
 						{
-							Volume:          *createVolumeSource(claim.Name, false /* readOnly */),
+							Volume:          *storageutils.CreateVolumeSource(claim.Name, false /* readOnly */),
 							Mode:            pattern.VolMode,
 							File:            "index.html",
 							ExpectedContent: expectedContent,
@@ -563,7 +564,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	class, err := t.Client.StorageV1().StorageClasses().Create(context.TODO(), t.Class, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	defer func() {
-		err = deleteStorageClass(t.Client, class.Name)
+		err = storageutils.DeleteStorageClass(t.Client, class.Name)
 		framework.ExpectNoError(err, "While deleting storage class")
 	}()
 
@@ -784,13 +785,13 @@ func verifyPVCsPending(client clientset.Interface, pvcs []*v1.PersistentVolumeCl
 func prepareSnapshotDataSourceForProvisioning(
 	f *framework.Framework,
 	config e2evolume.TestConfig,
-	perTestConfig *PerTestConfig,
-	pattern testpatterns.TestPattern,
+	perTestConfig *storageapi.PerTestConfig,
+	pattern storageapi.TestPattern,
 	client clientset.Interface,
 	dynamicClient dynamic.Interface,
 	initClaim *v1.PersistentVolumeClaim,
 	class *storagev1.StorageClass,
-	sDriver SnapshottableTestDriver,
+	sDriver storageapi.SnapshottableTestDriver,
 	mode v1.PersistentVolumeMode,
 	injectContent string,
 ) (*v1.TypedLocalObjectReference, func()) {
@@ -808,7 +809,7 @@ func prepareSnapshotDataSourceForProvisioning(
 	// write namespace to the /mnt/test (= the volume).
 	tests := []e2evolume.Test{
 		{
-			Volume:          *createVolumeSource(updatedClaim.Name, false /* readOnly */),
+			Volume:          *storageutils.CreateVolumeSource(updatedClaim.Name, false /* readOnly */),
 			Mode:            mode,
 			File:            "index.html",
 			ExpectedContent: injectContent,
@@ -816,7 +817,7 @@ func prepareSnapshotDataSourceForProvisioning(
 	}
 	e2evolume.InjectContent(f, config, nil, "", tests)
 
-	snapshotResource := CreateSnapshotResource(sDriver, perTestConfig, pattern, updatedClaim.GetName(), updatedClaim.GetNamespace(), f.Timeouts)
+	snapshotResource := storageapi.CreateSnapshotResource(sDriver, perTestConfig, pattern, updatedClaim.GetName(), updatedClaim.GetNamespace(), f.Timeouts)
 
 	group := "snapshot.storage.k8s.io"
 	dataSourceRef := &v1.TypedLocalObjectReference{
@@ -867,7 +868,7 @@ func preparePVCDataSourceForProvisioning(
 
 	tests := []e2evolume.Test{
 		{
-			Volume:          *createVolumeSource(sourcePVC.Name, false /* readOnly */),
+			Volume:          *storageutils.CreateVolumeSource(sourcePVC.Name, false /* readOnly */),
 			Mode:            mode,
 			File:            "index.html",
 			ExpectedContent: injectContent,
