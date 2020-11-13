@@ -139,6 +139,9 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 		if o.RequiresRepublish != nil {
 			object.Spec.RequiresRepublish = o.RequiresRepublish
 		}
+		if o.FSGroupPolicy != nil {
+			object.Spec.FSGroupPolicy = o.FSGroupPolicy
+		}
 	}
 
 	return nil
@@ -194,4 +197,8 @@ type PatchCSIOptions struct {
 	// field *if* the driver deploys a CSIDriver object. Ignored
 	// otherwise.
 	RequiresRepublish *bool
+	// If not nil, the value to use for the CSIDriver.Spec.FSGroupPolicy
+	// field *if* the driver deploys a CSIDriver object. Ignored
+	// otherwise.
+	FSGroupPolicy *storagev1.FSGroupPolicy
 }

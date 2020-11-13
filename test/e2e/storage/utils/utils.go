@@ -94,6 +94,17 @@ func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, shExec string) 
 	}
 }
 
+// VerifyFSGroupInPod verifies that the passed in filePath contains the expectedFSGroup
+func VerifyFSGroupInPod(f *framework.Framework, filePath, expectedFSGroup string, pod *v1.Pod) {
+	cmd := fmt.Sprintf("ls -l %s", filePath)
+	stdout, stderr, err := PodExec(f, pod, cmd)
+	framework.ExpectNoError(err)
+	framework.Logf("pod %s/%s exec for cmd %s, stdout: %s, stderr: %s", pod.Namespace, pod.Name, cmd, stdout, stderr)
+	fsGroupResult := strings.Fields(stdout)[3]
+	framework.ExpectEqual(expectedFSGroup, fsGroupResult,
+		"Expected fsGroup of %s, got %s", expectedFSGroup, fsGroupResult)
+}
+
 // VerifyExecInPodFail verifies shell cmd in target pod fail with certain exit code
 func VerifyExecInPodFail(f *framework.Framework, pod *v1.Pod, shExec string, exitCode int) {
 	stdout, stderr, err := PodExec(f, pod, shExec)

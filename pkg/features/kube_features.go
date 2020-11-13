@@ -432,6 +432,7 @@ const (
 
 	// owner: @huffmanca
 	// alpha: v1.19
+	// beta: v1.20
 	//
 	// Determines if a CSI Driver supports applying fsGroup.
 	CSIVolumeFSGroupPolicy featuregate.Feature = "CSIVolumeFSGroupPolicy"
@@ -770,7 +771,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIStorageCapacity:             {Default: false, PreRelease: featuregate.Alpha},
 	CSIServiceAccountToken:         {Default: false, PreRelease: featuregate.Alpha},
 	GenericEphemeralVolume:         {Default: false, PreRelease: featuregate.Alpha},
-	CSIVolumeFSGroupPolicy:         {Default: false, PreRelease: featuregate.Alpha},
+	CSIVolumeFSGroupPolicy:         {Default: true, PreRelease: featuregate.Beta},
 	RuntimeClass:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	NodeLease:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	SCTPSupport:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22

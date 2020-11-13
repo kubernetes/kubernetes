@@ -393,10 +393,13 @@ func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets
 	return allErrs
 }
 
+// ValidateCSIDriverName checks that a name is appropriate for a
+// CSIDriver object.
+var ValidateCSIDriverName = apimachineryvalidation.NameIsDNSSubdomain
+
 // ValidateCSIDriver validates a CSIDriver.
 func ValidateCSIDriver(csiDriver *storage.CSIDriver) field.ErrorList {
-	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(csiDriver.Name, field.NewPath("name"))...)
+	allErrs := apivalidation.ValidateObjectMeta(&csiDriver.ObjectMeta, false, ValidateCSIDriverName, field.NewPath("metadata"))
 
 	allErrs = append(allErrs, validateCSIDriverSpec(&csiDriver.Spec, field.NewPath("spec"))...)
 	return allErrs
@@ -404,7 +407,7 @@ func ValidateCSIDriver(csiDriver *storage.CSIDriver) field.ErrorList {
 
 // ValidateCSIDriverUpdate validates a CSIDriver.
 func ValidateCSIDriverUpdate(new, old *storage.CSIDriver) field.ErrorList {
-	allErrs := ValidateCSIDriver(new)
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
 
 	// Spec is read-only
 	// If this ever relaxes in the future, make sure to increment the Generation number in PrepareForUpdate

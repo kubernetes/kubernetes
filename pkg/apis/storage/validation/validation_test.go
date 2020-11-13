@@ -1870,8 +1870,11 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 	podInfoOnMount := true
 	notPodInfoOnMount := false
 	notRequiresRepublish := false
+	resourceVersion := "1"
+	invalidFSGroupPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
+	invalidFSGroupPolicy = "invalid-mode"
 	old := storage.CSIDriver{
-		ObjectMeta: metav1.ObjectMeta{Name: driverName},
+		ObjectMeta: metav1.ObjectMeta{Name: driverName, ResourceVersion: resourceVersion},
 		Spec: storage.CSIDriverSpec{
 			AttachRequired:    &attachNotRequired,
 			PodInfoOnMount:    &notPodInfoOnMount,
@@ -1883,11 +1886,27 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 		},
 	}
 
-	// Currently there is only one success case: exactly the same
-	// as the existing object.
-	successCases := []storage.CSIDriver{old}
+	// Currently we compare the object against itself
+	// and ensure updates succeed
+	successCases := []storage.CSIDriver{
+		old,
+		// An invalid FSGroupPolicy should still pass
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName, ResourceVersion: resourceVersion},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+					storage.VolumeLifecycleEphemeral,
+					storage.VolumeLifecyclePersistent,
+				},
+				FSGroupPolicy: &invalidFSGroupPolicy,
+			},
+		},
+	}
 	for _, csiDriver := range successCases {
-		if errs := ValidateCSIDriverUpdate(&csiDriver, &old); len(errs) != 0 {
+		newDriver := csiDriver.DeepCopy()
+		if errs := ValidateCSIDriverUpdate(&csiDriver, newDriver); len(errs) != 0 {
 			t.Errorf("expected success for %+v: %v", csiDriver, errs)
 		}
 	}
@@ -1961,6 +1980,21 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 				new.Spec.VolumeLifecycleModes = []storage.VolumeLifecycleMode{
 					storage.VolumeLifecyclePersistent,
 				}
+			},
+		},
+		{
+			name: "FSGroupPolicy invalidated",
+			modify: func(new *storage.CSIDriver) {
+				invalidFSGroupPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
+				invalidFSGroupPolicy = "invalid"
+				new.Spec.FSGroupPolicy = &invalidFSGroupPolicy
+			},
+		},
+		{
+			name: "FSGroupPolicy changed",
+			modify: func(new *storage.CSIDriver) {
+				fileFSGroupPolicy := storage.FileFSGroupPolicy
+				new.Spec.FSGroupPolicy = &fileFSGroupPolicy
 			},
 		},
 	}
