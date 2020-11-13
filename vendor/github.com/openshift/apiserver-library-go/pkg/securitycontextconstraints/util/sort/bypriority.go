@@ -13,6 +13,10 @@ func (s ByPriority) Len() int {
 }
 func (s ByPriority) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 func (s ByPriority) Less(i, j int) bool {
+	ret, _ := s.LessWithReason(i, j)
+	return ret
+}
+func (s ByPriority) LessWithReason(i, j int) (bool, string) {
 	iSCC := s[i]
 	jSCC := s[j]
 
@@ -21,11 +25,11 @@ func (s ByPriority) Less(i, j int) bool {
 
 	// a higher priority is considered "less" so that it moves to the front of the line
 	if iSCCPriority > jSCCPriority {
-		return true
+		return true, "has higher priority"
 	}
 
 	if iSCCPriority < jSCCPriority {
-		return false
+		return false, "has lower priority"
 	}
 
 	// priorities are equal, let's try point values
@@ -35,15 +39,15 @@ func (s ByPriority) Less(i, j int) bool {
 	// a lower restriction score is considered "less" so that it moves to the front of the line
 	// (the greater the score, the more lax the SCC is)
 	if iRestrictionScore < jRestrictionScore {
-		return true
+		return true, moreRestrictiveReason(iRestrictionScore, jRestrictionScore)
 	}
 
 	if iRestrictionScore > jRestrictionScore {
-		return false
+		return false, moreRestrictiveReason(jRestrictionScore, iRestrictionScore)
 	}
 
 	// they are still equal, sort by name
-	return iSCC.Name < jSCC.Name
+	return iSCC.Name < jSCC.Name, "ordered by name"
 }
 
 func getPriority(scc *securityv1.SecurityContextConstraints) int {

@@ -1,6 +1,7 @@
 package sort
 
 import (
+	"fmt"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -31,8 +32,8 @@ type points int
 const (
 	privilegedPoints points = 1000000
 
-	hostNetworkPoints points = 200000
 	hostPortsPoints   points = 400000
+	hostNetworkPoints points = 200000
 
 	hostVolumePoints       points = 100000
 	nonTrivialVolumePoints points = 50000
@@ -53,6 +54,53 @@ const (
 
 	noPoints points = 0
 )
+
+func moreRestrictiveReason(p, q points) string {
+	if p >= q {
+		return ""
+	}
+
+	var done bool
+	var reason string
+	dueTo := func(x points, what string) (points, points, string, bool) {
+		switch {
+		case p >= x && q >= x:
+			p -= x
+			q -= x
+		case p < x && q >= x:
+			return p, q, fmt.Sprintf("forbids %s", what), true
+		}
+		return p, q, "", false
+	}
+	if p, q, reason, done = dueTo(privilegedPoints, "privileged"); done {
+		return reason
+	}
+	if p, q, reason, done = dueTo(hostPortsPoints, "host ports"); done {
+		return reason
+	}
+	if p, q, reason, done = dueTo(hostNetworkPoints, "host networking"); done {
+		return reason
+	}
+	if p, q, reason, done = dueTo(hostVolumePoints, "host volume mounts"); done {
+		return reason
+	}
+	if p, q, reason, done = dueTo(nonTrivialVolumePoints, "non-trivial volume mounts"); done {
+		return reason
+	}
+
+	runsAsP, capP := p/10000, p%10000
+	runsAsQ, capQ := q/10000, q%10000
+
+	if runsAsP < runsAsQ {
+		return "permits less runAsUser strategies"
+	}
+	if capP < capQ {
+		return "permits less capabilities"
+	}
+
+	// this should never happen due to the comparison at the very top
+	return "is equally restrictive"
+}
 
 // pointValue places a value on the SCC based on the settings of the SCC that can be used
 // to determine how restrictive it is.  The lower the number, the more restrictive it is.
