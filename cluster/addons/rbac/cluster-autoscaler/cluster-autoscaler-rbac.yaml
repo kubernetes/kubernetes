@@ -6,11 +6,11 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
   # leader election
-  - apiGroups: ["coordination.k8s.io"]
-    resources: ["leases"]
+  - apiGroups: [""]
+    resources: ["endpoints"]
     verbs: ["create"]
-  - apiGroups: ["coordination.k8s.io"]
-    resources: ["leases"]
+  - apiGroups: [""]
+    resources: ["endpoints"]
     resourceNames: ["cluster-autoscaler"]
     verbs: ["get", "update", "patch", "delete"]
   # accessing & modifying cluster state (nodes & pods)
