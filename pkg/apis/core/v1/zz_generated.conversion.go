@@ -7596,6 +7596,7 @@ func autoConvert_v1_ServiceSpec_To_core_ServiceSpec(in *v1.ServiceSpec, out *cor
 	out.TopologyKeys = *(*[]string)(unsafe.Pointer(&in.TopologyKeys))
 	out.IPFamilies = *(*[]core.IPFamily)(unsafe.Pointer(&in.IPFamilies))
 	out.IPFamilyPolicy = (*core.IPFamilyPolicyType)(unsafe.Pointer(in.IPFamilyPolicy))
+	out.AllocateLoadBalancerNodePorts = (*bool)(unsafe.Pointer(in.AllocateLoadBalancerNodePorts))
 	return nil
 }
 
@@ -7622,6 +7623,7 @@ func autoConvert_core_ServiceSpec_To_v1_ServiceSpec(in *core.ServiceSpec, out *v
 	out.HealthCheckNodePort = in.HealthCheckNodePort
 	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
 	out.TopologyKeys = *(*[]string)(unsafe.Pointer(&in.TopologyKeys))
+	out.AllocateLoadBalancerNodePorts = (*bool)(unsafe.Pointer(in.AllocateLoadBalancerNodePorts))
 	return nil
 }
 

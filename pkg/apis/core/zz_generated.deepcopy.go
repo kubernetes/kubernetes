@@ -5290,6 +5290,11 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.AllocateLoadBalancerNodePorts != nil {
+		in, out := &in.AllocateLoadBalancerNodePorts, &out.AllocateLoadBalancerNodePorts
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
