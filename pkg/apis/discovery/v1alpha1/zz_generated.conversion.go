@@ -99,6 +99,7 @@ func autoConvert_v1alpha1_Endpoint_To_discovery_Endpoint(in *v1alpha1.Endpoint, 
 	out.Hostname = (*string)(unsafe.Pointer(in.Hostname))
 	out.TargetRef = (*core.ObjectReference)(unsafe.Pointer(in.TargetRef))
 	out.Topology = *(*map[string]string)(unsafe.Pointer(&in.Topology))
+	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
 	return nil
 }
 
@@ -115,6 +116,7 @@ func autoConvert_discovery_Endpoint_To_v1alpha1_Endpoint(in *discovery.Endpoint,
 	out.Hostname = (*string)(unsafe.Pointer(in.Hostname))
 	out.TargetRef = (*v1.ObjectReference)(unsafe.Pointer(in.TargetRef))
 	out.Topology = *(*map[string]string)(unsafe.Pointer(&in.Topology))
+	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
 	return nil
 }
 

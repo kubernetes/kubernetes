@@ -26,8 +26,10 @@ import (
 	"k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/utils/net"
 )
@@ -76,6 +78,7 @@ type endpointSliceInfo struct {
 // Addresses and Topology are copied from EndpointSlice Endpoints.
 type endpointInfo struct {
 	Addresses []string
+	NodeName  *string
 	Topology  map[string]string
 }
 
@@ -120,10 +123,14 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 	if !remove {
 		for _, endpoint := range endpointSlice.Endpoints {
 			if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready {
-				esInfo.Endpoints = append(esInfo.Endpoints, &endpointInfo{
+				eInfo := endpointInfo{
 					Addresses: endpoint.Addresses,
 					Topology:  endpoint.Topology,
-				})
+				}
+				if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceNodeName) {
+					eInfo.NodeName = endpoint.NodeName
+				}
+				esInfo.Endpoints = append(esInfo.Endpoints, &eInfo)
 			}
 		}
 
@@ -255,7 +262,13 @@ func (cache *EndpointSliceCache) addEndpointsByIP(serviceNN types.NamespacedName
 			continue
 		}
 
-		isLocal := cache.isLocal(endpoint.Topology[v1.LabelHostname])
+		isLocal := false
+		if endpoint.NodeName != nil {
+			isLocal = cache.isLocal(*endpoint.NodeName)
+		} else {
+			isLocal = cache.isLocal(endpoint.Topology[v1.LabelHostname])
+		}
+
 		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology)
 
 		// This logic ensures we're deduping potential overlapping endpoints

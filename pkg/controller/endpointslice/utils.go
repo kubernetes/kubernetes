@@ -87,6 +87,10 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node, service *corev1.Service, 
 		ep.Conditions.Terminating = &terminating
 	}
 
+	if pod.Spec.NodeName != "" && utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceNodeName) {
+		ep.NodeName = &pod.Spec.NodeName
+	}
+
 	if endpointutil.ShouldSetHostname(pod, service) {
 		ep.Hostname = &pod.Spec.Hostname
 	}
