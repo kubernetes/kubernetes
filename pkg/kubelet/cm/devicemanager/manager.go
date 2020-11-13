@@ -908,10 +908,12 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		allocDevicesWithNUMA := checkpoint.NewDevicesPerNUMA()
 		// Update internal cached podDevices state.
 		m.mutex.Lock()
-		if m.allDevices[resource][dev].Topology != nil {
-			for idx := range m.allDevices[resource][dev].Topology.Nodes {
-				node := m.allDevices[resource][dev].Topology.Nodes[idx]
-				allocDevicesWithNUMA[node.ID] = append(allocDevicesWithNUMA[node.ID], dev)
+		for dev := range allocDevices {
+			if m.allDevices[resource][dev].Topology != nil {
+				for idx := range m.allDevices[resource][dev].Topology.Nodes {
+					node := m.allDevices[resource][dev].Topology.Nodes[idx]
+					allocDevicesWithNUMA[node.ID] = append(allocDevicesWithNUMA[node.ID], dev)
+				}
 			}
 		}
 		m.mutex.Unlock()
