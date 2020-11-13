@@ -11,6 +11,13 @@
     - [Added](#added)
     - [Changed](#changed)
     - [Removed](#removed)
+- [v1.18.11](#v11811)
+  - [Downloads for v1.18.11](#downloads-for-v11811)
+  - [Changelog since v1.18.10](#changelog-since-v11810)
+  - [Dependencies](#dependencies)
+    - [Added](#added)
+    - [Changed](#changed)
+    - [Removed](#removed)
 - [v1.18.10](#v11810)
   - [Downloads for v1.18.10](#downloads-for-v11810)
     - [Source Code](#source-code-1)
@@ -337,6 +344,41 @@ _Nothing has changed._
 ### Removed
 _Nothing has changed._
 
+# v1.18.11
+
+## Downloads for v1.18.11
+
+No artifacts for v1.18.11 were released.
+
+## Changelog since v1.18.10
+
+## Changes by Kind
+
+### Bug or Regression
+
+- An issues preventing volume expand controller to annotate the PVC with `volume.kubernetes.io/storage-resizer` when the PVC StorageClass is already updated to the out-of-tree provisioner is now fixed. ([#94489](https://github.com/kubernetes/kubernetes/pull/94489), [@ialidzhikov](https://github.com/ialidzhikov)) [SIG API Machinery, Apps and Storage]
+- Disable watchcache for events.k8.io/Event resource for compatibility with core/Event. ([#96117](https://github.com/kubernetes/kubernetes/pull/96117), [@wojtek-t](https://github.com/wojtek-t)) [SIG Scalability]
+- Disabled `LocalStorageCapacityIsolation` feature gate is honored during scheduling. ([#96181](https://github.com/kubernetes/kubernetes/pull/96181), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG Scheduling]
+- Fix a bug that Pods with topologySpreadConstraints get scheduled to nodes without required labels. ([#95883](https://github.com/kubernetes/kubernetes/pull/95883), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG Scheduling]
+- Fix azure disk attach failure for disk size bigger than 4TB ([#95463](https://github.com/kubernetes/kubernetes/pull/95463), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider]
+- Fix azure disk data loss issue on Windows when unmount disk ([#95456](https://github.com/kubernetes/kubernetes/pull/95456), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider and Storage]
+- Fix azure file migration panic ([#94853](https://github.com/kubernetes/kubernetes/pull/94853), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider]
+- Fixed a bug in client-go where new clients with customized `Dial`, `Proxy`, `GetCert` config may get stale HTTP transports. ([#95427](https://github.com/kubernetes/kubernetes/pull/95427), [@roycaihw](https://github.com/roycaihw)) [SIG API Machinery]
+- Fixes high CPU usage in kubectl drain ([#95260](https://github.com/kubernetes/kubernetes/pull/95260), [@amandahla](https://github.com/amandahla)) [SIG CLI]
+- If we set SelectPolicy MinPolicySelect on scaleUp behavior or scaleDown behavior,Horizontal Pod Autoscaler doesn`t automatically scale the number of pods correctly ([#95647](https://github.com/kubernetes/kubernetes/pull/95647), [@JoshuaAndrew](https://github.com/JoshuaAndrew)) [SIG Apps and Autoscaling]
+- Kube-apiserver: multiple comma-separated protocols in a single X-Stream-Protocol-Version header are now recognized, in addition to multiple headers, complying with RFC2616 ([#89857](https://github.com/kubernetes/kubernetes/pull/89857), [@tedyu](https://github.com/tedyu)) [SIG API Machinery]
+- Kube-proxy now trims extra spaces found in loadBalancerSourceRanges to match Service validation. ([#94107](https://github.com/kubernetes/kubernetes/pull/94107), [@robscott](https://github.com/robscott)) [SIG Network]
+
+## Dependencies
+
+### Added
+_Nothing has changed._
+
+### Changed
+_Nothing has changed._
+
+### Removed
+_Nothing has changed._
 
 
 # v1.18.10
