@@ -32,8 +32,8 @@ import (
 // because that would require importing k8s.io/kubernetes).
 var (
 	MandatoryPriorityLevelConfigurations = []*flowcontrol.PriorityLevelConfiguration{
-		MandatoryPriorityLevelConfigurationExempt,
 		MandatoryPriorityLevelConfigurationCatchAll,
+		MandatoryPriorityLevelConfigurationExempt,
 	}
 	MandatoryFlowSchemas = []*flowcontrol.FlowSchema{
 		MandatoryFlowSchemaExempt,
