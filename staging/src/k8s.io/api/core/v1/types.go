@@ -4181,6 +4181,7 @@ type ServiceSpec struct {
 	// The special value "*" may be used to mean "any topology". This catch-all
 	// value, if used, only makes sense as the last value in the list.
 	// If this is not specified or empty, no topology constraints will be applied.
+	// This field is alpha-level and is only honored by servers that enable the ServiceTopology feature.
 	// +optional
 	TopologyKeys []string `json:"topologyKeys,omitempty" protobuf:"bytes,16,opt,name=topologyKeys"`
 
