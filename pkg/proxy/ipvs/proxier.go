@@ -1332,11 +1332,11 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		for _, ingress := range svcInfo.LoadBalancerIngress() {
-			if ingress.IP != "" && (!utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) || *ingress.IPMode == v1.LoadBalancerIPModeVIP) {
+		for _, ingress := range svcInfo.LoadBalancerIPStrings() {
+			if ingress != "" {
 				// ipset call
 				entry = &utilipset.Entry{
-					IP:       ingress.IP,
+					IP:       ingress,
 					Port:     svcInfo.Port(),
 					Protocol: protocol,
 					SetType:  utilipset.HashIPPort,
@@ -1371,7 +1371,7 @@ func (proxier *Proxier) syncProxyRules() {
 					for _, src := range svcInfo.LoadBalancerSourceRanges() {
 						// ipset call
 						entry = &utilipset.Entry{
-							IP:       ingress.IP,
+							IP:       ingress,
 							Port:     svcInfo.Port(),
 							Protocol: protocol,
 							Net:      src,
@@ -1395,10 +1395,10 @@ func (proxier *Proxier) syncProxyRules() {
 					// Need to add the following rule to allow request on host.
 					if allowFromNode {
 						entry = &utilipset.Entry{
-							IP:       ingress.IP,
+							IP:       ingress,
 							Port:     svcInfo.Port(),
 							Protocol: protocol,
-							IP2:      ingress.IP,
+							IP2:      ingress,
 							SetType:  utilipset.HashIPPortIP,
 						}
 						// enumerate all white list source ip
@@ -1412,7 +1412,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 				// ipvs call
 				serv := &utilipvs.VirtualServer{
-					Address:   net.ParseIP(ingress.IP),
+					Address:   net.ParseIP(ingress),
 					Port:      uint16(svcInfo.Port()),
 					Protocol:  string(svcInfo.Protocol()),
 					Scheduler: proxier.ipvsScheduler,
@@ -1957,10 +1957,10 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 					klog.Errorf("Failed to delete %s endpoint connections for externalIP %s, error: %v", epSvcPair.ServicePortName.String(), extIP, err)
 				}
 			}
-			for _, lbIngress := range svcInfo.LoadBalancerIngress() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIngress.IP, endpointIP, svcProto)
+			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
+				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, svcProto)
 				if err != nil {
-					klog.Errorf("Failed to delete %s endpoint connections for LoadBalancerIP %s, error: %v", epSvcPair.ServicePortName.String(), lbIngress.IP, err)
+					klog.Errorf("Failed to delete %s endpoint connections for LoadBalancerIP %s, error: %v", epSvcPair.ServicePortName.String(), lbIP, err)
 				}
 			}
 		}

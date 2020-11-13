@@ -3503,32 +3503,11 @@ type LoadBalancerIngress struct {
 	// (typically AWS load-balancers)
 	// +optional
 	Hostname string
-
-	// IPMode specifies how the load-balancer's IP behaves.
-	// Setting this to "VIP" indicates that the traffic passing through
-	// this load-balancer is delivered with the destination IP and port set to the load-balancer's IP and port.
-	// Setting this to "Proxy" indicates that the load-balancer acts like a proxy,
-	// delivering traffic with the destination IP and port set to the node's IP and nodePort or to the pod's IP and targetPort.
-	// This field can only be set when the ip field is also set, and defaults to "VIP" if not specified.
-	// +optional
-	IPMode *LoadBalancerIPMode
 }
 
 const (
 	// MaxServiceTopologyKeys is the largest number of topology keys allowed on a service
 	MaxServiceTopologyKeys = 16
-)
-
-// LoadBalancerIPMode represents the mode of the LoadBalancer ingress IP
-type LoadBalancerIPMode string
-
-const (
-	// LoadBalancerIPModeVIP indicates that the traffic passing through this LoadBalancer
-	// is delivered with the destination IP set to the specified LoadBalancer IP
-	LoadBalancerIPModeVIP LoadBalancerIPMode = "VIP"
-	// LoadBalancerIPModeProxy indicates that the specified LoadBalancer acts like a proxy,
-	// changing the destination IP to the node IP and the source IP to the LoadBalancer (mostly private) IP
-	LoadBalancerIPModeProxy LoadBalancerIPMode = "Proxy"
 )
 
 // IPFamily represents the IP Family (IPv4 or IPv6). This type is used

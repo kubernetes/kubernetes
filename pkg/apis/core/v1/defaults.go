@@ -19,7 +19,7 @@ package v1
 import (
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/parsers"
@@ -165,17 +165,6 @@ func SetDefaults_Service(obj *v1.Service) {
 		// any other defaulting depends on cluster configuration.
 		// further IPFamilies, IPFamilyPolicy defaulting is in ClusterIP alloc/reserve logic
 		// note: conversion logic handles cases where ClusterIPs is used (but not ClusterIP).
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) &&
-		obj.Spec.Type == v1.ServiceTypeLoadBalancer {
-		ipMode := v1.LoadBalancerIPModeVIP
-
-		for i, ing := range obj.Status.LoadBalancer.Ingress {
-			if ing.IP != "" && ing.IPMode == nil {
-				obj.Status.LoadBalancer.Ingress[i].IPMode = &ipMode
-			}
-		}
 	}
 }
 func SetDefaults_Pod(obj *v1.Pod) {

@@ -682,11 +682,6 @@ const (
 	// Enables kubelet support to size memory backed volumes
 	SizeMemoryBackedVolumes featuregate.Feature = "SizeMemoryBackedVolumes"
 
-	// owner: @Sh4d1
-	// alpha: v1.21
-	// LoadBalancerIPMode enables the IPMode field in the LoadBalancerIngress status of a Service
-	LoadBalancerIPMode featuregate.Feature = "LoadBalancerIPMode"
-
 	// owner: @andrewsykim @SergeyKanzhelev
 	// GA: v1.20
 	//
@@ -815,7 +810,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	HPAContainerMetrics:                            {Default: false, PreRelease: featuregate.Alpha},
 	RootCAConfigMap:                                {Default: true, PreRelease: featuregate.Beta},
 	SizeMemoryBackedVolumes:                        {Default: false, PreRelease: featuregate.Alpha},
-	LoadBalancerIPMode:                             {Default: false, PreRelease: featuregate.Alpha},
 	ExecProbeTimeout:                               {Default: true, PreRelease: featuregate.GA}, // lock to default in v1.21 and remove in v1.22
 	KubeletCredentialProviders:                     {Default: false, PreRelease: featuregate.Alpha},
 	GracefulNodeShutdown:                           {Default: false, PreRelease: featuregate.Alpha},

@@ -179,12 +179,6 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && !topologyKeysInUse(oldSvc) {
 		newSvc.Spec.TopologyKeys = nil
 	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) && !loadbalancerIPModeInUse(oldSvc) {
-		for _, ing := range newSvc.Status.LoadBalancer.Ingress {
-			ing.IPMode = nil
-		}
-	}
 }
 
 // returns true if svc.Spec.ServiceIPFamily field is in use
@@ -206,19 +200,6 @@ func topologyKeysInUse(svc *api.Service) bool {
 		return false
 	}
 	return len(svc.Spec.TopologyKeys) > 0
-}
-
-// returns true when the LoadBalancer Ingress IPMode fields are in use.
-func loadbalancerIPModeInUse(svc *api.Service) bool {
-	if svc == nil {
-		return false
-	}
-	for _, ing := range svc.Status.LoadBalancer.Ingress {
-		if ing.IPMode != nil {
-			return true
-		}
-	}
-	return false
 }
 
 type serviceStatusStrategy struct {

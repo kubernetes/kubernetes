@@ -105,9 +105,13 @@ func (info *BaseServiceInfo) ExternalIPStrings() []string {
 	return info.externalIPs
 }
 
-// LoadBalancerIngress is part of ServicePort interface.
-func (info *BaseServiceInfo) LoadBalancerIngress() []v1.LoadBalancerIngress {
-	return info.loadBalancerStatus.Ingress
+// LoadBalancerIPStrings is part of ServicePort interface.
+func (info *BaseServiceInfo) LoadBalancerIPStrings() []string {
+	var ips []string
+	for _, ing := range info.loadBalancerStatus.Ingress {
+		ips = append(ips, ing.IP)
+	}
+	return ips
 }
 
 // OnlyNodeLocalEndpoints is part of ServicePort interface.
@@ -163,16 +167,23 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		klog.V(4).Infof("service change tracker(%v) ignored the following load balancer source ranges(%s) for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(incorrectIPs, ","), service.Namespace, service.Name)
 	}
 
-	correctIngresses, incorrectIngresses := utilproxy.FilterIncorrectLoadBalancerIngress(service.Status.LoadBalancer.Ingress, sct.ipFamily)
+	// Obtain Load Balancer Ingress IPs
+	var ips []string
+	for _, ing := range service.Status.LoadBalancer.Ingress {
+		ips = append(ips, ing.IP)
+	}
 
-	info.loadBalancerStatus.Ingress = correctIngresses
+	if len(ips) > 0 {
+		correctIPs, incorrectIPs := utilproxy.FilterIncorrectIPVersion(ips, sct.ipFamily)
 
-	if len(incorrectIngresses) > 0 {
-		var incorrectIPs []string
-		for _, incorrectIng := range incorrectIngresses {
-			incorrectIPs = append(incorrectIPs, incorrectIng.IP)
+		if len(incorrectIPs) > 0 {
+			klog.V(4).Infof("service change tracker(%v) ignored the following load balancer(%s) ingress ips for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(incorrectIPs, ","), service.Namespace, service.Name)
+
 		}
-		klog.V(4).Infof("service change tracker(%v) ignored the following load balancer(%s) ingress ips for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(incorrectIPs, ","), service.Namespace, service.Name)
+		// Create the LoadBalancerStatus with the filtered IPs
+		for _, ip := range correctIPs {
+			info.loadBalancerStatus.Ingress = append(info.loadBalancerStatus.Ingress, v1.LoadBalancerIngress{IP: ip})
+		}
 	}
 
 	if apiservice.NeedsHealthCheck(service) {
