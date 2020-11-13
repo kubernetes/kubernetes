@@ -179,6 +179,11 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && !topologyKeysInUse(oldSvc) {
 		newSvc.Spec.TopologyKeys = nil
 	}
+
+	// Clear AllocateLoadBalancerNodePorts if ServiceLBNodePortControl if not enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
+		newSvc.Spec.AllocateLoadBalancerNodePorts = nil
+	}
 }
 
 // returns true if svc.Spec.ServiceIPFamily field is in use
@@ -355,6 +360,11 @@ func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
 	// be deallocated later.
 	if needsHCNodePort(oldSvc) && !needsHCNodePort(newSvc) && sameHCNodePort(oldSvc, newSvc) {
 		newSvc.Spec.HealthCheckNodePort = 0
+	}
+
+	// AllocateLoadBalancerNodePorts may only be set for type LoadBalancer
+	if newSvc.Spec.Type != api.ServiceTypeLoadBalancer {
+		newSvc.Spec.AllocateLoadBalancerNodePorts = nil
 	}
 
 	// NOTE: there are other fields like `selector` which we could wipe.

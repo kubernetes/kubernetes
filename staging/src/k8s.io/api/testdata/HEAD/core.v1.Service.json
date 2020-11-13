@@ -82,7 +82,8 @@
     "ipFamilies": [
       "斬³;Ơ歿:狞夌碕ʂɭîcP$Iņɖ"
     ],
-    "ipFamilyPolicy": "9ȫŚ"
+    "ipFamilyPolicy": "9ȫŚ",
+    "allocateLoadBalancerNodePorts": true
   },
   "status": {
     "loadBalancer": {

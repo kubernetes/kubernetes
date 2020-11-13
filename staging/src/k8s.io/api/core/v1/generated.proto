@@ -4984,6 +4984,15 @@ message ServiceSpec {
   // wiped when updating a service to type ExternalName.
   // +optional
   optional string ipFamilyPolicy = 17;
+
+  // allocateLoadBalancerNodePorts defines if NodePorts will be automatically
+  // allocated for services with type LoadBalancer.  Default is "true". It may be
+  // set to "false" if the cluster load-balancer does not rely on NodePorts.
+  // allocateLoadBalancerNodePorts may only be set for services with type LoadBalancer
+  // and will be cleared if the type is changed to any other type.
+  // This field is alpha-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
+  // +optional
+  optional bool allocateLoadBalancerNodePorts = 20;
 }
 
 // ServiceStatus represents the current status of a service.

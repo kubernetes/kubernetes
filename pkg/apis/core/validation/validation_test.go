@@ -11169,6 +11169,13 @@ func TestValidateServiceCreate(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+		{
+			name: "Use AllocateLoadBalancerNodePorts when type is not LoadBalancer",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -13536,6 +13543,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP"}}
 				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.StringPtr("~https")}}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "Set AllocateLoadBalancerNodePorts when type is not LoadBalancer",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			},
 			numErrs: 1,
 		},

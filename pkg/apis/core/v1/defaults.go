@@ -166,6 +166,14 @@ func SetDefaults_Service(obj *v1.Service) {
 		// further IPFamilies, IPFamilyPolicy defaulting is in ClusterIP alloc/reserve logic
 		// note: conversion logic handles cases where ClusterIPs is used (but not ClusterIP).
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
+		if obj.Spec.Type == v1.ServiceTypeLoadBalancer {
+			if obj.Spec.AllocateLoadBalancerNodePorts == nil {
+				obj.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+			}
+		}
+	}
 }
 func SetDefaults_Pod(obj *v1.Pod) {
 	// If limits are specified, but requests are not, default requests to limits

@@ -30,6 +30,7 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
+  allocateLoadBalancerNodePorts: true
   clusterIP: "24"
   clusterIPs:
   - "25"

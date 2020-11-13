@@ -5305,6 +5305,11 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 		*out = new(IPFamilyPolicyType)
 		**out = **in
 	}
+	if in.AllocateLoadBalancerNodePorts != nil {
+		in, out := &in.AllocateLoadBalancerNodePorts, &out.AllocateLoadBalancerNodePorts
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
