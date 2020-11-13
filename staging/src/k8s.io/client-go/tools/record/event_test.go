@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -373,6 +374,300 @@ func TestEventf(t *testing.T) {
 		}
 		logWatcher.Stop()
 	}
+	sinkWatcher.Stop()
+}
+
+func TestEventfWithOptions(t *testing.T) {
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			SelfLink:  "/api/v1/namespaces/baz/pods/foo",
+			Name:      "foo",
+			Namespace: "baz",
+			UID:       "bar",
+		},
+	}
+	testPod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			SelfLink:  "/api/v1/namespaces/baz/pods/foo",
+			Name:      "foo",
+			Namespace: "baz",
+			UID:       "differentUid",
+		},
+	}
+	testRef, err := ref.GetPartialReference(scheme.Scheme, testPod, "spec.containers[2]")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testRef2, err := ref.GetPartialReference(scheme.Scheme, testPod2, "spec.containers[3]")
+	if err != nil {
+		t.Fatal(err)
+	}
+	table := []struct {
+		obj          k8sruntime.Object
+		eventtype    string
+		reason       string
+		messageFmt   string
+		elements     []interface{}
+		expect       *v1.Event
+		expectLog    string
+		expectUpdate bool
+	}{
+		{
+			obj:        testRef,
+			eventtype:  v1.EventTypeNormal,
+			reason:     "Started",
+			messageFmt: "some verbose message: %v",
+			elements:   []interface{}{1},
+			expect: &v1.Event{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "baz",
+				},
+				InvolvedObject: v1.ObjectReference{
+					Kind:       "Pod",
+					Name:       "foo",
+					Namespace:  "baz",
+					UID:        "bar",
+					APIVersion: "v1",
+					FieldPath:  "spec.containers[2]",
+				},
+				Reason:  "Started",
+				Message: "some verbose message: 1",
+				Source:  v1.EventSource{Component: "eventTest"},
+				Count:   1,
+				Type:    v1.EventTypeNormal,
+			},
+			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[2]"}): type: 'Normal' reason: 'Started' some verbose message: 1`,
+			expectUpdate: false,
+		},
+		{
+			obj:        testPod,
+			eventtype:  v1.EventTypeNormal,
+			reason:     "Killed",
+			messageFmt: "some other verbose message: %v",
+			elements:   []interface{}{1},
+			expect: &v1.Event{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "baz",
+				},
+				InvolvedObject: v1.ObjectReference{
+					Kind:       "Pod",
+					Name:       "foo",
+					Namespace:  "baz",
+					UID:        "bar",
+					APIVersion: "v1",
+				},
+				Reason:  "Killed",
+				Message: "some other verbose message: 1",
+				Source:  v1.EventSource{Component: "eventTest"},
+				Count:   1,
+				Type:    v1.EventTypeNormal,
+			},
+			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1", ResourceVersion:"", FieldPath:""}): type: 'Normal' reason: 'Killed' some other verbose message: 1`,
+			expectUpdate: false,
+		},
+		{
+			obj:        testRef,
+			eventtype:  v1.EventTypeNormal,
+			reason:     "Started",
+			messageFmt: "some verbose message: %v",
+			elements:   []interface{}{1},
+			expect: &v1.Event{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "baz",
+				},
+				InvolvedObject: v1.ObjectReference{
+					Kind:       "Pod",
+					Name:       "foo",
+					Namespace:  "baz",
+					UID:        "bar",
+					APIVersion: "v1",
+					FieldPath:  "spec.containers[2]",
+				},
+				Reason:  "Started",
+				Message: "some verbose message: 1",
+				Source:  v1.EventSource{Component: "eventTest"},
+				Count:   2,
+				Type:    v1.EventTypeNormal,
+			},
+			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[2]"}): type: 'Normal' reason: 'Started' some verbose message: 1`,
+			expectUpdate: true,
+		},
+		{
+			obj:        testRef2,
+			eventtype:  v1.EventTypeNormal,
+			reason:     "Started",
+			messageFmt: "some verbose message: %v",
+			elements:   []interface{}{1},
+			expect: &v1.Event{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "baz",
+				},
+				InvolvedObject: v1.ObjectReference{
+					Kind:       "Pod",
+					Name:       "foo",
+					Namespace:  "baz",
+					UID:        "differentUid",
+					APIVersion: "v1",
+					FieldPath:  "spec.containers[3]",
+				},
+				Reason:  "Started",
+				Message: "some verbose message: 1",
+				Source:  v1.EventSource{Component: "eventTest"},
+				Count:   1,
+				Type:    v1.EventTypeNormal,
+			},
+			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[3]"}): type: 'Normal' reason: 'Started' some verbose message: 1`,
+			expectUpdate: false,
+		},
+		{
+			obj:        testRef,
+			eventtype:  v1.EventTypeNormal,
+			reason:     "Started",
+			messageFmt: "some verbose message: %v",
+			elements:   []interface{}{1},
+			expect: &v1.Event{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "baz",
+				},
+				InvolvedObject: v1.ObjectReference{
+					Kind:       "Pod",
+					Name:       "foo",
+					Namespace:  "baz",
+					UID:        "bar",
+					APIVersion: "v1",
+					FieldPath:  "spec.containers[2]",
+				},
+				Reason:  "Started",
+				Message: "some verbose message: 1",
+				Source:  v1.EventSource{Component: "eventTest"},
+				Count:   3,
+				Type:    v1.EventTypeNormal,
+			},
+			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[2]"}): type: 'Normal' reason: 'Started' some verbose message: 1`,
+			expectUpdate: true,
+		},
+		{
+			obj:        testRef2,
+			eventtype:  v1.EventTypeNormal,
+			reason:     "Stopped",
+			messageFmt: "some verbose message: %v",
+			elements:   []interface{}{1},
+			expect: &v1.Event{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "baz",
+				},
+				InvolvedObject: v1.ObjectReference{
+					Kind:       "Pod",
+					Name:       "foo",
+					Namespace:  "baz",
+					UID:        "differentUid",
+					APIVersion: "v1",
+					FieldPath:  "spec.containers[3]",
+				},
+				Reason:  "Stopped",
+				Message: "some verbose message: 1",
+				Source:  v1.EventSource{Component: "eventTest"},
+				Count:   1,
+				Type:    v1.EventTypeNormal,
+			},
+			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[3]"}): type: 'Normal' reason: 'Stopped' some verbose message: 1`,
+			expectUpdate: false,
+		},
+		{
+			obj:        testRef2,
+			eventtype:  v1.EventTypeNormal,
+			reason:     "Stopped",
+			messageFmt: "some verbose message: %v",
+			elements:   []interface{}{1},
+			expect: &v1.Event{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "baz",
+				},
+				InvolvedObject: v1.ObjectReference{
+					Kind:       "Pod",
+					Name:       "foo",
+					Namespace:  "baz",
+					UID:        "differentUid",
+					APIVersion: "v1",
+					FieldPath:  "spec.containers[3]",
+				},
+				Reason:  "Stopped",
+				Message: "some verbose message: 1",
+				Source:  v1.EventSource{Component: "eventTest"},
+				Count:   2,
+				Type:    v1.EventTypeNormal,
+			},
+			expectLog:    `Event(v1.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"v1", ResourceVersion:"", FieldPath:"spec.containers[3]"}): type: 'Normal' reason: 'Stopped' some verbose message: 1`,
+			expectUpdate: true,
+		},
+	}
+
+	testCache := map[string]*v1.Event{}
+	createEvent := make(chan *v1.Event)
+	updateEvent := make(chan *v1.Event)
+	patchEvent := make(chan *v1.Event)
+	testEvents := testEventSink{
+		OnCreate: OnCreateFactory(testCache, createEvent),
+		OnUpdate: func(event *v1.Event) (*v1.Event, error) {
+			updateEvent <- event
+			return event, nil
+		},
+		OnPatch: OnPatchFactory(testCache, patchEvent),
+	}
+	options := CorrelatorOptions{
+		QPS:          1. / 300.,
+		BurstSize:    2,
+		LRUCacheSize: 8192,
+	}
+	eventBroadcaster := NewBroadcasterWithCorrelatorOptionsForTests(0, options)
+	sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
+
+	clock := clock.NewFakeClock(time.Now())
+	recorder := recorderWithFakeClock(v1.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
+	expectedLogCount, expectedConsumedEventCount := 4, 4
+	logCount, consumedEventCount := 0, 0
+	var rw sync.RWMutex
+	logWatcher := eventBroadcaster.StartLoggingWithCorrelatorOptions(func(formatter string, args ...interface{}) {
+		rw.Lock()
+		logCount++
+		rw.Unlock()
+	})
+	for index, item := range table {
+		clock.Step(1 * time.Second)
+		recorder.Eventf(item.obj, item.eventtype, item.reason, item.messageFmt, item.elements...)
+
+		timeout := make(chan bool, 1)
+		go func() {
+			time.Sleep(1 * time.Second)
+			timeout <- true
+		}()
+		// validate event
+		select {
+		case actualEvent := <-patchEvent:
+			validateEvent(strconv.Itoa(index), actualEvent, item.expect, t)
+			consumedEventCount++
+		case actualEvent := <-createEvent:
+			validateEvent(strconv.Itoa(index), actualEvent, item.expect, t)
+			consumedEventCount++
+		case <-timeout:
+		}
+	}
+	rw.RLock()
+	if expectedLogCount != logCount {
+		t.Errorf("wanted %d, got %d logs", expectedLogCount, logCount)
+	}
+	rw.RUnlock()
+	if expectedConsumedEventCount != consumedEventCount {
+		t.Errorf("wanted %d, got %d consumed events", expectedLogCount, logCount)
+	}
+	logWatcher.Stop()
 	sinkWatcher.Stop()
 }
 

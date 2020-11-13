@@ -125,6 +125,11 @@ type EventBroadcaster interface {
 	// logging function. The return value can be ignored or used to stop recording, if desired.
 	StartStructuredLogging(verbosity klog.Level) watch.Interface
 
+	// StartLoggingWithCorrelatorOptions starts sending events received from this EventBroadcaster to the given
+	// logging function with correlator options enabled.
+	// The return value can be ignored or used to stop recording, if desired.
+	StartLoggingWithCorrelatorOptions(logf func(format string, args ...interface{})) watch.Interface
+
 	// NewRecorder returns an EventRecorder that can be used to send events to this EventBroadcaster
 	// with the event source set to the given event source.
 	NewRecorder(scheme *runtime.Scheme, source v1.EventSource) EventRecorder
@@ -171,6 +176,14 @@ func NewBroadcasterWithCorrelatorOptions(options CorrelatorOptions) EventBroadca
 	return &eventBroadcasterImpl{
 		Broadcaster:   watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
 		sleepDuration: defaultSleepDuration,
+		options:       options,
+	}
+}
+
+func NewBroadcasterWithCorrelatorOptionsForTests(sleepDuration time.Duration, options CorrelatorOptions) EventBroadcaster {
+	return &eventBroadcasterImpl{
+		Broadcaster:   watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
+		sleepDuration: sleepDuration,
 		options:       options,
 	}
 }
@@ -295,7 +308,7 @@ func (e *eventBroadcasterImpl) StartStructuredLogging(verbosity klog.Level) watc
 // StartLoggingWithCorrelatorOptions starts sending events received from this EventBroadcaster to the given
 // logging function with correlator options enabled.
 // The return value can be ignored or used to stop recording, if desired.
-func (e *eventBroadcasterImpl) StartLoggingWithCorrelatorOptions(logf func(format string, args ...interface{})) watch.Interface{
+func (e *eventBroadcasterImpl) StartLoggingWithCorrelatorOptions(logf func(format string, args ...interface{})) watch.Interface {
 	eventCorrelator := NewEventCorrelatorWithOptions(e.options)
 	return e.StartEventWatcher(
 		func(e *v1.Event) {
