@@ -655,44 +655,55 @@ func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDig
 	klog.V(7).Infof("startRequest(%#+v)", rd)
 	cfgCtlr.lock.Lock()
 	defer cfgCtlr.lock.Unlock()
+	var selectedFlowSchema *flowcontrol.FlowSchema
 	for _, fs := range cfgCtlr.flowSchemas {
 		if matchesFlowSchema(rd, fs) {
-			plName := fs.Spec.PriorityLevelConfiguration.Name
-			plState := cfgCtlr.priorityLevelStates[plName]
-			if plState.pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt {
-				klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, immediate", rd, fs.Name, fs.Spec.DistinguisherMethod, plName)
-				return fs, plState.pl, true, immediateRequest{}, time.Time{}
-			}
-			var numQueues int32
-			if plState.pl.Spec.Limited.LimitResponse.Type == flowcontrol.LimitResponseTypeQueue {
-				numQueues = plState.pl.Spec.Limited.LimitResponse.Queuing.Queues
-
-			}
-			var flowDistinguisher string
-			var hashValue uint64
-			if numQueues > 1 {
-				flowDistinguisher = computeFlowDistinguisher(rd, fs.Spec.DistinguisherMethod)
-				hashValue = hashFlowID(fs.Name, flowDistinguisher)
-			}
-			startWaitingTime = time.Now()
-			klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, numQueues=%d", rd, fs.Name, fs.Spec.DistinguisherMethod, plName, numQueues)
-			req, idle := plState.queues.StartRequest(ctx, hashValue, flowDistinguisher, fs.Name, rd.RequestInfo, rd.User, queueNoteFn)
-			if idle {
-				cfgCtlr.maybeReapLocked(plName, plState)
-			}
-			return fs, plState.pl, false, req, startWaitingTime
+			selectedFlowSchema = fs
+			break
 		}
 	}
-	// This can never happen because every configState has a
-	// FlowSchema that matches everything.  If somehow control reaches
-	// here, panic with some relevant information.
-	var catchAll *flowcontrol.FlowSchema
-	for _, fs := range cfgCtlr.flowSchemas {
-		if fs.Name == flowcontrol.FlowSchemaNameCatchAll {
-			catchAll = fs
+	if selectedFlowSchema == nil {
+		// This should never happen. If the requestDigest's User is a part of
+		// system:authenticated or system:unauthenticated, the catch-all flow
+		// schema should match it. However, if that invariant somehow fails,
+		// fallback to the catch-all flow schema anyway.
+		for _, fs := range cfgCtlr.flowSchemas {
+			if fs.Name == flowcontrol.FlowSchemaNameCatchAll {
+				selectedFlowSchema = fs
+				break
+			}
 		}
+		if selectedFlowSchema == nil {
+			// This should absolutely never, ever happen! APF guarantees two
+			// undeletable flow schemas at all times: an exempt flow schema and a
+			// catch-all flow schema.
+			panic(fmt.Sprintf("no fallback catch-all flow schema found for request %#+v and user %#+v", rd.RequestInfo, rd.User))
+		}
+		klog.Warningf("no match found for request %#+v and user %#+v; selecting catchAll=%s as fallback flow schema", rd.RequestInfo, rd.User, fcfmt.Fmt(selectedFlowSchema))
 	}
-	panic(fmt.Sprintf("No match; rd=%#+v, catchAll=%s", rd, fcfmt.Fmt(catchAll)))
+	plName := selectedFlowSchema.Spec.PriorityLevelConfiguration.Name
+	plState := cfgCtlr.priorityLevelStates[plName]
+	if plState.pl.Spec.Type == flowcontrol.PriorityLevelEnablementExempt {
+		klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, immediate", rd, selectedFlowSchema.Name, selectedFlowSchema.Spec.DistinguisherMethod, plName)
+		return selectedFlowSchema, plState.pl, true, immediateRequest{}, time.Time{}
+	}
+	var numQueues int32
+	if plState.pl.Spec.Limited.LimitResponse.Type == flowcontrol.LimitResponseTypeQueue {
+		numQueues = plState.pl.Spec.Limited.LimitResponse.Queuing.Queues
+	}
+	var flowDistinguisher string
+	var hashValue uint64
+	if numQueues > 1 {
+		flowDistinguisher = computeFlowDistinguisher(rd, selectedFlowSchema.Spec.DistinguisherMethod)
+		hashValue = hashFlowID(selectedFlowSchema.Name, flowDistinguisher)
+	}
+	startWaitingTime = time.Now()
+	klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, numQueues=%d", rd, selectedFlowSchema.Name, selectedFlowSchema.Spec.DistinguisherMethod, plName, numQueues)
+	req, idle := plState.queues.StartRequest(ctx, hashValue, flowDistinguisher, selectedFlowSchema.Name, rd.RequestInfo, rd.User, queueNoteFn)
+	if idle {
+		cfgCtlr.maybeReapLocked(plName, plState)
+	}
+	return selectedFlowSchema, plState.pl, false, req, startWaitingTime
 }
 
 // Call this after getting a clue that the given priority level is undesired and idle
