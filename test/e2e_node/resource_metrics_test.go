@@ -63,7 +63,7 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]
 			ginkgo.By("Waiting 15 seconds for cAdvisor to collect 2 stats points")
 			time.Sleep(15 * time.Second)
 		})
-		ginkgo.It("should report resource usage through the resouce metrics api", func() {
+		ginkgo.It("should report resource usage through the resource metrics api", func() {
 			ginkgo.By("Fetching node so we can match against an appropriate memory limit")
 			node := getLocalNode(f)
 			memoryCapacity := node.Status.Capacity["memory"]
