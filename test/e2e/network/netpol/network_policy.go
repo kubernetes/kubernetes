@@ -877,8 +877,8 @@ func defaultModel(namespaces []string, dnsDomain string) *Model {
 
 // getK8sModel uses the e2e framework to create all necessary namespace resources, and returns the default probing model used
 // in the scaffold of this test.
-func getK8SModel(f *framework.Framework) (string, string, string, *Model, *NetpolCluster) {
-	k8s := NewNetpolCluster(f, f.ClientSet)
+func getK8SModel(f *framework.Framework) (string, string, string, *Model, *Scenario) {
+	k8s := NewScenario(f, f.ClientSet)
 	rootNs := f.Namespace.GetName()
 	nsX, nsY, nsZ, namespaces := getNamespaces(rootNs)
 

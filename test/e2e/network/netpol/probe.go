@@ -41,7 +41,7 @@ type ProbeJobResults struct {
 }
 
 // ProbePodToPodConnectivity runs a series of probes in kube, and records the results in `testCase.Reachability`
-func ProbePodToPodConnectivity(k8s *NetpolCluster, model *Model, testCase *TestCase) {
+func ProbePodToPodConnectivity(k8s *Scenario, model *Model, testCase *TestCase) {
 	k8s.ClearCache()
 	numberOfWorkers := 30
 	allPods := model.AllPods()
@@ -87,7 +87,7 @@ func ProbePodToPodConnectivity(k8s *NetpolCluster, model *Model, testCase *TestC
 
 // probeWorker continues polling a pod connectivity status, until the incoming "jobs" channel is closed, and writes results back out to the "results" channel.
 // it only writes pass/fail status to a channel and has no failure side effects, this is by design since we do not want to fail inside a goroutine.
-func probeWorker(k8s *NetpolCluster, jobs <-chan *ProbeJob, results chan<- *ProbeJobResults) {
+func probeWorker(k8s *Scenario, jobs <-chan *ProbeJob, results chan<- *ProbeJobResults) {
 	defer ginkgo.GinkgoRecover()
 	for job := range jobs {
 		podFrom := job.PodFrom

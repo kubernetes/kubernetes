@@ -33,17 +33,17 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-// NetpolCluster provides a convenience interface to kube functionality that we leverage for polling NetworkPolicy connections.
-type NetpolCluster struct {
+// Scenario provides a convenience interface to kube functionality that we leverage for polling NetworkPolicy connections.
+type Scenario struct {
 	mutex     *sync.Mutex
 	podCache  map[string][]v1.Pod
 	framework *framework.Framework
 	ClientSet clientset.Interface
 }
 
-// NewNetpolCluster is a utility function that wraps creation of the stuff we're using for creating a cluster that expresses the global policy scenario we're testing.
-func NewNetpolCluster(framework *framework.Framework, clientSet clientset.Interface) *NetpolCluster {
-	return &NetpolCluster{
+// NewScenario is a utility function that wraps creation of the stuff we're using for creating a cluster that expresses the global policy scenario we're testing.
+func NewScenario(framework *framework.Framework, clientSet clientset.Interface) *Scenario {
+	return &Scenario{
 		mutex:     &sync.Mutex{},
 		podCache:  map[string][]v1.Pod{},
 		framework: framework,
@@ -52,7 +52,7 @@ func NewNetpolCluster(framework *framework.Framework, clientSet clientset.Interf
 }
 
 // InitializeCluster checks the state of the cluster, creating or updating namespaces and deployments as needed
-func (k *NetpolCluster) InitializeCluster(model *Model) error {
+func (k *Scenario) InitializeCluster(model *Model) error {
 	var createdPods []*v1.Pod
 	for _, ns := range model.Namespaces {
 		_, err := k.CreateNamespace(ns.Spec())
@@ -101,7 +101,7 @@ func (k *NetpolCluster) InitializeCluster(model *Model) error {
 }
 
 // GetPodFromCache returns a pod with the matching namespace and name
-func (k *NetpolCluster) GetPodFromCache(ns string, name string) (*v1.Pod, error) {
+func (k *Scenario) GetPodFromCache(ns string, name string) (*v1.Pod, error) {
 	pods, err := k.getPodsUncached(ns, "pod", name)
 	if err != nil {
 		return nil, err
@@ -112,7 +112,7 @@ func (k *NetpolCluster) GetPodFromCache(ns string, name string) (*v1.Pod, error)
 	return &pods[0], nil
 }
 
-func (k *NetpolCluster) getPodsUncached(ns string, key string, val string) ([]v1.Pod, error) {
+func (k *Scenario) getPodsUncached(ns string, key string, val string) ([]v1.Pod, error) {
 	v1PodList, err := k.ClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%v=%v", key, val),
 	})
@@ -123,7 +123,7 @@ func (k *NetpolCluster) getPodsUncached(ns string, key string, val string) ([]v1
 }
 
 // GetPodsFromCacheByKeyVal returns an array of all Pods in the given namespace having a k/v label pair.
-func (k *NetpolCluster) GetPodsFromCacheByKeyVal(ns string, key string, val string) ([]v1.Pod, error) {
+func (k *Scenario) GetPodsFromCacheByKeyVal(ns string, key string, val string) ([]v1.Pod, error) {
 	k.mutex.Lock()
 	p, ok := k.podCache[fmt.Sprintf("%v_%v_%v", ns, key, val)]
 	k.mutex.Unlock()
@@ -144,7 +144,7 @@ func (k *NetpolCluster) GetPodsFromCacheByKeyVal(ns string, key string, val stri
 }
 
 // GetPod gets a pod by namespace and name
-func (k *NetpolCluster) GetPod(ns string, name string) (*v1.Pod, error) {
+func (k *Scenario) GetPod(ns string, name string) (*v1.Pod, error) {
 	kubePod, err := k.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to get pod %s/%s", ns, name)
@@ -153,7 +153,7 @@ func (k *NetpolCluster) GetPod(ns string, name string) (*v1.Pod, error) {
 }
 
 // Probe execs into a pod and checks its connectivity to another pod.
-func (k *NetpolCluster) Probe(nsFrom string, podFrom string, containerFrom string, addrTo string, protocol v1.Protocol, toPort int) (bool, string, error) {
+func (k *Scenario) Probe(nsFrom string, podFrom string, containerFrom string, addrTo string, protocol v1.Protocol, toPort int) (bool, string, error) {
 	fromPods, err := k.GetPodsFromCacheByKeyVal(nsFrom, "pod", podFrom)
 	if err != nil {
 		return false, "", err
@@ -185,7 +185,7 @@ func (k *NetpolCluster) Probe(nsFrom string, podFrom string, containerFrom strin
 }
 
 // ExecuteRemoteCommand executes a remote shell command on the given pod
-func (k *NetpolCluster) ExecuteRemoteCommand(pod v1.Pod, containerName string, command []string) (string, string, error) {
+func (k *Scenario) ExecuteRemoteCommand(pod v1.Pod, containerName string, command []string) (string, string, error) {
 	return k.framework.ExecWithOptions(framework.ExecOptions{
 		Command:            command,
 		Namespace:          pod.Namespace,
@@ -200,7 +200,7 @@ func (k *NetpolCluster) ExecuteRemoteCommand(pod v1.Pod, containerName string, c
 }
 
 // CreateNamespace is a convenience function for namespace setup
-func (k *NetpolCluster) CreateNamespace(ns *v1.Namespace) (*v1.Namespace, error) {
+func (k *Scenario) CreateNamespace(ns *v1.Namespace) (*v1.Namespace, error) {
 	createdNamespace, err := k.ClientSet.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to update namespace %s", ns.Name)
@@ -209,7 +209,7 @@ func (k *NetpolCluster) CreateNamespace(ns *v1.Namespace) (*v1.Namespace, error)
 }
 
 // CreateService is a convenience function for service setup
-func (k *NetpolCluster) CreateService(service *v1.Service) (*v1.Service, error) {
+func (k *Scenario) CreateService(service *v1.Service) (*v1.Service, error) {
 	ns := service.Namespace
 	name := service.Name
 
@@ -221,7 +221,7 @@ func (k *NetpolCluster) CreateService(service *v1.Service) (*v1.Service, error) 
 }
 
 // CreatePod is a convenience function for pod setup
-func (k *NetpolCluster) CreatePod(pod *v1.Pod) (*v1.Pod, error) {
+func (k *Scenario) CreatePod(pod *v1.Pod) (*v1.Pod, error) {
 	ns := pod.Namespace
 	framework.Logf("creating pod %s/%s", ns, pod.Name)
 
@@ -233,7 +233,7 @@ func (k *NetpolCluster) CreatePod(pod *v1.Pod) (*v1.Pod, error) {
 }
 
 // CleanNetworkPolicies is a convenience function for deleting network policies before startup of any new test.
-func (k *NetpolCluster) CleanNetworkPolicies(namespaces []string) error {
+func (k *Scenario) CleanNetworkPolicies(namespaces []string) error {
 	for _, ns := range namespaces {
 		framework.Logf("deleting policies in %s ..........", ns)
 		l, err := k.ClientSet.NetworkingV1().NetworkPolicies(ns).List(context.TODO(), metav1.ListOptions{})
@@ -252,7 +252,7 @@ func (k *NetpolCluster) CleanNetworkPolicies(namespaces []string) error {
 }
 
 // ClearCache clears the kube pod cache
-func (k *NetpolCluster) ClearCache() {
+func (k *Scenario) ClearCache() {
 	framework.Logf("Clearing pod cache")
 	k.mutex.Lock()
 	k.podCache = map[string][]v1.Pod{}
@@ -261,7 +261,7 @@ func (k *NetpolCluster) ClearCache() {
 }
 
 // CreateNetworkPolicy is a convenience function for creating netpols
-func (k *NetpolCluster) CreateNetworkPolicy(ns string, netpol *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
+func (k *Scenario) CreateNetworkPolicy(ns string, netpol *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
 	framework.Logf("creating network policy %s/%s", ns, netpol.Name)
 	netpol.ObjectMeta.Namespace = ns
 	np, err := k.ClientSet.NetworkingV1().NetworkPolicies(ns).Create(context.TODO(), netpol, metav1.CreateOptions{})
@@ -272,7 +272,7 @@ func (k *NetpolCluster) CreateNetworkPolicy(ns string, netpol *networkingv1.Netw
 }
 
 // UpdateNetworkPolicy is a convenience function for updating netpols
-func (k *NetpolCluster) UpdateNetworkPolicy(ns string, netpol *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
+func (k *Scenario) UpdateNetworkPolicy(ns string, netpol *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
 	framework.Logf("updating network policy %s/%s", ns, netpol.Name)
 	netpol.ObjectMeta.Namespace = ns
 	np, err := k.ClientSet.NetworkingV1().NetworkPolicies(ns).Update(context.TODO(), netpol, metav1.UpdateOptions{})
@@ -282,7 +282,7 @@ func (k *NetpolCluster) UpdateNetworkPolicy(ns string, netpol *networkingv1.Netw
 	return np, nil
 }
 
-func (k *NetpolCluster) getNamespace(ns string) (*v1.Namespace, error) {
+func (k *Scenario) getNamespace(ns string) (*v1.Namespace, error) {
 	selectedNameSpace, err := k.ClientSet.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to get namespace %s", ns)
@@ -290,7 +290,7 @@ func (k *NetpolCluster) getNamespace(ns string) (*v1.Namespace, error) {
 	return selectedNameSpace, nil
 }
 
-func (k *NetpolCluster) setNamespaceLabels(ns string, labels map[string]string) error {
+func (k *Scenario) setNamespaceLabels(ns string, labels map[string]string) error {
 	selectedNameSpace, err := k.getNamespace(ns)
 	if err != nil {
 		return err
@@ -300,7 +300,7 @@ func (k *NetpolCluster) setNamespaceLabels(ns string, labels map[string]string) 
 	return errors.Wrapf(err, "unable to update namespace %s", ns)
 }
 
-func (k *NetpolCluster) deleteNamespaces(namespaces []string) error {
+func (k *Scenario) deleteNamespaces(namespaces []string) error {
 	for _, ns := range namespaces {
 		err := k.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{})
 		if err != nil {
@@ -311,7 +311,7 @@ func (k *NetpolCluster) deleteNamespaces(namespaces []string) error {
 }
 
 // waitForHTTPServers waits for all webservers to be up, on all protocols, and then validates them using the same probe logic as the rest of the suite.
-func (k *NetpolCluster) waitForHTTPServers(model *Model) error {
+func (k *Scenario) waitForHTTPServers(model *Model) error {
 	const maxTries = 10
 	framework.Logf("waiting for HTTP servers (ports 80 and 81) to become ready")
 
