@@ -88,12 +88,12 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]
 					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 				}),
 
-				"pod_cpu_usage_seconds_total": gstruct.MatchElements(containerID, gstruct.IgnoreExtras, gstruct.Elements{
+				"pod_cpu_usage_seconds_total": gstruct.MatchElements(podID, gstruct.IgnoreExtras, gstruct.Elements{
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod0): boundedSample(0, 100),
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod1): boundedSample(0, 100),
 				}),
 
-				"pod_memory_working_set_bytes": gstruct.MatchAllElements(containerID, gstruct.Elements{
+				"pod_memory_working_set_bytes": gstruct.MatchElements(podID, gstruct.IgnoreExtras, gstruct.Elements{
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod0): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod1): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 				}),
@@ -127,6 +127,11 @@ func getResourceMetrics() (e2emetrics.KubeletMetrics, error) {
 
 func nodeID(element interface{}) string {
 	return ""
+}
+
+func podID(element interface{}) string {
+	el := element.(*model.Sample)
+	return fmt.Sprintf("%s::%s", el.Metric["namespace"], el.Metric["pod"])
 }
 
 func containerID(element interface{}) string {
