@@ -93,7 +93,7 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod1): boundedSample(0, 100),
 				}),
 
-				"pod_memory_working_set_bytes": gstruct.MatchAllElements(podID, gstruct.Elements{
+				"pod_memory_working_set_bytes": gstruct.MatchElements(podID, gstruct.IgnoreExtras, gstruct.Elements{
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod0): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod1): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 				}),
