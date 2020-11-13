@@ -12,7 +12,7 @@ require (
 	github.com/json-iterator/go v1.1.10
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.6.1
 	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -22,7 +22,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/klog/v2 v2.4.0
 	k8s.io/kube-openapi v0.0.0-20201107163737-74b467f3a622
-	k8s.io/utils v0.0.0-20201104234853-8146046b121e
+	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 )
 
 replace (

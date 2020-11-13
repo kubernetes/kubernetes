@@ -3,8 +3,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "conn_pool.go",
         "creds.go",
-        "pool.go",
         "settings.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/google.golang.org/api/internal",
@@ -14,7 +14,6 @@ go_library(
         "//vendor/golang.org/x/oauth2:go_default_library",
         "//vendor/golang.org/x/oauth2/google:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
-        "//vendor/google.golang.org/grpc/naming:go_default_library",
     ],
 )
 

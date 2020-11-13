@@ -204,7 +204,10 @@ func TraceStatus(httpStatusCode int, statusLine string) trace.Status {
 		code = trace.StatusCodeUnavailable
 	case http.StatusOK:
 		code = trace.StatusCodeOK
+	case http.StatusConflict:
+		code = trace.StatusCodeAlreadyExists
 	}
+
 	return trace.Status{Code: code, Message: codeToStr[code]}
 }
 
