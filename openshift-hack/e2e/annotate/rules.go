@@ -86,6 +86,10 @@ var (
 
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1906808
 			`ServiceAccounts should support OIDC discovery of service account issuer`,
+
+			// NFS umount is broken in kernels 5.7+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1854379
+			`\[sig-storage\].*\[Driver: nfs\] \[Testpattern: Dynamic PV \(default fs\)\].*subPath should be able to unmount after the subpath directory is deleted`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
