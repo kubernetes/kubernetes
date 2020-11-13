@@ -567,7 +567,7 @@ func TestShuffleStrings(t *testing.T) {
 	}
 }
 
-func TestFilterIncorrectIPVersion(t *testing.T) {
+func TestMapIPsToIPFamily(t *testing.T) {
 	testCases := []struct {
 		desc            string
 		ipString        []string
@@ -650,15 +650,21 @@ func TestFilterIncorrectIPVersion(t *testing.T) {
 	for _, testcase := range testCases {
 		t.Run(testcase.desc, func(t *testing.T) {
 			ipFamily := v1.IPv4Protocol
+			otherIPFamily := v1.IPv6Protocol
+
 			if testcase.wantIPv6 {
 				ipFamily = v1.IPv6Protocol
+				otherIPFamily = v1.IPv4Protocol
 			}
-			correct, incorrect := FilterIncorrectIPVersion(testcase.ipString, ipFamily)
-			if !reflect.DeepEqual(testcase.expectCorrect, correct) {
-				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, correct)
+
+			isCIDR := false
+			ipMap := MapIPsToIPFamily(testcase.ipString, isCIDR)
+
+			if !reflect.DeepEqual(testcase.expectCorrect, ipMap[ipFamily]) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, ipMap[ipFamily])
 			}
-			if !reflect.DeepEqual(testcase.expectIncorrect, incorrect) {
-				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, incorrect)
+			if !reflect.DeepEqual(testcase.expectIncorrect, ipMap[otherIPFamily]) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, ipMap[otherIPFamily])
 			}
 		})
 	}

@@ -450,10 +450,14 @@ func NewProxier(ipt utiliptables.Interface,
 
 	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
 
-	var incorrectAddresses []string
-	nodePortAddresses, incorrectAddresses = utilproxy.FilterIncorrectCIDRVersion(nodePortAddresses, ipFamily)
-	if len(incorrectAddresses) > 0 {
-		klog.Warningf("NodePortAddresses of wrong family; %s", incorrectAddresses)
+	isCIDR := true
+	ipFamilyIPMap := utilproxy.MapIPsToIPFamily(nodePortAddresses, isCIDR)
+	nodePortAddresses = ipFamilyIPMap[ipFamily]
+	for ipFam, ips := range ipFamilyIPMap {
+		// Log the IPs not matching the ipFamily
+		if ipFam != ipFamily && len(ips) > 0 {
+			klog.Warningf("IP Family: %s, NodePortAddresses of wrong family; %s", ipFamily, strings.Join(ips, ","))
+		}
 	}
 	proxier := &Proxier{
 		ipFamily:              ipFamily,
@@ -532,14 +536,15 @@ func NewDualStackProxier(
 
 	safeIpset := newSafeIpset(ipset)
 
-	nodePortAddresses4, nodePortAddresses6 := utilproxy.FilterIncorrectCIDRVersion(nodePortAddresses, v1.IPv4Protocol)
+	isCIDR := true
+	ipFamilyIPMap := utilproxy.MapIPsToIPFamily(nodePortAddresses, isCIDR)
 
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(ipt[0], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[0], hostname, nodeIP[0],
-		recorder, healthzServer, scheduler, nodePortAddresses4, kernelHandler)
+		recorder, healthzServer, scheduler, ipFamilyIPMap[v1.IPv4Protocol], kernelHandler)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
@@ -548,7 +553,7 @@ func NewDualStackProxier(
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[1], hostname, nodeIP[1],
-		nil, nil, scheduler, nodePortAddresses6, kernelHandler)
+		nil, nil, scheduler, ipFamilyIPMap[v1.IPv6Protocol], kernelHandler)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}

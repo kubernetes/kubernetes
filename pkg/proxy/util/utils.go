@@ -255,26 +255,26 @@ func LogAndEmitIncorrectIPVersionEvent(recorder record.EventRecorder, fieldName,
 	}
 }
 
-// FilterIncorrectIPVersion filters out the incorrect IP version case from a slice of IP strings.
-func FilterIncorrectIPVersion(ipStrings []string, ipfamily v1.IPFamily) ([]string, []string) {
-	return filterWithCondition(ipStrings, (ipfamily == v1.IPv6Protocol), utilnet.IsIPv6String)
-}
-
-// FilterIncorrectCIDRVersion filters out the incorrect IP version case from a slice of CIDR strings.
-func FilterIncorrectCIDRVersion(ipStrings []string, ipfamily v1.IPFamily) ([]string, []string) {
-	return filterWithCondition(ipStrings, (ipfamily == v1.IPv6Protocol), utilnet.IsIPv6CIDRString)
-}
-
-func filterWithCondition(strs []string, expectedCondition bool, conditionFunc func(string) bool) ([]string, []string) {
-	var corrects, incorrects []string
-	for _, str := range strs {
-		if conditionFunc(str) != expectedCondition {
-			incorrects = append(incorrects, str)
-		} else {
-			corrects = append(corrects, str)
-		}
+// MapIPsToIPFamily maps a slice of IPs to their respective IP families (v4 or v6)
+func MapIPsToIPFamily(ipStrings []string, isCIDR bool) map[v1.IPFamily][]string {
+	ipFamilyMap := map[v1.IPFamily][]string{}
+	for _, ip := range ipStrings {
+		ipFamily := getIPFamilyFromIP(ip, isCIDR)
+		ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 	}
-	return corrects, incorrects
+	return ipFamilyMap
+}
+
+func getIPFamilyFromIP(ip string, isCIDR bool) v1.IPFamily {
+	conditionFunc := utilnet.IsIPv6String
+	if isCIDR {
+		conditionFunc = utilnet.IsIPv6CIDRString
+	}
+
+	if conditionFunc(ip) {
+		return v1.IPv6Protocol
+	}
+	return v1.IPv4Protocol
 }
 
 // AppendPortIfNeeded appends the given port to IP address unless it is already in
