@@ -292,6 +292,32 @@ func (e *eventBroadcasterImpl) StartStructuredLogging(verbosity klog.Level) watc
 		})
 }
 
+// StartLoggingWithCorrelatorOptions starts sending events received from this EventBroadcaster to the given
+// logging function with correlator options enabled.
+// The return value can be ignored or used to stop recording, if desired.
+func (e *eventBroadcasterImpl) StartLoggingWithCorrelatorOptions(logf func(format string, args ...interface{})) watch.Interface{
+	eventCorrelator := NewEventCorrelatorWithOptions(e.options)
+	return e.StartEventWatcher(
+		func(e *v1.Event) {
+			logging(logf, e, eventCorrelator)
+		})
+}
+
+func logging(logf func(format string, args ...interface{}), event *v1.Event, eventCorrelator *EventCorrelator) {
+	// Make a copy before modification, because there could be multiple listeners.
+	// Events are safe to copy like this.
+	eventCopy := *event
+	event = &eventCopy
+	result, err := eventCorrelator.EventCorrelate(event)
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
+	if result.Skip {
+		return
+	}
+	logf("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
+}
+
 // StartEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.
 // The return value can be ignored or used to stop recording, if desired.
 func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*v1.Event)) watch.Interface {
