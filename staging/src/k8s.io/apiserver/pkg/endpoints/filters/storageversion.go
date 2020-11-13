@@ -78,9 +78,9 @@ func WithStorageVersionPrecondition(handler http.Handler, svm storageversion.Man
 		// NOTE: with this exception, if the bootstrap client writes namespaces with a new version,
 		// and the upgraded apiserver dies before updating the StorageVersion for namespaces, the
 		// storage migrator won't be able to tell these namespaces are stored in a different version in etcd.
-		// Because the bootstrap client only creates system namespace and doesn't update them. This can
+		// Because the bootstrap client only creates system namespace and doesn't update them, this can
 		// only happen if the upgraded apiserver is the first apiserver that kicks off namespace creation,
-		// or if a upgraded server that joins an existing cluster have new system namespaces (other
+		// or if an upgraded server that joins an existing cluster has new system namespaces (other
 		// than kube-system, kube-public, kube-node-lease) that need to be created.
 		u, hasUser := request.UserFrom(ctx)
 		if requestInfo.APIGroup == "" && requestInfo.Resource == "namespaces" &&
