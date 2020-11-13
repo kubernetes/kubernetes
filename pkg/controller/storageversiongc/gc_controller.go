@@ -231,6 +231,7 @@ func (c *Controller) enqueueStorageVersion(obj *apiserverinternalv1alpha1.Storag
 		if err != nil || lease == nil || lease.Labels == nil ||
 			lease.Labels[controlplane.IdentityLeaseComponentLabelKey] != controlplane.KubeAPIServer {
 			// we cannot find a corresponding identity lease in cache, enqueue the storageversion
+			klog.V(4).Infof("Observed storage version %s with invalid apiserver entry", obj.Name)
 			c.storageVersionQueue.Add(obj.Name)
 			return
 		}
