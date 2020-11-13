@@ -37,7 +37,7 @@ import (
 // is invoked to serve the request.
 func WithAuthentication(handler http.Handler, auth authenticator.Request, failed http.Handler, apiAuds authenticator.Audiences) http.Handler {
 	if auth == nil {
-		klog.Warningf("Authentication is disabled")
+		klog.Warning("Authentication is disabled")
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
