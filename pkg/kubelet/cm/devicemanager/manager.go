@@ -905,6 +905,10 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		// Update internal cached podDevices state.
 		m.mutex.Lock()
 		for dev := range allocDevices {
+			if m.allDevices[resource][dev].Topology == nil || len(m.allDevices[resource][dev].Topology.Nodes) == 0 {
+				allocDevicesWithNUMA[0] = append(allocDevicesWithNUMA[0], dev)
+				continue
+			}
 			for idx := range m.allDevices[resource][dev].Topology.Nodes {
 				node := m.allDevices[resource][dev].Topology.Nodes[idx]
 				allocDevicesWithNUMA[node.ID] = append(allocDevicesWithNUMA[node.ID], dev)
