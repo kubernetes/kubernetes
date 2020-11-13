@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	subsystemsLegacy = subsystemSet{
+	subsystems = []subsystem{
 		&CpusetGroup{},
 		&DevicesGroup{},
 		&MemoryGroup{},
@@ -38,26 +38,13 @@ var (
 
 var errSubsystemDoesNotExist = errors.New("cgroup: subsystem does not exist")
 
-type subsystemSet []subsystem
-
-func (s subsystemSet) Get(name string) (subsystem, error) {
-	for _, ss := range s {
-		if ss.Name() == name {
-			return ss, nil
-		}
-	}
-	return nil, errSubsystemDoesNotExist
-}
-
 type subsystem interface {
 	// Name returns the name of the subsystem.
 	Name() string
 	// Returns the stats, as 'stats', corresponding to the cgroup under 'path'.
 	GetStats(path string, stats *cgroups.Stats) error
-	// Removes the cgroup represented by 'cgroupData'.
-	Remove(*cgroupData) error
 	// Creates and joins the cgroup represented by 'cgroupData'.
-	Apply(*cgroupData) error
+	Apply(path string, c *cgroupData) error
 	// Set the cgroup represented by cgroup.
 	Set(path string, cgroup *configs.Cgroup) error
 }
@@ -81,6 +68,56 @@ func NewManager(cg *configs.Cgroup, paths map[string]string, rootless bool) cgro
 var cgroupRootLock sync.Mutex
 var cgroupRoot string
 
+const defaultCgroupRoot = "/sys/fs/cgroup"
+
+func tryDefaultCgroupRoot() string {
+	var st, pst unix.Stat_t
+
+	// (1) it should be a directory...
+	err := unix.Lstat(defaultCgroupRoot, &st)
+	if err != nil || st.Mode&unix.S_IFDIR == 0 {
+		return ""
+	}
+
+	// (2) ... and a mount point ...
+	err = unix.Lstat(filepath.Dir(defaultCgroupRoot), &pst)
+	if err != nil {
+		return ""
+	}
+
+	if st.Dev == pst.Dev {
+		// parent dir has the same dev -- not a mount point
+		return ""
+	}
+
+	// (3) ... of 'tmpfs' fs type.
+	var fst unix.Statfs_t
+	err = unix.Statfs(defaultCgroupRoot, &fst)
+	if err != nil || fst.Type != unix.TMPFS_MAGIC {
+		return ""
+	}
+
+	// (4) it should have at least 1 entry ...
+	dir, err := os.Open(defaultCgroupRoot)
+	if err != nil {
+		return ""
+	}
+	names, err := dir.Readdirnames(1)
+	if err != nil {
+		return ""
+	}
+	if len(names) < 1 {
+		return ""
+	}
+	// ... which is a cgroup mount point.
+	err = unix.Statfs(filepath.Join(defaultCgroupRoot, names[0]), &fst)
+	if err != nil || fst.Type != unix.CGROUP_SUPER_MAGIC {
+		return ""
+	}
+
+	return defaultCgroupRoot
+}
+
 // Gets the cgroupRoot.
 func getCgroupRoot() (string, error) {
 	cgroupRootLock.Lock()
@@ -90,6 +127,14 @@ func getCgroupRoot() (string, error) {
 		return cgroupRoot, nil
 	}
 
+	// fast path
+	cgroupRoot = tryDefaultCgroupRoot()
+	if cgroupRoot != "" {
+		return cgroupRoot, nil
+	}
+
+	// slow path: parse mountinfo, find the first mount where fs=cgroup
+	// (e.g. "/sys/fs/cgroup/memory"), use its parent.
 	f, err := os.Open("/proc/self/mountinfo")
 	if err != nil {
 		return "", err
@@ -166,10 +211,6 @@ func isIgnorableError(rootless bool, err error) bool {
 	return false
 }
 
-func (m *manager) getSubsystems() subsystemSet {
-	return subsystemsLegacy
-}
-
 func (m *manager) Apply(pid int) (err error) {
 	if m.cgroups == nil {
 		return nil
@@ -199,7 +240,7 @@ func (m *manager) Apply(pid int) (err error) {
 		return cgroups.EnterPid(m.paths, pid)
 	}
 
-	for _, sys := range m.getSubsystems() {
+	for _, sys := range subsystems {
 		p, err := d.path(sys.Name())
 		if err != nil {
 			// The non-presence of the devices subsystem is
@@ -211,7 +252,7 @@ func (m *manager) Apply(pid int) (err error) {
 		}
 		m.paths[sys.Name()] = p
 
-		if err := sys.Apply(d); err != nil {
+		if err := sys.Apply(p, d); err != nil {
 			// In the case of rootless (including euid=0 in userns), where an
 			// explicit cgroup path hasn't been set, we don't bail on error in
 			// case of permission problems. Cases where limits have been set
@@ -250,9 +291,9 @@ func (m *manager) GetStats() (*cgroups.Stats, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	stats := cgroups.NewStats()
-	for name, path := range m.paths {
-		sys, err := m.getSubsystems().Get(name)
-		if err == errSubsystemDoesNotExist || !cgroups.PathExists(path) {
+	for _, sys := range subsystems {
+		path := m.paths[sys.Name()]
+		if path == "" {
 			continue
 		}
 		if err := sys.GetStats(path, stats); err != nil {
@@ -275,7 +316,7 @@ func (m *manager) Set(container *configs.Config) error {
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	for _, sys := range m.getSubsystems() {
+	for _, sys := range subsystems {
 		path := m.paths[sys.Name()]
 		if err := sys.Set(path, container.Cgroups); err != nil {
 			if m.rootless && sys.Name() == "devices" {
@@ -374,18 +415,14 @@ func (raw *cgroupData) path(subsystem string) (string, error) {
 	return filepath.Join(parentPath, raw.innerPath), nil
 }
 
-func (raw *cgroupData) join(subsystem string) (string, error) {
-	path, err := raw.path(subsystem)
-	if err != nil {
-		return "", err
+func join(path string, pid int) error {
+	if path == "" {
+		return nil
 	}
 	if err := os.MkdirAll(path, 0755); err != nil {
-		return "", err
+		return err
 	}
-	if err := cgroups.WriteCgroupProc(path, raw.pid); err != nil {
-		return "", err
-	}
-	return path, nil
+	return cgroups.WriteCgroupProc(path, pid)
 }
 
 func removePath(p string, err error) error {

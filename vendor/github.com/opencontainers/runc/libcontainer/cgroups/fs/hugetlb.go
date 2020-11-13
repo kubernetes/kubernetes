@@ -19,12 +19,8 @@ func (s *HugetlbGroup) Name() string {
 	return "hugetlb"
 }
 
-func (s *HugetlbGroup) Apply(d *cgroupData) error {
-	_, err := d.join("hugetlb")
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
-	}
-	return nil
+func (s *HugetlbGroup) Apply(path string, d *cgroupData) error {
+	return join(path, d.pid)
 }
 
 func (s *HugetlbGroup) Set(path string, cgroup *configs.Cgroup) error {
@@ -37,12 +33,11 @@ func (s *HugetlbGroup) Set(path string, cgroup *configs.Cgroup) error {
 	return nil
 }
 
-func (s *HugetlbGroup) Remove(d *cgroupData) error {
-	return removePath(d.path("hugetlb"))
-}
-
 func (s *HugetlbGroup) GetStats(path string, stats *cgroups.Stats) error {
 	hugetlbStats := cgroups.HugetlbStats{}
+	if !cgroups.PathExists(path) {
+		return nil
+	}
 	for _, pageSize := range HugePageSizes {
 		usage := strings.Join([]string{"hugetlb", pageSize, "usage_in_bytes"}, ".")
 		value, err := fscommon.GetCgroupParamUint(path, usage)

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
-
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
@@ -70,7 +70,7 @@ func runPoststopHooks(c *linuxContainer) error {
 	if err != nil {
 		return err
 	}
-	s.Status = configs.Stopped
+	s.Status = specs.StateStopped
 
 	if err := hooks[configs.Poststop].RunHooks(s); err != nil {
 		return err
