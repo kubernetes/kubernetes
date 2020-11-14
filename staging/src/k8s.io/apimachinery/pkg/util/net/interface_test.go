@@ -579,6 +579,33 @@ func TestGetIPFromInterface(t *testing.T) {
 	}
 }
 
+func TestGetIPFromLoopbackInterface(t *testing.T) {
+	testCases := []struct {
+		tcase      string
+		family     AddressFamily
+		nw         networkInterfacer
+		expected   net.IP
+		errStrFrag string
+	}{
+		{"ipv4", familyIPv4, linkLocalLoopbackNetworkInterface{}, net.ParseIP("10.1.1.1"), ""},
+		{"ipv6", familyIPv6, linkLocalLoopbackNetworkInterface{}, net.ParseIP("fd00:1:1::1"), ""},
+		{"no global ipv4", familyIPv4, loopbackNetworkInterface{}, nil, ""},
+		{"no global ipv6", familyIPv6, loopbackNetworkInterface{}, nil, ""},
+	}
+	for _, tc := range testCases {
+		ip, err := getIPFromLoopbackInterface(tc.family, tc.nw)
+		if err != nil {
+			if !strings.Contains(err.Error(), tc.errStrFrag) {
+				t.Errorf("case[%s]: Error string %q does not contain %q", tc.tcase, err, tc.errStrFrag)
+			}
+		} else if tc.errStrFrag != "" {
+			t.Errorf("case[%s]: Error %q expected, but seen %v", tc.tcase, tc.errStrFrag, err)
+		} else if !ip.Equal(tc.expected) {
+			t.Errorf("case[%v]: expected %v, got %+v .err : %v", tc.tcase, tc.expected, ip, err)
+		}
+	}
+}
+
 func TestChooseHostInterfaceFromRoute(t *testing.T) {
 	testCases := []struct {
 		tcase    string
