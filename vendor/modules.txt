@@ -2271,9 +2271,9 @@ k8s.io/cri-api/pkg/apis/testing
 k8s.io/csi-translation-lib
 # k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
 k8s.io/csi-translation-lib/plugins
-# k8s.io/gengo v0.0.0-20200428234225-8167cfdcfc14 => k8s.io/gengo v0.0.0-20200428234225-8167cfdcfc14
+# k8s.io/gengo v0.0.0-20201113003025-83324d819ded => k8s.io/gengo v0.0.0-20201113003025-83324d819ded
 ## explicit
-# k8s.io/gengo => k8s.io/gengo v0.0.0-20200428234225-8167cfdcfc14
+# k8s.io/gengo => k8s.io/gengo v0.0.0-20201113003025-83324d819ded
 k8s.io/gengo/args
 k8s.io/gengo/examples/deepcopy-gen/generators
 k8s.io/gengo/examples/defaulter-gen/generators
@@ -2326,9 +2326,9 @@ k8s.io/kube-aggregator/pkg/registry/apiservice/rest
 ## explicit
 # k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
 k8s.io/kube-controller-manager/config/v1alpha1
-# k8s.io/kube-openapi v0.0.0-20201107163737-74b467f3a622 => k8s.io/kube-openapi v0.0.0-20201107163737-74b467f3a622
+# k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd => k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
 ## explicit
-# k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20201107163737-74b467f3a622
+# k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args
 k8s.io/kube-openapi/pkg/aggregator

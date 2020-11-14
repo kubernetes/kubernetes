@@ -816,6 +816,7 @@ message ContainerPort {
   // Protocol for port. Must be UDP, TCP, or SCTP.
   // Defaults to "TCP".
   // +optional
+  // +default="TCP"
   optional string protocol = 4;
 
   // What host IP to bind the external port to.
