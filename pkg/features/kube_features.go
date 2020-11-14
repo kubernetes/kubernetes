@@ -494,14 +494,6 @@ const (
 	// Enables NonPreempting option for priorityClass and pod.
 	NonPreemptingPriority featuregate.Feature = "NonPreemptingPriority"
 
-	// owner: @j-griffith
-	// alpha: v1.15
-	// beta: v1.16
-	// GA: v1.18
-	//
-	// Enable support for specifying an existing PVC as a DataSource
-	VolumePVCDataSource featuregate.Feature = "VolumePVCDataSource"
-
 	// owner: @egernst
 	// alpha: v1.16
 	// beta: v1.18
@@ -795,7 +787,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WindowsRunAsUserName:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: true, PreRelease: featuregate.Beta},
-	VolumePVCDataSource:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	PodOverhead:                                    {Default: true, PreRelease: featuregate.Beta},
 	IPv6DualStack:                                  {Default: false, PreRelease: featuregate.Alpha},
 	EndpointSlice:                                  {Default: true, PreRelease: featuregate.Beta},
