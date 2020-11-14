@@ -92,7 +92,7 @@ func (plugin *storageosPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.StorageOS != nil)
 }
 
-func (plugin *storageosPlugin) RequiresRemount() bool {
+func (plugin *storageosPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -430,7 +430,7 @@ func (b *storageosMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin.GetPluginName()))
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
 	}
 	klog.V(4).Infof("StorageOS volume setup complete on %s", dir)
 	return nil

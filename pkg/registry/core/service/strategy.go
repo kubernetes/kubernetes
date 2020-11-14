@@ -97,7 +97,7 @@ func (strategy svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Ob
 	service := obj.(*api.Service)
 	service.Status = api.ServiceStatus{}
 
-	normalizeClusterIPs(nil, service)
+	NormalizeClusterIPs(nil, service)
 	dropServiceDisabledFields(service, nil)
 }
 
@@ -107,7 +107,7 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 	oldService := old.(*api.Service)
 	newService.Status = oldService.Status
 
-	normalizeClusterIPs(oldService, newService)
+	NormalizeClusterIPs(oldService, newService)
 	dropServiceDisabledFields(newService, oldService)
 	dropTypeDependentFields(newService, oldService)
 	trimFieldsForDualStackDowngrade(newService, oldService)
@@ -117,6 +117,7 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 func (strategy svcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	service := obj.(*api.Service)
 	allErrs := validation.ValidateServiceCreate(service)
+	allErrs = append(allErrs, validation.ValidateConditionalService(service, nil)...)
 	return allErrs
 }
 
@@ -130,6 +131,7 @@ func (svcStrategy) AllowCreateOnUpdate() bool {
 
 func (strategy svcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	allErrs := validation.ValidateServiceUpdate(obj.(*api.Service), old.(*api.Service))
+	allErrs = append(allErrs, validation.ValidateConditionalService(obj.(*api.Service), old.(*api.Service))...)
 	return allErrs
 }
 
@@ -179,6 +181,22 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceTopology) && !topologyKeysInUse(oldSvc) {
 		newSvc.Spec.TopologyKeys = nil
 	}
+
+	// Clear AllocateLoadBalancerNodePorts if ServiceLBNodePortControl if not enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
+		newSvc.Spec.AllocateLoadBalancerNodePorts = nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MixedProtocolLBService) {
+		if !serviceConditionsInUse(oldSvc) {
+			newSvc.Status.Conditions = nil
+		}
+		if !loadBalancerPortsInUse(oldSvc) {
+			for i := range newSvc.Status.LoadBalancer.Ingress {
+				newSvc.Status.LoadBalancer.Ingress[i].Ports = nil
+			}
+		}
+	}
 }
 
 // returns true if svc.Spec.ServiceIPFamily field is in use
@@ -200,6 +218,27 @@ func topologyKeysInUse(svc *api.Service) bool {
 		return false
 	}
 	return len(svc.Spec.TopologyKeys) > 0
+}
+
+// returns true when the svc.Status.Conditions field is in use.
+func serviceConditionsInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+	return svc.Status.Conditions != nil
+}
+
+// returns true when the svc.Status.LoadBalancer.Ingress.Ports field is in use.
+func loadBalancerPortsInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+	for _, ing := range svc.Status.LoadBalancer.Ingress {
+		if ing.Ports != nil {
+			return true
+		}
+	}
+	return false
 }
 
 type serviceStatusStrategy struct {
@@ -224,8 +263,9 @@ func (serviceStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtim
 	return validation.ValidateServiceStatusUpdate(obj.(*api.Service), old.(*api.Service))
 }
 
-// normalizeClusterIPs adjust clusterIPs based on ClusterIP
-func normalizeClusterIPs(oldSvc *api.Service, newSvc *api.Service) {
+// NormalizeClusterIPs adjust clusterIPs based on ClusterIP.  This must not
+// consider any other fields.
+func NormalizeClusterIPs(oldSvc, newSvc *api.Service) {
 	// In all cases here, we don't need to over-think the inputs.  Validation
 	// will be called on the new object soon enough.  All this needs to do is
 	// try to divine what user meant with these linked fields. The below
@@ -354,6 +394,11 @@ func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
 	// be deallocated later.
 	if needsHCNodePort(oldSvc) && !needsHCNodePort(newSvc) && sameHCNodePort(oldSvc, newSvc) {
 		newSvc.Spec.HealthCheckNodePort = 0
+	}
+
+	// AllocateLoadBalancerNodePorts may only be set for type LoadBalancer
+	if newSvc.Spec.Type != api.ServiceTypeLoadBalancer {
+		newSvc.Spec.AllocateLoadBalancerNodePorts = nil
 	}
 
 	// NOTE: there are other fields like `selector` which we could wipe.

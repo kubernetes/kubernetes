@@ -121,7 +121,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				DefaultingType: config.SystemDefaulting,
 			},
 			nodes: []*v1.Node{
-				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Label(v1.LabelZoneFailureDomainStable, "mars").Obj(),
+				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Label(v1.LabelTopologyZone, "mars").Obj(),
 			},
 			objs: []runtime.Object{
 				&appsv1.ReplicaSet{Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
@@ -135,13 +135,13 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					},
 					{
 						MaxSkew:     5,
-						TopologyKey: v1.LabelZoneFailureDomainStable,
+						TopologyKey: v1.LabelTopologyZone,
 						Selector:    mustConvertLabelSelectorAsSelector(t, st.MakeLabelSelector().Exists("foo").Obj()),
 					},
 				},
 				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: v1.LabelZoneFailureDomainStable, value: "mars"}: pointer.Int64Ptr(0),
+					{key: v1.LabelTopologyZone, value: "mars"}: pointer.Int64Ptr(0),
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(1)},
 			},
@@ -727,7 +727,7 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 		{
 			name: "1000nodes/single-constraint-zone",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, v1.LabelZoneFailureDomain, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, v1.LabelFailureDomainBetaZone, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPodsNum:  10000,
 			allNodesNum:      1000,
@@ -745,7 +745,7 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 		{
 			name: "1000nodes/two-Constraints-zone-node",
 			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
-				SpreadConstraint(1, v1.LabelZoneFailureDomain, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, v1.LabelFailureDomainBetaZone, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("foo").Obj()).
 				SpreadConstraint(1, v1.LabelHostname, v1.ScheduleAnyway, st.MakeLabelSelector().Exists("bar").Obj()).
 				Obj(),
 			existingPodsNum:  10000,

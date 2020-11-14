@@ -348,6 +348,7 @@ profiles:
 						{Name: "TaintToleration"},
 						{Name: "InterPodAffinity"},
 					},
+					"PostFilterPlugin": {{Name: "DefaultPreemption"}},
 					"PreScorePlugin": {
 						{Name: "InterPodAffinity"},
 					},

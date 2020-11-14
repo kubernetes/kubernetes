@@ -24,9 +24,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/discovery"
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // endpointSliceStrategy implements verification logic for Replication.
@@ -47,6 +49,8 @@ func (endpointSliceStrategy) NamespaceScoped() bool {
 func (endpointSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	endpointSlice.Generation = 1
+
+	dropDisabledFieldsOnCreate(endpointSlice)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -67,6 +71,8 @@ func (endpointSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 
 	newEPS.ObjectMeta = ogNewMeta
 	oldEPS.ObjectMeta = ogOldMeta
+
+	dropDisabledFieldsOnUpdate(oldEPS, newEPS)
 }
 
 // Validate validates a new EndpointSlice.
@@ -95,4 +101,58 @@ func (endpointSliceStrategy) ValidateUpdate(ctx context.Context, new, old runtim
 // AllowUnconditionalUpdate is the default update policy for EndpointSlice objects.
 func (endpointSliceStrategy) AllowUnconditionalUpdate() bool {
 	return true
+}
+
+// dropDisabledConditionsOnCreate will drop any fields that are disabled.
+func dropDisabledFieldsOnCreate(endpointSlice *discovery.EndpointSlice) {
+	dropNodeName := !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceNodeName)
+	dropTerminating := !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition)
+
+	if dropNodeName || dropTerminating {
+		for i := range endpointSlice.Endpoints {
+			if dropNodeName {
+				endpointSlice.Endpoints[i].NodeName = nil
+			}
+			if dropTerminating {
+				endpointSlice.Endpoints[i].Conditions.Serving = nil
+				endpointSlice.Endpoints[i].Conditions.Terminating = nil
+			}
+		}
+	}
+}
+
+// dropDisabledFieldsOnUpdate will drop any disable fields that have not already
+// been set on the EndpointSlice.
+func dropDisabledFieldsOnUpdate(oldEPS, newEPS *discovery.EndpointSlice) {
+	dropNodeName := !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceNodeName)
+	if dropNodeName {
+		for _, ep := range oldEPS.Endpoints {
+			if ep.NodeName != nil {
+				dropNodeName = false
+				break
+			}
+		}
+	}
+
+	dropTerminating := !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition)
+	if dropTerminating {
+		for _, ep := range oldEPS.Endpoints {
+			if ep.Conditions.Serving != nil || ep.Conditions.Terminating != nil {
+				dropTerminating = false
+				break
+			}
+		}
+	}
+
+	if dropNodeName || dropTerminating {
+		for i := range newEPS.Endpoints {
+			if dropNodeName {
+				newEPS.Endpoints[i].NodeName = nil
+			}
+			if dropTerminating {
+				newEPS.Endpoints[i].Conditions.Serving = nil
+				newEPS.Endpoints[i].Conditions.Terminating = nil
+			}
+		}
+	}
 }

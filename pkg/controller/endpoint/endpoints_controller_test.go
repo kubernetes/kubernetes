@@ -1984,27 +1984,14 @@ func TestSyncEndpointsServiceNotFound(t *testing.T) {
 func TestEndpointPortFromServicePort(t *testing.T) {
 	http := utilpointer.StringPtr("http")
 	testCases := map[string]struct {
-		featureGateEnabled           bool
 		serviceAppProtocol           *string
 		expectedEndpointsAppProtocol *string
 	}{
-		"feature gate disabled, empty app protocol": {
-			featureGateEnabled:           false,
+		"empty app protocol": {
 			serviceAppProtocol:           nil,
 			expectedEndpointsAppProtocol: nil,
 		},
-		"feature gate disabled, http app protocol": {
-			featureGateEnabled:           false,
-			serviceAppProtocol:           http,
-			expectedEndpointsAppProtocol: nil,
-		},
-		"feature gate enabled, empty app protocol": {
-			featureGateEnabled:           true,
-			serviceAppProtocol:           nil,
-			expectedEndpointsAppProtocol: nil,
-		},
-		"feature gate enabled, http app protocol": {
-			featureGateEnabled:           true,
+		"http app protocol": {
 			serviceAppProtocol:           http,
 			expectedEndpointsAppProtocol: http,
 		},
@@ -2012,8 +1999,6 @@ func TestEndpointPortFromServicePort(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.featureGateEnabled)()
-
 			epp := endpointPortFromServicePort(&v1.ServicePort{Name: "test", AppProtocol: tc.serviceAppProtocol}, 80)
 
 			if epp.AppProtocol != tc.expectedEndpointsAppProtocol {

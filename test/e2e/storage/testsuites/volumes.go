@@ -227,7 +227,7 @@ func testScriptInPod(
 			Containers: []v1.Container{
 				{
 					Name:    fmt.Sprintf("exec-container-%s", suffix),
-					Image:   e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.Nginx)),
+					Image:   e2evolume.GetTestImage(imageutils.Nginx),
 					Command: command,
 					VolumeMounts: []v1.VolumeMount{
 						{

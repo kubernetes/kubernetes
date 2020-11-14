@@ -120,15 +120,7 @@ func validateTokenRequest(options *ServerRunOptions) []error {
 
 	enableSucceeded := options.ServiceAccountIssuer != nil
 
-	if enableAttempted && !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-		errs = append(errs, errors.New("the TokenRequest feature is not enabled but --service-account-signing-key-file, --service-account-issuer and/or --api-audiences flags were passed"))
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) && !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-		errs = append(errs, errors.New("the BoundServiceAccountTokenVolume feature depends on the TokenRequest feature, but the TokenRequest features is not enabled"))
-	}
-
-	if !enableAttempted && utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
+	if !enableAttempted {
 		errs = append(errs, errors.New("--service-account-signing-key-file and --service-account-issuer are required flags"))
 	}
 
@@ -141,17 +133,17 @@ func validateTokenRequest(options *ServerRunOptions) []error {
 
 func validateAPIPriorityAndFairness(options *ServerRunOptions) []error {
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && options.GenericServerRunOptions.EnablePriorityAndFairness {
-		// We need the alpha API enabled.  There are only a few ways to turn it on
+		// If none of the following runtime config options are specified, APF is
+		// assumed to be turned on.
 		enabledAPIString := options.APIEnablement.RuntimeConfig.String()
-		switch {
-		case strings.Contains(enabledAPIString, "api/all=true"):
-			return nil
-		case strings.Contains(enabledAPIString, "api/alpha=true"):
-			return nil
-		case strings.Contains(enabledAPIString, "flowcontrol.apiserver.k8s.io/v1alpha1=true"):
-			return nil
-		default:
-			return []error{fmt.Errorf("enabling APIPriorityAndFairness requires --runtime-confg=flowcontrol.apiserver.k8s.io/v1alpha1=true to enable the required API")}
+		testConfigs := []string{"flowcontrol.apiserver.k8s.io/v1beta1", "api/beta", "api/all"} // in the order of precedence
+		for _, testConfig := range testConfigs {
+			if strings.Contains(enabledAPIString, fmt.Sprintf("%s=false", testConfig)) {
+				return []error{fmt.Errorf("%s=false conflicts with APIPriorityAndFairness feature gate", testConfig)}
+			}
+			if strings.Contains(enabledAPIString, fmt.Sprintf("%s=true", testConfig)) {
+				return nil
+			}
 		}
 	}
 
@@ -177,6 +169,12 @@ func (s *ServerRunOptions) Validate() []error {
 	errs = append(errs, validateTokenRequest(s)...)
 	errs = append(errs, s.Metrics.Validate()...)
 	errs = append(errs, s.Logs.Validate()...)
+	if s.IdentityLeaseDurationSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("--identity-lease-duration-seconds should be a positive number, but value '%d' provided", s.IdentityLeaseDurationSeconds))
+	}
+	if s.IdentityLeaseRenewIntervalSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("--identity-lease-renew-interval-seconds should be a positive number, but value '%d' provided", s.IdentityLeaseRenewIntervalSeconds))
+	}
 
 	return errs
 }

@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -36,8 +37,9 @@ import (
 )
 
 const (
-	maxTTL   = 24 * time.Hour
-	gcPeriod = time.Minute
+	maxTTL    = 24 * time.Hour
+	gcPeriod  = time.Minute
+	maxJitter = 10 * time.Second
 )
 
 // NewManager returns a new token manager.
@@ -177,11 +179,12 @@ func (m *Manager) requiresRefresh(tr *authenticationv1.TokenRequest) bool {
 	exp := tr.Status.ExpirationTimestamp.Time
 	iat := exp.Add(-1 * time.Duration(*tr.Spec.ExpirationSeconds) * time.Second)
 
-	if now.After(iat.Add(maxTTL)) {
+	jitter := time.Duration(rand.Float64()*maxJitter.Seconds()) * time.Second
+	if now.After(iat.Add(maxTTL - jitter)) {
 		return true
 	}
-	// Require a refresh if within 20% of the TTL from the expiration time.
-	if now.After(exp.Add(-1 * time.Duration((*tr.Spec.ExpirationSeconds*20)/100) * time.Second)) {
+	// Require a refresh if within 20% of the TTL plus a jitter from the expiration time.
+	if now.After(exp.Add(-1*time.Duration((*tr.Spec.ExpirationSeconds*20)/100)*time.Second - jitter)) {
 		return true
 	}
 	return false

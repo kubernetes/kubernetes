@@ -108,7 +108,7 @@ func (s *storageLeases) UpdateLease(ip string) error {
 		klog.V(6).Infof("Resetting TTL on master IP %q listed in storage to %v", ip, leaseTime)
 
 		return existing, &leaseTime, nil
-	})
+	}, nil)
 }
 
 // RemoveLease removes the lease on a master IP in storage

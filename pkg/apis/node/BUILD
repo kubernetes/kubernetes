@@ -30,6 +30,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/apis/node/install:all-srcs",
+        "//pkg/apis/node/v1:all-srcs",
         "//pkg/apis/node/v1alpha1:all-srcs",
         "//pkg/apis/node/v1beta1:all-srcs",
         "//pkg/apis/node/validation:all-srcs",

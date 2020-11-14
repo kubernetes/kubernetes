@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"testing"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -824,4 +825,139 @@ func getManagedFields(rawResponse []byte) ([]metav1.ManagedFieldsEntry, error) {
 		return nil, err
 	}
 	return obj.GetManagedFields(), nil
+}
+
+func TestDefaultMissingKeyCRD(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+	config := server.ClientConfig
+
+	apiExtensionClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
+	err = json.Unmarshal([]byte(`{
+		"openAPIV3Schema": {
+			"type": "object",
+			"properties": {
+				"spec": {
+					"type": "object",
+					"x-kubernetes-preserve-unknown-fields": true,
+					"properties": {
+						"cronSpec": {
+							"type": "string",
+							"pattern": "^(\\d+|\\*)(/\\d+)?(\\s+(\\d+|\\*)(/\\d+)?){4}$"
+						},
+						"ports": {
+							"type": "array",
+							"x-kubernetes-list-map-keys": [
+								"containerPort",
+								"protocol"
+							],
+							"x-kubernetes-list-type": "map",
+							"items": {
+								"properties": {
+									"containerPort": {
+										"format": "int32",
+										"type": "integer"
+									},
+									"hostIP": {
+										"type": "string"
+									},
+									"hostPort": {
+										"format": "int32",
+										"type": "integer"
+									},
+									"name": {
+										"type": "string"
+									},
+									"protocol": {
+										"default": "TCP",
+										"type": "string"
+									}
+								},
+								"required": [
+									"containerPort"
+								],
+								"type": "object"
+							}
+						}
+					}
+				}
+			}
+		}
+	}`), &noxuDefinition.Spec.Versions[0].Schema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kind := noxuDefinition.Spec.Names.Kind
+	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
+	name := "mytest"
+
+	rest := apiExtensionClient.Discovery().RESTClient()
+	yamlBody := []byte(fmt.Sprintf(`
+apiVersion: %s
+kind: %s
+metadata:
+  name: %s
+  finalizers:
+  - test-finalizer
+spec:
+  cronSpec: "* * * * */5"
+  replicas: 1
+  ports:
+  - name: x
+    containerPort: 80`, apiVersion, kind, name))
+	result, err := rest.Patch(types.ApplyPatchType).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
+		Name(name).
+		Param("fieldManager", "apply_test").
+		Body(yamlBody).
+		DoRaw(context.TODO())
+	if err != nil {
+		t.Fatalf("failed to create custom resource with apply: %v:\n%v", err, string(result))
+	}
+
+	// New applier tries to edit an existing list item, we should get conflicts.
+	result, err = rest.Patch(types.ApplyPatchType).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
+		Name(name).
+		Param("fieldManager", "apply_test_2").
+		Body([]byte(fmt.Sprintf(`
+apiVersion: %s
+kind: %s
+metadata:
+  name: %s
+spec:
+  ports:
+  - name: "y"
+    containerPort: 80
+    protocol: TCP`, apiVersion, kind, name))).
+		DoRaw(context.TODO())
+	if err == nil {
+		t.Fatalf("Expecting to get conflicts when a different applier updates existing list item, got no error: %s", result)
+	}
+	status, ok := err.(*apierrors.StatusError)
+	if !ok {
+		t.Fatalf("Expecting to get conflicts as API error")
+	}
+	if len(status.Status().Details.Causes) != 1 {
+		t.Fatalf("Expecting to get one conflict when a different applier updates existing list item, got: %v", status.Status().Details.Causes)
+	}
 }

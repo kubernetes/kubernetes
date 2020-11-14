@@ -46,7 +46,7 @@ func NewCmdCertificate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 		Use:                   "certificate SUBCOMMAND",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Modify certificate resources."),
-		Long:                  "Modify certificate resources.",
+		Long:                  i18n.T("Modify certificate resources."),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},
@@ -118,7 +118,7 @@ func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOS
 		Use:                   "approve (-f FILENAME | NAME)",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Approve a certificate signing request"),
-		Long: templates.LongDesc(`
+		Long: templates.LongDesc(i18n.T(`
 		Approve a certificate signing request.
 
 		kubectl certificate approve allows a cluster admin to approve a certificate
@@ -129,7 +129,7 @@ func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOS
 		can potentially grant a requester access to cluster resources or to authenticate
 		as a requested identity. Before approving a CSR, ensure you understand what the
 		signed certificate can do.
-		`),
+		`)),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -161,13 +161,13 @@ func NewCmdCertificateDeny(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 		Use:                   "deny (-f FILENAME | NAME)",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Deny a certificate signing request"),
-		Long: templates.LongDesc(`
+		Long: templates.LongDesc(i18n.T(`
 		Deny a certificate signing request.
 
 		kubectl certificate deny allows a cluster admin to deny a certificate
 		signing request (CSR). This action tells a certificate signing controller to
 		not to issue a certificate to the requestor.
-		`),
+		`)),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())

@@ -31,7 +31,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//test/conformance/behaviors:all-srcs",
         "//test/conformance/testdata:all-srcs",
     ],
     tags = ["automanaged"],

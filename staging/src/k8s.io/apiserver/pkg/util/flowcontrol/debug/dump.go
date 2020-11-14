@@ -17,8 +17,9 @@ limitations under the License.
 package debug
 
 import (
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"time"
+
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // QueueSetDump is an instant dump of queue-set.

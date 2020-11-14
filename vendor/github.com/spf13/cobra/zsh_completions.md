@@ -1,39 +1,48 @@
-## Generating Zsh Completion for your cobra.Command
+## Generating Zsh Completion For Your cobra.Command
 
-Cobra supports native Zsh completion generated from the root `cobra.Command`.
-The generated completion script should be put somewhere in your `$fpath` named
-`_<YOUR COMMAND>`.
+Please refer to [Shell Completions](shell_completions.md) for details.
 
-### What's Supported
+## Zsh completions standardization
 
-* Completion for all non-hidden subcommands using their `.Short` description.
-* Completion for all non-hidden flags using the following rules:
-  * Filename completion works by marking the flag with `cmd.MarkFlagFilename...`
-    family of commands.
-  * The requirement for argument to the flag is decided by the `.NoOptDefVal`
-    flag value - if it's empty then completion will expect an argument.
-  * Flags of one of the various `*Array` and `*Slice` types supports multiple
-    specifications (with or without argument depending on the specific type).
-* Completion of positional arguments using the following rules:
-  * Argument position for all options below starts at `1`. If argument position
-    `0` is requested it will raise an error.
-  * Use `command.MarkZshCompPositionalArgumentFile` to complete filenames. Glob
-    patterns (e.g. `"*.log"`) are optional - if not specified it will offer to
-    complete all file types.
-  * Use `command.MarkZshCompPositionalArgumentWords` to offer specific words for
-    completion. At least one word is required.
-  * It's possible to specify completion for some arguments and leave some
-    unspecified (e.g. offer words for second argument but nothing for first
-    argument). This will cause no completion for first argument but words
-    completion for second argument.
-  * If no argument completion was specified for 1st argument (but optionally was
-    specified for 2nd) and the command has `ValidArgs` it will be used as
-    completion options for 1st argument.
-  * Argument completions only offered for commands with no subcommands.
+Cobra 1.1 standardized its zsh completion support to align it with its other shell completions.  Although the API was kept backwards-compatible, some small changes in behavior were introduced.
 
-### What's not yet Supported
+### Deprecation summary
 
-* Custom completion scripts are not supported yet (We should probably create zsh
-  specific one, doesn't make sense to re-use the bash one as the functions will
-  be different).
-* Whatever other feature you're looking for and doesn't exist :)
+See further below for more details on these deprecations.
+
+* `cmd.MarkZshCompPositionalArgumentFile(pos, []string{})` is no longer needed.  It is therefore **deprecated** and silently ignored.
+* `cmd.MarkZshCompPositionalArgumentFile(pos, glob[])` is **deprecated** and silently ignored.
+  * Instead use `ValidArgsFunction` with `ShellCompDirectiveFilterFileExt`.
+* `cmd.MarkZshCompPositionalArgumentWords()` is **deprecated** and silently ignored.
+  * Instead use `ValidArgsFunction`.
+
+### Behavioral changes
+
+**Noun completion**
+|Old behavior|New behavior|
+|---|---|
+|No file completion by default (opposite of bash)|File completion by default; use `ValidArgsFunction` with `ShellCompDirectiveNoFileComp` to turn off file completion on a per-argument basis|
+|Completion of flag names without the `-` prefix having been typed|Flag names are only completed if the user has typed the first `-`|
+`cmd.MarkZshCompPositionalArgumentFile(pos, []string{})` used to turn on file completion on a per-argument position basis|File completion for all arguments by default; `cmd.MarkZshCompPositionalArgumentFile()` is **deprecated** and silently ignored|
+|`cmd.MarkZshCompPositionalArgumentFile(pos, glob[])` used to turn on file completion **with glob filtering** on a per-argument position basis (zsh-specific)|`cmd.MarkZshCompPositionalArgumentFile()` is **deprecated** and silently ignored; use `ValidArgsFunction` with `ShellCompDirectiveFilterFileExt` for file **extension** filtering (not full glob filtering)|
+|`cmd.MarkZshCompPositionalArgumentWords(pos, words[])` used to provide completion choices on a per-argument position basis (zsh-specific)|`cmd.MarkZshCompPositionalArgumentWords()` is **deprecated** and silently ignored; use `ValidArgsFunction` to achieve the same behavior|
+
+**Flag-value completion**
+
+|Old behavior|New behavior|
+|---|---|
+|No file completion by default (opposite of bash)|File completion by default; use `RegisterFlagCompletionFunc()` with `ShellCompDirectiveNoFileComp` to turn off file completion|
+|`cmd.MarkFlagFilename(flag, []string{})` and similar used to turn on file completion|File completion by default; `cmd.MarkFlagFilename(flag, []string{})` no longer needed in this context and silently ignored|
+|`cmd.MarkFlagFilename(flag, glob[])`  used to turn on file completion **with glob filtering** (syntax of `[]string{"*.yaml", "*.yml"}` incompatible with bash)|Will continue to work, however, support for bash syntax is added and should be used instead so as to work for all shells (`[]string{"yaml", "yml"}`)|
+|`cmd.MarkFlagDirname(flag)` only completes directories (zsh-specific)|Has been added for all shells|
+|Completion of a flag name does not repeat, unless flag is of type `*Array` or `*Slice` (not supported by bash)|Retained for `zsh` and added to `fish`|
+|Completion of a flag name does not provide the `=` form (unlike bash)|Retained for `zsh` and added to `fish`|
+
+**Improvements**
+
+* Custom completion support (`ValidArgsFunction` and `RegisterFlagCompletionFunc()`)
+* File completion by default if no other completions found
+* Handling of required flags
+* File extension filtering no longer mutually exclusive with bash usage
+* Completion of directory names *within* another directory
+* Support for `=` form of flags

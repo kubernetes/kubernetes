@@ -1307,7 +1307,8 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 						},
 					},
 				}
-				_, errs = ValidateVolumes(volumes, nil, field.NewPath(""))
+				opts := PodValidationOptions{}
+				_, errs = ValidateVolumes(volumes, nil, field.NewPath(""), opts)
 			} else {
 				errs = ValidatePersistentVolumeClaim(scenario.claim)
 			}
@@ -2199,6 +2200,7 @@ func TestValidateVolumes(t *testing.T) {
 		name string
 		vol  core.Volume
 		errs []verr
+		opts PodValidationOptions
 	}{
 		// EmptyDir and basic volume names
 		{
@@ -3295,6 +3297,79 @@ func TestValidateVolumes(t *testing.T) {
 			},
 		},
 		{
+			name: "hugepages-downwardAPI-enabled",
+			vol: core.Volume{
+				Name: "downwardapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						Items: []core.DownwardAPIVolumeFile{
+							{
+								Path: "hugepages_request",
+								ResourceFieldRef: &core.ResourceFieldSelector{
+									ContainerName: "test-container",
+									Resource:      "requests.hugepages-2Mi",
+								},
+							},
+							{
+								Path: "hugepages_limit",
+								ResourceFieldRef: &core.ResourceFieldSelector{
+									ContainerName: "test-container",
+									Resource:      "limits.hugepages-2Mi",
+								},
+							},
+						},
+					},
+				},
+			},
+			opts: PodValidationOptions{AllowDownwardAPIHugePages: true},
+		},
+		{
+			name: "hugepages-downwardAPI-requests-disabled",
+			vol: core.Volume{
+				Name: "downwardapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						Items: []core.DownwardAPIVolumeFile{
+							{
+								Path: "hugepages_request",
+								ResourceFieldRef: &core.ResourceFieldSelector{
+									ContainerName: "test-container",
+									Resource:      "requests.hugepages-2Mi",
+								},
+							},
+						},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeNotSupported,
+				field: "downwardAPI.resourceFieldRef.resource",
+			}},
+		},
+		{
+			name: "hugepages-downwardAPI-limits-disabled",
+			vol: core.Volume{
+				Name: "downwardapi",
+				VolumeSource: core.VolumeSource{
+					DownwardAPI: &core.DownwardAPIVolumeSource{
+						Items: []core.DownwardAPIVolumeFile{
+							{
+								Path: "hugepages_limit",
+								ResourceFieldRef: &core.ResourceFieldSelector{
+									ContainerName: "test-container",
+									Resource:      "limits.hugepages-2Mi",
+								},
+							},
+						},
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeNotSupported,
+				field: "downwardAPI.resourceFieldRef.resource",
+			}},
+		},
+		{
 			name: "downapi valid defaultMode",
 			vol: core.Volume{
 				Name: "downapi",
@@ -3990,7 +4065,7 @@ func TestValidateVolumes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			names, errs := ValidateVolumes([]core.Volume{tc.vol}, nil, field.NewPath("field"))
+			names, errs := ValidateVolumes([]core.Volume{tc.vol}, nil, field.NewPath("field"), tc.opts)
 			if len(errs) != len(tc.errs) {
 				t.Fatalf("unexpected error(s): got %d, want %d: %v", len(tc.errs), len(errs), errs)
 			}
@@ -4016,7 +4091,7 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "abc", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
 		{Name: "abc", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}},
 	}
-	_, errs := ValidateVolumes(dupsCase, nil, field.NewPath("field"))
+	_, errs := ValidateVolumes(dupsCase, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(errs) == 0 {
 		t.Errorf("expected error")
 	} else if len(errs) != 1 {
@@ -4029,7 +4104,7 @@ func TestValidateVolumes(t *testing.T) {
 	hugePagesCase := core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumHugePages}}
 
 	// Enable HugePages
-	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "working", nil); len(errs) != 0 {
+	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "working", nil, PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("Unexpected error when HugePages feature is enabled.")
 	}
 
@@ -4208,7 +4283,7 @@ func TestHugePagesIsolation(t *testing.T) {
 	for tcName, tc := range testCases {
 		t.Run(tcName, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HugePageStorageMediumSize, tc.enableHugePageStorageMediumSize)()
-			errs := ValidatePodCreate(tc.pod, PodValidationOptions{tc.enableHugePageStorageMediumSize})
+			errs := ValidatePodCreate(tc.pod, PodValidationOptions{AllowMultipleHugePageResources: tc.enableHugePageStorageMediumSize})
 			if tc.expectError && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}
@@ -4359,7 +4434,7 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if errs := validateVolumeSource(&tc, field.NewPath("spec"), "tmpvol", nil); len(errs) != 0 {
+		if errs := validateVolumeSource(&tc, field.NewPath("spec"), "tmpvol", nil, PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -4529,9 +4604,52 @@ func TestLocalStorageEnvWithFeatureGate(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		if errs := validateEnvVarValueFrom(testCase, field.NewPath("field")); len(errs) != 0 {
+		if errs := validateEnvVarValueFrom(testCase, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success, got: %v", errs)
 		}
+	}
+}
+
+func TestHugePagesEnv(t *testing.T) {
+	testCases := []core.EnvVar{
+		{
+			Name: "hugepages-limits",
+			ValueFrom: &core.EnvVarSource{
+				ResourceFieldRef: &core.ResourceFieldSelector{
+					ContainerName: "test-container",
+					Resource:      "limits.hugepages-2Mi",
+				},
+			},
+		},
+		{
+			Name: "hugepages-requests",
+			ValueFrom: &core.EnvVarSource{
+				ResourceFieldRef: &core.ResourceFieldSelector{
+					ContainerName: "test-container",
+					Resource:      "requests.hugepages-2Mi",
+				},
+			},
+		},
+	}
+	// enable gate
+	for _, testCase := range testCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DownwardAPIHugePages, true)()
+			opts := PodValidationOptions{AllowDownwardAPIHugePages: true}
+			if errs := validateEnvVarValueFrom(testCase, field.NewPath("field"), opts); len(errs) != 0 {
+				t.Errorf("expected success, got: %v", errs)
+			}
+		})
+	}
+	// disable gate
+	for _, testCase := range testCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DownwardAPIHugePages, false)()
+			opts := PodValidationOptions{AllowDownwardAPIHugePages: false}
+			if errs := validateEnvVarValueFrom(testCase, field.NewPath("field"), opts); len(errs) == 0 {
+				t.Errorf("expected failure")
+			}
+		})
 	}
 }
 
@@ -4656,7 +4774,7 @@ func TestValidateEnv(t *testing.T) {
 			},
 		},
 	}
-	if errs := ValidateEnv(successCase, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateEnv(successCase, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success, got: %v", errs)
 	}
 
@@ -4920,7 +5038,7 @@ func TestValidateEnv(t *testing.T) {
 		},
 	}
 	for _, tc := range errorCases {
-		if errs := ValidateEnv(tc.envs, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateEnv(tc.envs, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %s", tc.name)
 		} else {
 			for i := range errs {
@@ -5101,7 +5219,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
 		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"))
+	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)
 		return
@@ -5164,7 +5282,7 @@ func TestValidateDisabledSubpath(t *testing.T) {
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
 		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"))
+	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)
 		return
@@ -5226,7 +5344,7 @@ func TestValidateSubpathMutuallyExclusive(t *testing.T) {
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
 		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"))
+	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)
 		return
@@ -5307,7 +5425,7 @@ func TestValidateDisabledSubpathExpr(t *testing.T) {
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
 		{Name: "123", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"))
+	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)
 		return
@@ -5501,7 +5619,7 @@ func TestValidateMountPropagation(t *testing.T) {
 	volumes := []core.Volume{
 		{Name: "foo", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
-	vols2, v2err := ValidateVolumes(volumes, nil, field.NewPath("field"))
+	vols2, v2err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v2err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v2err)
 		return
@@ -5524,7 +5642,7 @@ func TestAlphaValidateVolumeDevices(t *testing.T) {
 		{Name: "def", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: "/foo/baz", Type: newHostPathType(string(core.HostPathUnset))}}},
 	}
 
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"))
+	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volumes - expected success %v", v1err)
 		return
@@ -5737,7 +5855,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			},
 		},
 	} {
-		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, field.NewPath("ephemeralContainers")); len(errs) != 0 {
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, field.NewPath("ephemeralContainers"), PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 	}
@@ -5901,7 +6019,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, field.NewPath("ephemeralContainers"))
+		errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, field.NewPath("ephemeralContainers"), PodValidationOptions{})
 
 		if len(errs) == 0 {
 			t.Errorf("for test %q, expected error but received none", tc.title)
@@ -6070,7 +6188,7 @@ func TestValidateContainers(t *testing.T) {
 		},
 		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: fakeValidSecurityContext(true)},
 	}
-	if errs := validateContainers(successCase, false, volumeDevices, field.NewPath("field")); len(errs) != 0 {
+	if errs := validateContainers(successCase, false, volumeDevices, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -6310,7 +6428,7 @@ func TestValidateContainers(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		if errs := validateContainers(v, false, volumeDevices, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateContainers(v, false, volumeDevices, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -6344,7 +6462,7 @@ func TestValidateInitContainers(t *testing.T) {
 			TerminationMessagePolicy: "File",
 		},
 	}
-	if errs := validateContainers(successCase, true, volumeDevices, field.NewPath("field")); len(errs) != 0 {
+	if errs := validateContainers(successCase, true, volumeDevices, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -6370,7 +6488,7 @@ func TestValidateInitContainers(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		if errs := validateContainers(v, true, volumeDevices, field.NewPath("field")); len(errs) == 0 {
+		if errs := validateContainers(v, true, volumeDevices, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -6881,7 +6999,7 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
-			if errs := ValidatePodSpec(&v, nil, field.NewPath("field")); len(errs) != 0 {
+			if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -7085,7 +7203,7 @@ func TestValidatePodSpec(t *testing.T) {
 		},
 	}
 	for k, v := range failureCases {
-		if errs := ValidatePodSpec(&v, nil, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
 	}
@@ -9875,7 +9993,7 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 	for _, test := range tests {
 		new := core.Pod{Spec: core.PodSpec{EphemeralContainers: test.new}}
 		old := core.Pod{Spec: core.PodSpec{EphemeralContainers: test.old}}
-		errs := ValidatePodEphemeralContainersUpdate(&new, &old)
+		errs := ValidatePodEphemeralContainersUpdate(&new, &old, PodValidationOptions{})
 		if test.err == "" {
 			if len(errs) != 0 {
 				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
@@ -9898,10 +10016,9 @@ func TestValidateServiceCreate(t *testing.T) {
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
 
 	testCases := []struct {
-		name               string
-		tweakSvc           func(svc *core.Service) // given a basic valid service, each test case can customize it
-		numErrs            int
-		appProtocolEnabled bool
+		name     string
+		tweakSvc func(svc *core.Service) // given a basic valid service, each test case can customize it
+		numErrs  int
 	}{
 		{
 			name: "missing namespace",
@@ -10171,12 +10288,12 @@ func TestValidateServiceCreate(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "invalid load balancer with mix protocol",
+			name: "load balancer with mix protocol",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(12345)})
 			},
-			numErrs: 1,
+			numErrs: 0,
 		},
 		{
 			name: "valid 1",
@@ -11008,8 +11125,7 @@ func TestValidateServiceCreate(t *testing.T) {
 					AppProtocol: utilpointer.StringPtr("HTTP"),
 				}}
 			},
-			appProtocolEnabled: true,
-			numErrs:            0,
+			numErrs: 0,
 		},
 		{
 			name: `valid custom appProtocol`,
@@ -11021,8 +11137,7 @@ func TestValidateServiceCreate(t *testing.T) {
 					AppProtocol: utilpointer.StringPtr("example.com/protocol"),
 				}}
 			},
-			appProtocolEnabled: true,
-			numErrs:            0,
+			numErrs: 0,
 		},
 		{
 			name: `invalid appProtocol`,
@@ -11034,8 +11149,7 @@ func TestValidateServiceCreate(t *testing.T) {
 					AppProtocol: utilpointer.StringPtr("example.com/protocol_with{invalid}[characters]"),
 				}}
 			},
-			appProtocolEnabled: true,
-			numErrs:            1,
+			numErrs: 1,
 		},
 
 		{
@@ -11055,12 +11169,17 @@ func TestValidateServiceCreate(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+		{
+			name: "Use AllocateLoadBalancerNodePorts when type is not LoadBalancer",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, true)()
-
 			svc := makeValidService()
 			tc.tweakSvc(&svc)
 			errs := ValidateServiceCreate(&svc)
@@ -11424,7 +11543,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 	for _, successCase := range successCases {
 		successCase.old.ObjectMeta.ResourceVersion = "1"
 		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateReplicationControllerUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
+		if errs := ValidateReplicationControllerUpdate(&successCase.update, &successCase.old, PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -11499,7 +11618,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 		},
 	}
 	for testName, errorCase := range errorCases {
-		if errs := ValidateReplicationControllerUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
+		if errs := ValidateReplicationControllerUpdate(&errorCase.update, &errorCase.old, PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}
@@ -11569,7 +11688,7 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateReplicationController(&successCase); len(errs) != 0 {
+		if errs := ValidateReplicationController(&successCase, PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -11719,7 +11838,7 @@ func TestValidateReplicationController(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateReplicationController(&v)
+		errs := ValidateReplicationController(&v, PodValidationOptions{})
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -12540,10 +12659,9 @@ func TestValidateServiceUpdate(t *testing.T) {
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
 	singleStack := core.IPFamilyPolicySingleStack
 	testCases := []struct {
-		name               string
-		tweakSvc           func(oldSvc, newSvc *core.Service) // given basic valid services, each test case can customize them
-		numErrs            int
-		appProtocolEnabled bool
+		name     string
+		tweakSvc func(oldSvc, newSvc *core.Service) // given basic valid services, each test case can customize them
+		numErrs  int
 	}{
 		{
 			name: "no change",
@@ -13412,47 +13530,33 @@ func TestValidateServiceUpdate(t *testing.T) {
 			},
 			numErrs: 1,
 		},
-
 		{
-			name: "update with valid app protocol, field unset, gate disabled",
+			name: "update to valid app protocol",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP"}}
-				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
-			},
-			numErrs: 1,
-		},
-		{
-			name: "update to valid app protocol, field set, gate disabled",
-			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.StringPtr("http")}}
 				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
 			},
 			numErrs: 0,
 		},
 		{
-			name: "update to valid app protocol, gate enabled",
-			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP"}}
-				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
-			},
-			appProtocolEnabled: true,
-			numErrs:            0,
-		},
-		{
-			name: "update to invalid app protocol, gate enabled",
+			name: "update to invalid app protocol",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP"}}
 				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt(3000), Protocol: "TCP", AppProtocol: utilpointer.StringPtr("~https")}}
 			},
-			appProtocolEnabled: true,
-			numErrs:            1,
+			numErrs: 1,
+		},
+		{
+			name: "Set AllocateLoadBalancerNodePorts when type is not LoadBalancer",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+			},
+			numErrs: 1,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.appProtocolEnabled)()
-
 			oldSvc := makeValidService()
 			newSvc := makeValidService()
 			tc.tweakSvc(&oldSvc, &newSvc)
@@ -14749,8 +14853,7 @@ func TestValidateSSHAuthSecret(t *testing.T) {
 
 func TestValidateEndpointsCreate(t *testing.T) {
 	successCases := map[string]struct {
-		endpoints          core.Endpoints
-		appProtocolEnabled bool
+		endpoints core.Endpoints
 	}{
 		"simple endpoint": {
 			endpoints: core.Endpoints{
@@ -14793,7 +14896,6 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					},
 				},
 			},
-			appProtocolEnabled: true,
 		},
 		"empty ports": {
 			endpoints: core.Endpoints{
@@ -14809,7 +14911,6 @@ func TestValidateEndpointsCreate(t *testing.T) {
 
 	for name, tc := range successCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.appProtocolEnabled)()
 			errs := ValidateEndpointsCreate(&tc.endpoints)
 			if len(errs) != 0 {
 				t.Errorf("Expected no validation errors, got %v", errs)
@@ -14819,10 +14920,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 	}
 
 	errorCases := map[string]struct {
-		endpoints          core.Endpoints
-		appProtocolEnabled bool
-		errorType          field.ErrorType
-		errorDetail        string
+		endpoints   core.Endpoints
+		errorType   field.ErrorType
+		errorDetail string
 	}{
 		"missing namespace": {
 			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "mysvc"}},
@@ -14990,15 +15090,13 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					},
 				},
 			},
-			appProtocolEnabled: true,
-			errorType:          "FieldValueInvalid",
-			errorDetail:        "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character",
+			errorType:   "FieldValueInvalid",
+			errorDetail: "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character",
 		},
 	}
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, v.appProtocolEnabled)()
 			if errs := ValidateEndpointsCreate(&v.endpoints); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
 				t.Errorf("Expected error type %s with detail %q, got %v", v.errorType, v.errorDetail, errs)
 			}
@@ -15015,54 +15113,32 @@ func TestValidateEndpointsUpdate(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		tweakOldEndpoints  func(ep *core.Endpoints)
-		tweakNewEndpoints  func(ep *core.Endpoints)
-		appProtocolEnabled bool
-		numExpectedErrors  int
+		tweakOldEndpoints func(ep *core.Endpoints)
+		tweakNewEndpoints func(ep *core.Endpoints)
+		numExpectedErrors int
 	}{
-		"update with valid app protocol, field unset, gate not enabled": {
+		"update to valid app protocol": {
 			tweakOldEndpoints: func(ep *core.Endpoints) {
 				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}}
-			},
-			tweakNewEndpoints: func(ep *core.Endpoints) {
-				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
-			},
-			numExpectedErrors: 1,
-		},
-		"update with valid app protocol, field set, gate not enabled": {
-			tweakOldEndpoints: func(ep *core.Endpoints) {
-				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("http")}}
 			},
 			tweakNewEndpoints: func(ep *core.Endpoints) {
 				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
 			},
 			numExpectedErrors: 0,
 		},
-		"update to valid app protocol, gate enabled": {
-			tweakOldEndpoints: func(ep *core.Endpoints) {
-				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}}
-			},
-			tweakNewEndpoints: func(ep *core.Endpoints) {
-				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("https")}}
-			},
-			appProtocolEnabled: true,
-			numExpectedErrors:  0,
-		},
-		"update to invalid app protocol, gate enabled": {
+		"update to invalid app protocol": {
 			tweakOldEndpoints: func(ep *core.Endpoints) {
 				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}}
 			},
 			tweakNewEndpoints: func(ep *core.Endpoints) {
 				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.StringPtr("~https")}}
 			},
-			appProtocolEnabled: true,
-			numExpectedErrors:  1,
+			numExpectedErrors: 1,
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.appProtocolEnabled)()
 			oldEndpoints := baseEndpoints.DeepCopy()
 			tc.tweakOldEndpoints(oldEndpoints)
 			newEndpoints := baseEndpoints.DeepCopy()
@@ -15612,7 +15688,7 @@ func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
 	updatedEndpoint := newNodeNameEndpoint("kubernetes-changed-nodename")
 	// Check that NodeName can be changed during update, this is to accommodate the case where nodeIP or PodCIDR is reused.
 	// The same ip will now have a different nodeName.
-	errList := ValidateEndpoints(updatedEndpoint, false)
+	errList := ValidateEndpoints(updatedEndpoint)
 	errList = append(errList, ValidateEndpointsUpdate(updatedEndpoint, oldEndpoint)...)
 	if len(errList) != 0 {
 		t.Error("Endpoint should allow changing of Subset.Addresses.NodeName on update")
@@ -15622,7 +15698,7 @@ func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
 func TestEndpointAddressNodeNameInvalidDNSSubdomain(t *testing.T) {
 	// Check NodeName DNS validation
 	endpoint := newNodeNameEndpoint("illegal*.nodename")
-	errList := ValidateEndpoints(endpoint, false)
+	errList := ValidateEndpoints(endpoint)
 	if len(errList) == 0 {
 		t.Error("Endpoint should reject invalid NodeName")
 	}
@@ -15630,7 +15706,7 @@ func TestEndpointAddressNodeNameInvalidDNSSubdomain(t *testing.T) {
 
 func TestEndpointAddressNodeNameCanBeAnIPAddress(t *testing.T) {
 	endpoint := newNodeNameEndpoint("10.10.1.1")
-	errList := ValidateEndpoints(endpoint, false)
+	errList := ValidateEndpoints(endpoint)
 	if len(errList) != 0 {
 		t.Error("Endpoint should accept a NodeName that is an IP address")
 	}
@@ -16835,7 +16911,7 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		err := ValidatePodTemplateSpec(test.spec, rootFld)
+		err := ValidatePodTemplateSpec(test.spec, rootFld, PodValidationOptions{})
 		asserttestify.Equal(t, test.expectedErr, err, "TestCase[%d]: %s", i, test.description)
 	}
 }

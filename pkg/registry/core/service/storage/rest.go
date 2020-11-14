@@ -231,7 +231,10 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation
 	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts, dryrun.IsDryRun(options.DryRun))
 	defer nodePortOp.Finish()
 
-	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
+	// TODO: This creates nodePorts if needed. In the future nodePorts may be cleared if *never* used.
+	// But for now we stick to the KEP "don't allocate new node ports but do not deallocate existing node ports if set"
+	if service.Spec.Type == api.ServiceTypeNodePort ||
+		(service.Spec.Type == api.ServiceTypeLoadBalancer && shouldAllocateNodePorts(service)) {
 		if err := initNodePorts(service, nodePortOp); err != nil {
 			return nil, err
 		}
@@ -333,6 +336,13 @@ func (rs *REST) releaseAllocatedResources(svc *api.Service) {
 			}
 		}
 	}
+}
+
+func shouldAllocateNodePorts(service *api.Service) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
+		return *service.Spec.AllocateLoadBalancerNodePorts
+	}
+	return true
 }
 
 // externalTrafficPolicyUpdate adjusts ExternalTrafficPolicy during service update if needed.
@@ -472,7 +482,8 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		releaseNodePorts(oldService, nodePortOp)
 	}
 	// Update service from any type to NodePort or LoadBalancer, should update NodePort.
-	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
+	if service.Spec.Type == api.ServiceTypeNodePort ||
+		(service.Spec.Type == api.ServiceTypeLoadBalancer && shouldAllocateNodePorts(service)) {
 		if err := updateNodePorts(oldService, service, nodePortOp); err != nil {
 			return nil, false, err
 		}

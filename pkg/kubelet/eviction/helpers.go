@@ -758,8 +758,8 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 		if rlimit.NumOfRunningProcesses != nil && rlimit.MaxPID != nil {
 			available := int64(*rlimit.MaxPID) - int64(*rlimit.NumOfRunningProcesses)
 			result[evictionapi.SignalPIDAvailable] = signalObservation{
-				available: resource.NewQuantity(available, resource.BinarySI),
-				capacity:  resource.NewQuantity(int64(*rlimit.MaxPID), resource.BinarySI),
+				available: resource.NewQuantity(available, resource.DecimalSI),
+				capacity:  resource.NewQuantity(int64(*rlimit.MaxPID), resource.DecimalSI),
 				time:      rlimit.Time,
 			}
 		}

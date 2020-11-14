@@ -42,5 +42,6 @@ go_test(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/handler:go_default_library",
     ],
 )

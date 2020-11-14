@@ -94,7 +94,8 @@ func (f *flexVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) 
 
 	if !f.readOnly {
 		if f.plugin.capabilities.FSGroup {
-			volume.SetVolumeOwnership(f, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(f.plugin.GetPluginName()))
+			// fullPluginName helps to distinguish different driver from flex volume plugin
+			volume.SetVolumeOwnership(f, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(f.plugin, f.spec))
 		}
 	}
 

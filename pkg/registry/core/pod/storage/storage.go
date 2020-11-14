@@ -214,7 +214,7 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podID, oldMa
 		})
 		finalPod = pod
 		return pod, nil
-	}), dryRun)
+	}), dryRun, nil)
 	return finalPod, err
 }
 

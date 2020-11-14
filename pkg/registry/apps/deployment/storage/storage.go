@@ -231,7 +231,7 @@ func (r *RollbackREST) setDeploymentRollback(ctx context.Context, deploymentID s
 		d.Spec.RollbackTo = config
 		finalDeployment = d
 		return d, nil
-	}), dryRun)
+	}), dryRun, nil)
 	return finalDeployment, err
 }
 

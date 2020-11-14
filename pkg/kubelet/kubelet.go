@@ -22,7 +22,6 @@ import (
 	"math"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path"
 	sysruntime "runtime"
@@ -56,7 +55,7 @@ import (
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/component-helpers/lease"
+	"k8s.io/component-helpers/apimachinery/lease"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog/v2"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
@@ -85,6 +84,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
+	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown"
 	oomwatcher "k8s.io/kubernetes/pkg/kubelet/oom"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
@@ -228,7 +228,6 @@ type Dependencies struct {
 	KubeletConfigController *kubeletconfig.Controller
 	RemoteRuntimeService    internalapi.RuntimeService
 	RemoteImageService      internalapi.ImageManagerService
-	criHandler              http.Handler
 	dockerLegacyService     legacy.DockerLegacyService
 	// remove it after cadvisor.UsingLegacyCadvisorStats dropped.
 	useLegacyCadvisorStats bool
@@ -270,13 +269,9 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 		config.NewSourceURL(kubeCfg.StaticPodURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource))
 	}
 
-	var updatechannel chan<- interface{}
 	if kubeDeps.KubeClient != nil {
 		klog.Infof("Watching apiserver")
-		if updatechannel == nil {
-			updatechannel = cfg.Channel(kubetypes.ApiserverSource)
-		}
-		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, updatechannel)
+		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, cfg.Channel(kubetypes.ApiserverSource))
 	}
 	return cfg, nil
 }
@@ -299,6 +294,7 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	switch containerRuntime {
 	case kubetypes.DockerContainerRuntime:
+		klog.Warningf("Using dockershim is deprecated, please consider using a full-fledged CRI implementation")
 		if err := runDockershim(
 			kubeCfg,
 			kubeDeps,
@@ -344,6 +340,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	cloudProvider string,
 	certDirectory string,
 	rootDirectory string,
+	imageCredentialProviderConfigFile string,
+	imageCredentialProviderBinDir string,
 	registerNode bool,
 	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
@@ -507,7 +505,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		daemonEndpoints:                         daemonEndpoints,
 		containerManager:                        kubeDeps.ContainerManager,
 		containerRuntimeName:                    containerRuntime,
-		redirectContainerStreaming:              crOptions.RedirectContainerStreaming,
 		nodeIPs:                                 nodeIPs,
 		nodeIPValidator:                         validateNodeIP,
 		clock:                                   clock.RealClock{},
@@ -571,10 +568,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration)
 
 	klet.dockerLegacyService = kubeDeps.dockerLegacyService
-	klet.criHandler = kubeDeps.criHandler
 	klet.runtimeService = kubeDeps.RemoteRuntimeService
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && kubeDeps.KubeClient != nil {
+	if kubeDeps.KubeClient != nil {
 		klet.runtimeClassManager = runtimeclass.NewManager(kubeDeps.KubeClient)
 	}
 
@@ -608,6 +604,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeCfg.SerializeImagePulls,
 		float32(kubeCfg.RegistryPullQPS),
 		int(kubeCfg.RegistryBurst),
+		imageCredentialProviderConfigFile,
+		imageCredentialProviderBinDir,
 		kubeCfg.CPUCFSQuota,
 		kubeCfg.CPUCFSQuotaPeriod,
 		kubeDeps.RemoteRuntimeService,
@@ -797,6 +795,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		v1.NamespaceNodeLease,
 		util.SetNodeOwnerFunc(klet.heartbeatClient, string(klet.nodeName)))
 
+	klet.shutdownManager = nodeshutdown.NewManager(klet.GetActivePods, killPodNow(klet.podWorkers, kubeDeps.Recorder), kubeCfg.ShutdownGracePeriod.Duration, kubeCfg.ShutdownGracePeriodCriticalPods.Duration)
+
 	// Finally, put the most recent version of the config on the Kubelet, so
 	// people can see how it was configured.
 	klet.kubeletConfiguration = *kubeCfg
@@ -945,9 +945,6 @@ type Kubelet struct {
 
 	// The name of the container runtime
 	containerRuntimeName string
-
-	// redirectContainerStreaming enables container streaming redirect.
-	redirectContainerStreaming bool
 
 	// Container runtime.
 	containerRuntime kubecontainer.Runtime
@@ -1116,9 +1113,6 @@ type Kubelet struct {
 	// The AppArmor validator for checking whether AppArmor is supported.
 	appArmorValidator apparmor.Validator
 
-	// The handler serving CRI streaming calls (exec/attach/port-forward).
-	criHandler http.Handler
-
 	// experimentalHostUserNamespaceDefaulting sets userns=true when users request host namespaces (pid, ipc, net),
 	// are using non-namespaced capabilities (mknod, sys_time, sys_module), the pod contains a privileged container,
 	// or using host path volumes.
@@ -1146,6 +1140,9 @@ type Kubelet struct {
 
 	// Handles RuntimeClass objects for the Kubelet.
 	runtimeClassManager *runtimeclass.Manager
+
+	// Handles node shutdown events for the Node.
+	shutdownManager *nodeshutdown.Manager
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -1362,6 +1359,12 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	// Start the plugin manager
 	klog.V(4).Infof("starting plugin manager")
 	go kl.pluginManager.Run(kl.sourcesReady, wait.NeverStop)
+
+	err = kl.shutdownManager.Start()
+	if err != nil {
+		// The shutdown manager is not critical for kubelet, so log failure, but don't block Kubelet startup if there was a failure starting it.
+		klog.Errorf("Failed to start node shutdown manager: %v", err)
+	}
 }
 
 // Run starts the kubelet reacting to config updates
@@ -2151,7 +2154,6 @@ func (kl *Kubelet) updateRuntimeUp() {
 		return
 	}
 	// Periodically log the whole runtime status for debugging.
-	// condition is unmet.
 	klog.V(4).Infof("Container runtime status: %v", s)
 	networkReady := s.GetRuntimeCondition(kubecontainer.NetworkReady)
 	if networkReady == nil || !networkReady.Status {
@@ -2193,7 +2195,7 @@ func (kl *Kubelet) ResyncInterval() time.Duration {
 
 // ListenAndServe runs the kubelet HTTP server.
 func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, enableSystemLogHandler bool) {
-	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, kl.redirectContainerStreaming, enableSystemLogHandler, kl.criHandler)
+	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, address, port, tlsOptions, auth, enableCAdvisorJSONEndpoints, enableDebuggingHandlers, enableContentionProfiling, enableSystemLogHandler)
 }
 
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.
@@ -2208,7 +2210,7 @@ func (kl *Kubelet) ListenAndServePodResources() {
 		klog.V(2).Infof("Failed to get local endpoint for PodResources endpoint: %v", err)
 		return
 	}
-	server.ListenAndServePodResources(socket, kl.podManager, kl.containerManager)
+	server.ListenAndServePodResources(socket, kl.podManager, kl.containerManager, kl.containerManager)
 }
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
@@ -2275,16 +2277,6 @@ func getStreamingConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kub
 		SupportedRemoteCommandProtocols: streaming.DefaultConfig.SupportedRemoteCommandProtocols,
 		SupportedPortForwardProtocols:   streaming.DefaultConfig.SupportedPortForwardProtocols,
 	}
-	if !crOptions.RedirectContainerStreaming {
-		config.Addr = net.JoinHostPort("localhost", "0")
-	} else {
-		// Use a relative redirect (no scheme or host).
-		config.BaseURL = &url.URL{
-			Path: "/cri/",
-		}
-		if kubeDeps.TLSOptions != nil {
-			config.TLSConfig = kubeDeps.TLSOptions.Config
-		}
-	}
+	config.Addr = net.JoinHostPort("localhost", "0")
 	return config
 }

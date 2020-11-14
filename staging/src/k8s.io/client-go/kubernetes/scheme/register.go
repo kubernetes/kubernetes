@@ -46,8 +46,10 @@ import (
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -98,8 +100,10 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	eventsv1beta1.AddToScheme,
 	extensionsv1beta1.AddToScheme,
 	flowcontrolv1alpha1.AddToScheme,
+	flowcontrolv1beta1.AddToScheme,
 	networkingv1.AddToScheme,
 	networkingv1beta1.AddToScheme,
+	nodev1.AddToScheme,
 	nodev1alpha1.AddToScheme,
 	nodev1beta1.AddToScheme,
 	policyv1beta1.AddToScheme,

@@ -27,9 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
-	cpconfig "k8s.io/cloud-provider/app/apis/config"
+	cpconfig "k8s.io/cloud-provider/config"
+	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
 	cpoptions "k8s.io/cloud-provider/options"
-	serviceconfig "k8s.io/cloud-provider/service/config"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
@@ -38,6 +38,7 @@ import (
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
+	cronjobconfig "k8s.io/kubernetes/pkg/controller/cronjob/config"
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
@@ -314,6 +315,11 @@ func TestAddFlags(t *testing.T) {
 				ConcurrentJobSyncs: 5,
 			},
 		},
+		CronJobController: &CronJobControllerOptions{
+			&cronjobconfig.CronJobControllerConfiguration{
+				ConcurrentCronJobSyncs: 5,
+			},
+		},
 		NamespaceController: &NamespaceControllerOptions{
 			&namespaceconfig.NamespaceControllerConfiguration{
 				NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
@@ -405,8 +411,10 @@ func TestAddFlags(t *testing.T) {
 			BindNetwork: "tcp",
 		}).WithLoopback(),
 		Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
-			CacheTTL:   10 * time.Second,
-			ClientCert: apiserveroptions.ClientCertAuthenticationOptions{},
+			CacheTTL:            10 * time.Second,
+			ClientTimeout:       10 * time.Second,
+			WebhookRetryBackoff: apiserveroptions.DefaultAuthWebhookRetryBackoff(),
+			ClientCert:          apiserveroptions.ClientCertAuthenticationOptions{},
 			RequestHeader: apiserveroptions.RequestHeaderAuthenticationOptions{
 				UsernameHeaders:     []string{"x-remote-user"},
 				GroupHeaders:        []string{"x-remote-group"},
@@ -418,6 +426,7 @@ func TestAddFlags(t *testing.T) {
 			AllowCacheTTL:                10 * time.Second,
 			DenyCacheTTL:                 10 * time.Second,
 			ClientTimeout:                10 * time.Second,
+			WebhookRetryBackoff:          apiserveroptions.DefaultAuthWebhookRetryBackoff(),
 			RemoteKubeConfigFileOptional: true,
 			AlwaysAllowPaths:             []string{"/healthz"}, // note: this does not match /healthz/ or /healthz/*
 		},
@@ -562,6 +571,9 @@ func TestApplyTo(t *testing.T) {
 			},
 			JobController: jobconfig.JobControllerConfiguration{
 				ConcurrentJobSyncs: 5,
+			},
+			CronJobController: cronjobconfig.CronJobControllerConfiguration{
+				ConcurrentCronJobSyncs: 5,
 			},
 			NamespaceController: namespaceconfig.NamespaceControllerConfiguration{
 				NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},

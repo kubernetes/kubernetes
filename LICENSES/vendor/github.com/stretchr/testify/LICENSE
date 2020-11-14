@@ -2,7 +2,7 @@
 
 MIT License
 
-Copyright (c) 2012-2018 Mat Ryer and Tyler Bunnell
+Copyright (c) 2012-2020 Mat Ryer, Tyler Bunnell and contributors.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,4 +22,4 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-= vendor/github.com/stretchr/testify/LICENSE d4c9e9b2abd3afaebed1524a9a77b937
+= vendor/github.com/stretchr/testify/LICENSE 188f01994659f3c0d310612333d2a26f

@@ -297,7 +297,7 @@ func NewProxier(ipt utiliptables.Interface,
 	var incorrectAddresses []string
 	nodePortAddresses, incorrectAddresses = utilproxy.FilterIncorrectCIDRVersion(nodePortAddresses, ipFamily)
 	if len(incorrectAddresses) > 0 {
-		klog.Warning("NodePortAddresses of wrong family; ", incorrectAddresses)
+		klog.Warningf("NodePortAddresses of wrong family; %s", incorrectAddresses)
 	}
 
 	proxier := &Proxier{
@@ -768,9 +768,11 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 			var err error
 			if nodePort != 0 {
 				err = conntrack.ClearEntriesForPortNAT(proxier.exec, endpointIP, nodePort, svcProto)
-			} else {
-				err = conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, svcProto)
+				if err != nil {
+					klog.Errorf("Failed to delete nodeport-related %s endpoint connections, error: %v", epSvcPair.ServicePortName.String(), err)
+				}
 			}
+			err = conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, svcProto)
 			if err != nil {
 				klog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.ServicePortName.String(), err)
 			}

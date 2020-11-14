@@ -241,8 +241,8 @@ type Authenticator struct {
 }
 
 type credentials struct {
-	token string
-	cert  *tls.Certificate
+	token string           `datapolicy:"token"`
+	cert  *tls.Certificate `datapolicy:"secret-key"`
 }
 
 // UpdateTransportConfig updates the transport.Config to use credentials

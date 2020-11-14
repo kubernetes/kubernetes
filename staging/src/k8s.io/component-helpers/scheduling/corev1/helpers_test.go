@@ -17,13 +17,11 @@ limitations under the License.
 package corev1
 
 import (
-	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 // TestPodPriority tests PodPriority function.
@@ -121,7 +119,7 @@ func TestMatchNodeSelectorTerms(t *testing.T) {
 						MatchFields: []v1.NodeSelectorRequirement{{
 							Key:      "metadata.name",
 							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"host_1, host_2"},
+							Values:   []string{"host_1", "host_2"},
 						}},
 					},
 				}},
@@ -539,75 +537,11 @@ func TestMatchNodeSelectorTermsStateless(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			MatchNodeSelectorTerms(tt.args.node, tt.args.nodeSelector)
+			_, _ = MatchNodeSelectorTerms(tt.args.node, tt.args.nodeSelector)
 			if !apiequality.Semantic.DeepEqual(tt.args.nodeSelector, tt.want) {
 				// fail when tt.args.nodeSelector is deeply modified
 				t.Errorf("MatchNodeSelectorTerms() got = %v, want %v", tt.args.nodeSelector, tt.want)
 			}
 		})
-	}
-}
-
-func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
-	matchExpressions := []v1.NodeSelectorRequirement{{
-		Key:      "foo",
-		Operator: v1.NodeSelectorOpIn,
-		Values:   []string{"bar", "baz"},
-	}}
-	mustParse := func(s string) labels.Selector {
-		out, e := labels.Parse(s)
-		if e != nil {
-			panic(e)
-		}
-		return out
-	}
-	tc := []struct {
-		in        []v1.NodeSelectorRequirement
-		out       labels.Selector
-		expectErr bool
-	}{
-		{in: nil, out: labels.Nothing()},
-		{in: []v1.NodeSelectorRequirement{}, out: labels.Nothing()},
-		{
-			in:  matchExpressions,
-			out: mustParse("foo in (baz,bar)"),
-		},
-		{
-			in: []v1.NodeSelectorRequirement{{
-				Key:      "foo",
-				Operator: v1.NodeSelectorOpExists,
-				Values:   []string{"bar", "baz"},
-			}},
-			expectErr: true,
-		},
-		{
-			in: []v1.NodeSelectorRequirement{{
-				Key:      "foo",
-				Operator: v1.NodeSelectorOpGt,
-				Values:   []string{"1"},
-			}},
-			out: mustParse("foo>1"),
-		},
-		{
-			in: []v1.NodeSelectorRequirement{{
-				Key:      "bar",
-				Operator: v1.NodeSelectorOpLt,
-				Values:   []string{"7"},
-			}},
-			out: mustParse("bar<7"),
-		},
-	}
-
-	for i, tc := range tc {
-		out, err := nodeSelectorRequirementsAsSelector(tc.in)
-		if err == nil && tc.expectErr {
-			t.Errorf("[%v]expected error but got none.", i)
-		}
-		if err != nil && !tc.expectErr {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
-		}
-		if !reflect.DeepEqual(out, tc.out) {
-			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, tc.out, out)
-		}
 	}
 }

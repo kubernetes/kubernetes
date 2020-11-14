@@ -25,17 +25,17 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service"
 	registry "k8s.io/kubernetes/pkg/registry/core/service"
+	svcreg "k8s.io/kubernetes/pkg/registry/core/service"
 
 	netutil "k8s.io/utils/net"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 type GenericREST struct {
@@ -85,7 +85,7 @@ func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet,
 		}
 	}
 	genericStore := &GenericREST{store, primaryIPFamily, secondaryFamily}
-	store.Decorator = genericStore.defaultServiceOnRead // default on read
+	store.Decorator = genericStore.defaultOnRead
 
 	return genericStore, &StatusREST{store: &statusStore}, nil
 }
@@ -126,35 +126,35 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
-// defaults fields that were not previously set on read. becomes an
-// essential part of upgrading a service
-func (r *GenericREST) defaultServiceOnRead(obj runtime.Object) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		return nil
-	}
-
+// defaultOnRead sets interlinked fields that were not previously set on read.
+// We can't do this in the normal defaulting path because that same logic
+// applies on Get, Create, and Update, but we need to distinguish between them.
+//
+// This will be called on both Service and ServiceList types.
+func (r *GenericREST) defaultOnRead(obj runtime.Object) error {
 	service, ok := obj.(*api.Service)
 	if ok {
-		return r.defaultAServiceOnRead(service)
+		return r.defaultOnReadService(service)
 	}
 
 	serviceList, ok := obj.(*api.ServiceList)
 	if ok {
-		return r.defaultServiceList(serviceList)
+		return r.defaultOnReadServiceList(serviceList)
 	}
 
-	// this was not an object we can default
+	// This was not an object we can default.  This is not an error, as the
+	// caching layer can pass through here, too.
 	return nil
 }
 
-// defaults a service list
-func (r *GenericREST) defaultServiceList(serviceList *api.ServiceList) error {
+// defaultOnReadServiceList defaults a ServiceList.
+func (r *GenericREST) defaultOnReadServiceList(serviceList *api.ServiceList) error {
 	if serviceList == nil {
 		return nil
 	}
 
 	for i := range serviceList.Items {
-		err := r.defaultAServiceOnRead(&serviceList.Items[i])
+		err := r.defaultOnReadService(&serviceList.Items[i])
 		if err != nil {
 			return err
 		}
@@ -163,9 +163,19 @@ func (r *GenericREST) defaultServiceList(serviceList *api.ServiceList) error {
 	return nil
 }
 
-// defaults a single service
-func (r *GenericREST) defaultAServiceOnRead(service *api.Service) error {
+// defaultOnReadService defaults a single Service.
+func (r *GenericREST) defaultOnReadService(service *api.Service) error {
 	if service == nil {
+		return nil
+	}
+
+	// We might find Services that were written before ClusterIP became plural.
+	// We still want to present a consistent view of them.
+	// NOTE: the args are (old, new)
+	svcreg.NormalizeClusterIPs(nil, service)
+
+	// The rest of this does not apply unless dual-stack is enabled.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 		return nil
 	}
 

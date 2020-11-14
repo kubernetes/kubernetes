@@ -19,6 +19,8 @@ package cronjob
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sync"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -35,11 +37,17 @@ import (
 // created as an interface to allow testing.
 type cjControlInterface interface {
 	UpdateStatus(cj *batchv1beta1.CronJob) (*batchv1beta1.CronJob, error)
+	// GetCronJob retrieves a CronJob.
+	GetCronJob(namespace, name string) (*batchv1beta1.CronJob, error)
 }
 
 // realCJControl is the default implementation of cjControlInterface.
 type realCJControl struct {
 	KubeClient clientset.Interface
+}
+
+func (c *realCJControl) GetCronJob(namespace, name string) (*batchv1beta1.CronJob, error) {
+	return c.KubeClient.BatchV1beta1().CronJobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 var _ cjControlInterface = &realCJControl{}
@@ -50,7 +58,18 @@ func (c *realCJControl) UpdateStatus(cj *batchv1beta1.CronJob) (*batchv1beta1.Cr
 
 // fakeCJControl is the default implementation of cjControlInterface.
 type fakeCJControl struct {
+	CronJob *batchv1beta1.CronJob
 	Updates []batchv1beta1.CronJob
+}
+
+func (c *fakeCJControl) GetCronJob(namespace, name string) (*batchv1beta1.CronJob, error) {
+	if name == c.CronJob.Name && namespace == c.CronJob.Namespace {
+		return c.CronJob, nil
+	}
+	return nil, errors.NewNotFound(schema.GroupResource{
+		Group:    "v1beta1",
+		Resource: "cronjobs",
+	}, name)
 }
 
 var _ cjControlInterface = &fakeCJControl{}

@@ -47,6 +47,7 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	cloudprovider "k8s.io/cloud-provider"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	"k8s.io/kubernetes/pkg/volume"
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -467,7 +468,7 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *FakeVolumePlugin) RequiresRemount() bool {
+func (plugin *FakeVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return plugin.SupportsRemount
 }
 
@@ -724,8 +725,8 @@ func (f *FakeBasicVolumePlugin) NewUnmounter(volName string, podUID types.UID) (
 	return f.Plugin.NewUnmounter(volName, podUID)
 }
 
-func (f *FakeBasicVolumePlugin) RequiresRemount() bool {
-	return f.Plugin.RequiresRemount()
+func (f *FakeBasicVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
+	return f.Plugin.RequiresRemount(spec)
 }
 
 func (f *FakeBasicVolumePlugin) SupportsBulkVolumeVerification() bool {
@@ -801,7 +802,7 @@ func (plugin *FakeFileVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *FakeFileVolumePlugin) RequiresRemount() bool {
+func (plugin *FakeFileVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

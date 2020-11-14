@@ -141,7 +141,7 @@ func (t *volumeIOTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 		l.migrationCheck.validateMigrationVolumeOpCounts()
 	}
 
-	ginkgo.It("should write files of various sizes, verify size, validate content [Slow]", func() {
+	ginkgo.It("should write files of various sizes, verify size, validate content [Slow][LinuxOnly]", func() {
 		init()
 		defer cleanup()
 
@@ -197,7 +197,7 @@ func makePodSpec(config e2evolume.TestConfig, initCmd string, volsrc v1.VolumeSo
 			InitContainers: []v1.Container{
 				{
 					Name:  config.Prefix + "-io-init",
-					Image: framework.BusyBoxImage,
+					Image: e2evolume.GetDefaultTestImage(),
 					Command: []string{
 						"/bin/sh",
 						"-c",
@@ -214,7 +214,7 @@ func makePodSpec(config e2evolume.TestConfig, initCmd string, volsrc v1.VolumeSo
 			Containers: []v1.Container{
 				{
 					Name:  config.Prefix + "-io-client",
-					Image: framework.BusyBoxImage,
+					Image: e2evolume.GetDefaultTestImage(),
 					Command: []string{
 						"/bin/sh",
 						"-c",

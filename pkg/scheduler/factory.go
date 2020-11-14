@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -82,24 +83,6 @@ type Configurator struct {
 	nodeInfoSnapshot  *internalcache.Snapshot
 	extenders         []schedulerapi.Extender
 	frameworkCapturer FrameworkCapturer
-}
-
-func (c *Configurator) buildFramework(p schedulerapi.KubeSchedulerProfile, opts ...frameworkruntime.Option) (framework.Framework, error) {
-	if c.frameworkCapturer != nil {
-		c.frameworkCapturer(p)
-	}
-	opts = append([]frameworkruntime.Option{
-		frameworkruntime.WithClientSet(c.client),
-		frameworkruntime.WithInformerFactory(c.informerFactory),
-		frameworkruntime.WithSnapshotSharedLister(c.nodeInfoSnapshot),
-		frameworkruntime.WithRunAllFilters(c.alwaysCheckAllPredicates),
-	}, opts...)
-	return frameworkruntime.NewFramework(
-		c.registry,
-		p.Plugins,
-		p.PluginConfig,
-		opts...,
-	)
 }
 
 // create a scheduler from a set of registered plugins.
@@ -149,8 +132,14 @@ func (c *Configurator) create() (*Scheduler, error) {
 
 	// The nominator will be passed all the way to framework instantiation.
 	nominator := internalqueue.NewPodNominator()
-	profiles, err := profile.NewMap(c.profiles, c.buildFramework, c.recorderFactory,
-		frameworkruntime.WithPodNominator(nominator))
+	profiles, err := profile.NewMap(c.profiles, c.registry, c.recorderFactory,
+		frameworkruntime.WithClientSet(c.client),
+		frameworkruntime.WithInformerFactory(c.informerFactory),
+		frameworkruntime.WithSnapshotSharedLister(c.nodeInfoSnapshot),
+		frameworkruntime.WithRunAllFilters(c.alwaysCheckAllPredicates),
+		frameworkruntime.WithPodNominator(nominator),
+		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(c.frameworkCapturer)),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
 	}
@@ -270,11 +259,14 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	// Combine all framework configurations. If this results in any duplication, framework
 	// instantiation should fail.
 
-	// "PrioritySort" and "DefaultBinder" were neither predicates nor priorities
+	// "PrioritySort", "DefaultPreemption" and "DefaultBinder" were neither predicates nor priorities
 	// before. We add them by default.
 	plugins := schedulerapi.Plugins{
 		QueueSort: &schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{{Name: queuesort.Name}},
+		},
+		PostFilter: &schedulerapi.PluginSet{
+			Enabled: []schedulerapi.Plugin{{Name: defaultpreemption.Name}},
 		},
 		Bind: &schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}},

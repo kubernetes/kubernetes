@@ -296,6 +296,35 @@ func TestListWithListResponderError(t *testing.T) {
 	assert.Equal(t, 0, len(result))
 }
 
+func TestListWithNextPage(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets"
+	armClient := mockarmclient.NewMockInterface(ctrl)
+	vmssList := []compute.VirtualMachineScaleSet{getTestVMSS("vmss1"), getTestVMSS("vmss2"), getTestVMSS("vmss3")}
+	partialResponse, err := json.Marshal(compute.VirtualMachineScaleSetListResult{Value: &vmssList, NextLink: to.StringPtr("nextLink")})
+	assert.NoError(t, err)
+	pagedResponse, err := json.Marshal(compute.VirtualMachineScaleSetListResult{Value: &vmssList})
+	assert.NoError(t, err)
+	armClient.EXPECT().PrepareGetRequest(gomock.Any(), gomock.Any()).Return(&http.Request{}, nil)
+	armClient.EXPECT().Send(gomock.Any(), gomock.Any()).Return(
+		&http.Response{
+			StatusCode: http.StatusOK,
+			Body:       ioutil.NopCloser(bytes.NewReader(pagedResponse)),
+		}, nil)
+	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
+		&http.Response{
+			StatusCode: http.StatusOK,
+			Body:       ioutil.NopCloser(bytes.NewReader(partialResponse)),
+		}, nil).Times(1)
+	armClient.EXPECT().CloseResponse(gomock.Any(), gomock.Any()).Times(2)
+	vmssClient := getTestVMSSClient(armClient)
+	result, rerr := vmssClient.List(context.TODO(), "rg")
+	assert.Nil(t, rerr)
+	assert.Equal(t, 6, len(result))
+}
+
 func TestListNeverRateLimiter(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

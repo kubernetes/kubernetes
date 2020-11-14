@@ -49,15 +49,15 @@ func (kl *Kubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume
 	return volumesToReturn, len(volumesToReturn) > 0
 }
 
-// podVolumesExist checks with the volume manager and returns true any of the
+// podMountedVolumesExistInCacheOrDisk checks with the volume manager and returns true any of the
 // pods for the specified volume are mounted.
-func (kl *Kubelet) podVolumesExist(podUID types.UID) bool {
+func (kl *Kubelet) podMountedVolumesExistInCacheOrDisk(podUID types.UID) bool {
 	if mountedVolumes :=
 		kl.volumeManager.GetMountedVolumesForPod(
 			volumetypes.UniquePodName(podUID)); len(mountedVolumes) > 0 {
 		return true
 	}
-	// TODO: This checks pod volume paths and whether they are mounted. If checking returns error, podVolumesExist will return true
+	// TODO: This checks pod volume paths and whether they are mounted. If checking returns error, podMountedVolumesExistInCacheOrDisk will return true
 	// which means we consider volumes might exist and requires further checking.
 	// There are some volume plugins such as flexvolume might not have mounts. See issue #61229
 	volumePaths, err := kl.getMountedVolumePathListFromDisk(podUID)
@@ -70,6 +70,27 @@ func (kl *Kubelet) podVolumesExist(podUID types.UID) bool {
 		return true
 	}
 
+	return false
+}
+
+// podVolumePathsExistInCacheOrDisk checks with the volume manager and returns true any of the
+// volumes for the specified pod are mounted or any of the volume paths of the specified pod exist.
+func (kl *Kubelet) podVolumePathsExistInCacheOrDisk(podUID types.UID) bool {
+	if mountedVolumes :=
+		kl.volumeManager.GetMountedVolumesForPod(
+			volumetypes.UniquePodName(podUID)); len(mountedVolumes) > 0 {
+		return true
+	}
+
+	volumePaths, err := kl.getPodVolumePathListFromDisk(podUID)
+	if err != nil {
+		klog.Errorf("pod %q found, but error %v occurred during checking volume dirs from disk", podUID, err)
+		return true
+	}
+	if len(volumePaths) > 0 {
+		klog.V(4).Infof("pod %q found, but volume paths are still present on disk %v", podUID, volumePaths)
+		return true
+	}
 	return false
 }
 
@@ -113,21 +134,10 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 			continue
 		}
 		// If volumes have not been unmounted/detached, do not delete directory.
-		// Doing so may result in corruption of data.
-		// TODO: getMountedVolumePathListFromDisk() call may be redundant with
-		// kl.getPodVolumePathListFromDisk(). Can this be cleaned up?
-		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist {
-			klog.V(3).Infof("Orphaned pod %q found, but volumes are not cleaned up", uid)
-			continue
-		}
 		// If there are still volume directories, do not delete directory
-		volumePaths, err := kl.getPodVolumePathListFromDisk(uid)
-		if err != nil {
-			orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but error %v occurred during reading volume dir from disk", uid, err))
-			continue
-		}
-		if len(volumePaths) > 0 {
-			orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but volume paths are still present on disk", uid))
+		// Doing so may result in corruption of data.
+		if kl.podVolumePathsExistInCacheOrDisk(uid) {
+			klog.V(3).Infof("Orphaned pod %q found, but volumes are not cleaned up", uid)
 			continue
 		}
 

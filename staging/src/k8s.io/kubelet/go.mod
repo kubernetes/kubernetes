@@ -6,8 +6,9 @@ go 1.15
 
 require (
 	github.com/gogo/protobuf v1.3.1
-	golang.org/x/net v0.0.0-20200707034311-ab3426394381
-	google.golang.org/grpc v1.27.0
+	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+	google.golang.org/genproto v0.0.0-20201110150050-8816d57aaa9a // indirect
+	google.golang.org/grpc v1.27.1
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/component-base v0.0.0

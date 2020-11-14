@@ -297,14 +297,14 @@ var _ = SIGDescribe("ResourceQuota", func() {
 	framework.ConformanceIt("should create a ResourceQuota and capture the life of a configMap.", func() {
 		found, unchanged := 0, 0
 		// On contended servers the service account controller can slow down, leading to the count changing during a run.
-		// Wait up to 5s for the count to stabilize, assuming that updates come at a consistent rate, and are not held indefinitely.
-		wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+		// Wait up to 15s for the count to stabilize, assuming that updates come at a consistent rate, and are not held indefinitely.
+		wait.Poll(1*time.Second, time.Minute, func() (bool, error) {
 			configmaps, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			if len(configmaps.Items) == found {
-				// loop until the number of configmaps has stabilized for 5 seconds
+				// loop until the number of configmaps has stabilized for 15 seconds
 				unchanged++
-				return unchanged > 4, nil
+				return unchanged > 15, nil
 			}
 			unchanged = 0
 			found = len(configmaps.Items)
@@ -1558,7 +1558,6 @@ func newTestPersistentVolumeClaimForQuota(name string) *v1.PersistentVolumeClaim
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 				v1.ReadOnlyMany,
-				v1.ReadWriteMany,
 			},
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{

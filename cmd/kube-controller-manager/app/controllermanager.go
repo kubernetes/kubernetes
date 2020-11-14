@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
@@ -67,7 +68,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -426,6 +426,10 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	controllers["ttl-after-finished"] = startTTLAfterFinishedController
 	controllers["root-ca-cert-publisher"] = startRootCACertPublisher
 	controllers["ephemeral-volume"] = startEphemeralVolumeController
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) &&
+		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) {
+		controllers["storage-version-gc"] = startStorageVersionGCController
+	}
 
 	return controllers
 }
@@ -621,9 +625,6 @@ func readCA(file string) ([]byte, error) {
 }
 
 func shouldTurnOnDynamicClient(client clientset.Interface) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-		return false
-	}
 	apiResourceList, err := client.Discovery().ServerResourcesForGroupVersion(v1.SchemeGroupVersion.String())
 	if err != nil {
 		klog.Warningf("fetch api resource lists failed, use legacy client builder: %v", err)

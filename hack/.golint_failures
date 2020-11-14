@@ -30,6 +30,7 @@ pkg/apis/events/v1
 pkg/apis/events/v1beta1
 pkg/apis/extensions/v1beta1
 pkg/apis/flowcontrol/v1alpha1
+pkg/apis/flowcontrol/v1beta1
 pkg/apis/networking/v1
 pkg/apis/networking/v1beta1
 pkg/apis/node/v1alpha1
@@ -50,6 +51,7 @@ pkg/controller/certificates
 pkg/controller/certificates/signer
 pkg/controller/certificates/signer/config/v1alpha1
 pkg/controller/clusterroleaggregation
+pkg/controller/cronjob/config/v1alpha1
 pkg/controller/daemon
 pkg/controller/daemon/config/v1alpha1
 pkg/controller/deployment
@@ -87,6 +89,7 @@ pkg/controller/volume/persistentvolume
 pkg/controller/volume/persistentvolume/config/v1alpha1
 pkg/controlplane/controller/crdregistration
 pkg/controlplane/tunneler
+pkg/credentialprovider/plugin
 pkg/features
 pkg/kubeapiserver
 pkg/kubectl/cmd/convert
@@ -150,7 +153,6 @@ pkg/registry/policy/rest
 pkg/registry/rbac/clusterrole/policybased
 pkg/registry/rbac/clusterrolebinding
 pkg/registry/rbac/clusterrolebinding/policybased
-pkg/registry/rbac/reconciliation
 pkg/registry/rbac/rest
 pkg/registry/rbac/role/policybased
 pkg/registry/rbac/rolebinding
@@ -253,8 +255,6 @@ staging/src/k8s.io/apimachinery/pkg/conversion
 staging/src/k8s.io/apimachinery/pkg/runtime
 staging/src/k8s.io/apimachinery/pkg/runtime/schema
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer
-staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json
-staging/src/k8s.io/apimachinery/pkg/runtime/serializer/protobuf
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer/recognizer
 staging/src/k8s.io/apimachinery/pkg/runtime/serializer/streaming
 staging/src/k8s.io/apimachinery/pkg/runtime/testing
@@ -384,7 +384,6 @@ staging/src/k8s.io/client-go/tools/leaderelection
 staging/src/k8s.io/client-go/tools/leaderelection/resourcelock
 staging/src/k8s.io/client-go/tools/record
 staging/src/k8s.io/client-go/tools/reference
-staging/src/k8s.io/client-go/transport
 staging/src/k8s.io/client-go/util/exec
 staging/src/k8s.io/client-go/util/flowcontrol
 staging/src/k8s.io/client-go/util/jsonpath
@@ -392,11 +391,11 @@ staging/src/k8s.io/client-go/util/retry
 staging/src/k8s.io/client-go/util/testing
 staging/src/k8s.io/client-go/util/workqueue
 staging/src/k8s.io/cloud-provider
-staging/src/k8s.io/cloud-provider/app/apis/config/v1alpha1
+staging/src/k8s.io/cloud-provider/config/v1alpha1
 staging/src/k8s.io/cloud-provider/controllers/node
 staging/src/k8s.io/cloud-provider/controllers/nodelifecycle
 staging/src/k8s.io/cloud-provider/controllers/route
-staging/src/k8s.io/cloud-provider/service/config/v1alpha1
+staging/src/k8s.io/cloud-provider/controllers/service/config/v1alpha1
 staging/src/k8s.io/code-generator/cmd/client-gen/args
 staging/src/k8s.io/code-generator/cmd/client-gen/generators/fake
 staging/src/k8s.io/code-generator/cmd/client-gen/generators/scheme
@@ -408,13 +407,14 @@ staging/src/k8s.io/component-base/cli/flag
 staging/src/k8s.io/component-base/config/v1alpha1
 staging/src/k8s.io/component-base/featuregate
 staging/src/k8s.io/component-base/version/verflag
+staging/src/k8s.io/component-helpers/auth/rbac/reconciliation
+staging/src/k8s.io/component-helpers/auth/rbac/validation
 staging/src/k8s.io/controller-manager/config/v1alpha1
 staging/src/k8s.io/controller-manager/pkg/features
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
 staging/src/k8s.io/kube-aggregator/pkg/apiserver
 staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister
-staging/src/k8s.io/kube-proxy/config/v1alpha1
 staging/src/k8s.io/kubectl/pkg/cmd/annotate
 staging/src/k8s.io/kubectl/pkg/cmd/apply
 staging/src/k8s.io/kubectl/pkg/cmd/attach
@@ -455,6 +455,8 @@ staging/src/k8s.io/kubectl/pkg/polymorphichelpers
 staging/src/k8s.io/kubectl/pkg/scale
 staging/src/k8s.io/kubectl/pkg/util/templates
 staging/src/k8s.io/kubelet/config/v1beta1
+staging/src/k8s.io/kubelet/pkg/apis/credentialprovider
+staging/src/k8s.io/kubelet/pkg/apis/credentialprovider/v1alpha1
 staging/src/k8s.io/legacy-cloud-providers/vsphere
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1

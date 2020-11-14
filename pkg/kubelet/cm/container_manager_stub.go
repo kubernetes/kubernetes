@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	internalapi "k8s.io/cri-api/pkg/apis"
-	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
+	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 type containerManagerStub struct {
@@ -123,6 +123,10 @@ func (cm *containerManagerStub) GetAllocateResourcesPodAdmitHandler() lifecycle.
 
 func (cm *containerManagerStub) UpdateAllocatedDevices() {
 	return
+}
+
+func (cm *containerManagerStub) GetCPUs(_, _ string) []int64 {
+	return nil
 }
 
 func NewStubContainerManager() ContainerManager {

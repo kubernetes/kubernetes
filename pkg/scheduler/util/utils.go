@@ -31,6 +31,7 @@ import (
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 // GetPodFullName returns a name that uniquely identifies a pod.
@@ -162,4 +163,10 @@ func ClearNominatedNodeName(cs kubernetes.Interface, pods ...*v1.Pod) utilerrors
 		}
 	}
 	return utilerrors.NewAggregate(errs)
+}
+
+// IsScalarResourceName validates the resource for Extended, Hugepages, Native and AttachableVolume resources
+func IsScalarResourceName(name v1.ResourceName) bool {
+	return v1helper.IsExtendedResourceName(name) || v1helper.IsHugePageResourceName(name) ||
+		v1helper.IsPrefixedNativeResource(name) || v1helper.IsAttachableVolumeResourceName(name)
 }

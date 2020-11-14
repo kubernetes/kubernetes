@@ -64,15 +64,20 @@ func NewE2EServices(monitorParent bool) *E2EServices {
 // standard kubelet launcher)
 func (e *E2EServices) Start() error {
 	var err error
-	if !framework.TestContext.NodeConformance {
-		if e.services, err = e.startInternalServices(); err != nil {
-			return fmt.Errorf("failed to start internal services: %v", err)
-		}
+	if e.services, err = e.startInternalServices(); err != nil {
+		return fmt.Errorf("failed to start internal services: %v", err)
+	}
+	klog.Infof("Node services started.")
+	// running the kubelet depends on whether we are running conformance test-suite
+	if framework.TestContext.NodeConformance {
+		klog.Info("nothing to do in node-e2e-services, running conformance suite")
+	} else {
 		// Start kubelet
 		e.kubelet, err = e.startKubelet()
 		if err != nil {
 			return fmt.Errorf("failed to start kubelet: %v", err)
 		}
+		klog.Infof("Kubelet started.")
 	}
 	return nil
 }

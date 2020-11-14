@@ -19,7 +19,7 @@ package v1
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/parsers"
@@ -68,11 +68,6 @@ func SetDefaults_Volume(obj *v1.Volume) {
 		obj.VolumeSource = v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}
-	}
-}
-func SetDefaults_ContainerPort(obj *v1.ContainerPort) {
-	if obj.Protocol == "" {
-		obj.Protocol = v1.ProtocolTCP
 	}
 }
 func SetDefaults_Container(obj *v1.Container) {
@@ -165,6 +160,14 @@ func SetDefaults_Service(obj *v1.Service) {
 		// any other defaulting depends on cluster configuration.
 		// further IPFamilies, IPFamilyPolicy defaulting is in ClusterIP alloc/reserve logic
 		// note: conversion logic handles cases where ClusterIPs is used (but not ClusterIP).
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
+		if obj.Spec.Type == v1.ServiceTypeLoadBalancer {
+			if obj.Spec.AllocateLoadBalancerNodePorts == nil {
+				obj.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+			}
+		}
 	}
 }
 func SetDefaults_Pod(obj *v1.Pod) {

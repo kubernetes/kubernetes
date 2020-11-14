@@ -24,12 +24,13 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	apisconfigv1alpha1 "k8s.io/cloud-provider/app/apis/config/v1alpha1"
-	serviceconfigv1alpha1 "k8s.io/cloud-provider/service/config/v1alpha1"
+	cloudproviderconfigv1alpha1 "k8s.io/cloud-provider/config/v1alpha1"
+	serviceconfigv1alpha1 "k8s.io/cloud-provider/controllers/service/config/v1alpha1"
 	configv1alpha1 "k8s.io/controller-manager/config/v1alpha1"
 	v1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	config "k8s.io/kubernetes/pkg/controller/apis/config"
 	signerconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/certificates/signer/config/v1alpha1"
+	cronjobconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/cronjob/config/v1alpha1"
 	daemonconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/daemon/config/v1alpha1"
 	deploymentconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/deployment/config/v1alpha1"
 	endpointconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/endpoint/config/v1alpha1"
@@ -142,7 +143,7 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 	if err := configv1alpha1.Convert_v1alpha1_GenericControllerManagerConfiguration_To_config_GenericControllerManagerConfiguration(&in.Generic, &out.Generic, s); err != nil {
 		return err
 	}
-	if err := apisconfigv1alpha1.Convert_v1alpha1_KubeCloudSharedConfiguration_To_config_KubeCloudSharedConfiguration(&in.KubeCloudShared, &out.KubeCloudShared, s); err != nil {
+	if err := cloudproviderconfigv1alpha1.Convert_v1alpha1_KubeCloudSharedConfiguration_To_config_KubeCloudSharedConfiguration(&in.KubeCloudShared, &out.KubeCloudShared, s); err != nil {
 		return err
 	}
 	if err := attachdetachconfigv1alpha1.Convert_v1alpha1_AttachDetachControllerConfiguration_To_config_AttachDetachControllerConfiguration(&in.AttachDetachController, &out.AttachDetachController, s); err != nil {
@@ -179,6 +180,9 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 		return err
 	}
 	if err := jobconfigv1alpha1.Convert_v1alpha1_JobControllerConfiguration_To_config_JobControllerConfiguration(&in.JobController, &out.JobController, s); err != nil {
+		return err
+	}
+	if err := cronjobconfigv1alpha1.Convert_v1alpha1_CronJobControllerConfiguration_To_config_CronJobControllerConfiguration(&in.CronJobController, &out.CronJobController, s); err != nil {
 		return err
 	}
 	if err := namespaceconfigv1alpha1.Convert_v1alpha1_NamespaceControllerConfiguration_To_config_NamespaceControllerConfiguration(&in.NamespaceController, &out.NamespaceController, s); err != nil {
@@ -226,7 +230,7 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 	if err := configv1alpha1.Convert_config_GenericControllerManagerConfiguration_To_v1alpha1_GenericControllerManagerConfiguration(&in.Generic, &out.Generic, s); err != nil {
 		return err
 	}
-	if err := apisconfigv1alpha1.Convert_config_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudSharedConfiguration(&in.KubeCloudShared, &out.KubeCloudShared, s); err != nil {
+	if err := cloudproviderconfigv1alpha1.Convert_config_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudSharedConfiguration(&in.KubeCloudShared, &out.KubeCloudShared, s); err != nil {
 		return err
 	}
 	if err := attachdetachconfigv1alpha1.Convert_config_AttachDetachControllerConfiguration_To_v1alpha1_AttachDetachControllerConfiguration(&in.AttachDetachController, &out.AttachDetachController, s); err != nil {
@@ -263,6 +267,9 @@ func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeContr
 		return err
 	}
 	if err := jobconfigv1alpha1.Convert_config_JobControllerConfiguration_To_v1alpha1_JobControllerConfiguration(&in.JobController, &out.JobController, s); err != nil {
+		return err
+	}
+	if err := cronjobconfigv1alpha1.Convert_config_CronJobControllerConfiguration_To_v1alpha1_CronJobControllerConfiguration(&in.CronJobController, &out.CronJobController, s); err != nil {
 		return err
 	}
 	if err := namespaceconfigv1alpha1.Convert_config_NamespaceControllerConfiguration_To_v1alpha1_NamespaceControllerConfiguration(&in.NamespaceController, &out.NamespaceController, s); err != nil {
