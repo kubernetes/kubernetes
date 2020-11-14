@@ -46,7 +46,7 @@ go_test(
     srcs = ["storage_flowcontrol_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/flowcontrol/v1beta1:go_default_library",
+        "//pkg/apis/flowcontrol/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/flowcontrol/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap:go_default_library",
