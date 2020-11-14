@@ -30,7 +30,7 @@ import (
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -41,7 +41,7 @@ const (
 	requestConcurrencyLimitMetricLabelName = "priorityLevel"
 )
 
-var _ = SIGDescribe("API priority and fairness", func() {
+var _ = SIGDescribe("[Feature:APIPriorityAndFairness]", func() {
 	f := framework.NewDefaultFramework("flowschemas")
 
 	ginkgo.It("should ensure that requests can be classified by testing flow-schemas/priority-levels", func() {
@@ -51,18 +51,18 @@ var _ = SIGDescribe("API priority and fairness", func() {
 		nonMatchingUsername := "foo"
 
 		ginkgo.By("creating a testing prioritylevel")
-		createdPriorityLevel, err := f.ClientSet.FlowcontrolV1beta1().PriorityLevelConfigurations().Create(
+		createdPriorityLevel, err := f.ClientSet.FlowcontrolV1alpha1().PriorityLevelConfigurations().Create(
 			context.TODO(),
-			&flowcontrol.PriorityLevelConfiguration{
+			&flowcontrolv1alpha1.PriorityLevelConfiguration{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: testingPriorityLevelName,
 				},
-				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelEnablementLimited,
-					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+				Spec: flowcontrolv1alpha1.PriorityLevelConfigurationSpec{
+					Type: flowcontrolv1alpha1.PriorityLevelEnablementLimited,
+					Limited: &flowcontrolv1alpha1.LimitedPriorityLevelConfiguration{
 						AssuredConcurrencyShares: 1, // will have at minimum 1 concurrency share
-						LimitResponse: flowcontrol.LimitResponse{
-							Type: flowcontrol.LimitResponseTypeReject,
+						LimitResponse: flowcontrolv1alpha1.LimitResponse{
+							Type: flowcontrolv1alpha1.LimitResponseTypeReject,
 						},
 					},
 				},
@@ -72,41 +72,41 @@ var _ = SIGDescribe("API priority and fairness", func() {
 
 		defer func() {
 			// clean-ups
-			err := f.ClientSet.FlowcontrolV1beta1().PriorityLevelConfigurations().Delete(context.TODO(), testingPriorityLevelName, metav1.DeleteOptions{})
+			err := f.ClientSet.FlowcontrolV1alpha1().PriorityLevelConfigurations().Delete(context.TODO(), testingPriorityLevelName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
-			err = f.ClientSet.FlowcontrolV1beta1().FlowSchemas().Delete(context.TODO(), testingFlowSchemaName, metav1.DeleteOptions{})
+			err = f.ClientSet.FlowcontrolV1alpha1().FlowSchemas().Delete(context.TODO(), testingFlowSchemaName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 		}()
 
 		ginkgo.By("creating a testing flowschema")
-		createdFlowSchema, err := f.ClientSet.FlowcontrolV1beta1().FlowSchemas().Create(
+		createdFlowSchema, err := f.ClientSet.FlowcontrolV1alpha1().FlowSchemas().Create(
 			context.TODO(),
-			&flowcontrol.FlowSchema{
+			&flowcontrolv1alpha1.FlowSchema{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: testingFlowSchemaName,
 				},
-				Spec: flowcontrol.FlowSchemaSpec{
+				Spec: flowcontrolv1alpha1.FlowSchemaSpec{
 					MatchingPrecedence: 1000, // a rather higher precedence to ensure it make effect
-					PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+					PriorityLevelConfiguration: flowcontrolv1alpha1.PriorityLevelConfigurationReference{
 						Name: testingPriorityLevelName,
 					},
-					DistinguisherMethod: &flowcontrol.FlowDistinguisherMethod{
-						Type: flowcontrol.FlowDistinguisherMethodByUserType,
+					DistinguisherMethod: &flowcontrolv1alpha1.FlowDistinguisherMethod{
+						Type: flowcontrolv1alpha1.FlowDistinguisherMethodByUserType,
 					},
-					Rules: []flowcontrol.PolicyRulesWithSubjects{
+					Rules: []flowcontrolv1alpha1.PolicyRulesWithSubjects{
 						{
-							Subjects: []flowcontrol.Subject{
+							Subjects: []flowcontrolv1alpha1.Subject{
 								{
-									Kind: flowcontrol.SubjectKindUser,
-									User: &flowcontrol.UserSubject{
+									Kind: flowcontrolv1alpha1.SubjectKindUser,
+									User: &flowcontrolv1alpha1.UserSubject{
 										Name: matchingUsername,
 									},
 								},
 							},
-							NonResourceRules: []flowcontrol.NonResourcePolicyRule{
+							NonResourceRules: []flowcontrolv1alpha1.NonResourcePolicyRule{
 								{
-									Verbs:           []string{flowcontrol.VerbAll},
-									NonResourceURLs: []string{flowcontrol.NonResourceAll},
+									Verbs:           []string{flowcontrolv1alpha1.VerbAll},
+									NonResourceURLs: []string{flowcontrolv1alpha1.NonResourceAll},
 								},
 							},
 						},
@@ -154,18 +154,18 @@ var _ = SIGDescribe("API priority and fairness", func() {
 		for i := range clients {
 			clients[i].priorityLevelName = fmt.Sprintf("%s-%s", priorityLevelNamePrefix, clients[i].username)
 			framework.Logf("creating PriorityLevel %q", clients[i].priorityLevelName)
-			_, err := f.ClientSet.FlowcontrolV1beta1().PriorityLevelConfigurations().Create(
+			_, err := f.ClientSet.FlowcontrolV1alpha1().PriorityLevelConfigurations().Create(
 				context.TODO(),
-				&flowcontrol.PriorityLevelConfiguration{
+				&flowcontrolv1alpha1.PriorityLevelConfiguration{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: clients[i].priorityLevelName,
 					},
-					Spec: flowcontrol.PriorityLevelConfigurationSpec{
-						Type: flowcontrol.PriorityLevelEnablementLimited,
-						Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+					Spec: flowcontrolv1alpha1.PriorityLevelConfigurationSpec{
+						Type: flowcontrolv1alpha1.PriorityLevelEnablementLimited,
+						Limited: &flowcontrolv1alpha1.LimitedPriorityLevelConfiguration{
 							AssuredConcurrencyShares: 1,
-							LimitResponse: flowcontrol.LimitResponse{
-								Type: flowcontrol.LimitResponseTypeReject,
+							LimitResponse: flowcontrolv1alpha1.LimitResponse{
+								Type: flowcontrolv1alpha1.LimitResponseTypeReject,
 							},
 						},
 					},
@@ -173,38 +173,38 @@ var _ = SIGDescribe("API priority and fairness", func() {
 				metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			defer func(name string) {
-				framework.ExpectNoError(f.ClientSet.FlowcontrolV1beta1().PriorityLevelConfigurations().Delete(context.TODO(), name, metav1.DeleteOptions{}))
+				framework.ExpectNoError(f.ClientSet.FlowcontrolV1alpha1().PriorityLevelConfigurations().Delete(context.TODO(), name, metav1.DeleteOptions{}))
 			}(clients[i].priorityLevelName)
 			clients[i].flowSchemaName = fmt.Sprintf("%s-%s", flowSchemaNamePrefix, clients[i].username)
 			framework.Logf("creating FlowSchema %q", clients[i].flowSchemaName)
-			_, err = f.ClientSet.FlowcontrolV1beta1().FlowSchemas().Create(
+			_, err = f.ClientSet.FlowcontrolV1alpha1().FlowSchemas().Create(
 				context.TODO(),
-				&flowcontrol.FlowSchema{
+				&flowcontrolv1alpha1.FlowSchema{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: clients[i].flowSchemaName,
 					},
-					Spec: flowcontrol.FlowSchemaSpec{
+					Spec: flowcontrolv1alpha1.FlowSchemaSpec{
 						MatchingPrecedence: clients[i].matchingPrecedence,
-						PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
+						PriorityLevelConfiguration: flowcontrolv1alpha1.PriorityLevelConfigurationReference{
 							Name: clients[i].priorityLevelName,
 						},
-						DistinguisherMethod: &flowcontrol.FlowDistinguisherMethod{
-							Type: flowcontrol.FlowDistinguisherMethodByUserType,
+						DistinguisherMethod: &flowcontrolv1alpha1.FlowDistinguisherMethod{
+							Type: flowcontrolv1alpha1.FlowDistinguisherMethodByUserType,
 						},
-						Rules: []flowcontrol.PolicyRulesWithSubjects{
+						Rules: []flowcontrolv1alpha1.PolicyRulesWithSubjects{
 							{
-								Subjects: []flowcontrol.Subject{
+								Subjects: []flowcontrolv1alpha1.Subject{
 									{
-										Kind: flowcontrol.SubjectKindUser,
-										User: &flowcontrol.UserSubject{
+										Kind: flowcontrolv1alpha1.SubjectKindUser,
+										User: &flowcontrolv1alpha1.UserSubject{
 											Name: clients[i].username,
 										},
 									},
 								},
-								NonResourceRules: []flowcontrol.NonResourcePolicyRule{
+								NonResourceRules: []flowcontrolv1alpha1.NonResourcePolicyRule{
 									{
-										Verbs:           []string{flowcontrol.VerbAll},
-										NonResourceURLs: []string{flowcontrol.NonResourceAll},
+										Verbs:           []string{flowcontrolv1alpha1.VerbAll},
+										NonResourceURLs: []string{flowcontrolv1alpha1.NonResourceAll},
 									},
 								},
 							},
@@ -214,7 +214,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 				metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 			defer func(name string) {
-				framework.ExpectNoError(f.ClientSet.FlowcontrolV1beta1().FlowSchemas().Delete(context.TODO(), name, metav1.DeleteOptions{}))
+				framework.ExpectNoError(f.ClientSet.FlowcontrolV1alpha1().FlowSchemas().Delete(context.TODO(), name, metav1.DeleteOptions{}))
 			}(clients[i].flowSchemaName)
 		}
 
@@ -291,10 +291,10 @@ func makeRequest(f *framework.Framework, username string) *http.Response {
 
 func testResponseHeaderMatches(f *framework.Framework, impersonatingUser, plUID, fsUID string) bool {
 	response := makeRequest(f, impersonatingUser)
-	if response.Header.Get(flowcontrol.ResponseHeaderMatchedFlowSchemaUID) != fsUID {
+	if response.Header.Get(flowcontrolv1alpha1.ResponseHeaderMatchedFlowSchemaUID) != fsUID {
 		return false
 	}
-	if response.Header.Get(flowcontrol.ResponseHeaderMatchedPriorityLevelConfigurationUID) != plUID {
+	if response.Header.Get(flowcontrolv1alpha1.ResponseHeaderMatchedPriorityLevelConfigurationUID) != plUID {
 		return false
 	}
 	return true
