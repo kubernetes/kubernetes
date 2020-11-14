@@ -28,7 +28,7 @@ type Byte map[byte]Empty
 
 // NewByte creates a Byte from a list of values.
 func NewByte(items ...byte) Byte {
-	ss := Byte{}
+	ss := make(Byte, len(items))
 	ss.Insert(items...)
 	return ss
 }
