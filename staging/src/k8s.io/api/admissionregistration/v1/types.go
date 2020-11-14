@@ -114,7 +114,7 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
+// ValidatingWebhookConfiguration describes the configuration of admission webhook that accept or reject object without changing it.
 type ValidatingWebhookConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -144,7 +144,7 @@ type ValidatingWebhookConfigurationList struct {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
+// MutatingWebhookConfiguration describes the configuration of admission webhook that accept or reject and may change the object.
 type MutatingWebhookConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
@@ -186,7 +186,7 @@ type ValidatingWebhook struct {
 	// Rules describes what operations on what resources/subresources the webhook cares about.
 	// The webhook cares about an operation if it matches _any_ Rule.
 	// However, in order to prevent ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks
-	// from putting the cluster in a state which cannot be recovered from without completely
+	// from putting the cluster in a state which cannot be recovered without completely
 	// disabling the plugin, ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks are never called
 	// on admission requests for ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects.
 	Rules []RuleWithOperations `json:"rules,omitempty" protobuf:"bytes,3,rep,name=rules"`
