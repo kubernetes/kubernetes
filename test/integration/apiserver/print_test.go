@@ -33,6 +33,7 @@ import (
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
@@ -175,6 +176,7 @@ func TestServerSidePrint(t *testing.T) {
 			nodev1alpha1.SchemeGroupVersion,
 			nodev1beta1.SchemeGroupVersion,
 			flowcontrolv1alpha1.SchemeGroupVersion,
+			flowcontrolv1beta1.SchemeGroupVersion,
 			apiserverinternalv1alpha1.SchemeGroupVersion,
 		},
 		[]schema.GroupVersionResource{},
