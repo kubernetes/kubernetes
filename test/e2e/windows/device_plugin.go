@@ -126,10 +126,10 @@ var _ = SIGDescribe("Device Plugin", func() {
 		windowsPod.Spec.Containers[0].Resources.Limits = v1.ResourceList{
 			"microsoft.com/directx": resource.MustParse("1"),
 		}
-                ginkgo.By("Waiting for the pod Running")
+		windowsPod, err := cs.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), windowsPod, metav1.CreateOptions{})
+		ginkgo.By("Waiting for the pod Running")
 		err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, windowsPod.name,  f.Namespace.Name, testSlowMultiplier*framework.PodStartTimeout)
 		framework.ExpectNoError(err)
-		windowsPod = f.PodClient().CreateSync(windowsPod)
 
 
 		ginkgo.By("verifying device access in Windows testing Pod")
