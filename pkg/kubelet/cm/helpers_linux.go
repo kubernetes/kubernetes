@@ -202,8 +202,16 @@ func getCgroupSubsystemsV1() (*CgroupSubsystems, error) {
 	}
 	mountPoints := make(map[string]string, len(allCgroups))
 	for _, mount := range allCgroups {
+		// BEFORE kubelet used a random mount point per cgroups subsystem;
+		// NOW    more deterministic: kubelet use mount point with shortest path;
+		// FUTURE is bright with clear expectation determined in doc.
+		// ref. issue: https://github.com/kubernetes/kubernetes/issues/95488
+
 		for _, subsystem := range mount.Subsystems {
-			mountPoints[subsystem] = mount.Mountpoint
+			previous := mountPoints[subsystem]
+			if previous == "" || len(mount.Mountpoint) < len(previous) {
+				mountPoints[subsystem] = mount.Mountpoint
+			}
 		}
 	}
 	return &CgroupSubsystems{
