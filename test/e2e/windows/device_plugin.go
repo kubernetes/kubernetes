@@ -28,8 +28,13 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/apimachinery/pkg/api/resource"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
+)
+
+const (
+	testSlowMultiplier = 60
 )
 
 var _ = SIGDescribe("Device Plugin", func() {
@@ -49,7 +54,6 @@ var _ = SIGDescribe("Device Plugin", func() {
 		image := "e2eteam/k8s-directx-device-plugin:0.9.0-1809"
 		mountName := "device-plugin"
 		mountPath := "/var/lib/kubelet/device-plugins"
-		privileged := true
 		labels := map[string]string{
 			daemonsetNameLabel: dsName,
 		}
@@ -80,9 +84,6 @@ var _ = SIGDescribe("Device Plugin", func() {
 							{
 								Name:  "hostdev",
 								Image: image,
-								SecurityContext: &v1.SecurityContext{
-									Privileged: &privileged,
-								},
 								VolumeMounts: []v1.VolumeMount{
 									{
 										Name: mountName,
@@ -125,10 +126,16 @@ var _ = SIGDescribe("Device Plugin", func() {
 		windowsPod.Spec.Containers[0].Resources.Limits = v1.ResourceList{
 			"microsoft.com/directx": resource.MustParse("1"),
 		}
+                ginkgo.By("Waiting for the pod Running")
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, windowsPod.name,  f.Namespace.Name, testSlowMultiplier*framework.PodStartTimeout)
+		framework.ExpectNoError(err)
 		windowsPod = f.PodClient().CreateSync(windowsPod)
+
 
 		ginkgo.By("verifying device access in Windows testing Pod")
 		dxdiagCommand := []string{"cmd.exe", "/c", "dxdiag", "/t", "dxdiag_output.txt", "&", "type", "dxdiag_output.txt"}
+		//If DirectX version issues caused by supsequent windows releases occur, these tests need to do version checks
+		//based on  the windows version running the test.
 		dxdiagDirectxVersion := "DirectX Version: DirectX 12"
 		defaultNs := f.Namespace.Name
 		_, dxdiagDirectxVersionErr := framework.LookForStringInPodExec(defaultNs, windowsPod.Name, dxdiagCommand, dxdiagDirectxVersion, time.Minute)
