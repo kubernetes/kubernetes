@@ -202,7 +202,7 @@ const (
 	VolumeGlusterServer
 	// VolumeRBDServer image
 	VolumeRBDServer
-	// WindowsServer
+	// WindowsServer image
 	WindowsServer
 )
 
