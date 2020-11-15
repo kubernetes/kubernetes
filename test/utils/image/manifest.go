@@ -202,8 +202,8 @@ const (
 	VolumeGlusterServer
 	// VolumeRBDServer image
 	VolumeRBDServer
-        // WindowsServer 
-        WindowsServer
+	// WindowsServer
+	WindowsServer
 )
 
 func initImageConfigs() map[int]Config {
