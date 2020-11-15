@@ -849,6 +849,46 @@ var _ = network.SIGDescribe("Netpol [LinuxOnly]", func() {
 			ValidateOrFail(k8s, model, &TestCase{FromPort: 81, ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
+		ginkgo.It("should support a UDP protocol policy [Feature:NetworkPolicy,UDP]", func() {
+			np := &networkingv1.NetworkPolicy{}
+			policy := `
+			{
+				"kind": "NetworkPolicy",
+				"apiVersion": "networking.k8s.io/v1",
+				"metadata": {
+				   "name": "udp-allow-single-port"
+				},
+				"spec": {
+				   "podSelector": {
+					  "matchLabels": {}
+				   },
+				   "ingress": [{
+						"ports": [
+							{
+								"protocol": "UDP",
+								"port": 81
+							}
+						]
+				   }],
+				   "egress": [],
+				   "policyTypes": [
+					"Ingress",
+				   ]
+				}
+			 }
+			 `
+			err := json.Unmarshal([]byte(policy), np)
+			framework.ExpectNoError(err, "unmarshal network policy")
+
+			nsX, _, _, model, k8s := getK8SModel(f)
+			CreatePolicy(k8s, np, nsX)
+
+			reachability := NewReachability(model.AllPods(), true)
+			reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
+			reachability.ExpectPeer(&Peer{Namespace: nsX}, &Peer{}, false)
+
+			ValidateOrFail(k8s, model, &TestCase{FromPort: 80, ToPort: 81, Protocol: v1.ProtocolUDP, Reachability: reachability})
+		})
 	})
 })
 
