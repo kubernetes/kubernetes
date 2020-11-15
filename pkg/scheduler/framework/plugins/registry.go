@@ -17,6 +17,9 @@ limitations under the License.
 package plugins
 
 import (
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
@@ -44,7 +47,7 @@ import (
 // A scheduler that runs out of tree plugins can register additional plugins
 // through the WithFrameworkOutOfTreeRegistry option.
 func NewInTreeRegistry() runtime.Registry {
-	return runtime.Registry{
+	ret := runtime.Registry{
 		selectorspread.Name:                         selectorspread.New,
 		imagelocality.Name:                          imagelocality.New,
 		tainttoleration.Name:                        tainttoleration.New,
@@ -73,6 +76,11 @@ func NewInTreeRegistry() runtime.Registry {
 		queuesort.Name:                              queuesort.New,
 		defaultbinder.Name:                          defaultbinder.New,
 		defaultpreemption.Name:                      defaultpreemption.New,
-		noderesources.NodeResourceTopologyMatchName: noderesources.NewNodeResourceTopologyMatch,
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeResourceTopology) {
+		ret[noderesources.NodeResourceTopologyMatchName] = noderesources.NewNodeResourceTopologyMatch
+	}
+
+	return ret
 }

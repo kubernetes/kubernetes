@@ -720,6 +720,14 @@ const (
 	//
 	// Enables the usage of different protocols in the same Service with type=LoadBalancer
 	MixedProtocolLBService featuregate.Feature = "MixedProtocolLBService"
+
+	// owner: @aperevalov
+	// alpha: v1.21
+	// beta: v1.22
+	//
+	// Allows kube-scheduler to receive NodeResourceTopology and choose a node
+	// according to NodeResourceTopology policy
+	NodeResourceTopology featuregate.Feature = "NodeResourceTopology"
 )
 
 func init() {
@@ -845,4 +853,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	// ...
 	HPAScaleToZero:         {Default: false, PreRelease: featuregate.Alpha},
 	LegacyNodeRoleBehavior: {Default: true, PreRelease: featuregate.Beta},
+
+	// support NodeResourceTopology in kube-scheduler
+	NodeResourceTopology: {Default:  false, PreRelease: featuregate.Alpha},
 }

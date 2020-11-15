@@ -19,6 +19,9 @@ package config
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 // GroupName is the group name used in this package
@@ -36,7 +39,7 @@ var (
 
 // addKnownTypes registers known types to the given scheme
 func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(SchemeGroupVersion,
+	types := []runtime.Object{
 		&KubeSchedulerConfiguration{},
 		&Policy{},
 		&DefaultPreemptionArgs{},
@@ -51,7 +54,12 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&NodeResourcesMostAllocatedArgs{},
 		&NodeAffinityArgs{},
 		&NodeResourceTopologyMatchArgs{},
-	)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeResourceTopology) {
+		types = append(types, &NodeResourceTopologyMatchArgs{})
+	}
+	scheme.AddKnownTypes(SchemeGroupVersion, types...)
 	scheme.AddKnownTypes(schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}, &Policy{})
 	return nil
 }

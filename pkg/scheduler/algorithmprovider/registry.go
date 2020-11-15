@@ -69,7 +69,7 @@ func ListAlgorithmProviders() string {
 }
 
 func getDefaultConfig() *schedulerapi.Plugins {
-	return &schedulerapi.Plugins{
+	ret := &schedulerapi.Plugins{
 		QueueSort: &schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: queuesort.Name},
@@ -101,7 +101,6 @@ func getDefaultConfig() *schedulerapi.Plugins {
 				{Name: volumezone.Name},
 				{Name: podtopologyspread.Name},
 				{Name: interpodaffinity.Name},
-				{Name: noderesources.NodeResourceTopologyMatchName},
 			},
 		},
 		PostFilter: &schedulerapi.PluginSet{
@@ -147,6 +146,11 @@ func getDefaultConfig() *schedulerapi.Plugins {
 			},
 		},
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeResourceTopology) {
+		ret.Filter.Enabled = append(ret.Filter.Enabled, schedulerapi.Plugin{Name: noderesources.NodeResourceTopologyMatchName})
+	}
+	return ret
 }
 
 func getClusterAutoscalerConfig() *schedulerapi.Plugins {
