@@ -117,7 +117,7 @@ var _ = SIGDescribe("Device Plugin", func() {
 		}
 
 		sysNs := "kube-system"
-		ds, err := cs.AppsV1().DaemonSets(sysNs).Create(context.TODO(), ds, metav1.CreateOptions{})
+		_, err := cs.AppsV1().DaemonSets(sysNs).Create(context.TODO(), ds, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("creating Windows testing Pod")
@@ -147,8 +147,8 @@ var _ = SIGDescribe("Device Plugin", func() {
 		framework.ExpectNoError(dxdiagDdiVersionErr, "failed: didn't find DDI version in dxdiag output.")
 
 		dxdiagVendorID := "Vendor ID: 0x"
-		_, dxdiagVendorIdErr := framework.LookForStringInPodExec(defaultNs, windowsPod.Name, dxdiagCommand, dxdiagVendorID, time.Minute)
-		framework.ExpectNoError(dxdiagVendorIdErr, "failed: didn't find vendorID in dxdiag output.")
+		_, dxdiagVendorIDErr := framework.LookForStringInPodExec(defaultNs, windowsPod.Name, dxdiagCommand, dxdiagVendorID, time.Minute)
+		framework.ExpectNoError(dxdiagVendorIDErr, "failed: didn't find vendorID in dxdiag output.")
 
 		envVarCommand := []string{"cmd.exe", "/c", "set", "DIRECTX_GPU_Name"}
 		envVarDirectxGpuName := "DIRECTX_GPU_Name="
