@@ -257,19 +257,30 @@ func makeServiceWithLoadBalancerClass(loadBalancerClass *string) *api.Service {
 	}
 }
 
+func makeServiceWithInternalTrafficPolicy(policy *api.ServiceInternalTrafficPolicyType) *api.Service {
+	return &api.Service{
+		Spec: api.ServiceSpec{
+			InternalTrafficPolicy: policy,
+		},
+	}
+}
+
 func TestDropDisabledField(t *testing.T) {
 	requireDualStack := api.IPFamilyPolicyRequireDualStack
 	preferDualStack := api.IPFamilyPolicyPreferDualStack
 	singleStack := api.IPFamilyPolicySingleStack
 
+	localInternalTrafficPolicy := api.ServiceInternalTrafficPolicyLocal
+
 	testCases := []struct {
-		name                    string
-		enableDualStack         bool
-		enableMixedProtocol     bool
-		enableLoadBalancerClass bool
-		svc                     *api.Service
-		oldSvc                  *api.Service
-		compareSvc              *api.Service
+		name                        string
+		enableDualStack             bool
+		enableMixedProtocol         bool
+		enableLoadBalancerClass     bool
+		enableInternalTrafficPolicy bool
+		svc                         *api.Service
+		oldSvc                      *api.Service
+		compareSvc                  *api.Service
 	}{
 		{
 			name:            "not dual stack, field not used",
@@ -500,6 +511,28 @@ func TestDropDisabledField(t *testing.T) {
 			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
 			compareSvc:              makeServiceWithLoadBalancerClass(nil),
 		},
+		/* svc.spec.internalTrafficPolicy */
+		{
+			name:                        "internal traffic policy not enabled, field used in old, not used in new",
+			enableInternalTrafficPolicy: false,
+			svc:                         makeServiceWithInternalTrafficPolicy(nil),
+			oldSvc:                      makeServiceWithInternalTrafficPolicy(&localInternalTrafficPolicy),
+			compareSvc:                  makeServiceWithInternalTrafficPolicy(nil),
+		},
+		{
+			name:                        "internal traffic policy not enabled, field not used in old, used in new",
+			enableInternalTrafficPolicy: false,
+			svc:                         makeServiceWithInternalTrafficPolicy(&localInternalTrafficPolicy),
+			oldSvc:                      makeServiceWithInternalTrafficPolicy(nil),
+			compareSvc:                  makeServiceWithInternalTrafficPolicy(nil),
+		},
+		{
+			name:                        "internal traffic policy enabled, field not used in old, used in new",
+			enableInternalTrafficPolicy: true,
+			svc:                         makeServiceWithInternalTrafficPolicy(&localInternalTrafficPolicy),
+			oldSvc:                      makeServiceWithInternalTrafficPolicy(nil),
+			compareSvc:                  makeServiceWithInternalTrafficPolicy(&localInternalTrafficPolicy),
+		},
 		/* add more tests for other dropped fields as needed */
 	}
 	for _, tc := range testCases {
@@ -507,12 +540,13 @@ func TestDropDisabledField(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MixedProtocolLBService, tc.enableMixedProtocol)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLoadBalancerClass, tc.enableLoadBalancerClass)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, tc.enableInternalTrafficPolicy)()
 			old := tc.oldSvc.DeepCopy()
 
 			// to test against user using IPFamily not set on cluster
 			dropServiceDisabledFields(tc.svc, tc.oldSvc)
 
-			// old node  should never be changed
+			// old node should never be changed
 			if !reflect.DeepEqual(tc.oldSvc, old) {
 				t.Errorf("%v: old svc changed: %v", tc.name, diff.ObjectReflectDiff(tc.oldSvc, old))
 			}

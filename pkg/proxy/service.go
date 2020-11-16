@@ -28,8 +28,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 )
@@ -39,18 +41,20 @@ import (
 // or can be used for constructing a more specific ServiceInfo struct
 // defined by the proxier if needed.
 type BaseServiceInfo struct {
-	clusterIP                net.IP
-	port                     int
-	protocol                 v1.Protocol
-	nodePort                 int
-	loadBalancerStatus       v1.LoadBalancerStatus
-	sessionAffinityType      v1.ServiceAffinity
-	stickyMaxAgeSeconds      int
-	externalIPs              []string
-	loadBalancerSourceRanges []string
-	healthCheckNodePort      int
-	onlyNodeLocalEndpoints   bool
-	topologyKeys             []string
+	clusterIP                         net.IP
+	port                              int
+	protocol                          v1.Protocol
+	nodePort                          int
+	loadBalancerStatus                v1.LoadBalancerStatus
+	sessionAffinityType               v1.ServiceAffinity
+	stickyMaxAgeSeconds               int
+	externalIPs                       []string
+	loadBalancerSourceRanges          []string
+	healthCheckNodePort               int
+	onlyNodeLocalEndpoints            bool
+	onlyNodeLocalEndpointsForInternal bool
+	internalTrafficPolicy             *v1.ServiceInternalTrafficPolicyType
+	topologyKeys                      []string
 }
 
 var _ ServicePort = &BaseServiceInfo{}
@@ -119,6 +123,16 @@ func (info *BaseServiceInfo) OnlyNodeLocalEndpoints() bool {
 	return info.onlyNodeLocalEndpoints
 }
 
+// OnlyNodeLocalEndpointsForInternal is part of ServicePort interface
+func (info *BaseServiceInfo) OnlyNodeLocalEndpointsForInternal() bool {
+	return info.onlyNodeLocalEndpointsForInternal
+}
+
+// InternalTrafficPolicy is part of ServicePort interface
+func (info *BaseServiceInfo) InternalTrafficPolicy() *v1.ServiceInternalTrafficPolicyType {
+	return info.internalTrafficPolicy
+}
+
 // TopologyKeys is part of ServicePort interface.
 func (info *BaseServiceInfo) TopologyKeys() []string {
 	return info.topologyKeys
@@ -129,6 +143,10 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	if apiservice.RequestsOnlyLocalTraffic(service) {
 		onlyNodeLocalEndpoints = true
 	}
+	onlyNodeLocalEndpointsForInternal := false
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
+		onlyNodeLocalEndpointsForInternal = apiservice.RequestsOnlyLocalTrafficForInternal(service)
+	}
 	var stickyMaxAgeSeconds int
 	if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
 		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
@@ -137,14 +155,16 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 
 	clusterIP := utilproxy.GetClusterIPByFamily(sct.ipFamily, service)
 	info := &BaseServiceInfo{
-		clusterIP:              net.ParseIP(clusterIP),
-		port:                   int(port.Port),
-		protocol:               port.Protocol,
-		nodePort:               int(port.NodePort),
-		sessionAffinityType:    service.Spec.SessionAffinity,
-		stickyMaxAgeSeconds:    stickyMaxAgeSeconds,
-		onlyNodeLocalEndpoints: onlyNodeLocalEndpoints,
-		topologyKeys:           service.Spec.TopologyKeys,
+		clusterIP:                         net.ParseIP(clusterIP),
+		port:                              int(port.Port),
+		protocol:                          port.Protocol,
+		nodePort:                          int(port.NodePort),
+		sessionAffinityType:               service.Spec.SessionAffinity,
+		stickyMaxAgeSeconds:               stickyMaxAgeSeconds,
+		onlyNodeLocalEndpoints:            onlyNodeLocalEndpoints,
+		onlyNodeLocalEndpointsForInternal: onlyNodeLocalEndpointsForInternal,
+		internalTrafficPolicy:             service.Spec.InternalTrafficPolicy,
+		topologyKeys:                      service.Spec.TopologyKeys,
 	}
 
 	loadBalancerSourceRanges := make([]string, len(service.Spec.LoadBalancerSourceRanges))

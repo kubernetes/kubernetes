@@ -85,6 +85,10 @@ type ServicePort interface {
 	NodePort() int
 	// GetOnlyNodeLocalEndpoints returns if a service has only node local endpoints
 	OnlyNodeLocalEndpoints() bool
+	// OnlyNodeLocalEndpointsForInternal returns if a service prefers routing to node local endpoints for internal traffic
+	OnlyNodeLocalEndpointsForInternal() bool
+	// InternalTrafficPolicy returns service InternalTrafficPolicy
+	InternalTrafficPolicy() *v1.ServiceInternalTrafficPolicyType
 	// TopologyKeys returns service TopologyKeys as a string array.
 	TopologyKeys() []string
 }

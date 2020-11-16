@@ -4171,6 +4171,8 @@ var supportedSessionAffinityType = sets.NewString(string(core.ServiceAffinityCli
 var supportedServiceType = sets.NewString(string(core.ServiceTypeClusterIP), string(core.ServiceTypeNodePort),
 	string(core.ServiceTypeLoadBalancer), string(core.ServiceTypeExternalName))
 
+var supportedServiceInternalTrafficPolicy = sets.NewString(string(core.ServiceInternalTrafficPolicyCluster), string(core.ServiceExternalTrafficPolicyTypeLocal))
+
 var supportedServiceIPFamily = sets.NewString(string(core.IPv4Protocol), string(core.IPv6Protocol))
 var supportedServiceIPFamilyPolicy = sets.NewString(string(core.IPFamilyPolicySingleStack), string(core.IPFamilyPolicyPreferDualStack), string(core.IPFamilyPolicyRequireDualStack))
 
@@ -4378,6 +4380,10 @@ func ValidateService(service *core.Service) field.ErrorList {
 
 	// external traffic fields
 	allErrs = append(allErrs, validateServiceExternalTrafficFieldsValue(service)...)
+
+	// internal traffic policy field
+	allErrs = append(allErrs, validateServiceInternalTrafficFieldsValue(service)...)
+
 	return allErrs
 }
 
@@ -4441,6 +4447,24 @@ func validateServiceExternalTrafficFieldsValue(service *core.Service) field.Erro
 	if service.Spec.HealthCheckNodePort < 0 {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("healthCheckNodePort"), service.Spec.HealthCheckNodePort,
 			"HealthCheckNodePort must be not less than 0"))
+	}
+
+	return allErrs
+}
+
+// validateServiceInternalTrafficFieldsValue validates InternalTraffic related
+// spec have legal value.
+func validateServiceInternalTrafficFieldsValue(service *core.Service) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
+		if service.Spec.InternalTrafficPolicy == nil {
+			allErrs = append(allErrs, field.Required(field.NewPath("spec").Child("internalTrafficPolicy"), ""))
+		}
+	}
+
+	if service.Spec.InternalTrafficPolicy != nil && !supportedServiceInternalTrafficPolicy.Has(string(*service.Spec.InternalTrafficPolicy)) {
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("spec").Child("internalTrafficPolicy"), *service.Spec.InternalTrafficPolicy, supportedServiceInternalTrafficPolicy.List()))
 	}
 
 	return allErrs

@@ -22,6 +22,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestFilterTopologyEndpoint(t *testing.T) {
@@ -472,6 +475,100 @@ func TestFilterTopologyEndpoint(t *testing.T) {
 			}
 			if !reflect.DeepEqual(filteredEndpoint, tc.expected) {
 				t.Errorf("expected %v, got %v", endpointsToStringArray(tc.expected), endpointsToStringArray(filteredEndpoint))
+			}
+		})
+	}
+}
+
+func TestFilterLocalEndpoint(t *testing.T) {
+	cluster := v1.ServiceInternalTrafficPolicyCluster
+	local := v1.ServiceInternalTrafficPolicyLocal
+
+	testCases := []struct {
+		name                  string
+		internalTrafficPolicy *v1.ServiceInternalTrafficPolicyType
+		endpoints             []Endpoint
+		expected              []Endpoint
+		featureGateOn         bool
+	}{
+		{
+			name:                  "no internalTrafficPolicy with empty endpoints",
+			internalTrafficPolicy: nil,
+			endpoints:             []Endpoint{},
+			expected:              []Endpoint{},
+			featureGateOn:         true,
+		},
+		{
+			name:                  "no internalTrafficPolicy with non-empty endpoints",
+			internalTrafficPolicy: nil,
+			endpoints: []Endpoint{
+				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
+			},
+			expected: []Endpoint{
+				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
+			},
+			featureGateOn: true,
+		},
+		{
+			name:                  "internalTrafficPolicy is cluster",
+			internalTrafficPolicy: &cluster,
+			endpoints: []Endpoint{
+				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
+			},
+			expected: []Endpoint{
+				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
+			},
+			featureGateOn: true,
+		},
+		{
+			name:                  "internalTrafficPolicy is local with non-zero local endpoints",
+			internalTrafficPolicy: &local,
+			endpoints: []Endpoint{
+				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
+			},
+			expected: []Endpoint{
+				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
+			},
+			featureGateOn: true,
+		},
+		{
+			name:                  "internalTrafficPolicy is local with zero local endpoints",
+			internalTrafficPolicy: &local,
+			endpoints: []Endpoint{
+				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: false},
+				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
+				&BaseEndpointInfo{Endpoint: "10.0.0.2:80", IsLocal: false},
+			},
+			expected:      nil,
+			featureGateOn: true,
+		},
+		{
+			name:                  "feature gate is off, internalTrafficPolicy is local with non-empty endpoints",
+			internalTrafficPolicy: &local,
+			endpoints: []Endpoint{
+				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
+				&BaseEndpointInfo{Endpoint: "10.0.0.2:80", IsLocal: false},
+			},
+			expected: []Endpoint{
+				&BaseEndpointInfo{Endpoint: "10.0.0.0:80", IsLocal: true},
+				&BaseEndpointInfo{Endpoint: "10.0.0.1:80", IsLocal: false},
+				&BaseEndpointInfo{Endpoint: "10.0.0.2:80", IsLocal: false},
+			},
+			featureGateOn: false,
+		},
+	}
+	for _, tc := range testCases {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, tc.featureGateOn)()
+		t.Run(tc.name, func(t *testing.T) {
+			filteredEndpoint := FilterLocalEndpoint(tc.internalTrafficPolicy, tc.endpoints)
+			if !reflect.DeepEqual(filteredEndpoint, tc.expected) {
+				t.Errorf("expected %v, got %v", tc.expected, filteredEndpoint)
 			}
 		})
 	}

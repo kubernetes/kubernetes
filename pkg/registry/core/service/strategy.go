@@ -156,7 +156,7 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 		newSvc.Spec.TopologyKeys = nil
 	}
 
-	// Clear AllocateLoadBalancerNodePorts if ServiceLBNodePortControl if not enabled
+	// Clear AllocateLoadBalancerNodePorts if ServiceLBNodePortControl is not enabled
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
 		if !allocateLoadBalancerNodePortsInUse(oldSvc) {
 			newSvc.Spec.AllocateLoadBalancerNodePorts = nil
@@ -178,6 +178,13 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceLoadBalancerClass) {
 		if !loadBalancerClassInUse(oldSvc) {
 			newSvc.Spec.LoadBalancerClass = nil
+		}
+	}
+
+	// Clear InternalTrafficPolicy if not enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
+		if !serviceInternalTrafficPolicyInUse(oldSvc) {
+			newSvc.Spec.InternalTrafficPolicy = nil
 		}
 	}
 }
@@ -238,6 +245,13 @@ func loadBalancerClassInUse(svc *api.Service) bool {
 		return false
 	}
 	return svc.Spec.LoadBalancerClass != nil
+}
+
+func serviceInternalTrafficPolicyInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+	return svc.Spec.InternalTrafficPolicy != nil
 }
 
 type serviceStatusStrategy struct {

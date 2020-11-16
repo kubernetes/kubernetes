@@ -1029,6 +1029,13 @@ func (proxier *Proxier) syncProxyRules() {
 			allEndpoints = proxy.FilterTopologyEndpoint(proxier.nodeLabels, svcInfo.TopologyKeys(), allEndpoints)
 		}
 
+		// Service InternalTrafficPolicy is only enabled when all of the
+		// following are true:
+		// 1. InternalTrafficPolicy is Local
+		// 2. ServiceInternalTrafficPolicy feature gate is on
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) && svcInfo.OnlyNodeLocalEndpointsForInternal() {
+			allEndpoints = proxy.FilterLocalEndpoint(svcInfo.InternalTrafficPolicy(), allEndpoints)
+		}
 		readyEndpoints := make([]proxy.Endpoint, 0, len(allEndpoints))
 		for _, endpoint := range allEndpoints {
 			if !endpoint.IsReady() {

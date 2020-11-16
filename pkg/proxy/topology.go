@@ -18,6 +18,8 @@ package proxy
 
 import (
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // FilterTopologyEndpoint returns the appropriate endpoints based on the cluster
@@ -44,7 +46,7 @@ func FilterTopologyEndpoint(nodeLabels map[string]string, topologyKeys []string,
 		return endpoints
 	}
 
-	filteredEndpoint := []Endpoint{}
+	filteredEndpoints := []Endpoint{}
 
 	if len(nodeLabels) == 0 {
 		if topologyKeys[len(topologyKeys)-1] == v1.TopologyKeyAny {
@@ -54,7 +56,7 @@ func FilterTopologyEndpoint(nodeLabels map[string]string, topologyKeys []string,
 		}
 		// edge case: do not include any endpoints if topology key "Any" is
 		// not specified when we cannot determine current node's topology.
-		return filteredEndpoint
+		return filteredEndpoints
 	}
 
 	for _, key := range topologyKeys {
@@ -69,12 +71,40 @@ func FilterTopologyEndpoint(nodeLabels map[string]string, topologyKeys []string,
 		for _, ep := range endpoints {
 			topology := ep.GetTopology()
 			if value, found := topology[key]; found && value == topologyValue {
-				filteredEndpoint = append(filteredEndpoint, ep)
+				filteredEndpoints = append(filteredEndpoints, ep)
 			}
 		}
-		if len(filteredEndpoint) > 0 {
-			return filteredEndpoint
+		if len(filteredEndpoints) > 0 {
+			return filteredEndpoints
 		}
 	}
-	return filteredEndpoint
+	return filteredEndpoints
+}
+
+// FilterLocalEndpoint returns the node local endpoints based on configured
+// InternalTrafficPolicy.
+//
+// If ServiceInternalTrafficPolicy feature gate is off, returns the original
+// endpoints slice.
+// Otherwise, if InternalTrafficPolicy is Local, only return the node local endpoints.
+func FilterLocalEndpoint(internalTrafficPolicy *v1.ServiceInternalTrafficPolicyType, endpoints []Endpoint) []Endpoint {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
+		return endpoints
+	}
+	if internalTrafficPolicy == nil || *internalTrafficPolicy == v1.ServiceInternalTrafficPolicyCluster {
+		return endpoints
+	}
+
+	var filteredEndpoints []Endpoint
+
+	// Get all the local endpoints
+	for _, ep := range endpoints {
+		if ep.GetIsLocal() {
+			filteredEndpoints = append(filteredEndpoints, ep)
+		}
+	}
+
+	// When internalTrafficPolicy is Local, only return the node local
+	// endpoints
+	return filteredEndpoints
 }
