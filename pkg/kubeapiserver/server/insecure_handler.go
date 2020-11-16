@@ -39,7 +39,14 @@ func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.H
 	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
 	handler = genericapifilters.WithAuthentication(handler, server.InsecureSuperuser{}, nil, nil)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
-	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc, c.RequestTimeout)
+
+	// WithTimeoutForNonLongRunningRequests will call the rest of the request handling in a go-routine with the
+	// context with deadline. The go-routine can keep running, while the timeout logic will return a timeout to the client.
+	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc)
+
+	// WithRequestDeadline sets a deadline for the request context appropriately
+	handler = genericapifilters.WithRequestDeadline(handler, c.LongRunningFunc, c.RequestTimeout)
+
 	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericapifilters.WithWarningRecorder(handler)
