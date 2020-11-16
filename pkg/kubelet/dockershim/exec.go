@@ -19,26 +19,22 @@ limitations under the License.
 package dockershim
 
 import (
+	"context"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
-	"k8s.io/klog/v2"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/probe/exec"
-
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 // ExecHandler knows how to execute a command in a running Docker container.
 type ExecHandler interface {
-	ExecInContainer(client libdocker.Interface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
+	ExecInContainer(ctx context.Context, client libdocker.Interface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
 }
 
 type dockerExitError struct {
@@ -65,7 +61,7 @@ func (d *dockerExitError) ExitStatus() int {
 type NativeExecHandler struct{}
 
 // ExecInContainer executes the cmd in container using the Docker's exec API
-func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
+func (*NativeExecHandler) ExecInContainer(ctx context.Context, client libdocker.Interface, container *dockertypes.ContainerJSON, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	done := make(chan struct{})
 	defer close(done)
 
@@ -109,53 +105,55 @@ func (*NativeExecHandler) ExecInContainer(client libdocker.Interface, container 
 		RawTerminal:  tty,
 		ExecStarted:  execStarted,
 	}
-	err = client.StartExec(execObj.ID, startOpts, streamOpts)
-	if err != nil {
-		return err
+
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
 	}
 
-	// if ExecProbeTimeout feature gate is disabled, preserve existing behavior to ignore exec timeouts
-	var execTimeout <-chan time.Time
-	if timeout > 0 && utilfeature.DefaultFeatureGate.Enabled(features.ExecProbeTimeout) {
-		execTimeout = time.After(timeout)
-	} else {
-		// skip exec timeout if provided timeout is 0
-		execTimeout = nil
+	// StartExec is a blocking call, so we need to run it concurrently and catch
+	// its error in a channel
+	execErr := make(chan error, 1)
+	go func() {
+		execErr <- client.StartExec(execObj.ID, startOpts, streamOpts)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-execErr:
+		if err != nil {
+			return err
+		}
 	}
 
+	// InspectExec may not always return latest state of exec, so call it a few times until
+	// it returns an exec inspect that shows that the process is no longer running.
+	retries := 0
+	maxRetries := 5
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
-	count := 0
 	for {
-		select {
-		case <-execTimeout:
-			return exec.NewTimeoutError(fmt.Errorf("command %q timed out", strings.Join(cmd, " ")), timeout)
-		// need to use "default" here instead of <-ticker.C, otherwise we delay the initial InspectExec by 2 seconds.
-		default:
-			inspect, inspectErr := client.InspectExec(execObj.ID)
-			if inspectErr != nil {
-				return inspectErr
-			}
-
-			if !inspect.Running {
-				if inspect.ExitCode != 0 {
-					return &dockerExitError{inspect}
-				}
-
-				return nil
-			}
-
-			// Only limit the amount of InspectExec calls if the exec timeout was not set.
-			// When a timeout is not set, we stop polling the exec session after 5 attempts and allow the process to continue running.
-			if execTimeout == nil {
-				count++
-				if count == 5 {
-					klog.Errorf("Exec session %s in container %s terminated but process still running!", execObj.ID, container.ID)
-					return nil
-				}
-			}
-
-			<-ticker.C
+		inspect, err := client.InspectExec(execObj.ID)
+		if err != nil {
+			return err
 		}
+
+		if !inspect.Running {
+			if inspect.ExitCode != 0 {
+				return &dockerExitError{inspect}
+			}
+
+			return nil
+		}
+
+		retries++
+		if retries == maxRetries {
+			klog.Errorf("Exec session %s in container %s terminated but process still running!", execObj.ID, container.ID)
+			return nil
+		}
+
+		<-ticker.C
 	}
 }
