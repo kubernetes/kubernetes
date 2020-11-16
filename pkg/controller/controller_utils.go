@@ -83,7 +83,7 @@ const (
 	//      1+floor(log_2(ceil(N/SlowStartInitialBatchSize)))
 	SlowStartInitialBatchSize = 1
 )
-const deletePriorityPodAnnotationKey = "controller.kubernetes.io/delete-priority"
+const deletePriorityPodAnnotationKey = "controller.kubernetes.io/replicaset-downscale-priority"
 
 var UpdateTaintBackoff = wait.Backoff{
 	Steps:    5,
