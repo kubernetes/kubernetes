@@ -38,7 +38,7 @@ import (
 
 const (
 	requestConcurrencyLimitMetricName      = "apiserver_flowcontrol_request_concurrency_limit"
-	requestConcurrencyLimitMetricLabelName = "priorityLevel"
+	requestConcurrencyLimitMetricLabelName = "priority_level"
 )
 
 var _ = SIGDescribe("API priority and fairness", func() {
