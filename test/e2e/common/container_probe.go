@@ -123,6 +123,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		livenessProbe := &v1.Probe{
 			Handler:             execHandler([]string{"cat", "/tmp/health"}),
 			InitialDelaySeconds: 15,
+			TimeoutSeconds:      5, // default 1s can be pretty aggressive in CI environments with low resources
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
@@ -139,6 +140,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		livenessProbe := &v1.Probe{
 			Handler:             execHandler([]string{"cat", "/tmp/health"}),
 			InitialDelaySeconds: 15,
+			TimeoutSeconds:      5, // default 1s can be pretty aggressive in CI environments with low resources
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
