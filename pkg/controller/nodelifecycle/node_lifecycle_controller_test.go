@@ -748,6 +748,302 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 	}
 }
 
+func TestMonitorNodeHealthEvictPodsWithSpecialPodPhase(t *testing.T) {
+	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	evictionTimeout := 10 * time.Minute
+	labels := map[string]string{
+		v1.LabelZoneRegion:        "region1",
+		v1.LabelZoneFailureDomain: "zone1",
+	}
+
+	// Because of the logic that prevents NC from evicting anything when all Nodes are NotReady
+	// we need second healthy node in tests. Because of how the tests are written we need to update
+	// the status of this Node.
+	healthyNodeNewStatus := v1.NodeStatus{
+		Conditions: []v1.NodeCondition{
+			{
+				Type:   v1.NodeReady,
+				Status: v1.ConditionTrue,
+				// Node status has just been updated, and is NotReady for 10min.
+				LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 9, 0, 0, time.UTC),
+				LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+
+	table := []struct {
+		fakeNodeHandler     *testutil.FakeNodeHandler
+		daemonSets          []apps.DaemonSet
+		timeToPass          time.Duration
+		newNodeStatus       v1.NodeStatus
+		secondNodeNewStatus v1.NodeStatus
+		expectedEvictPods   bool
+		description         string
+	}{
+		// Node created long time ago, and kubelet posted NotReady for a long period of time. The running pod should be evicted.
+		{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
+							},
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionFalse,
+									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node1",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
+							},
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionTrue,
+									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPodWithSpecialPhase("pod0", "node0", v1.PodRunning)}}),
+			},
+			daemonSets: nil,
+			timeToPass: time.Hour,
+			newNodeStatus: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:   v1.NodeReady,
+						Status: v1.ConditionFalse,
+						// Node status has just been updated, and is NotReady for 1hr.
+						LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 59, 0, 0, time.UTC),
+						LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
+			secondNodeNewStatus: healthyNodeNewStatus,
+			expectedEvictPods:   true,
+			description:         "Node created long time ago, and kubelet posted NotReady for a long period of time. The running pod should be evicted.",
+		},
+		// Node created long time ago, and kubelet posted NotReady for a long period of time. The succeeded pod should be ignored.
+		{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
+							},
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionFalse,
+									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node1",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
+							},
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionTrue,
+									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPodWithSpecialPhase("pod0", "node0", v1.PodSucceeded)}}),
+			},
+			daemonSets: nil,
+			timeToPass: time.Hour,
+			newNodeStatus: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:   v1.NodeReady,
+						Status: v1.ConditionFalse,
+						// Node status has just been updated, and is NotReady for 1hr.
+						LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 59, 0, 0, time.UTC),
+						LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
+			secondNodeNewStatus: healthyNodeNewStatus,
+			expectedEvictPods:   false,
+			description:         "Node created long time ago, and kubelet posted NotReady for a long period of time. The succeeded pod should be ignored.",
+		},
+		// Node created long time ago, and kubelet posted NotReady for a long period of time. The failed pod should be ignored.
+		{
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
+							},
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionFalse,
+									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node1",
+							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+							Labels: map[string]string{
+								v1.LabelZoneRegion:        "region1",
+								v1.LabelZoneFailureDomain: "zone1",
+							},
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionTrue,
+									LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPodWithSpecialPhase("pod0", "node0", v1.PodFailed)}}),
+			},
+			daemonSets: nil,
+			timeToPass: time.Hour,
+			newNodeStatus: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{
+					{
+						Type:   v1.NodeReady,
+						Status: v1.ConditionFalse,
+						// Node status has just been updated, and is NotReady for 1hr.
+						LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 59, 0, 0, time.UTC),
+						LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
+			secondNodeNewStatus: healthyNodeNewStatus,
+			expectedEvictPods:   false,
+			description:         "Node created long time ago, and kubelet posted NotReady for a long period of time. The failed pod should be ignored.",
+		},
+	}
+
+	for _, item := range table {
+		nodeController, _ := newNodeLifecycleControllerFromClient(
+			item.fakeNodeHandler,
+			evictionTimeout,
+			testRateLimiterQPS,
+			testRateLimiterQPS,
+			testLargeClusterThreshold,
+			testUnhealthyThreshold,
+			testNodeMonitorGracePeriod,
+			testNodeStartupGracePeriod,
+			testNodeMonitorPeriod,
+			false)
+		nodeController.now = func() metav1.Time { return fakeNow }
+		nodeController.recorder = testutil.NewFakeRecorder()
+		nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(item.fakeNodeHandler.Clientset)
+		for _, ds := range item.daemonSets {
+			nodeController.daemonSetInformer.Informer().GetStore().Add(&ds)
+		}
+		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if err := nodeController.monitorNodeHealth(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if item.timeToPass > 0 {
+			nodeController.now = func() metav1.Time { return metav1.Time{Time: fakeNow.Add(item.timeToPass)} }
+			item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
+			item.fakeNodeHandler.Existing[1].Status = item.secondNodeNewStatus
+		}
+		if len(item.fakeNodeHandler.Existing[0].Labels) == 0 && len(item.fakeNodeHandler.Existing[1].Labels) == 0 {
+			item.fakeNodeHandler.Existing[0].Labels = labels
+			item.fakeNodeHandler.Existing[1].Labels = labels
+		}
+		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if err := nodeController.monitorNodeHealth(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		zones := testutil.GetZones(item.fakeNodeHandler)
+		for _, zone := range zones {
+			if _, ok := nodeController.zonePodEvictor[zone]; ok {
+				nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
+					nodeUID, _ := value.UID.(string)
+					pods, err := nodeController.getPodsAssignedToNode(value.Value)
+					if err != nil {
+						t.Errorf("unexpected error: %v", err)
+					}
+					nodeutil.DeletePods(item.fakeNodeHandler, pods, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetInformer.Lister())
+					return true, 0
+				})
+			} else {
+				t.Fatalf("Zone %v was unitialized!", zone)
+			}
+		}
+
+		podEvicted := false
+		for _, action := range item.fakeNodeHandler.Actions() {
+			if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
+				podEvicted = true
+			}
+		}
+
+		if item.expectedEvictPods != podEvicted {
+			t.Errorf("expected pod eviction: %+v, got %+v for %+v", item.expectedEvictPods,
+				podEvicted, item.description)
+		}
+	}
+}
+
 func TestPodStatusChange(t *testing.T) {
 	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	evictionTimeout := 10 * time.Minute

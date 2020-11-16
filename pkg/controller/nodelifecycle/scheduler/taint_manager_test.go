@@ -585,6 +585,88 @@ func TestUpdateNodeWithMultipleTaints(t *testing.T) {
 	close(stopCh)
 }
 
+func TestEvictPodWithSpecialPodPhase(t *testing.T) {
+	testCases := []struct {
+		description     string
+		pods            []v1.Pod
+		oldNode         *v1.Node
+		newNode         *v1.Node
+		expectDelete    bool
+		additionalSleep time.Duration
+	}{
+		{
+			description: "Pod Running",
+			pods: []v1.Pod{
+				*testutil.NewPodWithSpecialPhase("pod1", "node1", v1.PodRunning),
+			},
+			oldNode:      testutil.NewNode("node1"),
+			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectDelete: true,
+		},
+		{
+			description: "Pod Succeeded",
+			pods: []v1.Pod{
+				*testutil.NewPodWithSpecialPhase("pod1", "node1", v1.PodSucceeded),
+			},
+			oldNode:      testutil.NewNode("node1"),
+			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectDelete: false,
+		},
+		{
+			description: "Pod Failed",
+			pods: []v1.Pod{
+				*testutil.NewPodWithSpecialPhase("pod1", "node1", v1.PodFailed),
+			},
+			oldNode:      testutil.NewNode("node1"),
+			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectDelete: false,
+		},
+		{
+			description: "Pod Pending",
+			pods: []v1.Pod{
+				*testutil.NewPodWithSpecialPhase("pod1", "node1", v1.PodPending),
+			},
+			oldNode:      testutil.NewNode("node1"),
+			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectDelete: true,
+		},
+		{
+			description: "Pod Unknown",
+			pods: []v1.Pod{
+				*testutil.NewPodWithSpecialPhase("pod1", "node1", v1.PodUnknown),
+			},
+			oldNode:      testutil.NewNode("node1"),
+			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectDelete: true,
+		},
+	}
+
+	for _, item := range testCases {
+		stopCh := make(chan struct{})
+		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
+		controller := NewNoExecuteTaintManager(fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{node: item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
+		controller.recorder = testutil.NewFakeRecorder()
+		go controller.Run(stopCh)
+		controller.NodeUpdated(item.oldNode, item.newNode)
+		// wait a bit
+		time.Sleep(timeForControllerToProgress)
+		if item.additionalSleep > 0 {
+			time.Sleep(item.additionalSleep)
+		}
+
+		podDeleted := false
+		for _, action := range fakeClientset.Actions() {
+			if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
+				podDeleted = true
+			}
+		}
+		if podDeleted != item.expectDelete {
+			t.Errorf("%v: Unexepected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
+		}
+		close(stopCh)
+	}
+}
+
 func TestUpdateNodeWithMultiplePods(t *testing.T) {
 	testCases := []struct {
 		description         string

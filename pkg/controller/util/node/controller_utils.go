@@ -72,6 +72,12 @@ func DeletePods(kubeClient clientset.Interface, pods []*v1.Pod, recorder record.
 			remaining = true
 			continue
 		}
+
+		// the terminated pod should be ignored during eviction.
+		if IsPodInTerminatedState(pod) {
+			continue
+		}
+
 		// if the pod is managed by a daemonset, ignore it
 		if _, err := daemonStore.GetPodDaemonSets(pod); err == nil {
 			// No error means at least one daemonset was found
@@ -299,4 +305,9 @@ func GetNodeCondition(status *v1.NodeStatus, conditionType v1.NodeConditionType)
 		}
 	}
 	return -1, nil
+}
+
+// IsPodInTerminatedState will return true, if the pod in terminated state.
+func IsPodInTerminatedState(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded
 }

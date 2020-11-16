@@ -441,6 +441,13 @@ func NewNode(name string) *v1.Node {
 	}
 }
 
+// NewPodWithSpecialPhase is a helper function for creating Pods with special phase for testing.
+func NewPodWithSpecialPhase(name, host string, podPhase v1.PodPhase) *v1.Pod {
+	pod := NewPod(name, host)
+	pod.Status.Phase = podPhase
+	return pod
+}
+
 // NewPod is a helper function for creating Pods for testing.
 func NewPod(name, host string) *v1.Pod {
 	pod := &v1.Pod{

@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 
 	"k8s.io/klog/v2"
 )
@@ -395,6 +396,10 @@ func (tc *NoExecuteTaintManager) handlePodUpdate(podUpdate podUpdateItem) {
 		return
 	}
 
+	if nodeutil.IsPodInTerminatedState(pod) {
+		return
+	}
+
 	// Create or Update
 	podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
 	klog.V(4).InfoS("Noticed pod update", "pod", podNamespacedName)
@@ -467,6 +472,9 @@ func (tc *NoExecuteTaintManager) handleNodeUpdate(nodeUpdate nodeUpdateItem) {
 
 	now := time.Now()
 	for _, pod := range pods {
+		if nodeutil.IsPodInTerminatedState(pod) {
+			continue
+		}
 		podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
 		tc.processPodOnNode(podNamespacedName, node.Name, pod.Spec.Tolerations, taints, now)
 	}
