@@ -204,6 +204,7 @@ aliases:
     - smarterclayton
     - soltysh
     - pwittrock
+    - eddiezane
   # emeritus:
   # - adohe
   sig-cli:
@@ -220,6 +221,7 @@ aliases:
     - soltysh
     - pwittrock
     - zhouya0
+    - eddiezane
 
   sig-testing-reviewers:
     - bentheelder
