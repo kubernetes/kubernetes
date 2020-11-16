@@ -104,6 +104,8 @@ spec:
               value: "0"
             - name: FELIX_TYPHAK8SSERVICENAME
               value: "calico-typha"
+            - name: FELIX_ROUTETABLERANGE
+              value: "10-250"
             - name: USE_POD_CIDR
               value: "true"
             - name: IP
