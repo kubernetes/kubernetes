@@ -197,7 +197,7 @@ func TestProvisioner(t *testing.T) {
 		t.Errorf("Expected reclaim policy %+v but got %+v", v1.PersistentVolumeReclaimDelete, pv.Spec.PersistentVolumeReclaimPolicy)
 	}
 
-	os.RemoveAll(hostPathCreator.basePath)
+	os.RemoveAll(fmt.Sprintf("/tmp/%s", hostPathCreator.basePath))
 
 }
 
