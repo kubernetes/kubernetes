@@ -32,6 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
 )
@@ -302,6 +303,133 @@ var _ = SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("recreating EndpointSlices after they've been deleted")
 		deleteEndpointSlices(cs, f.Namespace.Name, svc2)
 		expectEndpointsAndSlices(cs, f.Namespace.Name, svc2, []*v1.Pod{pod1, pod2}, 2, 2, true)
+	})
+
+	ginkgo.It("should NOT include terminating endpoints for Endpoints and EndpointSlices", func() {
+		labelPod1 := "pod1"
+		labelValue := "on"
+
+		pod1 := podClient.Create(&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod1",
+				Labels: map[string]string{
+					labelPod1: labelValue,
+				},
+			},
+			Spec: v1.PodSpec{
+				// use long grace periods to leave time to test endpoints
+				TerminationGracePeriodSeconds: utilpointer.Int64Ptr(60),
+				Containers: []v1.Container{
+					{
+						Name:    "container1",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sleep", "1000000"},
+						Ports: []v1.ContainerPort{{
+							Name:          "example-name",
+							ContainerPort: int32(3000),
+						}},
+					},
+				},
+			},
+		})
+
+		svc1 := createServiceReportErr(cs, f.Namespace.Name, &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "example-int-port",
+			},
+			Spec: v1.ServiceSpec{
+				Selector: map[string]string{labelPod1: labelValue},
+				Ports: []v1.ServicePort{{
+					Name:       "example",
+					Port:       80,
+					TargetPort: intstr.FromInt(3000),
+					Protocol:   v1.ProtocolTCP,
+				}},
+			},
+		})
+
+		// wait for pod to start up
+		err := wait.Poll(5*time.Second, time.Minute, func() (bool, error) {
+			var err error
+			pod1, err = podClient.Get(context.TODO(), pod1.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			if len(pod1.Status.PodIPs) == 0 {
+				return false, nil
+			}
+
+			return true, nil
+		})
+		framework.ExpectNoError(err, "timed out waiting for Pods to have IPs assigned")
+
+		ginkgo.By("referencing a single matching pod")
+		expectEndpointsAndSlices(cs, f.Namespace.Name, svc1, []*v1.Pod{pod1}, 1, 1, false)
+
+		// Delete pod1 with long termination grace period.
+		// NOTE: for this test we need to use a pod that ignores SIGTERM from kubelet
+		// in order to keep terminating pods around long enough to test this behavior.
+		err = podClient.Delete(context.TODO(), pod1.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err, fmt.Sprintf("failed to delete pod %s/%s", pod1.Namespace, pod1.Name))
+
+		// ensure deletion timestamp
+		err = wait.Poll(5*time.Second, time.Minute, func() (bool, error) {
+			var err error
+			pod1, err = podClient.Get(context.TODO(), pod1.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+
+			if pod1.DeletionTimestamp == nil {
+				return false, nil
+			}
+
+			return true, nil
+		})
+		framework.ExpectNoError(err, "timed out waiting for pod to have deletion timestamp")
+
+		// TODO: update this test to include terminating endpoints once EndpointSliceTerminatingCondition is enabled by default
+		ginkgo.By("checking terminating endpoints are NOT included in EndpointSlice")
+		err = wait.Poll(2*time.Second, 10*time.Second, func() (bool, error) {
+			listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1beta1.LabelServiceName, svc1.Name)}
+			esList, err := cs.DiscoveryV1beta1().EndpointSlices(f.Namespace.Name).List(context.TODO(), listOptions)
+			if err != nil {
+				return false, err
+			}
+			framework.ExpectNoError(err, fmt.Sprintf("error fetching EndpointSlice for Service %s/%s", f.Namespace.Name, svc1.Name))
+
+			numEndpoints := 0
+			for _, endpointSlice := range esList.Items {
+				numEndpoints += len(endpointSlice.Endpoints)
+			}
+
+			if numEndpoints == 0 {
+				return true, nil
+			}
+
+			return false, nil
+		})
+		framework.ExpectNoError(err, "EndpointSlice should not include terminating endpoints")
+
+		ginkgo.By("checking terminating pods are NOT included in Endpoints")
+		err = wait.Poll(2*time.Second, 10*time.Second, func() (bool, error) {
+			endpoints, err := cs.CoreV1().Endpoints(f.Namespace.Name).Get(context.TODO(), svc1.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+
+			numEndpoints := 0
+			for _, subsets := range endpoints.Subsets {
+				numEndpoints += len(subsets.Addresses)
+			}
+
+			if numEndpoints == 0 {
+				return true, nil
+			}
+
+			return false, nil
+		})
+		framework.ExpectNoError(err, "Endpoints should not include terminating endpoints")
 	})
 })
 
