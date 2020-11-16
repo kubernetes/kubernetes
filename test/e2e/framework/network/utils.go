@@ -181,10 +181,6 @@ type NetworkingTestConfig struct {
 	// SessionAffinityService is a Service with SessionAffinity=ClientIP
 	// spanning over all endpointPods.
 	SessionAffinityService *v1.Service
-	// ExternalAddr is a external IP of a node in the cluster.
-	ExternalAddr string
-	// SecondaryExternalAddr is a external IP of the secondary IP family of a node in the cluster.
-	SecondaryExternalAddr string
 	// Nodes is a list of nodes in the cluster.
 	Nodes []v1.Node
 	// MaxTries is the number of retries tolerated for tests run against
@@ -194,9 +190,11 @@ type NetworkingTestConfig struct {
 	ClusterIP string
 	// The SecondaryClusterIP of the Service created by this test config.
 	SecondaryClusterIP string
-	// External ip of first node for use in nodePort testing.
+	// NodeIP it's an ExternalIP if the node has one,
+	// or an InternalIP if not, for use in nodePort testing.
 	NodeIP string
-	// External ip of other IP family of first node for use in nodePort testing.
+	// SecondaryNodeIP it's an ExternalIP of the secondary IP family if the node has one,
+	// or an InternalIP if not, for usein nodePort testing.
 	SecondaryNodeIP string
 	// The http/udp/sctp nodePorts of the Service.
 	NodeHTTPPort int
@@ -779,6 +777,8 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	}
 
 	// Obtain the primary IP family of the Cluster based on the first ClusterIP
+	// TODO: Eventually we should just be getting these from Spec.IPFamilies
+	// but for now that would only if the feature gate is enabled.
 	family := v1.IPv4Protocol
 	secondaryFamily := v1.IPv6Protocol
 	if netutils.IsIPv6String(config.ClusterIP) {
@@ -786,17 +786,13 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 		secondaryFamily = v1.IPv4Protocol
 	}
 	// Get Node IPs from the cluster, ExternalIPs take precedence
-	config.ExternalAddr = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, family)
-	if config.ExternalAddr != "" {
-		config.NodeIP = config.ExternalAddr
-	} else {
+	config.NodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, family)
+	if config.NodeIP == "" {
 		config.NodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeInternalIP, family)
 	}
 	if config.DualStackEnabled {
-		config.SecondaryExternalAddr = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, secondaryFamily)
-		if config.SecondaryExternalAddr != "" {
-			config.SecondaryNodeIP = config.SecondaryExternalAddr
-		} else {
+		config.SecondaryNodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, secondaryFamily)
+		if config.SecondaryNodeIP == "" {
 			config.SecondaryNodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeInternalIP, secondaryFamily)
 		}
 	}

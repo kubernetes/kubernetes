@@ -24,8 +24,6 @@ import (
 	"strings"
 	"time"
 
-	netutil "k8s.io/utils/net"
-
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
@@ -43,6 +41,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientretry "k8s.io/client-go/util/retry"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	netutil "k8s.io/utils/net"
 )
 
 const (
@@ -250,7 +249,7 @@ func GetInternalIP(node *v1.Node) (string, error) {
 	return host, nil
 }
 
-// FirstAddressByTypeAndFamily returns the first address of the given type and family of each node.
+// FirstAddressByTypeAndFamily returns the first address that matches the given type and family of the list of nodes
 func FirstAddressByTypeAndFamily(nodelist *v1.NodeList, addrType v1.NodeAddressType, family v1.IPFamily) string {
 	for _, n := range nodelist.Items {
 		addresses := GetAddressesByTypeAndFamily(&n, addrType, family)
