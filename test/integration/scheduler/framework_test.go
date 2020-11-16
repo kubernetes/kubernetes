@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1173,7 +1174,7 @@ func TestBindPlugin(t *testing.T) {
 	}
 
 	// Create the scheduler with the test plugin set.
-	testCtx := testutils.InitTestSchedulerWithOptions(t, testContext, nil, time.Second,
+	testCtx := testutils.InitTestSchedulerWithOptions(t, testContext, nil,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	testutils.SyncInformerFactory(testCtx)
@@ -1217,7 +1218,7 @@ func TestBindPlugin(t *testing.T) {
 		{
 			name:               "bind plugin fails to bind the pod",
 			bindPluginStatuses: []*framework.Status{framework.NewStatus(framework.Error, "failed to bind"), framework.NewStatus(framework.Success, "")},
-			expectInvokeEvents: []pluginInvokeEvent{{pluginName: bindPlugin1.Name(), val: 1}, {pluginName: reservePlugin.Name(), val: 1}, {pluginName: bindPlugin1.Name(), val: 2}, {pluginName: reservePlugin.Name(), val: 2}},
+			expectInvokeEvents: []pluginInvokeEvent{{pluginName: bindPlugin1.Name(), val: 1}, {pluginName: reservePlugin.Name(), val: 1}},
 		},
 	}
 
@@ -1878,11 +1879,16 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 		t.Errorf("Error while creating the preemptor pod: %v", err)
 	}
 
-	if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, preemptorPod); err != nil {
-		t.Errorf("Expected the preemptor pod to be scheduled. error: %v", err)
-	}
+	// TODO(#96478): uncomment below once we find a way to trigger MoveAllToActiveOrBackoffQueue()
+	// upon deletion event of unassigned waiting pods.
+	// if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, preemptorPod); err != nil {
+	// 	t.Errorf("Expected the preemptor pod to be scheduled. error: %v", err)
+	// }
 
-	if _, err := getPod(testCtx.ClientSet, waitingPod.Name, waitingPod.Namespace); err == nil {
+	if err := wait.Poll(200*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		_, err := getPod(testCtx.ClientSet, waitingPod.Name, waitingPod.Namespace)
+		return apierrors.IsNotFound(err), nil
+	}); err != nil {
 		t.Error("Expected the waiting pod to get preempted and deleted")
 	}
 
@@ -1895,7 +1901,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 }
 
 func initTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestContext, nodeCount int, opts ...scheduler.Option) *testutils.TestContext {
-	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, nil, time.Second, opts...)
+	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, nil, opts...)
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 

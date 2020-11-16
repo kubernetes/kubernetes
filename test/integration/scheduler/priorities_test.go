@@ -57,7 +57,6 @@ func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *tes
 		t,
 		testutils.InitTestMaster(t, strings.ToLower(scorePluginName), nil),
 		nil,
-		0,
 		scheduler.WithProfiles(prof),
 	)
 	testutils.SyncInformerFactory(testCtx)

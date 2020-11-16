@@ -149,7 +149,7 @@ func TestPreemption(t *testing.T) {
 	}
 	testCtx := testutils.InitTestSchedulerWithOptions(t,
 		testutils.InitTestMaster(t, "preemption", nil),
-		nil, time.Second,
+		nil,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	testutils.SyncInformerFactory(testCtx)
