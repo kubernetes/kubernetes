@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,8 +30,10 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	batchinformers "k8s.io/client-go/informers/batch/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	batchv1listers "k8s.io/client-go/listers/batch/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -57,12 +60,18 @@ type PodGCController struct {
 
 	nodeQueue workqueue.DelayingInterface
 
+	jobLister       batchv1listers.JobLister
+	jobListerSynced cache.InformerSynced
+
 	deletePod              func(namespace, name string) error
 	terminatedPodThreshold int
 }
 
-func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
-	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int) *PodGCController {
+func NewPodGC(kubeClient clientset.Interface,
+	podInformer coreinformers.PodInformer,
+	nodeInformer coreinformers.NodeInformer,
+	jobInformer batchinformers.JobInformer,
+	terminatedPodThreshold int) *PodGCController {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
@@ -80,6 +89,12 @@ func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInfor
 		},
 	}
 
+	gcc.podLister = podInformer.Lister()
+	gcc.podListerSynced = podInformer.Informer().HasSynced
+
+	gcc.jobLister = jobInformer.Lister()
+	gcc.jobListerSynced = jobInformer.Informer().HasSynced
+
 	return gcc
 }
 
@@ -90,7 +105,7 @@ func (gcc *PodGCController) Run(stop <-chan struct{}) {
 	defer gcc.nodeQueue.ShutDown()
 	defer klog.Infof("Shutting down GC controller")
 
-	if !cache.WaitForNamedCacheSync("GC", stop, gcc.podListerSynced, gcc.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSync("GC", stop, gcc.podListerSynced, gcc.jobListerSynced, gcc.nodeListerSynced) {
 		return
 	}
 
@@ -179,6 +194,9 @@ func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod, nodes []*v1.Node) {
 		if !deletedNodesNames.Has(pod.Spec.NodeName) {
 			continue
 		}
+		if !gcc.orphanedPodDeletable(pod) {
+			continue
+		}
 		klog.V(2).Infof("Found orphaned Pod %v/%v assigned to the Node %v. Deleting.", pod.Namespace, pod.Name, pod.Spec.NodeName)
 		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
 			utilruntime.HandleError(err)
@@ -235,6 +253,57 @@ func (gcc *PodGCController) gcUnscheduledTerminating(pods []*v1.Pod) {
 			klog.V(0).Infof("Forced deletion of unscheduled terminating Pod %v/%v succeeded", pod.Namespace, pod.Name)
 		}
 	}
+}
+
+func isJobFinished(j *batch.Job) bool {
+	for _, c := range j.Status.Conditions {
+		if (c.Type == batch.JobComplete || c.Type == batch.JobFailed) && c.Status == v1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+// We should not delete a pod if it's terminated
+// and belongs to a job and the job has not finished yet.
+func (gcc *PodGCController) orphanedPodDeletable(pod *v1.Pod) bool {
+	if !isPodTerminated(pod) {
+		return true
+	}
+
+	controllerRef := metav1.GetControllerOf(pod)
+	if controllerRef == nil {
+		return true
+	}
+	job := gcc.resolveControllerRef(pod.Namespace, controllerRef)
+	if job == nil || isJobFinished(job) {
+		return true
+	}
+
+	return false
+}
+
+var concernedKind = batch.SchemeGroupVersion.WithKind("Job")
+
+// resolveControllerRef returns the controller referenced by a ControllerRef,
+// or nil if the ControllerRef could not be resolved to a matching controller
+// of the concerned Kind.
+func (gcc *PodGCController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *batch.Job {
+	// We can't look up by UID, so look up by Name and then verify UID.
+	// Don't even try to look up by Name if it's the wrong Kind.
+	if controllerRef.Kind != concernedKind.Kind {
+		return nil
+	}
+	job, err := gcc.jobLister.Jobs(namespace).Get(controllerRef.Name)
+	if err != nil {
+		return nil
+	}
+	if job.UID != controllerRef.UID {
+		// The controller we found with this Name is not the same one that the
+		// ControllerRef points to.
+		return nil
+	}
+	return job
 }
 
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.

@@ -22,13 +22,16 @@ import (
 	"testing"
 	"time"
 
+	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
+	batchinformers "k8s.io/client-go/informers/batch/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -39,13 +42,14 @@ import (
 
 func alwaysReady() bool { return true }
 
-func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (*PodGCController, coreinformers.PodInformer, coreinformers.NodeInformer) {
+func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (*PodGCController, coreinformers.PodInformer, coreinformers.NodeInformer, batchinformers.JobInformer) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
 	nodeInformer := informerFactory.Core().V1().Nodes()
-	controller := NewPodGC(kubeClient, podInformer, nodeInformer, terminatedPodThreshold)
+	jobInformer := informerFactory.Batch().V1().Jobs()
+	controller := NewPodGC(kubeClient, podInformer, nodeInformer, jobInformer, terminatedPodThreshold)
 	controller.podListerSynced = alwaysReady
-	return controller, podInformer, nodeInformer
+	return controller, podInformer, nodeInformer, jobInformer
 }
 
 func compareStringSetToList(set sets.String, list []string) bool {
@@ -125,7 +129,7 @@ func TestGCTerminated(t *testing.T) {
 	for i, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*testutil.NewNode("node")}})
-			gcc, podInformer, _ := NewFromClient(client, test.threshold)
+			gcc, podInformer, _, _ := NewFromClient(client, test.threshold)
 			deletedPodNames := make([]string, 0)
 			var lock sync.Mutex
 			gcc.deletePod = func(_, name string) error {
@@ -155,14 +159,41 @@ func TestGCTerminated(t *testing.T) {
 	}
 }
 
-func makePod(name string, nodeName string, phase v1.PodPhase) *v1.Pod {
-	return &v1.Pod{
+func makePod(name, ns string, nodeName string, phase v1.PodPhase, referenceJob *batch.Job) *v1.Pod {
+	res := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
+			Namespace: ns,
 		},
 		Spec:   v1.PodSpec{NodeName: nodeName},
 		Status: v1.PodStatus{Phase: phase},
 	}
+
+	if referenceJob != nil {
+		res.OwnerReferences = append(res.OwnerReferences, *metav1.NewControllerRef(referenceJob, concernedKind))
+	}
+
+	return res
+}
+
+
+func makeJob(name, ns string, finished bool) *batch.Job {
+	res := &batch.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+			UID:       uuid.NewUUID(),
+		},
+		Status: batch.JobStatus{
+			Conditions: []batch.JobCondition{},
+		},
+	}
+
+	if finished {
+		res.Status.Conditions = append(res.Status.Conditions, batch.JobCondition{Type: batch.JobComplete, Status: v1.ConditionTrue})
+	}
+
+	return res
 }
 
 func waitForAdded(q workqueue.DelayingInterface, depth int) error {
@@ -176,8 +207,14 @@ func waitForAdded(q workqueue.DelayingInterface, depth int) error {
 }
 
 func TestGCOrphaned(t *testing.T) {
+	var testNS = "test"
+
+	finishedJob := makeJob("finishedJob", testNS, true)
+	runningJob := makeJob("runningJob", testNS, false)
+
 	testCases := []struct {
 		name                 string
+		namespace            string
 		initialClientNodes   []*v1.Node
 		initialInformerNodes []*v1.Node
 		delay                time.Duration
@@ -186,6 +223,7 @@ func TestGCOrphaned(t *testing.T) {
 		addedInformerNodes   []*v1.Node
 		deletedInformerNodes []*v1.Node
 		pods                 []*v1.Pod
+		jobs                 []*batch.Job
 		itemsInQueue         int
 		deletedPodNames      sets.String
 	}{
@@ -197,9 +235,9 @@ func TestGCOrphaned(t *testing.T) {
 			},
 			delay: 2 * quarantineTime,
 			pods: []*v1.Pod{
-				makePod("a", "existing1", v1.PodRunning),
-				makePod("b", "existing2", v1.PodFailed),
-				makePod("c", "existing2", v1.PodSucceeded),
+				makePod("a", "", "existing1", v1.PodRunning, nil),
+				makePod("b", "", "existing2", v1.PodFailed, nil),
+				makePod("c", "", "existing2", v1.PodSucceeded, nil),
 			},
 			itemsInQueue:    0,
 			deletedPodNames: sets.NewString(),
@@ -212,9 +250,9 @@ func TestGCOrphaned(t *testing.T) {
 			},
 			delay: 2 * quarantineTime,
 			pods: []*v1.Pod{
-				makePod("a", "existing1", v1.PodRunning),
-				makePod("b", "existing2", v1.PodFailed),
-				makePod("c", "existing2", v1.PodSucceeded),
+				makePod("a", "","existing1", v1.PodRunning, nil),
+				makePod("b", "","existing2", v1.PodFailed, nil),
+				makePod("c", "","existing2", v1.PodSucceeded, nil),
 			},
 			itemsInQueue:    2,
 			deletedPodNames: sets.NewString(),
@@ -223,8 +261,8 @@ func TestGCOrphaned(t *testing.T) {
 			name:  "no nodes",
 			delay: 2 * quarantineTime,
 			pods: []*v1.Pod{
-				makePod("a", "deleted", v1.PodFailed),
-				makePod("b", "deleted", v1.PodSucceeded),
+				makePod("a", "", "deleted", v1.PodFailed, nil),
+				makePod("b", "", "deleted", v1.PodSucceeded, nil),
 			},
 			itemsInQueue:    1,
 			deletedPodNames: sets.NewString("a", "b"),
@@ -233,7 +271,7 @@ func TestGCOrphaned(t *testing.T) {
 			name:  "quarantine not finished",
 			delay: quarantineTime / 2,
 			pods: []*v1.Pod{
-				makePod("a", "deleted", v1.PodFailed),
+				makePod("a", "", "deleted", v1.PodFailed, nil),
 			},
 			itemsInQueue:    0,
 			deletedPodNames: sets.NewString(),
@@ -243,7 +281,7 @@ func TestGCOrphaned(t *testing.T) {
 			initialInformerNodes: []*v1.Node{testutil.NewNode("existing")},
 			delay:                2 * quarantineTime,
 			pods: []*v1.Pod{
-				makePod("a", "deleted", v1.PodRunning),
+				makePod("a", "", "deleted", v1.PodRunning, nil),
 			},
 			itemsInQueue:    1,
 			deletedPodNames: sets.NewString("a"),
@@ -253,20 +291,43 @@ func TestGCOrphaned(t *testing.T) {
 			initialInformerNodes: []*v1.Node{testutil.NewNode("existing")},
 			delay:                2 * quarantineTime,
 			pods: []*v1.Pod{
-				makePod("a", "deleted", v1.PodFailed),
-				makePod("b", "existing", v1.PodFailed),
-				makePod("c", "deleted", v1.PodSucceeded),
-				makePod("d", "deleted", v1.PodRunning),
+				makePod("a", "", "deleted", v1.PodFailed, nil),
+				makePod("b", "", "existing", v1.PodFailed, nil),
+				makePod("c", "", "deleted", v1.PodSucceeded, nil),
+				makePod("d", "", "deleted", v1.PodRunning, nil),
 			},
 			itemsInQueue:    1,
 			deletedPodNames: sets.NewString("a", "c", "d"),
+		},
+		{
+			name:                 "delete pod with special jod phase",
+			initialInformerNodes: []*v1.Node{testutil.NewNode("existing")},
+			delay:                2 * quarantineTime,
+			pods: []*v1.Pod{
+				// Under finished job, should be able to gc.
+				makePod("a", testNS, "deleted", v1.PodSucceeded, finishedJob),
+				// Not of job pod, should be able to gc.
+				makePod("b", testNS, "deleted", v1.PodSucceeded, nil),
+				// Under running job, but pod not terminated, should be able to gc.
+				makePod("c", testNS, "deleted", v1.PodRunning, runningJob),
+				// Under running job, not to gc.
+				makePod("d", testNS, "deleted", v1.PodFailed, runningJob),
+				// Under running job, not to gc.
+				makePod("e", testNS, "deleted", v1.PodSucceeded, runningJob),
+			},
+			jobs: []*batch.Job{
+				finishedJob,
+				runningJob,
+			},
+			itemsInQueue:    1,
+			deletedPodNames: sets.NewString("a", "b", "c"),
 		},
 		{
 			name:             "node added to client after quarantine",
 			delay:            2 * quarantineTime,
 			addedClientNodes: []*v1.Node{testutil.NewNode("node")},
 			pods: []*v1.Pod{
-				makePod("a", "node", v1.PodRunning),
+				makePod("a", "", "node", v1.PodRunning, nil),
 			},
 			itemsInQueue:    1,
 			deletedPodNames: sets.NewString(),
@@ -276,7 +337,7 @@ func TestGCOrphaned(t *testing.T) {
 			delay:              2 * quarantineTime,
 			addedInformerNodes: []*v1.Node{testutil.NewNode("node")},
 			pods: []*v1.Pod{
-				makePod("a", "node", v1.PodFailed),
+				makePod("a", "", "node", v1.PodFailed, nil),
 			},
 			itemsInQueue:    1,
 			deletedPodNames: sets.NewString(),
@@ -289,7 +350,7 @@ func TestGCOrphaned(t *testing.T) {
 			delay:              2 * quarantineTime,
 			deletedClientNodes: []*v1.Node{testutil.NewNode("node")},
 			pods: []*v1.Pod{
-				makePod("a", "node", v1.PodFailed),
+				makePod("a", "", "node", v1.PodFailed, nil),
 			},
 			itemsInQueue:    1,
 			deletedPodNames: sets.NewString("a"),
@@ -300,7 +361,7 @@ func TestGCOrphaned(t *testing.T) {
 			delay:                2 * quarantineTime,
 			deletedInformerNodes: []*v1.Node{testutil.NewNode("node")},
 			pods: []*v1.Pod{
-				makePod("a", "node", v1.PodSucceeded),
+				makePod("a", "", "node", v1.PodSucceeded, nil),
 			},
 			itemsInQueue:    0,
 			deletedPodNames: sets.NewString(),
@@ -314,12 +375,15 @@ func TestGCOrphaned(t *testing.T) {
 				nodeList.Items = append(nodeList.Items, *node)
 			}
 			client := fake.NewSimpleClientset(nodeList)
-			gcc, podInformer, nodeInformer := NewFromClient(client, -1)
+			gcc, podInformer, nodeInformer, jobInformer := NewFromClient(client, -1)
 			for _, node := range test.initialInformerNodes {
 				nodeInformer.Informer().GetStore().Add(node)
 			}
 			for _, pod := range test.pods {
 				podInformer.Informer().GetStore().Add(pod)
+			}
+			for _, job := range test.jobs{
+				jobInformer.Informer().GetStore().Add(job)
 			}
 			// Overwrite queue
 			fakeClock := clock.NewFakeClock(time.Now())
@@ -413,7 +477,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 	for i, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset()
-			gcc, podInformer, _ := NewFromClient(client, -1)
+			gcc, podInformer, _, _ := NewFromClient(client, -1)
 			deletedPodNames := make([]string, 0)
 			var lock sync.Mutex
 			gcc.deletePod = func(_, name string) error {
