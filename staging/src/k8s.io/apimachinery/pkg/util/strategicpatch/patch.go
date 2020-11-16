@@ -32,7 +32,8 @@ import (
 // certain fields with metadata that indicates whether the elements of JSON
 // lists should be merged or replaced.
 //
-// For more information, see the PATCH section of docs/devel/api-conventions.md.
+// For more information, see the PATCH section of
+// https://github.com/kubernetes/community/blob/01036e0d3f4230b2ba8affbb151ddd58d4706aa3/contributors/devel/sig-architecture/api-conventions.md#patch-operations
 //
 // Some of the content of this package was borrowed with minor adaptations from
 // evanphx/json-patch and openshift/origin.

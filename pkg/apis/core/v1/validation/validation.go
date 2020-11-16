@@ -107,7 +107,8 @@ func ValidateNonnegativeQuantity(value resource.Quantity, fldPath *field.Path) f
 }
 
 // Validate compute resource typename.
-// Refer to docs/design/resources.md for more details.
+// Refer to https://github.com/kubernetes/community/blob/01036e0d3f4230b2ba8affbb151ddd58d4706aa3/contributors/design-proposals/scheduling/resources.md
+// for more details.
 func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(value) {

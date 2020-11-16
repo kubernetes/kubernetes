@@ -4921,7 +4921,8 @@ func validateConfigMapNodeConfigSource(source *core.ConfigMapNodeConfigSource, f
 }
 
 // Validate compute resource typename.
-// Refer to docs/design/resources.md for more details.
+// Refer to https://github.com/kubernetes/community/blob/01036e0d3f4230b2ba8affbb151ddd58d4706aa3/contributors/design-proposals/scheduling/resources.md
+// for more details.
 func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(value) {
@@ -4941,7 +4942,8 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 }
 
 // Validate container resource name
-// Refer to docs/design/resources.md for more details.
+// Refer to https://github.com/kubernetes/community/blob/01036e0d3f4230b2ba8affbb151ddd58d4706aa3/contributors/design-proposals/scheduling/resources.md
+// for more details.
 func validateContainerResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
 
@@ -4958,7 +4960,8 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 }
 
 // Validate resource names that can go in a resource quota
-// Refer to docs/design/resources.md for more details.
+// Refer to https://github.com/kubernetes/community/blob/01036e0d3f4230b2ba8affbb151ddd58d4706aa3/contributors/design-proposals/scheduling/resources.md
+// for more details.
 func ValidateResourceQuotaResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
 
@@ -5004,7 +5007,8 @@ func validateLimitRangeResourceName(limitType core.LimitType, value string, fldP
 func ValidateLimitRange(limitRange *core.LimitRange) field.ErrorList {
 	allErrs := ValidateObjectMeta(&limitRange.ObjectMeta, true, ValidateLimitRangeName, field.NewPath("metadata"))
 
-	// ensure resource names are properly qualified per docs/design/resources.md
+	// ensure resource names are properly qualified per
+	// https://github.com/kubernetes/community/blob/01036e0d3f4230b2ba8affbb151ddd58d4706aa3/contributors/design-proposals/scheduling/resources.md
 	limitTypeSet := map[core.LimitType]bool{}
 	fldPath := field.NewPath("spec", "limits")
 	for i := range limitRange.Spec.Limits {
