@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
@@ -1372,6 +1372,79 @@ func Test_updateNodeStatusUpdateNeededError(t *testing.T) {
 	if err == nil {
 		t.Fatalf("updateNodeStatusUpdateNeeded should return error, but got nothing")
 	}
+}
+
+// Mark a volume as attached to a node.
+// Verify GetAttachState returns AttachedState
+// Verify GetAttachedVolumes return this volume
+func Test_MarkVolumeAsAttached(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	asw := NewActualStateOfWorld(volumePluginMgr)
+	volumeName := v1.UniqueVolumeName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+
+	nodeName := types.NodeName("node-name")
+	devicePath := "fake/device/path"
+
+	plugin, err := volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	if err != nil || plugin == nil {
+		t.Fatalf("Failed to get volume plugin from spec %v, %v", volumeSpec, err)
+	}
+
+	// Act
+	err = asw.MarkVolumeAsAttached(volumeName, volumeSpec, nodeName, devicePath)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	volumeNodeComboState := asw.GetAttachState(volumeName, nodeName)
+	if volumeNodeComboState != AttachStateAttached {
+		t.Fatalf("asw says the volume: %q is not attached (%v) to node:%q, it should.",
+			volumeName, AttachStateAttached, nodeName)
+	}
+	attachedVolumes := asw.GetAttachedVolumes()
+	if len(attachedVolumes) != 1 {
+		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
+	}
+	verifyAttachedVolume(t, attachedVolumes, volumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+}
+
+// Mark a volume as attachment as uncertain.
+// Verify GetAttachState returns UncertainState
+// Verify GetAttachedVolumes return this volume
+func Test_MarkVolumeAsUncertain(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	asw := NewActualStateOfWorld(volumePluginMgr)
+	volumeName := v1.UniqueVolumeName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+	nodeName := types.NodeName("node-name")
+
+	plugin, err := volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	if err != nil || plugin == nil {
+		t.Fatalf("Failed to get volume plugin from spec %v, %v", volumeSpec, err)
+	}
+
+	// Act
+	err = asw.MarkVolumeAsUncertain(volumeName, volumeSpec, nodeName)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("MarkVolumeAsUncertain failed. Expected: <no error> Actual: <%v>", err)
+	}
+	volumeNodeComboState := asw.GetAttachState(volumeName, nodeName)
+	if volumeNodeComboState != AttachStateUncertain {
+		t.Fatalf("asw says the volume: %q is attached (%v) to node:%q, it should not.",
+			volumeName, volumeNodeComboState, nodeName)
+	}
+	attachedVolumes := asw.GetAttachedVolumes()
+	if len(attachedVolumes) != 1 {
+		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
+	}
+	verifyAttachedVolume(t, attachedVolumes, volumeName, string(volumeName), nodeName, "", true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 }
 
 func verifyAttachedVolume(
