@@ -801,11 +801,20 @@ func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (in
 	return 0, nil
 }
 
-// CleanupAndExit remove iptables rules and exit if success return nil
+// CleanupAndExit remove iptables rules and ipset/ipvs rules in ipvs proxy mode
+// and exit if success return nil
 func (s *ProxyServer) CleanupAndExit() error {
-	encounteredError := userspace.CleanupLeftovers(s.IptInterface)
-	encounteredError = iptables.CleanupLeftovers(s.IptInterface) || encounteredError
-	encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, s.IptInterface, s.IpsetInterface, s.CleanupIPVS) || encounteredError
+	// cleanup IPv6 and IPv4 iptables rules
+	ipts := []utiliptables.Interface{
+		utiliptables.New(s.execer, utiliptables.ProtocolIPv4),
+		utiliptables.New(s.execer, utiliptables.ProtocolIPv6),
+	}
+	var encounteredError bool
+	for _, ipt := range ipts {
+		encounteredError = userspace.CleanupLeftovers(ipt) || encounteredError
+		encounteredError = iptables.CleanupLeftovers(ipt) || encounteredError
+		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, ipt, s.IpsetInterface, s.CleanupIPVS) || encounteredError
+	}
 	if encounteredError {
 		return errors.New("encountered an error while tearing down rules")
 	}
