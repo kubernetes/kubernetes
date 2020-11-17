@@ -123,19 +123,13 @@ github.com/PuerkitoBio/urlesc
 ## explicit
 github.com/armon/circbuf
 # github.com/armon/circbuf => github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
-<<<<<<< HEAD
 # github.com/armon/go-metrics => github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da
 # github.com/armon/go-radix => github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310
-=======
 # github.com/armon/consul-api => github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6
 # github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 => github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 ## explicit
 github.com/armon/go-socks5
-<<<<<<< HEAD
->>>>>>> run ./hack/update-vendor.sh after build/tools.go patch to suppport vendoring test-only submodule dependency
-=======
 # github.com/armon/go-socks5 => github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
->>>>>>> run hack/update-vendor.sh after rebase
 # github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a => github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
 github.com/asaskevich/govalidator
 # github.com/asaskevich/govalidator => github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
