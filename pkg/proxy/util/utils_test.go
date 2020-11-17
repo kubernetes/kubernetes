@@ -567,7 +567,7 @@ func TestShuffleStrings(t *testing.T) {
 	}
 }
 
-func TestMapIPsToIPFamily(t *testing.T) {
+func TestMapIPsByIPFamily(t *testing.T) {
 	testCases := []struct {
 		desc            string
 		ipString        []string
@@ -657,8 +657,7 @@ func TestMapIPsToIPFamily(t *testing.T) {
 				otherIPFamily = v1.IPv4Protocol
 			}
 
-			isCIDR := false
-			ipMap := MapIPsToIPFamily(testcase.ipString, isCIDR)
+			ipMap := MapIPsByIPFamily(testcase.ipString)
 
 			if !reflect.DeepEqual(testcase.expectCorrect, ipMap[ipFamily]) {
 				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, ipMap[ipFamily])

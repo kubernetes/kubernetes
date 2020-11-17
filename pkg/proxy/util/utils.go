@@ -255,23 +255,50 @@ func LogAndEmitIncorrectIPVersionEvent(recorder record.EventRecorder, fieldName,
 	}
 }
 
-// MapIPsToIPFamily maps a slice of IPs to their respective IP families (v4 or v6)
-func MapIPsToIPFamily(ipStrings []string, isCIDR bool) map[v1.IPFamily][]string {
+// MapIPsByIPFamily maps a slice of IPs to their respective IP families (v4 or v6)
+func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
 	ipFamilyMap := map[v1.IPFamily][]string{}
 	for _, ip := range ipStrings {
-		ipFamily := getIPFamilyFromIP(ip, isCIDR)
-		ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
+		// Handle only the valid IPs
+		if net.ParseIP(ip) != nil {
+			ipFamily := getIPFamilyFromIP(ip)
+			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
+		}
 	}
 	return ipFamilyMap
 }
 
-func getIPFamilyFromIP(ip string, isCIDR bool) v1.IPFamily {
-	conditionFunc := utilnet.IsIPv6String
-	if isCIDR {
-		conditionFunc = utilnet.IsIPv6CIDRString
+// MapCIDRsByIPFamily maps a slice of IPs to their respective IP families (v4 or v6)
+func MapCIDRsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
+	ipFamilyMap := map[v1.IPFamily][]string{}
+	for _, cidr := range ipStrings {
+		// Handle only the valid CIDRs
+		if _, _, err := net.ParseCIDR(cidr); err == nil {
+			ipFamily := getIPFamilyFromCIDR(cidr)
+			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
+		}
+	}
+	return ipFamilyMap
+}
+
+func getIPFamilyFromIP(ip string) v1.IPFamily {
+	if utilnet.IsIPv6String(ip) {
+		return v1.IPv6Protocol
+	}
+	return v1.IPv4Protocol
+}
+
+// OtherIPFamily returns the other ip family
+func OtherIPFamily(ipFamily v1.IPFamily) v1.IPFamily {
+	if ipFamily == v1.IPv6Protocol {
+		return v1.IPv4Protocol
 	}
 
-	if conditionFunc(ip) {
+	return v1.IPv6Protocol
+}
+
+func getIPFamilyFromCIDR(ip string) v1.IPFamily {
+	if utilnet.IsIPv6CIDRString(ip) {
 		return v1.IPv6Protocol
 	}
 	return v1.IPv4Protocol

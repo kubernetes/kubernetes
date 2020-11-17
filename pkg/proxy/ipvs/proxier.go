@@ -450,15 +450,13 @@ func NewProxier(ipt utiliptables.Interface,
 
 	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
 
-	isCIDR := true
-	ipFamilyIPMap := utilproxy.MapIPsToIPFamily(nodePortAddresses, isCIDR)
-	nodePortAddresses = ipFamilyIPMap[ipFamily]
-	for ipFam, ips := range ipFamilyIPMap {
-		// Log the IPs not matching the ipFamily
-		if ipFam != ipFamily && len(ips) > 0 {
-			klog.Warningf("IP Family: %s, NodePortAddresses of wrong family; %s", ipFamily, strings.Join(ips, ","))
-		}
+	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
+	nodePortAddresses = ipFamilyMap[ipFamily]
+	// Log the IPs not matching the ipFamily
+	if ips, ok := ipFamilyMap[utilproxy.OtherIPFamily(ipFamily)]; ok && len(ips) > 0 {
+		klog.Warningf("IP Family: %s, NodePortAddresses of wrong family; %s", ipFamily, strings.Join(ips, ","))
 	}
+
 	proxier := &Proxier{
 		ipFamily:              ipFamily,
 		portsMap:              make(map[utilproxy.LocalPort]utilproxy.Closeable),
@@ -536,15 +534,14 @@ func NewDualStackProxier(
 
 	safeIpset := newSafeIpset(ipset)
 
-	isCIDR := true
-	ipFamilyIPMap := utilproxy.MapIPsToIPFamily(nodePortAddresses, isCIDR)
+	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
 
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(ipt[0], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[0], hostname, nodeIP[0],
-		recorder, healthzServer, scheduler, ipFamilyIPMap[v1.IPv4Protocol], kernelHandler)
+		recorder, healthzServer, scheduler, ipFamilyMap[v1.IPv4Protocol], kernelHandler)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
@@ -553,7 +550,7 @@ func NewDualStackProxier(
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[1], hostname, nodeIP[1],
-		nil, nil, scheduler, ipFamilyIPMap[v1.IPv6Protocol], kernelHandler)
+		nil, nil, scheduler, ipFamilyMap[v1.IPv6Protocol], kernelHandler)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}

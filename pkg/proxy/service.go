@@ -156,25 +156,19 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	// services, this is actually expected. Hence we downgraded from reporting by events
 	// to just log lines with high verbosity
 
-	isCIDR := false
-	ipFamilyIPMap := utilproxy.MapIPsToIPFamily(service.Spec.ExternalIPs, isCIDR)
-	info.externalIPs = ipFamilyIPMap[sct.ipFamily]
+	ipFamilyMap := utilproxy.MapIPsByIPFamily(service.Spec.ExternalIPs)
+	info.externalIPs = ipFamilyMap[sct.ipFamily]
 
-	for ipFam, ips := range ipFamilyIPMap {
-		// Log the IPs not matching the ipFamily
-		if ipFam != sct.ipFamily && len(ips) > 0 {
-			klog.V(4).Infof("service change tracker(%v) ignored the following external IPs(%s) for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(ips, ","), service.Namespace, service.Name)
-		}
+	// Log the IPs not matching the ipFamily
+	if ips, ok := ipFamilyMap[utilproxy.OtherIPFamily(sct.ipFamily)]; ok && len(ips) > 0 {
+		klog.V(4).Infof("service change tracker(%v) ignored the following external IPs(%s) for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(ips, ","), service.Namespace, service.Name)
 	}
 
-	isCIDR = true
-	ipFamilyCIDRMap := utilproxy.MapIPsToIPFamily(loadBalancerSourceRanges, isCIDR)
-	info.loadBalancerSourceRanges = ipFamilyCIDRMap[sct.ipFamily]
-	for ipFam, cidrs := range ipFamilyCIDRMap {
-		// Log the CIDRs not matching the ipFamily
-		if ipFam != sct.ipFamily && len(cidrs) > 0 {
-			klog.V(4).Infof("service change tracker(%v) ignored the following load balancer source ranges(%s) for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(cidrs, ","), service.Namespace, service.Name)
-		}
+	ipFamilyMap = utilproxy.MapCIDRsByIPFamily(loadBalancerSourceRanges)
+	info.loadBalancerSourceRanges = ipFamilyMap[sct.ipFamily]
+	// Log the CIDRs not matching the ipFamily
+	if cidrs, ok := ipFamilyMap[utilproxy.OtherIPFamily(sct.ipFamily)]; ok && len(cidrs) > 0 {
+		klog.V(4).Infof("service change tracker(%v) ignored the following load balancer source ranges(%s) for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(cidrs, ","), service.Namespace, service.Name)
 	}
 
 	// Obtain Load Balancer Ingress IPs
@@ -184,17 +178,14 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	}
 
 	if len(ips) > 0 {
-		isCIDR = false
-		ipFamilyIPMap = utilproxy.MapIPsToIPFamily(ips, isCIDR)
+		ipFamilyMap = utilproxy.MapIPsByIPFamily(ips)
 
-		for ipFam, ipList := range ipFamilyIPMap {
-			if ipFam != sct.ipFamily && len(ipList) > 0 {
-				klog.V(4).Infof("service change tracker(%v) ignored the following load balancer(%s) ingress ips for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(ipList, ","), service.Namespace, service.Name)
+		if ipList, ok := ipFamilyMap[utilproxy.OtherIPFamily(sct.ipFamily)]; ok && len(ipList) > 0 {
+			klog.V(4).Infof("service change tracker(%v) ignored the following load balancer(%s) ingress ips for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(ipList, ","), service.Namespace, service.Name)
 
-			}
 		}
 		// Create the LoadBalancerStatus with the filtered IPs
-		for _, ip := range ipFamilyIPMap[sct.ipFamily] {
+		for _, ip := range ipFamilyMap[sct.ipFamily] {
 			info.loadBalancerStatus.Ingress = append(info.loadBalancerStatus.Ingress, v1.LoadBalancerIngress{IP: ip})
 		}
 	}

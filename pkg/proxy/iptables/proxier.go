@@ -294,14 +294,11 @@ func NewProxier(ipt utiliptables.Interface,
 		ipFamily = v1.IPv6Protocol
 	}
 
-	isCIDR := true
-	ipFamilyIPMap := utilproxy.MapIPsToIPFamily(nodePortAddresses, isCIDR)
-	nodePortAddresses = ipFamilyIPMap[ipFamily]
-	for ipFam, ips := range ipFamilyIPMap {
-		// Log the IPs not matching the ipFamily
-		if ipFam != ipFamily && len(ips) > 0 {
-			klog.Warningf("IP Family: %s, NodePortAddresses of wrong family; %s", ipFamily, strings.Join(ips, ","))
-		}
+	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
+	nodePortAddresses = ipFamilyMap[ipFamily]
+	// Log the IPs not matching the ipFamily
+	if ips, ok := ipFamilyMap[utilproxy.OtherIPFamily(ipFamily)]; ok && len(ips) > 0 {
+		klog.Warningf("IP Family: %s, NodePortAddresses of wrong family; %s", ipFamily, strings.Join(ips, ","))
 	}
 
 	proxier := &Proxier{
@@ -371,18 +368,17 @@ func NewDualStackProxier(
 	nodePortAddresses []string,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
-	isCIDR := true
-	ipFamilyIPMap := utilproxy.MapIPsToIPFamily(nodePortAddresses, isCIDR)
+	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
 	ipv4Proxier, err := NewProxier(ipt[0], sysctl,
 		exec, syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[0], hostname,
-		nodeIP[0], recorder, healthzServer, ipFamilyIPMap[v1.IPv4Protocol])
+		nodeIP[0], recorder, healthzServer, ipFamilyMap[v1.IPv4Protocol])
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
 	ipv6Proxier, err := NewProxier(ipt[1], sysctl,
 		exec, syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[1], hostname,
-		nodeIP[1], recorder, healthzServer, ipFamilyIPMap[v1.IPv6Protocol])
+		nodeIP[1], recorder, healthzServer, ipFamilyMap[v1.IPv6Protocol])
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
