@@ -553,6 +553,7 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
 	}
 	garbageCollector, err := garbagecollector.NewGarbageCollector(
+		gcClientset,
 		metadataClient,
 		ctx.RESTMapper,
 		ignoredResources,

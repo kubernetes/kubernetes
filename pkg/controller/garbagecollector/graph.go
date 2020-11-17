@@ -61,6 +61,25 @@ type node struct {
 	owners []metav1.OwnerReference
 }
 
+// clone() must only be called from the single-threaded GraphBuilder.processGraphChanges()
+func (n *node) clone() *node {
+	c := &node{
+		identity:           n.identity,
+		dependents:         make(map[*node]struct{}, len(n.dependents)),
+		deletingDependents: n.deletingDependents,
+		beingDeleted:       n.beingDeleted,
+		virtual:            n.virtual,
+		owners:             make([]metav1.OwnerReference, 0, len(n.owners)),
+	}
+	for dep := range n.dependents {
+		c.dependents[dep] = struct{}{}
+	}
+	for _, owner := range n.owners {
+		c.owners = append(c.owners, owner)
+	}
+	return c
+}
+
 // An object is on a one way trip to its final deletion if it starts being
 // deleted, so we only provide a function to set beingDeleted to true.
 func (n *node) markBeingDeleted() {
@@ -146,6 +165,23 @@ func (n *node) blockingDependents() []*node {
 		}
 	}
 	return ret
+}
+
+// ownerReferenceCoordinates returns an owner reference containing only the coordinate fields
+// from the input reference (uid, name, kind, apiVersion)
+func ownerReferenceCoordinates(ref metav1.OwnerReference) metav1.OwnerReference {
+	return metav1.OwnerReference{
+		UID:        ref.UID,
+		Name:       ref.Name,
+		Kind:       ref.Kind,
+		APIVersion: ref.APIVersion,
+	}
+}
+
+// ownerReferenceMatchesCoordinates returns true if all of the coordinate fields match
+// between the two references (uid, name, kind, apiVersion)
+func ownerReferenceMatchesCoordinates(a, b metav1.OwnerReference) bool {
+	return a.UID == b.UID && a.Name == b.Name && a.Kind == b.Kind && a.APIVersion == b.APIVersion
 }
 
 // String renders node as a string using fmt. Acquires a read lock to ensure the
