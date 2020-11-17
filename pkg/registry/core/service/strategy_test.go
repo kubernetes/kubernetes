@@ -34,6 +34,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func newStrategy(cidr string, hasSecondary bool) (testStrategy Strategy, testStatusStrategy Strategy) {
@@ -935,6 +936,15 @@ func TestDropTypeDependentFields(t *testing.T) {
 			}
 		}
 	}
+	setAllocateLoadBalancerNodePortsTrue := func(svc *api.Service) {
+		svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+	}
+	setAllocateLoadBalancerNodePortsFalse := func(svc *api.Service) {
+		svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
+	}
+	clearAllocateLoadBalancerNodePorts := func(svc *api.Service) {
+		svc.Spec.AllocateLoadBalancerNodePorts = nil
+	}
 
 	testCases := []struct {
 		name   string
@@ -1022,6 +1032,46 @@ func TestDropTypeDependentFields(t *testing.T) {
 			svc:    makeValidServiceCustom(setTypeLoadBalancer, setHCNodePort),
 			patch:  patches(setTypeClusterIP, changeHCNodePort),
 			expect: makeValidServiceCustom(setHCNodePort, changeHCNodePort),
+		}, { // allocatedLoadBalancerNodePorts cases
+			name:   "clear allocatedLoadBalancerNodePorts true -> true",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerNodePortsTrue),
+			patch:  setTypeNodePort,
+			expect: makeValidServiceCustom(setTypeNodePort),
+		}, {
+			name:   "clear allocatedLoadBalancerNodePorts false -> false",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerNodePortsFalse),
+			patch:  setTypeNodePort,
+			expect: makeValidServiceCustom(setTypeNodePort),
+		}, {
+			name:   "set allocatedLoadBalancerNodePorts nil -> true",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer),
+			patch:  patches(setTypeNodePort, setAllocateLoadBalancerNodePortsTrue),
+			expect: makeValidServiceCustom(setTypeNodePort, setAllocateLoadBalancerNodePortsTrue),
+		}, {
+			name:   "set allocatedLoadBalancerNodePorts nil -> false",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer),
+			patch:  patches(setTypeNodePort, setAllocateLoadBalancerNodePortsFalse),
+			expect: makeValidServiceCustom(setTypeNodePort, setAllocateLoadBalancerNodePortsFalse),
+		}, {
+			name:   "set allocatedLoadBalancerNodePorts true -> nil",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerNodePortsTrue),
+			patch:  patches(setTypeNodePort, clearAllocateLoadBalancerNodePorts),
+			expect: makeValidServiceCustom(setTypeNodePort),
+		}, {
+			name:   "set allocatedLoadBalancerNodePorts false -> nil",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerNodePortsFalse),
+			patch:  patches(setTypeNodePort, clearAllocateLoadBalancerNodePorts),
+			expect: makeValidServiceCustom(setTypeNodePort),
+		}, {
+			name:   "set allocatedLoadBalancerNodePorts true -> false",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerNodePortsTrue),
+			patch:  patches(setTypeNodePort, setAllocateLoadBalancerNodePortsFalse),
+			expect: makeValidServiceCustom(setTypeNodePort, setAllocateLoadBalancerNodePortsFalse),
+		}, {
+			name:   "set allocatedLoadBalancerNodePorts false -> true",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerNodePortsFalse),
+			patch:  patches(setTypeNodePort, setAllocateLoadBalancerNodePortsTrue),
+			expect: makeValidServiceCustom(setTypeNodePort, setAllocateLoadBalancerNodePortsTrue),
 		}}
 
 	for _, tc := range testCases {
@@ -1052,6 +1102,9 @@ func TestDropTypeDependentFields(t *testing.T) {
 			}
 			if result.Spec.HealthCheckNodePort != tc.expect.Spec.HealthCheckNodePort {
 				t.Errorf("failed %q: expected healthCheckNodePort %d, got %d", tc.name, tc.expect.Spec.HealthCheckNodePort, result.Spec.HealthCheckNodePort)
+			}
+			if !reflect.DeepEqual(result.Spec.AllocateLoadBalancerNodePorts, tc.expect.Spec.AllocateLoadBalancerNodePorts) {
+				t.Errorf("failed %q: expected AllocateLoadBalancerNodePorts %v, got %v", tc.name, tc.expect.Spec.AllocateLoadBalancerNodePorts, result.Spec.AllocateLoadBalancerNodePorts)
 			}
 		})
 	}
