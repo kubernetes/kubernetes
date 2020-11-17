@@ -89,6 +89,8 @@ func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet,
 	}
 	genericStore := &GenericREST{store, primaryIPFamily, secondaryFamily}
 	store.Decorator = genericStore.defaultOnRead
+	store.BeginCreate = genericStore.beginCreate
+	store.BeginUpdate = genericStore.beginUpdate
 
 	return genericStore, &StatusREST{store: &statusStore}, nil
 }
@@ -239,4 +241,38 @@ func (r *GenericREST) defaultOnReadService(service *api.Service) {
 			}
 		}
 	}
+}
+
+func (r *GenericREST) beginCreate(ctx context.Context, obj runtime.Object, options *metav1.CreateOptions) (genericregistry.FinishFunc, error) {
+	svc := obj.(*api.Service)
+
+	// FIXME: remove this when implementing
+	_ = svc
+
+	// Our cleanup callback
+	finish := func(_ context.Context, success bool) {
+		if success {
+		} else {
+		}
+	}
+
+	return finish, nil
+}
+
+func (r *GenericREST) beginUpdate(ctx context.Context, obj, oldObj runtime.Object, options *metav1.UpdateOptions) (genericregistry.FinishFunc, error) {
+	newSvc := obj.(*api.Service)
+	oldSvc := oldObj.(*api.Service)
+
+	// FIXME: remove these when implementing
+	_ = oldSvc
+	_ = newSvc
+
+	// Our cleanup callback
+	finish := func(_ context.Context, success bool) {
+		if success {
+		} else {
+		}
+	}
+
+	return finish, nil
 }
