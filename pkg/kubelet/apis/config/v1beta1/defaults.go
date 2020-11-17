@@ -157,6 +157,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.TopologyManagerPolicy == "" {
 		obj.TopologyManagerPolicy = kubeletconfigv1beta1.NoneTopologyManagerPolicy
 	}
+	if obj.TopologyManagerScope == "" {
+		obj.TopologyManagerScope = kubeletconfigv1beta1.ContainerTopologyManagerScope
+	}
 	if obj.RuntimeRequestTimeout == zeroDuration {
 		obj.RuntimeRequestTimeout = metav1.Duration{Duration: 2 * time.Minute}
 	}

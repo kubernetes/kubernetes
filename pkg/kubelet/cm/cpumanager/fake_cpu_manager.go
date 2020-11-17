@@ -56,12 +56,22 @@ func (m *fakeManager) RemoveContainer(containerID string) error {
 }
 
 func (m *fakeManager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	klog.Infof("[fake cpumanager] Get Topology Hints")
+	klog.Infof("[fake cpumanager] Get Container Topology Hints")
+	return map[string][]topologymanager.TopologyHint{}
+}
+
+func (m *fakeManager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	klog.Infof("[fake cpumanager] Get Pod Topology Hints")
 	return map[string][]topologymanager.TopologyHint{}
 }
 
 func (m *fakeManager) State() state.Reader {
 	return m.state
+}
+
+func (m *fakeManager) GetCPUs(podUID, containerName string) []int64 {
+	klog.Infof("[fake cpumanager] GetCPUs(podUID: %s, containerName: %s)", podUID, containerName)
+	return nil
 }
 
 // NewFakeManager creates empty/fake cpu manager

@@ -18,11 +18,18 @@ package clock
 
 import "time"
 
+// PassiveClock allows for injecting fake or real clocks into code
+// that needs to read the current time but does not support scheduling
+// activity in the future.
+type PassiveClock interface {
+	Now() time.Time
+	Since(time.Time) time.Duration
+}
+
 // Clock allows for injecting fake or real clocks into code that
 // needs to do arbitrary things based on time.
 type Clock interface {
-	Now() time.Time
-	Since(time.Time) time.Duration
+	PassiveClock
 	After(d time.Duration) <-chan time.Time
 	NewTimer(d time.Duration) Timer
 	Sleep(d time.Duration)

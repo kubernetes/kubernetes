@@ -60,7 +60,7 @@ const (
 // - when a service goes from no endpoints to new endpoint
 
 // Ref: https://api.semanticscholar.org/CorpusID:198903401
-// Boye, Magnus. “Netfilter Connection Tracking and NAT Implementation.” (2012).
+// Boye, Magnus. "Netfilter Connection Tracking and NAT Implementation." (2012).
 
 var _ = SIGDescribe("Conntrack", func() {
 
@@ -103,16 +103,25 @@ var _ = SIGDescribe("Conntrack", func() {
 				len(nodes.Items))
 		}
 
-		ips := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
+		var family v1.IPFamily
+		if framework.TestContext.ClusterIsIPv6() {
+			family = v1.IPv6Protocol
+		} else {
+			family = v1.IPv4Protocol
+		}
+
+		ips := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
 
 		clientNodeInfo = nodeInfo{
 			name:   nodes.Items[0].Name,
 			nodeIP: ips[0],
 		}
 
+		ips = e2enode.GetAddressesByTypeAndFamily(&nodes.Items[1], v1.NodeInternalIP, family)
+
 		serverNodeInfo = nodeInfo{
 			name:   nodes.Items[1].Name,
-			nodeIP: ips[1],
+			nodeIP: ips[0],
 		}
 	})
 

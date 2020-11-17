@@ -29,6 +29,10 @@ import (
 	"k8s.io/utils/keymutex"
 )
 
+const (
+	accessDenied string = "access is denied"
+)
+
 // Mounter provides the default implementation of mount.Interface
 // for the windows platform.  This implementation assumes that the
 // kubelet is running in the host's root mount namespace.
@@ -84,9 +88,8 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 		allOptions = append(allOptions, options...)
 		allOptions = append(allOptions, sensitiveOptions...)
 		if len(allOptions) < 2 {
-			klog.Warningf("mount options(%q) command number(%d) less than 2, source:%q, target:%q, skip mounting",
+			return fmt.Errorf("mount options(%q) should have at least 2 options, current number:%d, source:%q, target:%q",
 				sanitizedOptionsForLogging, len(allOptions), source, target)
-			return nil
 		}
 
 		// currently only cifs mount is supported
@@ -98,17 +101,27 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 		getSMBMountMutex.LockKey(source)
 		defer getSMBMountMutex.UnlockKey(source)
 
-		if output, err := newSMBMapping(allOptions[0], allOptions[1], source); err != nil {
+		username := allOptions[0]
+		password := allOptions[1]
+		if output, err := newSMBMapping(username, password, source); err != nil {
+			klog.Warningf("SMB Mapping(%s) returned with error(%v), output(%s)", source, err, string(output))
 			if isSMBMappingExist(source) {
-				klog.V(2).Infof("SMB Mapping(%s) already exists, now begin to remove and remount", source)
-				if output, err := removeSMBMapping(source); err != nil {
-					return fmt.Errorf("Remove-SmbGlobalMapping failed: %v, output: %q", err, output)
-				}
-				if output, err := newSMBMapping(allOptions[0], allOptions[1], source); err != nil {
-					return fmt.Errorf("New-SmbGlobalMapping remount failed: %v, output: %q", err, output)
+				valid, err := isValidPath(source)
+				if !valid {
+					if err == nil || isAccessDeniedError(err) {
+						klog.V(2).Infof("SMB Mapping(%s) already exists while it's not valid, return error: %v, now begin to remove and remount", source, err)
+						if output, err = removeSMBMapping(source); err != nil {
+							return fmt.Errorf("Remove-SmbGlobalMapping failed: %v, output: %q", err, output)
+						}
+						if output, err := newSMBMapping(username, password, source); err != nil {
+							return fmt.Errorf("New-SmbGlobalMapping(%s) failed: %v, output: %q", source, err, output)
+						}
+					}
+				} else {
+					klog.V(2).Infof("SMB Mapping(%s) already exists and is still valid, skip error(%v)", source, err)
 				}
 			} else {
-				return fmt.Errorf("New-SmbGlobalMapping failed: %v, output: %q", err, output)
+				return fmt.Errorf("New-SmbGlobalMapping(%s) failed: %v, output: %q", source, err, output)
 			}
 		}
 	}
@@ -151,6 +164,23 @@ func isSMBMappingExist(remotepath string) bool {
 	cmd.Env = append(os.Environ(), fmt.Sprintf("smbremotepath=%s", remotepath))
 	_, err := cmd.CombinedOutput()
 	return err == nil
+}
+
+// check whether remotepath is valid
+// return (true, nil) if remotepath is valid
+func isValidPath(remotepath string) (bool, error) {
+	cmd := exec.Command("powershell", "/c", `Test-Path $Env:remoteapth`)
+	cmd.Env = append(os.Environ(), fmt.Sprintf("remoteapth=%s", remotepath))
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("returned output: %s, error: %v", string(output), err)
+	}
+
+	return strings.HasPrefix(strings.ToLower(string(output)), "true"), nil
+}
+
+func isAccessDeniedError(err error) bool {
+	return err != nil && strings.Contains(strings.ToLower(err.Error()), accessDenied)
 }
 
 // remove SMB mapping

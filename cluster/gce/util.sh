@@ -1159,6 +1159,7 @@ ENABLE_DNS_HORIZONTAL_AUTOSCALER: $(yaml-quote "${ENABLE_DNS_HORIZONTAL_AUTOSCAL
 KUBE_PROXY_DAEMONSET: $(yaml-quote "${KUBE_PROXY_DAEMONSET:-false}")
 KUBE_PROXY_TOKEN: $(yaml-quote "${KUBE_PROXY_TOKEN:-}")
 KUBE_PROXY_MODE: $(yaml-quote "${KUBE_PROXY_MODE:-iptables}")
+DETECT_LOCAL_MODE: $(yaml-quote "${DETECT_LOCAL_MODE:-}")
 NODE_PROBLEM_DETECTOR_TOKEN: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TOKEN:-}")
 ADMISSION_CONTROL: $(yaml-quote "${ADMISSION_CONTROL:-}")
 ENABLE_POD_SECURITY_POLICY: $(yaml-quote "${ENABLE_POD_SECURITY_POLICY:-}")
@@ -1460,6 +1461,11 @@ EOF
 ETCD_LISTEN_CLIENT_IP: $(yaml-quote "${ETCD_LISTEN_CLIENT_IP}")
 EOF
     fi
+    if [ -n "${ETCD_PROGRESS_NOTIFY_INTERVAL:-}" ]; then
+      cat >>"$file" <<EOF
+ETCD_PROGRESS_NOTIFY_INTERVAL: $(yaml-quote "${ETCD_PROGRESS_NOTIFY_INTERVAL}")
+EOF
+    fi
 
   else
     # Node-only env vars.
@@ -1506,9 +1512,19 @@ EOF
 MAX_PODS_PER_NODE: $(yaml-quote "${MAX_PODS_PER_NODE}")
 EOF
   fi
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
-      cat >>"$file" <<EOF
-ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE: $(yaml-quote "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE}")
+  if [[ "${PREPARE_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+      cat >>$file <<EOF
+PREPARE_KONNECTIVITY_SERVICE: $(yaml-quote "${PREPARE_KONNECTIVITY_SERVICE}")
+EOF
+  fi
+  if [[ "${EGRESS_VIA_KONNECTIVITY:-false}" == "true" ]]; then
+      cat >>$file <<EOF
+EGRESS_VIA_KONNECTIVITY: $(yaml-quote "${EGRESS_VIA_KONNECTIVITY}")
+EOF
+  fi
+  if [[ "${RUN_KONNECTIVITY_PODS:-false}" == "true" ]]; then
+      cat >>$file <<EOF
+RUN_KONNECTIVITY_PODS: $(yaml-quote "${RUN_KONNECTIVITY_PODS}")
 EOF
   fi
   if [[ -n "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-}" ]]; then
@@ -2573,7 +2589,7 @@ function create-master() {
     --allow tcp:443 &
 
   echo "Configuring firewall for apiserver konnectivity server"
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${PREPARE_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     gcloud compute firewall-rules create "${MASTER_NAME}-konnectivity-server" \
       --project "${NETWORK_PROJECT}" \
       --network "${NETWORK}" \

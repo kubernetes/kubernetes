@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -287,8 +287,8 @@ func Test_GetZoneKey(t *testing.T) {
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						v1.LabelZoneFailureDomain: "zone1",
-						v1.LabelZoneRegion:        "region1",
+						v1.LabelFailureDomainBetaZone:   "zone1",
+						v1.LabelFailureDomainBetaRegion: "region1",
 					},
 				},
 			},
@@ -299,8 +299,8 @@ func Test_GetZoneKey(t *testing.T) {
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						v1.LabelZoneFailureDomainStable: "zone1",
-						v1.LabelZoneRegionStable:        "region1",
+						v1.LabelTopologyZone:   "zone1",
+						v1.LabelTopologyRegion: "region1",
 					},
 				},
 			},
@@ -311,10 +311,10 @@ func Test_GetZoneKey(t *testing.T) {
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						v1.LabelZoneFailureDomainStable: "zone1",
-						v1.LabelZoneRegionStable:        "region1",
-						v1.LabelZoneFailureDomain:       "zone1",
-						v1.LabelZoneRegion:              "region1",
+						v1.LabelTopologyZone:            "zone1",
+						v1.LabelTopologyRegion:          "region1",
+						v1.LabelFailureDomainBetaZone:   "zone1",
+						v1.LabelFailureDomainBetaRegion: "region1",
 					},
 				},
 			},
@@ -325,10 +325,10 @@ func Test_GetZoneKey(t *testing.T) {
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						v1.LabelZoneFailureDomainStable: "zone1",
-						v1.LabelZoneRegionStable:        "region1",
-						v1.LabelZoneFailureDomain:       "zone2",
-						v1.LabelZoneRegion:              "region2",
+						v1.LabelTopologyZone:            "zone1",
+						v1.LabelTopologyRegion:          "region1",
+						v1.LabelFailureDomainBetaZone:   "zone2",
+						v1.LabelFailureDomainBetaRegion: "region2",
 					},
 				},
 			},

@@ -19,7 +19,7 @@ package bootstrap
 import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
-	flowcontrol "k8s.io/api/flowcontrol/v1alpha1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -32,8 +32,8 @@ import (
 // because that would require importing k8s.io/kubernetes).
 var (
 	MandatoryPriorityLevelConfigurations = []*flowcontrol.PriorityLevelConfiguration{
-		MandatoryPriorityLevelConfigurationExempt,
 		MandatoryPriorityLevelConfigurationCatchAll,
+		MandatoryPriorityLevelConfigurationExempt,
 	}
 	MandatoryFlowSchemas = []*flowcontrol.FlowSchema{
 		MandatoryFlowSchemaExempt,
@@ -87,7 +87,7 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: 1,
+				AssuredConcurrencyShares: 5,
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeReject,
 				},
@@ -210,7 +210,7 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: 20,
+				AssuredConcurrencyShares: 100,
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -227,7 +227,7 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: 100,
+				AssuredConcurrencyShares: 20,
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{

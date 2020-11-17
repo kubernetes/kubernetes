@@ -1109,15 +1109,16 @@ func TestReadyCondition(t *testing.T) {
 	}
 
 	cases := []struct {
-		desc                     string
-		node                     *v1.Node
-		runtimeErrors            error
-		networkErrors            error
-		storageErrors            error
-		appArmorValidateHostFunc func() error
-		cmStatus                 cm.Status
-		expectConditions         []v1.NodeCondition
-		expectEvents             []testEvent
+		desc                      string
+		node                      *v1.Node
+		runtimeErrors             error
+		networkErrors             error
+		storageErrors             error
+		appArmorValidateHostFunc  func() error
+		cmStatus                  cm.Status
+		nodeShutdownManagerErrors error
+		expectConditions          []v1.NodeCondition
+		expectEvents              []testEvent
 	}{
 		{
 			desc:             "new, ready",
@@ -1153,6 +1154,12 @@ func TestReadyCondition(t *testing.T) {
 			node:             withCapacity.DeepCopy(),
 			storageErrors:    errors.New("some storage error"),
 			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "some storage error", now, now)},
+		},
+		{
+			desc:                      "new, not ready: shutdown active",
+			node:                      withCapacity.DeepCopy(),
+			nodeShutdownManagerErrors: errors.New("node is shutting down"),
+			expectConditions:          []v1.NodeCondition{*makeReadyCondition(false, "node is shutting down", now, now)},
 		},
 		{
 			desc:             "new, not ready: runtime and network errors",
@@ -1234,6 +1241,9 @@ func TestReadyCondition(t *testing.T) {
 			cmStatusFunc := func() cm.Status {
 				return tc.cmStatus
 			}
+			nodeShutdownErrorsFunc := func() error {
+				return tc.nodeShutdownManagerErrors
+			}
 			events := []testEvent{}
 			recordEventFunc := func(eventType, event string) {
 				events = append(events, testEvent{
@@ -1242,7 +1252,7 @@ func TestReadyCondition(t *testing.T) {
 				})
 			}
 			// construct setter
-			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, storageErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, recordEventFunc)
+			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, storageErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, nodeShutdownErrorsFunc, recordEventFunc)
 			// call setter on node
 			if err := setter(tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)

@@ -87,7 +87,7 @@ func (plugin *awsElasticBlockStorePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil)
 }
 
-func (plugin *awsElasticBlockStorePlugin) RequiresRemount() bool {
+func (plugin *awsElasticBlockStorePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -428,7 +428,7 @@ func (b *awsElasticBlockStoreMounter) SetUpAt(dir string, mounterArgs volume.Mou
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
 	}
 
 	klog.V(4).Infof("Successfully mounted %s", dir)

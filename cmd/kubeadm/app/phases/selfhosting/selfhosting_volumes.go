@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
-type tlsKeyPair struct {
+type tlsKeyPairPath struct {
 	name string
 	cert string
 	key  string
@@ -310,8 +310,8 @@ func createOpaqueSecretFromFile(secretName, file string) (*v1.Secret, error) {
 	}, nil
 }
 
-func getTLSKeyPairs() []*tlsKeyPair {
-	return []*tlsKeyPair{
+func getTLSKeyPairs() []*tlsKeyPairPath {
+	return []*tlsKeyPairPath{
 		{
 			name: kubeadmconstants.CACertAndKeyBaseName,
 			cert: kubeadmconstants.CACertName,

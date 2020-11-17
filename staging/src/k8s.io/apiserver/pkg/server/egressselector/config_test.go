@@ -70,6 +70,86 @@ egressSelections:
           caBundle: "/etc/srv/kubernetes/pki/konnectivity-server/ca.crt"
           clientKey: "/etc/srv/kubernetes/pki/konnectivity-server/client.key"
           clientCert: "/etc/srv/kubernetes/pki/konnectivity-server/client.crt"
+- name: "controlplane"
+  connection:
+    proxyProtocol: "HTTPConnect"
+    transport:
+      tcp:
+        url: "https://127.0.0.1:8132"
+        tlsConfig:
+          caBundle: "/etc/srv/kubernetes/pki/konnectivity-server-master/ca.crt"
+          clientKey: "/etc/srv/kubernetes/pki/konnectivity-server-master/client.key"
+          clientCert: "/etc/srv/kubernetes/pki/konnectivity-server-master/client.crt"
+- name: "etcd"
+  connection:
+    proxyProtocol: "Direct"
+`,
+			expectedResult: &apiserver.EgressSelectorConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				EgressSelections: []apiserver.EgressSelection{
+					{
+						Name: "cluster",
+						Connection: apiserver.Connection{
+							ProxyProtocol: "HTTPConnect",
+							Transport: &apiserver.Transport{
+								TCP: &apiserver.TCPTransport{
+									URL: "https://127.0.0.1:8131",
+
+									TLSConfig: &apiserver.TLSConfig{
+										CABundle:   "/etc/srv/kubernetes/pki/konnectivity-server/ca.crt",
+										ClientKey:  "/etc/srv/kubernetes/pki/konnectivity-server/client.key",
+										ClientCert: "/etc/srv/kubernetes/pki/konnectivity-server/client.crt",
+									},
+								},
+							},
+						},
+					},
+					{
+						Name: "controlplane",
+						Connection: apiserver.Connection{
+							ProxyProtocol: "HTTPConnect",
+							Transport: &apiserver.Transport{
+								TCP: &apiserver.TCPTransport{
+									URL: "https://127.0.0.1:8132",
+									TLSConfig: &apiserver.TLSConfig{
+										CABundle:   "/etc/srv/kubernetes/pki/konnectivity-server-master/ca.crt",
+										ClientKey:  "/etc/srv/kubernetes/pki/konnectivity-server-master/client.key",
+										ClientCert: "/etc/srv/kubernetes/pki/konnectivity-server-master/client.crt",
+									},
+								},
+							},
+						},
+					},
+					{
+						Name: "etcd",
+						Connection: apiserver.Connection{
+							ProxyProtocol: "Direct",
+						},
+					},
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:       "v1beta1 using deprecated 'master' type",
+			createFile: true,
+			contents: `
+apiVersion: apiserver.k8s.io/v1beta1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: "cluster"
+  connection:
+    proxyProtocol: "HTTPConnect"
+    transport:
+      tcp:
+        url: "https://127.0.0.1:8131"
+        tlsConfig:
+          caBundle: "/etc/srv/kubernetes/pki/konnectivity-server/ca.crt"
+          clientKey: "/etc/srv/kubernetes/pki/konnectivity-server/client.key"
+          clientCert: "/etc/srv/kubernetes/pki/konnectivity-server/client.crt"
 - name: "master"
   connection:
     proxyProtocol: "HTTPConnect"
@@ -240,7 +320,7 @@ func TestValidateEgressSelectorConfiguration(t *testing.T) {
 				},
 				EgressSelections: []apiserver.EgressSelection{
 					{
-						Name: "master",
+						Name: "controlplane",
 						Connection: apiserver.Connection{
 							ProxyProtocol: apiserver.ProtocolDirect,
 						},
@@ -408,6 +488,48 @@ func TestValidateEgressSelectorConfiguration(t *testing.T) {
 									UDSName: "/etc/srv/kubernetes/konnectivity/konnectivity-server.socket",
 								},
 							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "invalid egress selection name",
+			expectError: true,
+			contents: &apiserver.EgressSelectorConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				EgressSelections: []apiserver.EgressSelection{
+					{
+						Name: "invalid",
+						Connection: apiserver.Connection{
+							ProxyProtocol: apiserver.ProtocolDirect,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:        "both master and controlplane egress selection configured",
+			expectError: true,
+			contents: &apiserver.EgressSelectorConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				EgressSelections: []apiserver.EgressSelection{
+					{
+						Name: "controlplane",
+						Connection: apiserver.Connection{
+							ProxyProtocol: apiserver.ProtocolDirect,
+						},
+					},
+					{
+						Name: "master",
+						Connection: apiserver.Connection{
+							ProxyProtocol: apiserver.ProtocolDirect,
 						},
 					},
 				},

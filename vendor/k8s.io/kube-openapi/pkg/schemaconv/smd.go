@@ -293,8 +293,9 @@ func (c *convert) VisitKind(k *proto.Kind) {
 		member := k.Fields[name]
 		tr := c.makeRef(member, preserveUnknownFields)
 		a.Map.Fields = append(a.Map.Fields, schema.StructField{
-			Name: name,
-			Type: tr,
+			Name:    name,
+			Type:    tr,
+			Default: member.GetDefault(),
 		})
 	}
 

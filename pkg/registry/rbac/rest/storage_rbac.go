@@ -26,6 +26,7 @@ import (
 	rbacapiv1 "k8s.io/api/rbac/v1"
 	rbacapiv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacapiv1beta1 "k8s.io/api/rbac/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,6 +40,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	rbacv1client "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/component-helpers/auth/rbac/reconciliation"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
@@ -47,7 +49,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding"
 	clusterrolebindingpolicybased "k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding/policybased"
 	clusterrolebindingstore "k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding/storage"
-	"k8s.io/kubernetes/pkg/registry/rbac/reconciliation"
 	"k8s.io/kubernetes/pkg/registry/rbac/role"
 	rolepolicybased "k8s.io/kubernetes/pkg/registry/rbac/role/policybased"
 	rolestore "k8s.io/kubernetes/pkg/registry/rbac/role/storage"
@@ -160,11 +161,20 @@ type PolicyData struct {
 	ClusterRoleBindingsToSplit map[string]rbacapiv1.ClusterRoleBinding
 }
 
+func isConflictOrServiceUnavailable(err error) bool {
+	return errors.IsConflict(err) || errors.IsServiceUnavailable(err)
+}
+
+func retryOnConflictOrServiceUnavailable(backoff wait.Backoff, fn func() error) error {
+	return retry.OnError(backoff, isConflictOrServiceUnavailable, fn)
+}
+
 func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 	return func(hookContext genericapiserver.PostStartHookContext) error {
 		// initializing roles is really important.  On some e2e runs, we've seen cases where etcd is down when the server
 		// starts, the roles don't initialize, and nothing works.
 		err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
+			failedReconciliation := false
 
 			coreclientset, err := corev1client.NewForConfig(hookContext.LoopbackClientConfig)
 			if err != nil {
@@ -206,7 +216,8 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 					Client:  reconciliation.ClusterRoleModifier{Client: clientset.ClusterRoles()},
 					Confirm: true,
 				}
-				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				// ServiceUnavailble error is returned when the API server is blocked by storage version updates
+				err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
 					result, err := opts.Run()
 					if err != nil {
 						return err
@@ -224,6 +235,7 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 				if err != nil {
 					// don't fail on failures, try to create as many as you can
 					utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrole.%s/%s: %v", rbac.GroupName, clusterRole.Name, err))
+					failedReconciliation = true
 				}
 			}
 
@@ -234,7 +246,8 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 					Client:      reconciliation.ClusterRoleBindingClientAdapter{Client: clientset.ClusterRoleBindings()},
 					Confirm:     true,
 				}
-				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				// ServiceUnavailble error is returned when the API server is blocked by storage version updates
+				err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
 					result, err := opts.Run()
 					if err != nil {
 						return err
@@ -254,6 +267,7 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 				if err != nil {
 					// don't fail on failures, try to create as many as you can
 					utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrolebinding.%s/%s: %v", rbac.GroupName, clusterRoleBinding.Name, err))
+					failedReconciliation = true
 				}
 			}
 
@@ -265,7 +279,8 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 						Client:  reconciliation.RoleModifier{Client: clientset, NamespaceClient: coreclientset.Namespaces()},
 						Confirm: true,
 					}
-					err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					// ServiceUnavailble error is returned when the API server is blocked by storage version updates
+					err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
 						result, err := opts.Run()
 						if err != nil {
 							return err
@@ -283,6 +298,7 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 					if err != nil {
 						// don't fail on failures, try to create as many as you can
 						utilruntime.HandleError(fmt.Errorf("unable to reconcile role.%s/%s in %v: %v", rbac.GroupName, role.Name, namespace, err))
+						failedReconciliation = true
 					}
 				}
 			}
@@ -295,7 +311,8 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 						Client:      reconciliation.RoleBindingClientAdapter{Client: clientset, NamespaceClient: coreclientset.Namespaces()},
 						Confirm:     true,
 					}
-					err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+					// ServiceUnavailble error is returned when the API server is blocked by storage version updates
+					err := retryOnConflictOrServiceUnavailable(retry.DefaultBackoff, func() error {
 						result, err := opts.Run()
 						if err != nil {
 							return err
@@ -315,8 +332,13 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 					if err != nil {
 						// don't fail on failures, try to create as many as you can
 						utilruntime.HandleError(fmt.Errorf("unable to reconcile rolebinding.%s/%s in %v: %v", rbac.GroupName, roleBinding.Name, namespace, err))
+						failedReconciliation = true
 					}
 				}
+			}
+			// failed to reconcile some objects, retry
+			if failedReconciliation {
+				return false, nil
 			}
 
 			return true, nil

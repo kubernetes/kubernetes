@@ -584,6 +584,17 @@ func GetPodsInNamespace(c clientset.Interface, ns string, ignoreLabels map[strin
 	return filtered, nil
 }
 
+// GetPods return the label matched pods in the given ns
+func GetPods(c clientset.Interface, ns string, matchLabels map[string]string) ([]v1.Pod, error) {
+	label := labels.SelectorFromSet(matchLabels)
+	listOpts := metav1.ListOptions{LabelSelector: label.String()}
+	pods, err := c.CoreV1().Pods(ns).List(context.TODO(), listOpts)
+	if err != nil {
+		return []v1.Pod{}, err
+	}
+	return pods.Items, nil
+}
+
 // GetPodSecretUpdateTimeout returns the timeout duration for updating pod secret.
 func GetPodSecretUpdateTimeout(c clientset.Interface) time.Duration {
 	// With SecretManager(ConfigMapManager), we may have to wait up to full sync period +

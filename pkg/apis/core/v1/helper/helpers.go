@@ -23,7 +23,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -136,12 +135,6 @@ func IsAttachableVolumeResourceName(name v1.ResourceName) bool {
 	return strings.HasPrefix(string(name), v1.ResourceAttachableVolumesPrefix)
 }
 
-// IsScalarResourceName validates the resource for Extended, Hugepages, Native and AttachableVolume resources
-func IsScalarResourceName(name v1.ResourceName) bool {
-	return IsExtendedResourceName(name) || IsHugePageResourceName(name) ||
-		IsPrefixedNativeResource(name) || IsAttachableVolumeResourceName(name)
-}
-
 // IsServiceIPSet aims to check if the service's ClusterIP is set or not
 // the objective is not to perform validation here
 func IsServiceIPSet(service *v1.Service) bool {
@@ -232,72 +225,6 @@ func containsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.Persisten
 	return false
 }
 
-// NodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
-// labels.Selector.
-func NodeSelectorRequirementsAsSelector(nsm []v1.NodeSelectorRequirement) (labels.Selector, error) {
-	if len(nsm) == 0 {
-		return labels.Nothing(), nil
-	}
-	selector := labels.NewSelector()
-	for _, expr := range nsm {
-		var op selection.Operator
-		switch expr.Operator {
-		case v1.NodeSelectorOpIn:
-			op = selection.In
-		case v1.NodeSelectorOpNotIn:
-			op = selection.NotIn
-		case v1.NodeSelectorOpExists:
-			op = selection.Exists
-		case v1.NodeSelectorOpDoesNotExist:
-			op = selection.DoesNotExist
-		case v1.NodeSelectorOpGt:
-			op = selection.GreaterThan
-		case v1.NodeSelectorOpLt:
-			op = selection.LessThan
-		default:
-			return nil, fmt.Errorf("%q is not a valid node selector operator", expr.Operator)
-		}
-		r, err := labels.NewRequirement(expr.Key, op, expr.Values)
-		if err != nil {
-			return nil, err
-		}
-		selector = selector.Add(*r)
-	}
-	return selector, nil
-}
-
-// NodeSelectorRequirementsAsFieldSelector converts the []NodeSelectorRequirement core type into a struct that implements
-// fields.Selector.
-func NodeSelectorRequirementsAsFieldSelector(nsm []v1.NodeSelectorRequirement) (fields.Selector, error) {
-	if len(nsm) == 0 {
-		return fields.Nothing(), nil
-	}
-
-	selectors := []fields.Selector{}
-	for _, expr := range nsm {
-		switch expr.Operator {
-		case v1.NodeSelectorOpIn:
-			if len(expr.Values) != 1 {
-				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
-					len(expr.Values), expr.Operator)
-			}
-			selectors = append(selectors, fields.OneTermEqualSelector(expr.Key, expr.Values[0]))
-
-		case v1.NodeSelectorOpNotIn:
-			if len(expr.Values) != 1 {
-				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
-					len(expr.Values), expr.Operator)
-			}
-			selectors = append(selectors, fields.OneTermNotEqualSelector(expr.Key, expr.Values[0]))
-
-		default:
-			return nil, fmt.Errorf("%q is not a valid node field selector operator", expr.Operator)
-		}
-	}
-
-	return fields.AndSelectors(selectors...), nil
-}
-
 // NodeSelectorRequirementKeysExistInNodeSelectorTerms checks if a NodeSelectorTerm with key is already specified in terms
 func NodeSelectorRequirementKeysExistInNodeSelectorTerms(reqs []v1.NodeSelectorRequirement, terms []v1.NodeSelectorTerm) bool {
 	for _, req := range reqs {
@@ -309,39 +236,6 @@ func NodeSelectorRequirementKeysExistInNodeSelectorTerms(reqs []v1.NodeSelectorR
 			}
 		}
 	}
-	return false
-}
-
-// MatchNodeSelectorTerms checks whether the node labels and fields match node selector terms in ORed;
-// nil or empty term matches no objects.
-func MatchNodeSelectorTerms(
-	nodeSelectorTerms []v1.NodeSelectorTerm,
-	nodeLabels labels.Set,
-	nodeFields fields.Set,
-) bool {
-	for _, req := range nodeSelectorTerms {
-		// nil or empty term selects no objects
-		if len(req.MatchExpressions) == 0 && len(req.MatchFields) == 0 {
-			continue
-		}
-
-		if len(req.MatchExpressions) != 0 {
-			labelSelector, err := NodeSelectorRequirementsAsSelector(req.MatchExpressions)
-			if err != nil || !labelSelector.Matches(nodeLabels) {
-				continue
-			}
-		}
-
-		if len(req.MatchFields) != 0 {
-			fieldSelector, err := NodeSelectorRequirementsAsFieldSelector(req.MatchFields)
-			if err != nil || !fieldSelector.Matches(nodeFields) {
-				continue
-			}
-		}
-
-		return true
-	}
-
 	return false
 }
 

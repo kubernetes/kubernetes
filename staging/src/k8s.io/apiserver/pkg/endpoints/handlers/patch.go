@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -49,7 +50,6 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/utils/trace"
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -84,18 +84,13 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			return
 		}
 
-		// TODO: we either want to remove timeout or document it (if we
-		// document, move timeout out of this function and declare it in
-		// api_installer)
-		timeout := parseTimeout(req.URL.Query().Get("timeout"))
-
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(req.Context(), timeout)
+		ctx, cancel := context.WithTimeout(req.Context(), requestTimeout)
 		defer cancel()
 		ctx = request.WithNamespace(ctx, namespace)
 
@@ -208,7 +203,6 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 
 			codec: codec,
 
-			timeout: timeout,
 			options: options,
 
 			restPatcher: r,
@@ -271,7 +265,6 @@ type patcher struct {
 
 	codec runtime.Codec
 
-	timeout time.Duration
 	options *metav1.PatchOptions
 
 	// Operation information
@@ -586,7 +579,7 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 		wasCreated = created
 		return updateObject, updateErr
 	}
-	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
+	result, err := finishRequest(ctx, func() (runtime.Object, error) {
 		result, err := requestFunc()
 		// If the object wasn't committed to storage because it's serialized size was too large,
 		// it is safe to remove managedFields (which can be large) and try again.

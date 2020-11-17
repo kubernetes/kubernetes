@@ -38,6 +38,10 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) f
 	allErrs = append(allErrs, componentbasevalidation.ValidateLeaderElectionConfiguration(&cc.LeaderElection, field.NewPath("leaderElection"))...)
 
 	profilesPath := field.NewPath("profiles")
+	if cc.Parallelism <= 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("parallelism"), cc.Parallelism, "should be an integer value greater than zero"))
+	}
+
 	if len(cc.Profiles) == 0 {
 		allErrs = append(allErrs, field.Required(profilesPath, ""))
 	} else {
@@ -111,7 +115,7 @@ func ValidatePolicy(policy config.Policy) error {
 	priorities := make(map[string]config.PriorityPolicy, len(policy.Priorities))
 	for _, priority := range policy.Priorities {
 		if priority.Weight <= 0 || priority.Weight >= config.MaxWeight {
-			validationErrors = append(validationErrors, fmt.Errorf("Priority %s should have a positive weight applied to it or it has overflown", priority.Name))
+			validationErrors = append(validationErrors, fmt.Errorf("priority %s should have a positive weight applied to it or it has overflown", priority.Name))
 		}
 		validationErrors = append(validationErrors, validateCustomPriorities(priorities, priority))
 	}
@@ -167,7 +171,7 @@ func validateExtenders(fldPath *field.Path, extenders []config.Extender) field.E
 func validateCustomPriorities(priorities map[string]config.PriorityPolicy, priority config.PriorityPolicy) error {
 	verifyRedeclaration := func(priorityType string) error {
 		if existing, alreadyDeclared := priorities[priorityType]; alreadyDeclared {
-			return fmt.Errorf("Priority %q redeclares custom priority %q, from:%q", priority.Name, priorityType, existing.Name)
+			return fmt.Errorf("priority %q redeclares custom priority %q, from: %q", priority.Name, priorityType, existing.Name)
 		}
 		priorities[priorityType] = priority
 		return nil
@@ -195,7 +199,7 @@ func validateCustomPriorities(priorities map[string]config.PriorityPolicy, prior
 				return err
 			}
 		} else {
-			return fmt.Errorf("No priority arguments set for priority %s", priority.Name)
+			return fmt.Errorf("no priority arguments set for priority %s", priority.Name)
 		}
 	}
 	return nil

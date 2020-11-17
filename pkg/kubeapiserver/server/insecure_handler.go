@@ -26,6 +26,7 @@ import (
 
 // BuildInsecureHandlerChain sets up the server to listen to http. Should be removed.
 func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.Handler {
+	requestInfoResolver := server.NewRequestInfoResolver(c)
 	handler := apiHandler
 	// Temporarily disable APIPriorityAndFairness during development
 	// so that /debug/pprof works even while this feature is totally
@@ -38,12 +39,19 @@ func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.H
 	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
 	handler = genericapifilters.WithAuthentication(handler, server.InsecureSuperuser{}, nil, nil)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
-	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc, c.RequestTimeout)
+
+	// WithTimeoutForNonLongRunningRequests will call the rest of the request handling in a go-routine with the
+	// context with deadline. The go-routine can keep running, while the timeout logic will return a timeout to the client.
+	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc)
+
+	// WithRequestDeadline sets a deadline for the request context appropriately
+	handler = genericapifilters.WithRequestDeadline(handler, c.LongRunningFunc, c.RequestTimeout)
+
 	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)
-	handler = genericapifilters.WithRequestInfo(handler, server.NewRequestInfoResolver(c))
+	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericapifilters.WithWarningRecorder(handler)
 	handler = genericapifilters.WithCacheControl(handler)
-	handler = genericfilters.WithPanicRecovery(handler)
+	handler = genericfilters.WithPanicRecovery(handler, requestInfoResolver)
 
 	return handler
 }

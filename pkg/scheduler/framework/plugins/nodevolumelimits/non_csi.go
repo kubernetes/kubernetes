@@ -255,7 +255,6 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 	}
 
 	if numExistingVolumes+numNewVolumes > maxAttachLimit {
-		// violates MaxEBSVolumeCount or MaxGCEPDVolumeCount
 		return framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded)
 	}
 	if nodeInfo != nil && nodeInfo.TransientInfo != nil && utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) {

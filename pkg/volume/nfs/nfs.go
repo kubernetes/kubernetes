@@ -90,7 +90,7 @@ func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.NFS != nil)
 }
 
-func (plugin *nfsPlugin) RequiresRemount() bool {
+func (plugin *nfsPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

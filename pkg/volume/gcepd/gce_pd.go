@@ -98,7 +98,7 @@ func (plugin *gcePersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil)
 }
 
-func (plugin *gcePersistentDiskPlugin) RequiresRemount() bool {
+func (plugin *gcePersistentDiskPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -429,7 +429,7 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
 	}
 	return nil
 }
@@ -542,7 +542,7 @@ func (c *gcePersistentDiskProvisioner) Provision(selectedNode *v1.Node, allowedT
 		for k, v := range labels {
 			pv.Labels[k] = v
 			var values []string
-			if k == v1.LabelZoneFailureDomain {
+			if k == v1.LabelFailureDomainBetaZone {
 				values, err = volumehelpers.LabelZonesToList(v)
 				if err != nil {
 					return nil, fmt.Errorf("failed to convert label string for Zone: %s to a List: %v", v, err)

@@ -31,6 +31,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -90,8 +91,8 @@ func NewCmdAPIResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 
 	cmd := &cobra.Command{
 		Use:     "api-resources",
-		Short:   "Print the supported API resources on the server",
-		Long:    "Print the supported API resources on the server",
+		Short:   i18n.T("Print the supported API resources on the server"),
+		Long:    i18n.T("Print the supported API resources on the server"),
 		Example: apiresourcesExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(cmd, args))

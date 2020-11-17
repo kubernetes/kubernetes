@@ -70,7 +70,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		QPS:           -1,
 		Host:          testCtx.HTTPServer.URL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-	externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
+	externalInformers := informers.NewSharedInformerFactory(externalClientset, 0)
 
 	admission.SetExternalKubeClientSet(externalClientset)
 	admission.SetExternalKubeInformerFactory(externalInformers)

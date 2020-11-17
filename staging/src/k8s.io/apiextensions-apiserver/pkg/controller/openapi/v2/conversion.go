@@ -81,6 +81,13 @@ func ToStructuralOpenAPIV2(in *structuralschema.Structural) *structuralschema.St
 				changed = true
 			}
 
+			if s.XPreserveUnknownFields && s.Type == "object" {
+				// similar as above, kubectl doesn't properly handle object fields with `x-kubernetes-preserve-unknown-fields: true`
+				s.Type = ""
+
+				changed = true
+			}
+
 			for f, fs := range s.Properties {
 				if fs.Nullable {
 					s.ValueValidation.Required, changed = filterOut(s.ValueValidation.Required, f)

@@ -1225,8 +1225,8 @@ func TestGetVolumeLabels(t *testing.T) {
 
 	assert.Nil(t, err, "Error creating Volume %v", err)
 	assert.Equal(t, map[string]string{
-		v1.LabelZoneFailureDomain: "us-east-1a",
-		v1.LabelZoneRegion:        "us-east-1"}, labels)
+		v1.LabelFailureDomainBetaZone:   "us-east-1a",
+		v1.LabelFailureDomainBetaRegion: "us-east-1"}, labels)
 	awsServices.ec2.(*MockedFakeEC2).AssertExpectations(t)
 }
 
@@ -1299,8 +1299,8 @@ func TestGetLabelsForVolume(t *testing.T) {
 				AvailabilityZone: aws.String("us-east-1a"),
 			}},
 			map[string]string{
-				v1.LabelZoneFailureDomain: "us-east-1a",
-				v1.LabelZoneRegion:        "us-east-1",
+				v1.LabelFailureDomainBetaZone:   "us-east-1a",
+				v1.LabelFailureDomainBetaRegion: "us-east-1",
 			},
 			nil,
 		},
@@ -2961,7 +2961,7 @@ func TestCloud_buildNLBHealthCheckConfiguration(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name: "invalid interval",
+			name: "interval not 10 or 30",
 			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-svc",
@@ -2982,8 +2982,15 @@ func TestCloud_buildNLBHealthCheckConfiguration(t *testing.T) {
 					},
 				},
 			},
-			want:      healthCheckConfig{},
-			wantError: true,
+			want: healthCheckConfig{
+				Port:               "traffic-port",
+				Protocol:           elbv2.ProtocolEnumTcp,
+				Interval:           23,
+				Timeout:            10,
+				HealthyThreshold:   3,
+				UnhealthyThreshold: 3,
+			},
+			wantError: false,
 		},
 		{
 			name: "invalid timeout",
@@ -3033,8 +3040,15 @@ func TestCloud_buildNLBHealthCheckConfiguration(t *testing.T) {
 					},
 				},
 			},
-			want:      healthCheckConfig{},
-			wantError: true,
+			want: healthCheckConfig{
+				Port:               "traffic-port",
+				Protocol:           elbv2.ProtocolEnumTcp,
+				Interval:           30,
+				Timeout:            10,
+				HealthyThreshold:   7,
+				UnhealthyThreshold: 5,
+			},
+			wantError: false,
 		},
 	}
 

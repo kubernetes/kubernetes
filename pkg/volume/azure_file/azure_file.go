@@ -86,7 +86,7 @@ func (plugin *azureFilePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.AzureFile != nil)
 }
 
-func (plugin *azureFilePlugin) RequiresRemount() bool {
+func (plugin *azureFilePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

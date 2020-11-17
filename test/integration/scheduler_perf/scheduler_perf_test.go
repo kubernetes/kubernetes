@@ -173,8 +173,8 @@ func (cno *createNodesOp) isValid(allowParameterization bool) error {
 	if cno.Opcode != createNodesOpcode {
 		return fmt.Errorf("invalid opcode")
 	}
-	ok := (cno.Count > 0 ||
-		(cno.CountParam != "" && allowParameterization && isValidParameterizable(cno.CountParam)))
+	ok := cno.Count > 0 ||
+		(cno.CountParam != "" && allowParameterization && isValidParameterizable(cno.CountParam))
 	if !ok {
 		return fmt.Errorf("invalid Count=%d / CountParam=%q", cno.Count, cno.CountParam)
 	}
@@ -226,8 +226,8 @@ func (cpo *createPodsOp) isValid(allowParameterization bool) error {
 	if cpo.Opcode != createPodsOpcode {
 		return fmt.Errorf("invalid opcode")
 	}
-	ok := (cpo.Count > 0 ||
-		(cpo.CountParam != "" && allowParameterization && isValidParameterizable(cpo.CountParam)))
+	ok := cpo.Count > 0 ||
+		(cpo.CountParam != "" && allowParameterization && isValidParameterizable(cpo.CountParam))
 	if !ok {
 		return fmt.Errorf("invalid Count=%d / CountParam=%q", cpo.Count, cpo.CountParam)
 	}

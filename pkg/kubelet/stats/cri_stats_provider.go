@@ -464,7 +464,7 @@ func (p *criStatsProvider) addPodCPUMemoryStats(
 			ps.CPU = &statsapi.CPUStats{}
 		}
 
-		ps.CPU.Time = cs.StartTime
+		ps.CPU.Time = cs.CPU.Time
 		usageCoreNanoSeconds := getUint64Value(cs.CPU.UsageCoreNanoSeconds) + getUint64Value(ps.CPU.UsageCoreNanoSeconds)
 		usageNanoCores := getUint64Value(cs.CPU.UsageNanoCores) + getUint64Value(ps.CPU.UsageNanoCores)
 		ps.CPU.UsageCoreNanoSeconds = &usageCoreNanoSeconds

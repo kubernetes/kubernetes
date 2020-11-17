@@ -103,7 +103,8 @@ func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	if job.Spec.ManualSelector == nil || *job.Spec.ManualSelector == false {
 		generateSelector(job)
 	}
-	return validation.ValidateJob(job)
+	opts := pod.GetValidationOptionsFromPodTemplate(&job.Spec.Template, nil)
+	return validation.ValidateJob(job, opts)
 }
 
 // generateSelector adds a selector to a job and labels to its template
@@ -173,8 +174,10 @@ func (jobStrategy) AllowCreateOnUpdate() bool {
 func (jobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	job := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
-	validationErrorList := validation.ValidateJob(job)
-	updateErrorList := validation.ValidateJobUpdate(job, oldJob)
+
+	opts := pod.GetValidationOptionsFromPodTemplate(&job.Spec.Template, &oldJob.Spec.Template)
+	validationErrorList := validation.ValidateJob(job, opts)
+	updateErrorList := validation.ValidateJobUpdate(job, oldJob, opts)
 	return append(validationErrorList, updateErrorList...)
 }
 

@@ -64,13 +64,16 @@ func (spg SampleAndWaterMarkPairGenerator) metrics() Registerables {
 // SampleAndWaterMarkObserverGenerator creates TimedObservers that
 // populate histograms of samples and low- and high-water-marks.  The
 // generator has a samplePeriod, and the histograms get an observation
-// every samplePeriod.
+// every samplePeriod.  The sampling windows are quantized based on
+// the monotonic rather than wall-clock times.  The `t0` field is
+// there so to provide a baseline for monotonic clock differences.
 type SampleAndWaterMarkObserverGenerator struct {
 	*sampleAndWaterMarkObserverGenerator
 }
 
 type sampleAndWaterMarkObserverGenerator struct {
 	clock        clock.PassiveClock
+	t0           time.Time
 	samplePeriod time.Duration
 	samples      *compbasemetrics.HistogramVec
 	waterMarks   *compbasemetrics.HistogramVec
@@ -83,6 +86,7 @@ func NewSampleAndWaterMarkHistogramsGenerator(clock clock.PassiveClock, samplePe
 	return SampleAndWaterMarkObserverGenerator{
 		&sampleAndWaterMarkObserverGenerator{
 			clock:        clock,
+			t0:           clock.Now(),
 			samplePeriod: samplePeriod,
 			samples:      compbasemetrics.NewHistogramVec(sampleOpts, labelNames),
 			waterMarks:   compbasemetrics.NewHistogramVec(waterMarkOpts, append([]string{labelNameMark}, labelNames...)),
@@ -90,7 +94,7 @@ func NewSampleAndWaterMarkHistogramsGenerator(clock clock.PassiveClock, samplePe
 }
 
 func (swg *sampleAndWaterMarkObserverGenerator) quantize(when time.Time) int64 {
-	return when.UnixNano() / int64(swg.samplePeriod)
+	return int64(when.Sub(swg.t0) / swg.samplePeriod)
 }
 
 // Generate makes a new TimedObserver
@@ -156,31 +160,46 @@ func (saw *sampleAndWaterMarkHistograms) SetX1(x1 float64) {
 }
 
 func (saw *sampleAndWaterMarkHistograms) innerSet(updateXOrX1 func()) {
-	saw.Lock()
-	when := saw.clock.Now()
-	whenInt := saw.quantize(when)
-	acc := saw.sampleAndWaterMarkAccumulator
-	wellOrdered := !when.Before(acc.lastSet)
-	if wellOrdered {
+	var when time.Time
+	var whenInt int64
+	var acc sampleAndWaterMarkAccumulator
+	var wellOrdered bool
+	func() {
+		saw.Lock()
+		defer saw.Unlock()
+		when = saw.clock.Now()
+		whenInt = saw.quantize(when)
+		acc = saw.sampleAndWaterMarkAccumulator
+		wellOrdered = !when.Before(acc.lastSet)
 		updateXOrX1()
 		saw.relX = saw.x / saw.x1
-		if acc.lastSetInt < whenInt {
-			saw.loRelX, saw.hiRelX = acc.relX, acc.relX
-			saw.lastSetInt = whenInt
+		if wellOrdered {
+			if acc.lastSetInt < whenInt {
+				saw.loRelX, saw.hiRelX = acc.relX, acc.relX
+				saw.lastSetInt = whenInt
+			}
+			saw.lastSet = when
 		}
+		// `wellOrdered` should always be true because we are using
+		// monotonic clock readings and they never go backwards.  Yet
+		// very small backwards steps (under 1 microsecond) have been
+		// observed
+		// (https://github.com/kubernetes/kubernetes/issues/96459).
+		// In the backwards case, treat the current reading as if it
+		// had occurred at time `saw.lastSet` and log an error.  It
+		// would be wrong to update `saw.lastSet` in this case because
+		// that plants a time bomb for future updates to
+		// `saw.lastSetInt`.
 		if saw.relX < saw.loRelX {
 			saw.loRelX = saw.relX
 		} else if saw.relX > saw.hiRelX {
 			saw.hiRelX = saw.relX
 		}
-		saw.lastSet = when
-	}
-	saw.Unlock()
+	}()
 	if !wellOrdered {
-		lastSetS := acc.lastSet.Format(time.RFC3339Nano)
-		whenS := when.Format(time.RFC3339Nano)
-		klog.Fatalf("Time went backwards from %s to %s for labelValues=%#+v", lastSetS, whenS, saw.labelValues)
-		panic(append([]string{lastSetS, whenS}, saw.labelValues...))
+		lastSetS := acc.lastSet.String()
+		whenS := when.String()
+		klog.Errorf("Time went backwards from %s to %s for labelValues=%#+v", lastSetS, whenS, saw.labelValues)
 	}
 	for acc.lastSetInt < whenInt {
 		saw.samples.WithLabelValues(saw.labelValues...).Observe(acc.relX)

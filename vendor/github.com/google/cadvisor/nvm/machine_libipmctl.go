@@ -40,6 +40,7 @@ func init() {
 		// Unfortunately klog does not seem to work here. I believe it's better to
 		// output information using fmt rather then let it disappear silently.
 		fmt.Printf("libipmctl initialization failed with status %d", cErr)
+		return
 	}
 	isNVMLibInitialized = true
 }
@@ -55,6 +56,11 @@ func getAvgPowerBudget() (uint, error) {
 	if err != C.NVM_SUCCESS {
 		klog.Warningf("Unable to get number of NVM devices. Status code: %d", err)
 		return uint(0), fmt.Errorf("Unable to get number of NVM devices. Status code: %d", err)
+	}
+
+	if count == 0 {
+		klog.Warningf("There are no NVM devices!")
+		return uint(0), nil
 	}
 
 	// Load basic device information for all the devices
@@ -97,7 +103,7 @@ func GetInfo() (info.NVMInfo, error) {
 
 	nvmInfo := info.NVMInfo{}
 	if !isNVMLibInitialized {
-		klog.V(1).Info("libimpctl has not been initialized. NVM information will not be available")
+		klog.V(1).Info("libipmctl has not been initialized. NVM information will not be available")
 		return nvmInfo, nil
 	}
 

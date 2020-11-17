@@ -29,7 +29,7 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 
 	ginkgo.Describe("Granular Checks: Pods", func() {
 
-		checkNodeConnectivity := func(config *e2enetwork.NetworkingTestConfig, protocol string, port int) {
+		checkPodToPodConnectivity := func(config *e2enetwork.NetworkingTestConfig, protocol string, port int) {
 			// breadth first poll to quickly estimate failure.
 			failedPodsByHost := map[string][]*v1.Pod{}
 			// First time, we'll quickly try all pods, breadth first.
@@ -79,7 +79,7 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 		*/
 		framework.ConformanceIt("should function for intra-pod communication: http [NodeConformance]", func() {
 			config := e2enetwork.NewCoreNetworkingTestConfig(f, false)
-			checkNodeConnectivity(config, "http", e2enetwork.EndpointHTTPPort)
+			checkPodToPodConnectivity(config, "http", e2enetwork.EndpointHTTPPort)
 		})
 
 		/*
@@ -90,7 +90,7 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 		*/
 		framework.ConformanceIt("should function for intra-pod communication: udp [NodeConformance]", func() {
 			config := e2enetwork.NewCoreNetworkingTestConfig(f, false)
-			checkNodeConnectivity(config, "udp", e2enetwork.EndpointUDPPort)
+			checkPodToPodConnectivity(config, "udp", e2enetwork.EndpointUDPPort)
 		})
 
 		/*
@@ -126,5 +126,24 @@ var _ = ginkgo.Describe("[sig-network] Networking", func() {
 				}
 			}
 		})
+
+		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
+		ginkgo.It("should function for intra-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity][Disruptive]", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
+			checkPodToPodConnectivity(config, "sctp", e2enetwork.EndpointSCTPPort)
+		})
+
+		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
+		ginkgo.It("should function for node-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity][Disruptive]", func() {
+			ginkgo.Skip("Skipping SCTP node to pod test until DialFromNode supports SCTP #96482")
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
+			for _, endpointPod := range config.EndpointPods {
+				err := config.DialFromNode("sctp", endpointPod.Status.PodIP, e2enetwork.EndpointSCTPPort, config.MaxTries, 0, sets.NewString(endpointPod.Name))
+				if err != nil {
+					framework.Failf("Error dialing SCTP from node to pod: %v", err)
+				}
+			}
+		})
+
 	})
 })

@@ -179,7 +179,7 @@ func getRawError(resp *http.Response, err error) error {
 		return fmt.Errorf("empty HTTP response")
 	}
 
-	// return the http status if unabled to get response body.
+	// return the http status if it is unable to get response body.
 	defer resp.Body.Close()
 	respBody, _ := ioutil.ReadAll(resp.Body)
 	resp.Body = ioutil.NopCloser(bytes.NewReader(respBody))

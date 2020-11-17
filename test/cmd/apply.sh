@@ -269,7 +269,7 @@ __EOF__
   kube::test::get_object_assert 'services a' "{{${id_field:?}}}" 'a'
   # change immutable field and apply service a
   output_message=$(! kubectl apply -f hack/testdata/service-revision2.yaml 2>&1 "${kube_flags[@]:?}")
-  kube::test::if_has_string "${output_message}" 'field is immutable'
+  kube::test::if_has_string "${output_message}" 'may not change once set'
   # apply --force to recreate resources for immutable fields
   kubectl apply -f hack/testdata/service-revision2.yaml --force "${kube_flags[@]:?}"
   # check immutable field exists
@@ -310,8 +310,8 @@ __EOF__
   kubectl delete -f hack/testdata/multi-resource-1.yaml "${kube_flags[@]:?}"
 
   ## kubectl apply multiple resources with one failure during builder phase.
-  # Pre-Condition: No configmaps
-  kube::test::get_object_assert configmaps "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # Pre-Condition: No configmaps with name=foo
+  kube::test::get_object_assert 'configmaps --field-selector=metadata.name=foo' "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Apply a configmap and a bogus custom resource.
   output_message=$(! kubectl apply -f hack/testdata/multi-resource-2.yaml 2>&1 "${kube_flags[@]:?}")
   # Should be error message from bogus custom resource.

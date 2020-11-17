@@ -207,7 +207,7 @@ func (pl *InterPodAffinity) PreScore(
 func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) {
 	c, err := cycleState.Read(preScoreStateKey)
 	if err != nil {
-		return nil, fmt.Errorf("Error reading %q from cycleState: %v", preScoreStateKey, err)
+		return nil, fmt.Errorf("failed to read %q from cycleState: %v", preScoreStateKey, err)
 	}
 
 	s, ok := c.(*preScoreState)

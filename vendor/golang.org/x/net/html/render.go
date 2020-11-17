@@ -263,7 +263,7 @@ var voidElements = map[string]bool{
 	"hr":     true,
 	"img":    true,
 	"input":  true,
-	"keygen": true,
+	"keygen": true, // "keygen" has been removed from the spec, but are kept here for backwards compatibility.
 	"link":   true,
 	"meta":   true,
 	"param":  true,
