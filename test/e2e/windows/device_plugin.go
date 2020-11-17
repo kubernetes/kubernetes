@@ -20,15 +20,15 @@ import (
 	"context"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	appsv1 "k8s.io/api/apps/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/apimachinery/pkg/api/resource"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
 )
@@ -57,9 +57,9 @@ var _ = SIGDescribe("Device Plugin", func() {
 		labels := map[string]string{
 			daemonsetNameLabel: dsName,
 		}
-        	ds := &appsv1.DaemonSet{
+		ds := &appsv1.DaemonSet{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: dsName,
+				Name:      dsName,
 				Namespace: "kube-system",
 			},
 			Spec: appsv1.DaemonSetSpec{
@@ -76,7 +76,7 @@ var _ = SIGDescribe("Device Plugin", func() {
 					Spec: v1.PodSpec{
 						Tolerations: []v1.Toleration{
 							{
-								Key: "CriticalAddonsOnly",
+								Key:      "CriticalAddonsOnly",
 								Operator: "Exists",
 							},
 						},
@@ -86,13 +86,13 @@ var _ = SIGDescribe("Device Plugin", func() {
 								Image: image,
 								VolumeMounts: []v1.VolumeMount{
 									{
-										Name: mountName,
+										Name:      mountName,
 										MountPath: mountPath,
 									},
 								},
 								Env: []v1.EnvVar{
 									{
-										Name: "DIRECTX_GPU_MATCH_NAME",
+										Name:  "DIRECTX_GPU_MATCH_NAME",
 										Value: " ",
 									},
 								},
@@ -122,16 +122,15 @@ var _ = SIGDescribe("Device Plugin", func() {
 
 		ginkgo.By("creating Windows testing Pod")
 		windowsPod := createTestPod(f, imageutils.GetE2EImage(imageutils.WindowsServer), windowsOS)
-		windowsPod.Spec.Containers[0].Args = []string{"powershell.exe", "Start-Sleep", "3600" }
+		windowsPod.Spec.Containers[0].Args = []string{"powershell.exe", "Start-Sleep", "3600"}
 		windowsPod.Spec.Containers[0].Resources.Limits = v1.ResourceList{
 			"microsoft.com/directx": resource.MustParse("1"),
 		}
 		windowsPod, err = cs.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), windowsPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		ginkgo.By("Waiting for the pod Running")
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, windowsPod.Name,  f.Namespace.Name, testSlowMultiplier*framework.PodStartTimeout)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, windowsPod.Name, f.Namespace.Name, testSlowMultiplier*framework.PodStartTimeout)
 		framework.ExpectNoError(err)
-
 
 		ginkgo.By("verifying device access in Windows testing Pod")
 		dxdiagCommand := []string{"cmd.exe", "/c", "dxdiag", "/t", "dxdiag_output.txt", "&", "type", "dxdiag_output.txt"}
