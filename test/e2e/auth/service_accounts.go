@@ -424,7 +424,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	  Testname: TokenRequestProjection should mount a projected volume with token using TokenRequest API.
 	  Description: Ensure that projected service account token is mounted.
 	*/
-	ginkgo.It("should mount projected service account token when requested", func() {
+	framework.ConformanceIt("should mount projected service account token", func() {
 
 		var (
 			podName         = "test-pod-" + string(uuid.NewUUID())

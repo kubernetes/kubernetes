@@ -1364,6 +1364,13 @@
     Container.
   release: v1.9
   file: test/e2e/auth/service_accounts.go
+- testname: TokenRequestProjection should mount a projected volume with token using
+    TokenRequest API.
+  codename: '[sig-auth] ServiceAccounts should mount projected service account token
+    [Conformance]'
+  description: Ensure that projected service account token is mounted.
+  release: v1.20
+  file: test/e2e/auth/service_accounts.go
 - testname: ServiceAccount lifecycle test
   codename: '[sig-auth] ServiceAccounts should run through the lifecycle of a ServiceAccount
     [Conformance]'
