@@ -265,7 +265,11 @@ func (s *SpdyRoundTripper) dialWithSocks5Proxy(req *http.Request, proxyURL *url.
 
 	dialer := s.Dialer
 	if dialer == nil {
-		dialer = &net.Dialer{}
+		dialer = &net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}
 	}
 
 	proxyDialer, err := proxy.SOCKS5("tcp", proxyDialAddr, auth, dialer)
