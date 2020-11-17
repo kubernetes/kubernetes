@@ -86,7 +86,6 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				return ts
 			}
 
-			interceptor := &Interceptor{}
 			socks5Server := func(creds *socks5.StaticCredentials) *socks5.Server {
 				var conf *socks5.Config
 				if creds != nil {
@@ -380,6 +379,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				}
 
 				if testCase.socks5ProxyServerFunc != nil {
+					interceptor := &Interceptor{}
 					var l net.Listener
 					var proxyHandler *socks5.Server
 					if testCase.proxyAuth != nil {
