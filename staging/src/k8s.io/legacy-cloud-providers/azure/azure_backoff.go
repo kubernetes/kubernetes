@@ -278,7 +278,7 @@ func (az *Cloud) CreateOrUpdateLB(service *v1.Service, lb network.LoadBalancer) 
 			az.lbCache.Delete(*lb.Name)
 		}
 		// The LB update may fail because the referenced PIP is not in the Succeeded provisioning state
-		if strings.Contains(strings.ToLower(err.Error()), strings.ToLower(referencedResourceNotProvisionedMessageCode)) {
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), strings.ToLower(referencedResourceNotProvisionedMessageCode)) {
 			matches := pipErrorMessageRE.FindStringSubmatch(err.Error())
 			if len(matches) != 3 {
 				klog.Warningf("Failed to parse the retry error message %s", err.Error())
