@@ -82,13 +82,13 @@ var _ = SIGDescribe("API priority and fairness", func() {
 			completedRequests     int32
 		}
 		clients := []client{
-			// "elephant" refers to a client that creates requests at a much higher
+			// "highqps" refers to a client that creates requests at a much higher
 			// QPS than its counter-part and well above its concurrency share limit.
-			// In contrast, the mouse stays under its concurrency shares.
-			// Additionally, the "elephant" client also has a higher matching
+			// In contrast, "lowqps" stays under its concurrency shares.
+			// Additionally, the "highqps" client also has a higher matching
 			// precedence for its flow schema.
-			{username: "elephant", qps: 100.0, concurrencyMultiplier: 2.0, matchingPrecedence: 999},
-			{username: "mouse", qps: 5.0, concurrencyMultiplier: 0.5, matchingPrecedence: 1000},
+			{username: "highqps", qps: 100.0, concurrencyMultiplier: 2.0, matchingPrecedence: 999},
+			{username: "lowqps", qps: 5.0, concurrencyMultiplier: 0.5, matchingPrecedence: 1000},
 		}
 
 		ginkgo.By("creating test priority levels and flow schemas")
