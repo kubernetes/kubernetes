@@ -2132,7 +2132,7 @@ func shouldReleaseExistingOwnedPublicIP(existingPip *network.PublicIPAddress, lb
 		(ipTagRequest.IPTagsRequestedByAnnotation && !areIPTagsEquivalent(currentIPTags, ipTagRequest.IPTags))
 }
 
-//  ensurePIPTagged ensures the public IP of the service is tagged as configured
+// ensurePIPTagged ensures the public IP of the service is tagged as configured
 func (az *Cloud) ensurePIPTagged(service *v1.Service, pip *network.PublicIPAddress) bool {
 	changed := false
 	configTags := parseTags(az.Tags)
@@ -2158,7 +2158,12 @@ func (az *Cloud) ensurePIPTagged(service *v1.Service, pip *network.PublicIPAddre
 		configTags[serviceTagKey] = serviceNames
 	}
 	for k, v := range configTags {
-		if vv, ok := pip.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
+		vv, ok := pip.Tags[k]
+		if to.String(v) == "" && ok {
+			delete(pip.Tags, k)
+			changed = true
+		}
+		if to.String(v) != "" && (!ok || !strings.EqualFold(to.String(v), to.String(vv))) {
 			pip.Tags[k] = v
 			changed = true
 		}
@@ -2700,7 +2705,12 @@ func (az *Cloud) ensureLoadBalancerTagged(lb *network.LoadBalancer) bool {
 		lb.Tags = make(map[string]*string)
 	}
 	for k, v := range tags {
-		if vv, ok := lb.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
+		vv, ok := lb.Tags[k]
+		if to.String(v) == "" && ok {
+			delete(lb.Tags, k)
+			changed = true
+		}
+		if to.String(v) != "" && (!ok || !strings.EqualFold(to.String(v), to.String(vv))) {
 			lb.Tags[k] = v
 			changed = true
 		}
@@ -2719,7 +2729,12 @@ func (az *Cloud) ensureSecurityGroupTagged(sg *network.SecurityGroup) bool {
 		sg.Tags = make(map[string]*string)
 	}
 	for k, v := range tags {
-		if vv, ok := sg.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
+		vv, ok := sg.Tags[k]
+		if to.String(v) == "" && ok {
+			delete(sg.Tags, k)
+			changed = true
+		}
+		if to.String(v) != "" && (!ok || !strings.EqualFold(to.String(v), to.String(vv))) {
 			sg.Tags[k] = v
 			changed = true
 		}

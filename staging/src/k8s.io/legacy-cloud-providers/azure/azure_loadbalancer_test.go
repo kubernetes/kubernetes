@@ -3563,12 +3563,12 @@ func TestEnsurePIPTagged(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		cloud := GetTestCloud(ctrl)
-		cloud.Tags = "a=x,y=z"
+		cloud.Tags = "a=x,y=z, delete = , keep="
 
 		service := v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					ServiceAnnotationAzurePIPTags: "a=b,c=d,e=,=f,ghi",
+					ServiceAnnotationAzurePIPTags: "a=b,c=d,e=,=f,ghi , also = ,keep=that",
 				},
 			},
 		}
@@ -3578,6 +3578,9 @@ func TestEnsurePIPTagged(t *testing.T) {
 				serviceTagKey:  to.StringPtr("default/svc1,default/svc2"),
 				"foo":          to.StringPtr("bar"),
 				"a":            to.StringPtr("j"),
+				"delete":       to.StringPtr("this"),
+				"also":         to.StringPtr("this"),
+				"keep":         to.StringPtr("this"),
 			},
 		}
 		expectedPIP := network.PublicIPAddress{
@@ -3588,6 +3591,7 @@ func TestEnsurePIPTagged(t *testing.T) {
 				"a":            to.StringPtr("b"),
 				"c":            to.StringPtr("d"),
 				"y":            to.StringPtr("z"),
+				"keep":         to.StringPtr("that"),
 			},
 		}
 		changed := cloud.ensurePIPTagged(&service, &pip)

@@ -121,18 +121,21 @@ func convertMapToMapPointer(origin map[string]string) map[string]*string {
 }
 
 func parseTags(tags string) map[string]*string {
-	kvs := strings.Split(tags, ",")
+	kvs := strings.Split(tags, tagsDelimiter)
 	formatted := make(map[string]*string)
 	for _, kv := range kvs {
-		res := strings.Split(kv, "=")
+		res := strings.Split(kv, tagKeyValueDelimiter)
 		if len(res) != 2 {
 			klog.Warningf("parseTags: error when parsing key-value pair %s, would ignore this one", kv)
 			continue
 		}
 		k, v := strings.TrimSpace(res[0]), strings.TrimSpace(res[1])
-		if k == "" || v == "" {
+		if k == "" {
 			klog.Warningf("parseTags: error when parsing key-value pair %s-%s, would ignore this one", k, v)
 			continue
+		}
+		if v == "" {
+			klog.V(2).Infof("parseTags: detect empty value of key %s, would delete this pair", k)
 		}
 		formatted[k] = to.StringPtr(v)
 	}
