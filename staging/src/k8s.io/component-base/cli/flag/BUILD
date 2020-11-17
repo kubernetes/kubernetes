@@ -9,7 +9,6 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
-        "bracket_separated_slice_map_string_string_test.go",
         "ciphersuites_flag_test.go",
         "colon_separated_multimap_string_string_test.go",
         "langle_separated_map_string_string_test.go",
@@ -25,7 +24,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
-        "bracket_separated_slice_map_string_string.go",
         "ciphersuites_flag.go",
         "ciphersuites_flag_114.go",
         "colon_separated_multimap_string_string.go",

@@ -71,7 +71,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	corev1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
@@ -689,11 +688,6 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			klog.Infof("After cpu setting is overwritten, KubeReserved=\"%v\", SystemReserved=\"%v\"", s.KubeReserved, s.SystemReserved)
 		}
 
-		reservedMemory, err := parseReservedMemoryConfig(s.ReservedMemory)
-		if err != nil {
-			return err
-		}
-
 		kubeReserved, err := parseResourceList(s.KubeReserved)
 		if err != nil {
 			return err
@@ -743,7 +737,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				ExperimentalCPUManagerPolicy:            s.CPUManagerPolicy,
 				ExperimentalCPUManagerReconcilePeriod:   s.CPUManagerReconcilePeriod.Duration,
 				ExperimentalMemoryManagerPolicy:         s.MemoryManagerPolicy,
-				ExperimentalMemoryManagerReservedMemory: reservedMemory,
+				ExperimentalMemoryManagerReservedMemory: s.ReservedMemory,
 				ExperimentalPodPidsLimit:                s.PodPidsLimit,
 				EnforceCPULimits:                        s.CPUCFSQuota,
 				CPUCFSQuotaPeriod:                       s.CPUCFSQuotaPeriod.Duration,
@@ -1303,59 +1297,6 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 		}
 	}
 	return rl, nil
-}
-
-func parseReservedMemoryConfig(config []map[string]string) (kubetypes.NUMANodeResources, error) {
-	if len(config) == 0 {
-		return nil, nil
-	}
-
-	const (
-		indexKey = "numa-node"
-		typeKey  = "type"
-		limitKey = "limit"
-	)
-
-	keys := []string{indexKey, typeKey, limitKey}
-
-	// check whether all keys are present
-	for _, m := range config {
-		for _, key := range keys {
-			if _, exist := m[key]; !exist {
-				return nil, fmt.Errorf("key: %s is missing in given ReservedMemory flag: %v", key, config)
-			}
-		}
-	}
-
-	parsed := make(kubetypes.NUMANodeResources, len(config))
-	for _, m := range config {
-		idxInString, _ := m[indexKey]
-		idx, err := strconv.Atoi(idxInString)
-		if err != nil || idx < 0 {
-			return nil, fmt.Errorf("NUMA index conversion error for value: \"%s\"", idxInString)
-		}
-
-		typeInString, _ := m[typeKey]
-		v1Type := v1.ResourceName(typeInString)
-		if v1Type != v1.ResourceMemory && !corev1helper.IsHugePageResourceName(v1Type) {
-			return nil, fmt.Errorf("memory type conversion error, unknown type: \"%s\"", typeInString)
-		}
-		if corev1helper.IsHugePageResourceName(v1Type) {
-			if _, err := corev1helper.HugePageSizeFromResourceName(v1Type); err != nil {
-				return nil, fmt.Errorf("memory type conversion error, unknown type: \"%s\"", typeInString)
-			}
-		}
-
-		limitInString, _ := m[limitKey]
-		limit, err := resource.ParseQuantity(limitInString)
-		if err != nil || limit.Sign() != 1 {
-			return nil, fmt.Errorf("memory limit conversion error for value \"%s\"", limitInString)
-		}
-		parsed[idx] = make(map[v1.ResourceName]resource.Quantity)
-		parsed[idx][v1Type] = limit
-	}
-
-	return parsed, nil
 }
 
 // BootstrapKubeletConfigController constructs and bootstrap a configuration controller
