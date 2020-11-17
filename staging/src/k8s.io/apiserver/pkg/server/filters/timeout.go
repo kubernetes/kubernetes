@@ -33,8 +33,6 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
-var errConnKilled = fmt.Errorf("killing connection/stream because serving request timed out and response had been started")
-
 // WithTimeoutForNonLongRunningRequests times out non-long-running requests after the time given by timeout.
 func WithTimeoutForNonLongRunningRequests(handler http.Handler, longRunning apirequest.LongRunningRequestCheck, timeout time.Duration) http.Handler {
 	if longRunning == nil {
@@ -246,15 +244,17 @@ func (tw *baseTimeoutWriter) timeout(err *apierrors.StatusError) {
 		// no way to timeout the HTTP request at the point. We have to shutdown
 		// the connection for HTTP1 or reset stream for HTTP2.
 		//
-		// Note from: Brad Fitzpatrick
-		// if the ServeHTTP goroutine panics, that will do the best possible thing for both
-		// HTTP/1 and HTTP/2. In HTTP/1, assuming you're replying with at least HTTP/1.1 and
-		// you've already flushed the headers so it's using HTTP chunking, it'll kill the TCP
-		// connection immediately without a proper 0-byte EOF chunk, so the peer will recognize
-		// the response as bogus. In HTTP/2 the server will just RST_STREAM the stream, leaving
-		// the TCP connection open, but resetting the stream to the peer so it'll have an error,
-		// like the HTTP/1 case.
-		panic(errConnKilled)
+		// Note from the golang's docs:
+		// If ServeHTTP panics, the server (the caller of ServeHTTP) assumes
+		// that the effect of the panic was isolated to the active request.
+		// It recovers the panic, logs a stack trace to the server error log,
+		// and either closes the network connection or sends an HTTP/2
+		// RST_STREAM, depending on the HTTP protocol. To abort a handler so
+		// the client sees an interrupted response but the server doesn't log
+		// an error, panic with the value ErrAbortHandler.
+		//
+		// We are throwing http.ErrAbortHandler deliberately so that a client is notified and to suppress a not helpful stacktrace in the logs
+		panic(http.ErrAbortHandler)
 	}
 }
 
