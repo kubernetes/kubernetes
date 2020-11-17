@@ -47,8 +47,8 @@ const (
 	evictionHardMemory     = "memory.available"
 	memoryManagerStateFile = "/var/lib/kubelet/memory_manager_state"
 	resourceMemory         = "memory"
-	staticPolicy           = "static"
-	nonePolicy             = "none"
+	staticPolicy           = "Static"
+	nonePolicy             = "None"
 )
 
 // Helper for makeMemoryManagerPod().

@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
-const policyTypeStatic policyType = "static"
+const policyTypeStatic policyType = "Static"
 
 type systemReservedMemory map[int]map[v1.ResourceName]uint64
 

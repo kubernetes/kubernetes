@@ -75,11 +75,11 @@ const (
 	PodTopologyManagerScope = "pod"
 	// NoneMemoryManagerPolicy is a memory manager none policy, under the none policy
 	// the memory manager will not pin containers memory of guaranteed pods
-	NoneMemoryManagerPolicy = "none"
+	NoneMemoryManagerPolicy = "None"
 	// StaticMemoryManagerPolicy is a memory manager static policy, under the static policy
 	// the memory manager will try to pin containers memory of guaranteed pods to the smallest
 	// possible sub-set of NUMA nodes
-	StaticMemoryManagerPolicy = "static"
+	StaticMemoryManagerPolicy = "Static"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -430,7 +430,7 @@ type KubeletConfiguration struct {
 	// Requires the CPUManager feature gate to be enabled.
 	// Dynamic Kubelet Config (beta): This field should not be updated without a full node
 	// reboot. It is safest to keep this value the same as the local config.
-	// Default: "none"
+	// Default: "None"
 	// +optional
 	CPUManagerPolicy string `json:"cpuManagerPolicy,omitempty"`
 	// CPU Manager reconciliation period.
