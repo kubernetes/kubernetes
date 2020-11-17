@@ -699,6 +699,13 @@ func (config *NetworkingTestConfig) CreateService(serviceSpec *v1.Service) *v1.S
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
 	err = WaitForService(config.f.ClientSet, config.Namespace, serviceSpec.Name, true, 5*time.Second, 45*time.Second)
+	// If the endpoints of the service use HostNetwork: true, they are going to try to bind on the host namespace
+	// if those ports are in use by any process in the host, the endpoints pods will fail to be deployed
+	// and the service will never be ready. We can be smarter and check directly that the ports are free
+	// but by now we Skip the test if the service is not ready and we are using endpoints with host network
+	if config.EndpointsHostNetwork && err != nil {
+		e2eskipper.Skipf("Service not ready. Pods are using hostNetwork: true, please check there is no other process on the host using the same ports: %v", err)
+	}
 	framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceSpec.Name, err))
 
 	createdService, err := config.getServiceClient().Get(context.TODO(), serviceSpec.Name, metav1.GetOptions{})
