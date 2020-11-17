@@ -46,9 +46,6 @@ import (
 const (
 	evictionHardMemory     = "memory.available"
 	memoryManagerStateFile = "/var/lib/kubelet/memory_manager_state"
-	reservedLimit          = "limit"
-	reservedNUMANode       = "numa-node"
-	reservedType           = "type"
 	resourceMemory         = "memory"
 	staticPolicy           = "static"
 	nonePolicy             = "none"
@@ -159,7 +156,7 @@ func getMemoryManagerState() (*state.MemoryManagerCheckpoint, error) {
 type kubeletParams struct {
 	memoryManagerFeatureGate bool
 	memoryManagerPolicy      string
-	systemReservedMemory     []map[string]string
+	systemReservedMemory     []kubeletconfig.MemoryReservation
 	systemReserved           map[string]string
 	kubeReserved             map[string]string
 	evictionHard             map[string]string
@@ -200,10 +197,10 @@ func getUpdatedKubeletConfig(oldCfg *kubeletconfig.KubeletConfiguration, params 
 
 	// update reserved memory
 	if newCfg.ReservedMemory == nil {
-		newCfg.ReservedMemory = []map[string]string{}
+		newCfg.ReservedMemory = []kubeletconfig.MemoryReservation{}
 	}
-	for _, p := range params.systemReservedMemory {
-		newCfg.ReservedMemory = append(newCfg.ReservedMemory, p)
+	for _, memoryReservation := range params.systemReservedMemory {
+		newCfg.ReservedMemory = append(newCfg.ReservedMemory, memoryReservation)
 	}
 
 	return newCfg
@@ -259,10 +256,17 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 	)
 
 	f := framework.NewDefaultFramework("memory-manager-test")
+
+	memoryQuantatity := resource.MustParse("1100Mi")
 	defaultKubeParams := &kubeletParams{
 		memoryManagerFeatureGate: true,
-		systemReservedMemory: []map[string]string{
-			{reservedNUMANode: "0", reservedType: resourceMemory, reservedLimit: "1100Mi"},
+		systemReservedMemory: []kubeletconfig.MemoryReservation{
+			{
+				NumaNode: 0,
+				Limits: v1.ResourceList{
+					resourceMemory: memoryQuantatity,
+				},
+			},
 		},
 		systemReserved: map[string]string{resourceMemory: "500Mi"},
 		kubeReserved:   map[string]string{resourceMemory: "500Mi"},

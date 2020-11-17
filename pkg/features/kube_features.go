@@ -126,7 +126,7 @@ const (
 	// owner: @cynepco3hahue(alukiano) @cezaryzukowski @k-wiatrzyk
 	// alpha:: v1.20
 
-	// Allows to set containers memory affinity according to NUMA topology
+	// Allows setting memory affinity for a container based on NUMA topology
 	MemoryManager featuregate.Feature = "MemoryManager"
 
 	// owner: @sjenning
