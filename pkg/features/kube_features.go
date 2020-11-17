@@ -776,8 +776,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ProcMountType:                  {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:               {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:            {Default: true, PreRelease: featuregate.Beta},
-	WindowsGMSA:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
-	WindowsRunAsUserName:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: true, PreRelease: featuregate.Beta},
 	VolumePVCDataSource:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
