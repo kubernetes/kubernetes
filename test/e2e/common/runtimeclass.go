@@ -97,7 +97,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 		The runtimeclasses resource MUST exist in the /apis/node.k8s.io/v1 discovery document.
 		The runtimeclasses resource must support create, get, list, watch, update, patch, delete, and deletecollection.
 	*/
-	ginkgo.It(" [NodeConformance] should support RuntimeClasses API operations", func() {
+	framework.ConformanceIt(" should support RuntimeClasses API operations", func() {
 		// Setup
 		rcVersion := "v1"
 		rcClient := f.ClientSet.NodeV1().RuntimeClasses()

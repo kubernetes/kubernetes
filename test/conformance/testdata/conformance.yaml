@@ -1964,6 +1964,16 @@
     The PodTemplate must be deleted.
   release: v1.19
   file: test/e2e/common/podtemplates.go
+- testname: RuntimeClass API
+  codename: '[sig-node] RuntimeClass  should support RuntimeClasses API operations
+    [Conformance]'
+  description: ' The node.k8s.io API group MUST exist in the /apis discovery document.
+    The node.k8s.io/v1 API group/version MUST exist in the /apis/mode.k8s.io discovery
+    document. The runtimeclasses resource MUST exist in the /apis/node.k8s.io/v1 discovery
+    document. The runtimeclasses resource must support create, get, list, watch, update,
+    patch, delete, and deletecollection.'
+  release: v1.20
+  file: test/e2e/common/runtimeclass.go
 - testname: LimitRange, resources
   codename: '[sig-scheduling] LimitRange should create a LimitRange with defaults
     and ensure pod has those defaults applied. [Conformance]'
