@@ -701,7 +701,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 		desiredReplicas = currentReplicas
 	}
 
-	a.setStatus(hpa, currentReplicas, desiredReplicas, metricStatuses, rescale)
+	a.setStatus(hpa, scale.Status.Replicas, desiredReplicas, metricStatuses, rescale)
 	return a.updateStatusIfNeeded(hpaStatusOriginal, hpa)
 }
 
