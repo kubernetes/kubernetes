@@ -1215,9 +1215,15 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 			}
 
 		}
+		klog.V(4).Infof("DisksAreAttach successfully executed. result: %+v", attached)
+		// There could be nodes in cluster which do not have any pods with vsphere volumes running on them
+		// such nodes won't be part of nodeVolumes map because attach-detach controller does not keep track
+		// such nodes. But such nodes may still have dangling volumes on them and hence we need to scan all the
+		// remaining nodes which weren't scanned by code previously.
+		vs.BuildMissingVolumeNodeMap(ctx)
 		// any volume which we could not verify will be removed from the map.
 		vs.vsphereVolumeMap.RemoveUnverified()
-		klog.V(4).Infof("DisksAreAttach successfully executed. result: %+v", attached)
+		klog.V(4).Infof("current node volume map is: %+v", vs.vsphereVolumeMap.volumeNodeMap)
 		return disksAttached, nil
 	}
 	requestTime := time.Now()

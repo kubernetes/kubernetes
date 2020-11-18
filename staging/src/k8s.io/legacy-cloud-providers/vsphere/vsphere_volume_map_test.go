@@ -69,7 +69,8 @@ func TestVsphereVolumeMap(t *testing.T) {
 				vMap.RemoveUnverified()
 			}
 			_, ok := vMap.CheckForVolume(tc.volumeToCheck)
-			if ok != tc.expectInMap {
+			nodeOk := vMap.CheckForNode(tc.nodeToAdd)
+			if ok != tc.expectInMap && nodeOk != tc.expectInMap {
 				t.Errorf("error checking volume %s, expected %v got %v", tc.volumeToCheck, tc.expectInMap, ok)
 			}
 		})
