@@ -720,10 +720,10 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 func (util *ISCSIUtil) detachISCSIDisk(exec utilexec.Interface, portals []string, iqn, iface, volName, initiatorName string, found bool) error {
 	for _, portal := range portals {
 		logoutArgs := []string{"-m", "node", "-p", portal, "-T", iqn, "--logout"}
-		deleteArgs := []string{"-m", "node", "-p", portal, "-T", iqn, "-o", "delete"}
+		deleteNodeArgs := []string{"-m", "node", "-p", portal, "-T", iqn, "-o", "delete"}
 		if found {
 			logoutArgs = append(logoutArgs, []string{"-I", iface}...)
-			deleteArgs = append(deleteArgs, []string{"-I", iface}...)
+			deleteNodeArgs = append(deleteNodeArgs, []string{"-I", iface}...)
 		}
 		klog.Infof("iscsi: log out target %s iqn %s iface %s", portal, iqn, iface)
 		out, err := exec.Command("iscsiadm", logoutArgs...).CombinedOutput()
@@ -734,7 +734,7 @@ func (util *ISCSIUtil) detachISCSIDisk(exec utilexec.Interface, portals []string
 		}
 		// Delete the node record
 		klog.Infof("iscsi: delete node record target %s iqn %s", portal, iqn)
-		out, err = exec.Command("iscsiadm", deleteArgs...).CombinedOutput()
+		out, err = exec.Command("iscsiadm", deleteNodeArgs...).CombinedOutput()
 		err = ignoreExitCodes(err, exit_ISCSI_ERR_NO_OBJS_FOUND, exit_ISCSI_ERR_SESS_NOT_FOUND)
 		if err != nil {
 			klog.Errorf("iscsi: failed to delete node record Error: %s", string(out))
@@ -744,8 +744,8 @@ func (util *ISCSIUtil) detachISCSIDisk(exec utilexec.Interface, portals []string
 	// Delete the iface after all sessions have logged out
 	// If the iface is not created via iscsi plugin, skip to delete
 	if initiatorName != "" && found && iface == (portals[0]+":"+volName) {
-		deleteArgs := []string{"-m", "iface", "-I", iface, "-o", "delete"}
-		out, err := exec.Command("iscsiadm", deleteArgs...).CombinedOutput()
+		deleteIfaceArgs := []string{"-m", "iface", "-I", iface, "-o", "delete"}
+		out, err := exec.Command("iscsiadm", deleteIfaceArgs...).CombinedOutput()
 		err = ignoreExitCodes(err, exit_ISCSI_ERR_NO_OBJS_FOUND, exit_ISCSI_ERR_SESS_NOT_FOUND)
 		if err != nil {
 			klog.Errorf("iscsi: failed to delete iface Error: %s", string(out))
