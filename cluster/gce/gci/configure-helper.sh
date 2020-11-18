@@ -120,7 +120,7 @@ function gce-metadata-fw-helper {
 
   # Deliberately allow word split here
   # shellcheck disable=SC2086
-  iptables ${command} OUTPUT -p tcp --dport 80 -d ${METADATA_SERVER_IP} -m owner ${invert:-} --uid-owner=${METADATA_SERVER_ALLOWED_UID_RANGE:-0-2999} -j ${action}
+  iptables -w ${command} OUTPUT -p tcp --dport 80 -d ${METADATA_SERVER_IP} -m owner ${invert:-} --uid-owner=${METADATA_SERVER_ALLOWED_UID_RANGE:-0-2999} -j ${action}
 }
 
 function config-ip-firewall {
@@ -134,17 +134,17 @@ function config-ip-firewall {
   # We need to add rules to accept all TCP/UDP/ICMP/SCTP packets.
   if iptables -w -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
     echo "Add rules to accept all inbound TCP/UDP/ICMP packets"
-    iptables -A INPUT -w -p TCP -j ACCEPT
-    iptables -A INPUT -w -p UDP -j ACCEPT
-    iptables -A INPUT -w -p ICMP -j ACCEPT
-    iptables -A INPUT -w -p SCTP -j ACCEPT
+    iptables -w -A INPUT -w -p TCP -j ACCEPT
+    iptables -w -A INPUT -w -p UDP -j ACCEPT
+    iptables -w -A INPUT -w -p ICMP -j ACCEPT
+    iptables -w -A INPUT -w -p SCTP -j ACCEPT
   fi
   if iptables -w -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
     echo "Add rules to accept all forwarded TCP/UDP/ICMP/SCTP packets"
-    iptables -A FORWARD -w -p TCP -j ACCEPT
-    iptables -A FORWARD -w -p UDP -j ACCEPT
-    iptables -A FORWARD -w -p ICMP -j ACCEPT
-    iptables -A FORWARD -w -p SCTP -j ACCEPT
+    iptables -w -A FORWARD -w -p TCP -j ACCEPT
+    iptables -w -A FORWARD -w -p UDP -j ACCEPT
+    iptables -w -A FORWARD -w -p ICMP -j ACCEPT
+    iptables -w -A FORWARD -w -p SCTP -j ACCEPT
   fi
 
   # Flush iptables nat table
@@ -176,7 +176,7 @@ function config-ip-firewall {
     iptables -w -t nat -I PREROUTING -p tcp ! -i eth0 -d "${METADATA_SERVER_IP}" --dport 80 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j REDIRECT --to-ports 988
     iptables -w -t nat -I PREROUTING -p tcp ! -i eth0 -d "${METADATA_SERVER_IP}" --dport 8080 -m comment --comment "metadata-concealment: bridge traffic to metadata server goes to metadata proxy" -j REDIRECT --to-ports 987
   fi
-  iptables -w -t raw -I OUTPUT -s 169.254.169.254 -j DROP
+  iptables -w -t mangle -I OUTPUT -s 169.254.169.254 -j DROP
 
   # Log all metadata access not from approved processes.
   case "${METADATA_SERVER_FIREWALL_MODE:-off}" in
