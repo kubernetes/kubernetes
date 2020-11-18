@@ -109,6 +109,7 @@ func (strategy svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Ob
 	service := obj.(*api.Service)
 	service.Status = api.ServiceStatus{}
 
+	//FIXME: Normalize is now called from BeginCreate in pkg/registry/core/service/storage
 	NormalizeClusterIPs(nil, service)
 	dropServiceDisabledFields(service, nil)
 }
@@ -120,6 +121,7 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 	newService.Status = oldService.Status
 
 	patchAllocatedValues(newService, oldService)
+	//FIXME: Normalize is now called from BeginUpdate in pkg/registry/core/service/storage
 	NormalizeClusterIPs(oldService, newService)
 	dropServiceDisabledFields(newService, oldService)
 	dropTypeDependentFields(newService, oldService)
@@ -362,6 +364,7 @@ func patchAllocatedValues(newSvc, oldSvc *api.Service) {
 
 // NormalizeClusterIPs adjust clusterIPs based on ClusterIP.  This must not
 // consider any other fields.
+//FIXME: move this to pkg/registry/core/service/storage
 func NormalizeClusterIPs(oldSvc, newSvc *api.Service) {
 	// In all cases here, we don't need to over-think the inputs.  Validation
 	// will be called on the new object soon enough.  All this needs to do is
