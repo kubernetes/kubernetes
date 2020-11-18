@@ -14,7 +14,6 @@ go_library(
         "legacy.go",
         "metrics.go",
         "openidmetadata.go",
-        "util.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/serviceaccount",
     deps = [
@@ -25,7 +24,6 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/audit:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//vendor/gopkg.in/square/go-jose.v2:go_default_library",
@@ -53,7 +51,6 @@ go_test(
         "claims_test.go",
         "jwt_test.go",
         "openidmetadata_test.go",
-        "util_test.go",
     ],
     embed = [":go_default_library"],
     deps = [

@@ -29,7 +29,7 @@ import (
 )
 
 type structuredMergeManager struct {
-	typeConverter   internal.TypeConverter
+	typeConverter   TypeConverter
 	objectConverter runtime.ObjectConvertor
 	objectDefaulter runtime.ObjectDefaulter
 	groupVersion    schema.GroupVersion
@@ -41,7 +41,7 @@ var _ Manager = &structuredMergeManager{}
 
 // NewStructuredMergeManager creates a new Manager that merges apply requests
 // and update managed fields for other types of requests.
-func NewStructuredMergeManager(typeConverter internal.TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (Manager, error) {
+func NewStructuredMergeManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (Manager, error) {
 	return &structuredMergeManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
@@ -49,7 +49,7 @@ func NewStructuredMergeManager(typeConverter internal.TypeConverter, objectConve
 		groupVersion:    gv,
 		hubVersion:      hub,
 		updater: merge.Updater{
-			Converter: internal.NewVersionConverter(typeConverter, objectConverter, hub), // This is the converter provided to SMD from k8s
+			Converter: newVersionConverter(typeConverter, objectConverter, hub), // This is the converter provided to SMD from k8s
 		},
 	}, nil
 }
@@ -57,7 +57,7 @@ func NewStructuredMergeManager(typeConverter internal.TypeConverter, objectConve
 // NewCRDStructuredMergeManager creates a new Manager specifically for
 // CRDs. This allows for the possibility of fields which are not defined
 // in models, as well as having no models defined at all.
-func NewCRDStructuredMergeManager(typeConverter internal.TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, preserveUnknownFields bool) (_ Manager, err error) {
+func NewCRDStructuredMergeManager(typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (_ Manager, err error) {
 	return &structuredMergeManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
@@ -65,7 +65,7 @@ func NewCRDStructuredMergeManager(typeConverter internal.TypeConverter, objectCo
 		groupVersion:    gv,
 		hubVersion:      hub,
 		updater: merge.Updater{
-			Converter: internal.NewCRDVersionConverter(typeConverter, objectConverter, hub),
+			Converter: newCRDVersionConverter(typeConverter, objectConverter, hub),
 		},
 	}, nil
 }

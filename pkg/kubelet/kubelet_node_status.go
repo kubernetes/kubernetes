@@ -192,10 +192,10 @@ func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
 func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool {
 	defaultLabels := []string{
 		v1.LabelHostname,
-		v1.LabelZoneFailureDomainStable,
-		v1.LabelZoneRegionStable,
-		v1.LabelZoneFailureDomain,
-		v1.LabelZoneRegion,
+		v1.LabelTopologyZone,
+		v1.LabelTopologyRegion,
+		v1.LabelFailureDomainBetaZone,
+		v1.LabelFailureDomainBetaRegion,
 		v1.LabelInstanceTypeStable,
 		v1.LabelInstanceType,
 		v1.LabelOSStable,
@@ -392,16 +392,16 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 				return nil, fmt.Errorf("failed to get zone from cloud provider: %v", err)
 			}
 			if zone.FailureDomain != "" {
-				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneFailureDomain, zone.FailureDomain)
-				node.ObjectMeta.Labels[v1.LabelZoneFailureDomain] = zone.FailureDomain
-				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneFailureDomainStable, zone.FailureDomain)
-				node.ObjectMeta.Labels[v1.LabelZoneFailureDomainStable] = zone.FailureDomain
+				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelFailureDomainBetaZone, zone.FailureDomain)
+				node.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone] = zone.FailureDomain
+				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelTopologyZone, zone.FailureDomain)
+				node.ObjectMeta.Labels[v1.LabelTopologyZone] = zone.FailureDomain
 			}
 			if zone.Region != "" {
-				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegion, zone.Region)
-				node.ObjectMeta.Labels[v1.LabelZoneRegion] = zone.Region
-				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegionStable, zone.Region)
-				node.ObjectMeta.Labels[v1.LabelZoneRegionStable] = zone.Region
+				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelFailureDomainBetaRegion, zone.Region)
+				node.ObjectMeta.Labels[v1.LabelFailureDomainBetaRegion] = zone.Region
+				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelTopologyRegion, zone.Region)
+				node.ObjectMeta.Labels[v1.LabelTopologyRegion] = zone.Region
 			}
 		}
 	}
@@ -524,8 +524,6 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 // message for the node.
 func (kl *Kubelet) recordNodeStatusEvent(eventType, event string) {
 	klog.V(2).Infof("Recording %s event message for node %s", event, kl.nodeName)
-	// TODO: This requires a transaction, either both node status is updated
-	// and event is recorded or neither should happen, see issue #6055.
 	kl.recorder.Eventf(kl.nodeRef, eventType, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
@@ -602,7 +600,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),
 		nodestatus.DiskPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, kl.recordNodeStatusEvent),
 		nodestatus.PIDPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderPIDPressure, kl.recordNodeStatusEvent),
-		nodestatus.ReadyCondition(kl.clock.Now, kl.runtimeState.runtimeErrors, kl.runtimeState.networkErrors, kl.runtimeState.storageErrors, validateHostFunc, kl.containerManager.Status, kl.recordNodeStatusEvent),
+		nodestatus.ReadyCondition(kl.clock.Now, kl.runtimeState.runtimeErrors, kl.runtimeState.networkErrors, kl.runtimeState.storageErrors, validateHostFunc, kl.containerManager.Status, kl.shutdownManager.ShutdownStatus, kl.recordNodeStatusEvent),
 		nodestatus.VolumesInUse(kl.volumeManager.ReconcilerStatesHasBeenSynced, kl.volumeManager.GetVolumesInUse),
 		// TODO(mtaufen): I decided not to move this setter for now, since all it does is send an event
 		// and record state back to the Kubelet runtime object. In the future, I'd like to isolate

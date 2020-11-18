@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sort"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -33,7 +34,7 @@ import (
 	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
@@ -130,6 +131,7 @@ type frameworkOptions struct {
 	podNominator         framework.PodNominator
 	extenders            []framework.Extender
 	runAllFilters        bool
+	captureProfile       CaptureProfile
 }
 
 // Option for the frameworkImpl.
@@ -199,6 +201,16 @@ func WithExtenders(extenders []framework.Extender) Option {
 	}
 }
 
+// CaptureProfile is a callback to capture a finalized profile.
+type CaptureProfile func(config.KubeSchedulerProfile)
+
+// WithCaptureProfile sets a callback to capture the finalized profile.
+func WithCaptureProfile(c CaptureProfile) Option {
+	return func(o *frameworkOptions) {
+		o.captureProfile = c
+	}
+}
+
 var defaultFrameworkOptions = frameworkOptions{
 	metricsRecorder: newMetricsRecorder(1000, time.Second),
 }
@@ -258,6 +270,11 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		}
 		pluginConfig[name] = args[i].Args
 	}
+	outputProfile := config.KubeSchedulerProfile{
+		SchedulerName: f.profileName,
+		Plugins:       plugins,
+		PluginConfig:  make([]config.PluginConfig, 0, len(pg)),
+	}
 
 	pluginsMap := make(map[string]framework.Plugin)
 	var totalPriority int64
@@ -270,6 +287,12 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		args, err := getPluginArgsOrDefault(pluginConfig, name)
 		if err != nil {
 			return nil, fmt.Errorf("getting args for Plugin %q: %w", name, err)
+		}
+		if args != nil {
+			outputProfile.PluginConfig = append(outputProfile.PluginConfig, config.PluginConfig{
+				Name: name,
+				Args: args,
+			})
 		}
 		p, err := factory(args, f)
 		if err != nil {
@@ -312,6 +335,17 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	}
 	if len(f.bindPlugins) == 0 {
 		return nil, fmt.Errorf("at least one bind plugin is needed")
+	}
+
+	if options.captureProfile != nil {
+		if len(outputProfile.PluginConfig) != 0 {
+			sort.Slice(outputProfile.PluginConfig, func(i, j int) bool {
+				return outputProfile.PluginConfig[i].Name < outputProfile.PluginConfig[j].Name
+			})
+		} else {
+			outputProfile.PluginConfig = nil
+		}
+		options.captureProfile(outputProfile)
 	}
 
 	return f, nil
@@ -1026,4 +1060,9 @@ func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) map[string]config
 // PreemptHandle returns the internal preemptHandle object.
 func (f *frameworkImpl) PreemptHandle() framework.PreemptHandle {
 	return f.preemptHandle
+}
+
+// ProfileName returns the profile name associated to this framework.
+func (f *frameworkImpl) ProfileName() string {
+	return f.profileName
 }

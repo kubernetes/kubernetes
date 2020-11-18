@@ -36,7 +36,7 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-1",
 			Labels: map[string]string{
-				v1.LabelZoneRegion: "region-1",
+				v1.LabelFailureDomainBetaRegion: "region-1",
 			},
 		},
 	},
@@ -45,7 +45,7 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-2",
 			Labels: map[string]string{
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelFailureDomainBetaZone: "zone-2",
 			},
 		},
 	},
@@ -54,8 +54,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-3",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-1",
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelFailureDomainBetaRegion: "region-1",
+				v1.LabelFailureDomainBetaZone:   "zone-2",
 			},
 		},
 	},
@@ -64,8 +64,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-4",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-1",
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelFailureDomainBetaRegion: "region-1",
+				v1.LabelFailureDomainBetaZone:   "zone-2",
 			},
 		},
 	},
@@ -74,8 +74,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-5",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-1",
-				v1.LabelZoneFailureDomain: "zone-3",
+				v1.LabelFailureDomainBetaRegion: "region-1",
+				v1.LabelFailureDomainBetaZone:   "zone-3",
 			},
 		},
 	},
@@ -84,8 +84,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-6",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-2",
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelFailureDomainBetaRegion: "region-2",
+				v1.LabelFailureDomainBetaZone:   "zone-2",
 			},
 		},
 	},
@@ -94,8 +94,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-7",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-2",
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelFailureDomainBetaRegion: "region-2",
+				v1.LabelFailureDomainBetaZone:   "zone-2",
 			},
 		},
 	},
@@ -104,8 +104,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-8",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-2",
-				v1.LabelZoneFailureDomain: "zone-2",
+				v1.LabelFailureDomainBetaRegion: "region-2",
+				v1.LabelFailureDomainBetaZone:   "zone-2",
 			},
 		},
 	},
@@ -114,10 +114,10 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-9",
 			Labels: map[string]string{
-				v1.LabelZoneRegionStable:        "region-2",
-				v1.LabelZoneFailureDomainStable: "zone-2",
-				v1.LabelZoneRegion:              "region-2",
-				v1.LabelZoneFailureDomain:       "zone-2",
+				v1.LabelTopologyRegion:          "region-2",
+				v1.LabelTopologyZone:            "zone-2",
+				v1.LabelFailureDomainBetaRegion: "region-2",
+				v1.LabelFailureDomainBetaZone:   "zone-2",
 			},
 		},
 	},
@@ -126,8 +126,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-10",
 			Labels: map[string]string{
-				v1.LabelZoneRegion:        "region-2",
-				v1.LabelZoneFailureDomain: "zone-3",
+				v1.LabelFailureDomainBetaRegion: "region-2",
+				v1.LabelFailureDomainBetaZone:   "zone-3",
 			},
 		},
 	},
@@ -282,8 +282,8 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-0",
 					Labels: map[string]string{
-						v1.LabelZoneRegion:        "region-1",
-						v1.LabelZoneFailureDomain: "zone-2",
+						v1.LabelFailureDomainBetaRegion: "region-1",
+						v1.LabelFailureDomainBetaZone:   "zone-2",
 					},
 				},
 			},
@@ -302,8 +302,8 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-0",
 					Labels: map[string]string{
-						v1.LabelZoneRegion:        "region-1",
-						v1.LabelZoneFailureDomain: "zone-2",
+						v1.LabelFailureDomainBetaRegion: "region-1",
+						v1.LabelFailureDomainBetaZone:   "zone-2",
 					},
 				},
 			},
@@ -318,8 +318,8 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-new",
 					Labels: map[string]string{
-						v1.LabelZoneRegion:        "region-1",
-						v1.LabelZoneFailureDomain: "zone-2",
+						v1.LabelFailureDomainBetaRegion: "region-1",
+						v1.LabelFailureDomainBetaZone:   "zone-2",
 					},
 				},
 			},

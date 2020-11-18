@@ -16,23 +16,6 @@ limitations under the License.
 
 package schema
 
-// StripDefaults returns a copy without defaults.
-func (s *Structural) StripDefaults() *Structural {
-	s = s.DeepCopy()
-	v := Visitor{
-		Structural: func(s *Structural) bool {
-			changed := false
-			if s.Default.Object != nil {
-				s.Default.Object = nil
-				changed = true
-			}
-			return changed
-		},
-	}
-	v.Visit(s)
-	return s
-}
-
 // StripValueValidations returns a copy without value validations.
 func (s *Structural) StripValueValidations() *Structural {
 	s = s.DeepCopy()

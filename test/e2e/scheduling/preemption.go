@@ -24,6 +24,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -461,12 +462,12 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		ginkgo.AfterEach(func() {
 			// print out additional info if tests failed
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				// list existing priorities
+				// List existing PriorityClasses.
 				priorityList, err := cs.SchedulingV1().PriorityClasses().List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
-					framework.Logf("Unable to list priorities: %v", err)
+					framework.Logf("Unable to list PriorityClasses: %v", err)
 				} else {
-					framework.Logf("List existing priorities:")
+					framework.Logf("List existing PriorityClasses:")
 					for _, p := range priorityList.Items {
 						framework.Logf("%v/%v created at %v", p.Name, p.Value, p.CreationTimestamp)
 					}
@@ -518,8 +519,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				priorityPairs = append(priorityPairs, priorityPair{name: priorityName, value: priorityVal})
 				_, err := cs.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityName}, Value: priorityVal}, metav1.CreateOptions{})
 				if err != nil {
-					framework.Logf("Failed to create priority '%v/%v': %v", priorityName, priorityVal, err)
-					framework.Logf("Reason: %v. Msg: %v", apierrors.ReasonForError(err), err)
+					framework.Logf("Failed to create priority '%v/%v'. Reason: %v. Msg: %v", priorityName, priorityVal, apierrors.ReasonForError(err), err)
 				}
 				framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
 			}
@@ -669,6 +669,93 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			}
 		})
 	})
+
+	ginkgo.Context("PriorityClass endpoints", func() {
+		var cs clientset.Interface
+		f := framework.NewDefaultFramework("sched-preemption-path")
+		testUUID := uuid.New().String()
+		var pcs []*schedulingv1.PriorityClass
+
+		ginkgo.BeforeEach(func() {
+			cs = f.ClientSet
+			// Create 2 PriorityClass: p1, p2.
+			for i := 1; i <= 2; i++ {
+				name, val := fmt.Sprintf("p%d", i), int32(i)
+				pc, err := cs.SchedulingV1().PriorityClasses().Create(context.TODO(), &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"e2e": testUUID}}, Value: val}, metav1.CreateOptions{})
+				if err != nil {
+					framework.Logf("Failed to create priority '%v/%v'. Reason: %v. Msg: %v", name, val, apierrors.ReasonForError(err), err)
+				}
+				framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+				pcs = append(pcs, pc)
+			}
+		})
+
+		ginkgo.AfterEach(func() {
+			// Print out additional info if tests failed.
+			if ginkgo.CurrentGinkgoTestDescription().Failed {
+				// List existing PriorityClasses.
+				priorityList, err := cs.SchedulingV1().PriorityClasses().List(context.TODO(), metav1.ListOptions{})
+				if err != nil {
+					framework.Logf("Unable to list PriorityClasses: %v", err)
+				} else {
+					framework.Logf("List existing PriorityClasses:")
+					for _, p := range priorityList.Items {
+						framework.Logf("%v/%v created at %v", p.Name, p.Value, p.CreationTimestamp)
+					}
+				}
+			}
+
+			// Collection deletion on created PriorityClasses.
+			err := cs.SchedulingV1().PriorityClasses().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: fmt.Sprintf("e2e=%v", testUUID)})
+			framework.ExpectNoError(err)
+		})
+
+		/*
+			Release: v1.20
+			Testname: Scheduler, Verify PriorityClass endpoints
+			Description: Verify that PriorityClass endpoints can be listed. When any mutable field is
+			either patched or updated it MUST succeed. When any immutable field is either patched or
+			updated it MUST fail.
+		*/
+		framework.ConformanceIt("verify PriorityClass endpoints can be operated with different HTTP methods", func() {
+			// 1. Patch/Update on immutable fields will fail.
+			pcCopy := pcs[0].DeepCopy()
+			pcCopy.Value = pcCopy.Value * 10
+			err := patchPriorityClass(cs, pcs[0], pcCopy)
+			framework.ExpectError(err, "expect a patch error on an immutable field")
+			framework.Logf("%v", err)
+
+			pcCopy = pcs[1].DeepCopy()
+			pcCopy.Value = pcCopy.Value * 10
+			_, err = cs.SchedulingV1().PriorityClasses().Update(context.TODO(), pcCopy, metav1.UpdateOptions{})
+			framework.ExpectError(err, "expect an update error on an immutable field")
+			framework.Logf("%v", err)
+
+			// 2. Patch/Update on mutable fields will succeed.
+			newDesc := "updated description"
+			pcCopy = pcs[0].DeepCopy()
+			pcCopy.Description = newDesc
+			err = patchPriorityClass(cs, pcs[0], pcCopy)
+			framework.ExpectNoError(err)
+
+			pcCopy = pcs[1].DeepCopy()
+			pcCopy.Description = newDesc
+			_, err = cs.SchedulingV1().PriorityClasses().Update(context.TODO(), pcCopy, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+
+			// 3. List existing PriorityClasses.
+			_, err = cs.SchedulingV1().PriorityClasses().List(context.TODO(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+
+			// 4. Verify fields of updated PriorityClasses.
+			for _, pc := range pcs {
+				livePC, err := cs.SchedulingV1().PriorityClasses().Get(context.TODO(), pc.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				framework.ExpectEqual(livePC.Value, pc.Value)
+				framework.ExpectEqual(livePC.Description, newDesc)
+			}
+		})
+	})
 })
 
 type pauseRSConfig struct {
@@ -754,5 +841,23 @@ func patchNode(client clientset.Interface, old *v1.Node, new *v1.Node) error {
 		return fmt.Errorf("failed to create merge patch for node %q: %v", old.Name, err)
 	}
 	_, err = client.CoreV1().Nodes().Patch(context.TODO(), old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	return err
+}
+
+func patchPriorityClass(cs clientset.Interface, old, new *schedulingv1.PriorityClass) error {
+	oldData, err := json.Marshal(old)
+	if err != nil {
+		return err
+	}
+
+	newData, err := json.Marshal(new)
+	if err != nil {
+		return err
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &schedulingv1.PriorityClass{})
+	if err != nil {
+		return fmt.Errorf("failed to create merge patch for PriorityClass %q: %v", old.Name, err)
+	}
+	_, err = cs.SchedulingV1().PriorityClasses().Patch(context.TODO(), old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	return err
 }

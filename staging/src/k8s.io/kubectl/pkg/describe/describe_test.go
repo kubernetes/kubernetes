@@ -180,6 +180,7 @@ func TestDescribePodTolerations(t *testing.T) {
 		Spec: corev1.PodSpec{
 			Tolerations: []corev1.Toleration{
 				{Operator: corev1.TolerationOpExists},
+				{Effect: corev1.TaintEffectNoSchedule, Operator: corev1.TolerationOpExists},
 				{Key: "key0", Operator: corev1.TolerationOpExists},
 				{Key: "key1", Value: "value1"},
 				{Key: "key2", Operator: corev1.TolerationOpEqual, Value: "value2", Effect: corev1.TaintEffectNoSchedule},
@@ -195,6 +196,7 @@ func TestDescribePodTolerations(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "  op=Exists\n") ||
+		!strings.Contains(out, ":NoSchedule op=Exists\n") ||
 		!strings.Contains(out, "key0 op=Exists\n") ||
 		!strings.Contains(out, "key1=value1\n") ||
 		!strings.Contains(out, "key2=value2:NoSchedule\n") ||
@@ -356,8 +358,7 @@ func getResourceList(cpu, memory string) corev1.ResourceList {
 }
 
 func TestDescribeService(t *testing.T) {
-	defaultServiceIPFamily := corev1.IPv4Protocol
-
+	singleStack := corev1.IPFamilyPolicySingleStack
 	testCases := []struct {
 		name    string
 		service *corev1.Service
@@ -371,8 +372,7 @@ func TestDescribeService(t *testing.T) {
 					Namespace: "foo",
 				},
 				Spec: corev1.ServiceSpec{
-					Type:     corev1.ServiceTypeLoadBalancer,
-					IPFamily: &defaultServiceIPFamily,
+					Type: corev1.ServiceTypeLoadBalancer,
 					Ports: []corev1.ServicePort{{
 						Name:       "port-tcp",
 						Port:       8080,
@@ -382,6 +382,7 @@ func TestDescribeService(t *testing.T) {
 					}},
 					Selector:              map[string]string{"blah": "heh"},
 					ClusterIP:             "1.2.3.4",
+					IPFamilies:            []corev1.IPFamily{corev1.IPv4Protocol},
 					LoadBalancerIP:        "5.6.7.8",
 					SessionAffinity:       "None",
 					ExternalTrafficPolicy: "Local",
@@ -410,8 +411,7 @@ func TestDescribeService(t *testing.T) {
 					Namespace: "foo",
 				},
 				Spec: corev1.ServiceSpec{
-					Type:     corev1.ServiceTypeLoadBalancer,
-					IPFamily: &defaultServiceIPFamily,
+					Type: corev1.ServiceTypeLoadBalancer,
 					Ports: []corev1.ServicePort{{
 						Name:       "port-tcp",
 						Port:       8080,
@@ -421,6 +421,7 @@ func TestDescribeService(t *testing.T) {
 					}},
 					Selector:              map[string]string{"blah": "heh"},
 					ClusterIP:             "1.2.3.4",
+					IPFamilies:            []corev1.IPFamily{corev1.IPv4Protocol},
 					LoadBalancerIP:        "5.6.7.8",
 					SessionAffinity:       "None",
 					ExternalTrafficPolicy: "Local",
@@ -449,8 +450,7 @@ func TestDescribeService(t *testing.T) {
 					Namespace: "foo",
 				},
 				Spec: corev1.ServiceSpec{
-					Type:     corev1.ServiceTypeLoadBalancer,
-					IPFamily: &defaultServiceIPFamily,
+					Type: corev1.ServiceTypeLoadBalancer,
 					Ports: []corev1.ServicePort{{
 						Name:       "port-tcp",
 						Port:       8080,
@@ -460,6 +460,7 @@ func TestDescribeService(t *testing.T) {
 					}},
 					Selector:              map[string]string{"blah": "heh"},
 					ClusterIP:             "1.2.3.4",
+					IPFamilies:            []corev1.IPFamily{corev1.IPv4Protocol},
 					LoadBalancerIP:        "5.6.7.8",
 					SessionAffinity:       "None",
 					ExternalTrafficPolicy: "Local",
@@ -472,7 +473,51 @@ func TestDescribeService(t *testing.T) {
 				"Selector", "blah=heh",
 				"Type", "LoadBalancer",
 				"IP", "1.2.3.4",
-				"IPFamily", "IPv4",
+				"IP Families", "IPv4",
+				"Port", "port-tcp", "8080/TCP",
+				"TargetPort", "targetPort/TCP",
+				"NodePort", "port-tcp", "31111/TCP",
+				"Session Affinity", "None",
+				"External Traffic Policy", "Local",
+				"HealthCheck NodePort", "32222",
+			},
+		},
+		{
+			name: "test-ServiceIPFamilyPolicy+ClusterIPs",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeLoadBalancer,
+					Ports: []corev1.ServicePort{{
+						Name:       "port-tcp",
+						Port:       8080,
+						Protocol:   corev1.ProtocolTCP,
+						TargetPort: intstr.FromString("targetPort"),
+						NodePort:   31111,
+					}},
+					Selector:              map[string]string{"blah": "heh"},
+					ClusterIP:             "1.2.3.4",
+					IPFamilies:            []corev1.IPFamily{corev1.IPv4Protocol},
+					IPFamilyPolicy:        &singleStack,
+					ClusterIPs:            []string{"1.2.3.4"},
+					LoadBalancerIP:        "5.6.7.8",
+					SessionAffinity:       "None",
+					ExternalTrafficPolicy: "Local",
+					HealthCheckNodePort:   32222,
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+				"Namespace", "foo",
+				"Selector", "blah=heh",
+				"Type", "LoadBalancer",
+				"IP", "1.2.3.4",
+				"IP Families", "IPv4",
+				"IP Family Policy", "SingleStack",
+				"IPs", "1.2.3.4",
 				"Port", "port-tcp", "8080/TCP",
 				"TargetPort", "targetPort/TCP",
 				"NodePort", "port-tcp", "31111/TCP",
@@ -1599,7 +1644,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 				},
 				Status: corev1.PersistentVolumeClaimStatus{},
 			},
-			expectedElements: []string{"\nDataSource:\n  Kind:      PersistentVolumeClaim\n  Name:      srcpvc"},
+			expectedElements: []string{"\nDataSource:\n  Kind:   PersistentVolumeClaim\n  Name:   srcpvc"},
 		},
 		{
 			name: "snapshot-datasource",
@@ -1923,6 +1968,28 @@ Rules:
                /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
 Annotations:   <none>
 Events:        <none>` + "\n",
+		},
+		"DefaultBackend": {
+			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: networkingv1.IngressSpec{
+					DefaultBackend: &backendV1,
+				},
+			}),
+			output: `Name:             bar
+Namespace:        foo
+Address:          
+Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *           *     default-backend:80 (<error: endpoints "default-backend" not found>)
+Annotations:  <none>
+Events:       <none>
+`,
 		},
 	}
 
@@ -2687,6 +2754,152 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 				},
 			},
 		},
+		{
+			"container resource source type, target average value (no current)",
+			autoscalingv2beta2.HorizontalPodAutoscaler{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscalingv2beta2.MetricSpec{
+						{
+							Type: autoscalingv2beta2.ContainerResourceMetricSourceType,
+							ContainerResource: &autoscalingv2beta2.ContainerResourceMetricSource{
+								Name:      corev1.ResourceCPU,
+								Container: "application",
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:         autoscalingv2beta2.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+		},
+		{
+			"container resource source type, target average value (with current)",
+			autoscalingv2beta2.HorizontalPodAutoscaler{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscalingv2beta2.MetricSpec{
+						{
+							Type: autoscalingv2beta2.ContainerResourceMetricSourceType,
+							ContainerResource: &autoscalingv2beta2.ContainerResourceMetricSource{
+								Name:      corev1.ResourceCPU,
+								Container: "application",
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:         autoscalingv2beta2.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+					CurrentMetrics: []autoscalingv2beta2.MetricStatus{
+						{
+							Type: autoscalingv2beta2.ContainerResourceMetricSourceType,
+							ContainerResource: &autoscalingv2beta2.ContainerResourceMetricStatus{
+								Name:      corev1.ResourceCPU,
+								Container: "application",
+								Current: autoscalingv2beta2.MetricValueStatus{
+									AverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			"container resource source type, target utilization (no current)",
+			autoscalingv2beta2.HorizontalPodAutoscaler{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscalingv2beta2.MetricSpec{
+						{
+							Type: autoscalingv2beta2.ContainerResourceMetricSourceType,
+							ContainerResource: &autoscalingv2beta2.ContainerResourceMetricSource{
+								Name:      corev1.ResourceCPU,
+								Container: "application",
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:               autoscalingv2beta2.UtilizationMetricType,
+									AverageUtilization: &targetUtilizationVal,
+								},
+							},
+						},
+					},
+				},
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+		},
+		{
+			"container resource source type, target utilization (with current)",
+			autoscalingv2beta2.HorizontalPodAutoscaler{
+				Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+					Metrics: []autoscalingv2beta2.MetricSpec{
+						{
+							Type: autoscalingv2beta2.ContainerResourceMetricSourceType,
+							ContainerResource: &autoscalingv2beta2.ContainerResourceMetricSource{
+								Name:      corev1.ResourceCPU,
+								Container: "application",
+								Target: autoscalingv2beta2.MetricTarget{
+									Type:               autoscalingv2beta2.UtilizationMetricType,
+									AverageUtilization: &targetUtilizationVal,
+								},
+							},
+						},
+					},
+				},
+				Status: autoscalingv2beta2.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+					CurrentMetrics: []autoscalingv2beta2.MetricStatus{
+						{
+							Type: autoscalingv2beta2.ContainerResourceMetricSourceType,
+							ContainerResource: &autoscalingv2beta2.ContainerResourceMetricStatus{
+								Name:      corev1.ResourceCPU,
+								Container: "application",
+								Current: autoscalingv2beta2.MetricValueStatus{
+									AverageUtilization: &currentUtilizationVal,
+									AverageValue:       resource.NewMilliQuantity(40, resource.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+
 		{
 			"multiple metrics",
 			autoscalingv2beta2.HorizontalPodAutoscaler{

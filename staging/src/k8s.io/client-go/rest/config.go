@@ -65,12 +65,12 @@ type Config struct {
 
 	// Server requires Basic authentication
 	Username string
-	Password string
+	Password string `datapolicy:"password"`
 
 	// Server requires Bearer authentication. This client will not attempt to use
 	// refresh tokens for an OAuth2 flow.
 	// TODO: demonstrate an OAuth2 compatible client.
-	BearerToken string
+	BearerToken string `datapolicy:"token"`
 
 	// Path to a file containing a BearerToken.
 	// If set, the contents are periodically read.
@@ -160,6 +160,15 @@ func (sanitizedAuthConfigPersister) String() string {
 	return "rest.AuthProviderConfigPersister(--- REDACTED ---)"
 }
 
+type sanitizedObject struct{ runtime.Object }
+
+func (sanitizedObject) GoString() string {
+	return "runtime.Object(--- REDACTED ---)"
+}
+func (sanitizedObject) String() string {
+	return "runtime.Object(--- REDACTED ---)"
+}
+
 // GoString implements fmt.GoStringer and sanitizes sensitive fields of Config
 // to prevent accidental leaking via logs.
 func (c *Config) GoString() string {
@@ -183,7 +192,9 @@ func (c *Config) String() string {
 	if cc.AuthConfigPersister != nil {
 		cc.AuthConfigPersister = sanitizedAuthConfigPersister{cc.AuthConfigPersister}
 	}
-
+	if cc.ExecProvider != nil && cc.ExecProvider.Config != nil {
+		cc.ExecProvider.Config = sanitizedObject{Object: cc.ExecProvider.Config}
+	}
 	return fmt.Sprintf("%#v", cc)
 }
 
@@ -220,7 +231,7 @@ type TLSClientConfig struct {
 	CertData []byte
 	// KeyData holds PEM-encoded bytes (typically read from a client certificate key file).
 	// KeyData takes precedence over KeyFile
-	KeyData []byte
+	KeyData []byte `datapolicy:"security-key"`
 	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
 	// CAData takes precedence over CAFile
 	CAData []byte
@@ -588,7 +599,7 @@ func AnonymousClientConfig(config *Config) *Config {
 
 // CopyConfig returns a copy of the given config
 func CopyConfig(config *Config) *Config {
-	return &Config{
+	c := &Config{
 		Host:            config.Host,
 		APIPath:         config.APIPath,
 		ContentConfig:   config.ContentConfig,
@@ -627,4 +638,8 @@ func CopyConfig(config *Config) *Config {
 		Dial:               config.Dial,
 		Proxy:              config.Proxy,
 	}
+	if config.ExecProvider != nil && config.ExecProvider.Config != nil {
+		c.ExecProvider.Config = config.ExecProvider.Config.DeepCopyObject()
+	}
+	return c
 }

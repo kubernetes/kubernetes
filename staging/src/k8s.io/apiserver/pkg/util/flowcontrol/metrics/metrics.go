@@ -34,8 +34,8 @@ const (
 
 const (
 	requestKind   = "request_kind"
-	priorityLevel = "priorityLevel"
-	flowSchema    = "flowSchema"
+	priorityLevel = "priority_level"
+	flowSchema    = "flow_schema"
 	phase         = "phase"
 	mark          = "mark"
 )
@@ -84,19 +84,21 @@ func (rs Registerables) Append(more ...compbasemetrics.Registerable) Registerabl
 var (
 	apiserverRejectedRequestsTotal = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "rejected_requests_total",
-			Help:      "Number of requests rejected by API Priority and Fairness system",
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "rejected_requests_total",
+			Help:           "Number of requests rejected by API Priority and Fairness system",
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema, "reason"},
 	)
 	apiserverDispatchedRequestsTotal = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "dispatched_requests_total",
-			Help:      "Number of requests released by API Priority and Fairness system for service",
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "dispatched_requests_total",
+			Help:           "Number of requests released by API Priority and Fairness system for service",
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema},
 	)
@@ -143,58 +145,64 @@ var (
 
 	apiserverCurrentInqueueRequests = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "current_inqueue_requests",
-			Help:      "Number of requests currently pending in queues of the API Priority and Fairness system",
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "current_inqueue_requests",
+			Help:           "Number of requests currently pending in queues of the API Priority and Fairness system",
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema},
 	)
 	apiserverRequestQueueLength = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "request_queue_length_after_enqueue",
-			Help:      "Length of queue in the API Priority and Fairness system, as seen by each request after it is enqueued",
-			Buckets:   queueLengthBuckets,
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "request_queue_length_after_enqueue",
+			Help:           "Length of queue in the API Priority and Fairness system, as seen by each request after it is enqueued",
+			Buckets:        queueLengthBuckets,
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema},
 	)
 	apiserverRequestConcurrencyLimit = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "request_concurrency_limit",
-			Help:      "Shared concurrency limit in the API Priority and Fairness system",
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "request_concurrency_limit",
+			Help:           "Shared concurrency limit in the API Priority and Fairness system",
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel},
 	)
 	apiserverCurrentExecutingRequests = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "current_executing_requests",
-			Help:      "Number of requests currently executing in the API Priority and Fairness system",
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "current_executing_requests",
+			Help:           "Number of requests currently executing in the API Priority and Fairness system",
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema},
 	)
 	apiserverRequestWaitingSeconds = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "request_wait_duration_seconds",
-			Help:      "Length of time a request spent waiting in its queue",
-			Buckets:   requestDurationSecondsBuckets,
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "request_wait_duration_seconds",
+			Help:           "Length of time a request spent waiting in its queue",
+			Buckets:        requestDurationSecondsBuckets,
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema, "execute"},
 	)
 	apiserverRequestExecutionSeconds = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "request_execution_seconds",
-			Help:      "Duration of request execution in the API Priority and Fairness system",
-			Buckets:   requestDurationSecondsBuckets,
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "request_execution_seconds",
+			Help:           "Duration of request execution in the API Priority and Fairness system",
+			Buckets:        requestDurationSecondsBuckets,
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema},
 	)

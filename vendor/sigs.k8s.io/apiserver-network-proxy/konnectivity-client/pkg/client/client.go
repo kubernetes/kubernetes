@@ -94,11 +94,11 @@ func (t *grpcTunnel) serve(c clientConn) {
 			return
 		}
 		if err != nil || pkt == nil {
-			klog.Warningf("stream read error: %v", err)
+			klog.ErrorS(err, "stream read failure")
 			return
 		}
 
-		klog.V(6).Infof("[tracing] recv packet, type: %s", pkt.Type)
+		klog.V(5).InfoS("[tracing] recv packet", "type", pkt.Type)
 
 		switch pkt.Type {
 		case client.PacketType_DIAL_RSP:
@@ -108,7 +108,7 @@ func (t *grpcTunnel) serve(c clientConn) {
 			t.pendingDialLock.RUnlock()
 
 			if !ok {
-				klog.Warning("DialResp not recognized; dropped")
+				klog.V(1).Infoln("DialResp not recognized; dropped")
 			} else {
 				ch <- dialResult{
 					err:    resp.Error,
@@ -125,7 +125,7 @@ func (t *grpcTunnel) serve(c clientConn) {
 			if ok {
 				conn.readCh <- resp.Data
 			} else {
-				klog.Warningf("connection id %d not recognized", resp.ConnectID)
+				klog.V(1).InfoS("connection not recognized", "connectionID", resp.ConnectID)
 			}
 		case client.PacketType_CLOSE_RSP:
 			resp := pkt.GetCloseResponse()
@@ -142,7 +142,7 @@ func (t *grpcTunnel) serve(c clientConn) {
 				t.connsLock.Unlock()
 				return
 			}
-			klog.Warningf("connection id %d not recognized", resp.ConnectID)
+			klog.V(1).InfoS("connection not recognized", "connectionID", resp.ConnectID)
 		}
 	}
 }
@@ -175,14 +175,14 @@ func (t *grpcTunnel) Dial(protocol, address string) (net.Conn, error) {
 			},
 		},
 	}
-	klog.V(6).Infof("[tracing] send packet, type: %s", req.Type)
+	klog.V(5).InfoS("[tracing] send packet", "type", req.Type)
 
 	err := t.stream.Send(req)
 	if err != nil {
 		return nil, err
 	}
 
-	klog.Info("DIAL_REQ sent to proxy server")
+	klog.V(5).Infoln("DIAL_REQ sent to proxy server")
 
 	c := &conn{stream: t.stream}
 

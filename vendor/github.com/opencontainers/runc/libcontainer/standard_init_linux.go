@@ -13,9 +13,9 @@ import (
 	"github.com/opencontainers/runc/libcontainer/keys"
 	"github.com/opencontainers/runc/libcontainer/seccomp"
 	"github.com/opencontainers/runc/libcontainer/system"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/pkg/errors"
-
 	"golang.org/x/sys/unix"
 )
 
@@ -210,7 +210,7 @@ func (l *linuxStandardInit) Init() error {
 
 	s := l.config.SpecState
 	s.Pid = unix.Getpid()
-	s.Status = configs.Created
+	s.Status = specs.StateCreated
 	if err := l.config.Config.Hooks[configs.StartContainer].RunHooks(s); err != nil {
 		return err
 	}

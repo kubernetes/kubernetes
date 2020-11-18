@@ -128,9 +128,6 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 		if err != nil {
 			e2elog.Logf("Error getting replication controllers in namespace '%s': %v", ns, err)
 			lastAPIError = err
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		for _, rc := range rcList.Items {
@@ -142,9 +139,6 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 		if err != nil {
 			lastAPIError = err
 			e2elog.Logf("Error getting replication sets in namespace %q: %v", ns, err)
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		for _, rs := range rsList.Items {
@@ -156,9 +150,6 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 		if err != nil {
 			lastAPIError = err
 			e2elog.Logf("Error getting pods in namespace '%s': %v", ns, err)
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		nOk := int32(0)
@@ -406,9 +397,6 @@ func WaitForPodToDisappear(c clientset.Interface, ns, podName string, label labe
 		options := metav1.ListOptions{LabelSelector: label.String()}
 		pods, err := c.CoreV1().Pods(ns).List(context.TODO(), options)
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		found := false
@@ -459,9 +447,6 @@ func WaitForPodsWithLabel(c clientset.Interface, ns string, label labels.Selecto
 		options := metav1.ListOptions{LabelSelector: label.String()}
 		pods, err = c.CoreV1().Pods(ns).List(context.TODO(), options)
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				continue
-			}
 			return
 		}
 		if len(pods.Items) > 0 {
@@ -483,9 +468,6 @@ func WaitForPodsWithLabelRunningReady(c clientset.Interface, ns string, label la
 			pods, err = WaitForPodsWithLabel(c, ns, label)
 			if err != nil {
 				e2elog.Logf("Failed to list pods: %v", err)
-				if testutils.IsRetryableAPIError(err) {
-					return false, nil
-				}
 				return false, err
 			}
 			current = 0

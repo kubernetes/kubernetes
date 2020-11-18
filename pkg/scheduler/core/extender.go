@@ -30,7 +30,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 const (
@@ -386,7 +386,7 @@ func (h *HTTPExtender) Bind(binding *v1.Binding) error {
 	var result extenderv1.ExtenderBindingResult
 	if !h.IsBinder() {
 		// This shouldn't happen as this extender wouldn't have become a Binder.
-		return fmt.Errorf("Unexpected empty bindVerb in extender")
+		return fmt.Errorf("unexpected empty bindVerb in extender")
 	}
 	req := &extenderv1.ExtenderBindingArgs{
 		PodName:      binding.Name,
@@ -431,7 +431,7 @@ func (h *HTTPExtender) send(action string, args interface{}, result interface{})
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Failed %v with extender at URL %v, code %v", action, url, resp.StatusCode)
+		return fmt.Errorf("failed %v with extender at URL %v, code %v", action, url, resp.StatusCode)
 	}
 
 	return json.NewDecoder(resp.Body).Decode(result)

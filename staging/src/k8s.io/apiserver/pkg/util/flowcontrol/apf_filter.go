@@ -30,8 +30,8 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/klog/v2"
 
-	fctypesv1a1 "k8s.io/api/flowcontrol/v1alpha1"
-	fcclientv1a1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
 )
 
 // Interface defines how the API Priority and Fairness filter interacts with the underlying system.
@@ -47,7 +47,7 @@ type Interface interface {
 	// not be invoked.
 	Handle(ctx context.Context,
 		requestDigest RequestDigest,
-		noteFn func(fs *fctypesv1a1.FlowSchema, pl *fctypesv1a1.PriorityLevelConfiguration),
+		noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
 		queueNoteFn fq.QueueNoteFn,
 		execFn func(),
 	)
@@ -69,7 +69,7 @@ type Interface interface {
 // New creates a new instance to implement API priority and fairness
 func New(
 	informerFactory kubeinformers.SharedInformerFactory,
-	flowcontrolClient fcclientv1a1.FlowcontrolV1alpha1Interface,
+	flowcontrolClient flowcontrolclient.FlowcontrolV1beta1Interface,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
 ) Interface {
@@ -87,7 +87,7 @@ func New(
 // NewTestable is extra flexible to facilitate testing
 func NewTestable(
 	informerFactory kubeinformers.SharedInformerFactory,
-	flowcontrolClient fcclientv1a1.FlowcontrolV1alpha1Interface,
+	flowcontrolClient flowcontrolclient.FlowcontrolV1beta1Interface,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
 	obsPairGenerator metrics.TimedObserverPairGenerator,
@@ -97,7 +97,7 @@ func NewTestable(
 }
 
 func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest RequestDigest,
-	noteFn func(fs *fctypesv1a1.FlowSchema, pl *fctypesv1a1.PriorityLevelConfiguration),
+	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
 	queueNoteFn fq.QueueNoteFn,
 	execFn func()) {
 	fs, pl, isExempt, req, startWaitingTime := cfgCtlr.startRequest(ctx, requestDigest, queueNoteFn)

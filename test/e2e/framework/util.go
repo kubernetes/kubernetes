@@ -467,7 +467,13 @@ func LoadConfig() (config *restclient.Config, err error) {
 
 	if TestContext.NodeE2E {
 		// This is a node e2e test, apply the node e2e configuration
-		return &restclient.Config{Host: TestContext.Host}, nil
+		return &restclient.Config{
+			Host:        TestContext.Host,
+			BearerToken: TestContext.BearerToken,
+			TLSClientConfig: restclient.TLSClientConfig{
+				Insecure: true,
+			},
+		}, nil
 	}
 	c, err := restclientConfig(TestContext.KubeContext)
 	if err != nil {
@@ -1121,9 +1127,6 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 		// It should be OK to list unschedulable Nodes here.
 		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		for i := range nodes.Items {

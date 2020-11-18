@@ -12,6 +12,7 @@ go_library(
         "//vendor/google.golang.org/api/googleapi/transport:go_default_library",
         "//vendor/google.golang.org/api/internal:go_default_library",
         "//vendor/google.golang.org/api/option:go_default_library",
+        "//vendor/google.golang.org/api/transport/cert:go_default_library",
         "//vendor/google.golang.org/api/transport/http/internal/propagation:go_default_library",
     ],
 )

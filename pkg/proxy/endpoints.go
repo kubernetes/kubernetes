@@ -36,7 +36,6 @@ import (
 )
 
 var supportedEndpointSliceAddressTypes = sets.NewString(
-	string(discovery.AddressTypeIP), // IP is a deprecated address type
 	string(discovery.AddressTypeIPv4),
 	string(discovery.AddressTypeIPv6),
 )
@@ -112,27 +111,27 @@ type EndpointChangeTracker struct {
 	processEndpointsMapChange processEndpointsMapChangeFunc
 	// endpointSliceCache holds a simplified version of endpoint slices.
 	endpointSliceCache *EndpointSliceCache
-	// isIPv6Mode indicates if change tracker is under IPv6/IPv4 mode. Nil means not applicable.
-	isIPv6Mode *bool
-	recorder   record.EventRecorder
+	// ipfamily identify the ip family on which the tracker is operating on
+	ipFamily v1.IPFamily
+	recorder record.EventRecorder
 	// Map from the Endpoints namespaced-name to the times of the triggers that caused the endpoints
 	// object to change. Used to calculate the network-programming-latency.
 	lastChangeTriggerTimes map[types.NamespacedName][]time.Time
 }
 
 // NewEndpointChangeTracker initializes an EndpointsChangeMap
-func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, isIPv6Mode *bool, recorder record.EventRecorder, endpointSlicesEnabled bool, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointChangeTracker {
+func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, ipFamily v1.IPFamily, recorder record.EventRecorder, endpointSlicesEnabled bool, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointChangeTracker {
 	ect := &EndpointChangeTracker{
 		hostname:                  hostname,
 		items:                     make(map[types.NamespacedName]*endpointsChange),
 		makeEndpointInfo:          makeEndpointInfo,
-		isIPv6Mode:                isIPv6Mode,
+		ipFamily:                  ipFamily,
 		recorder:                  recorder,
 		lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
 		processEndpointsMapChange: processEndpointsMapChange,
 	}
 	if endpointSlicesEnabled {
-		ect.endpointSliceCache = NewEndpointSliceCache(hostname, isIPv6Mode, recorder, makeEndpointInfo)
+		ect.endpointSliceCache = NewEndpointSliceCache(hostname, ipFamily, recorder, makeEndpointInfo)
 	}
 	return ect
 }
@@ -374,14 +373,16 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 					klog.Warningf("ignoring invalid endpoint port %s with empty host", port.Name)
 					continue
 				}
+
 				// Filter out the incorrect IP version case.
 				// Any endpoint port that contains incorrect IP version will be ignored.
-				if ect.isIPv6Mode != nil && utilnet.IsIPv6String(addr.IP) != *ect.isIPv6Mode {
+				if (ect.ipFamily == v1.IPv6Protocol) != utilnet.IsIPv6String(addr.IP) {
 					// Emit event on the corresponding service which had a different
 					// IP version than the endpoint.
 					utilproxy.LogAndEmitIncorrectIPVersionEvent(ect.recorder, "endpoints", addr.IP, endpoints.Namespace, endpoints.Name, "")
 					continue
 				}
+
 				isLocal := addr.NodeName != nil && *addr.NodeName == ect.hostname
 				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal, nil)
 				if ect.makeEndpointInfo != nil {

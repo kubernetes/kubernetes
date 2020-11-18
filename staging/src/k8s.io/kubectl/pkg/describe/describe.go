@@ -1525,17 +1525,17 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 
 	pc := d.CoreV1().Pods(namespace)
 
-	mountPods, err := getMountPods(pc, pvc.Name)
+	pods, err := getPodsForPVC(pc, pvc.Name)
 	if err != nil {
 		return "", err
 	}
 
 	events, _ := d.CoreV1().Events(namespace).Search(scheme.Scheme, pvc)
 
-	return describePersistentVolumeClaim(pvc, events, mountPods)
+	return describePersistentVolumeClaim(pvc, events, pods)
 }
 
-func getMountPods(c corev1client.PodInterface, pvcName string) ([]corev1.Pod, error) {
+func getPodsForPVC(c corev1client.PodInterface, pvcName string) ([]corev1.Pod, error) {
 	nsPods, err := c.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return []corev1.Pod{}, err
@@ -1544,10 +1544,8 @@ func getMountPods(c corev1client.PodInterface, pvcName string) ([]corev1.Pod, er
 	var pods []corev1.Pod
 
 	for _, pod := range nsPods.Items {
-		pvcs := getPvcs(pod.Spec.Volumes)
-
-		for _, pvc := range pvcs {
-			if pvc.PersistentVolumeClaim.ClaimName == pvcName {
+		for _, volume := range pod.Spec.Volumes {
+			if volume.VolumeSource.PersistentVolumeClaim != nil && volume.VolumeSource.PersistentVolumeClaim.ClaimName == pvcName {
 				pods = append(pods, pod)
 			}
 		}
@@ -1556,23 +1554,11 @@ func getMountPods(c corev1client.PodInterface, pvcName string) ([]corev1.Pod, er
 	return pods, nil
 }
 
-func getPvcs(volumes []corev1.Volume) []corev1.Volume {
-	var pvcs []corev1.Volume
-
-	for _, volume := range volumes {
-		if volume.VolumeSource.PersistentVolumeClaim != nil {
-			pvcs = append(pvcs, volume)
-		}
-	}
-
-	return pvcs
-}
-
-func describePersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, events *corev1.EventList, mountPods []corev1.Pod) (string, error) {
+func describePersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, events *corev1.EventList, pods []corev1.Pod) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		printPersistentVolumeClaim(w, pvc, true)
-		printPodsMultiline(w, "Mounted By", mountPods)
+		printPodsMultiline(w, "Used By", pods)
 
 		if len(pvc.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n")
@@ -2465,7 +2451,7 @@ func (i *IngressDescriber) describeBackendV1(ns string, backend *networkingv1.In
 			}
 		}
 		ep := formatEndpoints(endpoints, sets.NewString(spName))
-		return fmt.Sprintf("%s\t %s)", sb, ep)
+		return fmt.Sprintf("%s (%s)", sb, ep)
 	}
 	if backend.Resource != nil {
 		ic := backend.Resource
@@ -2518,7 +2504,7 @@ func (i *IngressDescriber) describeIngressV1(ing *networkingv1.Ingress, events *
 			}
 		}
 		if count == 0 {
-			w.Write(LEVEL_1, "\t%s %s\n", "*", "*", i.describeBackendV1(ns, def))
+			w.Write(LEVEL_1, "%s\t%s\t%s\n", "*", "*", i.describeBackendV1(ns, def))
 		}
 		printAnnotationsMultiline(w, "Annotations", ing.Annotations)
 
@@ -2721,10 +2707,27 @@ func describeService(service *corev1.Service, endpoints *corev1.Endpoints, event
 		printAnnotationsMultiline(w, "Annotations", service.Annotations)
 		w.Write(LEVEL_0, "Selector:\t%s\n", labels.FormatLabels(service.Spec.Selector))
 		w.Write(LEVEL_0, "Type:\t%s\n", service.Spec.Type)
-		w.Write(LEVEL_0, "IP:\t%s\n", service.Spec.ClusterIP)
 
-		if service.Spec.IPFamily != nil {
-			w.Write(LEVEL_0, "IPFamily:\t%s\n", *(service.Spec.IPFamily))
+		if service.Spec.IPFamilyPolicy != nil {
+			w.Write(LEVEL_0, "IP Family Policy:\t%s\n", *(service.Spec.IPFamilyPolicy))
+		}
+
+		if len(service.Spec.IPFamilies) > 0 {
+			ipfamiliesStrings := make([]string, 0, len(service.Spec.IPFamilies))
+			for _, family := range service.Spec.IPFamilies {
+				ipfamiliesStrings = append(ipfamiliesStrings, string(family))
+			}
+
+			w.Write(LEVEL_0, "IP Families:\t%s\n", strings.Join(ipfamiliesStrings, ","))
+		} else {
+			w.Write(LEVEL_0, "IP Families:\t%s\n", "<none>")
+		}
+
+		w.Write(LEVEL_0, "IP:\t%s\n", service.Spec.ClusterIP)
+		if len(service.Spec.ClusterIPs) > 0 {
+			w.Write(LEVEL_0, "IPs:\t%s\n", strings.Join(service.Spec.ClusterIPs, ","))
+		} else {
+			w.Write(LEVEL_0, "IPs:\t%s\n", "<none>")
 		}
 
 		if len(service.Spec.ExternalIPs) > 0 {
@@ -3650,6 +3653,26 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 					target := "<auto>"
 					if metric.Resource.Target.AverageUtilization != nil {
 						target = fmt.Sprintf("%d%%", *metric.Resource.Target.AverageUtilization)
+					}
+					w.Write(LEVEL_1, "(as a percentage of request):\t%s / %s\n", current, target)
+				}
+			case autoscalingv2beta2.ContainerResourceMetricSourceType:
+				w.Write(LEVEL_1, "resource %s of container \"%s\" on pods", string(metric.ContainerResource.Name), metric.ContainerResource.Container)
+				if metric.ContainerResource.Target.AverageValue != nil {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].ContainerResource != nil {
+						current = hpa.Status.CurrentMetrics[i].ContainerResource.Current.AverageValue.String()
+					}
+					w.Write(LEVEL_0, ":\t%s / %s\n", current, metric.ContainerResource.Target.AverageValue.String())
+				} else {
+					current := "<unknown>"
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].ContainerResource != nil && hpa.Status.CurrentMetrics[i].ContainerResource.Current.AverageUtilization != nil {
+						current = fmt.Sprintf("%d%% (%s)", *hpa.Status.CurrentMetrics[i].ContainerResource.Current.AverageUtilization, hpa.Status.CurrentMetrics[i].ContainerResource.Current.AverageValue.String())
+					}
+
+					target := "<auto>"
+					if metric.ContainerResource.Target.AverageUtilization != nil {
+						target = fmt.Sprintf("%d%%", *metric.ContainerResource.Target.AverageUtilization)
 					}
 					w.Write(LEVEL_1, "(as a percentage of request):\t%s / %s\n", current, target)
 				}
@@ -4841,7 +4864,7 @@ func printTolerationsMultilineWithIndent(w PrefixWriter, initialIndent, title, i
 		// - operator: "Exists"
 		// is a special case which tolerates everything
 		if toleration.Operator == corev1.TolerationOpExists && len(toleration.Value) == 0 {
-			if len(toleration.Key) != 0 {
+			if len(toleration.Key) != 0 || len(toleration.Effect) != 0 {
 				w.Write(LEVEL_0, " op=Exists")
 			} else {
 				w.Write(LEVEL_0, "op=Exists")

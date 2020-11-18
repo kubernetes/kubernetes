@@ -17,72 +17,118 @@ limitations under the License.
 package devicemanager
 
 import (
+	"sync"
+
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
-	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
+	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 type deviceAllocateInfo struct {
 	// deviceIds contains device Ids allocated to this container for the given resourceName.
-	deviceIds sets.String
+	deviceIds checkpoint.DevicesPerNUMA
 	// allocResp contains cached rpc AllocateResponse.
 	allocResp *pluginapi.ContainerAllocateResponse
 }
 
 type resourceAllocateInfo map[string]deviceAllocateInfo // Keyed by resourceName.
 type containerDevices map[string]resourceAllocateInfo   // Keyed by containerName.
-type podDevices map[string]containerDevices             // Keyed by podUID.
+type podDevices struct {
+	sync.RWMutex
+	devs map[string]containerDevices // Keyed by podUID.
+}
 
-func (pdev podDevices) pods() sets.String {
+// NewPodDevices is a function that returns object of podDevices type with its own guard
+// RWMutex and a map where key is a pod UID and value contains
+// container devices information of type containerDevices.
+func newPodDevices() *podDevices {
+	return &podDevices{devs: make(map[string]containerDevices)}
+}
+
+func (pdev *podDevices) pods() sets.String {
+	pdev.RLock()
+	defer pdev.RUnlock()
 	ret := sets.NewString()
-	for k := range pdev {
+	for k := range pdev.devs {
 		ret.Insert(k)
 	}
 	return ret
 }
 
-func (pdev podDevices) insert(podUID, contName, resource string, devices sets.String, resp *pluginapi.ContainerAllocateResponse) {
-	if _, podExists := pdev[podUID]; !podExists {
-		pdev[podUID] = make(containerDevices)
+func (pdev *podDevices) size() int {
+	pdev.RLock()
+	defer pdev.RUnlock()
+	return len(pdev.devs)
+}
+
+func (pdev *podDevices) hasPod(podUID string) bool {
+	_, podExists := pdev.devs[podUID]
+	return podExists
+}
+
+func (pdev *podDevices) insert(podUID, contName, resource string, devices checkpoint.DevicesPerNUMA, resp *pluginapi.ContainerAllocateResponse) {
+	pdev.Lock()
+	defer pdev.Unlock()
+	if _, podExists := pdev.devs[podUID]; !podExists {
+		pdev.devs[podUID] = make(containerDevices)
 	}
-	if _, contExists := pdev[podUID][contName]; !contExists {
-		pdev[podUID][contName] = make(resourceAllocateInfo)
+	if _, contExists := pdev.devs[podUID][contName]; !contExists {
+		pdev.devs[podUID][contName] = make(resourceAllocateInfo)
 	}
-	pdev[podUID][contName][resource] = deviceAllocateInfo{
+	pdev.devs[podUID][contName][resource] = deviceAllocateInfo{
 		deviceIds: devices,
 		allocResp: resp,
 	}
 }
 
-func (pdev podDevices) delete(pods []string) {
+func (pdev *podDevices) delete(pods []string) {
+	pdev.Lock()
+	defer pdev.Unlock()
 	for _, uid := range pods {
-		delete(pdev, uid)
+		delete(pdev.devs, uid)
 	}
+}
+
+// Returns list of device Ids allocated to the given pod for the given resource.
+// Returns nil if we don't have cached state for the given <podUID, resource>.
+func (pdev *podDevices) podDevices(podUID, resource string) sets.String {
+	pdev.RLock()
+	defer pdev.RUnlock()
+
+	ret := sets.NewString()
+	for contName := range pdev.devs[podUID] {
+		ret = ret.Union(pdev.containerDevices(podUID, contName, resource))
+	}
+	return ret
 }
 
 // Returns list of device Ids allocated to the given container for the given resource.
 // Returns nil if we don't have cached state for the given <podUID, contName, resource>.
-func (pdev podDevices) containerDevices(podUID, contName, resource string) sets.String {
-	if _, podExists := pdev[podUID]; !podExists {
+func (pdev *podDevices) containerDevices(podUID, contName, resource string) sets.String {
+	pdev.RLock()
+	defer pdev.RUnlock()
+	if _, podExists := pdev.devs[podUID]; !podExists {
 		return nil
 	}
-	if _, contExists := pdev[podUID][contName]; !contExists {
+	if _, contExists := pdev.devs[podUID][contName]; !contExists {
 		return nil
 	}
-	devs, resourceExists := pdev[podUID][contName][resource]
+	devs, resourceExists := pdev.devs[podUID][contName][resource]
 	if !resourceExists {
 		return nil
 	}
-	return devs.deviceIds
+	return devs.deviceIds.Devices()
 }
 
 // Populates allocatedResources with the device resources allocated to the specified <podUID, contName>.
-func (pdev podDevices) addContainerAllocatedResources(podUID, contName string, allocatedResources map[string]sets.String) {
-	containers, exists := pdev[podUID]
+func (pdev *podDevices) addContainerAllocatedResources(podUID, contName string, allocatedResources map[string]sets.String) {
+	pdev.RLock()
+	defer pdev.RUnlock()
+	containers, exists := pdev.devs[podUID]
 	if !exists {
 		return
 	}
@@ -91,13 +137,15 @@ func (pdev podDevices) addContainerAllocatedResources(podUID, contName string, a
 		return
 	}
 	for resource, devices := range resources {
-		allocatedResources[resource] = allocatedResources[resource].Union(devices.deviceIds)
+		allocatedResources[resource] = allocatedResources[resource].Union(devices.deviceIds.Devices())
 	}
 }
 
 // Removes the device resources allocated to the specified <podUID, contName> from allocatedResources.
-func (pdev podDevices) removeContainerAllocatedResources(podUID, contName string, allocatedResources map[string]sets.String) {
-	containers, exists := pdev[podUID]
+func (pdev *podDevices) removeContainerAllocatedResources(podUID, contName string, allocatedResources map[string]sets.String) {
+	pdev.RLock()
+	defer pdev.RUnlock()
+	containers, exists := pdev.devs[podUID]
 	if !exists {
 		return
 	}
@@ -106,21 +154,23 @@ func (pdev podDevices) removeContainerAllocatedResources(podUID, contName string
 		return
 	}
 	for resource, devices := range resources {
-		allocatedResources[resource] = allocatedResources[resource].Difference(devices.deviceIds)
+		allocatedResources[resource] = allocatedResources[resource].Difference(devices.deviceIds.Devices())
 	}
 }
 
 // Returns all of devices allocated to the pods being tracked, keyed by resourceName.
-func (pdev podDevices) devices() map[string]sets.String {
+func (pdev *podDevices) devices() map[string]sets.String {
 	ret := make(map[string]sets.String)
-	for _, containerDevices := range pdev {
+	pdev.RLock()
+	defer pdev.RUnlock()
+	for _, containerDevices := range pdev.devs {
 		for _, resources := range containerDevices {
 			for resource, devices := range resources {
 				if _, exists := ret[resource]; !exists {
 					ret[resource] = sets.NewString()
 				}
 				if devices.allocResp != nil {
-					ret[resource] = ret[resource].Union(devices.deviceIds)
+					ret[resource] = ret[resource].Union(devices.deviceIds.Devices())
 				}
 			}
 		}
@@ -129,12 +179,13 @@ func (pdev podDevices) devices() map[string]sets.String {
 }
 
 // Turns podDevices to checkpointData.
-func (pdev podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
+func (pdev *podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
 	var data []checkpoint.PodDevicesEntry
-	for podUID, containerDevices := range pdev {
+	pdev.RLock()
+	defer pdev.RUnlock()
+	for podUID, containerDevices := range pdev.devs {
 		for conName, resources := range containerDevices {
 			for resource, devices := range resources {
-				devIds := devices.deviceIds.UnsortedList()
 				if devices.allocResp == nil {
 					klog.Errorf("Can't marshal allocResp for %v %v %v: allocation response is missing", podUID, conName, resource)
 					continue
@@ -149,7 +200,7 @@ func (pdev podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
 					PodUID:        podUID,
 					ContainerName: conName,
 					ResourceName:  resource,
-					DeviceIDs:     devIds,
+					DeviceIDs:     devices.deviceIds,
 					AllocResp:     allocResp})
 			}
 		}
@@ -158,27 +209,26 @@ func (pdev podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
 }
 
 // Populates podDevices from the passed in checkpointData.
-func (pdev podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
+func (pdev *podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
 	for _, entry := range data {
 		klog.V(2).Infof("Get checkpoint entry: %v %v %v %v %v\n",
 			entry.PodUID, entry.ContainerName, entry.ResourceName, entry.DeviceIDs, entry.AllocResp)
-		devIDs := sets.NewString()
-		for _, devID := range entry.DeviceIDs {
-			devIDs.Insert(devID)
-		}
 		allocResp := &pluginapi.ContainerAllocateResponse{}
 		err := allocResp.Unmarshal(entry.AllocResp)
 		if err != nil {
 			klog.Errorf("Can't unmarshal allocResp for %v %v %v: %v", entry.PodUID, entry.ContainerName, entry.ResourceName, err)
 			continue
 		}
-		pdev.insert(entry.PodUID, entry.ContainerName, entry.ResourceName, devIDs, allocResp)
+		pdev.insert(entry.PodUID, entry.ContainerName, entry.ResourceName, entry.DeviceIDs, allocResp)
 	}
 }
 
 // Returns combined container runtime settings to consume the container's allocated devices.
-func (pdev podDevices) deviceRunContainerOptions(podUID, contName string) *DeviceRunContainerOptions {
-	containers, exists := pdev[podUID]
+func (pdev *podDevices) deviceRunContainerOptions(podUID, contName string) *DeviceRunContainerOptions {
+	pdev.RLock()
+	defer pdev.RUnlock()
+
+	containers, exists := pdev.devs[podUID]
 	if !exists {
 		return nil
 	}
@@ -274,19 +324,25 @@ func (pdev podDevices) deviceRunContainerOptions(podUID, contName string) *Devic
 }
 
 // getContainerDevices returns the devices assigned to the provided container for all ResourceNames
-func (pdev podDevices) getContainerDevices(podUID, contName string) []*podresourcesapi.ContainerDevices {
-	if _, podExists := pdev[podUID]; !podExists {
+func (pdev *podDevices) getContainerDevices(podUID, contName string) []*podresourcesapi.ContainerDevices {
+	pdev.RLock()
+	defer pdev.RUnlock()
+
+	if _, podExists := pdev.devs[podUID]; !podExists {
 		return nil
 	}
-	if _, contExists := pdev[podUID][contName]; !contExists {
+	if _, contExists := pdev.devs[podUID][contName]; !contExists {
 		return nil
 	}
 	cDev := []*podresourcesapi.ContainerDevices{}
-	for resource, allocateInfo := range pdev[podUID][contName] {
-		cDev = append(cDev, &podresourcesapi.ContainerDevices{
-			ResourceName: resource,
-			DeviceIds:    allocateInfo.deviceIds.UnsortedList(),
-		})
+	for resource, allocateInfo := range pdev.devs[podUID][contName] {
+		for numaid, devlist := range allocateInfo.deviceIds {
+			cDev = append(cDev, &podresourcesapi.ContainerDevices{
+				ResourceName: resource,
+				DeviceIds:    devlist,
+				Topology:     &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: numaid}}},
+			})
+		}
 	}
 	return cDev
 }

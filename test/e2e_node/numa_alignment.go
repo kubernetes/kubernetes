@@ -181,6 +181,7 @@ type testEnvInfo struct {
 	numaNodes         int
 	sriovResourceName string
 	policy            string
+	scope             string
 }
 
 func containerWantsDevices(cnt *v1.Container, envInfo *testEnvInfo) bool {

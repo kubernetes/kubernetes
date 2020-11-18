@@ -26,9 +26,11 @@ ZONE=${KUBE_GCE_ZONE:-us-central1-b}
 export REGION=${ZONE%-*}
 RELEASE_REGION_FALLBACK=${RELEASE_REGION_FALLBACK:-false}
 REGIONAL_KUBE_ADDONS=${REGIONAL_KUBE_ADDONS:-true}
+# TODO: Migrate to e2-standard machine family.
 NODE_SIZE=${NODE_SIZE:-n1-standard-2}
 NUM_NODES=${NUM_NODES:-3}
 NUM_WINDOWS_NODES=${NUM_WINDOWS_NODES:-0}
+# TODO: Migrate to e2-standard machine family.
 MASTER_SIZE=${MASTER_SIZE:-n1-standard-$(get-master-size)}
 MASTER_MIN_CPU_ARCHITECTURE=${MASTER_MIN_CPU_ARCHITECTURE:-} # To allow choosing better architectures.
 export MASTER_DISK_TYPE=pd-ssd
@@ -383,10 +385,16 @@ if [ "${ENABLE_IP_ALIASES}" = true ]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_IP_ALIASES"
   PROVIDER_VARS="${PROVIDER_VARS:-} NODE_IPAM_MODE"
   PROVIDER_VARS="${PROVIDER_VARS:-} SECONDARY_RANGE_NAME"
-elif [[ -n "${MAX_PODS_PER_NODE:-}" ]]; then
-  # Should not have MAX_PODS_PER_NODE set for route-based clusters.
-  echo -e "${color_red:-}Cannot set MAX_PODS_PER_NODE for route-based projects for ${PROJECT}." >&2
-  exit 1
+else
+  if [[ -n "${MAX_PODS_PER_NODE:-}" ]]; then
+    # Should not have MAX_PODS_PER_NODE set for route-based clusters.
+    echo -e "${color_red:-}Cannot set MAX_PODS_PER_NODE for route-based projects for ${PROJECT}." >&2
+    exit 1
+  fi
+  if [[ "$(get-num-nodes)" -gt 100 ]]; then
+    echo -e "${color_red:-}Cannot create cluster with more than 100 nodes for route-based projects for ${PROJECT}." >&2
+    exit 1
+  fi
 fi
 
 # Enable GCE Alpha features.
@@ -469,7 +477,7 @@ ADVANCED_AUDIT_LOG_MODE=${ADVANCED_AUDIT_LOG_MODE:-batch} # batch, blocking
 ENABLE_BIG_CLUSTER_SUBNETS=${ENABLE_BIG_CLUSTER_SUBNETS:-false}
 
 # Optional: Enable log rotation for k8s services
-ENABLE_LOGROTATE_FILES="${ENABLE_LOGROTATE_FILES:-false}"
+ENABLE_LOGROTATE_FILES="${ENABLE_LOGROTATE_FILES:-true}"
 PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_LOGROTATE_FILES"
 if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_FILES_MAX_COUNT"
@@ -535,6 +543,9 @@ KUBE_PROXY_DISABLE="${KUBE_PROXY_DISABLE:-false}" # true, false
 # Optional: Change the kube-proxy implementation. Choices are [iptables, ipvs].
 KUBE_PROXY_MODE=${KUBE_PROXY_MODE:-iptables}
 
+# Will be passed into the kube-proxy via `--detect-local-mode`
+DETECT_LOCAL_MODE="${DETECT_LOCAL_MODE:-NodeCIDR}"
+
 # Optional: duration of cluster signed certificates.
 CLUSTER_SIGNING_DURATION=${CLUSTER_SIGNING_DURATION:-}
 
@@ -571,3 +582,18 @@ export GCE_UPLOAD_KUBCONFIG_TO_MASTER_METADATA=true
 
 # Optoinal: Enable Windows CSI-Proxy
 export ENABLE_CSI_PROXY="${ENABLE_CSI_PROXY:-true}"
+
+# KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP decides whether
+# kube-apiserver is healthchecked on host IP instead of 127.0.0.1.
+export KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP="${KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP:-false}"
+
+# ETCD_LISTEN_ON_HOST_IP decides whether etcd servers should also listen on host IP, 
+# in addition to listening to 127.0.0.1, and whether kube-apiserver should connect to etcd servers
+# through host IP.
+export ETCD_LISTEN_ON_HOST_IP="${ETCD_LISTEN_ON_HOST_IP:-false}"
+
+# ETCD_PROGRESS_NOTIFY_INTERVAL defines the interval for etcd watch progress notify events.
+export ETCD_PROGRESS_NOTIFY_INTERVAL="${ETCD_PROGRESS_NOTIFY_INTERVAL:-10m}"
+
+# Use host IP instead of localhost in control plane kubeconfig files.
+export KUBECONFIG_USE_HOST_IP="${KUBECONFIG_USE_HOST_IP:-false}"

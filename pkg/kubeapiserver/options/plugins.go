@@ -154,7 +154,7 @@ func DefaultOffAdmissionPlugins() sets.String {
 		storageobjectinuseprotection.PluginName, //StorageObjectInUseProtection
 		podpriority.PluginName,                  //PodPriority
 		nodetaint.PluginName,                    //TaintNodesByCondition
-		runtimeclass.PluginName,                 //RuntimeClass, gates internally on the feature
+		runtimeclass.PluginName,                 //RuntimeClass
 		certapproval.PluginName,                 // CertificateApproval
 		certsigning.PluginName,                  // CertificateSigning
 		certsubjectrestriction.PluginName,       // CertificateSubjectRestriction

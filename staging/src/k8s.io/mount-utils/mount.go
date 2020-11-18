@@ -46,6 +46,8 @@ type Interface interface {
 	// method should be used by callers that pass sensitive material (like
 	// passwords) as mount options.
 	MountSensitive(source string, target string, fstype string, options []string, sensitiveOptions []string) error
+	// MountSensitiveWithoutSystemd is the same as MountSensitive() but this method disable using systemd mount.
+	MountSensitiveWithoutSystemd(source string, target string, fstype string, options []string, sensitiveOptions []string) error
 	// Unmount unmounts given target.
 	Unmount(target string) error
 	// List returns a list of all mounted filesystems.  This can be large.

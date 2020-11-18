@@ -41,6 +41,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/registry:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/server:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/storage:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/storageversion:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/apihelpers:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/cache:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/util/dryrun:all-srcs",

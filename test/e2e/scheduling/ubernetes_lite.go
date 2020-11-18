@@ -54,11 +54,11 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 		// TODO: SkipUnlessDefaultScheduler() // Non-default schedulers might not spread
 	})
 	ginkgo.It("should spread the pods of a service across zones", func() {
-		SpreadServiceOrFail(f, (2*zoneCount)+1, imageutils.GetPauseImageName())
+		SpreadServiceOrFail(f, 5*zoneCount, imageutils.GetPauseImageName())
 	})
 
 	ginkgo.It("should spread the pods of a replication controller across zones", func() {
-		SpreadRCOrFail(f, int32((2*zoneCount)+1), framework.ServeHostnameImage, []string{"serve-hostname"})
+		SpreadRCOrFail(f, int32(5*zoneCount), framework.ServeHostnameImage, []string{"serve-hostname"})
 	})
 })
 
@@ -121,12 +121,12 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 // Find the name of the zone in which a Node is running
 func getZoneNameForNode(node v1.Node) (string, error) {
 	for key, value := range node.Labels {
-		if key == v1.LabelZoneFailureDomain {
+		if key == v1.LabelFailureDomainBetaZone {
 			return value, nil
 		}
 	}
-	return "", fmt.Errorf("Zone name for node %s not found. No label with key %s",
-		node.Name, v1.LabelZoneFailureDomain)
+	return "", fmt.Errorf("node %s doesn't have zone label %s",
+		node.Name, v1.LabelFailureDomainBetaZone)
 }
 
 // Return the number of zones in which we have nodes in this cluster.
@@ -171,7 +171,7 @@ func checkZoneSpreading(c clientset.Interface, pods *v1.PodList, zoneNames []str
 			maxPodsPerZone = podCount
 		}
 	}
-	gomega.Expect(minPodsPerZone).To(gomega.BeNumerically("~", maxPodsPerZone, 1),
+	gomega.Expect(maxPodsPerZone-minPodsPerZone).To(gomega.BeNumerically("~", 0, 2),
 		"Pods were not evenly spread across zones.  %d in one zone and %d in another zone",
 		minPodsPerZone, maxPodsPerZone)
 }

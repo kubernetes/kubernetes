@@ -21,11 +21,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
@@ -37,6 +39,7 @@ func TestNodeAffinity(t *testing.T) {
 		nodeName   string
 		name       string
 		wantStatus *framework.Status
+		args       config.NodeAffinityArgs
 	}{
 		{
 			pod:  &v1.Pod{},
@@ -51,7 +54,7 @@ func TestNodeAffinity(t *testing.T) {
 				},
 			},
 			name:       "missing labels",
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			pod: &v1.Pod{
@@ -93,7 +96,7 @@ func TestNodeAffinity(t *testing.T) {
 				"foo": "bar",
 			},
 			name:       "node labels are subset",
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			pod: &v1.Pod{
@@ -229,7 +232,7 @@ func TestNodeAffinity(t *testing.T) {
 				"foo": "bar",
 			},
 			name:       "Pod with affinity that don't match node's labels won't schedule onto the node",
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			pod: &v1.Pod{
@@ -247,7 +250,7 @@ func TestNodeAffinity(t *testing.T) {
 				"foo": "bar",
 			},
 			name:       "Pod with a nil []NodeSelectorTerm in affinity, can't match the node's labels and won't schedule onto the node",
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			pod: &v1.Pod{
@@ -265,7 +268,7 @@ func TestNodeAffinity(t *testing.T) {
 				"foo": "bar",
 			},
 			name:       "Pod with an empty []NodeSelectorTerm in affinity, can't match the node's labels and won't schedule onto the node",
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			pod: &v1.Pod{
@@ -287,7 +290,7 @@ func TestNodeAffinity(t *testing.T) {
 				"foo": "bar",
 			},
 			name:       "Pod with empty MatchExpressions is not a valid value will match no objects and won't schedule onto the node",
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			pod: &v1.Pod{},
@@ -370,7 +373,7 @@ func TestNodeAffinity(t *testing.T) {
 				"GPU": "NVIDIA-GRID-K1",
 			},
 			name:       "Pod with multiple matchExpressions ANDed that doesn't match the existing node",
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			pod: &v1.Pod{
@@ -467,7 +470,7 @@ func TestNodeAffinity(t *testing.T) {
 			},
 			name: "Pod with an Affinity matches node's labels but the PodSpec.NodeSelector(the old thing that we are deprecating) " +
 				"is not satisfied, won't schedule onto the node",
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			pod: &v1.Pod{
@@ -495,7 +498,7 @@ func TestNodeAffinity(t *testing.T) {
 				"foo": "bar",
 			},
 			name:       "Pod with an invalid value in Affinity term won't be scheduled onto the node",
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			pod: &v1.Pod{
@@ -546,7 +549,7 @@ func TestNodeAffinity(t *testing.T) {
 			},
 			nodeName:   "node_2",
 			name:       "Pod with matchFields using In operator that does not match the existing node",
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			pod: &v1.Pod{
@@ -615,7 +618,7 @@ func TestNodeAffinity(t *testing.T) {
 			nodeName:   "node_2",
 			labels:     map[string]string{"foo": "bar"},
 			name:       "Pod with one term: matchFields does not match, but matchExpressions matches",
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			pod: &v1.Pod{
@@ -684,7 +687,108 @@ func TestNodeAffinity(t *testing.T) {
 			nodeName:   "node_2",
 			labels:     map[string]string{"foo": "bar"},
 			name:       "Pod with two terms: both matchFields and matchExpressions do not match",
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReason),
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "zone",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"foo"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node_2",
+			labels:   map[string]string{"zone": "foo"},
+			args: config.NodeAffinityArgs{
+				AddedAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{{
+							MatchFields: []v1.NodeSelectorRequirement{{
+								Key:      api.ObjectNameField,
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{"node_2"},
+							}},
+						}},
+					},
+				},
+			},
+			name: "Matches added affinity and Pod's node affinity",
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchExpressions: []v1.NodeSelectorRequirement{
+											{
+												Key:      "zone",
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"bar"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName: "node_2",
+			labels:   map[string]string{"zone": "foo"},
+			args: config.NodeAffinityArgs{
+				AddedAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{{
+							MatchFields: []v1.NodeSelectorRequirement{{
+								Key:      api.ObjectNameField,
+								Operator: v1.NodeSelectorOpIn,
+								Values:   []string{"node_2"},
+							}},
+						}},
+					},
+				},
+			},
+			name:       "Matches added affinity but not Pod's node affinity",
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+		},
+		{
+			pod:      &v1.Pod{},
+			nodeName: "node_2",
+			labels:   map[string]string{"zone": "foo"},
+			args: config.NodeAffinityArgs{
+				AddedAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "zone",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"bar"},
+								},
+							},
+						}},
+					},
+				},
+			},
+			name:       "Doesn't match added affinity",
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, errReasonEnforced),
 		},
 	}
 
@@ -697,7 +801,10 @@ func TestNodeAffinity(t *testing.T) {
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(&node)
 
-			p, _ := New(nil, nil)
+			p, err := New(&test.args, nil)
+			if err != nil {
+				t.Fatalf("Creating plugin: %v", err)
+			}
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
@@ -786,6 +893,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 		nodes        []*v1.Node
 		expectedList framework.NodeScoreList
 		name         string
+		args         config.NodeAffinityArgs
 	}{
 		{
 			pod: &v1.Pod{
@@ -843,6 +951,50 @@ func TestNodeAffinityPriority(t *testing.T) {
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 18}, {Name: "machine5", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 36}},
 			name:         "all machines matches the preferred scheduling requirements of pod but with different priorities ",
 		},
+		{
+			pod: &v1.Pod{},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
+			},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}},
+			name:         "added affinity",
+			args: config.NodeAffinityArgs{
+				AddedAffinity: affinity1.NodeAffinity,
+			},
+		},
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: affinity1,
+				},
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label5}},
+			},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 40}, {Name: "machine2", Score: 60}, {Name: "machine3", Score: framework.MaxNodeScore}},
+			name:         "added affinity and pod has default affinity",
+			args: config.NodeAffinityArgs{
+				AddedAffinity: &v1.NodeAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
+						{
+							Weight: 3,
+							Preference: v1.NodeSelectorTerm{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "key",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"value"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -850,7 +1002,10 @@ func TestNodeAffinityPriority(t *testing.T) {
 			state := framework.NewCycleState()
 
 			fh, _ := runtime.NewFramework(nil, nil, nil, runtime.WithSnapshotSharedLister(cache.NewSnapshot(nil, test.nodes)))
-			p, _ := New(nil, fh)
+			p, err := New(&test.args, fh)
+			if err != nil {
+				t.Fatalf("Creating plugin: %v", err)
+			}
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
 				nodeName := n.ObjectMeta.Name
@@ -866,8 +1021,8 @@ func TestNodeAffinityPriority(t *testing.T) {
 				t.Errorf("unexpected error: %v", status)
 			}
 
-			if !reflect.DeepEqual(test.expectedList, gotList) {
-				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
+			if diff := cmp.Diff(test.expectedList, gotList); diff != "" {
+				t.Errorf("obtained scores (-want,+got):\n%s", diff)
 			}
 		})
 	}

@@ -149,7 +149,7 @@ func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *exampl
 		return obj.DeepCopyObject(), nil, nil
 	}
 	key := "pods/" + obj.Namespace + "/" + obj.Name
-	if err := s.GuaranteedUpdate(context.TODO(), key, &example.Pod{}, old == nil, nil, updateFn); err != nil {
+	if err := s.GuaranteedUpdate(context.TODO(), key, &example.Pod{}, old == nil, nil, updateFn, nil); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	obj.ResourceVersion = ""

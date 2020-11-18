@@ -36,7 +36,7 @@ type pflagValue struct {
 	flag *pflag.Flag
 }
 
-// HasChanges returns whether the flag has changes or not.
+// HasChanged returns whether the flag has changes or not.
 func (p pflagValue) HasChanged() bool {
 	return p.flag.Changed
 }

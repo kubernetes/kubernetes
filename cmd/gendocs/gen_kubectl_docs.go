@@ -22,8 +22,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra/doc"
+	"k8s.io/kubectl/pkg/cmd"
 	"k8s.io/kubernetes/cmd/genutils"
-	"k8s.io/kubernetes/pkg/kubectl/cmd"
 )
 
 func main() {

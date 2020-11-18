@@ -18,6 +18,7 @@ package network
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -44,7 +45,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
-	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -54,8 +54,9 @@ const (
 	// EndpointUDPPort is an endpoint UDP port for testing.
 	EndpointUDPPort = 8081
 	// EndpointSCTPPort is an endpoint SCTP port for testing.
-	EndpointSCTPPort      = 8082
-	testContainerHTTPPort = 8080
+	EndpointSCTPPort = 8082
+	// testContainerHTTPPort is the test container http port.
+	testContainerHTTPPort = 9080
 	// ClusterHTTPPort is a cluster HTTP port for testing.
 	ClusterHTTPPort = 80
 	// ClusterUDPPort is a cluster UDP port for testing.
@@ -90,9 +91,34 @@ const (
 // NetexecImageName is the image name for agnhost.
 var NetexecImageName = imageutils.GetE2EImage(imageutils.Agnhost)
 
+// Option is used to configure the NetworkingTest object
+type Option func(*NetworkingTestConfig)
+
+// EnableSCTP listen on SCTP ports on the endpoints
+func EnableSCTP(config *NetworkingTestConfig) {
+	config.SCTPEnabled = true
+}
+
+// UseHostNetwork run the test container with HostNetwork=true.
+func UseHostNetwork(config *NetworkingTestConfig) {
+	config.HostNetwork = true
+}
+
+// EndpointsUseHostNetwork run the endpoints pods with HostNetwork=true.
+func EndpointsUseHostNetwork(config *NetworkingTestConfig) {
+	config.EndpointsHostNetwork = true
+}
+
 // NewNetworkingTestConfig creates and sets up a new test config helper.
-func NewNetworkingTestConfig(f *framework.Framework, hostNetwork, SCTPEnabled bool) *NetworkingTestConfig {
-	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork, SCTPEnabled: SCTPEnabled}
+func NewNetworkingTestConfig(f *framework.Framework, setters ...Option) *NetworkingTestConfig {
+	// default options
+	config := &NetworkingTestConfig{
+		f:         f,
+		Namespace: f.Namespace.Name,
+	}
+	for _, setter := range setters {
+		setter(config)
+	}
 	ginkgo.By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setup(getServiceSelector())
 	return config
@@ -100,7 +126,12 @@ func NewNetworkingTestConfig(f *framework.Framework, hostNetwork, SCTPEnabled bo
 
 // NewCoreNetworkingTestConfig creates and sets up a new test config helper for Node E2E.
 func NewCoreNetworkingTestConfig(f *framework.Framework, hostNetwork bool) *NetworkingTestConfig {
-	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork}
+	// default options
+	config := &NetworkingTestConfig{
+		f:           f,
+		Namespace:   f.Namespace.Name,
+		HostNetwork: hostNetwork,
+	}
 	ginkgo.By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setupCore(getServiceSelector())
 	return config
@@ -125,6 +156,8 @@ type NetworkingTestConfig struct {
 	HostTestContainerPod *v1.Pod
 	// if the HostTestContainerPod is running with HostNetwork=true.
 	HostNetwork bool
+	// if the endpoints Pods are running with HostNetwork=true.
+	EndpointsHostNetwork bool
 	// if the test pods are listening on sctp port. We need this as sctp tests
 	// are marked as disruptive as they may load the sctp module.
 	SCTPEnabled bool
@@ -213,7 +246,11 @@ func (config *NetworkingTestConfig) diagnoseMissingEndpoints(foundEndpoints sets
 func (config *NetworkingTestConfig) EndpointHostnames() sets.String {
 	expectedEps := sets.NewString()
 	for _, p := range config.EndpointPods {
-		expectedEps.Insert(p.Name)
+		if config.EndpointsHostNetwork {
+			expectedEps.Insert(p.Spec.NodeSelector["kubernetes.io/hostname"])
+		} else {
+			expectedEps.Insert(p.Name)
+		}
 	}
 	return expectedEps
 }
@@ -574,8 +611,7 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Args: []string{
 						"netexec",
-						fmt.Sprintf("--http-port=%d", EndpointHTTPPort),
-						fmt.Sprintf("--udp-port=%d", EndpointUDPPort),
+						fmt.Sprintf("--http-port=%d", testContainerHTTPPort),
 					},
 					Ports: []v1.ContainerPort{
 						{
@@ -586,10 +622,6 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 				},
 			},
 		},
-	}
-	// we want sctp to be optional as it will load the sctp kernel module
-	if config.SCTPEnabled {
-		pod.Spec.Containers[0].Args = append(pod.Spec.Containers[0].Args, fmt.Sprintf("--sctp-port=%d", EndpointSCTPPort))
 	}
 	return pod
 }
@@ -667,6 +699,13 @@ func (config *NetworkingTestConfig) CreateService(serviceSpec *v1.Service) *v1.S
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create %s service: %v", serviceSpec.Name, err))
 
 	err = WaitForService(config.f.ClientSet, config.Namespace, serviceSpec.Name, true, 5*time.Second, 45*time.Second)
+	// If the endpoints of the service use HostNetwork: true, they are going to try to bind on the host namespace
+	// if those ports are in use by any process in the host, the endpoints pods will fail to be deployed
+	// and the service will never be ready. We can be smarter and check directly that the ports are free
+	// but by now we Skip the test if the service is not ready and we are using endpoints with host network
+	if config.EndpointsHostNetwork && err != nil {
+		e2eskipper.Skipf("Service not ready. Pods are using hostNetwork: true, please check there is no other process on the host using the same ports: %v", err)
+	}
 	framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceSpec.Name, err))
 
 	createdService, err := config.getServiceClient().Get(context.TODO(), serviceSpec.Name, metav1.GetOptions{})
@@ -686,6 +725,9 @@ func (config *NetworkingTestConfig) setupCore(selector map[string]string) {
 	config.createTestPods()
 
 	epCount := len(config.EndpointPods)
+
+	// Note that this is not O(n^2) in practice, because epCount SHOULD be < 10.  In cases that epCount is > 10, this would be prohibitively large.
+	// Check maxNetProxyPodsCount for details.
 	config.MaxTries = epCount*epCount + testTries
 	framework.Logf("Setting MaxTries for pod polling to %v for networking test based on endpoint count %v", config.MaxTries, epCount)
 }
@@ -747,6 +789,7 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 		hostname, _ := n.Labels["kubernetes.io/hostname"]
 		pod := config.createNetShellPodSpec(podName, hostname)
 		pod.ObjectMeta.Labels = selector
+		pod.Spec.HostNetwork = config.EndpointsHostNetwork
 		createdPod := config.createPod(pod)
 		createdPods = append(createdPods, createdPod)
 	}
@@ -803,6 +846,7 @@ type HTTPPokeParams struct {
 	ExpectCode     int // default = 200
 	BodyContains   string
 	RetriableCodes []int
+	EnableHTTPS    bool
 }
 
 // HTTPPokeResult is a struct for HTTP poke result.
@@ -849,8 +893,18 @@ const (
 // The result body will be populated if the HTTP transaction was completed, even
 // if the other test params make this a failure).
 func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPokeResult {
+	// Set default params.
+	if params == nil {
+		params = &HTTPPokeParams{}
+	}
+
 	hostPort := net.JoinHostPort(host, strconv.Itoa(port))
-	url := fmt.Sprintf("http://%s%s", hostPort, path)
+	var url string
+	if params.EnableHTTPS {
+		url = fmt.Sprintf("https://%s%s", hostPort, path)
+	} else {
+		url = fmt.Sprintf("http://%s%s", hostPort, path)
+	}
 
 	ret := HTTPPokeResult{}
 
@@ -865,10 +919,6 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 		return ret
 	}
 
-	// Set default params.
-	if params == nil {
-		params = &HTTPPokeParams{}
-	}
 	if params.ExpectCode == 0 {
 		params.ExpectCode = http.StatusOK
 	}
@@ -935,6 +985,7 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Response, error) {
 	tr := utilnet.SetTransportDefaults(&http.Transport{
 		DisableKeepAlives: true,
+		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
 	})
 	client := &http.Client{
 		Transport: tr,
@@ -1050,7 +1101,7 @@ func WaitForService(c clientset.Interface, namespace, name string, exist bool, i
 		case apierrors.IsNotFound(err):
 			framework.Logf("Service %s in namespace %s disappeared.", name, namespace)
 			return !exist, nil
-		case !testutils.IsRetryableAPIError(err):
+		case err != nil:
 			framework.Logf("Non-retryable failure while getting service.")
 			return false, err
 		default:

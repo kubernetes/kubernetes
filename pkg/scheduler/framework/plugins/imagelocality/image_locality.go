@@ -23,7 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // The two thresholds are used as bounds for the image score range. They correspond to a reasonable size range for
@@ -36,7 +36,7 @@ const (
 
 // ImageLocality is a score plugin that favors nodes that already have requested pod container's images.
 type ImageLocality struct {
-	handle framework.FrameworkHandle
+	handle framework.Handle
 }
 
 var _ framework.ScorePlugin = &ImageLocality{}
@@ -73,7 +73,7 @@ func (pl *ImageLocality) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, h framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, h framework.Handle) (framework.Plugin, error) {
 	return &ImageLocality{handle: h}, nil
 }
 

@@ -26,4 +26,7 @@ const (
 	// May be overridden by a flag at startup.
 	// Deprecated: use the secure KubeControllerManagerPort instead.
 	InsecureKubeControllerManagerPort = 10252
+	// KubeControllerManagerPort is the default port for the controller manager status server.
+	// May be overridden by a flag at startup.
+	KubeControllerManagerPort = 10257
 )

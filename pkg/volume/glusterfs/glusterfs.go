@@ -120,7 +120,7 @@ func (plugin *glusterfsPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.Glusterfs != nil)
 }
 
-func (plugin *glusterfsPlugin) RequiresRemount() bool {
+func (plugin *glusterfsPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -461,7 +461,7 @@ type provisionerConfig struct {
 	userKey            string
 	secretNamespace    string
 	secretName         string
-	secretValue        string
+	secretValue        string `datapolicy:"token"`
 	clusterID          string
 	gidMin             int
 	gidMax             int

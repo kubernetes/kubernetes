@@ -102,18 +102,19 @@ func TestCompileManifests(t *testing.T) {
 			name:     "KubeDNSDeployment manifest",
 			manifest: KubeDNSDeployment,
 			data: struct {
-				DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, ControlPlaneTaintKey string
-				Replicas                                                                                                             *int32
+				DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, OldControlPlaneTaintKey, ControlPlaneTaintKey string
+				Replicas                                                                                                                                      *int32
 			}{
-				DeploymentName:       "foo",
-				KubeDNSImage:         "foo",
-				DNSMasqImage:         "foo",
-				SidecarImage:         "foo",
-				DNSBindAddr:          "foo",
-				DNSProbeAddr:         "foo",
-				DNSDomain:            "foo",
-				ControlPlaneTaintKey: "foo",
-				Replicas:             &replicas,
+				DeploymentName:          "foo",
+				KubeDNSImage:            "foo",
+				DNSMasqImage:            "foo",
+				SidecarImage:            "foo",
+				DNSBindAddr:             "foo",
+				DNSProbeAddr:            "foo",
+				DNSDomain:               "foo",
+				OldControlPlaneTaintKey: "foo",
+				ControlPlaneTaintKey:    "foo",
+				Replicas:                &replicas,
 			},
 		},
 		{
@@ -127,13 +128,14 @@ func TestCompileManifests(t *testing.T) {
 			name:     "CoreDNSDeployment manifest",
 			manifest: CoreDNSDeployment,
 			data: struct {
-				DeploymentName, Image, ControlPlaneTaintKey string
-				Replicas                                    *int32
+				DeploymentName, Image, OldControlPlaneTaintKey, ControlPlaneTaintKey string
+				Replicas                                                             *int32
 			}{
-				DeploymentName:       "foo",
-				Image:                "foo",
-				ControlPlaneTaintKey: "foo",
-				Replicas:             &replicas,
+				DeploymentName:          "foo",
+				Image:                   "foo",
+				OldControlPlaneTaintKey: "foo",
+				ControlPlaneTaintKey:    "foo",
+				Replicas:                &replicas,
 			},
 		},
 		{
@@ -506,32 +508,34 @@ func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
 			name:     "KubeDNSDeployment",
 			manifest: KubeDNSDeployment,
 			data: struct {
-				DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, ControlPlaneTaintKey string
-				Replicas                                                                                                             *int32
+				DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, OldControlPlaneTaintKey, ControlPlaneTaintKey string
+				Replicas                                                                                                                                      *int32
 			}{
-				DeploymentName:       "foo",
-				KubeDNSImage:         "foo",
-				DNSMasqImage:         "foo",
-				SidecarImage:         "foo",
-				DNSBindAddr:          "foo",
-				DNSProbeAddr:         "foo",
-				DNSDomain:            "foo",
-				ControlPlaneTaintKey: "foo",
-				Replicas:             &replicas,
+				DeploymentName:          "foo",
+				KubeDNSImage:            "foo",
+				DNSMasqImage:            "foo",
+				SidecarImage:            "foo",
+				DNSBindAddr:             "foo",
+				DNSProbeAddr:            "foo",
+				DNSDomain:               "foo",
+				OldControlPlaneTaintKey: "foo",
+				ControlPlaneTaintKey:    "foo",
+				Replicas:                &replicas,
 			},
 		},
 		{
 			name:     "CoreDNSDeployment",
 			manifest: CoreDNSDeployment,
 			data: struct {
-				DeploymentName, Image, ControlPlaneTaintKey, CoreDNSConfigMapName string
-				Replicas                                                          *int32
+				DeploymentName, Image, OldControlPlaneTaintKey, ControlPlaneTaintKey, CoreDNSConfigMapName string
+				Replicas                                                                                   *int32
 			}{
-				DeploymentName:       "foo",
-				Image:                "foo",
-				ControlPlaneTaintKey: "foo",
-				CoreDNSConfigMapName: "foo",
-				Replicas:             &replicas,
+				DeploymentName:          "foo",
+				Image:                   "foo",
+				OldControlPlaneTaintKey: "foo",
+				ControlPlaneTaintKey:    "foo",
+				CoreDNSConfigMapName:    "foo",
+				Replicas:                &replicas,
 			},
 		},
 	}

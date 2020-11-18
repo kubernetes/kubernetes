@@ -80,9 +80,9 @@ func TestJitterWithNegativeMaxFactor(t *testing.T) {
 	// If maxFactor is 0.0 or less than 0.0, a suggested default value will be chosen.
 	// rand.Float64() returns, as a float64, a pseudo-random number in [0.0,1.0).
 	duration := time.Duration(time.Second)
-	maxFactor := float64(-3.0)
+	maxFactor := -3.0
 	res := jitter(duration, maxFactor)
-	defaultMaxFactor := float64(1.0)
+	defaultMaxFactor := 1.0
 	expected := jitter(duration, defaultMaxFactor)
 	assert.Equal(t, expected-res >= time.Duration(0.0*float64(duration)), true)
 	assert.Equal(t, expected-res < time.Duration(1.0*float64(duration)), true)
@@ -156,7 +156,7 @@ func TestDoBackoffRetry(t *testing.T) {
 			Path: "/api",
 		},
 	}
-	r := mocks.NewResponseWithStatus("500 InternelServerError", http.StatusInternalServerError)
+	r := mocks.NewResponseWithStatus("500 InternalServerError", http.StatusInternalServerError)
 	client := mocks.NewSender()
 	client.AppendAndRepeatResponse(r, 3)
 

@@ -12,7 +12,7 @@ endif
 all: build test phaul phaul-test
 
 lint:
-	@golint . test phaul
+	@golint -set_exit_status . test phaul
 build:
 	@$(GO) build -v
 

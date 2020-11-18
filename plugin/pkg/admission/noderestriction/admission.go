@@ -71,7 +71,6 @@ type Plugin struct {
 	podsGetter     corev1lister.PodLister
 	nodesGetter    corev1lister.NodeLister
 
-	tokenRequestEnabled            bool
 	csiNodeInfoEnabled             bool
 	expandPersistentVolumesEnabled bool
 }
@@ -84,7 +83,6 @@ var (
 
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	p.tokenRequestEnabled = featureGates.Enabled(features.TokenRequest)
 	p.csiNodeInfoEnabled = featureGates.Enabled(features.CSINodeInfo)
 	p.expandPersistentVolumesEnabled = featureGates.Enabled(features.ExpandPersistentVolumes)
 }
@@ -159,10 +157,7 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		}
 
 	case svcacctResource:
-		if p.tokenRequestEnabled {
-			return p.admitServiceAccount(nodeName, a)
-		}
-		return nil
+		return p.admitServiceAccount(nodeName, a)
 
 	case leaseResource:
 		return p.admitLease(nodeName, a)

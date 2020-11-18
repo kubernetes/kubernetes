@@ -57,7 +57,7 @@ var podResources = []corev1.ResourceName{
 }
 
 // podResourcePrefixes are the set of prefixes for resources (Hugepages, and other
-// potential extended reources with specific prefix) managed by quota associated with pods.
+// potential extended resources with specific prefix) managed by quota associated with pods.
 var podResourcePrefixes = []string{
 	corev1.ResourceHugePagesPrefix,
 	corev1.ResourceRequestsHugePagesPrefix,

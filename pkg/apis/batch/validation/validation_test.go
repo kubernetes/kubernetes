@@ -26,6 +26,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -99,7 +100,7 @@ func TestValidateJob(t *testing.T) {
 		},
 	}
 	for k, v := range successCases {
-		if errs := ValidateJob(&v); len(errs) != 0 {
+		if errs := ValidateJob(&v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success for %s: %v", k, errs)
 		}
 	}
@@ -194,7 +195,7 @@ func TestValidateJob(t *testing.T) {
 				},
 			},
 		},
-		"spec.template.spec.restartPolicy: Unsupported value": {
+		"spec.template.spec.restartPolicy: Required value": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "myjob",
 				Namespace: metav1.NamespaceDefault,
@@ -209,6 +210,27 @@ func TestValidateJob(t *testing.T) {
 					},
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyAlways,
+						DNSPolicy:     api.DNSClusterFirst,
+						Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+					},
+				},
+			},
+		},
+		"spec.template.spec.restartPolicy: Unsupported value": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "myjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.JobSpec{
+				Selector:       validManualSelector,
+				ManualSelector: newBool(true),
+				Template: api.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: validManualSelector.MatchLabels,
+					},
+					Spec: api.PodSpec{
+						RestartPolicy: "Invalid",
 						DNSPolicy:     api.DNSClusterFirst,
 						Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 					},
@@ -238,7 +260,7 @@ func TestValidateJob(t *testing.T) {
 		}
 
 		for k, v := range errorCases {
-			errs := ValidateJob(&v)
+			errs := ValidateJob(&v, corevalidation.PodValidationOptions{})
 			if len(errs) == 0 {
 				t.Errorf("expected failure for %s", k)
 			} else {
@@ -368,7 +390,7 @@ func TestValidateCronJob(t *testing.T) {
 		},
 	}
 	for k, v := range successCases {
-		if errs := ValidateCronJob(&v); len(errs) != 0 {
+		if errs := ValidateCronJob(&v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success for %s: %v", k, errs)
 		}
 
@@ -376,7 +398,7 @@ func TestValidateCronJob(t *testing.T) {
 		// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
 		v = *v.DeepCopy()
 		v.ResourceVersion = "1"
-		if errs := ValidateCronJobUpdate(&v, &v); len(errs) != 0 {
+		if errs := ValidateCronJobUpdate(&v, &v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success for %s: %v", k, errs)
 		}
 	}
@@ -585,7 +607,7 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
-		"spec.jobTemplate.spec.template.spec.restartPolicy: Unsupported value": {
+		"spec.jobTemplate.spec.template.spec.restartPolicy: Required value": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: metav1.NamespaceDefault,
@@ -599,6 +621,28 @@ func TestValidateCronJob(t *testing.T) {
 						Template: api.PodTemplateSpec{
 							Spec: api.PodSpec{
 								RestartPolicy: api.RestartPolicyAlways,
+								DNSPolicy:     api.DNSClusterFirst,
+								Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+							},
+						},
+					},
+				},
+			},
+		},
+		"spec.jobTemplate.spec.template.spec.restartPolicy: Unsupported value": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mycronjob",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: api.PodTemplateSpec{
+							Spec: api.PodSpec{
+								RestartPolicy: "Invalid",
 								DNSPolicy:     api.DNSClusterFirst,
 								Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
 							},
@@ -629,7 +673,7 @@ func TestValidateCronJob(t *testing.T) {
 	}
 
 	for k, v := range errorCases {
-		errs := ValidateCronJob(&v)
+		errs := ValidateCronJob(&v, corevalidation.PodValidationOptions{})
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		} else {
@@ -644,7 +688,7 @@ func TestValidateCronJob(t *testing.T) {
 		// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
 		v = *v.DeepCopy()
 		v.ResourceVersion = "1"
-		errs = ValidateCronJobUpdate(&v, &v)
+		errs = ValidateCronJobUpdate(&v, &v, corevalidation.PodValidationOptions{})
 		if len(errs) == 0 {
 			if k == "metadata.name: must be no more than 52 characters" {
 				continue

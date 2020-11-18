@@ -9,25 +9,8 @@ options:
   substitution_option: ALLOW_LOOSE
   machineType: 'N1_HIGHCPU_8'
 steps:
-  - name: gcr.io/cloud-builders/gcloud
+  - name: 'gcr.io/k8s-testimages/gcb-docker-gcloud:v20200422-b25d964'
     entrypoint: 'bash'
-    # NOTE(claudiub): We need to get the ca.pem, cert.pem, key.pem files and put create the
-    # /certs/.docker-1809/, /certs/.docker-1903/, /certs/.docker-1909/ folders, which will contain the files.
-    args:
-    - -c
-    - |
-      mkdir -p .docker-windows
-      gcloud secrets versions access latest --project=k8s-infra-prow-build-trusted --secret=windows-remote-docker_ca-pem > .docker-windows/ca.pem
-      gcloud secrets versions access latest --project=k8s-infra-prow-build-trusted --secret=windows-remote-docker_cert-pem > .docker-windows/cert.pem
-      gcloud secrets versions access latest --project=k8s-infra-prow-build-trusted --secret=windows-remote-docker_key-pem > .docker-windows/key.pem
-      cp -r .docker-windows /certs/.docker-1809
-      cp -r .docker-windows /certs/.docker-1903
-      cp -r .docker-windows /certs/.docker-1909
-    volumes:
-    - name: 'certs'
-      path: '/certs'
-  - name: 'gcr.io/k8s-testimages/gcb-docker-gcloud:v20190906-745fed4'
-    entrypoint: make
     dir: ./test/images/
     env:
     - DOCKER_CLI_EXPERIMENTAL=enabled
@@ -35,15 +18,18 @@ steps:
     - BASE_REF=$_PULL_BASE_REF
     - WHAT=$_WHAT
     - REGISTRY=gcr.io/k8s-staging-e2e-test-images
-    - DOCKER_CERT_BASE_PATH=/certs
-    - REMOTE_DOCKER_URL_1809=tcp://img-promoter-1809.eastus.cloudapp.azure.com:2376
-    - REMOTE_DOCKER_URL_1903=tcp://img-promoter-1903.eastus.cloudapp.azure.com:2376
-    - REMOTE_DOCKER_URL_1909=tcp://img-promoter-1909.eastus.cloudapp.azure.com:2376
+    # The default cloudbuild has HOME=/builder/home and docker buildx is in /root/.docker/cli-plugins/docker-buildx
+    # We need to set the HOME to /root explicitly since we're using docker buildx
+    - HOME=/root
     args:
-    - all-build-and-push
-    volumes:
-    - name: 'certs'
-      path: '/certs'
+    - '-c'
+    - |
+      gcloud auth configure-docker \
+      && docker run --rm --privileged multiarch/qemu-user-static --reset -p yes \
+      && export DOCKER_CLI_EXPERIMENTAL=enabled \
+      && docker buildx create --name img-builder --use \
+      && docker buildx inspect --bootstrap \
+      && make all-build-and-push
 substitutions:
   # _GIT_TAG will be filled with a git-based tag for the image, of the form vYYYYMMDD-hash, and
   # can be used as a substitution

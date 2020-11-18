@@ -1,7 +1,7 @@
 dependencies:
   # agnhost: bump this one first
   - name: "agnhost"
-    version: "2.24"
+    version: "2.25"
     refPaths:
     - path: test/images/agnhost/VERSION
       match: \d.\d
@@ -113,7 +113,7 @@ dependencies:
     version: v1.15.2-1
     refPaths:
     - path: build/build-image/cross/VERSION
-    - path: test/images/sample-apiserver/Dockerfile
+    - path: test/images/sample-apiserver/Makefile
       match: k8s\.gcr\.io\/build-image\/kube-cross:v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   # Base images
@@ -152,7 +152,7 @@ dependencies:
       match: tag =
 
   - name: "k8s.gcr.io/pause"
-    version: 3.3
+    version: 3.4
     refPaths:
     - path: build/pause/Makefile
       match: TAG =

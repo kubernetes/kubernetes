@@ -89,6 +89,9 @@ func (intstr *IntOrString) UnmarshalJSON(value []byte) error {
 
 // String returns the string value, or the Itoa of the int value.
 func (intstr *IntOrString) String() string {
+	if intstr == nil {
+		return "<nil>"
+	}
 	if intstr.Type == String {
 		return intstr.StrVal
 	}

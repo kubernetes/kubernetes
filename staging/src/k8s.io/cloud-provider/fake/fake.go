@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 )
@@ -64,6 +64,7 @@ type Cloud struct {
 	ErrByProviderID         error
 	NodeShutdown            bool
 	ErrShutdownByProviderID error
+	MetadataErr             error
 
 	Calls         []string
 	Addresses     []v1.NodeAddress
@@ -81,6 +82,7 @@ type Cloud struct {
 	RouteMap      map[string]*Route
 	Lock          sync.Mutex
 	Provider      string
+	ProviderID    map[types.NodeName]string
 	addCallLock   sync.Mutex
 	cloudprovider.Zone
 	VolumeLabelMap map[string]map[string]string
@@ -321,13 +323,20 @@ func (f *Cloud) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprov
 	f.addCall("instance-metadata-by-provider-id")
 	f.addressesMux.Lock()
 	defer f.addressesMux.Unlock()
+
+	providerID := ""
+	id, ok := f.ProviderID[types.NodeName(node.Name)]
+	if ok {
+		providerID = id
+	}
+
 	return &cloudprovider.InstanceMetadata{
-		ProviderID:    node.Spec.ProviderID,
+		ProviderID:    providerID,
 		InstanceType:  f.InstanceTypes[types.NodeName(node.Spec.ProviderID)],
 		NodeAddresses: f.Addresses,
 		Zone:          f.Zone.FailureDomain,
 		Region:        f.Zone.Region,
-	}, f.Err
+	}, f.MetadataErr
 }
 
 // List is a test-spy implementation of Instances.List.

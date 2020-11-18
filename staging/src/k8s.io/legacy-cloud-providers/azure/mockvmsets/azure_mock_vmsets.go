@@ -291,3 +291,19 @@ func (mr *MockVMSetMockRecorder) GetPrivateIPsByNodeName(name interface{}) *gomo
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPrivateIPsByNodeName", reflect.TypeOf((*MockVMSet)(nil).GetPrivateIPsByNodeName), name)
 }
+
+// GetNodeNameByIPConfigurationID mocks base method
+func (m *MockVMSet) GetNodeNameByIPConfigurationID(ipConfigurationID string) (string, string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNodeNameByIPConfigurationID", ipConfigurationID)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetNodeNameByIPConfigurationID indicates an expected call of GetNodeNameByIPConfigurationID
+func (mr *MockVMSetMockRecorder) GetNodeNameByIPConfigurationID(ipConfigurationID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeNameByIPConfigurationID", reflect.TypeOf((*MockVMSet)(nil).GetNodeNameByIPConfigurationID), ipConfigurationID)
+}

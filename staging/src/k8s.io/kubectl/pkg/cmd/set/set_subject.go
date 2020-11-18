@@ -37,8 +37,8 @@ import (
 )
 
 var (
-	subjectLong = templates.LongDesc(`
-	Update User, Group or ServiceAccount in a RoleBinding/ClusterRoleBinding.`)
+	subjectLong = templates.LongDesc(i18n.T(`
+	Update User, Group or ServiceAccount in a RoleBinding/ClusterRoleBinding.`))
 
 	subjectExample = templates.Examples(`
 	# Update a ClusterRoleBinding for serviceaccount1

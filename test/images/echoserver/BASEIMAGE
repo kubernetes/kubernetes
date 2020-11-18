@@ -3,3 +3,6 @@ linux/arm=arm32v6/nginx:1.15-alpine
 linux/arm64=arm64v8/nginx:1.15-alpine
 linux/ppc64le=ppc64le/nginx:1.15-alpine
 linux/s390x=s390x/nginx:1.15-alpine
+windows/amd64/1809=REGISTRY/busybox:1.29-windows-amd64-1809
+windows/amd64/1903=REGISTRY/busybox:1.29-windows-amd64-1903
+windows/amd64/1909=REGISTRY/busybox:1.29-windows-amd64-1909

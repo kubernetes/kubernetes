@@ -27,9 +27,11 @@ ZONE=${KUBE_GCE_ZONE:-us-central1-b}
 export REGION=${ZONE%-*}
 RELEASE_REGION_FALLBACK=${RELEASE_REGION_FALLBACK:-false}
 REGIONAL_KUBE_ADDONS=${REGIONAL_KUBE_ADDONS:-true}
+# TODO: Migrate to e2-standard machine family.
 NODE_SIZE=${NODE_SIZE:-n1-standard-2}
 NUM_NODES=${NUM_NODES:-3}
 NUM_WINDOWS_NODES=${NUM_WINDOWS_NODES:-0}
+# TODO: Migrate to e2-standard machine family.
 MASTER_SIZE=${MASTER_SIZE:-n1-standard-$(get-master-size)}
 MASTER_MIN_CPU_ARCHITECTURE=${MASTER_MIN_CPU_ARCHITECTURE:-} # To allow choosing better architectures.
 export MASTER_DISK_TYPE=pd-ssd
@@ -348,10 +350,16 @@ if [ "${ENABLE_IP_ALIASES}" = true ]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_IP_ALIASES"
   PROVIDER_VARS="${PROVIDER_VARS:-} NODE_IPAM_MODE"
   PROVIDER_VARS="${PROVIDER_VARS:-} SECONDARY_RANGE_NAME"
-elif [[ -n "${MAX_PODS_PER_NODE:-}" ]]; then
-  # Should not have MAX_PODS_PER_NODE set for route-based clusters.
-  echo -e "${color_red:-}Cannot set MAX_PODS_PER_NODE for route-based projects for ${PROJECT}." >&2
-  exit 1
+else
+  if [[ -n "${MAX_PODS_PER_NODE:-}" ]]; then
+    # Should not have MAX_PODS_PER_NODE set for route-based clusters.
+    echo -e "${color_red:-}Cannot set MAX_PODS_PER_NODE for route-based projects for ${PROJECT}." >&2
+    exit 1
+  fi
+  if [[ "$(get-num-nodes)" -gt 100 ]]; then
+    echo -e "${color_red:-}Cannot create cluster with more than 100 nodes for route-based projects for ${PROJECT}." >&2
+    exit 1
+  fi
 fi
 
 # Enable GCE Alpha features.
@@ -427,7 +435,7 @@ METADATA_CLOBBERS_CONFIG="${METADATA_CLOBBERS_CONFIG:-false}"
 ENABLE_BIG_CLUSTER_SUBNETS="${ENABLE_BIG_CLUSTER_SUBNETS:-false}"
 
 # Optional: Enable log rotation for k8s services
-ENABLE_LOGROTATE_FILES="${ENABLE_LOGROTATE_FILES:-false}"
+ENABLE_LOGROTATE_FILES="${ENABLE_LOGROTATE_FILES:-true}"
 PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_LOGROTATE_FILES"
 if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_FILES_MAX_COUNT"
@@ -490,6 +498,9 @@ KUBE_PROXY_DAEMONSET="${KUBE_PROXY_DAEMONSET:-false}" # true, false
 # as an addon daemonset.
 KUBE_PROXY_DISABLE="${KUBE_PROXY_DISABLE:-false}" # true, false
 
+# Will be passed into the kube-proxy via `--detect-local-mode`
+DETECT_LOCAL_MODE="${DETECT_LOCAL_MODE:-}"
+
 # Optional: duration of cluster signed certificates.
 CLUSTER_SIGNING_DURATION="${CLUSTER_SIGNING_DURATION:-}"
 
@@ -518,9 +529,35 @@ WINDOWS_NODE_TAINTS="${WINDOWS_NODE_TAINTS:-node.kubernetes.io/os=win1809:NoSche
 export GCE_PRIVATE_CLUSTER="${KUBE_GCE_PRIVATE_CLUSTER:-false}"
 export GCE_PRIVATE_CLUSTER_PORTS_PER_VM="${KUBE_GCE_PRIVATE_CLUSTER_PORTS_PER_VM:-}"
 
-# Optional: Create apiserver konnectivity server and agent.
-export ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE="${KUBE_ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}"
+# When KUBE_ENABLE_KONNECTIVITY_SERVICE is enabled, the three variables below will
+# default to true to enable the konnectivity network proxy and start the required pods.
+# Their values can be overridden for more granular control of the proxy.
+
+# Optional: Whether to do the setup for the konnectivity service
+# Includes setting up kubeconfig, tokens, egress files, and firewall rules
+export PREPARE_KONNECTIVITY_SERVICE="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-true}"
+# Optional: Whether to use konnectivity network proxy for all egress from apiserver.
+export EGRESS_VIA_KONNECTIVITY="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-true}"
+# Optional: Whether to start the konnectivity server and agent pods.
+export RUN_KONNECTIVITY_PODS="${KUBE_ENABLE_KONNECTIVITY_SERVICE:-true}"
+# Proxy Protocol Mode determines the protocol to use to communicate between apiserver and network proxy.
+# Valid options are grpc and http-connect. Default is grpc.
 export KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE="${KUBE_KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}"
 
 # Optional: Enable Windows CSI-Proxy
 export ENABLE_CSI_PROXY="${ENABLE_CSI_PROXY:-true}"
+
+# KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP decides whether
+# kube-apiserver is healthchecked on host IP instead of 127.0.0.1.
+export KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP="${KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP:-false}"
+
+# ETCD_LISTEN_ON_HOST_IP decides whether etcd servers should also listen on host IP,
+# in addition to listening to 127.0.0.1, and whether kube-apiserver should connect to etcd servers
+# through host IP.
+export ETCD_LISTEN_ON_HOST_IP="${ETCD_LISTEN_ON_HOST_IP:-false}"
+
+# ETCD_PROGRESS_NOTIFY_INTERVAL defines the interval for etcd watch progress notify events.
+export ETCD_PROGRESS_NOTIFY_INTERVAL="${ETCD_PROGRESS_NOTIFY_INTERVAL:-10m}"
+
+# Use host IP instead of localhost in control plane kubeconfig files.
+export KUBECONFIG_USE_HOST_IP="${KUBECONFIG_USE_HOST_IP:-false}"

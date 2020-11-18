@@ -41,10 +41,10 @@ type createContextOptions struct {
 }
 
 var (
-	createContextLong = templates.LongDesc(`
+	createContextLong = templates.LongDesc(i18n.T(`
 		Sets a context entry in kubeconfig
 
-		Specifying a name that already exists will merge new fields on top of existing values for those fields.`)
+		Specifying a name that already exists will merge new fields on top of existing values for those fields.`))
 
 	createContextExample = templates.Examples(`
 		# Set the user field on the gce context entry without touching other values

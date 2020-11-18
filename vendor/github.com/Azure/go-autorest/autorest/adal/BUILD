@@ -8,6 +8,8 @@ go_library(
         "persist.go",
         "sender.go",
         "token.go",
+        "token_1.13.go",
+        "token_legacy.go",
         "version.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/Azure/go-autorest/autorest/adal",
@@ -16,7 +18,8 @@ go_library(
     deps = [
         "//vendor/github.com/Azure/go-autorest/autorest/date:go_default_library",
         "//vendor/github.com/Azure/go-autorest/tracing:go_default_library",
-        "//vendor/github.com/dgrijalva/jwt-go:go_default_library",
+        "//vendor/github.com/form3tech-oss/jwt-go:go_default_library",
+        "//vendor/golang.org/x/crypto/pkcs12:go_default_library",
     ],
 )
 

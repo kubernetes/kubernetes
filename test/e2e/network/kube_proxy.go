@@ -42,14 +42,14 @@ import (
 
 var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
-var _ = SIGDescribe("Network", func() {
+var _ = SIGDescribe("KubeProxy", func() {
 	const (
 		testDaemonHTTPPort    = 11301
 		testDaemonTCPPort     = 11302
 		postFinTimeoutSeconds = 30
 	)
 
-	fr := framework.NewDefaultFramework("network")
+	fr := framework.NewDefaultFramework("kube-proxy")
 
 	ginkgo.It("should set TCP CLOSE_WAIT timeout [Privileged]", func() {
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(fr.ClientSet, 2)
@@ -60,13 +60,20 @@ var _ = SIGDescribe("Network", func() {
 				len(nodes.Items))
 		}
 
-		ips := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
-
 		type NodeInfo struct {
 			node   *v1.Node
 			name   string
 			nodeIP string
 		}
+
+		var family v1.IPFamily
+		if framework.TestContext.ClusterIsIPv6() {
+			family = v1.IPv6Protocol
+		} else {
+			family = v1.IPv4Protocol
+		}
+
+		ips := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
 
 		clientNodeInfo := NodeInfo{
 			node:   &nodes.Items[0],
@@ -74,10 +81,12 @@ var _ = SIGDescribe("Network", func() {
 			nodeIP: ips[0],
 		}
 
+		ips = e2enode.GetAddressesByTypeAndFamily(&nodes.Items[1], v1.NodeInternalIP, family)
+
 		serverNodeInfo := NodeInfo{
 			node:   &nodes.Items[1],
 			name:   nodes.Items[1].Name,
-			nodeIP: ips[1],
+			nodeIP: ips[0],
 		}
 
 		// Create a pod to check the conntrack entries on the host node

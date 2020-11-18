@@ -9,7 +9,7 @@ go_library(
         "cri_stats_provider_windows.go",
         "helper.go",
         "log_metrics_provider.go",
-        "stats_provider.go",
+        "provider.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/stats",
     visibility = ["//visibility:public"],
@@ -67,7 +67,7 @@ go_test(
         "cri_stats_provider_test.go",
         "helper_test.go",
         "log_metrics_provider_test.go",
-        "stats_provider_test.go",
+        "provider_test.go",
     ],
     embed = [":go_default_library"],
     deps = [

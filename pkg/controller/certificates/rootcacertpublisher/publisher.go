@@ -187,6 +187,10 @@ func (c *Publisher) syncNamespace(ns string) error {
 				"ca.crt": string(c.rootCA),
 			},
 		}, metav1.CreateOptions{})
+		// don't retry a create if the namespace doesn't exist or is terminating
+		if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+			return nil
+		}
 		return err
 	case err != nil:
 		return err
@@ -200,6 +204,8 @@ func (c *Publisher) syncNamespace(ns string) error {
 		return nil
 	}
 
+	// copy so we don't modify the cache's instance of the configmap
+	cm = cm.DeepCopy()
 	cm.Data = data
 
 	_, err = c.client.CoreV1().ConfigMaps(ns).Update(context.TODO(), cm, metav1.UpdateOptions{})

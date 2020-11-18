@@ -38,7 +38,7 @@ type SecretForDockerRegistryGeneratorV1 struct {
 	// Email for registry (optional)
 	Email string
 	// Password for registry (required)
-	Password string
+	Password string `datapolicy:"password"`
 	// Server for registry (required)
 	Server string
 	// AppendHash; if true, derive a hash from the Secret and append it to the name
@@ -171,9 +171,9 @@ func encodeDockerConfigFieldAuth(username, password string) string {
 // DockerConfigJSON represents a local docker auth config file
 // for pulling images.
 type DockerConfigJSON struct {
-	Auths DockerConfig `json:"auths"`
+	Auths DockerConfig `json:"auths" datapolicy:"token"`
 	// +optional
-	HttpHeaders map[string]string `json:"HttpHeaders,omitempty"`
+	HttpHeaders map[string]string `json:"HttpHeaders,omitempty" datapolicy:"token"`
 }
 
 // DockerConfig represents the config file used by the docker CLI.
@@ -183,7 +183,7 @@ type DockerConfig map[string]DockerConfigEntry
 
 type DockerConfigEntry struct {
 	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
+	Password string `json:"password,omitempty" datapolicy:"password"`
 	Email    string `json:"email,omitempty"`
-	Auth     string `json:"auth,omitempty"`
+	Auth     string `json:"auth,omitempty" datapolicy:"token"`
 }

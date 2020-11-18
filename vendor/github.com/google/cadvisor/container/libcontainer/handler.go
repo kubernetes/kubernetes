@@ -870,6 +870,24 @@ func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.Memory.WorkingSet = workingSet
 }
 
+func getNumaStats(memoryStats map[uint8]uint64) map[uint8]uint64 {
+	stats := make(map[uint8]uint64, len(memoryStats))
+	for node, usage := range memoryStats {
+		stats[node] = usage
+	}
+	return stats
+}
+
+func setMemoryNumaStats(s *cgroups.Stats, ret *info.ContainerStats) {
+	ret.Memory.ContainerData.NumaStats.File = getNumaStats(s.MemoryStats.PageUsageByNUMA.File.Nodes)
+	ret.Memory.ContainerData.NumaStats.Anon = getNumaStats(s.MemoryStats.PageUsageByNUMA.Anon.Nodes)
+	ret.Memory.ContainerData.NumaStats.Unevictable = getNumaStats(s.MemoryStats.PageUsageByNUMA.Unevictable.Nodes)
+
+	ret.Memory.HierarchicalData.NumaStats.File = getNumaStats(s.MemoryStats.PageUsageByNUMA.Hierarchical.File.Nodes)
+	ret.Memory.HierarchicalData.NumaStats.Anon = getNumaStats(s.MemoryStats.PageUsageByNUMA.Hierarchical.Anon.Nodes)
+	ret.Memory.HierarchicalData.NumaStats.Unevictable = getNumaStats(s.MemoryStats.PageUsageByNUMA.Hierarchical.Unevictable.Nodes)
+}
+
 func setHugepageStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.Hugetlb = make(map[string]info.HugetlbStats)
 	for k, v := range s.HugetlbStats {
@@ -923,6 +941,9 @@ func newContainerStats(libcontainerStats *libcontainer.Stats, includedMetrics co
 			setDiskIoStats(s, ret)
 		}
 		setMemoryStats(s, ret)
+		if includedMetrics.Has(container.MemoryNumaMetrics) {
+			setMemoryNumaStats(s, ret)
+		}
 		if includedMetrics.Has(container.HugetlbUsageMetrics) {
 			setHugepageStats(s, ret)
 		}

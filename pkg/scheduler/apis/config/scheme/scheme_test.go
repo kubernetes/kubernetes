@@ -24,9 +24,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/utils/pointer"
@@ -39,7 +36,6 @@ func TestCodecsDecodePluginConfig(t *testing.T) {
 	testCases := []struct {
 		name         string
 		data         []byte
-		feature      featuregate.Feature
 		wantErr      string
 		wantProfiles []config.KubeSchedulerProfile
 	}{
@@ -50,6 +46,10 @@ apiVersion: kubescheduler.config.k8s.io/v1beta1
 kind: KubeSchedulerConfiguration
 profiles:
 - pluginConfig:
+  - name: DefaultPreemption
+    args:
+      minCandidateNodesPercentage: 50
+      minCandidateNodesAbsolute: 500
   - name: InterPodAffinity
     args:
       hardPodAffinityWeight: 5
@@ -87,11 +87,24 @@ profiles:
   - name: VolumeBinding
     args:
       bindTimeoutSeconds: 300
+  - name: NodeAffinity
+    args:
+      addedAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: foo
+              operator: In
+              values: ["bar"]
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
 					SchedulerName: "default-scheduler",
 					PluginConfig: []config.PluginConfig{
+						{
+							Name: "DefaultPreemption",
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 500},
+						},
 						{
 							Name: "InterPodAffinity",
 							Args: &config.InterPodAffinityArgs{HardPodAffinityWeight: 5},
@@ -142,6 +155,26 @@ profiles:
 							Name: "VolumeBinding",
 							Args: &config.VolumeBindingArgs{
 								BindTimeoutSeconds: 300,
+							},
+						},
+						{
+							Name: "NodeAffinity",
+							Args: &config.NodeAffinityArgs{
+								AddedAffinity: &corev1.NodeAffinity{
+									RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+										NodeSelectorTerms: []corev1.NodeSelectorTerm{
+											{
+												MatchExpressions: []corev1.NodeSelectorRequirement{
+													{
+														Key:      "foo",
+														Operator: corev1.NodeSelectorOpIn,
+														Values:   []string{"bar"},
+													},
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -253,6 +286,8 @@ apiVersion: kubescheduler.config.k8s.io/v1beta1
 kind: KubeSchedulerConfiguration
 profiles:
 - pluginConfig:
+  - name: DefaultPreemption
+    args:
   - name: InterPodAffinity
     args:
   - name: NodeResourcesFit
@@ -265,11 +300,16 @@ profiles:
   - name: VolumeBinding
     args:
   - name: PodTopologySpread
+  - name: NodeAffinity
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
 					SchedulerName: "default-scheduler",
 					PluginConfig: []config.PluginConfig{
+						{
+							Name: "DefaultPreemption",
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+						},
 						{
 							Name: "InterPodAffinity",
 							Args: &config.InterPodAffinityArgs{
@@ -302,8 +342,12 @@ profiles:
 						{
 							Name: "PodTopologySpread",
 							Args: &config.PodTopologySpreadArgs{
-								DefaultingType: config.ListDefaulting,
+								DefaultingType: config.SystemDefaulting,
 							},
+						},
+						{
+							Name: "NodeAffinity",
+							Args: &config.NodeAffinityArgs{},
 						},
 					},
 				},
@@ -313,9 +357,6 @@ profiles:
 	decoder := Codecs.UniversalDecoder()
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.feature != "" {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, tt.feature, true)()
-			}
 			obj, gvk, err := decoder.Decode(tt.data, nil, nil)
 			if err != nil {
 				if tt.wantErr != err.Error() {
@@ -466,6 +507,7 @@ profiles:
 			name:    "v1beta1 in-tree and out-of-tree plugins from internal",
 			version: v1beta1.SchemeGroupVersion,
 			obj: &config.KubeSchedulerConfiguration{
+				Parallelism: 8,
 				Profiles: []config.KubeSchedulerProfile{
 					{
 						PluginConfig: []config.PluginConfig{
@@ -521,6 +563,7 @@ leaderElection:
   resourceNamespace: ""
   retryPeriod: 0s
 metricsBindAddress: ""
+parallelism: 8
 percentageOfNodesToScore: 0
 podInitialBackoffSeconds: 0
 podMaxBackoffSeconds: 0
