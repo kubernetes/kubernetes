@@ -24,7 +24,6 @@ vendor/k8s.io/apiserver/pkg/endpoints/handlers
 vendor/k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager
 vendor/k8s.io/apiserver/pkg/endpoints/handlers/responsewriters
 vendor/k8s.io/apiserver/pkg/endpoints/metrics
-vendor/k8s.io/apiserver/pkg/endpoints/request
 vendor/k8s.io/apiserver/pkg/registry/generic/registry
 vendor/k8s.io/apiserver/pkg/registry/generic/rest
 vendor/k8s.io/apiserver/pkg/registry/rest/resttest
