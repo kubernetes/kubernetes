@@ -491,11 +491,14 @@ func (os *OpenStack) CreateVolume(name string, size int, vtype, availability str
 func (os *OpenStack) GetDevicePathBySerialID(volumeID string) string {
 	// Build a list of candidate device paths.
 	// Certain Nova drivers will set the disk serial ID, including the Cinder volume id.
+	// Newer OpenStacks may not truncate the volumeID to 20 chars.
 	candidateDeviceNodes := []string{
 		// KVM
 		fmt.Sprintf("virtio-%s", volumeID[:20]),
+		fmt.Sprintf("virtio-%s", volumeID),
 		// KVM virtio-scsi
 		fmt.Sprintf("scsi-0QEMU_QEMU_HARDDISK_%s", volumeID[:20]),
+		fmt.Sprintf("scsi-0QEMU_QEMU_HARDDISK_%s", volumeID),
 		// ESXi
 		fmt.Sprintf("wwn-0x%s", strings.Replace(volumeID, "-", "", -1)),
 	}
