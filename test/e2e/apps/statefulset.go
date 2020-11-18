@@ -984,14 +984,14 @@ func (z *zookeeperTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh create /%v %v", k, v)
-		framework.Logf(e2ekubectl.RunKubectlOrDie(z.ss.Namespace, "exec", ns, name, "--", "/bin/sh", "-c", cmd))
+		framework.Logf(e2ekubectl.RunKubectlOrDie(z.ss.Namespace, "exec", name, "--", "/bin/sh", "-c", cmd))
 	}
 }
 
 func (z *zookeeperTester) read(statefulPodIndex int, key string) string {
 	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
 	cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh get /%v", key)
-	return lastLine(e2ekubectl.RunKubectlOrDie(z.ss.Namespace, "exec", ns, name, "--", "/bin/sh", "-c", cmd))
+	return lastLine(e2ekubectl.RunKubectlOrDie(z.ss.Namespace, "exec", name, "--", "/bin/sh", "-c", cmd))
 }
 
 type mysqlGaleraTester struct {

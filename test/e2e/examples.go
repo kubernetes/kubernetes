@@ -70,8 +70,8 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			execYaml := readFile(test, "exec-liveness.yaml.in")
 			httpYaml := readFile(test, "http-liveness.yaml.in")
 
-			e2ekubectl.RunKubectlOrDieInput(ns, execYaml, "create", "-f", "-", nsFlag)
-			e2ekubectl.RunKubectlOrDieInput(ns, httpYaml, "create", "-f", "-", nsFlag)
+			e2ekubectl.RunKubectlOrDieInput(ns, execYaml, "create", "-f", "-")
+			e2ekubectl.RunKubectlOrDieInput(ns, httpYaml, "create", "-f", "-")
 
 			// Since both containers start rapidly, we can easily run this test in parallel.
 			var wg sync.WaitGroup

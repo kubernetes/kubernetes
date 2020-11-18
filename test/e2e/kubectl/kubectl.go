@@ -407,7 +407,8 @@ var _ = SIGDescribe("Kubectl client", func() {
 			framework.ExpectEqual(string(veryLongData), strings.TrimSpace(execOutput), "Unexpected kubectl exec output")
 
 			ginkgo.By("executing a command in the container with noninteractive stdin")
-			execOutput = e2ekubectl.NewKubectlCommand(ns, "exec", "-i", simplePodName, "cat").
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
+			execOutput = e2ekubectl.NewKubectlCommand(tk, "exec", "-i", simplePodName, "cat").
 				WithStdinData("abcd1234").
 				ExecOrDie(ns)
 			if e, a := "abcd1234", execOutput; e != a {
@@ -423,7 +424,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			defer closer.Close()
 
 			ginkgo.By("executing a command in the container with pseudo-interactive stdin")
-			execOutput = e2ekubectl.NewKubectlCommand(ns, "exec", "-i", simplePodName, "sh").
+			execOutput = e2ekubectl.NewKubectlCommand(tk, "exec", "-i", simplePodName, "sh").
 				WithStdinReader(r).
 				ExecOrDie(ns)
 			if e, a := "hi", strings.TrimSpace(execOutput); e != a {
@@ -502,28 +503,29 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 
 		ginkgo.It("should return command exit codes", func() {
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
 			ginkgo.By("execing into a container with a successful command")
-			_, err := e2ekubectl.NewKubectlCommand(ns, "exec", "httpd", "--", "/bin/sh", "-c", "exit 0").Exec()
+			_, err := e2ekubectl.NewKubectlCommand(tk, "exec", "httpd", "--", "/bin/sh", "-c", "exit 0").Exec()
 			framework.ExpectNoError(err)
 
 			ginkgo.By("execing into a container with a failing command")
-			_, err = e2ekubectl.NewKubectlCommand(ns, "exec", "httpd", "--", "/bin/sh", "-c", "exit 42").Exec()
+			_, err = e2ekubectl.NewKubectlCommand(tk, "exec", "httpd", "--", "/bin/sh", "-c", "exit 42").Exec()
 			ee, ok := err.(uexec.ExitError)
 			framework.ExpectEqual(ok, true)
 			framework.ExpectEqual(ee.ExitStatus(), 42)
 
 			ginkgo.By("running a successful command")
-			_, err = e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=Never", "success", "--", "/bin/sh", "-c", "exit 0").Exec()
+			_, err = e2ekubectl.NewKubectlCommand(tk, "run", "-i", "--image="+busyboxImage, "--restart=Never", "success", "--", "/bin/sh", "-c", "exit 0").Exec()
 			framework.ExpectNoError(err)
 
 			ginkgo.By("running a failing command")
-			_, err = e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=Never", "failure-1", "--", "/bin/sh", "-c", "exit 42").Exec()
+			_, err = e2ekubectl.NewKubectlCommand(tk, "run", "-i", "--image="+busyboxImage, "--restart=Never", "failure-1", "--", "/bin/sh", "-c", "exit 42").Exec()
 			ee, ok = err.(uexec.ExitError)
 			framework.ExpectEqual(ok, true)
 			framework.ExpectEqual(ee.ExitStatus(), 42)
 
 			ginkgo.By("running a failing command without --restart=Never")
-			_, err = e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "failure-2", "--", "/bin/sh", "-c", "cat && exit 42").
+			_, err = e2ekubectl.NewKubectlCommand(tk, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "failure-2", "--", "/bin/sh", "-c", "cat && exit 42").
 				WithStdinData("abcd1234").
 				Exec()
 			ee, ok = err.(uexec.ExitError)
@@ -533,7 +535,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 
 			ginkgo.By("running a failing command without --restart=Never, but with --rm")
-			_, err = e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "--rm", "failure-3", "--", "/bin/sh", "-c", "cat && exit 42").
+			_, err = e2ekubectl.NewKubectlCommand(tk, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "--rm", "failure-3", "--", "/bin/sh", "-c", "cat && exit 42").
 				WithStdinData("abcd1234").
 				Exec()
 			ee, ok = err.(uexec.ExitError)
@@ -544,7 +546,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			e2epod.WaitForPodToDisappear(f.ClientSet, ns, "failure-3", labels.Everything(), 2*time.Second, wait.ForeverTestTimeout)
 
 			ginkgo.By("running a failing command with --leave-stdin-open")
-			_, err = e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=Never", "failure-4", "--leave-stdin-open", "--", "/bin/sh", "-c", "exit 42").
+			_, err = e2ekubectl.NewKubectlCommand(tk, "run", "-i", "--image="+busyboxImage, "--restart=Never", "failure-4", "--leave-stdin-open", "--", "/bin/sh", "-c", "exit 42").
 				WithStdinData("abcd1234").
 				Exec()
 			framework.ExpectNoError(err)
@@ -554,7 +556,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			waitForStdinContent := func(pod, content string) string {
 				var logOutput string
 				err := wait.Poll(10*time.Second, 5*time.Minute, func() (bool, error) {
-					logOutput = framework.RunKubectlOrDie(ns, "logs", pod)
+					logOutput = e2ekubectl.RunKubectlOrDie(ns, "logs", pod)
 					return strings.Contains(logOutput, content), nil
 				})
 
@@ -562,9 +564,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 				return logOutput
 			}
 
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
+
 			ginkgo.By("executing a command with run and attach with stdin")
 			// We wait for a non-empty line so we know kubectl has attached
-			e2ekubectl.NewKubectlCommand(ns, "run", "run-test", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--stdin", "--", "sh", "-c", "echo -n read: && cat && echo 'stdin closed'").
+			e2ekubectl.NewKubectlCommand(tk, "run", "run-test", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--stdin", "--", "sh", "-c", "echo -n read: && cat && echo 'stdin closed'").
 				WithStdinData("value\nabcd1234").
 				ExecOrDie(ns)
 
@@ -581,7 +585,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			// "stdin closed", but hasn't exited yet.
 			// We wait 10 seconds before printing to give time to kubectl to attach
 			// to the container, this does not solve the race though.
-			e2ekubectl.NewKubectlCommand(ns, "run", "run-test-2", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			e2ekubectl.NewKubectlCommand(tk, "run", "run-test-2", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234").
 				ExecOrDie(ns)
 
@@ -592,7 +596,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			gomega.Expect(c.CoreV1().Pods(ns).Delete(context.TODO(), "run-test-2", metav1.DeleteOptions{})).To(gomega.BeNil())
 
 			ginkgo.By("executing a command with run and attach with stdin with open stdin should remain running")
-			e2ekubectl.NewKubectlCommand(ns, "run", "run-test-3", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			e2ekubectl.NewKubectlCommand(tk, "run", "run-test-3", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234\n").
 				ExecOrDie(ns)
 
@@ -800,12 +804,13 @@ metadata:
 
 	ginkgo.Describe("Kubectl apply", func() {
 		ginkgo.It("should apply a new configuration to an existing RC", func() {
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, f.Namespace.Name)
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
 			ginkgo.By("creating Agnhost RC")
 			e2ekubectl.RunKubectlOrDieInput(ns, controllerJSON, "create", "-f", "-")
 			ginkgo.By("applying a modified configuration")
 			stdin := modifyReplicationControllerConfiguration(controllerJSON)
-			e2ekubectl.NewKubectlCommand(ns, "apply", "-f", "-").
+			e2ekubectl.NewKubectlCommand(tk, "apply", "-f", "-").
 				WithStdinReader(stdin).
 				ExecOrDie(ns)
 			ginkgo.By("checking the result")
@@ -841,7 +846,7 @@ metadata:
 			e2ekubectl.RunKubectlOrDieInput(ns, deployment1Yaml, "apply", "-f", "-")
 
 			ginkgo.By("check the last-applied matches expectations annotations")
-			output := framework.RunKubectlOrDieInput(ns, deployment1Yaml, "apply", "view-last-applied", "-f", "-", "-o", "json")
+			output := e2ekubectl.RunKubectlOrDieInput(ns, deployment1Yaml, "apply", "view-last-applied", "-f", "-", "-o", "json")
 			requiredString := "\"replicas\": 2"
 			if !strings.Contains(output, requiredString) {
 				framework.Failf("Missing %s in kubectl view-last-applied", requiredString)
@@ -866,7 +871,7 @@ metadata:
 			e2ekubectl.RunKubectlOrDieInput(ns, deployment3Yaml, "apply", "-f", "-")
 
 			ginkgo.By("verify replicas still is 3 and image has been updated")
-			output = framework.RunKubectlOrDieInput(ns, deployment3Yaml, "get", "-f", "-", "-o", "json")
+			output = e2ekubectl.RunKubectlOrDieInput(ns, deployment3Yaml, "get", "-f", "-", "-o", "json")
 			requiredItems := []string{"\"replicas\": 3", imageutils.GetE2EImage(imageutils.Httpd)}
 			for _, item := range requiredItems {
 				if !strings.Contains(output, item) {
@@ -1334,7 +1339,7 @@ metadata:
 			ginkgo.By("adding the label " + labelName + " with value " + labelValue + " to a pod")
 			e2ekubectl.RunKubectlOrDie(ns, "label", "pods", pausePodName, labelName+"="+labelValue)
 			ginkgo.By("verifying the pod has the label " + labelName + " with the value " + labelValue)
-			output := framework.RunKubectlOrDie(ns, "get", "pod", pausePodName, "-L", labelName)
+			output := e2ekubectl.RunKubectlOrDie(ns, "get", "pod", pausePodName, "-L", labelName)
 			if !strings.Contains(output, labelValue) {
 				framework.Failf("Failed updating label " + labelName + " to the pod " + pausePodName)
 			}
@@ -1342,7 +1347,7 @@ metadata:
 			ginkgo.By("removing the label " + labelName + " of a pod")
 			e2ekubectl.RunKubectlOrDie(ns, "label", "pods", pausePodName, labelName+"-")
 			ginkgo.By("verifying the pod doesn't have the label " + labelName)
-			output = framework.RunKubectlOrDie(ns, "get", "pod", pausePodName, "-L", labelName)
+			output = e2ekubectl.RunKubectlOrDie(ns, "get", "pod", pausePodName, "-L", labelName)
 			if strings.Contains(output, labelValue) {
 				framework.Failf("Failed removing label " + labelName + " of the pod " + pausePodName)
 			}

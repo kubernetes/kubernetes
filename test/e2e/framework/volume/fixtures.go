@@ -467,13 +467,8 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 		} else {
 			// Filesystem: check content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
-<<<<<<< HEAD
 			commands := GenerateReadFileCmd(fileName)
-			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
-=======
-			commands := generateReadFileCmd(fileName)
 			_, err := e2ekubectl.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
->>>>>>> Refactor e2e fw core's all kubectl related functions into kubectl subpackage
 			framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
 
 			// Check that a directory has been mounted

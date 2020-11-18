@@ -394,7 +394,7 @@ func verifyServeHostnameServiceDown(c clientset.Interface, ns string, serviceIP 
 		"curl -g -s --connect-timeout 2 http://%s && echo service-down-failed", ipPort)
 
 	for start := time.Now(); time.Since(start) < e2eservice.KubeProxyLagTimeout; time.Sleep(5 * time.Second) {
-		output, err := framework.RunHostCmd(ns, hostExecPod.Name, command)
+		output, err := e2ekubectl.RunHostCmd(ns, hostExecPod.Name, command)
 		if err != nil {
 			framework.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", command, ns, hostExecPod.Name, err, output)
 		}
@@ -3709,7 +3709,10 @@ func restartApiserver(namespace string, cs clientset.Interface) error {
 		if err != nil {
 			return err
 		}
-		return e2ekubectl.MasterUpgradeGKE(namespace, v.GitVersion[1:]) // strip leading 'v'
+		projectID := framework.TestContext.CloudConfig.ProjectID
+		locationParamGKE := framework.LocationParamGKE()
+		cluster := framework.TestContext.CloudConfig.Cluster
+		return e2ekubectl.MasterUpgradeGKE(namespace, v.GitVersion[1:], projectID, locationParamGKE, cluster) // strip leading 'v'
 	}
 
 	return restartComponent(cs, kubeAPIServerLabelName, metav1.NamespaceSystem, map[string]string{clusterComponentKey: kubeAPIServerLabelName})

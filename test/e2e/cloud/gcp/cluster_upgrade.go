@@ -96,11 +96,14 @@ var serviceaccountAdmissionControllerMigrationTests = []upgrades.Test{
 
 // masterUpgrade upgrades master node on GCE/GKE.
 func masterUpgrade(f *framework.Framework, v string, extraEnvs []string) error {
+	projectID := framework.TestContext.CloudConfig.ProjectID
+	locationParamGKE := framework.LocationParamGKE()
+	cluster := framework.TestContext.CloudConfig.Cluster
 	switch framework.TestContext.Provider {
 	case "gce":
 		return masterUpgradeGCE(v, extraEnvs)
 	case "gke":
-		return framework.MasterUpgradeGKE(f.Namespace.Name, v)
+		return e2ekubectl.MasterUpgradeGKE(f.Namespace.Name, v, projectID, locationParamGKE, cluster)
 	default:
 		return fmt.Errorf("masterUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
 	}

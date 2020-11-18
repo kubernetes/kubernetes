@@ -359,8 +359,8 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 
 func verifyFilesExistOnVSphereVolume(namespace string, podName string, filePaths ...string) {
 	for _, filePath := range filePaths {
-		_, err := framework.RunKubectl(namespace, "exec", podName, "--", "/bin/ls", filePath)
-		e2ekubectl.ExpectNoError(err, fmt.Sprintf("failed to verify file: %q on the pod: %q", filePath, podName))
+		_, err := e2ekubectl.RunKubectl(namespace, "exec", podName, "--", "/bin/ls", filePath)
+		framework.ExpectNoError(err, fmt.Sprintf("failed to verify file: %q on the pod: %q", filePath, podName))
 	}
 }
 
