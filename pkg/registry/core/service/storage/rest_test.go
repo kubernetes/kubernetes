@@ -3548,7 +3548,7 @@ func TestDefaultingValidation(t *testing.T) {
 				testCase.modifyRest(storage)
 			}
 
-			err := storage.tryDefaultValidateServiceClusterIPFields(testCase.oldSvc, testCase.svc)
+			err := storage.alloc.tryDefaultValidateServiceClusterIPFields(testCase.oldSvc, testCase.svc)
 			if err != nil && !testCase.expectError {
 				t.Fatalf("error %v was not expected", err)
 			}
