@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -32,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -435,6 +437,147 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 	})
 	// TODO (khenidak add slice validation logic, since endpoint controller only operates
 	// on primary ClusterIP
+
+	// Service Granular Checks as in k8s.io/kubernetes/test/e2e/network/networking.go
+	// but using the secondary IP, so we run the same tests for each ClusterIP family
+	ginkgo.Describe("Granular Checks: Services Secondary IP Family", func() {
+
+		ginkgo.It("should function for pod-Service: http", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
+			config.DialFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.SecondaryNodeIP, config.NodeHTTPPort))
+			config.DialFromTestContainer("http", config.SecondaryNodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+		})
+
+		ginkgo.It("should function for pod-Service: udp", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
+			config.DialFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.SecondaryNodeIP, config.NodeUDPPort))
+			config.DialFromTestContainer("udp", config.SecondaryNodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+		})
+
+		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
+		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack, e2enetwork.EnableSCTP)
+			ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterSCTPPort))
+			config.DialFromTestContainer("sctp", config.SecondaryClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.SecondaryNodeIP, config.NodeSCTPPort))
+			config.DialFromTestContainer("sctp", config.SecondaryNodeIP, config.NodeSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
+		})
+
+		ginkgo.It("should function for node-Service: http", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack, e2enetwork.UseHostNetwork)
+			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (config.clusterIP)", config.SecondaryNodeIP, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
+			config.DialFromNode("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (nodeIP)", config.SecondaryNodeIP, config.SecondaryNodeIP, config.NodeHTTPPort))
+			config.DialFromNode("http", config.SecondaryNodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+		})
+
+		ginkgo.It("should function for node-Service: udp", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack, e2enetwork.UseHostNetwork)
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (config.clusterIP)", config.SecondaryNodeIP, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
+			config.DialFromNode("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP)", config.SecondaryNodeIP, config.SecondaryNodeIP, config.NodeUDPPort))
+			config.DialFromNode("udp", config.SecondaryNodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+		})
+
+		ginkgo.It("should function for endpoint-Service: http", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
+			config.DialFromEndpointContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (nodeIP)", config.EndpointPods[0].Name, config.SecondaryNodeIP, config.NodeHTTPPort))
+			config.DialFromEndpointContainer("http", config.SecondaryNodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+		})
+
+		ginkgo.It("should function for endpoint-Service: udp", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
+			config.DialFromEndpointContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v (endpoint) --> %v:%v (nodeIP)", config.EndpointPods[0].Name, config.SecondaryNodeIP, config.NodeUDPPort))
+			config.DialFromEndpointContainer("udp", config.SecondaryNodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+		})
+
+		ginkgo.It("should update endpoints: http", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
+			config.DialFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			config.DeleteNetProxyPod()
+
+			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
+			config.DialFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, config.MaxTries, config.EndpointHostnames())
+		})
+
+		ginkgo.It("should update endpoints: udp", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
+			config.DialFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+
+			config.DeleteNetProxyPod()
+
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
+			config.DialFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, config.MaxTries, config.EndpointHostnames())
+		})
+
+		// [LinuxOnly]: Windows does not support session affinity.
+		ginkgo.It("should function for client IP based session affinity: http [LinuxOnly]", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIPs[1], e2enetwork.ClusterHTTPPort))
+
+			// Check if number of endpoints returned are exactly one.
+			eps, err := config.GetEndpointsFromTestContainer("http", config.SessionAffinityService.Spec.ClusterIPs[1], e2enetwork.ClusterHTTPPort, e2enetwork.SessionAffinityChecks)
+			if err != nil {
+				framework.Failf("ginkgo.Failed to get endpoints from test container, error: %v", err)
+			}
+			if len(eps) == 0 {
+				framework.Failf("Unexpected no endpoints return")
+			}
+			if len(eps) > 1 {
+				framework.Failf("Unexpected endpoints return: %v, expect 1 endpoints", eps)
+			}
+		})
+
+		// [LinuxOnly]: Windows does not support session affinity.
+		ginkgo.It("should function for client IP based session affinity: udp [LinuxOnly]", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIPs[1], e2enetwork.ClusterUDPPort))
+
+			// Check if number of endpoints returned are exactly one.
+			eps, err := config.GetEndpointsFromTestContainer("udp", config.SessionAffinityService.Spec.ClusterIPs[1], e2enetwork.ClusterUDPPort, e2enetwork.SessionAffinityChecks)
+			if err != nil {
+				framework.Failf("ginkgo.Failed to get endpoints from test container, error: %v", err)
+			}
+			if len(eps) == 0 {
+				framework.Failf("Unexpected no endpoints return")
+			}
+			if len(eps) > 1 {
+				framework.Failf("Unexpected endpoints return: %v, expect 1 endpoints", eps)
+			}
+		})
+
+		ginkgo.It("should be able to handle large requests: http", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort))
+			message := strings.Repeat("42", 1000)
+			config.DialEchoFromTestContainer("http", config.SecondaryClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, message)
+		})
+
+		ginkgo.It("should be able to handle large requests: udp", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.SecondaryClusterIP, e2enetwork.ClusterUDPPort))
+			message := "n" + strings.Repeat("o", 1999)
+			config.DialEchoFromTestContainer("udp", config.SecondaryClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, message)
+		})
+	})
 })
 
 func validateNumOfServicePorts(svc *v1.Service, expectedNumOfPorts int) {

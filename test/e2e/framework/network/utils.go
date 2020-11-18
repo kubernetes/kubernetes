@@ -46,6 +46,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -97,6 +98,11 @@ type Option func(*NetworkingTestConfig)
 // EnableSCTP listen on SCTP ports on the endpoints
 func EnableSCTP(config *NetworkingTestConfig) {
 	config.SCTPEnabled = true
+}
+
+// EnableDualStack create Dual Stack services
+func EnableDualStack(config *NetworkingTestConfig) {
+	config.DualStackEnabled = true
 }
 
 // UseHostNetwork run the test container with HostNetwork=true.
@@ -161,6 +167,8 @@ type NetworkingTestConfig struct {
 	// if the test pods are listening on sctp port. We need this as sctp tests
 	// are marked as disruptive as they may load the sctp module.
 	SCTPEnabled bool
+	// DualStackEnabled enables dual stack on services
+	DualStackEnabled bool
 	// EndpointPods are the pods belonging to the Service created by this
 	// test config. Each invocation of `setup` creates a service with
 	// 1 pod per node running the netexecImage.
@@ -173,17 +181,21 @@ type NetworkingTestConfig struct {
 	// SessionAffinityService is a Service with SessionAffinity=ClientIP
 	// spanning over all endpointPods.
 	SessionAffinityService *v1.Service
-	// ExternalAddrs is a list of external IPs of nodes in the cluster.
-	ExternalAddr string
 	// Nodes is a list of nodes in the cluster.
 	Nodes []v1.Node
 	// MaxTries is the number of retries tolerated for tests run against
 	// endpoints and services created by this config.
 	MaxTries int
-	// The ClusterIP of the Service reated by this test config.
+	// The ClusterIP of the Service created by this test config.
 	ClusterIP string
-	// External ip of first node for use in nodePort testing.
+	// The SecondaryClusterIP of the Service created by this test config.
+	SecondaryClusterIP string
+	// NodeIP it's an ExternalIP if the node has one,
+	// or an InternalIP if not, for use in nodePort testing.
 	NodeIP string
+	// SecondaryNodeIP it's an ExternalIP of the secondary IP family if the node has one,
+	// or an InternalIP if not, for usein nodePort testing.
+	SecondaryNodeIP string
 	// The http/udp/sctp nodePorts of the Service.
 	NodeHTTPPort int
 	NodeUDPPort  int
@@ -649,6 +661,10 @@ func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, se
 	if config.SCTPEnabled {
 		res.Spec.Ports = append(res.Spec.Ports, v1.ServicePort{Port: ClusterSCTPPort, Name: "sctp", Protocol: v1.ProtocolSCTP, TargetPort: intstr.FromInt(EndpointSCTPPort)})
 	}
+	if config.DualStackEnabled {
+		requireDual := v1.IPFamilyPolicyRequireDualStack
+		res.Spec.IPFamilyPolicy = &requireDual
+	}
 	return res
 }
 
@@ -740,7 +756,6 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList, err := e2enode.GetReadySchedulableNodes(config.f.ClientSet)
 	framework.ExpectNoError(err)
-	config.ExternalAddr = e2enode.FirstAddress(nodeList, v1.NodeExternalIP)
 
 	e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 	config.Nodes = nodeList.Items
@@ -761,11 +776,32 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 			continue
 		}
 	}
+
+	// obtain the ClusterIP
 	config.ClusterIP = config.NodePortService.Spec.ClusterIP
-	if config.ExternalAddr != "" {
-		config.NodeIP = config.ExternalAddr
-	} else {
-		config.NodeIP = e2enode.FirstAddress(nodeList, v1.NodeInternalIP)
+	if config.DualStackEnabled {
+		config.SecondaryClusterIP = config.NodePortService.Spec.ClusterIPs[1]
+	}
+
+	// Obtain the primary IP family of the Cluster based on the first ClusterIP
+	// TODO: Eventually we should just be getting these from Spec.IPFamilies
+	// but for now that would only if the feature gate is enabled.
+	family := v1.IPv4Protocol
+	secondaryFamily := v1.IPv6Protocol
+	if netutils.IsIPv6String(config.ClusterIP) {
+		family = v1.IPv6Protocol
+		secondaryFamily = v1.IPv4Protocol
+	}
+	// Get Node IPs from the cluster, ExternalIPs take precedence
+	config.NodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, family)
+	if config.NodeIP == "" {
+		config.NodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeInternalIP, family)
+	}
+	if config.DualStackEnabled {
+		config.SecondaryNodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeExternalIP, secondaryFamily)
+		if config.SecondaryNodeIP == "" {
+			config.SecondaryNodeIP = e2enode.FirstAddressByTypeAndFamily(nodeList, v1.NodeInternalIP, secondaryFamily)
+		}
 	}
 
 	ginkgo.By("Waiting for NodePort service to expose endpoint")
