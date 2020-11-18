@@ -240,7 +240,13 @@ func NewTestRESTWithPods(t *testing.T, endpoints []*api.Endpoints, pods []api.Po
 		t.Fatalf("cannot create port allocator %v", err)
 	}
 
-	rest, _ := NewREST(serviceStorage, endpointStorage, podStorage.Pod, rPrimary, rSecondary, portAllocator, nil)
+	ipAllocators := map[api.IPFamily]ipallocator.Interface{
+		rPrimary.IPFamily(): rPrimary,
+	}
+	if rSecondary != nil {
+		ipAllocators[rSecondary.IPFamily()] = rSecondary
+	}
+	rest, _ := NewREST(serviceStorage, endpointStorage, podStorage.Pod, rPrimary.IPFamily(), ipAllocators, portAllocator, nil)
 
 	return rest, server
 }
@@ -332,7 +338,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 			}
 
 			for i, family := range createdService.Spec.IPFamilies {
-				allocator := storage.serviceIPAllocatorsByFamily[family]
+				allocator := storage.alloc.serviceIPAllocatorsByFamily[family]
 				c := allocator.CIDR()
 				cidr := &c
 				if !cidr.Contains(netutils.ParseIPSloppy(createdService.Spec.ClusterIPs[i])) {
@@ -399,7 +405,7 @@ func TestServiceRegistryCreateDryRun(t *testing.T) {
 			}
 
 			for i, family := range tc.svc.Spec.IPFamilies {
-				alloc := storage.serviceIPAllocatorsByFamily[family]
+				alloc := storage.alloc.serviceIPAllocatorsByFamily[family]
 				if ipIsAllocated(t, alloc, tc.svc.Spec.ClusterIPs[i]) {
 					t.Errorf("unexpected side effect: ip allocated %v", tc.svc.Spec.ClusterIPs[i])
 				}
@@ -429,7 +435,7 @@ func TestDryRunNodePort(t *testing.T) {
 	if createdSvc.Spec.Ports[0].NodePort == 0 {
 		t.Errorf("expected NodePort value assigned")
 	}
-	if portIsAllocated(t, storage.serviceNodePorts, createdSvc.Spec.Ports[0].NodePort) {
+	if portIsAllocated(t, storage.alloc.serviceNodePorts, createdSvc.Spec.Ports[0].NodePort) {
 		t.Errorf("unexpected side effect: NodePort allocated")
 	}
 	_, err = getService(storage, ctx, svc.Name, &metav1.GetOptions{})
@@ -456,7 +462,7 @@ func TestDryRunNodePort(t *testing.T) {
 		t.Errorf("Expected %v, but got %v", expectNodePorts, actualNodePorts)
 	}
 	for i := range svc.Spec.Ports {
-		if portIsAllocated(t, storage.serviceNodePorts, svc.Spec.Ports[i].NodePort) {
+		if portIsAllocated(t, storage.alloc.serviceNodePorts, svc.Spec.Ports[i].NodePort) {
 			t.Errorf("unexpected side effect: NodePort allocated")
 		}
 	}
@@ -560,7 +566,7 @@ func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
 		for i := range serviceNodePorts {
 			nodePort := serviceNodePorts[i]
 			// Release the node port at the end of the test case.
-			storage.serviceNodePorts.Release(nodePort)
+			storage.alloc.serviceNodePorts.Release(nodePort)
 		}
 	}
 }
@@ -902,7 +908,7 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	if created {
 		t.Errorf("expected not created")
 	}
-	if portIsAllocated(t, storage.serviceNodePorts, new1.Spec.Ports[0].NodePort) {
+	if portIsAllocated(t, storage.alloc.serviceNodePorts, new1.Spec.Ports[0].NodePort) {
 		t.Errorf("unexpected side effect: NodePort allocated")
 	}
 
@@ -915,7 +921,7 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
-	if ipIsAllocated(t, storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily], new2.Spec.ClusterIP) {
+	if ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[storage.alloc.defaultServiceIPFamily], new2.Spec.ClusterIP) {
 		t.Errorf("unexpected side effect: ip allocated")
 	}
 
@@ -925,10 +931,10 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 		t.Fatalf("Expected no error: %v", err)
 	}
 	svc = obj.(*api.Service)
-	if !ipIsAllocated(t, storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily], svc.Spec.ClusterIP) {
+	if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[storage.alloc.defaultServiceIPFamily], svc.Spec.ClusterIP) {
 		t.Errorf("expected IP to be allocated")
 	}
-	if !portIsAllocated(t, storage.serviceNodePorts, svc.Spec.Ports[0].NodePort) {
+	if !portIsAllocated(t, storage.alloc.serviceNodePorts, svc.Spec.Ports[0].NodePort) {
 		t.Errorf("expected NodePort to be allocated")
 	}
 
@@ -939,7 +945,7 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
-	if !portIsAllocated(t, storage.serviceNodePorts, svc.Spec.Ports[0].NodePort) {
+	if !portIsAllocated(t, storage.alloc.serviceNodePorts, svc.Spec.Ports[0].NodePort) {
 		t.Errorf("unexpected side effect: NodePort unallocated")
 	}
 
@@ -957,7 +963,7 @@ func TestServiceRegistryUpdateDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error: %v", err)
 	}
-	if !ipIsAllocated(t, storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily], svc.Spec.ClusterIP) {
+	if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[storage.alloc.defaultServiceIPFamily], svc.Spec.ClusterIP) {
 		t.Errorf("unexpected side effect: ip unallocated")
 	}
 }
@@ -1130,14 +1136,14 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 	if createdSvc.Spec.ClusterIP == "" {
 		t.Fatalf("expected ClusterIP to be set")
 	}
-	if !ipIsAllocated(t, storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily], createdSvc.Spec.ClusterIP) {
+	if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[storage.alloc.defaultServiceIPFamily], createdSvc.Spec.ClusterIP) {
 		t.Errorf("expected ClusterIP to be allocated")
 	}
 	_, _, err = storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
-	if !ipIsAllocated(t, storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily], createdSvc.Spec.ClusterIP) {
+	if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[storage.alloc.defaultServiceIPFamily], createdSvc.Spec.ClusterIP) {
 		t.Errorf("unexpected side effect: ip unallocated")
 	}
 
@@ -1151,7 +1157,7 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 	if createdSvc.Spec.Ports[0].NodePort == 0 {
 		t.Fatalf("expected NodePort to be set")
 	}
-	if !portIsAllocated(t, storage.serviceNodePorts, createdSvc.Spec.Ports[0].NodePort) {
+	if !portIsAllocated(t, storage.alloc.serviceNodePorts, createdSvc.Spec.Ports[0].NodePort) {
 		t.Errorf("expected NodePort to be allocated")
 	}
 
@@ -1161,7 +1167,7 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error: %v", err)
 	}
-	if !portIsAllocated(t, storage.serviceNodePorts, createdSvc.Spec.Ports[0].NodePort) {
+	if !portIsAllocated(t, storage.alloc.serviceNodePorts, createdSvc.Spec.Ports[0].NodePort) {
 		t.Errorf("unexpected side effect: NodePort unallocated")
 	}
 }
@@ -1189,7 +1195,7 @@ func TestDualStackServiceRegistryDeleteDryRun(t *testing.T) {
 		t.Fatalf("Expected no error: %v", err)
 	}
 	for i, family := range dualstack_svc.Spec.IPFamilies {
-		if !ipIsAllocated(t, dualstack_storage.serviceIPAllocatorsByFamily[family], dualstack_svc.Spec.ClusterIPs[i]) {
+		if !ipIsAllocated(t, dualstack_storage.alloc.serviceIPAllocatorsByFamily[family], dualstack_svc.Spec.ClusterIPs[i]) {
 			t.Errorf("unexpected side effect: ip unallocated %v", dualstack_svc.Spec.ClusterIPs[i])
 		}
 	}
@@ -1492,7 +1498,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	testIPs := []string{"1.2.3.93", "1.2.3.94", "1.2.3.95", "1.2.3.96"}
 	testIP := "not-an-ip"
 	for _, ip := range testIPs {
-		if !ipIsAllocated(t, storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].(*ipallocator.Range), ip) {
+		if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[storage.alloc.defaultServiceIPFamily].(*ipallocator.Range), ip) {
 			testIP = ip
 			break
 		}
@@ -1581,7 +1587,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	testIPs := []string{"1.2.3.93", "1.2.3.94", "1.2.3.95", "1.2.3.96"}
 	testIP := ""
 	for _, ip := range testIPs {
-		if !ipIsAllocated(t, storage.serviceIPAllocatorsByFamily[storage.defaultServiceIPFamily].(*ipallocator.Range), ip) {
+		if !ipIsAllocated(t, storage.alloc.serviceIPAllocatorsByFamily[storage.alloc.defaultServiceIPFamily].(*ipallocator.Range), ip) {
 			testIP = ip
 			break
 		}
@@ -1955,7 +1961,7 @@ func TestInitClusterIP(t *testing.T) {
 
 			// pre allocate ips if any
 			for family, ip := range test.preAllocateClusterIPs {
-				allocator, ok := storage.serviceIPAllocatorsByFamily[family]
+				allocator, ok := storage.alloc.serviceIPAllocatorsByFamily[family]
 				if !ok {
 					t.Fatalf("test is incorrect, allocator does not exist on rest")
 				}
@@ -1986,7 +1992,7 @@ func TestInitClusterIP(t *testing.T) {
 					if netutils.IsIPv6String(ip) {
 						family = api.IPv6Protocol
 					}
-					allocator := storage.serviceIPAllocatorsByFamily[family]
+					allocator := storage.alloc.serviceIPAllocatorsByFamily[family]
 					if !ipIsAllocated(t, allocator, ip) {
 						t.Fatalf("expected ip:%v to be allocated by %v allocator. it was not", ip, family)
 					}
@@ -2021,7 +2027,7 @@ func TestInitClusterIP(t *testing.T) {
 				return
 			}
 
-			shouldUpgrade := len(newSvc.Spec.IPFamilies) == 2 && *(newSvc.Spec.IPFamilyPolicy) != api.IPFamilyPolicySingleStack && len(storage.serviceIPAllocatorsByFamily) == 2
+			shouldUpgrade := len(newSvc.Spec.IPFamilies) == 2 && *(newSvc.Spec.IPFamilyPolicy) != api.IPFamilyPolicySingleStack && len(storage.alloc.serviceIPAllocatorsByFamily) == 2
 			if shouldUpgrade && len(newSvc.Spec.ClusterIPs) < 2 {
 				t.Fatalf("Service should have been upgraded %+v", newSvc)
 			}
@@ -2037,7 +2043,7 @@ func TestInitClusterIP(t *testing.T) {
 func TestInitNodePorts(t *testing.T) {
 	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
-	nodePortOp := portallocator.StartOperation(storage.serviceNodePorts, false)
+	nodePortOp := portallocator.StartOperation(storage.alloc.serviceNodePorts, false)
 
 	testCases := []struct {
 		name                     string
@@ -2103,7 +2109,7 @@ func TestInitNodePorts(t *testing.T) {
 		serviceNodePorts := collectServiceNodePorts(test.service)
 		if len(test.expectSpecifiedNodePorts) == 0 {
 			for _, nodePort := range serviceNodePorts {
-				if !storage.serviceNodePorts.Has(nodePort) {
+				if !storage.alloc.serviceNodePorts.Has(nodePort) {
 					t.Errorf("%q: unexpected NodePort %d, out of range", test.name, nodePort)
 				}
 			}
@@ -2113,7 +2119,7 @@ func TestInitNodePorts(t *testing.T) {
 		for i := range serviceNodePorts {
 			nodePort := serviceNodePorts[i]
 			// Release the node port at the end of the test case.
-			storage.serviceNodePorts.Release(nodePort)
+			storage.alloc.serviceNodePorts.Release(nodePort)
 		}
 	}
 }
@@ -2121,7 +2127,7 @@ func TestInitNodePorts(t *testing.T) {
 func TestUpdateNodePorts(t *testing.T) {
 	storage, server := NewTestREST(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
-	nodePortOp := portallocator.StartOperation(storage.serviceNodePorts, false)
+	nodePortOp := portallocator.StartOperation(storage.alloc.serviceNodePorts, false)
 
 	testCases := []struct {
 		name                     string
@@ -2218,7 +2224,7 @@ func TestUpdateNodePorts(t *testing.T) {
 		serviceNodePorts := collectServiceNodePorts(test.newService)
 		if len(test.expectSpecifiedNodePorts) == 0 {
 			for _, nodePort := range serviceNodePorts {
-				if !storage.serviceNodePorts.Has(nodePort) {
+				if !storage.alloc.serviceNodePorts.Has(nodePort) {
 					t.Errorf("%q: unexpected NodePort %d, out of range", test.name, nodePort)
 				}
 			}
@@ -2228,7 +2234,7 @@ func TestUpdateNodePorts(t *testing.T) {
 		for i := range serviceNodePorts {
 			nodePort := serviceNodePorts[i]
 			// Release the node port at the end of the test case.
-			storage.serviceNodePorts.Release(nodePort)
+			storage.alloc.serviceNodePorts.Release(nodePort)
 		}
 	}
 }
@@ -2386,7 +2392,7 @@ func TestServiceUpgrade(t *testing.T) {
 			createdSvc := obj.(*api.Service)
 			// allocated IP
 			for family, ip := range testCase.allocateIPsBeforeUpdate {
-				alloc := storage.serviceIPAllocatorsByFamily[family]
+				alloc := storage.alloc.serviceIPAllocatorsByFamily[family]
 				if err := alloc.Allocate(netutils.ParseIPSloppy(ip)); err != nil {
 					t.Fatalf("test is incorrect, unable to preallocate ip:%v", ip)
 				}
@@ -2418,7 +2424,7 @@ func TestServiceUpgrade(t *testing.T) {
 			updatedSvc := updated.(*api.Service)
 			isValidClusterIPFields(t, storage, updatedSvc, updatedSvc)
 
-			shouldUpgrade := len(createdSvc.Spec.IPFamilies) == 2 && *(createdSvc.Spec.IPFamilyPolicy) != api.IPFamilyPolicySingleStack && len(storage.serviceIPAllocatorsByFamily) == 2
+			shouldUpgrade := len(createdSvc.Spec.IPFamilies) == 2 && *(createdSvc.Spec.IPFamilyPolicy) != api.IPFamilyPolicySingleStack && len(storage.alloc.serviceIPAllocatorsByFamily) == 2
 			if shouldUpgrade && len(updatedSvc.Spec.ClusterIPs) < 2 {
 				t.Fatalf("Service should have been upgraded %+v", createdSvc)
 			}
@@ -2430,7 +2436,7 @@ func TestServiceUpgrade(t *testing.T) {
 			// make sure that ips were allocated, correctly
 			for i, family := range updatedSvc.Spec.IPFamilies {
 				ip := updatedSvc.Spec.ClusterIPs[i]
-				allocator := storage.serviceIPAllocatorsByFamily[family]
+				allocator := storage.alloc.serviceIPAllocatorsByFamily[family]
 				if !ipIsAllocated(t, allocator, ip) {
 					t.Fatalf("expected ip:%v to be allocated by %v allocator. it was not", ip, family)
 				}
@@ -2562,7 +2568,7 @@ func TestServiceDowngrade(t *testing.T) {
 			if shouldDowngrade {
 				releasedIP := copySvc.Spec.ClusterIPs[1]
 				releasedIPFamily := copySvc.Spec.IPFamilies[1]
-				allocator := storage.serviceIPAllocatorsByFamily[releasedIPFamily]
+				allocator := storage.alloc.serviceIPAllocatorsByFamily[releasedIPFamily]
 
 				if ipIsAllocated(t, allocator, releasedIP) {
 					t.Fatalf("expected ip:%v to be released by %v allocator. it was not", releasedIP, releasedIPFamily)
@@ -2579,28 +2585,28 @@ func TestDefaultingValidation(t *testing.T) {
 
 	// takes in REST and modify it for a specific config
 	fnMakeSingleStackIPv4Allocator := func(rest *REST) {
-		rest.defaultServiceIPFamily = api.IPv4Protocol
-		rest.serviceIPAllocatorsByFamily = map[api.IPFamily]ipallocator.Interface{api.IPv4Protocol: rest.serviceIPAllocatorsByFamily[api.IPv4Protocol]}
+		rest.alloc.defaultServiceIPFamily = api.IPv4Protocol
+		rest.alloc.serviceIPAllocatorsByFamily = map[api.IPFamily]ipallocator.Interface{api.IPv4Protocol: rest.alloc.serviceIPAllocatorsByFamily[api.IPv4Protocol]}
 	}
 
 	fnMakeSingleStackIPv6Allocator := func(rest *REST) {
-		rest.defaultServiceIPFamily = api.IPv6Protocol
-		rest.serviceIPAllocatorsByFamily = map[api.IPFamily]ipallocator.Interface{api.IPv6Protocol: rest.serviceIPAllocatorsByFamily[api.IPv6Protocol]}
+		rest.alloc.defaultServiceIPFamily = api.IPv6Protocol
+		rest.alloc.serviceIPAllocatorsByFamily = map[api.IPFamily]ipallocator.Interface{api.IPv6Protocol: rest.alloc.serviceIPAllocatorsByFamily[api.IPv6Protocol]}
 	}
 
 	fnMakeDualStackStackIPv4IPv6Allocator := func(rest *REST) {
-		rest.defaultServiceIPFamily = api.IPv4Protocol
-		rest.serviceIPAllocatorsByFamily = map[api.IPFamily]ipallocator.Interface{
-			api.IPv6Protocol: rest.serviceIPAllocatorsByFamily[api.IPv6Protocol],
-			api.IPv4Protocol: rest.serviceIPAllocatorsByFamily[api.IPv4Protocol],
+		rest.alloc.defaultServiceIPFamily = api.IPv4Protocol
+		rest.alloc.serviceIPAllocatorsByFamily = map[api.IPFamily]ipallocator.Interface{
+			api.IPv6Protocol: rest.alloc.serviceIPAllocatorsByFamily[api.IPv6Protocol],
+			api.IPv4Protocol: rest.alloc.serviceIPAllocatorsByFamily[api.IPv4Protocol],
 		}
 	}
 
 	fnMakeDualStackStackIPv6IPv4Allocator := func(rest *REST) {
-		rest.defaultServiceIPFamily = api.IPv6Protocol
-		rest.serviceIPAllocatorsByFamily = map[api.IPFamily]ipallocator.Interface{
-			api.IPv6Protocol: rest.serviceIPAllocatorsByFamily[api.IPv6Protocol],
-			api.IPv4Protocol: rest.serviceIPAllocatorsByFamily[api.IPv4Protocol],
+		rest.alloc.defaultServiceIPFamily = api.IPv6Protocol
+		rest.alloc.serviceIPAllocatorsByFamily = map[api.IPFamily]ipallocator.Interface{
+			api.IPv6Protocol: rest.alloc.serviceIPAllocatorsByFamily[api.IPv6Protocol],
+			api.IPv4Protocol: rest.alloc.serviceIPAllocatorsByFamily[api.IPv4Protocol],
 		}
 	}
 
