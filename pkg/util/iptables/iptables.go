@@ -246,6 +246,7 @@ func (runner *runner) EnsureChain(table Table, chain Chain) (bool, error) {
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
+	// Because it is faster than doing a pre-check, just try to create.
 	out, err := runner.run(opCreateChain, fullArgs)
 	if err != nil {
 		if ee, ok := err.(utilexec.ExitError); ok {
@@ -279,7 +280,7 @@ func (runner *runner) DeleteChain(table Table, chain Chain) error {
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
-	// TODO: we could call iptables -S first, ignore the output and check for non-zero return (more like DeleteRule)
+	// Because it is faster than doing a pre-check, just try to delete.
 	out, err := runner.run(opDeleteChain, fullArgs)
 	if err != nil {
 		return fmt.Errorf("error deleting chain %q: %v: %s", chain, err, out)
