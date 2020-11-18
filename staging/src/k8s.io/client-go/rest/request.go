@@ -588,12 +588,12 @@ func (r *Request) tryThrottle(ctx context.Context) error {
 
 	latency := time.Since(now)
 	if latency > longThrottleLatency {
-		klog.V(3).Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
+		klog.V(3).Infof("Throttled request took %v, request: %s:%s", latency, r.verb, r.URL().String())
 	}
 	if latency > extraLongThrottleLatency {
 		// If the rate limiter latency is very high, the log message should be printed at a higher log level,
 		// but we use a throttled logger to prevent spamming.
-		globalThrottledLogger.Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
+		globalThrottledLogger.Infof("Throttled request took %v, request: %s:%s", latency, r.verb, r.URL().String())
 	}
 	metrics.RateLimiterLatency.Observe(r.verb, r.finalURLTemplate(), latency)
 
