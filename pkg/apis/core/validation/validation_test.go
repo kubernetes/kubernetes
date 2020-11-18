@@ -12019,7 +12019,8 @@ func TestValidateServiceExternalTrafficFieldsCombination(t *testing.T) {
 	for _, tc := range testCases {
 		svc := makeValidService()
 		tc.tweakSvc(&svc)
-		errs := ValidateServiceExternalTrafficFieldsCombination(&svc)
+		// TODO: This test is probably insufficient for such a big function under test.
+		errs := validateServiceExternalTrafficFieldsCombination(&svc)
 		if len(errs) != tc.numErrs {
 			t.Errorf("Unexpected error list for case %q: %v", tc.name, errs.ToAggregate())
 		}
