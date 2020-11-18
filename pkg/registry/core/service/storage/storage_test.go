@@ -17,6 +17,8 @@ limitations under the License.
 package storage
 
 import (
+	"fmt"
+	"net"
 	"reflect"
 	"testing"
 
@@ -30,6 +32,7 @@ import (
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	netutils "k8s.io/utils/net"
 
@@ -37,6 +40,14 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 )
+
+func makeIPAllocator(cidr *net.IPNet) ipallocator.Interface {
+	al, err := ipallocator.NewInMemory(cidr)
+	if err != nil {
+		panic(fmt.Sprintf("error creating IP allocator: %v", err))
+	}
+	return al
+}
 
 func newStorage(t *testing.T) (*GenericREST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
@@ -46,7 +57,10 @@ func newStorage(t *testing.T) (*GenericREST, *StatusREST, *etcd3testing.EtcdTest
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "services",
 	}
-	serviceStorage, statusStorage, err := NewGenericREST(restOptions, *makeIPNet(t), false)
+	ipAllocs := map[api.IPFamily]ipallocator.Interface{
+		api.IPv4Protocol: makeIPAllocator(makeIPNet(t)),
+	}
+	serviceStorage, statusStorage, err := NewGenericREST(restOptions, api.IPv4Protocol, ipAllocs, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -427,7 +441,10 @@ func TestServiceDefaultOnRead(t *testing.T) {
 				t.Fatalf("failed to parse CIDR")
 			}
 
-			serviceStorage, _, err := NewGenericREST(restOptions, *cidr, false)
+			ipAllocs := map[api.IPFamily]ipallocator.Interface{
+				api.IPv4Protocol: makeIPAllocator(cidr),
+			}
+			serviceStorage, _, err := NewGenericREST(restOptions, api.IPv4Protocol, ipAllocs, nil)
 			if err != nil {
 				t.Fatalf("unexpected error from REST storage: %v", err)
 			}
@@ -471,7 +488,7 @@ func TestServiceDefaultOnRead(t *testing.T) {
 }
 
 func TestServiceDefaulting(t *testing.T) {
-	makeStorage := func(t *testing.T, primaryCIDR string, isDualStack bool) (*GenericREST, *StatusREST, *etcd3testing.EtcdTestServer) {
+	makeStorage := func(t *testing.T, ipFamilies []api.IPFamily) (*GenericREST, *StatusREST, *etcd3testing.EtcdTestServer) {
 		etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 		restOptions := generic.RESTOptions{
 			StorageConfig:           etcdStorage.ForResource(schema.GroupResource{Resource: "services"}),
@@ -480,12 +497,19 @@ func TestServiceDefaulting(t *testing.T) {
 			ResourcePrefix:          "services",
 		}
 
-		_, cidr, err := netutils.ParseCIDRSloppy(primaryCIDR)
-		if err != nil {
-			t.Fatalf("failed to parse CIDR %s", primaryCIDR)
+		ipAllocs := map[api.IPFamily]ipallocator.Interface{}
+		for _, fam := range ipFamilies {
+			switch fam {
+			case api.IPv4Protocol:
+				_, cidr, _ := netutils.ParseCIDRSloppy("10.0.0.0/16")
+				ipAllocs[fam] = makeIPAllocator(cidr)
+			case api.IPv6Protocol:
+				_, cidr, _ := netutils.ParseCIDRSloppy("2000::/108")
+				ipAllocs[fam] = makeIPAllocator(cidr)
+			}
 		}
 
-		serviceStorage, statusStorage, err := NewGenericREST(restOptions, *(cidr), isDualStack)
+		serviceStorage, statusStorage, err := NewGenericREST(restOptions, ipFamilies[0], ipAllocs, nil)
 		if err != nil {
 			t.Fatalf("unexpected error from REST storage: %v", err)
 		}
@@ -493,35 +517,25 @@ func TestServiceDefaulting(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name        string
-		primaryCIDR string
-		PrimaryIPv6 bool
-		isDualStack bool
+		name       string
+		ipFamilies []api.IPFamily
 	}{
 		{
-			name:        "IPv4 single stack cluster",
-			primaryCIDR: "10.0.0.0/16",
-			PrimaryIPv6: false,
-			isDualStack: false,
+			name:       "IPv4 single stack cluster",
+			ipFamilies: []api.IPFamily{api.IPv4Protocol},
 		},
 		{
-			name:        "IPv6 single stack cluster",
-			primaryCIDR: "2000::/108",
-			PrimaryIPv6: true,
-			isDualStack: false,
+			name:       "IPv6 single stack cluster",
+			ipFamilies: []api.IPFamily{api.IPv6Protocol},
 		},
 
 		{
-			name:        "IPv4, IPv6 dual stack cluster",
-			primaryCIDR: "10.0.0.0/16",
-			PrimaryIPv6: false,
-			isDualStack: true,
+			name:       "IPv4, IPv6 dual stack cluster",
+			ipFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 		},
 		{
-			name:        "IPv6, IPv4 dual stack cluster",
-			primaryCIDR: "2000::/108",
-			PrimaryIPv6: true,
-			isDualStack: true,
+			name:       "IPv6, IPv4 dual stack cluster",
+			ipFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 		},
 	}
 
@@ -533,7 +547,7 @@ func TestServiceDefaulting(t *testing.T) {
 			// this func only works with dual stack feature gate on.
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 
-			storage, _, server := makeStorage(t, testCase.primaryCIDR, testCase.isDualStack)
+			storage, _, server := makeStorage(t, testCase.ipFamilies)
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 
@@ -551,7 +565,7 @@ func TestServiceDefaulting(t *testing.T) {
 			defaultedServiceList.Items[0].Spec.IPFamilyPolicy = &singleStack
 
 			// primary family
-			if testCase.PrimaryIPv6 {
+			if testCase.ipFamilies[0] == api.IPv6Protocol {
 				// no selector, gets both families
 				defaultedServiceList.Items[1].Spec.IPFamilyPolicy = &preferDualStack
 				defaultedServiceList.Items[1].Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol}
@@ -559,7 +573,7 @@ func TestServiceDefaulting(t *testing.T) {
 				//assume single stack for w/selector
 				defaultedServiceList.Items[0].Spec.IPFamilies = []api.IPFamily{api.IPv6Protocol}
 				// make dualstacked. if needed
-				if testCase.isDualStack {
+				if len(testCase.ipFamilies) > 1 {
 					defaultedServiceList.Items[0].Spec.IPFamilyPolicy = &preferDualStack
 					defaultedServiceList.Items[0].Spec.IPFamilies = append(defaultedServiceList.Items[0].Spec.IPFamilies, api.IPv4Protocol)
 				}
@@ -571,7 +585,7 @@ func TestServiceDefaulting(t *testing.T) {
 				// assume single stack for w/selector
 				defaultedServiceList.Items[0].Spec.IPFamilies = []api.IPFamily{api.IPv4Protocol}
 				// make dualstacked. if needed
-				if testCase.isDualStack {
+				if len(testCase.ipFamilies) > 1 {
 					defaultedServiceList.Items[0].Spec.IPFamilyPolicy = &preferDualStack
 					defaultedServiceList.Items[0].Spec.IPFamilies = append(defaultedServiceList.Items[0].Spec.IPFamilies, api.IPv6Protocol)
 				}
