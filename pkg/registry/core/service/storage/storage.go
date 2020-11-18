@@ -18,13 +18,13 @@ package storage
 
 import (
 	"context"
-	"net"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
@@ -32,8 +32,9 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service"
-	registry "k8s.io/kubernetes/pkg/registry/core/service"
 	svcreg "k8s.io/kubernetes/pkg/registry/core/service"
+	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	netutil "k8s.io/utils/net"
@@ -41,13 +42,19 @@ import (
 
 type GenericREST struct {
 	*genericregistry.Store
-	primaryIPFamily *api.IPFamily
-	secondaryFamily *api.IPFamily
+	primaryIPFamily   api.IPFamily
+	secondaryIPFamily api.IPFamily
+	alloc             RESTAllocStuff
 }
 
 // NewGenericREST returns a RESTStorage object that will work against services.
-func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet, hasSecondary bool) (*GenericREST, *StatusREST, error) {
-	strategy, _ := registry.StrategyForServiceCIDRs(serviceCIDR, hasSecondary)
+func NewGenericREST(
+	optsGetter generic.RESTOptionsGetter,
+	serviceIPFamily api.IPFamily,
+	ipAllocs map[api.IPFamily]ipallocator.Interface,
+	portAlloc portallocator.Interface) (*GenericREST, *StatusREST, error) {
+
+	strategy, _ := svcreg.StrategyForServiceCIDRs(ipAllocs[serviceIPFamily].CIDR(), len(ipAllocs) > 1)
 
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.Service{} },
@@ -72,27 +79,26 @@ func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet,
 	statusStore.UpdateStrategy = statusStrategy
 	statusStore.ResetFieldsStrategy = statusStrategy
 
-	ipv4 := api.IPv4Protocol
-	ipv6 := api.IPv6Protocol
-	var primaryIPFamily *api.IPFamily
-	var secondaryFamily *api.IPFamily
-	if netutil.IsIPv6CIDR(&serviceCIDR) {
-		primaryIPFamily = &ipv6
-		if hasSecondary {
-			secondaryFamily = &ipv4
-		}
-	} else {
-		primaryIPFamily = &ipv4
-		if hasSecondary {
-			secondaryFamily = &ipv6
-		}
+	var primaryIPFamily api.IPFamily = serviceIPFamily
+	var secondaryIPFamily api.IPFamily = "" // sentinel value
+	if len(ipAllocs) > 1 {
+		secondaryIPFamily = otherFamily(serviceIPFamily)
 	}
-	genericStore := &GenericREST{store, primaryIPFamily, secondaryFamily}
+	genericStore := &GenericREST{store, primaryIPFamily, secondaryIPFamily, makeAlloc(serviceIPFamily, ipAllocs, portAlloc)}
 	store.Decorator = genericStore.defaultOnRead
 	store.BeginCreate = genericStore.beginCreate
 	store.BeginUpdate = genericStore.beginUpdate
 
 	return genericStore, &StatusREST{store: &statusStore}, nil
+}
+
+// otherFamily returns the non-selected IPFamily.  This assumes the input is
+// valid.
+func otherFamily(fam api.IPFamily) api.IPFamily {
+	if fam == api.IPv4Protocol {
+		return api.IPv6Protocol
+	}
+	return api.IPv4Protocol
 }
 
 var (
@@ -196,7 +202,7 @@ func (r *GenericREST) defaultOnReadService(service *api.Service) {
 	preferDualStack := api.IPFamilyPolicyPreferDualStack
 	// headless services
 	if len(service.Spec.ClusterIPs) == 1 && service.Spec.ClusterIPs[0] == api.ClusterIPNone {
-		service.Spec.IPFamilies = []api.IPFamily{*r.primaryIPFamily}
+		service.Spec.IPFamilies = []api.IPFamily{r.primaryIPFamily}
 
 		// headless+selectorless
 		// headless+selectorless takes both families. Why?
@@ -205,7 +211,7 @@ func (r *GenericREST) defaultOnReadService(service *api.Service) {
 		// it to PreferDualStack on any cluster (single or dualstack configured).
 		if len(service.Spec.Selector) == 0 {
 			service.Spec.IPFamilyPolicy = &preferDualStack
-			if *r.primaryIPFamily == api.IPv4Protocol {
+			if r.primaryIPFamily == api.IPv4Protocol {
 				service.Spec.IPFamilies = append(service.Spec.IPFamilies, api.IPv6Protocol)
 			} else {
 				service.Spec.IPFamilies = append(service.Spec.IPFamilies, api.IPv4Protocol)
@@ -216,8 +222,8 @@ func (r *GenericREST) defaultOnReadService(service *api.Service) {
 			// selector and will have to follow how the cluster is configured. If the cluster is
 			// configured to dual stack then the service defaults to PreferDualStack. Otherwise we
 			// default it to SingleStack.
-			if r.secondaryFamily != nil {
-				service.Spec.IPFamilies = append(service.Spec.IPFamilies, *r.secondaryFamily)
+			if r.secondaryIPFamily != "" {
+				service.Spec.IPFamilies = append(service.Spec.IPFamilies, r.secondaryIPFamily)
 				service.Spec.IPFamilyPolicy = &preferDualStack
 			} else {
 				service.Spec.IPFamilyPolicy = &singleStack
@@ -246,13 +252,27 @@ func (r *GenericREST) defaultOnReadService(service *api.Service) {
 func (r *GenericREST) beginCreate(ctx context.Context, obj runtime.Object, options *metav1.CreateOptions) (genericregistry.FinishFunc, error) {
 	svc := obj.(*api.Service)
 
-	// FIXME: remove this when implementing
-	_ = svc
+	// Make sure ClusterIP and ClusterIPs are in sync.  This has to happen
+	// early, before anyone looks at them.
+	// NOTE: the args are (old, new)
+	svcreg.NormalizeClusterIPs(nil, svc)
+
+	// Allocate IPs and ports. If we had a transactional store, this would just
+	// be part of the larger transaction.  We don't have that, so we have to do
+	// it manually. This has to happen here and not in any earlier hooks (e.g.
+	// defaulting) because it needs to be aware of flags and be able to access
+	// API storage.
+	txn, err := r.alloc.allocateCreate(svc, dryrun.IsDryRun(options.DryRun))
+	if err != nil {
+		return nil, err
+	}
 
 	// Our cleanup callback
 	finish := func(_ context.Context, success bool) {
 		if success {
+			txn.Commit()
 		} else {
+			txn.Revert()
 		}
 	}
 
@@ -263,9 +283,10 @@ func (r *GenericREST) beginUpdate(ctx context.Context, obj, oldObj runtime.Objec
 	newSvc := obj.(*api.Service)
 	oldSvc := oldObj.(*api.Service)
 
-	// FIXME: remove these when implementing
-	_ = oldSvc
-	_ = newSvc
+	// Make sure ClusterIP and ClusterIPs are in sync.  This has to happen
+	// early, before anyone looks at them.
+	// NOTE: the args are (old, new)
+	svcreg.NormalizeClusterIPs(oldSvc, newSvc)
 
 	// Our cleanup callback
 	finish := func(_ context.Context, success bool) {

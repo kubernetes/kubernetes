@@ -36,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -59,6 +60,7 @@ import (
 // in a completely different way. We should unify it.
 
 type serviceStorage struct {
+	inner    *GenericREST
 	Services map[string]*api.Service
 }
 
@@ -117,12 +119,16 @@ func (s *serviceStorage) New() runtime.Object {
 }
 
 func (s *serviceStorage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
-	if dryrun.IsDryRun(options.DryRun) {
-		return obj, nil
+	ret, err := s.inner.Create(ctx, obj, createValidation, options)
+	if err != nil {
+		return ret, err
 	}
-	svc := obj.(*api.Service)
+
+	if dryrun.IsDryRun(options.DryRun) {
+		return ret.DeepCopyObject(), nil
+	}
+	svc := ret.(*api.Service)
 	s.saveService(svc)
-	s.Services[svc.Name].ResourceVersion = "1"
 
 	return s.Services[svc.Name].DeepCopy(), nil
 }
@@ -171,8 +177,6 @@ func NewTestREST(t *testing.T, ipFamilies []api.IPFamily) (*REST, *etcd3testing.
 
 func NewTestRESTWithPods(t *testing.T, endpoints []*api.Endpoints, pods []api.Pod, ipFamilies []api.IPFamily) (*REST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-
-	serviceStorage := &serviceStorage{}
 
 	podStorage, err := podstore.NewStorage(generic.RESTOptions{
 		StorageConfig:           etcdStorage,
@@ -245,9 +249,27 @@ func NewTestRESTWithPods(t *testing.T, endpoints []*api.Endpoints, pods []api.Po
 	if rSecondary != nil {
 		ipAllocators[rSecondary.IPFamily()] = rSecondary
 	}
-	rest, _ := NewREST(serviceStorage, endpointStorage, podStorage.Pod, rPrimary.IPFamily(), ipAllocators, portAllocator, nil)
+
+	inner := newInnerREST(t, etcdStorage, ipAllocators, portAllocator)
+	rest, _ := NewREST(inner, endpointStorage, podStorage.Pod, rPrimary.IPFamily(), ipAllocators, portAllocator, nil)
 
 	return rest, server
+}
+
+// This bridges to the "inner" REST implementation so tests continue to run
+// during the delayering of service REST code.
+func newInnerREST(t *testing.T, etcdStorage *storagebackend.Config, ipAllocs map[api.IPFamily]ipallocator.Interface, portAlloc portallocator.Interface) *serviceStorage {
+	restOptions := generic.RESTOptions{
+		StorageConfig:           etcdStorage,
+		Decorator:               generic.UndecoratedStorage,
+		DeleteCollectionWorkers: 1,
+		ResourcePrefix:          "services",
+	}
+	inner, _, err := NewGenericREST(restOptions, api.IPv4Protocol, ipAllocs, portAlloc)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+	return &serviceStorage{inner: inner}
 }
 
 func makeIPNet(t *testing.T) *net.IPNet {

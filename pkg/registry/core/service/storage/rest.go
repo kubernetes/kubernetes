@@ -177,41 +177,7 @@ func (rs *REST) Watch(ctx context.Context, options *metainternalversion.ListOpti
 }
 
 func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
-	// DeepCopy to prevent writes here propagating back to tests.
-	obj = obj.DeepCopyObject()
-
-	service := obj.(*api.Service)
-
-	if err := rest.BeforeCreate(rs.strategy, ctx, obj); err != nil {
-		return nil, err
-	}
-
-	// Allocate IPs and ports. If we had a transactional store, this would just
-	// be part of the larger transaction.  We don't have that, so we have to do
-	// it manually. This has to happen here and not in any earlier hooks (e.g.
-	// defaulting) because it needs to be aware of flags and be able to access
-	// API storage.
-	txn, err := rs.alloc.allocateCreate(service, dryrun.IsDryRun(options.DryRun))
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if txn != nil {
-			txn.Revert()
-		}
-	}()
-
-	out, err := rs.services.Create(ctx, service, createValidation, options)
-	if err != nil {
-		err = rest.CheckGeneratedNameError(rs.strategy, err, service)
-	}
-
-	if err == nil {
-		txn.Commit()
-		txn = nil
-	}
-
-	return out, err
+	return rs.services.Create(ctx, obj, createValidation, options)
 }
 
 func (al *RESTAllocStuff) allocateCreate(service *api.Service, dryRun bool) (transaction, error) {
