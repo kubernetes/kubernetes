@@ -51,14 +51,20 @@ import (
 
 // REST adapts a service registry into apiserver's RESTStorage model.
 type REST struct {
-	strategy                    rest.RESTCreateUpdateStrategy
-	services                    ServiceStorage
-	endpoints                   EndpointsStorage
+	strategy       rest.RESTCreateUpdateStrategy
+	services       ServiceStorage
+	endpoints      EndpointsStorage
+	alloc          RESTAllocStuff
+	proxyTransport http.RoundTripper
+	pods           rest.Getter
+}
+
+// RESTAllocStuff is a temporary struct to facilitate the flattening of service
+// REST layers.  It will be cleaned up over a series of commits.
+type RESTAllocStuff struct {
 	serviceIPAllocatorsByFamily map[api.IPFamily]ipallocator.Interface
 	defaultServiceIPFamily      api.IPFamily // --service-cluster-ip-range[0]
 	serviceNodePorts            portallocator.Interface
-	proxyTransport              http.RoundTripper
-	pods                        rest.Getter
 }
 
 // ServiceNodePort includes protocol and port number of a service NodePort.
@@ -95,52 +101,35 @@ func NewREST(
 	services ServiceStorage,
 	endpoints EndpointsStorage,
 	pods rest.Getter,
-	serviceIPs ipallocator.Interface,
-	secondaryServiceIPs ipallocator.Interface,
-	serviceNodePorts portallocator.Interface,
+	defaultFamily api.IPFamily,
+	ipAllocs map[api.IPFamily]ipallocator.Interface,
+	portAlloc portallocator.Interface,
 	proxyTransport http.RoundTripper,
 ) (*REST, *registry.ProxyREST) {
 
-	strategy, _ := registry.StrategyForServiceCIDRs(serviceIPs.CIDR(), secondaryServiceIPs != nil)
+	strategy, _ := registry.StrategyForServiceCIDRs(ipAllocs[defaultFamily].CIDR(), len(ipAllocs) > 1)
 
-	byIPFamily := make(map[api.IPFamily]ipallocator.Interface)
-
-	// detect this cluster default Service IPFamily (ipfamily of --service-cluster-ip-range[0])
-	serviceIPFamily := api.IPv4Protocol
-	cidr := serviceIPs.CIDR()
-	if netutils.IsIPv6CIDR(&cidr) {
-		serviceIPFamily = api.IPv6Protocol
-	}
-
-	// add primary family
-	byIPFamily[serviceIPFamily] = serviceIPs
-
-	if secondaryServiceIPs != nil {
-		// process secondary family
-		secondaryServiceIPFamily := api.IPv6Protocol
-
-		// get family of secondary
-		if serviceIPFamily == api.IPv6Protocol {
-			secondaryServiceIPFamily = api.IPv4Protocol
-		}
-		// add it
-		byIPFamily[secondaryServiceIPFamily] = secondaryServiceIPs
-	}
-
-	klog.V(0).Infof("the default service ipfamily for this cluster is: %s", string(serviceIPFamily))
+	klog.V(0).Infof("the default service ipfamily for this cluster is: %s", string(defaultFamily))
 
 	rest := &REST{
-		strategy:                    strategy,
-		services:                    services,
-		endpoints:                   endpoints,
-		serviceIPAllocatorsByFamily: byIPFamily,
-		serviceNodePorts:            serviceNodePorts,
-		defaultServiceIPFamily:      serviceIPFamily,
-		proxyTransport:              proxyTransport,
-		pods:                        pods,
+		strategy:       strategy,
+		services:       services,
+		endpoints:      endpoints,
+		proxyTransport: proxyTransport,
+		pods:           pods,
+		alloc:          makeAlloc(defaultFamily, ipAllocs, portAlloc),
 	}
 
 	return rest, &registry.ProxyREST{Redirector: rest, ProxyTransport: proxyTransport}
+}
+
+// This is a trasitionary function to facilitate service REST flattening.
+func makeAlloc(defaultFamily api.IPFamily, ipAllocs map[api.IPFamily]ipallocator.Interface, portAlloc portallocator.Interface) RESTAllocStuff {
+	return RESTAllocStuff{
+		defaultServiceIPFamily:      defaultFamily,
+		serviceIPAllocatorsByFamily: ipAllocs,
+		serviceNodePorts:            portAlloc,
+	}
 }
 
 var (
@@ -226,7 +215,7 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation
 		}
 	}
 
-	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts, dryrun.IsDryRun(options.DryRun))
+	nodePortOp := portallocator.StartOperation(rs.alloc.serviceNodePorts, dryrun.IsDryRun(options.DryRun))
 	defer nodePortOp.Finish()
 
 	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
@@ -314,7 +303,7 @@ func (rs *REST) releaseAllocatedResources(svc *api.Service) {
 	rs.releaseServiceClusterIPs(svc)
 
 	for _, nodePort := range collectServiceNodePorts(svc) {
-		err := rs.serviceNodePorts.Release(nodePort)
+		err := rs.alloc.serviceNodePorts.Release(nodePort)
 		if err != nil {
 			// these should be caught by an eventual reconciliation / restart
 			utilruntime.HandleError(fmt.Errorf("Error releasing service %s node port %d: %v", svc.Name, nodePort, err))
@@ -324,7 +313,7 @@ func (rs *REST) releaseAllocatedResources(svc *api.Service) {
 	if apiservice.NeedsHealthCheck(svc) {
 		nodePort := svc.Spec.HealthCheckNodePort
 		if nodePort > 0 {
-			err := rs.serviceNodePorts.Release(int(nodePort))
+			err := rs.alloc.serviceNodePorts.Release(int(nodePort))
 			if err != nil {
 				// these should be caught by an eventual reconciliation / restart
 				utilruntime.HandleError(fmt.Errorf("Error releasing service %s health check node port %d: %v", svc.Name, nodePort, err))
@@ -443,7 +432,7 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		}
 	}()
 
-	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts, dryrun.IsDryRun(options.DryRun))
+	nodePortOp := portallocator.StartOperation(rs.alloc.serviceNodePorts, dryrun.IsDryRun(options.DryRun))
 	defer nodePortOp.Finish()
 
 	// try set ip families (for missing ip families)
@@ -586,7 +575,7 @@ func (rs *REST) allocClusterIPs(service *api.Service, toAlloc map[api.IPFamily]s
 	allocated := make(map[api.IPFamily]string)
 
 	for family, ip := range toAlloc {
-		allocator := rs.serviceIPAllocatorsByFamily[family] // should always be there, as we pre validate
+		allocator := rs.alloc.serviceIPAllocatorsByFamily[family] // should always be there, as we pre validate
 		if ip == "" {
 			allocatedIP, err := allocator.AllocateNext()
 			if err != nil {
@@ -613,7 +602,7 @@ func (rs *REST) releaseClusterIPs(toRelease map[api.IPFamily]string) (map[api.IP
 
 	released := make(map[api.IPFamily]string)
 	for family, ip := range toRelease {
-		allocator, ok := rs.serviceIPAllocatorsByFamily[family]
+		allocator, ok := rs.alloc.serviceIPAllocatorsByFamily[family]
 		if !ok {
 			// cluster was configured for dual stack, then single stack
 			klog.V(4).Infof("delete service. Not releasing ClusterIP:%v because IPFamily:%v is no longer configured on server", ip, family)
@@ -636,14 +625,14 @@ func (rs *REST) allocServiceClusterIP(service *api.Service) (map[api.IPFamily]st
 	toAlloc := make(map[api.IPFamily]string)
 
 	// get clusterIP.. empty string if user did not specify an ip
-	toAlloc[rs.defaultServiceIPFamily] = service.Spec.ClusterIP
+	toAlloc[rs.alloc.defaultServiceIPFamily] = service.Spec.ClusterIP
 	// alloc
 	allocated, err := rs.allocClusterIPs(service, toAlloc)
 
 	// set
 	if err == nil {
-		service.Spec.ClusterIP = allocated[rs.defaultServiceIPFamily]
-		service.Spec.ClusterIPs = []string{allocated[rs.defaultServiceIPFamily]}
+		service.Spec.ClusterIP = allocated[rs.alloc.defaultServiceIPFamily]
+		service.Spec.ClusterIPs = []string{allocated[rs.alloc.defaultServiceIPFamily]}
 	}
 
 	return allocated, err
@@ -752,7 +741,7 @@ func (rs *REST) handleClusterIPsForUpdatedService(oldService *api.Service, servi
 		toRelease = make(map[api.IPFamily]string)
 		if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 			// for non dual stack enabled cluster we use clusterIPs
-			toRelease[rs.defaultServiceIPFamily] = oldService.Spec.ClusterIP
+			toRelease[rs.alloc.defaultServiceIPFamily] = oldService.Spec.ClusterIP
 		} else {
 			// dual stack is enabled, collect ClusterIPs by families
 			for i, family := range oldService.Spec.IPFamilies {
@@ -963,14 +952,14 @@ func (rs *REST) tryDefaultValidateServiceClusterIPFields(oldService, service *ap
 		if i >= len(service.Spec.IPFamilies) {
 			if isIPv6 {
 				// first make sure that family(ip) is configured
-				if _, found := rs.serviceIPAllocatorsByFamily[api.IPv6Protocol]; !found {
+				if _, found := rs.alloc.serviceIPAllocatorsByFamily[api.IPv6Protocol]; !found {
 					el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIPs").Index(i), service.Spec.ClusterIPs, "may not use IPv6 on a cluster which is not configured for it")}
 					return errors.NewInvalid(api.Kind("Service"), service.Name, el)
 				}
 				service.Spec.IPFamilies = append(service.Spec.IPFamilies, api.IPv6Protocol)
 			} else {
 				// first make sure that family(ip) is configured
-				if _, found := rs.serviceIPAllocatorsByFamily[api.IPv4Protocol]; !found {
+				if _, found := rs.alloc.serviceIPAllocatorsByFamily[api.IPv4Protocol]; !found {
 					el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIPs").Index(i), service.Spec.ClusterIPs, "may not use IPv4 on a cluster which is not configured for it")}
 					return errors.NewInvalid(api.Kind("Service"), service.Name, el)
 				}
@@ -997,7 +986,7 @@ func (rs *REST) tryDefaultValidateServiceClusterIPFields(oldService, service *ap
 		// If IPFamilies was not set by the user, start with the default
 		// family.
 		if len(service.Spec.IPFamilies) == 0 {
-			service.Spec.IPFamilies = []api.IPFamily{rs.defaultServiceIPFamily}
+			service.Spec.IPFamilies = []api.IPFamily{rs.alloc.defaultServiceIPFamily}
 		}
 
 		// this follows headful services. With one exception on a single stack
@@ -1024,13 +1013,13 @@ func (rs *REST) tryDefaultValidateServiceClusterIPFields(oldService, service *ap
 
 	// asking for dual stack on a non dual stack cluster
 	// should fail without assigning any family
-	if service.Spec.IPFamilyPolicy != nil && *(service.Spec.IPFamilyPolicy) == api.IPFamilyPolicyRequireDualStack && len(rs.serviceIPAllocatorsByFamily) < 2 {
+	if service.Spec.IPFamilyPolicy != nil && *(service.Spec.IPFamilyPolicy) == api.IPFamilyPolicyRequireDualStack && len(rs.alloc.serviceIPAllocatorsByFamily) < 2 {
 		el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy, "Cluster is not configured for dual stack services"))
 	}
 
 	// if there is a family requested then it has to be configured on cluster
 	for i, ipFamily := range service.Spec.IPFamilies {
-		if _, found := rs.serviceIPAllocatorsByFamily[ipFamily]; !found {
+		if _, found := rs.alloc.serviceIPAllocatorsByFamily[ipFamily]; !found {
 			el = append(el, field.Invalid(field.NewPath("spec", "ipFamilies").Index(i), service.Spec.ClusterIPs, fmt.Sprintf("ipfamily %v is not configured on cluster", ipFamily)))
 		}
 	}
@@ -1049,14 +1038,14 @@ func (rs *REST) tryDefaultValidateServiceClusterIPFields(oldService, service *ap
 
 	// nil families, gets cluster default (if feature flag is not in effect, the strategy will take care of removing it)
 	if len(service.Spec.IPFamilies) == 0 {
-		service.Spec.IPFamilies = []api.IPFamily{rs.defaultServiceIPFamily}
+		service.Spec.IPFamilies = []api.IPFamily{rs.alloc.defaultServiceIPFamily}
 	}
 
 	// is this service looking for dual stack, and this cluster does have two families?
 	// if so, then append the missing family
 	if *(service.Spec.IPFamilyPolicy) != api.IPFamilyPolicySingleStack &&
 		len(service.Spec.IPFamilies) == 1 &&
-		len(rs.serviceIPAllocatorsByFamily) == 2 {
+		len(rs.alloc.serviceIPAllocatorsByFamily) == 2 {
 
 		if service.Spec.IPFamilies[0] == api.IPv4Protocol {
 			service.Spec.IPFamilies = append(service.Spec.IPFamilies, api.IPv6Protocol)
