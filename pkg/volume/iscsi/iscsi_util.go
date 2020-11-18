@@ -721,9 +721,11 @@ func (util *ISCSIUtil) detachISCSIDisk(exec utilexec.Interface, portals []string
 	for _, portal := range portals {
 		logoutArgs := []string{"-m", "node", "-p", portal, "-T", iqn, "--logout"}
 		deleteNodeArgs := []string{"-m", "node", "-p", portal, "-T", iqn, "-o", "delete"}
+		deleteDiscoveryArgs := []string{"-m", "discoverydb", "-t", "sendtargets", "-p", portal, "-o", "delete"}
 		if found {
 			logoutArgs = append(logoutArgs, []string{"-I", iface}...)
 			deleteNodeArgs = append(deleteNodeArgs, []string{"-I", iface}...)
+			deleteDiscoveryArgs = append(deleteDiscoveryArgs, []string{"-I", iface}...)
 		}
 		klog.Infof("iscsi: log out target %s iqn %s iface %s", portal, iqn, iface)
 		out, err := exec.Command("iscsiadm", logoutArgs...).CombinedOutput()
@@ -738,6 +740,13 @@ func (util *ISCSIUtil) detachISCSIDisk(exec utilexec.Interface, portals []string
 		err = ignoreExitCodes(err, exit_ISCSI_ERR_NO_OBJS_FOUND, exit_ISCSI_ERR_SESS_NOT_FOUND)
 		if err != nil {
 			klog.Errorf("iscsi: failed to delete node record Error: %s", string(out))
+			return err
+		}
+		// Delete the discoverydb record
+		out, err = exec.Command("iscsiadm", deleteDiscoveryArgs...).CombinedOutput()
+		err = ignoreExitCodes(err, exit_ISCSI_ERR_NO_OBJS_FOUND, exit_ISCSI_ERR_SESS_NOT_FOUND)
+		if err != nil {
+			klog.Errorf("iscsi: failed to delete discoverydb record Error: %s", string(out))
 			return err
 		}
 	}
