@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	resourcecli "k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -53,7 +53,7 @@ type ServiceAccountOpts struct {
 	// Name of resource being created
 	Name             string
 	DryRunStrategy   cmdutil.DryRunStrategy
-	DryRunVerifier   *resourcecli.DryRunVerifier
+	DryRunVerifier   *resource.DryRunVerifier
 	CreateAnnotation bool
 	FieldManager     string
 
@@ -132,7 +132,7 @@ func (o *ServiceAccountOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resourcecli.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
