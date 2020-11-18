@@ -69,7 +69,10 @@ func WithRequestDeadline(handler http.Handler, longRunning request.LongRunningRe
 				return
 			}
 
-			timeout = userSpecifiedTimeout
+			// if the user has specified a timeout of 0s, this means no timeout, so we should use the maximum timeout allowed.
+			if userSpecifiedTimeout != 0 {
+				timeout = userSpecifiedTimeout
+			}
 		}
 
 		ctx, cancel := context.WithTimeout(ctx, timeout)
