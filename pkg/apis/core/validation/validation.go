@@ -4455,6 +4455,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 
 	// external traffic fields
 	allErrs = append(allErrs, validateServiceExternalTrafficFieldsValue(service)...)
+	allErrs = append(allErrs, validateServiceExternalTrafficFieldsCombination(service)...)
 
 	// internal traffic policy field
 	allErrs = append(allErrs, validateServiceInternalTrafficFieldsValue(service)...)
@@ -4545,11 +4546,11 @@ func validateServiceInternalTrafficFieldsValue(service *core.Service) field.Erro
 	return allErrs
 }
 
-// ValidateServiceExternalTrafficFieldsCombination validates if ExternalTrafficPolicy,
+// validateServiceExternalTrafficFieldsCombination validates if ExternalTrafficPolicy,
 // HealthCheckNodePort and Type combination are legal. For update, it should be called
 // after clearing externalTraffic related fields for the ease of transitioning between
 // different service types.
-func ValidateServiceExternalTrafficFieldsCombination(service *core.Service) field.ErrorList {
+func validateServiceExternalTrafficFieldsCombination(service *core.Service) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if service.Spec.Type != core.ServiceTypeLoadBalancer &&

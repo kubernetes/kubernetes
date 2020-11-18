@@ -40,7 +40,6 @@ import (
 	"k8s.io/klog/v2"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
@@ -229,9 +228,6 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation
 		if err := allocateHealthCheckNodePort(service, nodePortOp); err != nil {
 			return nil, errors.NewInternalError(err)
 		}
-	}
-	if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
-		return nil, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
 
 	out, err := rs.services.Create(ctx, service, createValidation, options)
@@ -467,9 +463,6 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	success, err := rs.alloc.healthCheckNodePortUpdate(oldService, service, nodePortOp)
 	if !success || err != nil {
 		return nil, false, err
-	}
-	if errs := validation.ValidateServiceExternalTrafficFieldsCombination(service); len(errs) > 0 {
-		return nil, false, errors.NewInvalid(api.Kind("Service"), service.Name, errs)
 	}
 
 	out, created, err := rs.services.Update(ctx, service.Name, rest.DefaultUpdatedObjectInfo(service), createValidation, updateValidation, forceAllowCreate, options)
