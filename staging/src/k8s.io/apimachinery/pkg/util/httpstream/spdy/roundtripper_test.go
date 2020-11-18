@@ -86,7 +86,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				return ts
 			}
 
-			socks5Server := func(creds *socks5.StaticCredentials) *socks5.Server {
+			socks5Server := func(creds *socks5.StaticCredentials, interceptor *Interceptor) *socks5.Server {
 				var conf *socks5.Config
 				if creds != nil {
 					cator := socks5.UserPassAuthenticator{Credentials: creds}
@@ -107,7 +107,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 
 			testCases := map[string]struct {
 				serverFunc             func(http.Handler) *httptest.Server
-				socks5ProxyServerFunc  func(*socks5.StaticCredentials) *socks5.Server
+				socks5ProxyServerFunc  func(*socks5.StaticCredentials, *Interceptor) *socks5.Server
 				proxyServerFunc        func(http.Handler) *httptest.Server
 				proxyAuth              *url.Userinfo
 				clientTLS              *tls.Config
@@ -385,9 +385,9 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 					if testCase.proxyAuth != nil {
 						proxyHandler = testCase.socks5ProxyServerFunc(&socks5.StaticCredentials{
 							"proxyuser": "proxypasswd",
-						})
+						}, interceptor)
 					} else {
-						proxyHandler = socks5Server(nil)
+						proxyHandler = testCase.socks5ProxyServerFunc(nil, interceptor)
 					}
 
 					closed := false
@@ -495,7 +495,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				if testCase.socks5ProxyServerFunc != nil && testCase.proxyAuth != nil {
 					expectedSocks5AuthMethod := 2
 					expectedSocks5AuthUser := "proxyuser"
-					authMethod, authUser := interceptor.GetAuthContext()
+					authMethod, authUser := testCase.socks5ProxyServerFunc.interceptor.GetAuthContext()
 
 					if expectedSocks5AuthMethod != authMethod {
 						t.Fatalf("%s: Socks5 Proxy authorization unexpected, got %d, expected %d", k, authMethod, expectedSocks5AuthMethod)
