@@ -203,7 +203,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           RuntimeOperationsDurationKey,
 			Help:           "Duration in seconds of runtime operations. Broken down by operation type.",
-			Buckets:        metrics.DefBuckets,
+			Buckets:        metrics.ExponentialBuckets(.005, 2.5, 14),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_type"},
