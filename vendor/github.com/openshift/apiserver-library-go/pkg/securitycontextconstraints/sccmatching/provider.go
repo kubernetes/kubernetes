@@ -355,6 +355,10 @@ func (s *simpleProvider) hasHostPort(container *api.Container, fldPath *field.Pa
 	return allErrs
 }
 
+func (s *simpleProvider) GetSCC() *securityv1.SecurityContextConstraints {
+	return s.scc
+}
+
 // Get the name of the SCC that this provider was initialized with.
 func (s *simpleProvider) GetSCCName() string {
 	return s.scc.Name

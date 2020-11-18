@@ -29,6 +29,7 @@ import (
 	securityv1listers "github.com/openshift/client-go/security/listers/security/v1"
 
 	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sccmatching"
+	sccsort "github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util/sort"
 )
 
 const PluginName = "security.openshift.io/SecurityContextConstraint"
@@ -157,7 +158,7 @@ func (c *constraint) computeSecurityContext(ctx context.Context, a admission.Att
 	}
 
 	// If mutation is not allowed and validatedSCCHint is provided, check the validated policy first.
-	// Keep the other the same for everything else
+	// Keep the order the same for everything else
 	sort.SliceStable(constraints, func(i, j int) bool {
 		if !specMutationAllowed {
 			if constraints[i].Name == validatedSCCHint {
@@ -190,22 +191,39 @@ func (c *constraint) computeSecurityContext(ctx context.Context, a admission.Att
 		saUserInfo = serviceaccount.UserInfo(a.GetNamespace(), pod.Spec.ServiceAccountName, "")
 	}
 
-loop:
-	for _, provider := range providers {
-		// Get the SCC attributes required to decide whether the SCC applies for current user/SA
+	allowedForUserOrSA := func(provider sccmatching.SecurityContextConstraintsProvider) bool {
 		sccName := provider.GetSCCName()
 		sccUsers := provider.GetSCCUsers()
 		sccGroups := provider.GetSCCGroups()
+		return sccmatching.ConstraintAppliesTo(ctx, sccName, sccUsers, sccGroups, userInfo, a.GetNamespace(), c.authorizer) ||
+			(saUserInfo != nil && sccmatching.ConstraintAppliesTo(ctx, sccName, sccUsers, sccGroups, saUserInfo, a.GetNamespace(), c.authorizer))
+	}
 
-		// continue to the next provider if the current SCC one does not apply to either the user or the serviceaccount
-		if !sccmatching.ConstraintAppliesTo(ctx, sccName, sccUsers, sccGroups, userInfo, a.GetNamespace(), c.authorizer) &&
-			!(saUserInfo != nil && sccmatching.ConstraintAppliesTo(ctx, sccName, sccUsers, sccGroups, saUserInfo, a.GetNamespace(), c.authorizer)) {
+	appliesToPod := func(provider sccmatching.SecurityContextConstraintsProvider, pod *coreapi.Pod) (podCopy *coreapi.Pod, errs field.ErrorList) {
+		podCopy = pod.DeepCopy()
+		if errs := sccmatching.AssignSecurityContext(provider, podCopy, field.NewPath(fmt.Sprintf("provider %s: ", provider.GetSCCName()))); len(errs) > 0 {
+			return nil, errs
+		}
+		return podCopy, nil
+	}
+
+	var (
+		provider sccmatching.SecurityContextConstraintsProvider
+		denied   = []string{}
+		failures = map[string]string{}
+		i        int
+	)
+loop:
+	for i, provider = range providers {
+		if !allowedForUserOrSA(provider) {
+			denied = append(denied, provider.GetSCCName())
 			continue
 		}
 
-		podCopy := pod.DeepCopy()
-		if errs := sccmatching.AssignSecurityContext(provider, podCopy, field.NewPath(fmt.Sprintf("provider %s: ", sccName))); len(errs) > 0 {
+		podCopy, errs := appliesToPod(provider, pod)
+		if len(errs) > 0 {
 			validationErrs = append(validationErrs, errs...)
+			failures[provider.GetSCCName()] = errs.ToAggregate().Error()
 			continue
 		}
 
@@ -217,22 +235,81 @@ loop:
 			// even on creating. We prefer most restrictive SCC in this case even if it mutates a pod.
 			allowedPod = podCopy
 			allowingProvider = provider
-			klog.V(5).Infof("pod %s (generate: %s) validated against provider %s with mutation", pod.Name, pod.GenerateName, sccName)
+			klog.V(5).Infof("pod %s (generate: %s) validated against provider %s with mutation", pod.Name, pod.GenerateName, provider.GetSCCName())
 			break loop
 		case apiequality.Semantic.DeepEqual(pod, podCopy):
 			// if we don't allow mutation, only use the validated pod if it didn't require any spec changes
 			allowedPod = podCopy
 			allowingProvider = provider
-			klog.V(5).Infof("pod %s (generate: %s) validated against provider %s without mutation", pod.Name, pod.GenerateName, sccName)
+			klog.V(5).Infof("pod %s (generate: %s) validated against provider %s without mutation", pod.Name, pod.GenerateName, provider.GetSCCName())
 			break loop
 		default:
-			klog.V(5).Infof("pod %s (generate: %s) validated against provider %s, but required mutation, skipping", pod.Name, pod.GenerateName, sccName)
+			klog.V(5).Infof("pod %s (generate: %s) validated against provider %s, but required mutation, skipping", pod.Name, pod.GenerateName, provider.GetSCCName())
+			failures[provider.GetSCCName()] = fmt.Sprintf("failures final validation after mutating admission")
+		}
+	}
+
+	// add audit annotations
+	if specMutationAllowed {
+		// find next provider that was not chosen
+		var nextNotChosenProvider sccmatching.SecurityContextConstraintsProvider
+		for _, provider := range providers[i+1:] {
+			if !allowedForUserOrSA(provider) {
+				continue
+			}
+			if _, errs := appliesToPod(provider, pod); len(errs) == 0 {
+				nextNotChosenProvider = provider
+				break
+			}
+		}
+
+		a.AddAnnotation("securityserviceconstraints.admission.openshift.io/denied", strings.Join(denied, ","))
+		for sccName, reason := range failures {
+			a.AddAnnotation(fmt.Sprintf("securitycontextconstraints.admission.openshift.io/too-restrictive-%s", sccName), reason)
+		}
+
+		if allowingProvider != nil && nextNotChosenProvider != nil {
+			chosen := allowingProvider.GetSCC()
+			next := nextNotChosenProvider.GetSCC()
+			if chosen != nil && next != nil {
+				_, reason := sccsort.ByPriority([]*securityv1.SecurityContextConstraints{chosen, next}).LessWithReason(0, 1)
+				if len(reason) == 0 {
+					reason = "unknown"
+				} else {
+					reason = fmt.Sprintf("%q is most restrictive, not denied, and chosen over %q because %q %s", chosen.Name, next.Name, chosen.Name, reason)
+				}
+				a.AddAnnotation("securitycontextconstraints.admission.openshift.io/reason", reason)
+			}
+		} else if allowingProvider != nil {
+			a.AddAnnotation("securitycontextconstraints.admission.openshift.io/reason", fmt.Sprintf("%q is the only one not too restrictive and not denied", allowingProvider.GetSCCName()))
+		} else if len(failures) == 0 {
+			a.AddAnnotation("securitycontextconstraints.admission.openshift.io/reason", "all denied")
+		} else {
+			a.AddAnnotation("securitycontextconstraints.admission.openshift.io/reason", "all too restrictive or denied")
+		}
+	} else if len(validatedSCCHint) != 0 && (allowingProvider == nil || allowingProvider.GetSCCName() != validatedSCCHint) {
+		if reason, ok := failures[validatedSCCHint]; ok {
+			a.AddAnnotation(fmt.Sprintf("securitycontextconstraints.admission.openshift.io/too-restrictive-%s", validatedSCCHint), reason)
+		} else {
+			a.AddAnnotation("securitycontextconstraints.admission.openshift.io/denied-validation", fmt.Sprintf("originally chosen %q got denied in final validation after mutating admission", validatedSCCHint))
+		}
+
+		if allowingProvider != nil {
+			a.AddAnnotation("securitycontextconstraints.admission.openshift.io/reason-validation", fmt.Sprintf("originally chosen %q did not pass final validation after mutating admission, but %q did instead", validatedSCCHint, allowingProvider.GetSCCName()))
+		} else {
+			a.AddAnnotation("securitycontextconstraints.admission.openshift.io/denied-validation", fmt.Sprintf("originally chosen %q got denied in final validation after mutating admission, and no other matched", validatedSCCHint))
 		}
 	}
 
 	if allowedPod == nil || allowingProvider == nil {
 		return nil, "", validationErrs, nil
 	}
+
+	if !specMutationAllowed {
+		// the finally chosen SCC. Note that we are not allowed to set an annotation multiple times, hence only for !specMutationAllowed
+		a.AddAnnotation("securitycontextconstraints.admission.openshift.io/chosen", allowingProvider.GetSCCName())
+	}
+
 	return allowedPod, allowingProvider.GetSCCName(), validationErrs, nil
 }
 
