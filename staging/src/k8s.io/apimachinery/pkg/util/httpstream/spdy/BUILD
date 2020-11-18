@@ -16,8 +16,8 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",
-        "//vendor/github.com/docker/spdystream:go_default_library",
         "//vendor/github.com/armon/go-socks5:go_default_library",
+        "//vendor/github.com/docker/spdystream:go_default_library",
         "//vendor/github.com/elazarl/goproxy:go_default_library",
     ],
 )
