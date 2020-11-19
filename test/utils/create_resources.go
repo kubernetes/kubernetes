@@ -26,6 +26,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	storage "k8s.io/api/storage/v1"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -62,7 +63,8 @@ func CreatePodWithRetries(c clientset.Interface, namespace string, obj *v1.Pod) 
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		klog.Errorf("Failed to create Pod with error: %v", err)
+		return false, nil
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -76,7 +78,8 @@ func CreateRCWithRetries(c clientset.Interface, namespace string, obj *v1.Replic
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		klog.Errorf("Failed to create ReplicationController with error: %v", err)
+		return false, nil
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -90,7 +93,8 @@ func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *a
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		klog.Errorf("Failed to create ReplicaSet with error: %v", err)
+		return false, nil
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -104,7 +108,8 @@ func CreateDeploymentWithRetries(c clientset.Interface, namespace string, obj *a
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		klog.Errorf("Failed to create Deployment with error: %v", err)
+		return false, nil
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -118,7 +123,8 @@ func CreateDaemonSetWithRetries(c clientset.Interface, namespace string, obj *ap
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		klog.Errorf("Failed to create DaemonSet with error: %v", err)
+		return false, nil
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -132,7 +138,8 @@ func CreateJobWithRetries(c clientset.Interface, namespace string, obj *batch.Jo
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		klog.Errorf("Failed to create Job with error: %v", err)
+		return false, nil
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -146,7 +153,8 @@ func CreateSecretWithRetries(c clientset.Interface, namespace string, obj *v1.Se
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		klog.Errorf("Failed to create Secret with error: %v", err)
+		return false, nil
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -160,7 +168,8 @@ func CreateConfigMapWithRetries(c clientset.Interface, namespace string, obj *v1
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		klog.Errorf("Failed to create ConfigMap with error: %v", err)
+		return false, nil
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -174,7 +183,8 @@ func CreateServiceWithRetries(c clientset.Interface, namespace string, obj *v1.S
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		klog.Errorf("Failed to create Service with error: %v", err)
+		return false, nil
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -188,7 +198,8 @@ func CreateStorageClassWithRetries(c clientset.Interface, obj *storage.StorageCl
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		klog.Errorf("Failed to create StorageClass with error: %v", err)
+		return false, nil
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -202,7 +213,8 @@ func CreateResourceQuotaWithRetries(c clientset.Interface, namespace string, obj
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		klog.Errorf("Failed to create ResourceQuota with error: %v", err)
+		return false, nil
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -216,7 +228,8 @@ func CreatePersistentVolumeWithRetries(c clientset.Interface, obj *v1.Persistent
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		klog.Errorf("Failed to create PersistentVolume with error: %v", err)
+		return false, nil
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
@@ -230,7 +243,8 @@ func CreatePersistentVolumeClaimWithRetries(c clientset.Interface, namespace str
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
+		klog.Errorf("Failed to create PersistentVolumeClaim with error: %v", err)
+		return false, nil
 	}
 	return RetryWithExponentialBackOff(createFunc)
 }
