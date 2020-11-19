@@ -2216,6 +2216,7 @@ func TestDedupOwnerReferences(t *testing.T) {
 			}
 			klog.Infof("creating dependent with duplicate owner references")
 			dependent := c.createDependentWithOwners([]metav1.OwnerReference{fakeRefA, fakeRefA})
+			assertManagedFields(t, dependent)
 			expectedWarning := fmt.Sprintf(handlers.DuplicateOwnerReferencesWarningFormat, fakeRefA.UID)
 			assertOwnerReferences(t, dependent, []metav1.OwnerReference{fakeRefA})
 			assertWarningCount(t, warningWriter, previousWarningCount+1)
@@ -2223,12 +2224,18 @@ func TestDedupOwnerReferences(t *testing.T) {
 
 			klog.Infof("updating dependent with duplicate owner references")
 			dependent = c.updateDependentWithOwners(dependent, []metav1.OwnerReference{fakeRefA, fakeRefA})
+			assertManagedFields(t, dependent)
 			assertOwnerReferences(t, dependent, []metav1.OwnerReference{fakeRefA})
 			assertWarningCount(t, warningWriter, previousWarningCount+2)
 			assertWarningMessage(t, b, expectedWarning)
 
 			klog.Infof("patching dependent with duplicate owner reference")
 			dependent = c.patchDependentWithOwner(dependent, fakeRefA)
+			// TODO: currently a patch request that duplicates owner references can still
+			// wipe out managed fields. Note that this happens to built-in resources but
+			// not custom resources. In future we should either dedup before writing manage
+			// fields, or stop deduping and reject the request.
+			// assertManagedFields(t, dependent)
 			expectedPatchWarning := fmt.Sprintf(handlers.DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat, fakeRefA.UID)
 			assertOwnerReferences(t, dependent, []metav1.OwnerReference{fakeRefA})
 			assertWarningCount(t, warningWriter, previousWarningCount+3)
@@ -2330,5 +2337,11 @@ func assertWarningMessage(t *testing.T, b *bytes.Buffer, expected string) {
 	}
 	if !strings.Contains(actual, expected) {
 		t.Errorf("unexpected warning message, expected: %v, got: %v", expected, actual)
+	}
+}
+
+func assertManagedFields(t *testing.T, obj *unstructured.Unstructured) {
+	if len(obj.GetManagedFields()) == 0 {
+		t.Errorf("unexpected empty managed fields in object: %v", obj)
 	}
 }
