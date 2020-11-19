@@ -53,14 +53,23 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc) error {
 	return wait.ExponentialBackoff(backoff, fn)
 }
 
-func CreatePodWithRetries(c clientset.Interface, namespace string, obj *v1.Pod) error {
+func CreatePodWithRetries(c clientset.Interface, namespace string, obj *v1.Pod, opts ...Option) error {
 	if obj == nil {
 		return fmt.Errorf("Object provided to create is empty")
+	}
+
+	o := options{}
+	for _, opt := range opts {
+		opt(&o)
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().Pods(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
 		if err == nil || apierrors.IsAlreadyExists(err) {
 			return true, nil
+		}
+		// Filter some types of errors and retry.
+		if o.filterErr != nil && o.filterErr(err) {
+			return false, nil
 		}
 		return false, fmt.Errorf("Failed to create object with non-retriable error: %v", err)
 	}

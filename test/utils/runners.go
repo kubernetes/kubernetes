@@ -1319,21 +1319,14 @@ func MakePodSpec() v1.PodSpec {
 	}
 }
 
-func makeCreatePod(client clientset.Interface, namespace string, podTemplate *v1.Pod) error {
-	if err := CreatePodWithRetries(client, namespace, podTemplate); err != nil {
-		return fmt.Errorf("Error creating pod: %v", err)
-	}
-	return nil
-}
-
-func CreatePod(client clientset.Interface, namespace string, podCount int, podTemplate *v1.Pod) error {
+func CreatePod(client clientset.Interface, namespace string, podCount int, podTemplate *v1.Pod, opts ...Option) error {
 	var createError error
 	lock := sync.Mutex{}
 	createPodFunc := func(i int) {
-		if err := makeCreatePod(client, namespace, podTemplate); err != nil {
+		if err := CreatePodWithRetries(client, namespace, podTemplate, opts...); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
-			createError = err
+			createError = fmt.Errorf("error creating pod: %v", err)
 		}
 	}
 
@@ -1413,10 +1406,10 @@ func CreatePodWithPersistentVolume(client clientset.Interface, namespace string,
 				},
 			},
 		}
-		if err := makeCreatePod(client, namespace, pod); err != nil {
+		if err := CreatePodWithRetries(client, namespace, podTemplate); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
-			createError = err
+			createError = fmt.Errorf("error creating pod: %v", err)
 			return
 		}
 	}
@@ -1451,9 +1444,23 @@ func createController(client clientset.Interface, controllerName, namespace stri
 	return nil
 }
 
-func NewCustomCreatePodStrategy(podTemplate *v1.Pod) TestPodCreateStrategy {
+type options struct {
+	filterErr func(err error) bool
+}
+
+// Option for the options.
+type Option func(*options)
+
+// WithFilterErr sets a function to filter an error.
+func WithFilterErr(fn func(err error) bool) Option {
+	return func(o *options) {
+		o.filterErr = fn
+	}
+}
+
+func NewCustomCreatePodStrategy(podTemplate *v1.Pod, opts ...Option) TestPodCreateStrategy {
 	return func(client clientset.Interface, namespace string, podCount int) error {
-		return CreatePod(client, namespace, podCount, podTemplate)
+		return CreatePod(client, namespace, podCount, podTemplate, opts...)
 	}
 }
 
