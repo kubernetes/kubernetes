@@ -341,7 +341,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		},
 		// TODO: Figure out the correct value for the buffer size.
 		incoming:              make(chan watchCacheEvent, 100),
-		dispatchTimeoutBudget: newTimeBudget(stopCh),
+		dispatchTimeoutBudget: newTimeBudget(clock.RealClock{}),
 		// We need to (potentially) stop both:
 		// - wait.Until go-routine
 		// - reflector.ListAndWatch

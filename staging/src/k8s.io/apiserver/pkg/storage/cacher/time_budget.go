@@ -19,6 +19,8 @@ package cacher
 import (
 	"sync"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/clock"
 )
 
 const (
@@ -48,43 +50,51 @@ type timeBudgetImpl struct {
 	sync.Mutex
 	budget time.Duration
 
-	refresh   time.Duration
-	maxBudget time.Duration
+	refresh         time.Duration
+	maxBudget       time.Duration
+	clock           clock.Clock
+	lastRefreshTime time.Time
 }
 
-func newTimeBudget(stopCh <-chan struct{}) timeBudget {
-	result := &timeBudgetImpl{
-		budget:    time.Duration(0),
-		refresh:   refreshPerSecond,
-		maxBudget: maxBudget,
-	}
-	go result.periodicallyRefresh(stopCh)
-	return result
-}
-
-func (t *timeBudgetImpl) periodicallyRefresh(stopCh <-chan struct{}) {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			t.Lock()
-			if t.budget = t.budget + t.refresh; t.budget > t.maxBudget {
-				t.budget = t.maxBudget
-			}
-			t.Unlock()
-		case <-stopCh:
-			return
-		}
+func newTimeBudget(inputClock clock.Clock) timeBudget {
+	return &timeBudgetImpl{
+		budget:          time.Duration(0),
+		refresh:         refreshPerSecond,
+		maxBudget:       maxBudget,
+		clock:           inputClock,
+		lastRefreshTime: inputClock.Now(), // set the last refresh time to now
 	}
 }
 
 func (t *timeBudgetImpl) takeAvailable() time.Duration {
 	t.Lock()
 	defer t.Unlock()
-	result := t.budget
+
+	// freeze the time of refresh
+	now := t.clock.Now()
+
+	// number of elapsed seconds since last refresh
+	// it is rounded down to the previous integral second
+	elapsedSeconds := int(now.Sub(t.lastRefreshTime).Seconds())
+
+	// calculate the available budget as
+	// minimum of
+	// 1. existingBudget + number of seconds elapsed since last take * refresh duration per second
+	// 2. maxBudget
+	available := t.budget + time.Duration(elapsedSeconds)*t.refresh
+	if available > t.maxBudget {
+		available = t.maxBudget
+	}
+
+	// reset the lastRefreshTime only if the
+	// last time takeAvailable called was more than a second earlier
+	if elapsedSeconds >= 1 {
+		t.lastRefreshTime = now
+	}
+
 	t.budget = time.Duration(0)
-	return result
+
+	return available
 }
 
 func (t *timeBudgetImpl) returnUnused(unused time.Duration) {
