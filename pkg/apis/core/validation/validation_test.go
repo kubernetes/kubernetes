@@ -13666,6 +13666,102 @@ func TestValidateServiceUpdate(t *testing.T) {
 	}
 }
 
+func TestValidateServiceStatusUpdate(t *testing.T) {
+	testCases := []struct {
+		name     string
+		tweakSvc func(oldSvc, newSvc *core.Service) // given basic valid services, each test case can customize them
+		numErrs  int
+	}{
+		{
+			name: "no change",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				// do nothing
+			},
+			numErrs: 0,
+		},
+		{
+			name: "ClusterIP Type empty status",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Status.LoadBalancer.Ingress = []core.LoadBalancerIngress{}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "LoadBalancer type can set Status.LoadBalancer",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Status.LoadBalancer.Ingress = []core.LoadBalancerIngress{
+					{
+						IP: "1.2.3.4",
+					},
+				}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "ClusterIP type can not set Status.LoadBalancer",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Status.LoadBalancer.Ingress = []core.LoadBalancerIngress{
+					{
+						IP: "1.2.3.4",
+					},
+				}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "NodePort type can not set Status.LoadBalancer",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				newSvc.Spec.Type = core.ServiceTypeNodePort
+				newSvc.Status.LoadBalancer.Ingress = []core.LoadBalancerIngress{
+					{
+						IP: "1.2.3.4",
+					},
+				}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "ExternalName type can not set Status.LoadBalancer",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				newSvc.Spec.Type = core.ServiceTypeExternalName
+				newSvc.Status.LoadBalancer.Ingress = []core.LoadBalancerIngress{
+					{
+						IP: "1.2.3.4",
+					},
+				}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "non LoadBalancer type can not set wrong Status.LoadBalancer",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				newSvc.Spec.Type = core.ServiceTypeClusterIP
+				newSvc.Status.LoadBalancer.Ingress = []core.LoadBalancerIngress{
+					{
+						IP: "a.b.c.d",
+					},
+				}
+			},
+			numErrs: 2,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			oldSvc := makeValidService()
+			newSvc := makeValidService()
+			tc.tweakSvc(&oldSvc, &newSvc)
+			errs := ValidateServiceStatusUpdate(&newSvc, &oldSvc)
+			if len(errs) != tc.numErrs {
+				t.Errorf("Expected %d errors, got %d: %v", tc.numErrs, len(errs), errs.ToAggregate())
+			}
+		})
+	}
+}
+
 func TestValidateResourceNames(t *testing.T) {
 	table := []struct {
 		input   string
