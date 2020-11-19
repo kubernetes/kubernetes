@@ -1191,6 +1191,14 @@
     before the rollout finishes.
   release: v1.12
   file: test/e2e/apps/deployment.go
+- testname: Deployment, completes the lifecycle of a Deployment
+  codename: '[sig-apps] Deployment should run the lifecycle of a Deployment [Conformance]'
+  description: When a Deployment is created it MUST succeed with the required number
+    of replicas. It MUST succeed when the Deployment is patched. When scaling the
+    deployment is MUST succeed. When fetching and patching the DeploymentStatus it
+    MUST succeed. It MUST succeed when deleting the Deployment.
+  release: v1.20
+  file: test/e2e/apps/deployment.go
 - testname: Jobs, orphan pods, re-adoption
   codename: '[sig-apps] Job should adopt matching orphans and release non-matching
     pods [Conformance]'
