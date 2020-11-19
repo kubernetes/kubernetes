@@ -748,21 +748,6 @@ func (s ActivePods) Len() int      { return len(s) }
 func (s ActivePods) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 func (s ActivePods) Less(i, j int) bool {
-	//0. controller.kubernetes.io/delete-priority=1 < controller.kubernetes.io/delete-priority=0
-	//If pod has annotation controller.kubernetes.io/delete-priority the larger is small
-	if s[i].Annotations[deletePriorityPodAnnotationKey] != s[j].Annotations[deletePriorityPodAnnotationKey] {
-		s1, err1 := strconv.Atoi(s[i].Annotations[deletePriorityPodAnnotationKey])
-		s2, err2 := strconv.Atoi(s[j].Annotations[deletePriorityPodAnnotationKey])
-		if err1 == nil && err2 == nil {
-			return s1 > s2
-		}
-		if err1 != nil && err2 == nil {
-			return true
-		}
-		if err1 == nil && err2 != nil {
-			return false
-		}
-	}
 	// 1. Unassigned < assigned
 	// If only one of the pods is unassigned, the unassigned one is smaller
 	if s[i].Spec.NodeName != s[j].Spec.NodeName && (len(s[i].Spec.NodeName) == 0 || len(s[j].Spec.NodeName) == 0) {
@@ -777,9 +762,24 @@ func (s ActivePods) Less(i, j int) bool {
 	if podutil.IsPodReady(s[i]) != podutil.IsPodReady(s[j]) {
 		return !podutil.IsPodReady(s[i])
 	}
+        // 4. controller.kubernetes.io/delete-priority=1 < controller.kubernetes.io/delete-priority=0
+        //If pod has annotation controller.kubernetes.io/delete-priority the larger is small
+        if s[i].Annotations[deletePriorityPodAnnotationKey] != s[j].Annotations[deletePriorityPodAnnotationKey] {
+                s1, err1 := strconv.Atoi(s[i].Annotations[deletePriorityPodAnnotationKey])
+                s2, err2 := strconv.Atoi(s[j].Annotations[deletePriorityPodAnnotationKey])
+                if err1 == nil && err2 == nil {
+                        return s1 > s2
+                }
+                if err1 != nil && err2 == nil {
+                        return true
+                }
+                if err1 == nil && err2 != nil {
+                        return false
+                }
+        }
 	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
 	//       see https://github.com/kubernetes/kubernetes/issues/22065
-	// 4. Been ready for empty time < less time < more time
+	// 5. Been ready for empty time < less time < more time
 	// If both pods are ready, the latest ready one is smaller
 	if podutil.IsPodReady(s[i]) && podutil.IsPodReady(s[j]) {
 		readyTime1 := podReadyTime(s[i])
@@ -788,11 +788,11 @@ func (s ActivePods) Less(i, j int) bool {
 			return afterOrZero(readyTime1, readyTime2)
 		}
 	}
-	// 5. Pods with containers with higher restart counts < lower restart counts
+	// 6. Pods with containers with higher restart counts < lower restart counts
 	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
 		return maxContainerRestarts(s[i]) > maxContainerRestarts(s[j])
 	}
-	// 6. Empty creation time pods < newer pods < older pods
+	// 7. Empty creation time pods < newer pods < older pods
 	if !s[i].CreationTimestamp.Equal(&s[j].CreationTimestamp) {
 		return afterOrZero(&s[i].CreationTimestamp, &s[j].CreationTimestamp)
 	}
