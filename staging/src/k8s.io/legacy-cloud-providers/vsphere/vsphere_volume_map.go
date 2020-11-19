@@ -74,6 +74,9 @@ func (vsphereVolume *VsphereVolumeMap) CheckForVolume(path string) (k8stypes.Nod
 	return "", false
 }
 
+// CheckForNode returns true if given node has already been processed by volume
+// verification mechanism. This is used to skip verifying attached disks on nodes
+// which were previously verified.
 func (vsphereVolume *VsphereVolumeMap) CheckForNode(nodeName k8stypes.NodeName) bool {
 	vsphereVolume.lock.RLock()
 	defer vsphereVolume.lock.RUnlock()

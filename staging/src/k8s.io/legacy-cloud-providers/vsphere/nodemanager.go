@@ -311,6 +311,8 @@ func (nm *NodeManager) GetNodeDetails() ([]NodeDetails, error) {
 	return nodeDetails, nil
 }
 
+// GetNodeNames returns list of nodes that are known to vsphere cloudprovider.
+// These are typically nodes that make up k8s cluster.
 func (nm *NodeManager) GetNodeNames() []k8stypes.NodeName {
 	nodes := nm.getNodes()
 	var nodeNameList []k8stypes.NodeName
