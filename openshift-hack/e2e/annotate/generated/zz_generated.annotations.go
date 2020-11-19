@@ -8851,7 +8851,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] stress multiple pods should access different volumes repeatedly [Slow] [Serial]": "multiple pods should access different volumes repeatedly [Slow] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should be able to unmount after the subpath directory is deleted": "should be able to unmount after the subpath directory is deleted [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should be able to unmount after the subpath directory is deleted": "should be able to unmount after the subpath directory is deleted [Disabled:Broken] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
