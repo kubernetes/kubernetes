@@ -60,6 +60,9 @@ func TestExportService(t *testing.T) {
 					Name:      "foo",
 					Namespace: "bar",
 				},
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+				},
 				Status: api.ServiceStatus{
 					LoadBalancer: api.LoadBalancerStatus{
 						Ingress: []api.LoadBalancerIngress{
@@ -72,6 +75,9 @@ func TestExportService(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "bar",
+				},
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
 				},
 			},
 			exact: true,
@@ -84,6 +90,7 @@ func TestExportService(t *testing.T) {
 				},
 				Spec: api.ServiceSpec{
 					ClusterIPs: []string{"10.0.0.1"},
+					Type:       api.ServiceTypeLoadBalancer,
 				},
 				Status: api.ServiceStatus{
 					LoadBalancer: api.LoadBalancerStatus{
@@ -100,6 +107,7 @@ func TestExportService(t *testing.T) {
 				},
 				Spec: api.ServiceSpec{
 					ClusterIPs: nil,
+					Type:       api.ServiceTypeLoadBalancer,
 				},
 			},
 		},
@@ -111,6 +119,7 @@ func TestExportService(t *testing.T) {
 				},
 				Spec: api.ServiceSpec{
 					ClusterIPs: []string{"10.0.0.1", "2001::1"},
+					Type:       api.ServiceTypeLoadBalancer,
 				},
 				Status: api.ServiceStatus{
 					LoadBalancer: api.LoadBalancerStatus{
@@ -127,6 +136,7 @@ func TestExportService(t *testing.T) {
 				},
 				Spec: api.ServiceSpec{
 					ClusterIPs: nil,
+					Type:       api.ServiceTypeLoadBalancer,
 				},
 			},
 		},
