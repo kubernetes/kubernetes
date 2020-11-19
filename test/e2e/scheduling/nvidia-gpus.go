@@ -171,6 +171,32 @@ func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *fra
 	// Wait for Nvidia GPUs to be available on nodes
 	framework.Logf("Waiting for drivers to be installed and GPUs to be available in Node Capacity...")
 	gomega.Eventually(func() bool {
+		pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			framework.Logf("Failed to list pods with error: %q", err)
+			return false
+		}
+		for _, p := range pods.Items {
+			if len(p.Spec.InitContainers) == 0 {
+				continue
+			}
+
+			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, p.Name, p.Spec.InitContainers[0].Name)
+			if err != nil {
+				framework.Logf("Failed to get pod logs with error: %q", err)
+				continue
+			}
+			framework.Logf("Got the following logs from pod %q: %s", p.Spec.InitContainers[0].Name, logs)
+			stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
+				Command:       []string{"/bin/bash", "-c", "cat /usr/local/nvidia/nvidia-installer.log"},
+				Namespace:     f.Namespace.Name,
+				PodName:       p.Name,
+				ContainerName: p.Spec.InitContainers[0].Name,
+				CaptureStdout: true,
+				CaptureStderr: true,
+			})
+			framework.Logf("Exec returned: %q, %s, %s", err, stdout, stderr)
+		}
 		return areGPUsAvailableOnAllSchedulableNodes(f)
 	}, driverInstallTimeout, time.Second).Should(gomega.BeTrue())
 
