@@ -1215,7 +1215,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 			}
 
 		}
-		klog.V(4).Infof("DisksAreAttach successfully executed. result: %+v", attached)
+		klog.V(4).Infof("DisksAreAttached successfully executed. result: %+v", attached)
 		// There could be nodes in cluster which do not have any pods with vsphere volumes running on them
 		// such nodes won't be part of nodeVolumes map because attach-detach controller does not keep track
 		// such nodes. But such nodes may still have dangling volumes on them and hence we need to scan all the
