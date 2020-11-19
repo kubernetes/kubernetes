@@ -2228,14 +2228,18 @@ func TestRequestPreflightCheck(t *testing.T) {
 
 func TestThrottledLogger(t *testing.T) {
 	now := time.Now()
+	oldClock := globalThrottledLogger.clock
+	defer func() {
+		globalThrottledLogger.clock = oldClock
+	}()
 	clock := clock.NewFakeClock(now)
 	globalThrottledLogger.clock = clock
 
 	logMessages := 0
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < 1000; i++ {
 		var wg sync.WaitGroup
-		wg.Add(100)
-		for j := 0; j < 100; j++ {
+		wg.Add(10)
+		for j := 0; j < 10; j++ {
 			go func() {
 				if _, ok := globalThrottledLogger.attemptToLog(); ok {
 					logMessages++
@@ -2248,7 +2252,7 @@ func TestThrottledLogger(t *testing.T) {
 		clock.SetTime(now)
 	}
 
-	if a, e := logMessages, 1000; a != e {
+	if a, e := logMessages, 100; a != e {
 		t.Fatalf("expected %v log messages, but got %v", e, a)
 	}
 }
