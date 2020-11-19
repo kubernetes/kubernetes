@@ -36,14 +36,14 @@ type nodeVolumeStatus struct {
 // VsphereVolumeMap stores last known state of node and volume mapping
 type VsphereVolumeMap struct {
 	volumeNodeMap map[volumePath]nodeVolumeStatus
-	knownNodes    map[k8stypes.NodeName]bool
+	nodeMap       map[k8stypes.NodeName]bool
 	lock          sync.RWMutex
 }
 
 func NewVsphereVolumeMap() *VsphereVolumeMap {
 	return &VsphereVolumeMap{
 		volumeNodeMap: map[volumePath]nodeVolumeStatus{},
-		knownNodes:    map[k8stypes.NodeName]bool{},
+		nodeMap:       map[k8stypes.NodeName]bool{},
 	}
 }
 
@@ -56,6 +56,9 @@ func (vsphereVolume *VsphereVolumeMap) StartDiskVerification() {
 		v.verified = false
 		vsphereVolume.volumeNodeMap[k] = v
 	}
+	// reset nodeMap to empty so that any node we could not verify via usual verification process
+	// can still be verified.
+	vsphereVolume.nodeMap = map[k8stypes.NodeName]bool{}
 }
 
 // CheckForVolume verifies if disk is attached to some node in the cluster.
@@ -74,11 +77,8 @@ func (vsphereVolume *VsphereVolumeMap) CheckForVolume(path string) (k8stypes.Nod
 func (vsphereVolume *VsphereVolumeMap) CheckForNode(nodeName k8stypes.NodeName) bool {
 	vsphereVolume.lock.RLock()
 	defer vsphereVolume.lock.RUnlock()
-	_, ok := vsphereVolume.knownNodes[nodeName]
-	if ok {
-		return true
-	}
-	return false
+	_, ok := vsphereVolume.nodeMap[nodeName]
+	return ok
 }
 
 // Add all devices found on a node to the device map
@@ -91,7 +91,7 @@ func (vsphereVolume *VsphereVolumeMap) Add(node k8stypes.NodeName, vmDevices obj
 			if backing, ok := virtualDevice.Backing.(*types.VirtualDiskFlatVer2BackingInfo); ok {
 				filename := volumePath(backing.FileName)
 				vsphereVolume.volumeNodeMap[filename] = nodeVolumeStatus{node, true}
-				vsphereVolume.knownNodes[node] = true
+				vsphereVolume.nodeMap[node] = true
 			}
 		}
 	}
@@ -104,7 +104,7 @@ func (vsphereVolume *VsphereVolumeMap) RemoveUnverified() {
 	for k, v := range vsphereVolume.volumeNodeMap {
 		if !v.verified {
 			delete(vsphereVolume.volumeNodeMap, k)
-			delete(vsphereVolume.knownNodes, v.nodeName)
+			delete(vsphereVolume.nodeMap, v.nodeName)
 		}
 	}
 }
