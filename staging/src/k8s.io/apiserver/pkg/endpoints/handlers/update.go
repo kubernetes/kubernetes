@@ -54,12 +54,15 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			return
 		}
 
+		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
+		timeout := parseTimeout(req.URL.Query().Get("timeout"))
+
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
-		ctx, cancel := context.WithTimeout(req.Context(), requestTimeout)
+		ctx, cancel := context.WithTimeout(req.Context(), timeout)
 		defer cancel()
 		ctx = request.WithNamespace(ctx, namespace)
 
@@ -192,7 +195,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 		}
 		// Dedup owner references before updating managed fields
 		dedupOwnerReferencesAndAddWarning(obj, req.Context(), false)
-		result, err := finishRequest(ctx, func() (runtime.Object, error) {
+		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			result, err := requestFunc()
 			// If the object wasn't committed to storage because it's serialized size was too large,
 			// it is safe to remove managedFields (which can be large) and try again.
