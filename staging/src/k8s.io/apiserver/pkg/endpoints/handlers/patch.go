@@ -569,9 +569,14 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 	default:
 		return nil, false, fmt.Errorf("%v: unimplemented patch type", p.patchType)
 	}
+	dedupOwnerReferencesTransformer := func(_ context.Context, obj, _ runtime.Object) (runtime.Object, error) {
+		// Dedup owner references after mutating admission happens
+		dedupOwnerReferencesAndAddWarning(obj, ctx, true)
+		return obj, nil
+	}
 
 	wasCreated := false
-	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
+	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission, dedupOwnerReferencesTransformer)
 	requestFunc := func() (runtime.Object, error) {
 		// Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
 		options := patchToUpdateOptions(p.options)
@@ -585,11 +590,15 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 		// it is safe to remove managedFields (which can be large) and try again.
 		if isTooLargeError(err) && p.patchType != types.ApplyPatchType {
 			if _, accessorErr := meta.Accessor(p.restPatcher.New()); accessorErr == nil {
-				p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission, func(_ context.Context, obj, _ runtime.Object) (runtime.Object, error) {
-					accessor, _ := meta.Accessor(obj)
-					accessor.SetManagedFields(nil)
-					return obj, nil
-				})
+				p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil,
+					p.applyPatch,
+					p.applyAdmission,
+					dedupOwnerReferencesTransformer,
+					func(_ context.Context, obj, _ runtime.Object) (runtime.Object, error) {
+						accessor, _ := meta.Accessor(obj)
+						accessor.SetManagedFields(nil)
+						return obj, nil
+					})
 				result, err = requestFunc()
 			}
 		}

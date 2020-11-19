@@ -49,8 +49,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
@@ -61,9 +63,11 @@ import (
 	"k8s.io/client-go/tools/pager"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration"
+	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -2134,5 +2138,210 @@ func expectPartialObjectMetaV1EventsProtobuf(t *testing.T, r io.Reader, values .
 		if meta.Annotations["test"] != value {
 			t.Fatalf("expected event %d to have value %q instead of %q", i+1, value, meta.Annotations["test"])
 		}
+	}
+}
+
+func TestDedupOwnerReferences(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
+	etcd.CreateTestCRDs(t, apiextensionsclient.NewForConfigOrDie(server.ClientConfig), false, etcd.GetCustomResourceDefinitionData()[0])
+
+	b := &bytes.Buffer{}
+	warningWriter := restclient.NewWarningWriter(b, restclient.WarningWriterOptions{})
+	server.ClientConfig.WarningHandler = warningWriter
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	dynamicClient := dynamic.NewForConfigOrDie(server.ClientConfig)
+
+	ns := "test-dedup-owner-references"
+	// create test namespace
+	_, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: ns,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create test ns: %v", err)
+	}
+
+	// some fake owner references
+	fakeRefA := metav1.OwnerReference{
+		APIVersion: "v1",
+		Kind:       "ConfigMap",
+		Name:       "fake-configmap",
+		UID:        uuid.NewUUID(),
+	}
+	fakeRefB := metav1.OwnerReference{
+		APIVersion: "v1",
+		Kind:       "Node",
+		Name:       "fake-node",
+		UID:        uuid.NewUUID(),
+	}
+	fakeRefC := metav1.OwnerReference{
+		APIVersion: "cr.bar.com/v1",
+		Kind:       "Foo",
+		Name:       "fake-foo",
+		UID:        uuid.NewUUID(),
+	}
+
+	tcs := []struct {
+		gvr  schema.GroupVersionResource
+		kind string
+	}{
+		{
+			gvr: schema.GroupVersionResource{
+				Group:    "",
+				Version:  "v1",
+				Resource: "configmaps",
+			},
+			kind: "ConfigMap",
+		},
+		{
+			gvr: schema.GroupVersionResource{
+				Group:    "cr.bar.com",
+				Version:  "v1",
+				Resource: "foos",
+			},
+			kind: "Foo",
+		},
+	}
+
+	for i, tc := range tcs {
+		t.Run(tc.gvr.String(), func(t *testing.T) {
+			previousWarningCount := i * 3
+			c := &dependentClient{
+				t:      t,
+				client: dynamicClient.Resource(tc.gvr).Namespace(ns),
+				gvr:    tc.gvr,
+				kind:   tc.kind,
+			}
+			klog.Infof("creating dependent with duplicate owner references")
+			dependent := c.createDependentWithOwners([]metav1.OwnerReference{fakeRefA, fakeRefA})
+			assertManagedFields(t, dependent)
+			expectedWarning := fmt.Sprintf(handlers.DuplicateOwnerReferencesWarningFormat, fakeRefA.UID)
+			assertOwnerReferences(t, dependent, []metav1.OwnerReference{fakeRefA})
+			assertWarningCount(t, warningWriter, previousWarningCount+1)
+			assertWarningMessage(t, b, expectedWarning)
+
+			klog.Infof("updating dependent with duplicate owner references")
+			dependent = c.updateDependentWithOwners(dependent, []metav1.OwnerReference{fakeRefA, fakeRefA})
+			assertManagedFields(t, dependent)
+			assertOwnerReferences(t, dependent, []metav1.OwnerReference{fakeRefA})
+			assertWarningCount(t, warningWriter, previousWarningCount+2)
+			assertWarningMessage(t, b, expectedWarning)
+
+			klog.Infof("patching dependent with duplicate owner reference")
+			dependent = c.patchDependentWithOwner(dependent, fakeRefA)
+			// TODO: currently a patch request that duplicates owner references can still
+			// wipe out managed fields. Note that this happens to built-in resources but
+			// not custom resources. In future we should either dedup before writing manage
+			// fields, or stop deduping and reject the request.
+			// assertManagedFields(t, dependent)
+			expectedPatchWarning := fmt.Sprintf(handlers.DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat, fakeRefA.UID)
+			assertOwnerReferences(t, dependent, []metav1.OwnerReference{fakeRefA})
+			assertWarningCount(t, warningWriter, previousWarningCount+3)
+			assertWarningMessage(t, b, expectedPatchWarning)
+
+			klog.Infof("updating dependent with different owner references")
+			dependent = c.updateDependentWithOwners(dependent, []metav1.OwnerReference{fakeRefA, fakeRefB})
+			assertOwnerReferences(t, dependent, []metav1.OwnerReference{fakeRefA, fakeRefB})
+			assertWarningCount(t, warningWriter, previousWarningCount+3)
+			assertWarningMessage(t, b, "")
+
+			klog.Infof("patching dependent with different owner references")
+			dependent = c.patchDependentWithOwner(dependent, fakeRefC)
+			assertOwnerReferences(t, dependent, []metav1.OwnerReference{fakeRefA, fakeRefB, fakeRefC})
+			assertWarningCount(t, warningWriter, previousWarningCount+3)
+			assertWarningMessage(t, b, "")
+
+			klog.Infof("deleting dependent")
+			c.deleteDependent()
+			assertWarningCount(t, warningWriter, previousWarningCount+3)
+			assertWarningMessage(t, b, "")
+		})
+	}
+	// cleanup
+	if err := client.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{}); err != nil {
+		t.Fatalf("failed to delete test ns: %v", err)
+	}
+}
+
+type dependentClient struct {
+	t      *testing.T
+	client dynamic.ResourceInterface
+	gvr    schema.GroupVersionResource
+	kind   string
+}
+
+func (c *dependentClient) createDependentWithOwners(refs []metav1.OwnerReference) *unstructured.Unstructured {
+	obj := &unstructured.Unstructured{}
+	obj.SetName("dependent")
+	obj.SetOwnerReferences(refs)
+	obj.SetKind(c.kind)
+	obj.SetAPIVersion(fmt.Sprintf("%s/%s", c.gvr.Group, c.gvr.Version))
+	obj, err := c.client.Create(context.TODO(), obj, metav1.CreateOptions{})
+	if err != nil {
+		c.t.Fatalf("failed to create dependent with owner references %v: %v", refs, err)
+	}
+	return obj
+}
+
+func (c *dependentClient) updateDependentWithOwners(obj *unstructured.Unstructured, refs []metav1.OwnerReference) *unstructured.Unstructured {
+	obj.SetOwnerReferences(refs)
+	obj, err := c.client.Update(context.TODO(), obj, metav1.UpdateOptions{})
+	if err != nil {
+		c.t.Fatalf("failed to update dependent with owner references %v: %v", refs, err)
+	}
+	return obj
+}
+
+func (c *dependentClient) patchDependentWithOwner(obj *unstructured.Unstructured, ref metav1.OwnerReference) *unstructured.Unstructured {
+	patch := []byte(fmt.Sprintf(`[{"op":"add","path":"/metadata/ownerReferences/-","value":{"apiVersion":"%v", "kind": "%v", "name": "%v", "uid": "%v"}}]`, ref.APIVersion, ref.Kind, ref.Name, ref.UID))
+	obj, err := c.client.Patch(context.TODO(), obj.GetName(), types.JSONPatchType, patch, metav1.PatchOptions{})
+	if err != nil {
+		c.t.Fatalf("failed to append owner reference to dependent with owner reference %v, patch %v: %v",
+			ref, patch, err)
+	}
+	return obj
+}
+
+func (c *dependentClient) deleteDependent() {
+	if err := c.client.Delete(context.TODO(), "dependent", metav1.DeleteOptions{}); err != nil {
+		c.t.Fatalf("failed to delete dependent: %v", err)
+	}
+}
+
+type warningCounter interface {
+	WarningCount() int
+}
+
+func assertOwnerReferences(t *testing.T, obj *unstructured.Unstructured, refs []metav1.OwnerReference) {
+	if !reflect.DeepEqual(obj.GetOwnerReferences(), refs) {
+		t.Errorf("unexpected owner references, expected: %v, got: %v", refs, obj.GetOwnerReferences())
+	}
+}
+
+func assertWarningCount(t *testing.T, counter warningCounter, expected int) {
+	if counter.WarningCount() != expected {
+		t.Errorf("unexpected warning count, expected: %v, got: %v", expected, counter.WarningCount())
+	}
+}
+
+func assertWarningMessage(t *testing.T, b *bytes.Buffer, expected string) {
+	defer b.Reset()
+	actual := b.String()
+	if len(expected) == 0 && len(actual) != 0 {
+		t.Errorf("unexpected warning message, expected no warning, got: %v", actual)
+	}
+	if len(expected) == 0 {
+		return
+	}
+	if !strings.Contains(actual, expected) {
+		t.Errorf("unexpected warning message, expected: %v, got: %v", expected, actual)
+	}
+}
+
+func assertManagedFields(t *testing.T, obj *unstructured.Unstructured) {
+	if len(obj.GetManagedFields()) == 0 {
+		t.Errorf("unexpected empty managed fields in object: %v", obj)
 	}
 }
