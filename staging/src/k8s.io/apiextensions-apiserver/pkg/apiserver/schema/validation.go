@@ -160,6 +160,7 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 			metadata.Properties = nil
 		}
 		metadata.Type = ""
+		metadata.Description = ""
 		metadata.Default.Object = nil // this is checked in API validation (and also tested)
 		if metadata.ValueValidation == nil {
 			metadata.ValueValidation = &ValueValidation{}
