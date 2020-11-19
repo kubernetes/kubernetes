@@ -611,15 +611,15 @@ func (vs *VSphere) checkDiskAttached(ctx context.Context, nodes []k8stypes.NodeN
 
 // BuildMissingVolumeNodeMap builds a map of volumes and nodes which are not known to attach detach controller.
 // There could be nodes in cluster which do not have any pods with vsphere volumes running on them
-// such nodes won't be part of disk verificatio check because attach-detach controller does not keep track
+// such nodes won't be part of disk verification check because attach-detach controller does not keep track
 // such nodes. But such nodes may still have dangling volumes on them and hence we need to scan all the
 // remaining nodes which weren't scanned by code previously.
 func (vs *VSphere) BuildMissingVolumeNodeMap(ctx context.Context) {
-	nodeDetails := vs.nodeManager.GetNodeNames()
+	nodeNames := vs.nodeManager.GetNodeNames()
 	// Segregate nodes according to VC-DC
 	dcNodes := make(map[string][]k8stypes.NodeName)
 
-	for _, nodeName := range nodeDetails {
+	for _, nodeName := range nodeNames {
 		// if given node is not in node volume map
 		if !vs.vsphereVolumeMap.CheckForNode(nodeName) {
 			nodeInfo, err := vs.nodeManager.GetNodeInfo(nodeName)
