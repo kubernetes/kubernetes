@@ -95,15 +95,6 @@ func TestWithRequestDeadline(t *testing.T) {
 			statusCodeExpected:       http.StatusOK,
 		},
 		{
-			name:                     "the specified timeout is 0s, default deadline is expected to be set",
-			requestURL:               "/api/v1/namespaces?timeout=0s",
-			longRunning:              false,
-			handlerCallCountExpected: 1,
-			hasDeadlineExpected:      true,
-			deadlineExpected:         requestTimeoutMaximum - time.Second, // to account for the delay in verification
-			statusCodeExpected:       http.StatusOK,
-		},
-		{
 			name:                     "the user does not specify any request timeout, default deadline is expected to be set",
 			requestURL:               "/api/v1/namespaces?timeout=",
 			longRunning:              false,
