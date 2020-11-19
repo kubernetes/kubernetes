@@ -88,19 +88,19 @@ func TestConfigConsumerFight(t *testing.T) {
 			fieldMgr = fieldMgr + "x"
 			foundToDangling = func(found bool) bool { return found }
 		}
-		ctlr := utilfc.NewTestable(
-			fmt.Sprintf("Controller%d[invert=%v]", i, invert),
-			clk,
-			func(workqueue.RateLimitingInterface) {},
-			fieldMgr,
-			foundToDangling,
-			informerFactory,
-			fcIfc,
-			200,         // server concurrency limit
-			time.Minute, // request wait limit
-			metrics.PriorityLevelConcurrencyObserverPairGenerator,
-			fqtesting.NewNoRestraintFactory(),
-		)
+		ctlr := utilfc.NewTestable(utilfc.TestableConfig{
+			Name:                       fmt.Sprintf("Controller%d[invert=%v]", i, invert),
+			Clock:                      clk,
+			FinishHandlingNotification: func(wq workqueue.RateLimitingInterface, obj interface{}) {},
+			AsFieldManager:             fieldMgr,
+			FoundToDangling:            foundToDangling,
+			InformerFactory:            informerFactory,
+			FlowcontrolClient:          fcIfc,
+			ServerConcurrencyLimit:     200,         // server concurrency limit
+			RequestWaitLimit:           time.Minute, // request wait limit
+			ObsPairGenerator:           metrics.PriorityLevelConcurrencyObserverPairGenerator,
+			QueueSetFactory:            fqtesting.NewNoRestraintFactory(),
+		})
 		ctlrs[invert][i] = ctlr
 		informerFactory.Start(stopCh)
 		if !ctlr.WaitForCacheSync(stopCh) {

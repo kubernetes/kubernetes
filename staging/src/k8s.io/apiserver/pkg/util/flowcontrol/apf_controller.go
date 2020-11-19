@@ -45,7 +45,6 @@ import (
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	fcfmt "k8s.io/apiserver/pkg/util/flowcontrol/format"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
-	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -95,7 +94,7 @@ type configController struct {
 	obsPairGenerator metrics.TimedObserverPairGenerator
 
 	// Puts something in the workqueue to trigger work
-	finishHandlingNotification func(workqueue.RateLimitingInterface)
+	finishHandlingNotification func(workqueue.RateLimitingInterface, interface{})
 
 	// How this controller appears in an ObjectMeta ManagedFieldsEntry.Manager
 	asFieldManager string
@@ -180,39 +179,27 @@ type priorityLevelState struct {
 }
 
 // NewTestableController is extra flexible to facilitate testing
-func newTestableController(
-	name string,
-	clock clock.PassiveClock,
-	finishHandlingNotification func(workqueue.RateLimitingInterface),
-	asFieldManager string,
-	foundToDangling func(bool) bool,
-	informerFactory kubeinformers.SharedInformerFactory,
-	flowcontrolClient flowcontrolclient.FlowcontrolV1beta1Interface,
-	serverConcurrencyLimit int,
-	requestWaitLimit time.Duration,
-	obsPairGenerator metrics.TimedObserverPairGenerator,
-	queueSetFactory fq.QueueSetFactory,
-) *configController {
+func newTestableController(config TestableConfig) *configController {
 	cfgCtlr := &configController{
-		name:                       name,
-		clock:                      clock,
-		queueSetFactory:            queueSetFactory,
-		obsPairGenerator:           obsPairGenerator,
-		finishHandlingNotification: finishHandlingNotification,
-		asFieldManager:             asFieldManager,
-		foundToDangling:            foundToDangling,
-		serverConcurrencyLimit:     serverConcurrencyLimit,
-		requestWaitLimit:           requestWaitLimit,
-		flowcontrolClient:          flowcontrolClient,
+		name:                       config.Name,
+		clock:                      config.Clock,
+		queueSetFactory:            config.QueueSetFactory,
+		obsPairGenerator:           config.ObsPairGenerator,
+		finishHandlingNotification: config.FinishHandlingNotification,
+		asFieldManager:             config.AsFieldManager,
+		foundToDangling:            config.FoundToDangling,
+		serverConcurrencyLimit:     config.ServerConcurrencyLimit,
+		requestWaitLimit:           config.RequestWaitLimit,
+		flowcontrolClient:          config.FlowcontrolClient,
 		priorityLevelStates:        make(map[string]*priorityLevelState),
 	}
-	klog.V(2).Infof("NewTestableController %q with serverConcurrencyLimit=%d, requestWaitLimit=%s", name, serverConcurrencyLimit, requestWaitLimit)
+	klog.V(2).Infof("NewTestableController %q with serverConcurrencyLimit=%d, requestWaitLimit=%s", cfgCtlr.name, cfgCtlr.serverConcurrencyLimit, cfgCtlr.requestWaitLimit)
 	cfgCtlr.configQueue = workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 8*time.Hour), "priority_and_fairness_config_queue")
 
 	// ensure the data structure reflects the mandatory config
 	cfgCtlr.lockAndDigestConfigObjects(nil, nil)
 
-	fci := informerFactory.Flowcontrol().V1beta1()
+	fci := config.InformerFactory.Flowcontrol().V1beta1()
 	pli := fci.PriorityLevelConfigurations()
 	fsi := fci.FlowSchemas()
 	cfgCtlr.plLister = pli.Lister()
@@ -223,40 +210,40 @@ func newTestableController(
 		AddFunc: func(obj interface{}) {
 			pl := obj.(*flowcontrol.PriorityLevelConfiguration)
 			klog.V(7).Infof("Triggered API priority and fairness config reloading due to creation of PLC %s", pl.Name)
-			cfgCtlr.finishHandlingNotification(cfgCtlr.configQueue)
+			cfgCtlr.finishHandlingNotification(cfgCtlr.configQueue, obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newPL := newObj.(*flowcontrol.PriorityLevelConfiguration)
 			oldPL := oldObj.(*flowcontrol.PriorityLevelConfiguration)
 			if !apiequality.Semantic.DeepEqual(oldPL.Spec, newPL.Spec) {
 				klog.V(7).Infof("Triggered API priority and fairness config reloading due to spec update of PLC %s", newPL.Name)
-				cfgCtlr.finishHandlingNotification(cfgCtlr.configQueue)
+				cfgCtlr.finishHandlingNotification(cfgCtlr.configQueue, newObj)
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			name, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			klog.V(7).Infof("Triggered API priority and fairness config reloading due to deletion of PLC %s", name)
-			cfgCtlr.finishHandlingNotification(cfgCtlr.configQueue)
+			cfgCtlr.finishHandlingNotification(cfgCtlr.configQueue, obj)
 
 		}})
 	fsi.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			fs := obj.(*flowcontrol.FlowSchema)
 			klog.V(7).Infof("Triggered API priority and fairness config reloading due to creation of FS %s", fs.Name)
-			cfgCtlr.finishHandlingNotification(cfgCtlr.configQueue)
+			cfgCtlr.finishHandlingNotification(cfgCtlr.configQueue, obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newFS := newObj.(*flowcontrol.FlowSchema)
 			oldFS := oldObj.(*flowcontrol.FlowSchema)
 			if !apiequality.Semantic.DeepEqual(oldFS.Spec, newFS.Spec) {
 				klog.V(7).Infof("Triggered API priority and fairness config reloading due to spec update of FS %s", newFS.Name)
-				cfgCtlr.finishHandlingNotification(cfgCtlr.configQueue)
+				cfgCtlr.finishHandlingNotification(cfgCtlr.configQueue, newObj)
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			name, _ := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 			klog.V(7).Infof("Triggered API priority and fairness config reloading due to deletion of FS %s", name)
-			cfgCtlr.finishHandlingNotification(cfgCtlr.configQueue)
+			cfgCtlr.finishHandlingNotification(cfgCtlr.configQueue, obj)
 
 		}})
 	return cfgCtlr
@@ -264,7 +251,7 @@ func newTestableController(
 
 // FinishHandlingNotification is the normal way to do so.
 // Pass this to NewTestable(..) to make a normal Interface.
-func FinishHandlingNotification(wq workqueue.RateLimitingInterface) {
+func FinishHandlingNotification(wq workqueue.RateLimitingInterface, obj interface{}) {
 	wq.Add(0)
 }
 
@@ -336,7 +323,7 @@ type SyncReport struct {
 	NeedRetry bool
 }
 
-// DigestReport describes the outcome of a call to SyncOne
+// DigestReport describes the outcome of digesting config objects
 type DigestReport struct {
 	// TriedWrites indicates whether status updates were attempted
 	TriedWrites bool

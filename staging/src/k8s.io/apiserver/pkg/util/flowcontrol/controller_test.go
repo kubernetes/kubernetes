@@ -231,19 +231,19 @@ func TestConfigConsumer(t *testing.T) {
 				heldRequestsMap: map[string][]heldRequest{},
 				queues:          map[string]*ctlrTestQueueSet{},
 			}
-			ctlr := newTestableController(
-				"Controller",
-				clock.RealClock{},
-				FinishHandlingNotification,
-				ConfigConsumerAsFieldManager,
-				func(found bool) bool { return !found },
-				informerFactory,
-				flowcontrolClient,
-				100,         // server concurrency limit
-				time.Minute, // request wait limit
-				metrics.PriorityLevelConcurrencyObserverPairGenerator,
-				cts,
-			)
+			ctlr := newTestableController(TestableConfig{
+				Name:                       "Controller",
+				Clock:                      clock.RealClock{},
+				FinishHandlingNotification: FinishHandlingNotification,
+				AsFieldManager:             ConfigConsumerAsFieldManager,
+				FoundToDangling:            func(found bool) bool { return !found },
+				InformerFactory:            informerFactory,
+				FlowcontrolClient:          flowcontrolClient,
+				ServerConcurrencyLimit:     100,         // server concurrency limit
+				RequestWaitLimit:           time.Minute, // request wait limit
+				ObsPairGenerator:           metrics.PriorityLevelConcurrencyObserverPairGenerator,
+				QueueSetFactory:            cts,
+			})
 			cts.cfgCtlr = ctlr
 			persistingPLNames := sets.NewString()
 			trialStep := fmt.Sprintf("trial%d-0", i)

@@ -93,36 +93,65 @@ func New(
 ) Interface {
 	grc := counter.NoOp{}
 	clk := clock.RealClock{}
-	return NewTestable(
-		"Controller",
-		clk,
-		FinishHandlingNotification,
-		ConfigConsumerAsFieldManager,
-		func(found bool) bool { return !found },
-		informerFactory,
-		flowcontrolClient,
-		serverConcurrencyLimit,
-		requestWaitLimit,
-		metrics.PriorityLevelConcurrencyObserverPairGenerator,
-		fqs.NewQueueSetFactory(clk, grc),
-	)
+	return NewTestable(TestableConfig{
+		Name:                       "Controller",
+		Clock:                      clk,
+		FinishHandlingNotification: FinishHandlingNotification,
+		AsFieldManager:             ConfigConsumerAsFieldManager,
+		FoundToDangling:            func(found bool) bool { return !found },
+		InformerFactory:            informerFactory,
+		FlowcontrolClient:          flowcontrolClient,
+		ServerConcurrencyLimit:     serverConcurrencyLimit,
+		RequestWaitLimit:           requestWaitLimit,
+		ObsPairGenerator:           metrics.PriorityLevelConcurrencyObserverPairGenerator,
+		QueueSetFactory:            fqs.NewQueueSetFactory(clk, grc),
+	})
+}
+
+// TestableConfig carries the parameters to an implementation that is testable
+type TestableConfig struct {
+	// Name of the controller
+	Name string
+
+	// Clock to use in timing deliberate delays
+	Clock clock.PassiveClock
+
+	// FinishHandlingNotification is what to do when notified by an
+	// informer about a config object.  In the case of an update
+	// notification, the object appearing here is the new one.  In the
+	// case of a delete, it might be a `DeletedFinalStateUnknown`.
+	FinishHandlingNotification func(wq workqueue.RateLimitingInterface, obj interface{})
+
+	// AsFieldManager is the string to use in the metadata for server-side apply
+	AsFieldManager string
+
+	// FoundToDangling maps the boolean indicating whether a
+	// FlowSchema's referenced PLC exists to the boolean indicating
+	// that FlowSchema's status should indicate a dangling reference
+	FoundToDangling func(bool) bool
+
+	// InformerFactory to use in building the controller
+	InformerFactory kubeinformers.SharedInformerFactory
+
+	// FlowcontrolClient to use for manipulating config objects
+	FlowcontrolClient flowcontrolclient.FlowcontrolV1beta1Interface
+
+	// ServerConcurrencyLimit for the controller to enforce
+	ServerConcurrencyLimit int
+
+	// RequestWaitLimit configured on the server
+	RequestWaitLimit time.Duration
+
+	// ObsPairGenerator for metrics
+	ObsPairGenerator metrics.TimedObserverPairGenerator
+
+	// QueueSetFactory for the queuing implementation
+	QueueSetFactory fq.QueueSetFactory
 }
 
 // NewTestable is extra flexible to facilitate testing
-func NewTestable(
-	name string,
-	clock clock.PassiveClock,
-	finishHandlingNotification func(workqueue.RateLimitingInterface),
-	asFieldManager string,
-	foundToDangling func(bool) bool,
-	informerFactory kubeinformers.SharedInformerFactory,
-	flowcontrolClient flowcontrolclient.FlowcontrolV1beta1Interface,
-	serverConcurrencyLimit int,
-	requestWaitLimit time.Duration,
-	obsPairGenerator metrics.TimedObserverPairGenerator,
-	queueSetFactory fq.QueueSetFactory,
-) TestableInterface {
-	return newTestableController(name, clock, finishHandlingNotification, asFieldManager, foundToDangling, informerFactory, flowcontrolClient, serverConcurrencyLimit, requestWaitLimit, obsPairGenerator, queueSetFactory)
+func NewTestable(config TestableConfig) TestableInterface {
+	return newTestableController(config)
 }
 
 func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest RequestDigest,
