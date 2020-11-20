@@ -1245,6 +1245,26 @@ EOF
     cat >>"$file" <<EOF
 EOF
   fi
+  if [ -n "${KUBE_SCHEDULER_API_QPS:-}" ]; then
+    cat >>"$file" <<EOF
+KUBE_SCHEDULER_API_QPS: $(yaml-quote "${KUBE_SCHEDULER_API_QPS}")
+EOF
+  fi
+  if [ -n "${KUBE_SCHEDULER_API_BURST:-}" ]; then
+    cat >>"$file" <<EOF
+KUBE_SCHEDULER_API_BURST: $(yaml-quote "${KUBE_SCHEDULER_API_BURST}")
+EOF
+  fi
+  if [ -n "${KUBE_CONTROLLER_MANAGER_API_QPS:-}" ]; then
+    cat >>"$file" <<EOF
+KUBE_CONTROLLER_MANAGER_API_QPS: $(yaml-quote "${KUBE_CONTROLLER_MANAGER_API_QPS}")
+EOF
+  fi
+  if [ -n "${KUBE_CONTROLLER_MANAGER_API_BURST:-}" ]; then
+    cat >>"$file" <<EOF
+KUBE_CONTROLLER_MANAGER_API_BURST: $(yaml-quote "${KUBE_CONTROLLER_MANAGER_API_BURST}")
+EOF
+  fi
   if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
     cat >>"$file" <<EOF
 KUBE_APISERVER_REQUEST_TIMEOUT: $(yaml-quote "${KUBE_APISERVER_REQUEST_TIMEOUT}")

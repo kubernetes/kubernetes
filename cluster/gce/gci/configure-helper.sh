@@ -2065,6 +2065,12 @@ function start-kube-controller-manager {
   if [[ -n "${RUN_CONTROLLERS:-}" ]]; then
     params+=("--controllers=${RUN_CONTROLLERS}")
   fi
+  if [[ -n "${KUBE_CONTROLLER_MANAGER_API_QPS:-}" ]]; then
+    params+=("--kube-api-qps=${KUBE_CONTROLLER_MANAGER_API_QPS}")
+  fi
+  if [[ -n "${KUBE_CONTROLLER_MANAGER_API_BURST:-}" ]]; then
+    params+=("--kube-api-burst=${KUBE_CONTROLLER_MANAGER_API_BURST}")
+  fi
 
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
   local container_env=""
@@ -2135,6 +2141,15 @@ function start-kube-scheduler {
       params+=("--use-legacy-policy-config")
       params+=("--policy-config-file=/etc/srv/kubernetes/kube-scheduler/policy-config")
     fi
+  fi
+
+  # Set rate limit parameters (QPS and burst limits) for the scheduler when
+  # talking to the API server.
+  if [[ -n "${KUBE_SCHEDULER_API_QPS:-}" ]]; then
+    params+=("--kube-api-qps=${KUBE_SCHEDULER_API_QPS}")
+  fi
+  if [[ -n "${KUBE_SCHEDULER_API_BURST:-}" ]]; then
+    params+=("--kube-api-burst=${KUBE_SCHEDULER_API_BURST}")
   fi
 
   local paramstring
