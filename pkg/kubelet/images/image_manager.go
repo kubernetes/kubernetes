@@ -138,21 +138,25 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 		m.logIt(ref, v1.EventTypeNormal, events.BackOffPullImage, logPrefix, msg, klog.Info)
 		return "", msg, ErrImagePullBackOff
 	}
+
+	// Start to pull image
 	m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q", container.Image), klog.Info)
 	startTime := time.Now()
 	pullChan := make(chan pullResult)
 	m.puller.pullImage(spec, pullSecrets, pullChan, podSandboxConfig)
+
 	imagePullResult := <-pullChan
 	if imagePullResult.err != nil {
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, imagePullResult.err), klog.Warning)
 		m.backOff.Next(backOffKey, m.backOff.Clock.Now())
+
 		if imagePullResult.err == ErrRegistryUnavailable {
-			msg := fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
-			return "", msg, imagePullResult.err
+			return "", fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image), imagePullResult.err
 		}
 
 		return "", imagePullResult.err.Error(), ErrImagePull
 	}
+
 	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q in %v", container.Image, time.Since(startTime)), klog.Info)
 	m.backOff.GC()
 	return imagePullResult.imageRef, "", nil
