@@ -6,10 +6,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/controller-manager/pkg/clientbuilder"
 )
 
-func createPVRecyclerSA(openshiftConfig string, clientBuilder controller.ControllerClientBuilder) error {
+func createPVRecyclerSA(openshiftConfig string, clientBuilder clientbuilder.ControllerClientBuilder) error {
 	if len(openshiftConfig) == 0 {
 		return nil
 	}
