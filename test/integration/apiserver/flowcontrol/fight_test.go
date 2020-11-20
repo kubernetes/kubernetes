@@ -67,7 +67,7 @@ func TestConfigConsumerFight(t *testing.T) {
 		for i := 0; i < size; i++ {
 			// The order of the following iteration is not deterministic,
 			// and that is good.
-			for invert, _ := range ctlrs {
+			for invert := range ctlrs {
 				visit(invert, i)
 			}
 		}
@@ -135,6 +135,7 @@ func TestConfigConsumerFight(t *testing.T) {
 			t.Fatalf("Never achieved initial sync for invert=%v, i=%v", invert, i)
 		}
 	})
+	someTimedOut := false
 	var writeCount, countAtStart int
 	var tStart time.Time
 	const testN = 30
@@ -155,6 +156,7 @@ func TestConfigConsumerFight(t *testing.T) {
 		}
 		if !AOK {
 			t.Logf("For size=%d, j=%d, lastRVs=%v but notifiedRVs=%#+v", size, j, lastRVs, notifiedRVs)
+			someTimedOut = true
 		}
 		now = nextTime
 		clk.SetTime(now)
@@ -204,6 +206,9 @@ func TestConfigConsumerFight(t *testing.T) {
 		}
 	}
 	close(stopCh)
+	if someTimedOut {
+		t.Error("Some timed out")
+	}
 }
 
 func peel(obj interface{}) interface{} {
