@@ -60,7 +60,7 @@ require (
 	github.com/googleapis/gnostic v0.4.1
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.1
-	github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible
+	github.com/heketi/heketi v10.1.0+incompatible
 	github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6 // indirect
 	github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
 	github.com/json-iterator/go v1.1.10
@@ -317,7 +317,7 @@ replace (
 	github.com/hashicorp/mdns => github.com/hashicorp/mdns v1.0.0
 	github.com/hashicorp/memberlist => github.com/hashicorp/memberlist v0.1.3
 	github.com/hashicorp/serf => github.com/hashicorp/serf v0.8.2
-	github.com/heketi/heketi => github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible
+	github.com/heketi/heketi => github.com/heketi/heketi v10.1.0+incompatible
 	github.com/heketi/tests => github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6
 	github.com/hpcloud/tail => github.com/hpcloud/tail v1.0.0
 	github.com/ianlancetaylor/demangle => github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6
