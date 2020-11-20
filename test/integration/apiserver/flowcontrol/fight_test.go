@@ -138,7 +138,7 @@ func TestConfigConsumerFight(t *testing.T) {
 	for j := 0; j < 2+testN; j++ {
 		AOK := false
 		// wait until notifiedRVs[invert][i] == lastRVs for all invert, i
-		for !AOK {
+		for k := 0; k < 10 && !AOK; k++ {
 			time.Sleep(time.Millisecond * 50)
 			AOK = true
 			foreach(func(invert bool, i int) {
@@ -148,6 +148,9 @@ func TestConfigConsumerFight(t *testing.T) {
 					}
 				}
 			})
+		}
+		if !AOK {
+			t.Logf("For size=%d, j=%d, lastRVs=%v but notifiedRVs=%#+v", size, j, lastRVs, notifiedRVs)
 		}
 		now = nextTime
 		clk.SetTime(now)
