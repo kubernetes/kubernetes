@@ -9,15 +9,13 @@ var (
 	TestMaps = map[string][]string{
 		// alpha features that are not gated
 		"[Disabled:Alpha]": {
-			// ALPHA features in 1.19, disabled by default.
-			// !!! Review their status as part of the 1.20 rebase.
+			// ALPHA features in 1.20, disabled by default.
+			// !!! Review their status as part of the 1.21 rebase.
 			`\[Feature:CSIStorageCapacity\]`,
 			`\[Feature:IPv6DualStack.*\]`,
-			`\[Feature:ServiceAccountIssuerDiscovery\]`,
-			`\[Feature:SetHostnameAsFQDN\]`,
 			`\[Feature:TTLAfterFinished\]`,
 
-			// BETA features in 1.19, enabled by default
+			// BETA features in 1.20, enabled by default
 			// Their enablement is tracked via bz's targeted at 4.6.
 			`\[Feature:SCTPConnectivity\]`, // https://bugzilla.redhat.com/show_bug.cgi?id=1861606
 		},
@@ -164,6 +162,7 @@ var (
 			`Liveness liveness pods should be automatically restarted`,
 			`Secret should create a pod that reads a secret`,
 			`Pods should delete a collection of pods`,
+			`Pods should run through the lifecycle of Pods and PodStatus`,
 		},
 		"[sig-cluster-lifecycle]": {
 			`Feature:ClusterAutoscalerScalability`,
