@@ -10,6 +10,64 @@ The instructions in this document apply to OpenShift releases 4.6 and
 above. For previous releases, please see the [rebase
 enhancement](https://github.com/openshift/enhancements/blob/master/enhancements/rebase.md).
 
+## Maintaining this document
+
+An openshift/kubernetes rebase is a complex process involving many manual and
+potentially error-prone steps. If, while performing a rebase, you find areas where
+the documented procedure is unclear or missing detail, please update this document
+and include the change in the rebase PR. This will ensure that the instructions are
+as comprehensive and accurate as possible for the person performing the next
+rebase.
+
+## Rebase Checklists
+
+The checklists provided below highlight the key responsibilities of
+someone performing an openshift/kubernetes rebase.
+
+In preparation for submitting a PR to the [openshift fork of
+kubernetes](https://github.com/openshift/kubernetes), the following
+should be true:
+
+- [ ] The new rebase branch has been created from the upstream tag
+- [ ] The new rebase branch includes relevant carries from target branch
+- [ ] Dependencies have been updated
+- [ ] Hyperkube dockerfile version has been updated
+- [ ] `make update` has been invoked and the results committed
+- [ ] `make` executes without error
+- [ ] `make verify` executes without error
+- [ ] `make test` executes without error
+- [ ] The upstream tag is pushed to `openshift/kubernetes` to ensure that
+      build artifacts are versioned correctly
+      - Upstream tooling uses the value of the most recent tag (e.g. `v1.20.0`)
+        in the branch history as the version of the binaries it builds.
+      - Pushing the tag is easy as
+```
+git push git@github.com:openshift/kubernetes.git refs/tags/v1.20.0
+```
+
+Details to include in the description of the PR:
+
+- [ ] A link to the rebase spreadsheet for the benefit for reviewers
+
+After the rebase PR has merged to `openshift/kubernetes`, vendor the changes
+into `openshift/origin` to ensure that the openshift-tests binary reflects
+the upstream test changes introduced by the rebase:
+
+- [ ] Find the SHA of the merge commit after your PR lands in `openshift/kubernetes`
+- [ ] Run `hack/update-kube-vendor.sh <o/k SHA>` in a clone of the `origin`
+      repo and commit the results
+- [ ] Run `make update` and commit the results
+- [ ] Submit as a PR to `origin`
+
+As a final step, send an email to the aos-devel mailing list announcing the
+rebase. Make sure to include:
+
+- [ ] The new version of upstream Kubernetes that OpenShift is now based on
+- [ ] Link(s) to upstream changelog(s) detailing what has changed since the last rebase landed
+- [ ] A reminder to component maintainers to bump their dependencies
+- [ ] Relevant details of the challenges involved in landing the rebase that
+      could benefit from a wider audience.
+
 ## Getting started
 
 Before incorporating upstream changes you may want to:
@@ -51,12 +109,12 @@ git remote add --fetch openshift https://github.com/openshift/kubernetes
 git checkout -b rebase-1.20.0 v1.20.0
 ```
 
-- Merge `openshift(master)` branch into the `rebase-1.20.0` branch with merge 
-  strategy `ours`. It discards all changes from the other branch (`openshift/master`) 
+- Merge `openshift(master)` branch into the `rebase-1.20.0` branch with merge
+  strategy `ours`. It discards all changes from the other branch (`openshift/master`)
   and create a merge commit. This leaves the content of your branch unchanged,
   and when you next merge with the other branch, Git will only consider changes made
-  from this point forward.  (Do not confuse this with `ours` conflict resolution 
-  strategy for `recursive` merge strategy, `-X` option.) 
+  from this point forward.  (Do not confuse this with `ours` conflict resolution
+  strategy for `recursive` merge strategy, `-X` option.)
 
 ```
 git merge -s ours openshift/master
@@ -87,7 +145,7 @@ Go through the spreadsheet and for every commit set one of the appropriate actio
  - `s`, to squash it (add a comment with the sha of the target)
  - `d`, to drop the commit (if it is not obvious, comment why)
 
-Set up conditional formatting in the google sheet to color these lines appropriately. 
+Set up conditional formatting in the google sheet to color these lines appropriately.
 
 Commits carried on rebase branches have commit messages prefixed as follows:
 
@@ -121,12 +179,14 @@ expectations, feel free to revise and note the change in the spreadsheet row for
 commit.
 
 If you first pick all the pick+squash commits first and push them for review it is easier for you
-and your reviewers to check the code changes and you squash it at the end. 
+and your reviewers to check the code changes and you squash it at the end.
 
 Explicit commit rules:
 - Anything touching `openshift-hack/`, openshift specific READMEs or similar files
   should be squashed to 1 commit named "UPSTREAM: <carry>: Add OpenShift specific files"
-- Updating generated files coming from kubernetes should be `<drop>` commit 
+- Updating generated files coming from kubernetes should be `<drop>` commit
+- Generated changes should never be mixed with non-generated changes. If a carry is
+  ever seen to contain generated changes, those changes should be dropped.
 
 ## Update the hyperkube image version to the release tag
 
@@ -149,7 +209,7 @@ on the upstream tag targeted by the rebase:
 Often these repositories are updated in parallel by other team members, so make
 sure to ask around before starting the work of bumping their dependencies.
 
-Once the above repos have been updated to depend on the target release, 
+Once the above repos have been updated to depend on the target release,
 it will be necessary to update `go.mod` to point to the appropriate revision
 of these repos by running `hack/pin-dependency.sh` for each of them and then running
 `hack/update-vendor.sh` (as per the [upstream documentation](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/vendor.md#adding-or-updating-a-dependency)).
@@ -198,7 +258,7 @@ regression in behavior) can often be skipped and addressed post-merge.
 - Update generated files by running `make update`
   - This step depends on etcd being installed in the path, which can be
     accomplished by running `hack/install-etcd.sh`.
-  - Alternatively, run it in the same container as CI is using for build_root that already has 
+  - Alternatively, run it in the same container as CI is using for build_root that already has
     the etcd at correct version
 ```
 podman run -it --rm -v $( pwd ):/go/k8s.io/kubernetes:Z --workdir=/go/k8s.io/kubernetes registry.svc.ci.openshift.org/openshift/release:rhel-8-release-golang-1.15-openshift-4.7 make update OS_RUN_WITHOUT_DOCKER=yes
@@ -217,48 +277,22 @@ podman run -it --rm -v $( pwd ):/go/k8s.io/kubernetes:Z --workdir=/go/k8s.io/kub
     exhibiting test failure. If in doubt, ask for help!
 - Verify the code with `make verify`
 
-### Rebase Checklists
+## Reacting to new commits
 
-In preparation for submitting a PR to the [openshift fork of
-kubernetes](https://github.com/openshift/kubernetes), the following
-should be true:
+Inevitably, a rebase will take long enough that new commits will end up being
+merged to the targeted openshift/kubernetes branch after the rebase is
+underway. The following strategy is suggested to minimize the cost of incorporating
+these new commits:
 
-- [ ] The new rebase branch has been created from the upstream tag
-- [ ] The new rebase branch includes relevant carries from target branch
-- [ ] Dependencies have been updated
-- [ ] Hyperkube dockerfile version has been updated
-- [ ] `make update` has been invoked and the results committed
-- [ ] `make` executes without error
-- [ ] `make verify` executes without error
-- [ ] `make test` executes without error
-- [ ] The upstream tag is pushed to `openshift/kubernetes` to ensure that
-      build artifacts are versioned correctly
-      - Upstream tooling uses the value of the most recent tag (e.g. `v1.20.0`)
-        in the branch history as the version of the binaries it builds.
-      - Pushing the tag is easy as
-```
-git push git@github.com:openshift/kubernetes.git refs/tags/v1.20.0
-```
+- rename existing rebase branch (e.g. 1.20.0-beta.2 -> 1.20.0-beta.2-old)
+- create new rebase branch from HEAD of master
+- merge the target upstream tag (e.g. 1.20.0-beta.2) with strategy ours
+- pick all carries from renamed rebase branch (e.g. 1.20.0-beta.2-old)
+- pick new carries from the openshift/kubernetes target branch
+- add details of the new carries to the spreadsheet
+- update generated files
 
-Details to include in the description of the PR:
-
-- [ ] A link to the rebase spreadsheet for the benefit for reviewers
-
-After the rebase PR has merged to `openshift/kubernetes`, vendor the changes
-into `openshift/origin` to ensure that the openshift-tests binary reflects 
-the upstream test changes introduced by the rebase:
-
-- [ ] Find the SHA of the merge commit after your PR lands in `openshift/kubernetes`
-- [ ] Run `hack/update-kube-vendor.sh <o/k SHA>` in a clone of the `origin`
-      repo and commit the results
-- [ ] Run `make update` and commit the results
-- [ ] Submit as a PR to `origin`
-
-As a final step, send an email to the aos-devel mailing list announcing the
-rebase. Make sure to include:
-
-- [ ] The new version of upstream Kubernetes that OpenShift is now based on
-- [ ] Link(s) to upstream changelog(s) detailing what has changed since the last rebase landed
-- [ ] A reminder to component maintainers to bump their dependencies
-- [ ] Relevant details of the challenges involved in landing the rebase that
-      could benefit from a wider audience.
+With good tooling, the cost of this procedure should be ~10 minutes at
+most. Re-picking carries should not result in conflicts since the base of the
+rebase branch will be the same as before. The only potential sources of conflict
+will be the newly added commits.
