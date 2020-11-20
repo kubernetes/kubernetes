@@ -124,7 +124,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 		},
 		{
 			name:           "timed out client requests skip later mutating webhooks (regardless of failure policy) and fail",
-			timeoutSeconds: 4,
+			timeoutSeconds: 3,
 			mutatingWebhooks: []testWebhook{
 				{path: "/mutating/1/5s", policy: admissionv1beta1.Ignore, timeoutSeconds: 4},
 				{path: "/mutating/2/1s", policy: admissionv1beta1.Ignore, timeoutSeconds: 5},
@@ -133,7 +133,8 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 			expectInvocations: []invocation{
 				{path: "/mutating/1/5s", timeoutSeconds: 3}, // from request
 			},
-			expectError: true,
+			expectError:   true,
+			errorContains: "request did not complete within requested timeout",
 		},
 	}
 

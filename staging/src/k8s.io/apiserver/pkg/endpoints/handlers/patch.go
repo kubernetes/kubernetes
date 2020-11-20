@@ -84,13 +84,18 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			return
 		}
 
+		// TODO: we either want to remove timeout or document it (if we
+		// document, move timeout out of this function and declare it in
+		// api_installer)
+		timeout := parseTimeout(req.URL.Query().Get("timeout"))
+
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(req.Context(), requestTimeout)
+		ctx, cancel := context.WithTimeout(req.Context(), timeout)
 		defer cancel()
 		ctx = request.WithNamespace(ctx, namespace)
 
@@ -203,6 +208,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 
 			codec: codec,
 
+			timeout: timeout,
 			options: options,
 
 			restPatcher: r,
@@ -265,6 +271,7 @@ type patcher struct {
 
 	codec runtime.Codec
 
+	timeout time.Duration
 	options *metav1.PatchOptions
 
 	// Operation information
@@ -584,7 +591,7 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 		wasCreated = created
 		return updateObject, updateErr
 	}
-	result, err := finishRequest(ctx, func() (runtime.Object, error) {
+	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
 		result, err := requestFunc()
 		// If the object wasn't committed to storage because it's serialized size was too large,
 		// it is safe to remove managedFields (which can be large) and try again.

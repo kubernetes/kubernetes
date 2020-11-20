@@ -25,7 +25,6 @@ go_library(
         "health_handlers.go",
         "namespace.go",
         "protocol.go",
-        "request_timeout.go",
         "resource_quota.go",
         "server_version.go",
         "table_conversion.go",
