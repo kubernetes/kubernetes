@@ -538,6 +538,9 @@ func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {
 	if err := os.RemoveAll(dir); err != nil {
 		return err
 	}
+	klog.Infof("checking if %s has been deleted", dir)
+	_, err := os.Stat(dir)
+	klog.Infof("has %s been deleted? %t, %v", dir, os.IsNotExist(err), err)
 	return nil
 }
 
