@@ -143,8 +143,8 @@ func TestConfigConsumerFight(t *testing.T) {
 	for j := 0; j < 2+testN; j++ {
 		AOK := false
 		// wait until notifiedRVs[invert][i] covers lastRVs for all invert, i
-		for k := 0; k < 10 && !AOK; k++ {
-			time.Sleep(time.Millisecond * 50)
+		for k := 0; k < 100 && !AOK; k++ {
+			time.Sleep(time.Millisecond * 100)
 			AOK = true
 			foreach(func(invert bool, i int) {
 				for key, rv := range lastRVs {
