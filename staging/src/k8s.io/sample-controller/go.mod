@@ -5,14 +5,17 @@ module k8s.io/sample-controller
 go 1.15
 
 require (
-	k8s.io/api v0.0.0
-	k8s.io/apimachinery v0.0.0
-	k8s.io/client-go v0.0.0
-	k8s.io/code-generator v0.0.0
+	k8s.io/api v0.20.0
+	k8s.io/apimachinery v0.20.0
+	k8s.io/client-go v0.20.0
+	k8s.io/code-generator v0.20.0
 	k8s.io/klog/v2 v2.4.0
 )
 
 replace (
+	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
+	github.com/onsi/ginkgo => github.com/openshift/ginkgo v4.5.0-origin.1+incompatible
+	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
