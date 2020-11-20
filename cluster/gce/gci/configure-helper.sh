@@ -1519,11 +1519,6 @@ addockeropt '"pidfile": "/var/run/docker.pid",
       "max-size": "'${DOCKER_LOG_MAX_SIZE:-10m}'",
       "max-file": "'${DOCKER_LOG_MAX_FILE:-5}'"
     }'
-  
-  cat <<EOF >>/usr/local/google/home/teratipally/Desktop/daemon.json
-}
-EOF
-
   echo "DOCKER_OPTS=\"${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
 
   # Ensure TasksMax is sufficient for docker.
