@@ -88,6 +88,7 @@ func TestConfigConsumerFight(t *testing.T) {
 					if err != nil {
 						return false, err
 					}
+					t.Logf("Got initial FlowSchema %#+v", fs)
 					key, _ := cache.MetaNamespaceKeyFunc(fs)
 					lastRVs[key] = fs.ResourceVersion
 				}
@@ -109,6 +110,7 @@ func TestConfigConsumerFight(t *testing.T) {
 			Name:  fmt.Sprintf("Controller%d[invert=%v]", i, invert),
 			Clock: clk,
 			FinishHandlingNotification: func(wq workqueue.RateLimitingInterface, obj interface{}) {
+				t.Logf("For invert=%v, i=%v, notified of %#+v", invert, i, obj)
 				obj = peel(obj)
 				switch typed := obj.(type) {
 				case *flowcontrol.FlowSchema:
@@ -137,7 +139,7 @@ func TestConfigConsumerFight(t *testing.T) {
 	nextTime := clk.Now()
 	for j := 0; j < 2+testN; j++ {
 		AOK := false
-		// wait until notifiedRVs[invert][i] == lastRVs for all invert, i
+		// wait until notifiedRVs[invert][i] covers lastRVs for all invert, i
 		for k := 0; k < 10 && !AOK; k++ {
 			time.Sleep(time.Millisecond * 50)
 			AOK = true
