@@ -391,10 +391,6 @@ type cfgMeal struct {
 	// Indicates that items were omitted from fsStatusUpdates because
 	// the embargoTime has not arrived yet.
 	suppressedWrites bool
-
-	// For each written FlowSchema `fs`, maps
-	// `cache.MetaNamespaceKeyFunc(fs)` to `fs.ResourceVersion`.
-	flowSchemaRVs map[string]string
 }
 
 // A buffered set of status updates for FlowSchemas

@@ -129,8 +129,10 @@ func TestConfigConsumerFight(t *testing.T) {
 		})
 		ctlrs[invert][i] = ctlr
 		informerFactory.Start(stopCh)
-		if !ctlr.WaitForCacheSync(stopCh) {
-			t.Fatalf("Never achieved initial sync for i=%d, invert=%v", i, invert)
+		if ctlr.WaitForCacheSync(stopCh) {
+			t.Logf("Achieved initial sync for invert=%v, i=%v", invert, i)
+		} else {
+			t.Fatalf("Never achieved initial sync for invert=%v, i=%v", invert, i)
 		}
 	})
 	var writeCount, countAtStart int
