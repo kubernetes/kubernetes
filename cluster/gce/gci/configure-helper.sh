@@ -1466,7 +1466,7 @@ function addockeropt {
 	if [ "$#" -lt 1 ]; then
 	echo "No arguments are passed while adding docker options. Expect one argument"
 	exit 1
-	else if [ "$#" -gt 1 ];
+	elif [ "$#" -gt 1 ]; then
 	echo "Only one argument is accepeted"
 	exit 1
 	fi
