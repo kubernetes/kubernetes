@@ -274,6 +274,18 @@ func Test_GetZoneKey(t *testing.T) {
 		zone string
 	}{
 		{
+			name: "nil node",
+			node: nil,
+			zone:"",
+		},
+		{
+			name: "nil label",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Labels: nil},
+			},
+			zone:"",
+		},
+		{
 			name: "has no zone or region keys",
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{

@@ -182,6 +182,9 @@ func GetNodeIP(client clientset.Interface, name string) net.IP {
 // GetZoneKey will first check failure-domain.beta.kubernetes.io/zone and if not exists, will then check
 // topology.kubernetes.io/zone
 func GetZoneKey(node *v1.Node) string {
+	if node == nil {
+		return ""
+	}
 	labels := node.Labels
 	if labels == nil {
 		return ""
