@@ -74,8 +74,10 @@ type TestableInterface interface {
 	WaitForCacheSync(stopCh <-chan struct{}) bool
 
 	// SyncOne attempts to sync all the API Priority and Fairness
-	// config objects.
-	SyncOne() SyncReport
+	// config objects.  Writes to FlowSchema objects are recorded in
+	// the given map, with an entry mapping
+	// `cache.MetaNamespaceKeyFunc(fs)` to `fs.ResourceVersion`.
+	SyncOne(flowSchemaRVs map[string]string) SyncReport
 }
 
 // This request filter implements https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190228-priority-and-fairness.md

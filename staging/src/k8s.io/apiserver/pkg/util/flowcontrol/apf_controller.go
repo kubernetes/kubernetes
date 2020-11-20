@@ -301,7 +301,7 @@ func (cfgCtlr *configController) processNextWorkItem() bool {
 
 	func(obj interface{}) {
 		defer cfgCtlr.configQueue.Done(obj)
-		report := cfgCtlr.SyncOne()
+		report := cfgCtlr.SyncOne(map[string]string{})
 		switch {
 		case report.NeedRetry:
 			cfgCtlr.configQueue.AddRateLimited(obj)
@@ -338,7 +338,7 @@ type DigestReport struct {
 // SyncOne does one full synchronization.  It reads all the API
 // objects that configure API Priority and Fairness and updates the
 // local configController accordingly.
-func (cfgCtlr *configController) SyncOne() SyncReport {
+func (cfgCtlr *configController) SyncOne(flowSchemaRVs map[string]string) SyncReport {
 	klog.V(5).Infof("%s SyncOne at %s", cfgCtlr.name, cfgCtlr.clock.Now().Format(timeFmt))
 	all := labels.Everything()
 	newPLs, err := cfgCtlr.plLister.List(all)
@@ -352,7 +352,7 @@ func (cfgCtlr *configController) SyncOne() SyncReport {
 		return SyncReport{NeedRetry: true}
 	}
 	report := SyncReport{}
-	report.DigestReport, err = cfgCtlr.digestConfigObjects(newPLs, newFSs)
+	report.DigestReport, err = cfgCtlr.digestConfigObjects(newPLs, newFSs, flowSchemaRVs)
 	if err == nil {
 		return report
 	}
@@ -391,6 +391,10 @@ type cfgMeal struct {
 	// Indicates that items were omitted from fsStatusUpdates because
 	// the embargoTime has not arrived yet.
 	suppressedWrites bool
+
+	// For each written FlowSchema `fs`, maps
+	// `cache.MetaNamespaceKeyFunc(fs)` to `fs.ResourceVersion`.
+	flowSchemaRVs map[string]string
 }
 
 // A buffered set of status updates for FlowSchemas
@@ -402,7 +406,7 @@ type fsStatusUpdate struct {
 
 // digestConfigObjects is given all the API objects that configure
 // cfgCtlr and writes its consequent new configState.
-func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.PriorityLevelConfiguration, newFSs []*flowcontrol.FlowSchema) (DigestReport, error) {
+func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.PriorityLevelConfiguration, newFSs []*flowcontrol.FlowSchema, flowSchemaRVs map[string]string) (DigestReport, error) {
 	fsStatusUpdates, wait := cfgCtlr.lockAndDigestConfigObjects(newPLs, newFSs)
 	var triedWrites, didWrites bool
 	var errs []error
@@ -421,6 +425,8 @@ func (cfgCtlr *configController) digestConfigObjects(newPLs []*flowcontrol.Prior
 		switch {
 		case err == nil:
 			cfgCtlr.noteStatusUpdate(fsu.flowSchema, fs2)
+			key, _ := cache.MetaNamespaceKeyFunc(fs2)
+			flowSchemaRVs[key] = fs2.ResourceVersion
 			didWrites = true
 		case apierrors.IsNotFound(err) || apierrors.IsConflict(err):
 			// This object has been deleted or the server has a newer
