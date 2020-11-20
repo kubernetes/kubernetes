@@ -763,20 +763,20 @@ func (s ActivePods) Less(i, j int) bool {
 		return !podutil.IsPodReady(s[i])
 	}
         // 4. controller.kubernetes.io/delete-priority=1 < controller.kubernetes.io/delete-priority=0
-        //If pod has annotation controller.kubernetes.io/delete-priority the larger is small
-        if s[i].Annotations[deletePriorityPodAnnotationKey] != s[j].Annotations[deletePriorityPodAnnotationKey] {
-                s1, err1 := strconv.Atoi(s[i].Annotations[deletePriorityPodAnnotationKey])
-                s2, err2 := strconv.Atoi(s[j].Annotations[deletePriorityPodAnnotationKey])
-                if err1 == nil && err2 == nil {
-                        return s1 > s2
-                }
-                if err1 != nil && err2 == nil {
-                        return true
-                }
-                if err1 == nil && err2 != nil {
-                        return false
-                }
-        }
+	//If pod has annotation controller.kubernetes.io/delete-priority the larger is small
+	if s[i].Annotations[deletePriorityPodAnnotationKey] != s[j].Annotations[deletePriorityPodAnnotationKey] {
+		s1, err1 := strconv.Atoi(s[i].Annotations[deletePriorityPodAnnotationKey])
+		s2, err2 := strconv.Atoi(s[j].Annotations[deletePriorityPodAnnotationKey])
+		if err1 == nil && err2 == nil {
+			return s1 > s2
+		}
+		if err1 != nil && err2 == nil {
+			return true
+		}
+		if err1 == nil && err2 != nil {
+			return false
+		}
+	}
 	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
 	//       see https://github.com/kubernetes/kubernetes/issues/22065
 	// 5. Been ready for empty time < less time < more time
