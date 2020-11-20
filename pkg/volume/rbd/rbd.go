@@ -837,7 +837,7 @@ func (b *rbdMounter) SetUp(mounterArgs volume.MounterArgs) error {
 func (b *rbdMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	klog.V(4).Infof("rbd: attempting to setup at %s", dir)
-	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, b.plugin)
+	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	if err != nil {
 		klog.Errorf("rbd: failed to setup at %s %v", dir, err)
 	}
