@@ -149,6 +149,9 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	dInfo := driver.GetDriverInfo()
 	var isSupported bool
 
+	// 0. Check with driver specific logic
+	driver.SkipUnsupportedTest(pattern)
+
 	// 1. Check if Whether volType is supported by driver from its interface
 	switch pattern.VolType {
 	case testpatterns.InlineVolume:
@@ -177,9 +180,6 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 	if pattern.FsType == "ntfs" && !framework.NodeOSDistroIs("windows") {
 		e2eskipper.Skipf("Distro %s doesn't support ntfs -- skipping", framework.TestContext.NodeOSDistro)
 	}
-
-	// 3. Check with driver specific logic
-	driver.SkipUnsupportedTest(pattern)
 }
 
 // VolumeResource is a generic implementation of TestResource that wil be able to
