@@ -396,20 +396,29 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 	return r, i, nil
 }
 
-// TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
-func findRunningKubletServiceName() string {
+func kubeletRunningStatus() ([]byte, string) {
 	stdout, err := exec.Command("sudo", "systemctl", "list-units", "*kubelet*", "--state=running").CombinedOutput()
 	framework.ExpectNoError(err)
 	regex := regexp.MustCompile("(kubelet-\\w+)")
 	matches := regex.FindStringSubmatch(string(stdout))
-	framework.ExpectNotEqual(len(matches), 0, "Found more than one kubelet service running: %q", stdout)
-	kubeletServiceName := matches[0]
+
+	serviceName := ""
+	if len(matches) > 0 {
+		serviceName = matches[0]
+	}
+	return stdout, serviceName
+}
+
+// TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
+func findRunningKubeletServiceName() string {
+	stdout, kubeletServiceName := kubeletRunningStatus()
+	framework.ExpectNotEqual(kubeletServiceName, "", "Found more than one kubelet service running: %q", stdout)
 	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kubeletServiceName)
 	return kubeletServiceName
 }
 
 func restartKubelet() {
-	kubeletServiceName := findRunningKubletServiceName()
+	kubeletServiceName := findRunningKubeletServiceName()
 	// reset the kubelet service start-limit-hit
 	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %v", err, stdout)
@@ -420,7 +429,7 @@ func restartKubelet() {
 
 // stopKubelet will kill the running kubelet, and returns a func that will restart the process again
 func stopKubelet() func() {
-	kubeletServiceName := findRunningKubletServiceName()
+	kubeletServiceName := findRunningKubeletServiceName()
 
 	// reset the kubelet service start-limit-hit
 	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
