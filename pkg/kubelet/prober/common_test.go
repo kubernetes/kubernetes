@@ -19,6 +19,7 @@ package prober
 import (
 	"reflect"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -150,4 +151,8 @@ func (p *syncExecProber) Probe(cmd exec.Cmd) (probe.Result, string, error) {
 	p.RLock()
 	defer p.RUnlock()
 	return p.fakeExecProber.Probe(cmd)
+}
+
+func secondsToDuration(seconds int32) time.Duration {
+	return time.Duration(seconds) * time.Second
 }

@@ -126,13 +126,13 @@ func newWorker(
 
 // run periodically probes the container.
 func (w *worker) run() {
-	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
+	initialTickerPeriod := w.nextProbeTime()
 
 	// If kubelet restarted the probes could be started in rapid succession.
 	// Let the worker wait for a random portion of tickerPeriod before probing.
-	time.Sleep(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
+	time.Sleep(time.Duration(rand.Float64() * float64(initialTickerPeriod)))
 
-	probeTicker := time.NewTicker(probeTickerPeriod)
+	probeTicker := time.NewTicker(initialTickerPeriod)
 
 	defer func() {
 		// Clean up.
@@ -149,6 +149,10 @@ func (w *worker) run() {
 
 probeLoop:
 	for w.doProbe() {
+		// reset the ticker time, if the probe we just did was not successful
+		// the next probe time will be determined by FailedPeriodSeconds
+		probeTicker.Reset(w.nextProbeTime())
+
 		// Wait for next probe tick.
 		select {
 		case <-w.stopCh:
@@ -157,6 +161,20 @@ probeLoop:
 			// continue
 		}
 	}
+}
+
+// nextProbeTime returns the next time the probe should run. If we have a previous probe
+// result and if that probe result is not successful, then the next probe time is determined
+// by the FailedPeriodSeconds, otherwise the next probe time is determined by PeriodSeconds.
+func (w *worker) nextProbeTime() time.Duration {
+	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
+	probeFailedTickerPeriod := time.Duration(w.spec.FailedPeriodSeconds) * time.Second
+	result, ok := w.resultsManager.Get(w.containerID)
+	if ok && result != results.Success {
+		// we got the previous probe result and it was not successful
+		return probeFailedTickerPeriod
+	}
+	return probeTickerPeriod
 }
 
 // stop stops the probe worker. The worker handles cleanup and removes itself from its manager.

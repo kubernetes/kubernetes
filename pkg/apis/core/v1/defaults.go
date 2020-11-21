@@ -237,6 +237,9 @@ func SetDefaults_Probe(obj *v1.Probe) {
 	if obj.PeriodSeconds == 0 {
 		obj.PeriodSeconds = 10
 	}
+	if obj.FailedPeriodSeconds == 0 {
+		obj.FailedPeriodSeconds = obj.PeriodSeconds
+	}
 	if obj.SuccessThreshold == 0 {
 		obj.SuccessThreshold = 1
 	}

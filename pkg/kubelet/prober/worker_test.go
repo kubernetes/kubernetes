@@ -18,6 +18,7 @@ package prober
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 
@@ -154,6 +155,20 @@ func TestInitialDelay(t *testing.T) {
 		// Second call should succeed (already waited).
 		expectContinue(t, w, w.doProbe(), "after initial delay")
 		expectResult(t, w, results.Success, "after initial delay")
+	}
+}
+
+func TestNextProbeTime(t *testing.T) {
+	m := newTestManager()
+	for _, probeType := range [...]probeType{liveness, readiness, startup} {
+		p := v1.Probe{
+			PeriodSeconds:       10,
+			FailedPeriodSeconds: 1,
+		}
+		w := newTestWorker(m, probeType, p)
+		require.Equal(t, secondsToDuration(p.PeriodSeconds), w.nextProbeTime())
+		w.resultsManager.Set(w.containerID, results.Failure, w.pod)
+		require.Equal(t, secondsToDuration(p.FailedPeriodSeconds), w.nextProbeTime())
 	}
 }
 
