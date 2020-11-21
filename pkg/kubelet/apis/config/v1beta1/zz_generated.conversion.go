@@ -505,6 +505,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	}
 	out.ShutdownGracePeriod = in.ShutdownGracePeriod
 	out.ShutdownGracePeriodCriticalPods = in.ShutdownGracePeriodCriticalPods
+	out.MaxWaitForContainerRuntime = in.MaxWaitForContainerRuntime
 	return nil
 }
 

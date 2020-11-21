@@ -154,6 +154,12 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) && !localFeatureGate.Enabled(features.GracefulNodeShutdown) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: Specifying ShutdownGracePeriod or ShutdownGracePeriodCriticalPods requires feature gate GracefulNodeShutdown"))
 	}
+	if kc.MaxWaitForContainerRuntime.Duration < 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: MaxWaitForContainerRuntime %v must be >= 0", kc.MaxWaitForContainerRuntime))
+	}
+	if kc.MaxWaitForContainerRuntime.Duration > 0 && kc.MaxWaitForContainerRuntime.Duration < time.Duration(time.Second) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: MaxWaitForContainerRuntime %v must be either zero or otherwise >= 1 sec", kc.MaxWaitForContainerRuntime))
+	}
 
 	for _, val := range kc.EnforceNodeAllocatable {
 		switch val {

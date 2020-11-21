@@ -121,8 +121,6 @@ import (
 )
 
 const (
-	// Max amount of time to wait for the container runtime to come up.
-	maxWaitForContainerRuntime = 30 * time.Second
 
 	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
 	nodeStatusUpdateRetry = 5
@@ -649,7 +647,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
-	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
+	klet.runtimeState = newRuntimeState(kubeCfg.MaxWaitForContainerRuntime.Duration)
 	klet.runtimeState.addHealthCheck("PLEG", klet.pleg.Healthy)
 	if _, err := klet.updatePodCIDR(kubeCfg.PodCIDR); err != nil {
 		klog.Errorf("Pod CIDR update failed %v", err)

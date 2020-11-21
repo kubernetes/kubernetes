@@ -61,6 +61,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
 		},
+		MaxWaitForContainerRuntime: metav1.Duration{Duration: 30 * time.Second},
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase1); allErrors != nil {
 		t.Errorf("expect no errors, got %v", allErrors)
@@ -102,6 +103,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
 		},
+		MaxWaitForContainerRuntime: metav1.Duration{Duration: 0},
 	}
 	if allErrors := ValidateKubeletConfiguration(successCase2); allErrors != nil {
 		t.Errorf("expect no errors, got %v", allErrors)
@@ -134,6 +136,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		CPUCFSQuotaPeriod:               metav1.Duration{Duration: 100 * time.Millisecond},
 		ShutdownGracePeriod:             metav1.Duration{Duration: 30 * time.Second},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 10 * time.Second},
+		MaxWaitForContainerRuntime:      metav1.Duration{Duration: 30 * time.Second},
 	}
 	const numErrsErrorCase1 = 28
 	if allErrors := ValidateKubeletConfiguration(errorCase1); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase1 {
@@ -176,6 +179,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			"CustomCPUCFSQuotaPeriod": true,
 			"GracefulNodeShutdown":    true,
 		},
+		MaxWaitForContainerRuntime: metav1.Duration{Duration: 20 * time.Second},
 	}
 	const numErrsErrorCase2 = 3
 	if allErrors := ValidateKubeletConfiguration(errorCase2); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase2 {

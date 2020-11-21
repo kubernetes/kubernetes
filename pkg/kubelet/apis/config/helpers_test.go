@@ -236,5 +236,6 @@ var (
 		"VolumePluginDir",
 		"ShutdownGracePeriod.Duration",
 		"ShutdownGracePeriodCriticalPods.Duration",
+		"MaxWaitForContainerRuntime.Duration",
 	)
 )

@@ -824,6 +824,10 @@ type KubeletConfiguration struct {
 	// Default: "10s"
 	// +optional
 	ShutdownGracePeriodCriticalPods metav1.Duration `json:"shutdownGracePeriodCriticalPods,omitempty"`
+	// MaxWaitForContainerRuntime specifies the duration for the healthchecks from the kubelet to the container runtime.
+	// Default: "30s"
+	// +optional
+	MaxWaitForContainerRuntime metav1.Duration `json:"waitForContainerRuntime,omitempty"`
 }
 
 type KubeletAuthorizationMode string

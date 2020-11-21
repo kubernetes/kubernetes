@@ -382,6 +382,9 @@ type KubeletConfiguration struct {
 	// Defaults to 10 seconds, requires GracefulNodeShutdown feature gate to be enabled.
 	// For example, if ShutdownGracePeriod=30s, and ShutdownGracePeriodCriticalPods=10s, during a node shutdown the first 20 seconds would be reserved for gracefully terminating normal pods, and the last 10 seconds would be reserved for terminating critical pods.
 	ShutdownGracePeriodCriticalPods metav1.Duration
+	// MaxWaitForContainerRuntime specifies the duration for the healthchecks from the kubelet to the container runtime.
+	// Defaults to 30 seconds.
+	MaxWaitForContainerRuntime metav1.Duration
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

@@ -92,6 +92,8 @@ const (
 	// Reasonable size range of all container images. 90%ile of images on dockerhub drops into this range.
 	minImgSize int64 = 23 * 1024 * 1024
 	maxImgSize int64 = 1000 * 1024 * 1024
+
+	maxWaitForContainerRuntime = 30 * time.Second
 )
 
 // fakeImageGCManager is a fake image gc manager for testing. It will return image
