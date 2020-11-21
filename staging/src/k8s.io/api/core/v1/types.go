@@ -2111,7 +2111,7 @@ type Probe struct {
 	// How often (in seconds) to perform the probe if the last probe failed.
 	// Defaults to the value of PeriodSeconds
 	// +optional
-	FailedPeriodSeconds int32
+	FailedPeriodSeconds int32 `json:"failedPeriodSeconds,omitempty" protobuf:"varint,7,opt,name=failedPeriodSeconds"`
 	// Minimum consecutive successes for the probe to be considered successful after having failed.
 	// Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
 	// +optional
