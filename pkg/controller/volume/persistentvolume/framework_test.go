@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
+	"k8s.io/kubernetes/pkg/volume"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 )
@@ -861,7 +862,7 @@ func (plugin *mockVolumePlugin) CanSupport(spec *vol.Spec) bool {
 	return true
 }
 
-func (plugin *mockVolumePlugin) RequiresRemount() bool {
+func (plugin *mockVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

@@ -117,6 +117,7 @@ func (strategy svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 func (strategy svcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	service := obj.(*api.Service)
 	allErrs := validation.ValidateServiceCreate(service)
+	allErrs = append(allErrs, validation.ValidateConditionalService(service, nil)...)
 	return allErrs
 }
 
@@ -130,6 +131,7 @@ func (svcStrategy) AllowCreateOnUpdate() bool {
 
 func (strategy svcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	allErrs := validation.ValidateServiceUpdate(obj.(*api.Service), old.(*api.Service))
+	allErrs = append(allErrs, validation.ValidateConditionalService(obj.(*api.Service), old.(*api.Service))...)
 	return allErrs
 }
 
@@ -180,9 +182,19 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 		newSvc.Spec.TopologyKeys = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) && !loadbalancerIPModeInUse(oldSvc) {
-		for _, ing := range newSvc.Status.LoadBalancer.Ingress {
-			ing.IPMode = nil
+	// Clear AllocateLoadBalancerNodePorts if ServiceLBNodePortControl if not enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
+		newSvc.Spec.AllocateLoadBalancerNodePorts = nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MixedProtocolLBService) {
+		if !serviceConditionsInUse(oldSvc) {
+			newSvc.Status.Conditions = nil
+		}
+		if !loadBalancerPortsInUse(oldSvc) {
+			for i := range newSvc.Status.LoadBalancer.Ingress {
+				newSvc.Status.LoadBalancer.Ingress[i].Ports = nil
+			}
 		}
 	}
 }
@@ -208,13 +220,21 @@ func topologyKeysInUse(svc *api.Service) bool {
 	return len(svc.Spec.TopologyKeys) > 0
 }
 
-// returns true when the LoadBalancer Ingress IPMode fields are in use.
-func loadbalancerIPModeInUse(svc *api.Service) bool {
+// returns true when the svc.Status.Conditions field is in use.
+func serviceConditionsInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+	return svc.Status.Conditions != nil
+}
+
+// returns true when the svc.Status.LoadBalancer.Ingress.Ports field is in use.
+func loadBalancerPortsInUse(svc *api.Service) bool {
 	if svc == nil {
 		return false
 	}
 	for _, ing := range svc.Status.LoadBalancer.Ingress {
-		if ing.IPMode != nil {
+		if ing.Ports != nil {
 			return true
 		}
 	}
@@ -374,6 +394,11 @@ func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
 	// be deallocated later.
 	if needsHCNodePort(oldSvc) && !needsHCNodePort(newSvc) && sameHCNodePort(oldSvc, newSvc) {
 		newSvc.Spec.HealthCheckNodePort = 0
+	}
+
+	// AllocateLoadBalancerNodePorts may only be set for type LoadBalancer
+	if newSvc.Spec.Type != api.ServiceTypeLoadBalancer {
+		newSvc.Spec.AllocateLoadBalancerNodePorts = nil
 	}
 
 	// NOTE: there are other fields like `selector` which we could wipe.

@@ -110,7 +110,7 @@ func (plugin *cinderPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.Cinder != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Cinder != nil)
 }
 
-func (plugin *cinderPlugin) RequiresRemount() bool {
+func (plugin *cinderPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

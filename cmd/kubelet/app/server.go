@@ -410,6 +410,7 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) error {
 	logOption := logs.NewOptions()
 	logOption.LogFormat = s.Logging.Format
+	logOption.LogSanitization = s.Logging.Sanitization
 	logOption.Apply()
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
@@ -738,6 +739,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				EnforceCPULimits:                      s.CPUCFSQuota,
 				CPUCFSQuotaPeriod:                     s.CPUCFSQuotaPeriod.Duration,
 				ExperimentalTopologyManagerPolicy:     s.TopologyManagerPolicy,
+				ExperimentalTopologyManagerScope:      s.TopologyManagerScope,
 			},
 			s.FailSwapOn,
 			devicePluginEnabled,
@@ -1130,6 +1132,8 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		kubeServer.CloudProvider,
 		kubeServer.CertDirectory,
 		kubeServer.RootDirectory,
+		kubeServer.ImageCredentialProviderConfigFile,
+		kubeServer.ImageCredentialProviderBinDir,
 		kubeServer.RegisterNode,
 		kubeServer.RegisterWithTaints,
 		kubeServer.AllowedUnsafeSysctls,
@@ -1204,6 +1208,8 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	cloudProvider string,
 	certDirectory string,
 	rootDirectory string,
+	imageCredentialProviderConfigFile string,
+	imageCredentialProviderBinDir string,
 	registerNode bool,
 	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
@@ -1235,6 +1241,8 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		cloudProvider,
 		certDirectory,
 		rootDirectory,
+		imageCredentialProviderConfigFile,
+		imageCredentialProviderBinDir,
 		registerNode,
 		registerWithTaints,
 		allowedUnsafeSysctls,

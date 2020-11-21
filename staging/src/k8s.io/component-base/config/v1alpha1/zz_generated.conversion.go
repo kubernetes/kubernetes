@@ -143,10 +143,12 @@ func autoConvert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionCo
 
 func autoConvert_v1alpha1_LoggingConfiguration_To_config_LoggingConfiguration(in *LoggingConfiguration, out *config.LoggingConfiguration, s conversion.Scope) error {
 	out.Format = in.Format
+	out.Sanitization = in.Sanitization
 	return nil
 }
 
 func autoConvert_config_LoggingConfiguration_To_v1alpha1_LoggingConfiguration(in *config.LoggingConfiguration, out *LoggingConfiguration, s conversion.Scope) error {
 	out.Format = in.Format
+	out.Sanitization = in.Sanitization
 	return nil
 }

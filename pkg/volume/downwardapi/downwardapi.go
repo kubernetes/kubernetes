@@ -80,7 +80,7 @@ func (plugin *downwardAPIPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.DownwardAPI != nil
 }
 
-func (plugin *downwardAPIPlugin) RequiresRemount() bool {
+func (plugin *downwardAPIPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return true
 }
 

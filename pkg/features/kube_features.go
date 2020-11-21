@@ -306,6 +306,7 @@ const (
 	// owner: @tallclair
 	// alpha: v1.12
 	// beta:  v1.14
+	// GA: v1.20
 	//
 	// Enables RuntimeClass, for selecting between multiple runtimes to run a pod.
 	RuntimeClass featuregate.Feature = "RuntimeClass"
@@ -330,6 +331,7 @@ const (
 	// owner: @xing-yang
 	// alpha: v1.12
 	// beta: v1.17
+	// GA: v1.20
 	//
 	// Enable volume snapshot data source support.
 	VolumeSnapshotDataSource featuregate.Feature = "VolumeSnapshotDataSource"
@@ -430,6 +432,7 @@ const (
 
 	// owner: @huffmanca
 	// alpha: v1.19
+	// beta: v1.20
 	//
 	// Determines if a CSI Driver supports applying fsGroup.
 	CSIVolumeFSGroupPolicy featuregate.Feature = "CSIVolumeFSGroupPolicy"
@@ -560,6 +563,16 @@ const (
 	// Enable all logic related to the PodDisruptionBudget API object in policy
 	PodDisruptionBudget featuregate.Feature = "PodDisruptionBudget"
 
+	// owner: @alaypatel07, @soltysh
+	// alpha: v1.20
+	// beta: v1.21
+	//
+	// CronJobControllerV2 controls whether the controller manager starts old cronjob
+	// controller or new one which is implemented with informers and delaying queue
+	//
+	// This feature is deprecated, and will be removed in v1.22.
+	CronJobControllerV2 featuregate.Feature = "CronJobControllerV2"
+
 	// owner: @m1093782566
 	// alpha: v1.17
 	//
@@ -569,6 +582,7 @@ const (
 	// owner: @robscott
 	// alpha: v1.18
 	// beta:  v1.19
+	// ga:    v1.20
 	//
 	// Enables AppProtocol field for Services and Endpoints.
 	ServiceAppProtocol featuregate.Feature = "ServiceAppProtocol"
@@ -657,16 +671,17 @@ const (
 	// Enable Terminating condition in Endpoint Slices.
 	EndpointSliceTerminatingCondition featuregate.Feature = "EndpointSliceTerminatingCondition"
 
+	// owner: @robscott
+	// alpha: v1.20
+	//
+	// Enable NodeName field on Endpoint Slices.
+	EndpointSliceNodeName featuregate.Feature = "EndpointSliceNodeName"
+
 	// owner: @derekwaynecarr
 	// alpha: v1.20
 	//
 	// Enables kubelet support to size memory backed volumes
 	SizeMemoryBackedVolumes featuregate.Feature = "SizeMemoryBackedVolumes"
-
-	// owner: @Sh4d1
-	// alpha: v1.21
-	// LoadBalancerIPMode enables the IPMode field in the LoadBalancerIngress status of a Service
-	LoadBalancerIPMode featuregate.Feature = "LoadBalancerIPMode"
 
 	// owner: @andrewsykim @SergeyKanzhelev
 	// GA: v1.20
@@ -675,6 +690,36 @@ const (
 	// may depend on old behavior where exec probe timeouts were ignored.
 	// Lock to default in v1.21 and remove in v1.22.
 	ExecProbeTimeout featuregate.Feature = "ExecProbeTimeout"
+
+	// owner: @andrewsykim
+	// alpha: v1.20
+	//
+	// Enable kubelet exec plugins for image pull credentials.
+	KubeletCredentialProviders featuregate.Feature = "KubeletCredentialProviders"
+
+	// owner: @zshihang
+	// alpha: v1.20
+	//
+	// Enable kubelet to pass pod's service account token to NodePublishVolume
+	// call of CSI driver which is mounting volumes for that pod.
+	CSIServiceAccountToken featuregate.Feature = "CSIServiceAccountToken"
+
+	// owner: @bobbypage
+	// alpha: v1.20
+	// Adds support for kubelet to detect node shutdown and gracefully terminate pods prior to the node being shutdown.
+	GracefulNodeShutdown featuregate.Feature = "GracefulNodeShutdown"
+
+	// owner: @andrewsykim @uablrek
+	// alpha: v1.20
+	//
+	// Allows control if NodePorts shall be created for services with "type: LoadBalancer" by defining the spec.AllocateLoadBalancerNodePorts field (bool)
+	ServiceLBNodePortControl featuregate.Feature = "ServiceLBNodePortControl"
+
+	// owner: @janosi
+	// alpha: v1.20
+	//
+	// Enables the usage of different protocols in the same Service with type=LoadBalancer
+	MixedProtocolLBService featuregate.Feature = "MixedProtocolLBService"
 )
 
 func init() {
@@ -736,12 +781,13 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIBlockVolume:                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	CSIInlineVolume:                {Default: true, PreRelease: featuregate.Beta},
 	CSIStorageCapacity:             {Default: false, PreRelease: featuregate.Alpha},
+	CSIServiceAccountToken:         {Default: false, PreRelease: featuregate.Alpha},
 	GenericEphemeralVolume:         {Default: false, PreRelease: featuregate.Alpha},
-	CSIVolumeFSGroupPolicy:         {Default: false, PreRelease: featuregate.Alpha},
-	RuntimeClass:                   {Default: true, PreRelease: featuregate.Beta},
+	CSIVolumeFSGroupPolicy:         {Default: true, PreRelease: featuregate.Beta},
+	RuntimeClass:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	NodeLease:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	SCTPSupport:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
-	VolumeSnapshotDataSource:       {Default: true, PreRelease: featuregate.Beta},
+	VolumeSnapshotDataSource:       {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	ProcMountType:                  {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:               {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:            {Default: true, PreRelease: featuregate.Beta},
@@ -755,13 +801,15 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	EndpointSlice:                                  {Default: true, PreRelease: featuregate.Beta},
 	EndpointSliceProxying:                          {Default: true, PreRelease: featuregate.Beta},
 	EndpointSliceTerminatingCondition:              {Default: false, PreRelease: featuregate.Alpha},
+	EndpointSliceNodeName:                          {Default: false, PreRelease: featuregate.Alpha},
 	WindowsEndpointSliceProxying:                   {Default: false, PreRelease: featuregate.Alpha},
 	EvenPodsSpread:                                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	StartupProbe:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
+	CronJobControllerV2:                            {Default: false, PreRelease: featuregate.Alpha},
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
-	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.Beta},
+	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.Beta},
 	HugePageStorageMediumSize:                      {Default: true, PreRelease: featuregate.Beta},
 	DownwardAPIHugePages:                           {Default: false, PreRelease: featuregate.Alpha},
@@ -775,8 +823,11 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	HPAContainerMetrics:                            {Default: false, PreRelease: featuregate.Alpha},
 	RootCAConfigMap:                                {Default: true, PreRelease: featuregate.Beta},
 	SizeMemoryBackedVolumes:                        {Default: false, PreRelease: featuregate.Alpha},
-	LoadBalancerIPMode:                             {Default: false, PreRelease: featuregate.Alpha},
 	ExecProbeTimeout:                               {Default: true, PreRelease: featuregate.GA}, // lock to default in v1.21 and remove in v1.22
+	KubeletCredentialProviders:                     {Default: false, PreRelease: featuregate.Alpha},
+	GracefulNodeShutdown:                           {Default: false, PreRelease: featuregate.Alpha},
+	ServiceLBNodePortControl:                       {Default: false, PreRelease: featuregate.Alpha},
+	MixedProtocolLBService:                         {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
@@ -787,7 +838,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	genericfeatures.APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.DryRun:                  {Default: true, PreRelease: featuregate.GA},
 	genericfeatures.ServerSideApply:         {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.APIPriorityAndFairness:  {Default: false, PreRelease: featuregate.Alpha},
+	genericfeatures.APIPriorityAndFairness:  {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.WarningHeaders:          {Default: true, PreRelease: featuregate.Beta},
 
 	// features that enable backwards compatibility but are scheduled to be removed

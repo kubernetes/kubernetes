@@ -27,15 +27,16 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
-func Test_dropConditionsOnCreate(t *testing.T) {
+func Test_dropDisabledFieldsOnCreate(t *testing.T) {
 	testcases := []struct {
 		name                   string
 		terminatingGateEnabled bool
+		nodeNameGateEnabled    bool
 		eps                    *discovery.EndpointSlice
 		expectedEPS            *discovery.EndpointSlice
 	}{
 		{
-			name:                   "gate enabled, field should be allowed",
+			name:                   "terminating gate enabled, field should be allowed",
 			terminatingGateEnabled: true,
 			eps: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
@@ -83,7 +84,7 @@ func Test_dropConditionsOnCreate(t *testing.T) {
 			},
 		},
 		{
-			name:                   "gate disabled, field should be set to nil",
+			name:                   "terminating gate disabled, field should be set to nil",
 			terminatingGateEnabled: false,
 			eps: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
@@ -130,13 +131,62 @@ func Test_dropConditionsOnCreate(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                "node name gate enabled, field should be allowed",
+			nodeNameGateEnabled: true,
+			eps: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName: utilpointer.StringPtr("node-1"),
+					},
+					{
+						NodeName: utilpointer.StringPtr("node-2"),
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName: utilpointer.StringPtr("node-1"),
+					},
+					{
+						NodeName: utilpointer.StringPtr("node-2"),
+					},
+				},
+			},
+		},
+		{
+			name:                "node name gate disabled, field should be allowed",
+			nodeNameGateEnabled: false,
+			eps: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName: utilpointer.StringPtr("node-1"),
+					},
+					{
+						NodeName: utilpointer.StringPtr("node-2"),
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName: nil,
+					},
+					{
+						NodeName: nil,
+					},
+				},
+			},
+		},
 	}
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceTerminatingCondition, testcase.terminatingGateEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceNodeName, testcase.nodeNameGateEnabled)()
 
-			dropDisabledConditionsOnCreate(testcase.eps)
+			dropDisabledFieldsOnCreate(testcase.eps)
 			if !apiequality.Semantic.DeepEqual(testcase.eps, testcase.expectedEPS) {
 				t.Logf("actual endpointslice: %v", testcase.eps)
 				t.Logf("expected endpointslice: %v", testcase.expectedEPS)
@@ -146,16 +196,17 @@ func Test_dropConditionsOnCreate(t *testing.T) {
 	}
 }
 
-func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
+func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 	testcases := []struct {
 		name                   string
 		terminatingGateEnabled bool
+		nodeNameGateEnabled    bool
 		oldEPS                 *discovery.EndpointSlice
 		newEPS                 *discovery.EndpointSlice
 		expectedEPS            *discovery.EndpointSlice
 	}{
 		{
-			name:                   "gate enabled, field should be allowed",
+			name:                   "terminating gate enabled, field should be allowed",
 			terminatingGateEnabled: true,
 			oldEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
@@ -225,7 +276,7 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 			},
 		},
 		{
-			name:                   "gate disabled, and not set on existing EPS",
+			name:                   "terminating gate disabled, and not set on existing EPS",
 			terminatingGateEnabled: false,
 			oldEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
@@ -295,7 +346,7 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 			},
 		},
 		{
-			name:                   "gate disabled, and set on existing EPS",
+			name:                   "terminating gate disabled, and set on existing EPS",
 			terminatingGateEnabled: false,
 			oldEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
@@ -365,7 +416,7 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 			},
 		},
 		{
-			name:                   "gate disabled, and set on existing EPS with new values",
+			name:                   "terminating gate disabled, and set on existing EPS with new values",
 			terminatingGateEnabled: false,
 			oldEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
@@ -427,6 +478,108 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 						Conditions: discovery.EndpointConditions{
 							Terminating: utilpointer.BoolPtr(false),
 						},
+					},
+				},
+			},
+		},
+		{
+			name:                "node name gate enabled, set on new EPS",
+			nodeNameGateEnabled: true,
+			oldEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName: nil,
+					},
+					{
+						NodeName: nil,
+					},
+				},
+			},
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName: utilpointer.StringPtr("node-1"),
+					},
+					{
+						NodeName: utilpointer.StringPtr("node-2"),
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName: utilpointer.StringPtr("node-1"),
+					},
+					{
+						NodeName: utilpointer.StringPtr("node-2"),
+					},
+				},
+			},
+		},
+		{
+			name:                "node name gate disabled, set on new EPS",
+			nodeNameGateEnabled: false,
+			oldEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName: nil,
+					},
+					{
+						NodeName: nil,
+					},
+				},
+			},
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName: utilpointer.StringPtr("node-1"),
+					},
+					{
+						NodeName: utilpointer.StringPtr("node-2"),
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName: nil,
+					},
+					{
+						NodeName: nil,
+					},
+				},
+			},
+		},
+		{
+			name:                "node name gate disabled, set on old and updated EPS",
+			nodeNameGateEnabled: false,
+			oldEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName: utilpointer.StringPtr("node-1-old"),
+					},
+					{
+						NodeName: utilpointer.StringPtr("node-2-old"),
+					},
+				},
+			},
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName: utilpointer.StringPtr("node-1"),
+					},
+					{
+						NodeName: utilpointer.StringPtr("node-2"),
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						NodeName: utilpointer.StringPtr("node-1"),
+					},
+					{
+						NodeName: utilpointer.StringPtr("node-2"),
 					},
 				},
 			},
@@ -436,8 +589,9 @@ func Test_dropTerminatingConditionOnUpdate(t *testing.T) {
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceTerminatingCondition, testcase.terminatingGateEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceNodeName, testcase.nodeNameGateEnabled)()
 
-			dropDisabledConditionsOnUpdate(testcase.oldEPS, testcase.newEPS)
+			dropDisabledFieldsOnUpdate(testcase.oldEPS, testcase.newEPS)
 			if !apiequality.Semantic.DeepEqual(testcase.newEPS, testcase.expectedEPS) {
 				t.Logf("actual endpointslice: %v", testcase.newEPS)
 				t.Logf("expected endpointslice: %v", testcase.expectedEPS)

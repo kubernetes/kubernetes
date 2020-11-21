@@ -93,7 +93,7 @@ func (plugin *projectedPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.Projected != nil
 }
 
-func (plugin *projectedPlugin) RequiresRemount() bool {
+func (plugin *projectedPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return true
 }
 

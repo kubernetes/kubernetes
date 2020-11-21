@@ -19,7 +19,7 @@ package v1alpha1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cpconfigv1alpha1 "k8s.io/cloud-provider/config/v1alpha1"
-	serviceconfigv1alpha1 "k8s.io/cloud-provider/service/config/v1alpha1"
+	serviceconfigv1alpha1 "k8s.io/cloud-provider/controllers/service/config/v1alpha1"
 	cmconfigv1alpha1 "k8s.io/controller-manager/config/v1alpha1"
 )
 
@@ -126,6 +126,10 @@ type KubeControllerManagerConfiguration struct {
 	HPAController HPAControllerConfiguration
 	// JobControllerConfiguration holds configuration for JobController related features.
 	JobController JobControllerConfiguration
+	// CronJobControllerConfiguration holds configuration for CronJobController related features.
+	CronJobController CronJobControllerConfiguration
+	// NamespaceControllerConfiguration holds configuration for NamespaceController
+	// related features.
 	// NamespaceControllerConfiguration holds configuration for NamespaceController
 	// related features.
 	NamespaceController NamespaceControllerConfiguration
@@ -344,6 +348,14 @@ type JobControllerConfiguration struct {
 	// allowed to sync concurrently. Larger number = more responsive jobs,
 	// but more CPU (and network) load.
 	ConcurrentJobSyncs int32
+}
+
+// CronJobControllerConfiguration contains elements describing CrongJob2Controller.
+type CronJobControllerConfiguration struct {
+	// concurrentCronJobSyncs is the number of job objects that are
+	// allowed to sync concurrently. Larger number = more responsive jobs,
+	// but more CPU (and network) load.
+	ConcurrentCronJobSyncs int32
 }
 
 // NamespaceControllerConfiguration contains elements describing NamespaceController.

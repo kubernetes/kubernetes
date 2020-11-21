@@ -21,6 +21,8 @@ limitations under the License.
 package v1
 
 import (
+	"reflect"
+
 	v1 "k8s.io/api/apps/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -107,7 +109,9 @@ func SetObjectDefaults_DaemonSet(in *v1.DaemonSet) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -155,7 +159,9 @@ func SetObjectDefaults_DaemonSet(in *v1.DaemonSet) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -203,7 +209,9 @@ func SetObjectDefaults_DaemonSet(in *v1.DaemonSet) {
 		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.EphemeralContainerCommon.Env {
 			b := &a.EphemeralContainerCommon.Env[j]
@@ -322,7 +330,9 @@ func SetObjectDefaults_Deployment(in *v1.Deployment) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -370,7 +380,9 @@ func SetObjectDefaults_Deployment(in *v1.Deployment) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -418,7 +430,9 @@ func SetObjectDefaults_Deployment(in *v1.Deployment) {
 		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.EphemeralContainerCommon.Env {
 			b := &a.EphemeralContainerCommon.Env[j]
@@ -537,7 +551,9 @@ func SetObjectDefaults_ReplicaSet(in *v1.ReplicaSet) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -585,7 +601,9 @@ func SetObjectDefaults_ReplicaSet(in *v1.ReplicaSet) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -633,7 +651,9 @@ func SetObjectDefaults_ReplicaSet(in *v1.ReplicaSet) {
 		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.EphemeralContainerCommon.Env {
 			b := &a.EphemeralContainerCommon.Env[j]
@@ -752,7 +772,9 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -800,7 +822,9 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 		corev1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.Env {
 			b := &a.Env[j]
@@ -848,7 +872,9 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 		corev1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			corev1.SetDefaults_ContainerPort(b)
+			if reflect.ValueOf(b.Protocol).IsZero() {
+				b.Protocol = "TCP"
+			}
 		}
 		for j := range a.EphemeralContainerCommon.Env {
 			b := &a.EphemeralContainerCommon.Env[j]

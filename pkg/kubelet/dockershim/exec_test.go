@@ -19,6 +19,7 @@ limitations under the License.
 package dockershim
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"testing"
@@ -29,7 +30,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/client-go/tools/remotecommand"
-
 	mockclient "k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker/testing"
 )
 
@@ -37,6 +37,7 @@ func TestExecInContainer(t *testing.T) {
 
 	testcases := []struct {
 		description        string
+		timeout            time.Duration
 		returnCreateExec1  *dockertypes.IDResponse
 		returnCreateExec2  error
 		returnStartExec    error
@@ -45,6 +46,7 @@ func TestExecInContainer(t *testing.T) {
 		expectError        error
 	}{{
 		description:       "ExecInContainer succeeds",
+		timeout:           time.Minute,
 		returnCreateExec1: &dockertypes.IDResponse{ID: "12345678"},
 		returnCreateExec2: nil,
 		returnStartExec:   nil,
@@ -58,6 +60,7 @@ func TestExecInContainer(t *testing.T) {
 		expectError:        nil,
 	}, {
 		description:        "CreateExec returns an error",
+		timeout:            time.Minute,
 		returnCreateExec1:  nil,
 		returnCreateExec2:  fmt.Errorf("error in CreateExec()"),
 		returnStartExec:    nil,
@@ -66,6 +69,7 @@ func TestExecInContainer(t *testing.T) {
 		expectError:        fmt.Errorf("failed to exec in container - Exec setup failed - error in CreateExec()"),
 	}, {
 		description:        "StartExec returns an error",
+		timeout:            time.Minute,
 		returnCreateExec1:  &dockertypes.IDResponse{ID: "12345678"},
 		returnCreateExec2:  nil,
 		returnStartExec:    fmt.Errorf("error in StartExec()"),
@@ -74,12 +78,27 @@ func TestExecInContainer(t *testing.T) {
 		expectError:        fmt.Errorf("error in StartExec()"),
 	}, {
 		description:        "InspectExec returns an error",
+		timeout:            time.Minute,
 		returnCreateExec1:  &dockertypes.IDResponse{ID: "12345678"},
 		returnCreateExec2:  nil,
 		returnStartExec:    nil,
 		returnInspectExec1: nil,
 		returnInspectExec2: fmt.Errorf("error in InspectExec()"),
 		expectError:        fmt.Errorf("error in InspectExec()"),
+	}, {
+		description:       "ExecInContainer returns context DeadlineExceeded",
+		timeout:           1 * time.Second,
+		returnCreateExec1: &dockertypes.IDResponse{ID: "12345678"},
+		returnCreateExec2: nil,
+		returnStartExec:   context.DeadlineExceeded,
+		returnInspectExec1: &dockertypes.ContainerExecInspect{
+			ExecID:      "200",
+			ContainerID: "12345678",
+			Running:     true,
+			ExitCode:    0,
+			Pid:         100},
+		returnInspectExec2: nil,
+		expectError:        context.DeadlineExceeded,
 	}}
 
 	eh := &NativeExecHandler{}
@@ -89,7 +108,6 @@ func TestExecInContainer(t *testing.T) {
 	var stdin io.Reader
 	var stdout, stderr io.WriteCloser
 	var resize <-chan remotecommand.TerminalSize
-	var timeout time.Duration
 
 	for _, tc := range testcases {
 		t.Logf("TestCase: %q", tc.description)
@@ -102,8 +120,13 @@ func TestExecInContainer(t *testing.T) {
 		mockClient.EXPECT().InspectExec(gomock.Any()).Return(
 			tc.returnInspectExec1,
 			tc.returnInspectExec2)
-		err := eh.ExecInContainer(mockClient, container, cmd, stdin, stdout, stderr, false, resize, timeout)
-		assert.Equal(t, err, tc.expectError)
+
+		// use parent context of 2 minutes since that's the default remote
+		// runtime connection timeout used by dockershim
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		err := eh.ExecInContainer(ctx, mockClient, container, cmd, stdin, stdout, stderr, false, resize, tc.timeout)
+		assert.Equal(t, tc.expectError, err)
 	}
 }
 

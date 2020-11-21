@@ -178,8 +178,7 @@ var _ = SIGDescribe("Networking", func() {
 			}
 		})
 
-		// Once basic tests checking for the sctp module not to be loaded are implemented, this
-		// needs to be marked as [Disruptive]
+		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
 		ginkgo.It("should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func() {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
 			ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterSCTPPort))
@@ -222,6 +221,22 @@ var _ = SIGDescribe("Networking", func() {
 			}
 		})
 
+		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
+		ginkgo.It("should function for node-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func() {
+			ginkgo.Skip("Skipping SCTP node to service test until DialFromNode supports SCTP #96482")
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
+			ginkgo.By(fmt.Sprintf("dialing(sctp) %v (node) --> %v:%v (config.clusterIP)", config.NodeIP, config.ClusterIP, e2enetwork.ClusterSCTPPort))
+			err := config.DialFromNode("sctp", config.ClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
+			if err != nil {
+				framework.Failf("failed dialing endpoint, %v", err)
+			}
+			ginkgo.By(fmt.Sprintf("dialing(sctp) %v (node) --> %v:%v (nodeIP)", config.NodeIP, config.NodeIP, config.NodeSCTPPort))
+			err = config.DialFromNode("sctp", config.NodeIP, config.NodeSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
+			if err != nil {
+				framework.Failf("failed dialing endpoint, %v", err)
+			}
+		})
+
 		ginkgo.It("should function for endpoint-Service: http", func() {
 			config := e2enetwork.NewNetworkingTestConfig(f)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.ClusterIP, e2enetwork.ClusterHTTPPort))
@@ -246,6 +261,22 @@ var _ = SIGDescribe("Networking", func() {
 
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v (endpoint) --> %v:%v (nodeIP)", config.EndpointPods[0].Name, config.NodeIP, config.NodeUDPPort))
 			err = config.DialFromEndpointContainer("udp", config.NodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+			if err != nil {
+				framework.Failf("failed dialing endpoint, %v", err)
+			}
+		})
+
+		// [Disruptive] because it conflicts with tests that call CheckSCTPModuleLoadedOnNodes
+		ginkgo.It("should function for endpoint-Service: sctp [Feature:SCTPConnectivity][Disruptive]", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
+			ginkgo.By(fmt.Sprintf("dialing(sctp) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.ClusterIP, e2enetwork.ClusterSCTPPort))
+			err := config.DialFromEndpointContainer("sctp", config.ClusterIP, e2enetwork.ClusterSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
+			if err != nil {
+				framework.Failf("failed dialing endpoint, %v", err)
+			}
+
+			ginkgo.By(fmt.Sprintf("dialing(sctp) %v (endpoint) --> %v:%v (nodeIP)", config.EndpointPods[0].Name, config.NodeIP, config.NodeSCTPPort))
+			err = config.DialFromEndpointContainer("sctp", config.NodeIP, config.NodeSCTPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
 				framework.Failf("failed dialing endpoint, %v", err)
 			}
@@ -506,18 +537,6 @@ var _ = SIGDescribe("Networking", func() {
 
 		})
 
-	})
-
-	// Once basic tests checking for the sctp module not to be loaded are implemented, this
-	// needs to be marked as [Disruptive]
-	ginkgo.It("should function for pod-pod: sctp [Feature:SCTPConnectivity][Disruptive]", func() {
-		config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableSCTP)
-		ginkgo.By(fmt.Sprintf("dialing(sctp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterSCTPPort))
-		message := "hello"
-		err := config.DialEchoFromTestContainer("sctp", config.TestContainerPod.Status.PodIP, e2enetwork.EndpointSCTPPort, config.MaxTries, 0, message)
-		if err != nil {
-			framework.Failf("failed dialing endpoint, %v", err)
-		}
 	})
 
 	ginkgo.It("should recreate its iptables rules if they are deleted [Disruptive]", func() {

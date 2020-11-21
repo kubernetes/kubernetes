@@ -1191,6 +1191,14 @@
     before the rollout finishes.
   release: v1.12
   file: test/e2e/apps/deployment.go
+- testname: Deployment, completes the lifecycle of a Deployment
+  codename: '[sig-apps] Deployment should run the lifecycle of a Deployment [Conformance]'
+  description: When a Deployment is created it MUST succeed with the required number
+    of replicas. It MUST succeed when the Deployment is patched. When scaling the
+    deployment is MUST succeed. When fetching and patching the DeploymentStatus it
+    MUST succeed. It MUST succeed when deleting the Deployment.
+  release: v1.20
+  file: test/e2e/apps/deployment.go
 - testname: Jobs, orphan pods, re-adoption
   codename: '[sig-apps] Job should adopt matching orphans and release non-matching
     pods [Conformance]'
@@ -1363,6 +1371,13 @@
     files MUST exist and the Service Account mount path MUST be auto mounted to the
     Container.
   release: v1.9
+  file: test/e2e/auth/service_accounts.go
+- testname: TokenRequestProjection should mount a projected volume with token using
+    TokenRequest API.
+  codename: '[sig-auth] ServiceAccounts should mount projected service account token
+    [Conformance]'
+  description: Ensure that projected service account token is mounted.
+  release: v1.20
   file: test/e2e/auth/service_accounts.go
 - testname: ServiceAccount lifecycle test
   codename: '[sig-auth] ServiceAccounts should run through the lifecycle of a ServiceAccount
@@ -1957,6 +1972,16 @@
     The PodTemplate must be deleted.
   release: v1.19
   file: test/e2e/common/podtemplates.go
+- testname: RuntimeClass API
+  codename: '[sig-node] RuntimeClass  should support RuntimeClasses API operations
+    [Conformance]'
+  description: ' The node.k8s.io API group MUST exist in the /apis discovery document.
+    The node.k8s.io/v1 API group/version MUST exist in the /apis/mode.k8s.io discovery
+    document. The runtimeclasses resource MUST exist in the /apis/node.k8s.io/v1 discovery
+    document. The runtimeclasses resource must support create, get, list, watch, update,
+    patch, delete, and deletecollection.'
+  release: v1.20
+  file: test/e2e/common/runtimeclass.go
 - testname: LimitRange, resources
   codename: '[sig-scheduling] LimitRange should create a LimitRange with defaults
     and ensure pod has those defaults applied. [Conformance]'

@@ -123,8 +123,38 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: serverTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
 	}
 	if kc.TopologyManagerPolicy != kubeletconfig.NoneTopologyManagerPolicy && !localFeatureGate.Enabled(features.TopologyManager) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManager %v requires feature gate TopologyManager", kc.TopologyManagerPolicy))
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerPolicy %v requires feature gate TopologyManager", kc.TopologyManagerPolicy))
 	}
+	switch kc.TopologyManagerPolicy {
+	case kubeletconfig.NoneTopologyManagerPolicy:
+	case kubeletconfig.BestEffortTopologyManagerPolicy:
+	case kubeletconfig.RestrictedTopologyManagerPolicy:
+	case kubeletconfig.SingleNumaNodeTopologyManagerPolicy:
+	default:
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerPolicy non-allowable value: %v", kc.TopologyManagerPolicy))
+	}
+	if kc.TopologyManagerScope != kubeletconfig.ContainerTopologyManagerScope && !localFeatureGate.Enabled(features.TopologyManager) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerScope %v requires feature gate TopologyManager", kc.TopologyManagerScope))
+	}
+	if kc.TopologyManagerScope != kubeletconfig.ContainerTopologyManagerScope && kc.TopologyManagerScope != kubeletconfig.PodTopologyManagerScope {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerScope non-allowable value: %v", kc.TopologyManagerScope))
+	}
+
+	if localFeatureGate.Enabled(features.GracefulNodeShutdown) {
+		if kc.ShutdownGracePeriod.Duration < 0 || kc.ShutdownGracePeriodCriticalPods.Duration < 0 || kc.ShutdownGracePeriodCriticalPods.Duration > kc.ShutdownGracePeriod.Duration {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: ShutdownGracePeriod %v must be >= 0, ShutdownGracePeriodCriticalPods %v must be >= 0, and ShutdownGracePeriodCriticalPods %v must be <= ShutdownGracePeriod %v", kc.ShutdownGracePeriod, kc.ShutdownGracePeriodCriticalPods, kc.ShutdownGracePeriodCriticalPods, kc.ShutdownGracePeriod))
+		}
+		if kc.ShutdownGracePeriod.Duration > 0 && kc.ShutdownGracePeriod.Duration < time.Duration(time.Second) {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: ShutdownGracePeriod %v must be either zero or otherwise >= 1 sec", kc.ShutdownGracePeriod))
+		}
+		if kc.ShutdownGracePeriodCriticalPods.Duration > 0 && kc.ShutdownGracePeriodCriticalPods.Duration < time.Duration(time.Second) {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: ShutdownGracePeriodCriticalPods %v must be either zero or otherwise >= 1 sec", kc.ShutdownGracePeriodCriticalPods))
+		}
+	}
+	if (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) && !localFeatureGate.Enabled(features.GracefulNodeShutdown) {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: Specifying ShutdownGracePeriod or ShutdownGracePeriodCriticalPods requires feature gate GracefulNodeShutdown"))
+	}
+
 	for _, val := range kc.EnforceNodeAllocatable {
 		switch val {
 		case kubetypes.NodeAllocatableEnforcementKey:

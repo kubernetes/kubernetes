@@ -98,7 +98,13 @@
         {
           "ip": "34",
           "hostname": "35",
-          "ipMode": "ɑ"
+          "ports": [
+            {
+              "port": -8441701,
+              "protocol": "",
+              "error": "36"
+            }
+          ]
         }
       ]
     }

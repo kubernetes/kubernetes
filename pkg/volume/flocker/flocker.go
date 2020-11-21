@@ -108,7 +108,7 @@ func (p *flockerPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.Flocker != nil)
 }
 
-func (p *flockerPlugin) RequiresRemount() bool {
+func (p *flockerPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

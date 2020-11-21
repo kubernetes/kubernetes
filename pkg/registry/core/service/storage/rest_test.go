@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 
 	netutil "k8s.io/utils/net"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var (
@@ -1155,6 +1156,165 @@ func TestServiceRegistryExternalService(t *testing.T) {
 		nodePort := serviceNodePorts[i]
 		// Release the node port at the end of the test case.
 		storage.serviceNodePorts.Release(nodePort)
+	}
+}
+func TestAllocateLoadBalancerNodePorts(t *testing.T) {
+	testcases := []struct {
+		name                 string
+		svc                  *api.Service
+		expectNodePorts      bool
+		allocateNodePortGate bool
+		expectError          bool
+	}{
+		{
+			name: "allocate nil, gate on",
+			svc: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "alloc-nil"},
+				Spec: api.ServiceSpec{
+					AllocateLoadBalancerNodePorts: nil,
+					Selector:                      map[string]string{"bar": "baz"},
+					SessionAffinity:               api.ServiceAffinityNone,
+					Type:                          api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{{
+						Port:       6502,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+					}},
+				},
+			},
+			expectNodePorts:      true,
+			allocateNodePortGate: true,
+			expectError:          true,
+		},
+		{
+			name: "allocate false, gate on",
+			svc: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "alloc-false"},
+				Spec: api.ServiceSpec{
+					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(false),
+					Selector:                      map[string]string{"bar": "baz"},
+					SessionAffinity:               api.ServiceAffinityNone,
+					Type:                          api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{{
+						Port:       6502,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+					}},
+				},
+			},
+			expectNodePorts:      false,
+			allocateNodePortGate: true,
+		},
+		{
+			name: "allocate true, gate on",
+			svc: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "alloc-true"},
+				Spec: api.ServiceSpec{
+					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(true),
+					Selector:                      map[string]string{"bar": "baz"},
+					SessionAffinity:               api.ServiceAffinityNone,
+					Type:                          api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{{
+						Port:       6502,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+					}},
+				},
+			},
+			expectNodePorts:      true,
+			allocateNodePortGate: true,
+		},
+		{
+			name: "allocate nil, gate off",
+			svc: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "alloc-false"},
+				Spec: api.ServiceSpec{
+					AllocateLoadBalancerNodePorts: nil,
+					Selector:                      map[string]string{"bar": "baz"},
+					SessionAffinity:               api.ServiceAffinityNone,
+					Type:                          api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{{
+						Port:       6502,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+					}},
+				},
+			},
+			expectNodePorts:      true,
+			allocateNodePortGate: false,
+		},
+		{
+			name: "allocate false, gate off",
+			svc: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "alloc-false"},
+				Spec: api.ServiceSpec{
+					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(false),
+					Selector:                      map[string]string{"bar": "baz"},
+					SessionAffinity:               api.ServiceAffinityNone,
+					Type:                          api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{{
+						Port:       6502,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+					}},
+				},
+			},
+			expectNodePorts:      true,
+			allocateNodePortGate: false,
+		},
+		{
+			name: "allocate true, gate off",
+			svc: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "alloc-true"},
+				Spec: api.ServiceSpec{
+					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(true),
+					Selector:                      map[string]string{"bar": "baz"},
+					SessionAffinity:               api.ServiceAffinityNone,
+					Type:                          api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{{
+						Port:       6502,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(6502),
+					}},
+				},
+			},
+			expectNodePorts:      true,
+			allocateNodePortGate: false,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := genericapirequest.NewDefaultContext()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLBNodePortControl, tc.allocateNodePortGate)()
+
+			storage, registry, server := NewTestREST(t, nil, singleStackIPv4)
+			defer server.Terminate(t)
+
+			_, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				if tc.expectError {
+					return
+				}
+				t.Errorf("%s; Failed to create service: %#v", tc.name, err)
+			}
+			srv, err := registry.GetService(ctx, tc.svc.Name, &metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("%s; Unexpected error: %v", tc.name, err)
+			}
+			if srv == nil {
+				t.Fatalf("%s; Failed to find service: %s", tc.name, tc.svc.Name)
+			}
+			serviceNodePorts := collectServiceNodePorts(srv)
+			if (len(serviceNodePorts) != 0) != tc.expectNodePorts {
+				t.Errorf("%s; Allocated NodePorts not as expected", tc.name)
+			}
+
+			for i := range serviceNodePorts {
+				nodePort := serviceNodePorts[i]
+				// Release the node port at the end of the test case.
+				storage.serviceNodePorts.Release(nodePort)
+			}
+		})
 	}
 }
 

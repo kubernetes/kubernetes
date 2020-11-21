@@ -152,7 +152,15 @@ var _ = SIGDescribe("Deployment", func() {
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 	// See https://github.com/kubernetes/kubernetes/issues/29229
 
-	ginkgo.It("should run the lifecycle of a Deployment", func() {
+	/*
+		Release: v1.20
+		Testname: Deployment, completes the lifecycle of a Deployment
+		Description: When a Deployment is created it MUST succeed with the required number of replicas.
+		It MUST succeed when the Deployment is patched. When scaling the deployment is MUST succeed.
+		When fetching and patching the DeploymentStatus it MUST succeed. It MUST succeed when deleting
+		the Deployment.
+	*/
+	framework.ConformanceIt("should run the lifecycle of a Deployment", func() {
 		zero := int64(0)
 		deploymentResource := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
 		testNamespaceName := f.Namespace.Name
@@ -359,7 +367,7 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectEqual(deploymentGet.Spec.Template.Spec.Containers[0].Image, testDeploymentUpdateImage, "failed to update image")
 		framework.ExpectEqual(deploymentGet.ObjectMeta.Labels["test-deployment"], "updated", "failed to update labels")
 
-		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel = context.WithTimeout(context.Background(), 1*time.Minute)
 		defer cancel()
 		_, err = watchtools.Until(ctx, deploymentsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 			if deployment, ok := event.Object.(*appsv1.Deployment); ok {

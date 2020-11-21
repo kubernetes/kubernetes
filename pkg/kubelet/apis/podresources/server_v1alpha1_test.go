@@ -25,6 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	podresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 )
 
@@ -37,9 +38,14 @@ func (m *mockProvider) GetPods() []*v1.Pod {
 	return args.Get(0).([]*v1.Pod)
 }
 
-func (m *mockProvider) GetDevices(podUID, containerName string) []*v1alpha1.ContainerDevices {
+func (m *mockProvider) GetDevices(podUID, containerName string) []*podresourcesv1.ContainerDevices {
 	args := m.Called(podUID, containerName)
-	return args.Get(0).([]*v1alpha1.ContainerDevices)
+	return args.Get(0).([]*podresourcesv1.ContainerDevices)
+}
+
+func (m *mockProvider) GetCPUs(podUID, containerName string) []int64 {
+	args := m.Called(podUID, containerName)
+	return args.Get(0).([]int64)
 }
 
 func (m *mockProvider) UpdateAllocatedDevices() {
@@ -52,7 +58,7 @@ func TestListPodResourcesV1alpha1(t *testing.T) {
 	podUID := types.UID("pod-uid")
 	containerName := "container-name"
 
-	devs := []*v1alpha1.ContainerDevices{
+	devs := []*podresourcesv1.ContainerDevices{
 		{
 			ResourceName: "resource",
 			DeviceIds:    []string{"dev0", "dev1"},
@@ -62,13 +68,13 @@ func TestListPodResourcesV1alpha1(t *testing.T) {
 	for _, tc := range []struct {
 		desc             string
 		pods             []*v1.Pod
-		devices          []*v1alpha1.ContainerDevices
+		devices          []*podresourcesv1.ContainerDevices
 		expectedResponse *v1alpha1.ListPodResourcesResponse
 	}{
 		{
 			desc:             "no pods",
 			pods:             []*v1.Pod{},
-			devices:          []*v1alpha1.ContainerDevices{},
+			devices:          []*podresourcesv1.ContainerDevices{},
 			expectedResponse: &v1alpha1.ListPodResourcesResponse{},
 		},
 		{
@@ -89,7 +95,7 @@ func TestListPodResourcesV1alpha1(t *testing.T) {
 					},
 				},
 			},
-			devices: []*v1alpha1.ContainerDevices{},
+			devices: []*podresourcesv1.ContainerDevices{},
 			expectedResponse: &v1alpha1.ListPodResourcesResponse{
 				PodResources: []*v1alpha1.PodResources{
 					{
@@ -132,7 +138,7 @@ func TestListPodResourcesV1alpha1(t *testing.T) {
 						Containers: []*v1alpha1.ContainerResources{
 							{
 								Name:    containerName,
-								Devices: devs,
+								Devices: v1DevicesToAlphaV1(devs),
 							},
 						},
 					},

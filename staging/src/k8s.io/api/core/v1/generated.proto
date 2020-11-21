@@ -816,6 +816,7 @@ message ContainerPort {
   // Protocol for port. Must be UDP, TCP, or SCTP.
   // Defaults to "TCP".
   // +optional
+  // +default="TCP"
   optional string protocol = 4;
 
   // What host IP to bind the external port to.
@@ -2037,14 +2038,11 @@ message LoadBalancerIngress {
   // +optional
   optional string hostname = 2;
 
-  // IPMode specifies how the load-balancer's IP behaves.
-  // Setting this to "VIP" indicates that the traffic passing through
-  // this load-balancer is delivered with the destination IP and port set to the load-balancer's IP and port.
-  // Setting this to "Proxy" indicates that the load-balancer acts like a proxy,
-  // delivering traffic with the destination IP and port set to the node's IP and nodePort or to the pod's IP and targetPort.
-  // This field can only be set when the ip field is also set, and defaults to "VIP" if not specified.
+  // Ports is a list of records of service ports
+  // If used, every port defined in the service should have an entry in it
+  // +listType=atomic
   // +optional
-  optional string ipMode = 3;
+  repeated PortStatus ports = 4;
 }
 
 // LoadBalancerStatus represents the status of a load-balancer.
@@ -2690,17 +2688,13 @@ message PersistentVolumeClaimSpec {
   optional string volumeMode = 6;
 
   // This field can be used to specify either:
-  // * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot - Beta)
+  // * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)
   // * An existing PVC (PersistentVolumeClaim)
-  // * An existing custom resource/object that implements data population (Alpha)
-  // In order to use VolumeSnapshot object types, the appropriate feature gate
-  // must be enabled (VolumeSnapshotDataSource or AnyVolumeDataSource)
+  // * An existing custom resource that implements data population (Alpha)
+  // In order to use custom resource types that implement data population,
+  // the AnyVolumeDataSource feature gate must be enabled.
   // If the provisioner or an external controller can support the specified data source,
   // it will create a new volume based on the contents of the specified data source.
-  // If the specified data source is not supported, the volume will
-  // not be created and the failure will be reported as an event.
-  // In the future, we plan to support more data source types and the behavior
-  // of the provisioner may change.
   // +optional
   optional TypedLocalObjectReference dataSource = 7;
 }
@@ -3776,6 +3770,29 @@ message PodTemplateSpec {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional PodSpec spec = 2;
+}
+
+message PortStatus {
+  // Port is the port number of the service port of which status is recorded here
+  optional int32 port = 1;
+
+  // Protocol is the protocol of the service port of which status is recorded here
+  // The supported values are: "TCP", "UDP", "SCTP"
+  optional string protocol = 2;
+
+  // Error is to record the problem with the service port
+  // The format of the error shall comply with the following rules:
+  // - built-in error values shall be specified in this file and those shall use
+  //   CamelCase names
+  // - cloud provider specific error values must have names that comply with the
+  //   format foo.example.com/CamelCase.
+  // ---
+  // The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+  // +optional
+  // +kubebuilder:validation:Required
+  // +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
+  // +kubebuilder:validation:MaxLength=316
+  optional string error = 3;
 }
 
 // PortworxVolumeSource represents a Portworx volume resource.
@@ -4961,6 +4978,7 @@ message ServiceSpec {
   // The special value "*" may be used to mean "any topology". This catch-all
   // value, if used, only makes sense as the last value in the list.
   // If this is not specified or empty, no topology constraints will be applied.
+  // This field is alpha-level and is only honored by servers that enable the ServiceTopology feature.
   // +optional
   repeated string topologyKeys = 16;
 
@@ -4996,6 +5014,15 @@ message ServiceSpec {
   // wiped when updating a service to type ExternalName.
   // +optional
   optional string ipFamilyPolicy = 17;
+
+  // allocateLoadBalancerNodePorts defines if NodePorts will be automatically
+  // allocated for services with type LoadBalancer.  Default is "true". It may be
+  // set to "false" if the cluster load-balancer does not rely on NodePorts.
+  // allocateLoadBalancerNodePorts may only be set for services with type LoadBalancer
+  // and will be cleared if the type is changed to any other type.
+  // This field is alpha-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
+  // +optional
+  optional bool allocateLoadBalancerNodePorts = 20;
 }
 
 // ServiceStatus represents the current status of a service.
@@ -5004,6 +5031,14 @@ message ServiceStatus {
   // if one is present.
   // +optional
   optional LoadBalancerStatus loadBalancer = 1;
+
+  // Current service state
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
+  repeated k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 2;
 }
 
 // SessionAffinityConfig represents the configurations of session affinity.

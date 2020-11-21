@@ -80,7 +80,7 @@ func initDisruptionController(t *testing.T, testCtx *testutils.TestContext) *dis
 // initTest initializes a test environment and creates master and scheduler with default
 // configuration.
 func initTest(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testutils.TestContext {
-	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestMaster(t, nsPrefix, nil), nil, time.Second, opts...)
+	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestMaster(t, nsPrefix, nil), nil, opts...)
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx
@@ -101,7 +101,7 @@ func initTestDisablePreemption(t *testing.T, nsPrefix string) *testutils.TestCon
 	}
 	testCtx := testutils.InitTestSchedulerWithOptions(
 		t, testutils.InitTestMaster(t, nsPrefix, nil), nil,
-		time.Second, scheduler.WithProfiles(prof))
+		scheduler.WithProfiles(prof))
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx
@@ -263,13 +263,13 @@ func createPausePodWithResource(cs clientset.Interface, podName string,
 func runPausePod(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
 	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("Error creating pause pod: %v", err)
+		return nil, fmt.Errorf("failed to create pause pod: %v", err)
 	}
 	if err = testutils.WaitForPodToSchedule(cs, pod); err != nil {
 		return pod, fmt.Errorf("Pod %v/%v didn't schedule successfully. Error: %v", pod.Namespace, pod.Name, err)
 	}
 	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{}); err != nil {
-		return pod, fmt.Errorf("Error getting pod %v/%v info: %v", pod.Namespace, pod.Name, err)
+		return pod, fmt.Errorf("failed to get pod %v/%v info: %v", pod.Namespace, pod.Name, err)
 	}
 	return pod, nil
 }
@@ -300,13 +300,13 @@ func initPodWithContainers(cs clientset.Interface, conf *podWithContainersConfig
 func runPodWithContainers(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
 	pod, err := cs.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("Error creating pod-with-containers: %v", err)
+		return nil, fmt.Errorf("failed to create pod-with-containers: %v", err)
 	}
 	if err = testutils.WaitForPodToSchedule(cs, pod); err != nil {
 		return pod, fmt.Errorf("Pod %v didn't schedule successfully. Error: %v", pod.Name, err)
 	}
 	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{}); err != nil {
-		return pod, fmt.Errorf("Error getting pod %v info: %v", pod.Name, err)
+		return pod, fmt.Errorf("failed to get pod %v info: %v", pod.Name, err)
 	}
 	return pod, nil
 }

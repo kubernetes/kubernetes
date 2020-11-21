@@ -782,10 +782,10 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 					klog.Errorf("Failed to delete %s endpoint connections for externalIP %s, error: %v", epSvcPair.ServicePortName.String(), extIP, err)
 				}
 			}
-			for _, lbIngress := range svcInfo.LoadBalancerIngress() {
-				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIngress.IP, endpointIP, svcProto)
+			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
+				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, svcProto)
 				if err != nil {
-					klog.Errorf("Failed to delete %s endpoint connections for LoabBalancerIP %s, error: %v", epSvcPair.ServicePortName.String(), lbIngress.IP, err)
+					klog.Errorf("Failed to delete %s endpoint connections for LoabBalancerIP %s, error: %v", epSvcPair.ServicePortName.String(), lbIP, err)
 				}
 			}
 		}
@@ -1161,8 +1161,8 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Capture load-balancer ingress.
 		fwChain := svcInfo.serviceFirewallChainName
-		for _, ingress := range svcInfo.LoadBalancerIngress() {
-			if ingress.IP != "" {
+		for _, ingress := range svcInfo.LoadBalancerIPStrings() {
+			if ingress != "" {
 				if hasEndpoints {
 					// create service firewall chain
 					if chain, ok := existingNATChains[fwChain]; ok {
@@ -1175,17 +1175,15 @@ func (proxier *Proxier) syncProxyRules() {
 					// This currently works for loadbalancers that preserves source ips.
 					// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
 
-					if !utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) || *ingress.IPMode == v1.LoadBalancerIPModeVIP {
-						args = append(args[:0],
-							"-A", string(kubeServicesChain),
-							"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
-							"-m", protocol, "-p", protocol,
-							"-d", utilproxy.ToCIDR(net.ParseIP(ingress.IP)),
-							"--dport", strconv.Itoa(svcInfo.Port()),
-						)
-						// jump to service firewall chain
-						writeLine(proxier.natRules, append(args, "-j", string(fwChain))...)
-					}
+					args = append(args[:0],
+						"-A", string(kubeServicesChain),
+						"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
+						"-m", protocol, "-p", protocol,
+						"-d", utilproxy.ToCIDR(net.ParseIP(ingress)),
+						"--dport", strconv.Itoa(svcInfo.Port()),
+					)
+					// jump to service firewall chain
+					writeLine(proxier.natRules, append(args, "-j", string(fwChain))...)
 
 					args = append(args[:0],
 						"-A", string(fwChain),
@@ -1220,7 +1218,7 @@ func (proxier *Proxier) syncProxyRules() {
 						// loadbalancer's backend hosts. In this case, request will not hit the loadbalancer but loop back directly.
 						// Need to add the following rule to allow request on host.
 						if allowFromNode {
-							writeLine(proxier.natRules, append(args, "-s", utilproxy.ToCIDR(net.ParseIP(ingress.IP)), "-j", string(chosenChain))...)
+							writeLine(proxier.natRules, append(args, "-s", utilproxy.ToCIDR(net.ParseIP(ingress)), "-j", string(chosenChain))...)
 						}
 					}
 
@@ -1233,7 +1231,7 @@ func (proxier *Proxier) syncProxyRules() {
 						"-A", string(kubeExternalServicesChain),
 						"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
 						"-m", protocol, "-p", protocol,
-						"-d", utilproxy.ToCIDR(net.ParseIP(ingress.IP)),
+						"-d", utilproxy.ToCIDR(net.ParseIP(ingress)),
 						"--dport", strconv.Itoa(svcInfo.Port()),
 						"-j", "REJECT",
 					)

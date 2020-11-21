@@ -57,7 +57,7 @@ func NewSnippetWriter(w io.Writer, c *Context, left, right string) *SnippetWrite
 
 // Do parses format and runs args through it. You can have arbitrary logic in
 // the format (see the text/template documentation), but consider running many
-// short templaces, with ordinary go logic in between--this may be more
+// short templates with ordinary go logic in between--this may be more
 // readable. Do is chainable. Any error causes every other call to do to be
 // ignored, and the error will be returned by Error(). So you can check it just
 // once, at the end of your function.

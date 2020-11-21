@@ -83,7 +83,7 @@ func (plugin *localVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Local != nil)
 }
 
-func (plugin *localVolumePlugin) RequiresRemount() bool {
+func (plugin *localVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

@@ -78,7 +78,7 @@ func (plugin *configMapPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.ConfigMap != nil
 }
 
-func (plugin *configMapPlugin) RequiresRemount() bool {
+func (plugin *configMapPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return true
 }
 

@@ -149,7 +149,7 @@ func TestPreemption(t *testing.T) {
 	}
 	testCtx := testutils.InitTestSchedulerWithOptions(t,
 		testutils.InitTestMaster(t, "preemption", nil),
-		nil, time.Second,
+		nil,
 		scheduler.WithProfiles(prof),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	testutils.SyncInformerFactory(testCtx)
@@ -653,7 +653,7 @@ func TestPodPriorityResolution(t *testing.T) {
 				Namespace:         metav1.NamespaceSystem,
 				PriorityClassName: "foo",
 			}),
-			ExpectedError: fmt.Errorf("Error creating pause pod: pods \"pod3-system-cluster-critical\" is forbidden: no PriorityClass with name foo was found"),
+			ExpectedError: fmt.Errorf("failed to create pause pod: pods \"pod3-system-cluster-critical\" is forbidden: no PriorityClass with name foo was found"),
 		},
 	}
 

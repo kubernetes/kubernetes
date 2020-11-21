@@ -326,17 +326,40 @@ func makeServiceWithIPFamilies(ipfamilies []api.IPFamily, ipFamilyPolicy *api.IP
 	}
 }
 
+func makeServiceWithConditions(conditions []metav1.Condition) *api.Service {
+	return &api.Service{
+		Status: api.ServiceStatus{
+			Conditions: conditions,
+		},
+	}
+}
+
+func makeServiceWithPorts(ports []api.PortStatus) *api.Service {
+	return &api.Service{
+		Status: api.ServiceStatus{
+			LoadBalancer: api.LoadBalancerStatus{
+				Ingress: []api.LoadBalancerIngress{
+					{
+						Ports: ports,
+					},
+				},
+			},
+		},
+	}
+}
+
 func TestDropDisabledField(t *testing.T) {
 	requireDualStack := api.IPFamilyPolicyRequireDualStack
 	preferDualStack := api.IPFamilyPolicyPreferDualStack
 	singleStack := api.IPFamilyPolicySingleStack
 
 	testCases := []struct {
-		name            string
-		enableDualStack bool
-		svc             *api.Service
-		oldSvc          *api.Service
-		compareSvc      *api.Service
+		name                string
+		enableDualStack     bool
+		enableMixedProtocol bool
+		svc                 *api.Service
+		oldSvc              *api.Service
+		compareSvc          *api.Service
 	}{
 		{
 			name:            "not dual stack, field not used",
@@ -396,12 +419,126 @@ func TestDropDisabledField(t *testing.T) {
 			oldSvc:          nil,
 			compareSvc:      makeServiceWithIPFamilies(nil, &singleStack),
 		},
-
+		/* svc.Status.Conditions */
+		{
+			name:                "mixed protocol not enabled, field not used in old, not used in new",
+			enableMixedProtocol: false,
+			svc:                 makeServiceWithConditions(nil),
+			oldSvc:              makeServiceWithConditions(nil),
+			compareSvc:          makeServiceWithConditions(nil),
+		},
+		{
+			name:                "mixed protocol not enabled, field used in old and in new",
+			enableMixedProtocol: false,
+			svc:                 makeServiceWithConditions([]metav1.Condition{}),
+			oldSvc:              makeServiceWithConditions([]metav1.Condition{}),
+			compareSvc:          makeServiceWithConditions([]metav1.Condition{}),
+		},
+		{
+			name:                "mixed protocol not enabled, field not used in old, used in new",
+			enableMixedProtocol: false,
+			svc:                 makeServiceWithConditions([]metav1.Condition{}),
+			oldSvc:              makeServiceWithConditions(nil),
+			compareSvc:          makeServiceWithConditions(nil),
+		},
+		{
+			name:                "mixed protocol not enabled, field used in old, not used in new",
+			enableMixedProtocol: false,
+			svc:                 makeServiceWithConditions(nil),
+			oldSvc:              makeServiceWithConditions([]metav1.Condition{}),
+			compareSvc:          makeServiceWithConditions(nil),
+		},
+		{
+			name:                "mixed protocol enabled, field not used in old, not used in new",
+			enableMixedProtocol: true,
+			svc:                 makeServiceWithConditions(nil),
+			oldSvc:              makeServiceWithConditions(nil),
+			compareSvc:          makeServiceWithConditions(nil),
+		},
+		{
+			name:                "mixed protocol enabled, field used in old and in new",
+			enableMixedProtocol: true,
+			svc:                 makeServiceWithConditions([]metav1.Condition{}),
+			oldSvc:              makeServiceWithConditions([]metav1.Condition{}),
+			compareSvc:          makeServiceWithConditions([]metav1.Condition{}),
+		},
+		{
+			name:                "mixed protocol enabled, field not used in old, used in new",
+			enableMixedProtocol: true,
+			svc:                 makeServiceWithConditions([]metav1.Condition{}),
+			oldSvc:              makeServiceWithConditions(nil),
+			compareSvc:          makeServiceWithConditions([]metav1.Condition{}),
+		},
+		{
+			name:                "mixed protocol enabled, field used in old, not used in new",
+			enableMixedProtocol: true,
+			svc:                 makeServiceWithConditions(nil),
+			oldSvc:              makeServiceWithConditions([]metav1.Condition{}),
+			compareSvc:          makeServiceWithConditions(nil),
+		},
+		/* svc.Status.LoadBalancer.Ingress.Ports */
+		{
+			name:                "mixed protocol not enabled, field not used in old, not used in new",
+			enableMixedProtocol: false,
+			svc:                 makeServiceWithPorts(nil),
+			oldSvc:              makeServiceWithPorts(nil),
+			compareSvc:          makeServiceWithPorts(nil),
+		},
+		{
+			name:                "mixed protocol not enabled, field used in old and in new",
+			enableMixedProtocol: false,
+			svc:                 makeServiceWithPorts([]api.PortStatus{}),
+			oldSvc:              makeServiceWithPorts([]api.PortStatus{}),
+			compareSvc:          makeServiceWithPorts([]api.PortStatus{}),
+		},
+		{
+			name:                "mixed protocol not enabled, field not used in old, used in new",
+			enableMixedProtocol: false,
+			svc:                 makeServiceWithPorts([]api.PortStatus{}),
+			oldSvc:              makeServiceWithPorts(nil),
+			compareSvc:          makeServiceWithPorts(nil),
+		},
+		{
+			name:                "mixed protocol not enabled, field used in old, not used in new",
+			enableMixedProtocol: false,
+			svc:                 makeServiceWithPorts(nil),
+			oldSvc:              makeServiceWithPorts([]api.PortStatus{}),
+			compareSvc:          makeServiceWithPorts(nil),
+		},
+		{
+			name:                "mixed protocol enabled, field not used in old, not used in new",
+			enableMixedProtocol: true,
+			svc:                 makeServiceWithPorts(nil),
+			oldSvc:              makeServiceWithPorts(nil),
+			compareSvc:          makeServiceWithPorts(nil),
+		},
+		{
+			name:                "mixed protocol enabled, field used in old and in new",
+			enableMixedProtocol: true,
+			svc:                 makeServiceWithPorts([]api.PortStatus{}),
+			oldSvc:              makeServiceWithPorts([]api.PortStatus{}),
+			compareSvc:          makeServiceWithPorts([]api.PortStatus{}),
+		},
+		{
+			name:                "mixed protocol enabled, field not used in old, used in new",
+			enableMixedProtocol: true,
+			svc:                 makeServiceWithPorts([]api.PortStatus{}),
+			oldSvc:              makeServiceWithPorts(nil),
+			compareSvc:          makeServiceWithPorts([]api.PortStatus{}),
+		},
+		{
+			name:                "mixed protocol enabled, field used in old, not used in new",
+			enableMixedProtocol: true,
+			svc:                 makeServiceWithPorts(nil),
+			oldSvc:              makeServiceWithPorts([]api.PortStatus{}),
+			compareSvc:          makeServiceWithPorts(nil),
+		},
 		/* add more tests for other dropped fields as needed */
 	}
 	for _, tc := range testCases {
 		func() {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MixedProtocolLBService, tc.enableMixedProtocol)()
 			old := tc.oldSvc.DeepCopy()
 
 			// to test against user using IPFamily not set on cluster

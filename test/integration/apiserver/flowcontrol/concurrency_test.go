@@ -28,7 +28,7 @@ import (
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 
-	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -234,18 +234,18 @@ func getRequestCountOfPriorityLevel(c clientset.Interface) (map[string]int, map[
 	}
 }
 
-func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, username string, concurrencyShares, queuelength int) (*flowcontrolv1alpha1.PriorityLevelConfiguration, *flowcontrolv1alpha1.FlowSchema, error) {
-	pl, err := c.FlowcontrolV1alpha1().PriorityLevelConfigurations().Create(context.Background(), &flowcontrolv1alpha1.PriorityLevelConfiguration{
+func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, username string, concurrencyShares, queuelength int) (*flowcontrol.PriorityLevelConfiguration, *flowcontrol.FlowSchema, error) {
+	pl, err := c.FlowcontrolV1beta1().PriorityLevelConfigurations().Create(context.Background(), &flowcontrol.PriorityLevelConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: username,
 		},
-		Spec: flowcontrolv1alpha1.PriorityLevelConfigurationSpec{
-			Type: flowcontrolv1alpha1.PriorityLevelEnablementLimited,
-			Limited: &flowcontrolv1alpha1.LimitedPriorityLevelConfiguration{
+		Spec: flowcontrol.PriorityLevelConfigurationSpec{
+			Type: flowcontrol.PriorityLevelEnablementLimited,
+			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 				AssuredConcurrencyShares: int32(concurrencyShares),
-				LimitResponse: flowcontrolv1alpha1.LimitResponse{
-					Type: flowcontrolv1alpha1.LimitResponseTypeQueue,
-					Queuing: &flowcontrolv1alpha1.QueuingConfiguration{
+				LimitResponse: flowcontrol.LimitResponse{
+					Type: flowcontrol.LimitResponseTypeQueue,
+					Queuing: &flowcontrol.QueuingConfiguration{
 						Queues:           100,
 						HandSize:         1,
 						QueueLengthLimit: int32(queuelength),
@@ -257,33 +257,33 @@ func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, usern
 	if err != nil {
 		return nil, nil, err
 	}
-	fs, err := c.FlowcontrolV1alpha1().FlowSchemas().Create(context.TODO(), &flowcontrolv1alpha1.FlowSchema{
+	fs, err := c.FlowcontrolV1beta1().FlowSchemas().Create(context.TODO(), &flowcontrol.FlowSchema{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: username,
 		},
-		Spec: flowcontrolv1alpha1.FlowSchemaSpec{
-			DistinguisherMethod: &flowcontrolv1alpha1.FlowDistinguisherMethod{
-				Type: flowcontrolv1alpha1.FlowDistinguisherMethodByUserType,
+		Spec: flowcontrol.FlowSchemaSpec{
+			DistinguisherMethod: &flowcontrol.FlowDistinguisherMethod{
+				Type: flowcontrol.FlowDistinguisherMethodByUserType,
 			},
 			MatchingPrecedence: 1000,
-			PriorityLevelConfiguration: flowcontrolv1alpha1.PriorityLevelConfigurationReference{
+			PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
 				Name: username,
 			},
-			Rules: []flowcontrolv1alpha1.PolicyRulesWithSubjects{
+			Rules: []flowcontrol.PolicyRulesWithSubjects{
 				{
-					ResourceRules: []flowcontrolv1alpha1.ResourcePolicyRule{
+					ResourceRules: []flowcontrol.ResourcePolicyRule{
 						{
-							Verbs:        []string{flowcontrolv1alpha1.VerbAll},
-							APIGroups:    []string{flowcontrolv1alpha1.APIGroupAll},
-							Resources:    []string{flowcontrolv1alpha1.ResourceAll},
-							Namespaces:   []string{flowcontrolv1alpha1.NamespaceEvery},
+							Verbs:        []string{flowcontrol.VerbAll},
+							APIGroups:    []string{flowcontrol.APIGroupAll},
+							Resources:    []string{flowcontrol.ResourceAll},
+							Namespaces:   []string{flowcontrol.NamespaceEvery},
 							ClusterScope: true,
 						},
 					},
-					Subjects: []flowcontrolv1alpha1.Subject{
+					Subjects: []flowcontrol.Subject{
 						{
-							Kind: flowcontrolv1alpha1.SubjectKindUser,
-							User: &flowcontrolv1alpha1.UserSubject{
+							Kind: flowcontrol.SubjectKindUser,
+							User: &flowcontrol.UserSubject{
 								Name: username,
 							},
 						},
@@ -297,13 +297,13 @@ func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, usern
 	}
 
 	return pl, fs, wait.Poll(time.Second, timeout, func() (bool, error) {
-		fs, err := c.FlowcontrolV1alpha1().FlowSchemas().Get(context.TODO(), username, metav1.GetOptions{})
+		fs, err := c.FlowcontrolV1beta1().FlowSchemas().Get(context.TODO(), username, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		for _, condition := range fs.Status.Conditions {
-			if condition.Type == flowcontrolv1alpha1.FlowSchemaConditionDangling {
-				if condition.Status == flowcontrolv1alpha1.ConditionFalse {
+			if condition.Type == flowcontrol.FlowSchemaConditionDangling {
+				if condition.Status == flowcontrol.ConditionFalse {
 					return true, nil
 				}
 			}

@@ -91,3 +91,7 @@ func (o *ServiceAccountOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 func (o *ServiceAccountOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }
+
+func errUnsupportedGenerator(cmd *cobra.Command, generatorName string) error {
+	return cmdutil.UsageErrorf(cmd, "Generator %s not supported. ", generatorName)
+}

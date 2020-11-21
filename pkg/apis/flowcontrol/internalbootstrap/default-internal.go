@@ -17,7 +17,7 @@ limitations under the License.
 package internalbootstrap
 
 import (
-	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
+	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
@@ -46,7 +46,7 @@ func NewAPFScheme() *runtime.Scheme {
 	return scheme
 }
 
-func internalizeFSes(exts []*fcv1a1.FlowSchema) map[string]*flowcontrol.FlowSchema {
+func internalizeFSes(exts []*flowcontrolv1beta1.FlowSchema) map[string]*flowcontrol.FlowSchema {
 	ans := make(map[string]*flowcontrol.FlowSchema, len(exts))
 	scheme := NewAPFScheme()
 	for _, ext := range exts {
@@ -59,7 +59,7 @@ func internalizeFSes(exts []*fcv1a1.FlowSchema) map[string]*flowcontrol.FlowSche
 	return ans
 }
 
-func internalizePLs(exts []*fcv1a1.PriorityLevelConfiguration) map[string]*flowcontrol.PriorityLevelConfiguration {
+func internalizePLs(exts []*flowcontrolv1beta1.PriorityLevelConfiguration) map[string]*flowcontrol.PriorityLevelConfiguration {
 	ans := make(map[string]*flowcontrol.PriorityLevelConfiguration, len(exts))
 	scheme := NewAPFScheme()
 	for _, ext := range exts {

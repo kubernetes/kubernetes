@@ -18,7 +18,7 @@ package devicemanager
 
 import (
 	v1 "k8s.io/api/core/v1"
-	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
+	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -71,6 +71,11 @@ func (h *ManagerStub) GetWatcherHandler() cache.PluginHandler {
 
 // GetTopologyHints returns an empty TopologyHint map
 func (h *ManagerStub) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+	return map[string][]topologymanager.TopologyHint{}
+}
+
+// GetPodTopologyHints returns an empty TopologyHint map
+func (h *ManagerStub) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	return map[string][]topologymanager.TopologyHint{}
 }
 

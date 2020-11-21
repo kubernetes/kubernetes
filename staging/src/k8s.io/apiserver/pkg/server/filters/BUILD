@@ -18,7 +18,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/api/flowcontrol/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/api/flowcontrol/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -58,7 +58,7 @@ go_library(
     importpath = "k8s.io/apiserver/pkg/server/filters",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/flowcontrol/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/api/flowcontrol/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",

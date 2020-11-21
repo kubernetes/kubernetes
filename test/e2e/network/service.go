@@ -3799,18 +3799,10 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 	})
 
 	ginkgo.It("should create a Pod with SCTP HostPort", func() {
-		ginkgo.By("checking whether kubenet is used")
 		node, err := e2enode.GetRandomReadySchedulableNode(cs)
 		framework.ExpectNoError(err)
 		hostExec := utils.NewHostExec(f)
 		defer hostExec.Cleanup()
-		cmd := "ps -C kubelet -o cmd= | grep kubenet"
-		framework.Logf("Executing cmd %q on node %v", cmd, node.Name)
-		err = hostExec.IssueCommand(cmd, node)
-		if err != nil {
-			e2eskipper.Skipf("Interrogation of kubenet usage failed on node %s", node.Name)
-		}
-		framework.Logf("kubenet is in use")
 
 		ginkgo.By("getting the state of the sctp module on the selected node")
 		nodes := &v1.NodeList{}
@@ -3829,7 +3821,7 @@ var _ = SIGDescribe("SCTP [Feature:SCTP] [LinuxOnly]", func() {
 			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", podName, f.Namespace.Name)
 		}()
 		// wait until host port manager syncs rules
-		cmd = "iptables-save"
+		cmd := "iptables-save"
 		if framework.TestContext.ClusterIsIPv6() {
 			cmd = "ip6tables-save"
 		}

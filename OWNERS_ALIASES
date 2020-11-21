@@ -376,6 +376,7 @@ aliases:
     - thockin
 
   sig-network-api-reviewers:
+    - andrewsykim
     - caseydavenport
     - cmluciano
     - danwinship
@@ -400,6 +401,7 @@ aliases:
     - liggitt
 
   api-reviewers:
+    - andrewsykim
     - erictune
     - lavalamp
     - smarterclayton

@@ -77,7 +77,7 @@ type PersistAuthProviderConfigForUser func(user string) restclient.AuthProviderC
 
 type promptedCredentials struct {
 	username string
-	password string
+	password string `datapolicy:"password"`
 }
 
 // DirectClientConfig is a ClientConfig interface that is backed by a clientcmdapi.Config, options overrides, and an optional fallbackReader for auth information

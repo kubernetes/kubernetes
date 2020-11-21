@@ -639,12 +639,10 @@ func shouldPodBeInEndpoints(pod *v1.Pod) bool {
 
 func endpointPortFromServicePort(servicePort *v1.ServicePort, portNum int) *v1.EndpointPort {
 	epp := &v1.EndpointPort{
-		Name:     servicePort.Name,
-		Port:     int32(portNum),
-		Protocol: servicePort.Protocol,
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAppProtocol) {
-		epp.AppProtocol = servicePort.AppProtocol
+		Name:        servicePort.Name,
+		Port:        int32(portNum),
+		Protocol:    servicePort.Protocol,
+		AppProtocol: servicePort.AppProtocol,
 	}
 	return epp
 }

@@ -344,6 +344,43 @@ type CSIDriverSpec struct {
 	// that enable the CSIVolumeFSGroupPolicy feature gate.
 	// +optional
 	FSGroupPolicy *FSGroupPolicy `json:"fsGroupPolicy,omitempty" protobuf:"bytes,5,opt,name=fsGroupPolicy"`
+
+	// TokenRequests indicates the CSI driver needs pods' service account
+	// tokens it is mounting volume for to do necessary authentication. Kubelet
+	// will pass the tokens in VolumeContext in the CSI NodePublishVolume calls.
+	// The CSI driver should parse and validate the following VolumeContext:
+	// "csi.storage.k8s.io/serviceAccount.tokens": {
+	//   "<audience>": {
+	//     "token": <token>,
+	//     "expirationTimestamp": <expiration timestamp in RFC3339>,
+	//   },
+	//   ...
+	// }
+	//
+	// Note: Audience in each TokenRequest should be different and at
+	// most one token is empty string. To receive a new token after expiry,
+	// RequiresRepublish can be used to trigger NodePublishVolume periodically.
+	//
+	// This is an alpha feature and only available when the
+	// CSIServiceAccountToken feature is enabled.
+	//
+	// +optional
+	// +listType=atomic
+	TokenRequests []TokenRequest `json:"tokenRequests,omitempty" protobuf:"bytes,6,opt,name=tokenRequests"`
+
+	// RequiresRepublish indicates the CSI driver wants `NodePublishVolume`
+	// being periodically called to reflect any possible change in the mounted
+	// volume. This field defaults to false.
+	//
+	// Note: After a successful initial NodePublishVolume call, subsequent calls
+	// to NodePublishVolume should only update the contents of the volume. New
+	// mount points will not be seen by a running container.
+	//
+	// This is an alpha feature and only available when the
+	// CSIServiceAccountToken feature is enabled.
+	//
+	// +optional
+	RequiresRepublish *bool `json:"requiresRepublish,omitempty" protobuf:"varint,7,opt,name=requiresRepublish"`
 }
 
 // FSGroupPolicy specifies if a CSI Driver supports modifying
@@ -380,6 +417,20 @@ const (
 // VolumeLifecycleMode is an enumeration of possible usage modes for a volume
 // provided by a CSI driver. More modes may be added in the future.
 type VolumeLifecycleMode string
+
+// TokenRequest contains parameters of a service account token.
+type TokenRequest struct {
+	// Audience is the intended audience of the token in "TokenRequestSpec".
+	// It will default to the audiences of kube apiserver.
+	//
+	Audience string `json:"audience" protobuf:"bytes,1,opt,name=audience"`
+
+	// ExpirationSeconds is the duration of validity of the token in "TokenRequestSpec".
+	// It has the same default value of "ExpirationSeconds" in "TokenRequestSpec".
+	//
+	// +optional
+	ExpirationSeconds *int64 `json:"expirationSeconds,omitempty" protobuf:"varint,2,opt,name=expirationSeconds"`
+}
 
 const (
 	// VolumeLifecyclePersistent explicitly confirms that the driver implements

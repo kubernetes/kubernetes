@@ -1558,7 +1558,6 @@ func newTestPersistentVolumeClaimForQuota(name string) *v1.PersistentVolumeClaim
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 				v1.ReadOnlyMany,
-				v1.ReadWriteMany,
 			},
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{

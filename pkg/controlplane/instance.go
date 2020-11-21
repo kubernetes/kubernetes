@@ -51,6 +51,7 @@ import (
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
+	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
@@ -81,8 +82,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
-	"k8s.io/component-helpers/lease"
+	"k8s.io/component-base/version"
+	"k8s.io/component-helpers/apimachinery/lease"
+	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	flowcontrolv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -93,8 +97,6 @@ import (
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
-
-	"k8s.io/klog/v2"
 
 	// RESTStorage installers
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
@@ -580,6 +582,12 @@ type RESTStorageProvider interface {
 func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) error {
 	apiGroupsInfo := []*genericapiserver.APIGroupInfo{}
 
+	// used later in the loop to filter the served resource by those that have expired.
+	resourceExpirationEvaluator, err := newResourceExpirationEvaluator(version.Get())
+	if err != nil {
+		return err
+	}
+
 	for _, restStorageBuilder := range restStorageProviders {
 		groupName := restStorageBuilder.GroupName()
 		if !apiResourceConfigSource.AnyVersionForGroupEnabled(groupName) {
@@ -594,6 +602,16 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 			klog.Warningf("API group %q is not enabled, skipping.", groupName)
 			continue
 		}
+
+		// Remove resources that serving kinds that are removed.
+		// We do this here so that we don't accidentally serve versions without resources or openapi information that for kinds we don't serve.
+		// This is a spot above the construction of individual storage handlers so that no sig accidentally forgets to check.
+		resourceExpirationEvaluator.removeDeletedKinds(groupName, apiGroupInfo.VersionedResourcesStorageMap)
+		if len(apiGroupInfo.VersionedResourcesStorageMap) == 0 {
+			klog.V(1).Infof("Removing API group %v because it is time to stop serving it because it has no versions per APILifecycle.", groupName)
+			continue
+		}
+
 		klog.V(1).Infof("Enabling API group %q.", groupName)
 
 		if postHookProvider, ok := restStorageBuilder.(genericapiserver.PostStartHookProvider); ok {
@@ -676,6 +694,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		extensionsapiv1beta1.SchemeGroupVersion,
 		networkingapiv1.SchemeGroupVersion,
 		networkingapiv1beta1.SchemeGroupVersion,
+		nodev1.SchemeGroupVersion,
 		nodev1beta1.SchemeGroupVersion,
 		policyapiv1beta1.SchemeGroupVersion,
 		rbacv1.SchemeGroupVersion,
@@ -684,6 +703,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		storageapiv1beta1.SchemeGroupVersion,
 		schedulingapiv1beta1.SchemeGroupVersion,
 		schedulingapiv1.SchemeGroupVersion,
+		flowcontrolv1beta1.SchemeGroupVersion,
 	)
 	// enable non-deprecated beta resources in extensions/v1beta1 explicitly so we have a full list of what's possible to serve
 	ret.EnableResources(

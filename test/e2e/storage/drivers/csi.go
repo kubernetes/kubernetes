@@ -253,6 +253,9 @@ type mockCSIDriver struct {
 	enableNodeExpansion bool
 	cleanupHandle       framework.CleanupActionHandle
 	javascriptHooks     map[string]string
+	tokenRequests       []storagev1.TokenRequest
+	requiresRepublish   *bool
+	fsGroupPolicy       *storagev1.FSGroupPolicy
 }
 
 // CSIMockDriverOpts defines options used for csi driver
@@ -267,6 +270,9 @@ type CSIMockDriverOpts struct {
 	EnableNodeExpansion bool
 	EnableSnapshot      bool
 	JavascriptHooks     map[string]string
+	TokenRequests       []storagev1.TokenRequest
+	RequiresRepublish   *bool
+	FSGroupPolicy       *storagev1.FSGroupPolicy
 }
 
 var _ testsuites.TestDriver = &mockCSIDriver{}
@@ -324,6 +330,9 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 		attachLimit:         driverOpts.AttachLimit,
 		enableNodeExpansion: driverOpts.EnableNodeExpansion,
 		javascriptHooks:     driverOpts.JavascriptHooks,
+		tokenRequests:       driverOpts.TokenRequests,
+		requiresRepublish:   driverOpts.RequiresRepublish,
+		fsGroupPolicy:       driverOpts.FSGroupPolicy,
 	}
 }
 
@@ -425,6 +434,9 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 			storagev1.VolumeLifecyclePersistent,
 			storagev1.VolumeLifecycleEphemeral,
 		},
+		TokenRequests:     m.tokenRequests,
+		RequiresRepublish: m.requiresRepublish,
+		FSGroupPolicy:     m.fsGroupPolicy,
 	}
 	cleanup, err := utils.CreateFromManifests(f, driverNamespace, func(item interface{}) error {
 		return utils.PatchCSIDeployment(f, o, item)

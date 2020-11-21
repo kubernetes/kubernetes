@@ -70,11 +70,6 @@ func SetDefaults_Volume(obj *v1.Volume) {
 		}
 	}
 }
-func SetDefaults_ContainerPort(obj *v1.ContainerPort) {
-	if obj.Protocol == "" {
-		obj.Protocol = v1.ProtocolTCP
-	}
-}
 func SetDefaults_Container(obj *v1.Container) {
 	if obj.ImagePullPolicy == "" {
 		// Ignore error and assume it has been validated elsewhere
@@ -167,13 +162,10 @@ func SetDefaults_Service(obj *v1.Service) {
 		// note: conversion logic handles cases where ClusterIPs is used (but not ClusterIP).
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) &&
-		obj.Spec.Type == v1.ServiceTypeLoadBalancer {
-		ipMode := v1.LoadBalancerIPModeVIP
-
-		for i, ing := range obj.Status.LoadBalancer.Ingress {
-			if ing.IP != "" && ing.IPMode == nil {
-				obj.Status.LoadBalancer.Ingress[i].IPMode = &ipMode
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
+		if obj.Spec.Type == v1.ServiceTypeLoadBalancer {
+			if obj.Spec.AllocateLoadBalancerNodePorts == nil {
+				obj.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			}
 		}
 	}

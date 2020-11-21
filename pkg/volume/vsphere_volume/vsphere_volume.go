@@ -92,7 +92,7 @@ func (plugin *vsphereVolumePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.VsphereVolume != nil)
 }
 
-func (plugin *vsphereVolumePlugin) RequiresRemount() bool {
+func (plugin *vsphereVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 

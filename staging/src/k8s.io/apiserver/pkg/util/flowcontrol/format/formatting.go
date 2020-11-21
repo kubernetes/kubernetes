@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	fcv1a1 "k8s.io/api/flowcontrol/v1alpha1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
@@ -46,25 +46,25 @@ func (sr Stringer) String() string {
 		return "nil"
 	}
 	switch typed := sr.val.(type) {
-	case *fcv1a1.FlowSchema,
-		fcv1a1.FlowSchema,
-		fcv1a1.FlowSchemaSpec,
-		fcv1a1.FlowDistinguisherMethod,
-		*fcv1a1.FlowDistinguisherMethod,
-		*fcv1a1.PolicyRulesWithSubjects,
-		fcv1a1.PolicyRulesWithSubjects,
-		fcv1a1.Subject,
-		fcv1a1.ResourcePolicyRule,
-		fcv1a1.NonResourcePolicyRule,
-		fcv1a1.FlowSchemaCondition,
-		*fcv1a1.PriorityLevelConfiguration,
-		fcv1a1.PriorityLevelConfiguration,
-		fcv1a1.PriorityLevelConfigurationSpec,
-		*fcv1a1.LimitedPriorityLevelConfiguration,
-		fcv1a1.LimitedPriorityLevelConfiguration,
-		fcv1a1.LimitResponse,
-		*fcv1a1.QueuingConfiguration,
-		fcv1a1.QueuingConfiguration:
+	case *flowcontrol.FlowSchema,
+		flowcontrol.FlowSchema,
+		flowcontrol.FlowSchemaSpec,
+		flowcontrol.FlowDistinguisherMethod,
+		*flowcontrol.FlowDistinguisherMethod,
+		*flowcontrol.PolicyRulesWithSubjects,
+		flowcontrol.PolicyRulesWithSubjects,
+		flowcontrol.Subject,
+		flowcontrol.ResourcePolicyRule,
+		flowcontrol.NonResourcePolicyRule,
+		flowcontrol.FlowSchemaCondition,
+		*flowcontrol.PriorityLevelConfiguration,
+		flowcontrol.PriorityLevelConfiguration,
+		flowcontrol.PriorityLevelConfigurationSpec,
+		*flowcontrol.LimitedPriorityLevelConfiguration,
+		flowcontrol.LimitedPriorityLevelConfiguration,
+		flowcontrol.LimitResponse,
+		*flowcontrol.QueuingConfiguration,
+		flowcontrol.QueuingConfiguration:
 		return ToJSON(sr.val)
 	case []user.Info:
 		return FmtUsers(typed)
@@ -88,12 +88,12 @@ func ToJSON(val interface{}) string {
 
 // FmtPriorityLevelConfiguration returns a golang source expression
 // equivalent to the given value
-func FmtPriorityLevelConfiguration(pl *fcv1a1.PriorityLevelConfiguration) string {
+func FmtPriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfiguration) string {
 	if pl == nil {
 		return "nil"
 	}
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("&v1alpha1.PriorityLevelConfiguration{ObjectMeta: %#+v, Spec: ",
+	buf.WriteString(fmt.Sprintf("&flowcontrolv1beta1.PriorityLevelConfiguration{ObjectMeta: %#+v, Spec: ",
 		pl.ObjectMeta))
 	BufferPriorityLevelConfigurationSpec(&buf, &pl.Spec)
 	buf.WriteString(fmt.Sprintf(", Status: %#+v}", pl.Status))
@@ -102,7 +102,7 @@ func FmtPriorityLevelConfiguration(pl *fcv1a1.PriorityLevelConfiguration) string
 
 // FmtPriorityLevelConfigurationSpec returns a golang source
 // expression equivalent to the given value
-func FmtPriorityLevelConfigurationSpec(plSpec *fcv1a1.PriorityLevelConfigurationSpec) string {
+func FmtPriorityLevelConfigurationSpec(plSpec *flowcontrol.PriorityLevelConfigurationSpec) string {
 	var buf bytes.Buffer
 	BufferPriorityLevelConfigurationSpec(&buf, plSpec)
 	return buf.String()
@@ -110,10 +110,10 @@ func FmtPriorityLevelConfigurationSpec(plSpec *fcv1a1.PriorityLevelConfiguration
 
 // BufferPriorityLevelConfigurationSpec writes a golang source
 // expression for the given value to the given buffer
-func BufferPriorityLevelConfigurationSpec(buf *bytes.Buffer, plSpec *fcv1a1.PriorityLevelConfigurationSpec) {
-	buf.WriteString(fmt.Sprintf("v1alpha1.PriorityLevelConfigurationSpec{Type: %#v", plSpec.Type))
+func BufferPriorityLevelConfigurationSpec(buf *bytes.Buffer, plSpec *flowcontrol.PriorityLevelConfigurationSpec) {
+	buf.WriteString(fmt.Sprintf("flowcontrolv1beta1.PriorityLevelConfigurationSpec{Type: %#v", plSpec.Type))
 	if plSpec.Limited != nil {
-		buf.WriteString(fmt.Sprintf(", Limited: &v1alpha1.LimitedPriorityLevelConfiguration{AssuredConcurrencyShares:%d, LimitResponse:v1alpha1.LimitResponse{Type:%#v", plSpec.Limited.AssuredConcurrencyShares, plSpec.Limited.LimitResponse.Type))
+		buf.WriteString(fmt.Sprintf(", Limited: &flowcontrol.LimitedPriorityLevelConfiguration{AssuredConcurrencyShares:%d, LimitResponse:flowcontrol.LimitResponse{Type:%#v", plSpec.Limited.AssuredConcurrencyShares, plSpec.Limited.LimitResponse.Type))
 		if plSpec.Limited.LimitResponse.Queuing != nil {
 			buf.WriteString(fmt.Sprintf(", Queuing:&%#+v", *plSpec.Limited.LimitResponse.Queuing))
 		}
@@ -123,12 +123,12 @@ func BufferPriorityLevelConfigurationSpec(buf *bytes.Buffer, plSpec *fcv1a1.Prio
 }
 
 // FmtFlowSchema produces a golang source expression of the value.
-func FmtFlowSchema(fs *fcv1a1.FlowSchema) string {
+func FmtFlowSchema(fs *flowcontrol.FlowSchema) string {
 	if fs == nil {
 		return "nil"
 	}
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("&v1alpha1.FlowSchema{ObjectMeta: %#+v, Spec: ",
+	buf.WriteString(fmt.Sprintf("&flowcontrolv1beta1.FlowSchema{ObjectMeta: %#+v, Spec: ",
 		fs.ObjectMeta))
 	BufferFlowSchemaSpec(&buf, &fs.Spec)
 	buf.WriteString(fmt.Sprintf(", Status: %#+v}", fs.Status))
@@ -137,7 +137,7 @@ func FmtFlowSchema(fs *fcv1a1.FlowSchema) string {
 
 // FmtFlowSchemaSpec produces a golang source expression equivalent to
 // the given spec
-func FmtFlowSchemaSpec(fsSpec *fcv1a1.FlowSchemaSpec) string {
+func FmtFlowSchemaSpec(fsSpec *flowcontrol.FlowSchemaSpec) string {
 	var buf bytes.Buffer
 	BufferFlowSchemaSpec(&buf, fsSpec)
 	return buf.String()
@@ -145,8 +145,8 @@ func FmtFlowSchemaSpec(fsSpec *fcv1a1.FlowSchemaSpec) string {
 
 // BufferFlowSchemaSpec writes a golang source expression for the
 // given value to the given buffer
-func BufferFlowSchemaSpec(buf *bytes.Buffer, fsSpec *fcv1a1.FlowSchemaSpec) {
-	buf.WriteString(fmt.Sprintf("v1alpha1.FlowSchemaSpec{PriorityLevelConfiguration: %#+v, MatchingPrecedence: %d, DistinguisherMethod: ",
+func BufferFlowSchemaSpec(buf *bytes.Buffer, fsSpec *flowcontrol.FlowSchemaSpec) {
+	buf.WriteString(fmt.Sprintf("flowcontrolv1beta1.FlowSchemaSpec{PriorityLevelConfiguration: %#+v, MatchingPrecedence: %d, DistinguisherMethod: ",
 		fsSpec.PriorityLevelConfiguration,
 		fsSpec.MatchingPrecedence))
 	if fsSpec.DistinguisherMethod == nil {
@@ -154,7 +154,7 @@ func BufferFlowSchemaSpec(buf *bytes.Buffer, fsSpec *fcv1a1.FlowSchemaSpec) {
 	} else {
 		buf.WriteString(fmt.Sprintf("&%#+v", *fsSpec.DistinguisherMethod))
 	}
-	buf.WriteString(", Rules: []v1alpha1.PolicyRulesWithSubjects{")
+	buf.WriteString(", Rules: []flowcontrol.PolicyRulesWithSubjects{")
 	for idx, rule := range fsSpec.Rules {
 		if idx > 0 {
 			buf.WriteString(", ")
@@ -165,14 +165,14 @@ func BufferFlowSchemaSpec(buf *bytes.Buffer, fsSpec *fcv1a1.FlowSchemaSpec) {
 }
 
 // FmtPolicyRulesWithSubjects produces a golang source expression of the value.
-func FmtPolicyRulesWithSubjects(rule fcv1a1.PolicyRulesWithSubjects) string {
-	return "v1alpha1.PolicyRulesWithSubjects" + FmtPolicyRulesWithSubjectsSlim(rule)
+func FmtPolicyRulesWithSubjects(rule flowcontrol.PolicyRulesWithSubjects) string {
+	return "flowcontrolv1beta1.PolicyRulesWithSubjects" + FmtPolicyRulesWithSubjectsSlim(rule)
 }
 
 // FmtPolicyRulesWithSubjectsSlim produces a golang source expression
 // of the value but without the leading type name.  See above for an
 // example context where this is useful.
-func FmtPolicyRulesWithSubjectsSlim(rule fcv1a1.PolicyRulesWithSubjects) string {
+func FmtPolicyRulesWithSubjectsSlim(rule flowcontrol.PolicyRulesWithSubjects) string {
 	var buf bytes.Buffer
 	BufferFmtPolicyRulesWithSubjectsSlim(&buf, rule)
 	return buf.String()
@@ -181,8 +181,8 @@ func FmtPolicyRulesWithSubjectsSlim(rule fcv1a1.PolicyRulesWithSubjects) string 
 // BufferFmtPolicyRulesWithSubjectsSlim writes a golang source
 // expression for the given value to the given buffer but excludes the
 // leading type name
-func BufferFmtPolicyRulesWithSubjectsSlim(buf *bytes.Buffer, rule fcv1a1.PolicyRulesWithSubjects) {
-	buf.WriteString("{Subjects: []v1alpha1.Subject{")
+func BufferFmtPolicyRulesWithSubjectsSlim(buf *bytes.Buffer, rule flowcontrol.PolicyRulesWithSubjects) {
+	buf.WriteString("{Subjects: []flowcontrolv1beta1.Subject{")
 	for jdx, subj := range rule.Subjects {
 		if jdx > 0 {
 			buf.WriteString(", ")

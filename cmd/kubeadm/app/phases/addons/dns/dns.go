@@ -135,18 +135,20 @@ func kubeDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 
 	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(KubeDNSDeployment,
 		struct {
-			DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, ControlPlaneTaintKey string
-			Replicas                                                                                                             *int32
+			DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, OldControlPlaneTaintKey, ControlPlaneTaintKey string
+			Replicas                                                                                                                                      *int32
 		}{
-			DeploymentName:       kubeadmconstants.KubeDNSDeploymentName,
-			KubeDNSImage:         images.GetDNSImage(cfg, kubeadmconstants.KubeDNSKubeDNSImageName),
-			DNSMasqImage:         images.GetDNSImage(cfg, kubeadmconstants.KubeDNSDnsMasqNannyImageName),
-			SidecarImage:         images.GetDNSImage(cfg, kubeadmconstants.KubeDNSSidecarImageName),
-			DNSBindAddr:          dnsBindAddr,
-			DNSProbeAddr:         dnsProbeAddr,
-			DNSDomain:            cfg.Networking.DNSDomain,
-			ControlPlaneTaintKey: kubeadmconstants.LabelNodeRoleMaster,
-			Replicas:             replicas,
+			DeploymentName: kubeadmconstants.KubeDNSDeploymentName,
+			KubeDNSImage:   images.GetDNSImage(cfg, kubeadmconstants.KubeDNSKubeDNSImageName),
+			DNSMasqImage:   images.GetDNSImage(cfg, kubeadmconstants.KubeDNSDnsMasqNannyImageName),
+			SidecarImage:   images.GetDNSImage(cfg, kubeadmconstants.KubeDNSSidecarImageName),
+			DNSBindAddr:    dnsBindAddr,
+			DNSProbeAddr:   dnsProbeAddr,
+			DNSDomain:      cfg.Networking.DNSDomain,
+			// TODO: https://github.com/kubernetes/kubeadm/issues/2200
+			OldControlPlaneTaintKey: kubeadmconstants.LabelNodeRoleOldControlPlane,
+			ControlPlaneTaintKey:    kubeadmconstants.LabelNodeRoleControlPlane,
+			Replicas:                replicas,
 		})
 	if err != nil {
 		return errors.Wrap(err, "error when parsing kube-dns deployment template")
@@ -196,13 +198,15 @@ func createKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.I
 func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, replicas *int32) error {
 	// Get the YAML manifest
 	coreDNSDeploymentBytes, err := kubeadmutil.ParseTemplate(CoreDNSDeployment, struct {
-		DeploymentName, Image, ControlPlaneTaintKey string
-		Replicas                                    *int32
+		DeploymentName, Image, OldControlPlaneTaintKey, ControlPlaneTaintKey string
+		Replicas                                                             *int32
 	}{
-		DeploymentName:       kubeadmconstants.CoreDNSDeploymentName,
-		Image:                images.GetDNSImage(cfg, kubeadmconstants.CoreDNSImageName),
-		ControlPlaneTaintKey: kubeadmconstants.LabelNodeRoleMaster,
-		Replicas:             replicas,
+		DeploymentName: kubeadmconstants.CoreDNSDeploymentName,
+		Image:          images.GetDNSImage(cfg, kubeadmconstants.CoreDNSImageName),
+		// TODO: https://github.com/kubernetes/kubeadm/issues/2200
+		OldControlPlaneTaintKey: kubeadmconstants.LabelNodeRoleOldControlPlane,
+		ControlPlaneTaintKey:    kubeadmconstants.LabelNodeRoleControlPlane,
+		Replicas:                replicas,
 	})
 	if err != nil {
 		return errors.Wrap(err, "error when parsing CoreDNS deployment template")

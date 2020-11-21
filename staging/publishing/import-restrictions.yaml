@@ -210,6 +210,7 @@
   - k8s.io/apimachinery
   - k8s.io/klog
   - k8s.io/component-base
+  - k8s.io/kubelet
 
 - baseImportPath: "./vendor/k8s.io/cluster-bootstrap/"
   allowedImports:

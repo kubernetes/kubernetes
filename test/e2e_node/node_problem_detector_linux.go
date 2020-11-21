@@ -28,7 +28,6 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -77,9 +76,10 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 			condition = v1.NodeConditionType("TestCondition")
 
 			// File paths used in the test.
-			logFile      = "/log/test.log"
-			configFile   = "/config/testconfig.json"
-			etcLocaltime = "/etc/localtime"
+			logFile        = "/log/test.log"
+			configFile     = "/config/testconfig.json"
+			kubeConfigFile = "/config/kubeconfig"
+			etcLocaltime   = "/etc/localtime"
 
 			// Volumes used in the test.
 			configVolume    = "config"
@@ -154,6 +154,28 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				]
 			}`
 
+			// This token is known to apiserver and its group is `system:masters`.
+			// See also the function `generateTokenFile` in `test/e2e_node/services/apiserver.go`.
+			kubeConfig := fmt.Sprintf(`
+apiVersion: v1
+kind: Config
+users:
+- name: node-problem-detector
+  user:
+    token: %s
+clusters:
+- cluster:
+    server: %s
+    insecure-skip-tls-verify: true
+  name: local
+contexts:
+- context:
+    cluster: local
+    user: node-problem-detector
+  name: local-context
+current-context: local-context
+`, framework.TestContext.BearerToken, framework.TestContext.Host)
+
 			ginkgo.By("Generate event list options")
 			selector := fields.Set{
 				"involvedObject.kind":      "Node",
@@ -166,35 +188,9 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 			ginkgo.By("Create config map for the node problem detector")
 			_, err = c.CoreV1().ConfigMaps(ns).Create(context.TODO(), &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: configName},
-				Data:       map[string]string{path.Base(configFile): config},
-			}, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-
-			ginkgo.By("Create the service account for node problem detector")
-			_, err = f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(context.TODO(), &v1.ServiceAccount{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      name,
-					Namespace: ns,
-				},
-			}, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-
-			ginkgo.By("Bind the cluster role system:node-problem-detector with the service account for node problem detector")
-			_, err = f.ClientSet.RbacV1().ClusterRoleBindings().Create(context.TODO(), &rbacv1.ClusterRoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: name,
-				},
-				RoleRef: rbacv1.RoleRef{
-					APIGroup: rbacv1.GroupName,
-					Kind:     "ClusterRole",
-					Name:     "system:node-problem-detector",
-				},
-				Subjects: []rbacv1.Subject{
-					{
-						Kind:      rbacv1.ServiceAccountKind,
-						Name:      name,
-						Namespace: ns,
-					},
+				Data: map[string]string{
+					path.Base(configFile):     config,
+					path.Base(kubeConfigFile): kubeConfig,
 				},
 			}, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
@@ -264,7 +260,9 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 							Args: []string{
 								"--logtostderr",
 								fmt.Sprintf("--system-log-monitors=%s", configFile),
-								fmt.Sprintf(" --apiserver-override=%s?inClusterConfig=true", framework.TestContext.Host),
+								// `ServiceAccount` admission controller is disabled in node e2e tests, so we could not use
+								// inClusterConfig here.
+								fmt.Sprintf("--apiserver-override=%s?inClusterConfig=false&auth=%s", framework.TestContext.Host, kubeConfigFile),
 							},
 							Env: []v1.EnvVar{
 								{
@@ -436,10 +434,6 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 			gomega.Expect(e2epod.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(gomega.Succeed())
 			ginkgo.By("Delete the config map")
 			c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), configName, metav1.DeleteOptions{})
-			ginkgo.By("Delete the service account")
-			c.CoreV1().ServiceAccounts(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
-			ginkgo.By("Delete the clusterRoleBinding")
-			c.RbacV1().ClusterRoleBindings().Delete(context.TODO(), name, metav1.DeleteOptions{})
 			ginkgo.By("Clean up the events")
 			gomega.Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(context.TODO(), *metav1.NewDeleteOptions(0), eventListOptions)).To(gomega.Succeed())
 			ginkgo.By("Clean up the node condition")

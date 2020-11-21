@@ -63,7 +63,7 @@ run_template_output_tests() {
   kube::test::if_has_string "${output_message}" 'redis-slave:'
 
   # check that convert command supports --template output
-  output_message=$(kubectl "${kube_flags[@]:?}" convert -f hack/testdata/deployment-revision1.yaml --output-version=apps/v1beta1 --template="{{ .metadata.name }}:")
+  output_message=$(kubectl convert "${kube_flags[@]:?}" -f hack/testdata/deployment-revision1.yaml --output-version=apps/v1beta1 --template="{{ .metadata.name }}:")
   kube::test::if_has_string "${output_message}" 'nginx:'
 
   # check that run command supports --template output

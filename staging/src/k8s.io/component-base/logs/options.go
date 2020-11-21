@@ -90,7 +90,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 
 	// No new log formats should be added after generation is of flag options
 	logRegistry.Freeze()
-	fs.BoolVar(&o.LogSanitization, "experimental-logging-sanitization", false, `[Experimental] When enabled prevents logging of fields that tagged as sensitive (passwords, keys, tokens).
+	fs.BoolVar(&o.LogSanitization, "experimental-logging-sanitization", o.LogSanitization, `[Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
 Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
 }
 

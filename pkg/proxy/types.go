@@ -73,8 +73,8 @@ type ServicePort interface {
 	StickyMaxAgeSeconds() int
 	// ExternalIPStrings returns service ExternalIPs as a string array.
 	ExternalIPStrings() []string
-	// LoadBalancerIngress returns service an array of LoadBalancerIngress.
-	LoadBalancerIngress() []v1.LoadBalancerIngress
+	// LoadBalancerIPStrings returns service LoadBalancerIPs as a string array.
+	LoadBalancerIPStrings() []string
 	// GetProtocol returns service protocol.
 	Protocol() v1.Protocol
 	// LoadBalancerSourceRanges returns service LoadBalancerSourceRanges if present empty array if not
