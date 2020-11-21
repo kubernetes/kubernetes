@@ -16,7 +16,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/volume/flocker",
     deps = [
-        "//pkg/util/env:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -28,6 +27,7 @@ go_library(
         "//staging/src/k8s.io/mount-utils:go_default_library",
         "//vendor/github.com/clusterhq/flocker-go:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
+        "//vendor/k8s.io/utils/env:go_default_library",
         "//vendor/k8s.io/utils/strings:go_default_library",
     ],
 )

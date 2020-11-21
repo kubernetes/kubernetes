@@ -44,7 +44,6 @@ go_library(
         "//pkg/generated/openapi:go_default_library",
         "//pkg/kubeapiserver:go_default_library",
         "//pkg/kubelet/client:go_default_library",
-        "//pkg/util/env:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -80,6 +79,7 @@ go_library(
         "//vendor/google.golang.org/grpc/grpclog:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
+        "//vendor/k8s.io/utils/env:go_default_library",
     ],
 )
 
