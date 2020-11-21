@@ -1488,37 +1488,37 @@ function assemble-docker-flags {
 {
 EOF
   
-addockeropt '"pidfile": "/var/run/docker.pid",
-  "iptables": false,
-  "ip-masq": false,'
+addockeropt "\"pidfile\": \"/var/run/docker.pid\",
+  \"iptables\": false,
+  \"ip-masq\": false,"
   
   if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
-    addockeropt '"log-level": "debug",'
+    addockeropt "\"log-level\"": "\"debug\","
   else
-    addockeropt '"log-level": "warn",'
+    addockeropt "\"log-level\": \"warn\","
   fi
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" || "${NETWORK_PROVIDER:-}" == "cni" ]]; then
     # set docker0 cidr to private ip address range to avoid conflict with cbr0 cidr range
-    addockeropt '"bip": "169.254.123.1/24",'
+    addockeropt "\"bip\": \"169.254.123.1/24\","
   else
-   addockeropt '"bridge": "cbr0",'
+   addockeropt "\"bridge\": \"cbr0\","
   fi
   # Decide whether to enable a docker registry mirror. This is taken from
   # the "kube-env" metadata value.
   if [[ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]]; then
     echo "Enable docker registry mirror at: ${DOCKER_REGISTRY_MIRROR_URL}"
-    addockeropt '"registry-mirrors": ["'${DOCKER_REGISTRY_MIRROR_URL}'"],'
+    addockeropt "\"registry-mirrors\": [\"${DOCKER_REGISTRY_MIRROR_URL}\"],"
   fi
     # Disable live-restore if the environment variable is set.
   if [[ "${DISABLE_DOCKER_LIVE_RESTORE:-false}" == "true" ]]; then
-    addockeropt '"live-restore": "false",'
+    addockeropt "\"live-restore\": \"false\","
   fi
   # Configure docker logging
-  addockeropt '"log-driver": "'${DOCKER_LOG_DRIVER:-json-file}'",'
-  addockeropt '"log-opts": {
-      "max-size": "'${DOCKER_LOG_MAX_SIZE:-10m}'",
-      "max-file": "'${DOCKER_LOG_MAX_FILE:-5}'"
-    }'
+  addockeropt "\"log-driver\": \"${DOCKER_LOG_DRIVER:-json-file}\","
+  addockeropt "\"log-opts\": {
+      \"max-size\": \"${DOCKER_LOG_MAX_SIZE:-10m}\",
+      \"max-file\": \"${DOCKER_LOG_MAX_FILE:-5}\"
+    }"
   cat <<EOF >>/etc/docker/daemon.json
 }
 EOF
