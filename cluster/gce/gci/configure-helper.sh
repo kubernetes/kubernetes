@@ -1467,7 +1467,7 @@ function addockeropt {
 	echo "No arguments are passed while adding docker options. Expect one argument"
 	exit 1
 	elif [ "$#" -gt 1 ]; then
-	echo "Only one argument is accepeted"
+	echo "Only one argument is accepted"
 	exit 1
 	fi
 	# appends the given input to the docker opts file i.e. /etc/docker/daemon.json file
@@ -1519,6 +1519,9 @@ addockeropt '"pidfile": "/var/run/docker.pid",
       "max-size": "'${DOCKER_LOG_MAX_SIZE:-10m}'",
       "max-file": "'${DOCKER_LOG_MAX_FILE:-5}'"
     }'
+  cat <<EOF >>/etc/docker/daemon.json
+}
+EOF
   echo "DOCKER_OPTS=\"${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
 
   # Ensure TasksMax is sufficient for docker.
