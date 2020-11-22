@@ -26,8 +26,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	appsv1 "k8s.io/api/apps/v1"
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -235,33 +233,6 @@ func TestSetImageRemote(t *testing.T) {
 			args:         []string{"replicaset", "nginx", "*=thingy"},
 		},
 		{
-			name: "set image appsv1beta2 ReplicaSet",
-			object: &appsv1beta2.ReplicaSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
-				Spec: appsv1beta2.ReplicaSetSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "nginx",
-									Image: "nginx",
-								},
-							},
-							InitContainers: []corev1.Container{
-								{
-									Name:  "busybox",
-									Image: "busybox",
-								},
-							},
-						},
-					},
-				},
-			},
-			groupVersion: appsv1beta2.SchemeGroupVersion,
-			path:         "/namespaces/test/replicasets/nginx",
-			args:         []string{"replicaset", "nginx", "*=thingy"},
-		},
-		{
 			name: "set image appsv1 ReplicaSet",
 			object: &appsv1.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
@@ -312,33 +283,6 @@ func TestSetImageRemote(t *testing.T) {
 				},
 			},
 			groupVersion: extensionsv1beta1.SchemeGroupVersion,
-			path:         "/namespaces/test/daemonsets/nginx",
-			args:         []string{"daemonset", "nginx", "*=thingy"},
-		},
-		{
-			name: "set image appsv1beta2 DaemonSet",
-			object: &appsv1beta2.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
-				Spec: appsv1beta2.DaemonSetSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "nginx",
-									Image: "nginx",
-								},
-							},
-							InitContainers: []corev1.Container{
-								{
-									Name:  "busybox",
-									Image: "busybox",
-								},
-							},
-						},
-					},
-				},
-			},
-			groupVersion: appsv1beta2.SchemeGroupVersion,
 			path:         "/namespaces/test/daemonsets/nginx",
 			args:         []string{"daemonset", "nginx", "*=thingy"},
 		},
@@ -397,60 +341,6 @@ func TestSetImageRemote(t *testing.T) {
 			args:         []string{"deployment", "nginx", "*=thingy"},
 		},
 		{
-			name: "set image appsv1beta1 Deployment",
-			object: &appsv1beta1.Deployment{
-				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
-				Spec: appsv1beta1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "nginx",
-									Image: "nginx",
-								},
-							},
-							InitContainers: []corev1.Container{
-								{
-									Name:  "busybox",
-									Image: "busybox",
-								},
-							},
-						},
-					},
-				},
-			},
-			groupVersion: appsv1beta1.SchemeGroupVersion,
-			path:         "/namespaces/test/deployments/nginx",
-			args:         []string{"deployment", "nginx", "*=thingy"},
-		},
-		{
-			name: "set image appsv1beta2 Deployment",
-			object: &appsv1beta2.Deployment{
-				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
-				Spec: appsv1beta2.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "nginx",
-									Image: "nginx",
-								},
-							},
-							InitContainers: []corev1.Container{
-								{
-									Name:  "busybox",
-									Image: "busybox",
-								},
-							},
-						},
-					},
-				},
-			},
-			groupVersion: appsv1beta2.SchemeGroupVersion,
-			path:         "/namespaces/test/deployments/nginx",
-			args:         []string{"deployment", "nginx", "*=thingy"},
-		},
-		{
 			name: "set image appsv1 Deployment",
 			object: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
@@ -476,60 +366,6 @@ func TestSetImageRemote(t *testing.T) {
 			groupVersion: appsv1.SchemeGroupVersion,
 			path:         "/namespaces/test/deployments/nginx",
 			args:         []string{"deployment", "nginx", "*=thingy"},
-		},
-		{
-			name: "set image appsv1beta1 StatefulSet",
-			object: &appsv1beta1.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
-				Spec: appsv1beta1.StatefulSetSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "nginx",
-									Image: "nginx",
-								},
-							},
-							InitContainers: []corev1.Container{
-								{
-									Name:  "busybox",
-									Image: "busybox",
-								},
-							},
-						},
-					},
-				},
-			},
-			groupVersion: appsv1beta1.SchemeGroupVersion,
-			path:         "/namespaces/test/statefulsets/nginx",
-			args:         []string{"statefulset", "nginx", "*=thingy"},
-		},
-		{
-			name: "set image appsv1beta2 StatefulSet",
-			object: &appsv1beta2.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
-				Spec: appsv1beta2.StatefulSetSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "nginx",
-									Image: "nginx",
-								},
-							},
-							InitContainers: []corev1.Container{
-								{
-									Name:  "busybox",
-									Image: "busybox",
-								},
-							},
-						},
-					},
-				},
-			},
-			groupVersion: appsv1beta2.SchemeGroupVersion,
-			path:         "/namespaces/test/statefulsets/nginx",
-			args:         []string{"statefulset", "nginx", "*=thingy"},
 		},
 		{
 			name: "set image appsv1 StatefulSet",
@@ -694,33 +530,6 @@ func TestSetImageRemoteWithSpecificContainers(t *testing.T) {
 				},
 			},
 			groupVersion: extensionsv1beta1.SchemeGroupVersion,
-			path:         "/namespaces/test/replicasets/nginx",
-			args:         []string{"replicaset", "nginx", "nginx=thingy"},
-		},
-		{
-			name: "set initContainer image only",
-			object: &appsv1beta2.ReplicaSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
-				Spec: appsv1beta2.ReplicaSetSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "busybox",
-									Image: "busybox",
-								},
-							},
-							InitContainers: []corev1.Container{
-								{
-									Name:  "nginx",
-									Image: "nginx",
-								},
-							},
-						},
-					},
-				},
-			},
-			groupVersion: appsv1beta2.SchemeGroupVersion,
 			path:         "/namespaces/test/replicasets/nginx",
 			args:         []string{"replicaset", "nginx", "nginx=thingy"},
 		},

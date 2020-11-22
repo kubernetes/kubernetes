@@ -29,8 +29,6 @@ import (
 	"k8s.io/client-go/discovery"
 	scalescheme "k8s.io/client-go/scale/scheme"
 	scaleappsint "k8s.io/client-go/scale/scheme/appsint"
-	scaleappsv1beta1 "k8s.io/client-go/scale/scheme/appsv1beta1"
-	scaleappsv1beta2 "k8s.io/client-go/scale/scheme/appsv1beta2"
 	scaleautoscaling "k8s.io/client-go/scale/scheme/autoscalingv1"
 	scaleextint "k8s.io/client-go/scale/scheme/extensionsint"
 	scaleext "k8s.io/client-go/scale/scheme/extensionsv1beta1"
@@ -149,8 +147,6 @@ func NewScaleConverter() *ScaleConverter {
 	utilruntime.Must(scaleext.AddToScheme(scheme))
 	utilruntime.Must(scaleextint.AddToScheme(scheme))
 	utilruntime.Must(scaleappsint.AddToScheme(scheme))
-	utilruntime.Must(scaleappsv1beta1.AddToScheme(scheme))
-	utilruntime.Must(scaleappsv1beta2.AddToScheme(scheme))
 
 	return &ScaleConverter{
 		scheme: scheme,
@@ -159,8 +155,6 @@ func NewScaleConverter() *ScaleConverter {
 			scalescheme.SchemeGroupVersion,
 			schema.GroupKind{Group: scaleext.GroupName, Kind: "Scale"},
 			schema.GroupKind{Group: scaleautoscaling.GroupName, Kind: "Scale"},
-			schema.GroupKind{Group: scaleappsv1beta1.GroupName, Kind: "Scale"},
-			schema.GroupKind{Group: scaleappsv1beta2.GroupName, Kind: "Scale"},
 		),
 	}
 }
@@ -181,8 +175,6 @@ func (c *ScaleConverter) ScaleVersions() []schema.GroupVersion {
 		scaleext.SchemeGroupVersion,
 		scaleextint.SchemeGroupVersion,
 		scaleappsint.SchemeGroupVersion,
-		scaleappsv1beta1.SchemeGroupVersion,
-		scaleappsv1beta2.SchemeGroupVersion,
 	}
 }
 

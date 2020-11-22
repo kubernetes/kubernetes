@@ -36,8 +36,6 @@ import (
 	fakerest "k8s.io/client-go/rest/fake"
 
 	"github.com/stretchr/testify/assert"
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
 	extv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -71,20 +69,6 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 			APIResources: []metav1.APIResource{
 				{Name: "replicasets", Namespaced: true, Kind: "ReplicaSet"},
 				{Name: "replicasets/scale", Namespaced: true, Kind: "Scale"},
-			},
-		},
-		{
-			GroupVersion: appsv1beta2.SchemeGroupVersion.String(),
-			APIResources: []metav1.APIResource{
-				{Name: "deployments", Namespaced: true, Kind: "Deployment"},
-				{Name: "deployments/scale", Namespaced: true, Kind: "Scale", Group: "apps", Version: "v1beta2"},
-			},
-		},
-		{
-			GroupVersion: appsv1beta1.SchemeGroupVersion.String(),
-			APIResources: []metav1.APIResource{
-				{Name: "statefulsets", Namespaced: true, Kind: "StatefulSet"},
-				{Name: "statefulsets/scale", Namespaced: true, Kind: "Scale", Group: "apps", Version: "v1beta1"},
 			},
 		},
 		// test a resource that doesn't exist anywere to make sure we're not accidentally depending
@@ -132,40 +116,10 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 			TargetSelector: "foo=bar",
 		},
 	}
-	appsV1beta2Scale := &appsv1beta2.Scale{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Scale",
-			APIVersion: appsv1beta2.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-		},
-		Spec: appsv1beta2.ScaleSpec{Replicas: 10},
-		Status: appsv1beta2.ScaleStatus{
-			Replicas:       10,
-			TargetSelector: "foo=bar",
-		},
-	}
-	appsV1beta1Scale := &appsv1beta1.Scale{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Scale",
-			APIVersion: appsv1beta1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
-		},
-		Spec: appsv1beta1.ScaleSpec{Replicas: 10},
-		Status: appsv1beta1.ScaleStatus{
-			Replicas:       10,
-			TargetSelector: "foo=bar",
-		},
-	}
 
 	resourcePaths := map[string]runtime.Object{
 		"/api/v1/namespaces/default/replicationcontrollers/foo/scale":                  autoscalingScale,
 		"/apis/extensions/v1beta1/namespaces/default/replicasets/foo/scale":            extScale,
-		"/apis/apps/v1beta1/namespaces/default/statefulsets/foo/scale":                 appsV1beta1Scale,
-		"/apis/apps/v1beta2/namespaces/default/deployments/foo/scale":                  appsV1beta2Scale,
 		"/apis/cheese.testing.k8s.io/v27alpha15/namespaces/default/cheddars/foo/scale": extScale,
 	}
 
@@ -249,7 +203,6 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 	groupResources := []schema.GroupResource{
 		{Group: corev1.GroupName, Resource: "replicationcontrollers"},
 		{Group: extv1beta1.GroupName, Resource: "replicasets"},
-		{Group: appsv1beta2.GroupName, Resource: "deployments"},
 		{Group: "cheese.testing.k8s.io", Resource: "cheddars"},
 	}
 
@@ -335,8 +288,6 @@ func TestPatchScale(t *testing.T) {
 			gvrs = append(gvrs, gr.WithVersion(corev1.SchemeGroupVersion.Version))
 		case extv1beta1.GroupName:
 			gvrs = append(gvrs, gr.WithVersion(extv1beta1.SchemeGroupVersion.Version))
-		case appsv1beta2.GroupName:
-			gvrs = append(gvrs, gr.WithVersion(appsv1beta2.SchemeGroupVersion.Version))
 		default:
 			// Group cheese.testing.k8s.io
 			gvrs = append(gvrs, gr.WithVersion("v27alpha15"))
