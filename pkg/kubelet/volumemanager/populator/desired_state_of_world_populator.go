@@ -332,6 +332,20 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 			continue
 		}
 
+		// If we delete the pod and the configmap used by the pod when kubelet is stoped, after kubelet started, the configmap volume will mount failed forever.
+		// so we should not add the configmap volume to desiredStateOfWorld when pod's DeletionTimestamp is not empty.
+		if pod.DeletionTimestamp != nil && podVolume.VolumeSource.ConfigMap != nil {
+			klog.V(4).Infof("Skipping ConfigMap volume %q for Terminating pod %q", podVolume.Name, format.Pod(pod))
+			continue
+		}
+
+		// If we delete the pod and the secret used by the pod when kubelet is stoped, after kubelet started, the secret volume will mount failed forever.
+		// so we should not add the secret volume to desiredStateOfWorld when pod's DeletionTimestamp is not empty.
+		if pod.DeletionTimestamp != nil && podVolume.VolumeSource.Secret != nil {
+			klog.V(4).Infof("Skipping Secret volume %q for Terminating pod %q", podVolume.Name, format.Pod(pod))
+			continue
+		}
+
 		pvc, volumeSpec, volumeGidValue, err :=
 			dswp.createVolumeSpec(podVolume, pod, mounts, devices)
 		if err != nil {

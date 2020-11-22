@@ -153,6 +153,112 @@ func TestFindAndAddNewPods_WithVolumeRetrievalError(t *testing.T) {
 	}
 }
 
+func TestFindAndAddNewPods_AddTerminatingPodWithConfigMapVolume(t *testing.T) {
+	dswp, fakePodManager := prepareDswpWithVolume(t)
+	now := metav1.Now()
+
+	// create terminating pod with configmap volume
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "dswp-test-pod",
+			UID:               "dswp-test-pod-uid",
+			Namespace:         "dswp-test",
+			DeletionTimestamp: &now,
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "dswp-test-volume-name",
+					VolumeSource: v1.VolumeSource{
+						ConfigMap: &v1.ConfigMapVolumeSource{
+							LocalObjectReference: v1.LocalObjectReference{Name: "dswp-test-configmap-name"},
+						},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name: "dswp-test-container-name",
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "dswp-test-volume-name",
+							MountPath: "/mnt",
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodPhase("Running"),
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "dswp-test-container-name",
+				},
+			},
+		},
+	}
+
+	fakePodManager.AddPod(pod)
+	dswp.findAndAddNewPods()
+	volumeToMounts := dswp.desiredStateOfWorld.GetVolumesToMount()
+	if len(volumeToMounts) > 0 {
+		t.Fatalf("Unexpected volumes: %v's configmap volume should not been added to desiredStateOfWorld when the pod's status is Terminating", pod.Name)
+	}
+}
+
+func TestFindAndAddNewPods_AddTerminatingWithSecretVolume(t *testing.T) {
+	dswp, fakePodManager := prepareDswpWithVolume(t)
+	now := metav1.Now()
+
+	// create terminating pod with secret volume
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "dswp-test-pod",
+			UID:               "dswp-test-pod-uid",
+			Namespace:         "dswp-test",
+			DeletionTimestamp: &now,
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "dswp-test-volume-name",
+					VolumeSource: v1.VolumeSource{
+						Secret: &v1.SecretVolumeSource{
+							SecretName: "dswp-test-secret-name",
+						},
+					},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name: "dswp-test-container-name",
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "dswp-test-volume-name",
+							MountPath: "/mnt",
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodPhase("Running"),
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "dswp-test-container-name",
+				},
+			},
+		},
+	}
+
+	fakePodManager.AddPod(pod)
+	dswp.findAndAddNewPods()
+	volumeToMounts := dswp.desiredStateOfWorld.GetVolumesToMount()
+	if len(volumeToMounts) > 0 {
+		t.Fatalf("Unexpected volumes: %v's secret volume should not been added to desiredStateOfWorld when the pod's status is Terminating", pod.Name)
+	}
+}
+
 func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 	// create dswp
 	mode := v1.PersistentVolumeFilesystem
