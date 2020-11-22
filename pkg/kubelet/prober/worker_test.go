@@ -166,9 +166,9 @@ func TestNextProbeTime(t *testing.T) {
 			FailedPeriodSeconds: 1,
 		}
 		w := newTestWorker(m, probeType, p)
-		require.Equal(t, secondsToDuration(p.PeriodSeconds), w.nextProbeTime())
+		require.Equal(t, secondsToDuration(p.PeriodSeconds), w.nextProbeInterval())
 		w.resultsManager.Set(w.containerID, results.Failure, w.pod)
-		require.Equal(t, secondsToDuration(p.FailedPeriodSeconds), w.nextProbeTime())
+		require.Equal(t, secondsToDuration(p.FailedPeriodSeconds), w.nextProbeInterval())
 	}
 }
 
