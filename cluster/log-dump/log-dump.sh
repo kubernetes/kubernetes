@@ -317,11 +317,13 @@ function save-windows-logs-via-ssh() {
       # Retry up to 3 times to allow ssh keys to be properly propagated and
       # stored.
       for retry in {1..3}; do
+        echo "copy log file ${remote_file} from ${node}"
         if gcloud compute scp --recurse --project "${PROJECT}" \
           --zone "${ZONE}" "${node}:${remote_file}" "${dest_dir}" \
-          > /dev/null; then
+          ; then
           break
         else
+          echo "failed to copy log file ${remote_file} from ${node}"
           sleep 10
         fi
       done
