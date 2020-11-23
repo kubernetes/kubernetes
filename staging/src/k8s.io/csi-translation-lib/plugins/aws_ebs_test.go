@@ -17,10 +17,18 @@ limitations under the License.
 package plugins
 
 import (
+	v1 "k8s.io/api/core/v1"
 	"reflect"
 	"testing"
 
 	storage "k8s.io/api/storage/v1"
+)
+
+const (
+	normalVolumeID  = "vol-02399794d890f9375"
+	awsVolumeID     = "aws:///vol-02399794d890f9375"
+	awsZoneVolumeID = "aws://us-west-2a/vol-02399794d890f9375"
+	invalidVolumeID = "aws://us-west-2a/02399794d890f9375"
 )
 
 func TestKubernetesVolumeIDToEBSVolumeID(t *testing.T) {
@@ -32,22 +40,22 @@ func TestKubernetesVolumeIDToEBSVolumeID(t *testing.T) {
 	}{
 		{
 			name:         "Normal ID format",
-			kubernetesID: "vol-02399794d890f9375",
-			ebsVolumeID:  "vol-02399794d890f9375",
+			kubernetesID: normalVolumeID,
+			ebsVolumeID:  normalVolumeID,
 		},
 		{
 			name:         "aws:///{volumeId} format",
-			kubernetesID: "aws:///vol-02399794d890f9375",
-			ebsVolumeID:  "vol-02399794d890f9375",
+			kubernetesID: awsVolumeID,
+			ebsVolumeID:  normalVolumeID,
 		},
 		{
 			name:         "aws://{zone}/{volumeId} format",
-			kubernetesID: "aws://us-west-2a/vol-02399794d890f9375",
-			ebsVolumeID:  "vol-02399794d890f9375",
+			kubernetesID: awsZoneVolumeID,
+			ebsVolumeID:  normalVolumeID,
 		},
 		{
 			name:         "fails on invalid volume ID",
-			kubernetesID: "aws://us-west-2a/02399794d890f9375",
+			kubernetesID: invalidVolumeID,
 			expErr:       true,
 		},
 	}
@@ -110,5 +118,83 @@ func TestTranslateEBSInTreeStorageClassToCSI(t *testing.T) {
 			t.Errorf("Got parameters: %v, expected :%v", got, tc.expSc)
 		}
 
+	}
+}
+
+func TestTranslateInTreeInlineVolumeToCSI(t *testing.T) {
+	translator := NewAWSElasticBlockStoreCSITranslator()
+
+	cases := []struct {
+		name         string
+		volumeSource v1.VolumeSource
+		expPVName    string
+		expErr       bool
+	}{
+		{
+			name: "Normal ID format",
+			volumeSource: v1.VolumeSource{
+				AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+					VolumeID: normalVolumeID,
+				},
+			},
+			expPVName: "ebs.csi.aws.com-" + normalVolumeID,
+		},
+		{
+			name: "aws:///{volumeId} format",
+			volumeSource: v1.VolumeSource{
+				AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+					VolumeID: awsVolumeID,
+				},
+			},
+			expPVName: "ebs.csi.aws.com-" + normalVolumeID,
+		},
+		{
+			name: "aws://{zone}/{volumeId} format",
+			volumeSource: v1.VolumeSource{
+				AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+					VolumeID: awsZoneVolumeID,
+				},
+			},
+			expPVName: "ebs.csi.aws.com-" + normalVolumeID,
+		},
+		{
+			name: "fails on invalid volume ID",
+			volumeSource: v1.VolumeSource{
+				AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+					VolumeID: invalidVolumeID,
+				},
+			},
+			expErr: true,
+		},
+		{
+			name:         "fails on empty volume source",
+			volumeSource: v1.VolumeSource{},
+			expErr:       true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Logf("Testing %v", tc.name)
+			got, err := translator.TranslateInTreeInlineVolumeToCSI(&v1.Volume{Name: "volume", VolumeSource: tc.volumeSource})
+			if err != nil && !tc.expErr {
+				t.Fatalf("Did not expect error but got: %v", err)
+			}
+
+			if err == nil && tc.expErr {
+				t.Fatalf("Expected error, but did not get one.")
+			}
+
+			if err == nil {
+				if !reflect.DeepEqual(got.Name, tc.expPVName) {
+					t.Errorf("Got PV name: %v, expected :%v", got.Name, tc.expPVName)
+				}
+
+				if !reflect.DeepEqual(got.Spec.CSI.VolumeHandle, normalVolumeID) {
+					t.Errorf("Got PV volumeHandle: %v, expected :%v", got.Spec.CSI.VolumeHandle, normalVolumeID)
+				}
+			}
+
+		})
 	}
 }
