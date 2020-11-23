@@ -159,7 +159,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 		defer cleanup()
 
 		framework.Logf("creating FlowSchema %q", flowSchemaName)
-		_, cleanup = createFlowSchema(f, flowSchemaName, 1000, priorityLevelName, "*")
+		_, cleanup = createFlowSchema(f, flowSchemaName, 1000, priorityLevelName, "highqps", "lowqps")
 		defer cleanup()
 
 		type client struct {
@@ -265,9 +265,9 @@ func getPriorityLevelConcurrency(f *framework.Framework, priorityLevelName strin
 
 // createFlowSchema creates a flow schema referring to a particular priority
 // level and matching the username provided.
-func createFlowSchema(f *framework.Framework, flowSchemaName string, matchingPrecedence int32, priorityLevelName string, matchingUsername string) (*flowcontrol.FlowSchema, func()) {
+func createFlowSchema(f *framework.Framework, flowSchemaName string, matchingPrecedence int32, priorityLevelName string, matchingUsernames ...string) (*flowcontrol.FlowSchema, func()) {
 	var subjects []flowcontrol.Subject
-	if matchingUsername == "*" {
+	if len(matchingUsernames) == 1 && matchingUsernames[0] == "*" {
 		subjects = append(subjects, flowcontrol.Subject{
 			Kind: flowcontrol.SubjectKindGroup,
 			Group: &flowcontrol.GroupSubject{
@@ -275,12 +275,14 @@ func createFlowSchema(f *framework.Framework, flowSchemaName string, matchingPre
 			},
 		})
 	} else {
-		subjects = append(subjects, flowcontrol.Subject{
-			Kind: flowcontrol.SubjectKindUser,
-			User: &flowcontrol.UserSubject{
-				Name: matchingUsername,
-			},
-		})
+		for _, matchingUsername := range matchingUsernames {
+			subjects = append(subjects, flowcontrol.Subject{
+				Kind: flowcontrol.SubjectKindUser,
+				User: &flowcontrol.UserSubject{
+					Name: matchingUsername,
+				},
+			})
+		}
 	}
 
 	createdFlowSchema, err := f.ClientSet.FlowcontrolV1beta1().FlowSchemas().Create(
