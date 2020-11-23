@@ -269,6 +269,14 @@
     IP address.
   release: v1.9
   file: test/e2e/common/pods.go
+- testname: Pods, completes the lifecycle of a Pod and the PodStatus
+  codename: '[k8s.io] Pods should run through the lifecycle of Pods and PodStatus
+    [Conformance]'
+  description: A Pod is created with a static label which MUST succeed. It MUST succeed
+    when patching the label and the pod data. When checking and replacing the PodStatus
+    it MUST succeed. It MUST succeed when deleting the Pod.
+  release: v1.20
+  file: test/e2e/common/pods.go
 - testname: Pods, remote command execution over websocket
   codename: '[k8s.io] Pods should support remote command execution over websockets
     [NodeConformance] [Conformance]'
