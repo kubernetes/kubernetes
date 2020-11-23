@@ -22,11 +22,11 @@ limitations under the License.
 // Generation is governed by comment tags in the source.  Any package may
 // request Status generation by including a comment in the file-comments of
 // one file, of the form:
-//   // +k8s:prerelease-lifecycle-gen=package
 //
-// // +k8s:prerelease-lifecycle-gen:introduced=1.19
-// // +k8s:prerelease-lifecycle-gen:to-be-deprecated=1.22
-// // +k8s:prerelease-lifecycle-gen:to-be-removed=1.25
+//   // +k8s:prerelease-lifecycle-gen=package
+//   // +k8s:prerelease-lifecycle-gen:introduced=1.19
+//   // +k8s:prerelease-lifecycle-gen:to-be-deprecated=1.22
+//   // +k8s:prerelease-lifecycle-gen:to-be-removed=1.25
 //
 // Note that registration is a whole-package option, and is not available for
 // individual types.
