@@ -186,10 +186,20 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 				Limits:   podRes,
 			},
 		})
+		// Make sure that the lowest priority pod gets deleted
+		var podPreempted bool
+		// Wait till pod gets deleted
+		err := wait.PollImmediate(framework.Poll, framework.PodDeleteTimeout, func() (bool, error) {
+			preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(context.TODO(), pods[0].Name, metav1.GetOptions{})
+			if (err != nil && apierrors.IsNotFound(err)) || (err == nil && preemptedPod.DeletionTimestamp != nil) {
+				podPreempted = true
+				return podPreempted, nil
+			}
+			// Ignore transient errors
+			return false, err
+		})
+		framework.ExpectNoError(err)
 
-		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(context.TODO(), pods[0].Name, metav1.GetOptions{})
-		podPreempted := (err != nil && apierrors.IsNotFound(err)) ||
-			(err == nil && preemptedPod.DeletionTimestamp != nil)
 		for i := 1; i < len(pods); i++ {
 			livePod, err := cs.CoreV1().Pods(pods[i].Namespace).Get(context.TODO(), pods[i].Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -287,9 +297,20 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			framework.ExpectNoError(err)
 		}()
 		// Make sure that the lowest priority pod is deleted.
-		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(context.TODO(), pods[0].Name, metav1.GetOptions{})
-		podPreempted := (err != nil && apierrors.IsNotFound(err)) ||
-			(err == nil && preemptedPod.DeletionTimestamp != nil)
+		var podPreempted bool
+		// Wait till pod gets deleted
+		err := wait.PollImmediate(framework.Poll, framework.PodDeleteTimeout, func() (bool, error) {
+			preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(context.TODO(), pods[0].Name, metav1.GetOptions{})
+			if (err != nil && apierrors.IsNotFound(err)) || (err == nil && preemptedPod.DeletionTimestamp != nil) {
+				podPreempted = true
+				return podPreempted, nil
+			}
+			// Ignore transient errors
+			return false, err
+
+		})
+		framework.ExpectNoError(err)
+
 		for i := 1; i < len(pods); i++ {
 			livePod, err := cs.CoreV1().Pods(pods[i].Namespace).Get(context.TODO(), pods[i].Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
