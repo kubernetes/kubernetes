@@ -31,7 +31,9 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode/utf8"
 
+	"golang.org/x/net/idna"
 	"golang.org/x/net/proxy"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,8 +41,51 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apimachinery/third_party/forked/golang/netutil"
 )
+
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= utf8.RuneSelf {
+			return false
+		}
+	}
+	return true
+}
+
+func idnaASCII(v string) (string, error) {
+	// TODO: Consider removing this check after verifying performance is okay.
+	// Right now punycode verification, length checks, context checks, and the
+	// permissible character tests are all omitted. It also prevents the ToASCII
+	// call from salvaging an invalid IDN, when possible. As a result it may be
+	// possible to have two IDNs that appear identical to the user where the
+	// ASCII-only version causes an error downstream whereas the non-ASCII
+	// version does not.
+	// Note that for correct ASCII IDNs ToASCII will only do considerably more
+	// work, but it will not cause an allocation.
+	if isASCII(v) {
+		return v, nil
+	}
+	return idna.Lookup.ToASCII(v)
+}
+
+var portMap = map[string]string{
+	"http":   "80",
+	"https":  "443",
+	"socks5": "1080",
+}
+
+// canonicalAddr returns url.Host but always with a ":port" suffix
+func canonicalAddr(url *url.URL) string {
+	addr := url.Hostname()
+	if v, err := idnaASCII(addr); err == nil {
+		addr = v
+	}
+	port := url.Port()
+	if port == "" {
+		port = portMap[url.Scheme]
+	}
+	return net.JoinHostPort(addr, port)
+}
 
 // SpdyRoundTripper knows how to upgrade an HTTP request to one that supports
 // multiplexed streams. After RoundTrip() is invoked, Conn will be set
@@ -177,7 +222,7 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 // dialWithHttpProxy dials the host specified by url through an http or an https proxy.
 func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.URL) (net.Conn, error) {
 	// ensure we use a canonical host with proxyReq
-	targetHost := netutil.CanonicalAddr(req.URL)
+	targetHost := canonicalAddr(req.URL)
 
 	// proxying logic adapted from http://blog.h6t.eu/post/74098062923/golang-websocket-with-http-proxy-support
 	proxyReq := http.Request{
@@ -251,8 +296,8 @@ func (s *SpdyRoundTripper) dialWithHttpProxy(req *http.Request, proxyURL *url.UR
 // dialWithSocks5Proxy dials the host specified by url through a socks5 proxy.
 func (s *SpdyRoundTripper) dialWithSocks5Proxy(req *http.Request, proxyURL *url.URL) (net.Conn, error) {
 	// ensure we use a canonical host with proxyReq
-	targetHost := netutil.CanonicalAddr(req.URL)
-	proxyDialAddr := netutil.CanonicalAddr(proxyURL)
+	targetHost := canonicalAddr(req.URL)
+	proxyDialAddr := canonicalAddr(proxyURL)
 
 	var auth *proxy.Auth
 	if proxyURL.User != nil {
@@ -368,7 +413,7 @@ func (s *SpdyRoundTripper) tlsConn(requestUrl *url.URL, rwc net.Conn, targetHost
 
 // dialWithoutProxy dials the host specified by url, using TLS if appropriate.
 func (s *SpdyRoundTripper) dialWithoutProxy(ctx context.Context, url *url.URL) (net.Conn, error) {
-	dialAddr := netutil.CanonicalAddr(url)
+	dialAddr := canonicalAddr(url)
 
 	if url.Scheme == "http" {
 		if s.Dialer == nil {
