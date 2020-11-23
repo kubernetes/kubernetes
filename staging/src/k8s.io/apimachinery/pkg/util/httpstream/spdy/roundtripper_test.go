@@ -36,13 +36,16 @@ import (
 	"github.com/elazarl/goproxy"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type Interceptor struct {
-	Authorization socks5.AuthContext
+	Authorization       socks5.AuthContext
+	proxyCalledWithHost *string
 }
 
 func (i *Interceptor) Rewrite(ctx context.Context, req *socks5.Request) (context.Context, *socks5.AddrSpec) {
+	*i.proxyCalledWithHost = req.DestAddr.Address()
 	i.Authorization = socks5.AuthContext(*req.AuthContext)
 	return ctx, req.DestAddr
 }
@@ -95,7 +98,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 						Rewriter:    interceptor,
 					}
 				} else {
-					conf = &socks5.Config{}
+					conf = &socks5.Config{Rewriter: interceptor}
 				}
 
 				ts, err := socks5.New(conf)
@@ -305,214 +308,216 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				},
 			}
 
-			for k, testCase := range testCases {
-				testCase := testCase
-				server := testCase.serverFunc(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-					if testCase.shouldError {
-						if e, a := httpstream.HeaderUpgrade, req.Header.Get(httpstream.HeaderConnection); e != a {
-							t.Fatalf("%s: Expected connection=upgrade header, got '%s", k, a)
+			for _, k := range sets.StringKeySet(testCases).List() {
+				testCase := testCases[k]
+				t.Run(k, func(t *testing.T) {
+					server := testCase.serverFunc(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+						if testCase.shouldError {
+							if e, a := httpstream.HeaderUpgrade, req.Header.Get(httpstream.HeaderConnection); e != a {
+								t.Fatalf("%s: Expected connection=upgrade header, got '%s", k, a)
+							}
+
+							w.Header().Set(httpstream.HeaderConnection, testCase.serverConnectionHeader)
+							w.Header().Set(httpstream.HeaderUpgrade, testCase.serverUpgradeHeader)
+							w.WriteHeader(testCase.serverStatusCode)
+
+							return
 						}
 
-						w.Header().Set(httpstream.HeaderConnection, testCase.serverConnectionHeader)
-						w.Header().Set(httpstream.HeaderUpgrade, testCase.serverUpgradeHeader)
-						w.WriteHeader(testCase.serverStatusCode)
+						streamCh := make(chan httpstream.Stream)
 
-						return
-					}
-
-					streamCh := make(chan httpstream.Stream)
-
-					responseUpgrader := NewResponseUpgrader()
-					spdyConn := responseUpgrader.UpgradeResponse(w, req, func(s httpstream.Stream, replySent <-chan struct{}) error {
-						streamCh <- s
-						return nil
-					})
-					if spdyConn == nil {
-						t.Fatalf("%s: unexpected nil spdyConn", k)
-					}
-					defer spdyConn.Close()
-
-					stream := <-streamCh
-					io.Copy(stream, stream)
-				}))
-				defer server.Close()
-
-				serverURL, err := url.Parse(server.URL)
-				if err != nil {
-					t.Fatalf("%s: Error creating request: %s", k, err)
-				}
-				req, err := http.NewRequest("GET", server.URL, nil)
-				if err != nil {
-					t.Fatalf("%s: Error creating request: %s", k, err)
-				}
-
-				spdyTransport := NewRoundTripper(testCase.clientTLS, redirect, redirect)
-
-				var proxierCalled bool
-				var proxyCalledWithHost string
-				var proxyCalledWithAuth bool
-				var proxyCalledWithAuthHeader string
-				if testCase.proxyServerFunc != nil {
-					proxyHandler := goproxy.NewProxyHttpServer()
-
-					proxyHandler.OnRequest().HandleConnectFunc(func(host string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
-						proxyCalledWithHost = host
-
-						proxyAuthHeaderName := "Proxy-Authorization"
-						_, proxyCalledWithAuth = ctx.Req.Header[proxyAuthHeaderName]
-						proxyCalledWithAuthHeader = ctx.Req.Header.Get(proxyAuthHeaderName)
-						return goproxy.OkConnect, host
-					})
-
-					proxy := testCase.proxyServerFunc(proxyHandler)
-
-					spdyTransport.proxier = func(proxierReq *http.Request) (*url.URL, error) {
-						proxierCalled = true
-						proxyURL, err := url.Parse(proxy.URL)
-						if err != nil {
-							return nil, err
+						responseUpgrader := NewResponseUpgrader()
+						spdyConn := responseUpgrader.UpgradeResponse(w, req, func(s httpstream.Stream, replySent <-chan struct{}) error {
+							streamCh <- s
+							return nil
+						})
+						if spdyConn == nil {
+							t.Fatalf("%s: unexpected nil spdyConn", k)
 						}
-						proxyURL.User = testCase.proxyAuth
-						return proxyURL, nil
-					}
-					defer proxy.Close()
-				}
+						defer spdyConn.Close()
 
-				if testCase.socks5ProxyServerFunc != nil {
-					interceptor := &Interceptor{}
-					var l net.Listener
-					var proxyHandler *socks5.Server
-					if testCase.proxyAuth != nil {
-						proxyHandler = testCase.socks5ProxyServerFunc(&socks5.StaticCredentials{
-							"proxyuser": "proxypasswd",
-						}, interceptor)
-					} else {
-						proxyHandler = testCase.socks5ProxyServerFunc(nil, interceptor)
-					}
+						stream := <-streamCh
+						io.Copy(stream, stream)
+					}))
+					defer server.Close()
 
-					closed := false
-					l, err = net.Listen("tcp", "127.0.0.1:0")
+					serverURL, err := url.Parse(server.URL)
 					if err != nil {
-						t.Fatalf("socks5Server: proxy_test: Listen: %v", err)
+						t.Fatalf("%s: Error creating request: %s", k, err)
 					}
-					defer func() {
-						closed = true
-						l.Close()
-					}()
+					req, err := http.NewRequest("GET", server.URL, nil)
+					if err != nil {
+						t.Fatalf("%s: Error creating request: %s", k, err)
+					}
 
-					proxyCalledWithHost = "//127.0.0.1:" + strconv.Itoa(l.Addr().(*net.TCPAddr).Port)
+					spdyTransport := NewRoundTripper(testCase.clientTLS, redirect, redirect)
 
-					go func() {
-						for {
-							conn, err := l.Accept()
+					var proxierCalled bool
+					var proxyCalledWithHost string
+					var proxyCalledWithAuth bool
+					var proxyCalledWithAuthHeader string
+					if testCase.proxyServerFunc != nil {
+						proxyHandler := goproxy.NewProxyHttpServer()
+
+						proxyHandler.OnRequest().HandleConnectFunc(func(host string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
+							proxyCalledWithHost = host
+
+							proxyAuthHeaderName := "Proxy-Authorization"
+							_, proxyCalledWithAuth = ctx.Req.Header[proxyAuthHeaderName]
+							proxyCalledWithAuthHeader = ctx.Req.Header.Get(proxyAuthHeaderName)
+							return goproxy.OkConnect, host
+						})
+
+						proxy := testCase.proxyServerFunc(proxyHandler)
+
+						spdyTransport.proxier = func(proxierReq *http.Request) (*url.URL, error) {
+							proxierCalled = true
+							proxyURL, err := url.Parse(proxy.URL)
 							if err != nil {
-								if closed {
-									break
-								}
-								t.Errorf("error accepting connection: %s", err)
+								return nil, err
 							}
-							if err := proxyHandler.ServeConn(conn); err != nil && !testCase.shouldError {
-								if closed {
-									break
-								}
-								t.Errorf("ServeConn error: %s", err)
-							}
+							proxyURL.User = testCase.proxyAuth
+							return proxyURL, nil
 						}
-					}()
+						defer proxy.Close()
+					}
 
-					spdyTransport.proxier = func(proxierReq *http.Request) (*url.URL, error) {
-						proxierCalled = true
-						proxyURL, err := url.Parse(proxyCalledWithHost)
+					if testCase.socks5ProxyServerFunc != nil {
+						interceptor := &Interceptor{}
+						var l net.Listener
+						var proxyHandler *socks5.Server
+						if testCase.proxyAuth != nil {
+							proxyHandler = testCase.socks5ProxyServerFunc(&socks5.StaticCredentials{
+								"proxyuser": "proxypasswd",
+							}, interceptor)
+						} else {
+							proxyHandler = testCase.socks5ProxyServerFunc(nil, interceptor)
+						}
+
+						closed := false
+						l, err = net.Listen("tcp", "127.0.0.1:0")
 						if err != nil {
-							return nil, err
+							t.Fatalf("socks5Server: proxy_test: Listen: %v", err)
 						}
-						proxyURL.User = testCase.proxyAuth
-						proxyURL.Scheme = "socks5"
-						return proxyURL, nil
-					}
-				}
+						defer func() {
+							closed = true
+							l.Close()
+						}()
 
-				client := &http.Client{Transport: spdyTransport}
+						proxyCalledWithHost = "//127.0.0.1:" + strconv.Itoa(l.Addr().(*net.TCPAddr).Port)
 
-				resp, err := client.Do(req)
-				var conn httpstream.Connection
-				if err == nil {
-					conn, err = spdyTransport.NewConnection(resp)
-				}
-				haveErr := err != nil
-				if e, a := testCase.shouldError, haveErr; e != a {
-					t.Fatalf("%s: shouldError=%t, got %t: %v", k, e, a, err)
-				}
-				if testCase.shouldError {
-					continue
-				}
-				defer conn.Close()
+						go func() {
+							for {
+								conn, err := l.Accept()
+								if err != nil {
+									if closed {
+										break
+									}
+									t.Errorf("error accepting connection: %s", err)
+								}
+								if err := proxyHandler.ServeConn(conn); err != nil && !testCase.shouldError {
+									if closed {
+										break
+									}
+									t.Errorf("ServeConn error: %s", err)
+								}
+							}
+						}()
 
-				if resp.StatusCode != http.StatusSwitchingProtocols {
-					t.Fatalf("%s: expected http 101 switching protocols, got %d", k, resp.StatusCode)
-				}
-
-				stream, err := conn.CreateStream(http.Header{})
-				if err != nil {
-					t.Fatalf("%s: error creating client stream: %s", k, err)
-				}
-
-				n, err := stream.Write([]byte("hello"))
-				if err != nil {
-					t.Fatalf("%s: error writing to stream: %s", k, err)
-				}
-				if n != 5 {
-					t.Fatalf("%s: Expected to write 5 bytes, but actually wrote %d", k, n)
-				}
-
-				b := make([]byte, 5)
-				n, err = stream.Read(b)
-				if err != nil {
-					t.Fatalf("%s: error reading from stream: %s", k, err)
-				}
-				if n != 5 {
-					t.Fatalf("%s: Expected to read 5 bytes, but actually read %d", k, n)
-				}
-				if e, a := "hello", string(b[0:n]); e != a {
-					t.Fatalf("%s: expected '%s', got '%s'", k, e, a)
-				}
-
-				if testCase.proxyServerFunc != nil {
-					if !proxierCalled {
-						t.Fatalf("%s: Expected to use a proxy but proxier in SpdyRoundTripper wasn't called", k)
-					}
-					if proxyCalledWithHost != serverURL.Host {
-						t.Fatalf("%s: Expected to see a call to the proxy for backend %q, got %q", k, serverURL.Host, proxyCalledWithHost)
-					}
-				}
-
-				var expectedProxyAuth string
-				if testCase.proxyAuth != nil {
-					encodedCredentials := base64.StdEncoding.EncodeToString([]byte(testCase.proxyAuth.String()))
-					expectedProxyAuth = "Basic " + encodedCredentials
-				}
-
-				if testCase.socks5ProxyServerFunc != nil && testCase.proxyAuth != nil {
-					expectedSocks5AuthMethod := 2
-					expectedSocks5AuthUser := "proxyuser"
-					authMethod, authUser := testCase.socks5ProxyServerFunc.interceptor.GetAuthContext()
-
-					if expectedSocks5AuthMethod != authMethod {
-						t.Fatalf("%s: Socks5 Proxy authorization unexpected, got %d, expected %d", k, authMethod, expectedSocks5AuthMethod)
+						spdyTransport.proxier = func(proxierReq *http.Request) (*url.URL, error) {
+							proxierCalled = true
+							proxyURL, err := url.Parse(proxyCalledWithHost)
+							if err != nil {
+								return nil, err
+							}
+							proxyURL.User = testCase.proxyAuth
+							proxyURL.Scheme = "socks5"
+							return proxyURL, nil
+						}
 					}
 
-					if expectedSocks5AuthUser != authUser["Username"] {
-						t.Fatalf("%s: Socks5 Proxy authorization user unexpected, got %q, expected %q", k, authUser["Username"], expectedSocks5AuthUser)
+					client := &http.Client{Transport: spdyTransport}
+
+					resp, err := client.Do(req)
+					var conn httpstream.Connection
+					if err == nil {
+						conn, err = spdyTransport.NewConnection(resp)
+					}
+					haveErr := err != nil
+					if e, a := testCase.shouldError, haveErr; e != a {
+						t.Fatalf("%s: shouldError=%t, got %t: %v", k, e, a, err)
+					}
+					if testCase.shouldError {
+						continue
+					}
+					defer conn.Close()
+
+					if resp.StatusCode != http.StatusSwitchingProtocols {
+						t.Fatalf("%s: expected http 101 switching protocols, got %d", k, resp.StatusCode)
 					}
 
-				} else {
-					if len(expectedProxyAuth) == 0 && proxyCalledWithAuth {
-						t.Fatalf("%s: Proxy authorization unexpected, got %q", k, proxyCalledWithAuthHeader)
+					stream, err := conn.CreateStream(http.Header{})
+					if err != nil {
+						t.Fatalf("%s: error creating client stream: %s", k, err)
 					}
-					if proxyCalledWithAuthHeader != expectedProxyAuth {
-						t.Fatalf("%s: Expected to see a call to the proxy with credentials %q, got %q", k, testCase.proxyAuth, proxyCalledWithAuthHeader)
+
+					n, err := stream.Write([]byte("hello"))
+					if err != nil {
+						t.Fatalf("%s: error writing to stream: %s", k, err)
 					}
-				}
+					if n != 5 {
+						t.Fatalf("%s: Expected to write 5 bytes, but actually wrote %d", k, n)
+					}
+
+					b := make([]byte, 5)
+					n, err = stream.Read(b)
+					if err != nil {
+						t.Fatalf("%s: error reading from stream: %s", k, err)
+					}
+					if n != 5 {
+						t.Fatalf("%s: Expected to read 5 bytes, but actually read %d", k, n)
+					}
+					if e, a := "hello", string(b[0:n]); e != a {
+						t.Fatalf("%s: expected '%s', got '%s'", k, e, a)
+					}
+
+					if testCase.proxyServerFunc != nil || testCase.socks5ProxyServerFunc != nil {
+						if !proxierCalled {
+							t.Fatalf("%s: Expected to use a proxy but proxier in SpdyRoundTripper wasn't called", k)
+						}
+						if proxyCalledWithHost != serverURL.Host {
+							t.Fatalf("%s: Expected to see a call to the proxy for backend %q, got %q", k, serverURL.Host, proxyCalledWithHost)
+						}
+					}
+
+					var expectedProxyAuth string
+					if testCase.proxyAuth != nil {
+						encodedCredentials := base64.StdEncoding.EncodeToString([]byte(testCase.proxyAuth.String()))
+						expectedProxyAuth = "Basic " + encodedCredentials
+					}
+
+					if testCase.socks5ProxyServerFunc != nil && testCase.proxyAuth != nil {
+						expectedSocks5AuthMethod := 2
+						expectedSocks5AuthUser := "proxyuser"
+						authMethod, authUser := testCase.socks5ProxyServerFunc.interceptor.GetAuthContext()
+
+						if expectedSocks5AuthMethod != authMethod {
+							t.Fatalf("%s: Socks5 Proxy authorization unexpected, got %d, expected %d", k, authMethod, expectedSocks5AuthMethod)
+						}
+
+						if expectedSocks5AuthUser != authUser["Username"] {
+							t.Fatalf("%s: Socks5 Proxy authorization user unexpected, got %q, expected %q", k, authUser["Username"], expectedSocks5AuthUser)
+						}
+
+					} else {
+						if len(expectedProxyAuth) == 0 && proxyCalledWithAuth {
+							t.Fatalf("%s: Proxy authorization unexpected, got %q", k, proxyCalledWithAuthHeader)
+						}
+						if proxyCalledWithAuthHeader != expectedProxyAuth {
+							t.Fatalf("%s: Expected to see a call to the proxy with credentials %q, got %q", k, testCase.proxyAuth, proxyCalledWithAuthHeader)
+						}
+					}
+				})
 			}
 		})
 	}
