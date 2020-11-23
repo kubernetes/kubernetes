@@ -383,7 +383,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 					}
 
 					if testCase.socks5ProxyServerFunc != nil {
-						interceptor := &Interceptor{}
+						interceptor := &Interceptor{proxyCalledWithHost: &proxyCalledWithHost}
 						var l net.Listener
 						var proxyHandler *socks5.Server
 						if testCase.proxyAuth != nil {
@@ -403,8 +403,6 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 							closed = true
 							l.Close()
 						}()
-
-						proxyCalledWithHost = "//127.0.0.1:" + strconv.Itoa(l.Addr().(*net.TCPAddr).Port)
 
 						go func() {
 							for {
@@ -426,13 +424,11 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 
 						spdyTransport.proxier = func(proxierReq *http.Request) (*url.URL, error) {
 							proxierCalled = true
-							proxyURL, err := url.Parse(proxyCalledWithHost)
-							if err != nil {
-								return nil, err
-							}
-							proxyURL.User = testCase.proxyAuth
-							proxyURL.Scheme = "socks5"
-							return proxyURL, nil
+							return &url.URL{
+								Scheme: "socks5",
+								Host:   net.JoinHostPort("127.0.0.1", strconv.Itoa(l.Addr().(*net.TCPAddr).Port)),
+								User:   testCase.proxyAuth,
+							}, nil
 						}
 					}
 
@@ -448,7 +444,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 						t.Fatalf("%s: shouldError=%t, got %t: %v", k, e, a, err)
 					}
 					if testCase.shouldError {
-						continue
+						return
 					}
 					defer conn.Close()
 
