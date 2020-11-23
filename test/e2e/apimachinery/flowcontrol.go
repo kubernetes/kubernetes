@@ -321,6 +321,7 @@ func createFlowSchema(f *framework.Framework, flowSchemaName string, matchingPre
 func makeRequest(f *framework.Framework, username string) *http.Response {
 	config := f.ClientConfig()
 	config.Impersonate.UserName = username
+	config.RateLimiter = nil
 	config.Impersonate.Groups = []string{"system:authenticated"}
 	roundTripper, err := rest.TransportFor(config)
 	framework.ExpectNoError(err)
