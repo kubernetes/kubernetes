@@ -1,7 +1,0 @@
-# See the OWNERS docs at https://go.k8s.io/owners
-
-reviewers:
-- derekwaynecarr
-- smarterclayton
-labels:
-- sig/api-machinery
