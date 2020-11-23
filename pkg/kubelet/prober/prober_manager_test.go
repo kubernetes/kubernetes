@@ -264,6 +264,14 @@ func TestUpdatePodStatus(t *testing.T) {
 			Running: &v1.ContainerStateRunning{},
 		},
 	}
+	crashedNoReadiness := v1.ContainerStatus{
+		Name:        "crashed_no_readiness",
+		ContainerID: "test://crashed_no_readiness_id",
+		Ready:       true,
+		State: v1.ContainerState{
+			Waiting: &v1.ContainerStateWaiting{},
+		},
+	}
 	terminated := v1.ContainerStatus{
 		Name:        "terminated_container",
 		ContainerID: "test://terminated_container_id",
@@ -271,10 +279,11 @@ func TestUpdatePodStatus(t *testing.T) {
 			Terminated: &v1.ContainerStateTerminated{},
 		},
 	}
+
 	podStatus := v1.PodStatus{
 		Phase: v1.PodRunning,
 		ContainerStatuses: []v1.ContainerStatus{
-			unprobed, probedReady, probedPending, probedUnready, notStartedNoReadiness, startedNoReadiness, terminated,
+			unprobed, probedReady, probedPending, probedUnready, notStartedNoReadiness, startedNoReadiness, crashedNoReadiness, terminated,
 		},
 	}
 
@@ -294,6 +303,7 @@ func TestUpdatePodStatus(t *testing.T) {
 	m.readinessManager.Set(kubecontainer.ParseContainerID(probedReady.ContainerID), results.Success, &v1.Pod{})
 	m.readinessManager.Set(kubecontainer.ParseContainerID(probedUnready.ContainerID), results.Failure, &v1.Pod{})
 	m.startupManager.Set(kubecontainer.ParseContainerID(startedNoReadiness.ContainerID), results.Success, &v1.Pod{})
+	m.readinessManager.Set(kubecontainer.ParseContainerID(crashedNoReadiness.ContainerID), results.Success, &v1.Pod{})
 	m.readinessManager.Set(kubecontainer.ParseContainerID(terminated.ContainerID), results.Success, &v1.Pod{})
 
 	m.UpdatePodStatus(testPodUID, &podStatus)
@@ -305,6 +315,7 @@ func TestUpdatePodStatus(t *testing.T) {
 		{testPodUID, probedUnready.Name, readiness}:         false,
 		{testPodUID, notStartedNoReadiness.Name, readiness}: false,
 		{testPodUID, startedNoReadiness.Name, readiness}:    true,
+		{testPodUID, crashedNoReadiness.Name, readiness}:    false,
 		{testPodUID, terminated.Name, readiness}:            false,
 	}
 	for _, c := range podStatus.ContainerStatuses {
