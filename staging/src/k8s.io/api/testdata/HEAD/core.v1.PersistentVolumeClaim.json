@@ -41,31 +41,34 @@
     ]
   },
   "spec": {
+    "resources": {
+      "limits": {
+        "@Hr鯹)晿": "617"
+      },
+      "requests": {
+        "Ĩɘ.蘯6ċV夸eɑeʤ脽ěĂ": "524"
+      }
+    },
     "accessModes": [
-      "@Hr鯹)晿"
+      "ʕVŚ(ĿȊ甞谐颋ǅSǡƏS$+½H牗"
     ],
     "selector": {
       "matchLabels": {
-        "h0-6pJ": "Hn7y-74.-0MUORQQ.N2.1L"
+        "Y._.-44..d.__Gg8-2_kS91.e5K-_e63_-_3-nS": "U_3u-.__P__.7U-Uo_4_-D7r__.am6-4_WE-_JTrcd2"
       },
       "matchExpressions": [
         {
-          "key": "PGg8-2_kS91.e5K-_e63_-_3n",
-          "operator": "DoesNotExist"
+          "key": "FE_Sv__26KX_R_.-.Nth._--S_4DA_-5_-4lQ42s",
+          "operator": "In",
+          "values": [
+            "09I"
+          ]
         }
       ]
     },
-    "resources": {
-      "limits": {
-        "Ď儇击3ƆìQ喞艋涽託仭w-檮Ǣ": "465"
-      },
-      "requests": {
-        "Ł%ŨȈ\u003eŅ£趕ã/鈱$-议}ȧ外ĺ稥": "713"
-      }
-    },
     "volumeName": "25",
     "storageClassName": "26",
-    "volumeMode": "娲瘹ɭȊɚɎ(dɅ囥糷磩窮秳ķ蟒苾h^",
+    "volumeMode": "Q捇ȸ",
     "dataSource": {
       "apiGroup": "27",
       "kind": "28",
@@ -73,19 +76,19 @@
     }
   },
   "status": {
-    "phase": "燴壩卄蓨MĮ?",
+    "phase": "+ɸ殁Ka縳讋ɮ衺勽Ƙq/Ź ",
     "accessModes": [
-      "ĭÐl恕ɍȇ廄裭4懙"
+      "衲\u003c¿燥"
     ],
     "capacity": {
-      "嵒ƫS捕ɷD¡轫n": "583"
+      "_è绺": "720"
     },
     "conditions": [
       {
-        "type": "Ü郀",
-        "status": "ƣKʘńw:5塋",
-        "lastProbeTime": "2588-10-04T08:20:38Z",
-        "lastTransitionTime": "2095-10-31T02:52:44Z",
+        "type": "O澘銈e棈_Ĭ艥\u003c檔",
+        "status": "Þ",
+        "lastProbeTime": "2445-03-08T07:00:15Z",
+        "lastTransitionTime": "2885-04-04T06:15:05Z",
         "reason": "30",
         "message": "31"
       }

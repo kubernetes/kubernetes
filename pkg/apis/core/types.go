@@ -422,6 +422,8 @@ type PersistentVolumeClaimList struct {
 // PersistentVolumeClaimSpec describes the common attributes of storage devices
 // and allows a Source for provider-specific attributes
 type PersistentVolumeClaimSpec struct {
+	// Resources represents the minimum resources required
+	Resources ResourceRequirements
 	// Contains the types of access modes required
 	// +optional
 	AccessModes []PersistentVolumeAccessMode
@@ -429,9 +431,6 @@ type PersistentVolumeClaimSpec struct {
 	// ignored when VolumeName is set
 	// +optional
 	Selector *metav1.LabelSelector
-	// Resources represents the minimum resources required
-	// +optional
-	Resources ResourceRequirements
 	// VolumeName is the binding reference to the PersistentVolume backing this
 	// claim. When set to non-empty value Selector is not evaluated
 	// +optional

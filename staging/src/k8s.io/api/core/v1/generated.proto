@@ -2659,6 +2659,10 @@ message PersistentVolumeClaimList {
 // PersistentVolumeClaimSpec describes the common attributes of storage devices
 // and allows a Source for provider-specific attributes
 message PersistentVolumeClaimSpec {
+  // Resources represents the minimum resources the volume should have.
+  // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
+  optional ResourceRequirements resources = 2;
+
   // AccessModes contains the desired access modes the volume should have.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
   // +optional
@@ -2667,11 +2671,6 @@ message PersistentVolumeClaimSpec {
   // A label query over volumes to consider for binding.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 4;
-
-  // Resources represents the minimum resources the volume should have.
-  // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
-  // +optional
-  optional ResourceRequirements resources = 2;
 
   // VolumeName is the binding reference to the PersistentVolume backing this claim.
   // +optional
