@@ -51,6 +51,9 @@ require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7
 	github.com/golang/mock v1.3.1
+	github.com/golangplus/bytes v0.0.0-20160111154220-45c989fe5450 // indirect
+	github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995 // indirect
+	github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e // indirect
 	github.com/google/btree v1.0.0
 	github.com/google/cadvisor v0.37.0
 	github.com/google/go-cmp v0.4.0
@@ -76,7 +79,7 @@ require (
 	github.com/openshift/api v0.0.0-20201019163320-c6a5ec25f267
 	github.com/openshift/apiserver-library-go v0.0.0-20201113074933-3e1a513af676
 	github.com/openshift/client-go v0.0.0-20201020082437-7737f16e53fc
-	github.com/openshift/library-go v0.0.0-20201020083322-646ad9742a1e
+	github.com/openshift/library-go v0.0.0-20201123124239-2028f7c79b16
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.7.1
@@ -379,7 +382,7 @@ replace (
 	github.com/openshift/apiserver-library-go => github.com/openshift/apiserver-library-go v0.0.0-20201113074933-3e1a513af676
 	github.com/openshift/build-machinery-go => github.com/openshift/build-machinery-go v0.0.0-20200917070002-f171684f77ab
 	github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20201020082437-7737f16e53fc
-	github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20201020083322-646ad9742a1e
+	github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20201123124239-2028f7c79b16
 	github.com/pelletier/go-toml => github.com/pelletier/go-toml v1.2.0
 	github.com/peterbourgon/diskv => github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/pkg/errors => github.com/pkg/errors v0.9.1
