@@ -146,7 +146,7 @@ func NewAttachDetachController(
 	adc.csiDriverLister = csiDriverInformer.Lister()
 	adc.csiDriversSynced = csiDriverInformer.Informer().HasSynced
 
-	adc.volumeAttachmentLister = volumeAttachmentInformer.Lister()
+	adc.volumeAttachmentInformer = volumeAttachmentInformer
 	adc.volumeAttachmentSynced = volumeAttachmentInformer.Informer().HasSynced
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
@@ -261,11 +261,11 @@ type attachDetachController struct {
 	csiDriverLister  storagelistersv1.CSIDriverLister
 	csiDriversSynced kcache.InformerSynced
 
-	// volumeAttachmentLister is the shared volumeAttachment lister used to fetch and store
+	// volumeAttachmentInformer is the shared volumeAttachment informer used to fetch, store, and watch for
 	// VolumeAttachment objects from the API server. It is shared with other controllers
 	// and therefore the VolumeAttachment objects in its store should be treated as immutable.
-	volumeAttachmentLister storagelistersv1.VolumeAttachmentLister
-	volumeAttachmentSynced kcache.InformerSynced
+	volumeAttachmentInformer storageinformersv1.VolumeAttachmentInformer
+	volumeAttachmentSynced   kcache.InformerSynced
 
 	// cloud provider used by volume host
 	cloud cloudprovider.Interface
@@ -699,8 +699,8 @@ func (adc *attachDetachController) IsAttachDetachController() bool {
 	return true
 }
 
-func (adc *attachDetachController) VolumeAttachmentLister() storagelistersv1.VolumeAttachmentLister {
-	return adc.volumeAttachmentLister
+func (adc *attachDetachController) VolumeAttachmentInformer() storageinformersv1.VolumeAttachmentInformer {
+	return adc.volumeAttachmentInformer
 }
 
 // VolumeHost implementation

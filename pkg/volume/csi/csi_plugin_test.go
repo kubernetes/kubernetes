@@ -63,7 +63,8 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 	csiDriverInformer := factory.Storage().V1().CSIDrivers()
 	csiDriverLister := csiDriverInformer.Lister()
 	volumeAttachmentInformer := factory.Storage().V1().VolumeAttachments()
-	volumeAttachmentLister := volumeAttachmentInformer.Lister()
+	// This is necessary for ensuring the informer is instantiated so it can be synced.
+	_ = volumeAttachmentInformer.Informer()
 
 	factory.Start(wait.NeverStop)
 	syncedTypes := factory.WaitForCacheSync(wait.NeverStop)
@@ -82,7 +83,7 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 		ProbeVolumePlugins(),
 		"fakeNode",
 		csiDriverLister,
-		volumeAttachmentLister,
+		volumeAttachmentInformer,
 	)
 
 	pluginMgr := host.GetPluginMgr()
@@ -1026,7 +1027,7 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 				ProbeVolumePlugins(),
 				"fakeNode",
 				factory.Storage().V1().CSIDrivers().Lister(),
-				factory.Storage().V1().VolumeAttachments().Lister(),
+				factory.Storage().V1().VolumeAttachments(),
 			)
 
 			plugMgr := host.GetPluginMgr()

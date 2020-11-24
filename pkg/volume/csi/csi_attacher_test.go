@@ -1586,7 +1586,8 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlu
 	csiDriverInformer := factory.Storage().V1().CSIDrivers()
 	csiDriverLister := csiDriverInformer.Lister()
 	volumeAttachmentInformer := factory.Storage().V1().VolumeAttachments()
-	volumeAttachmentLister := volumeAttachmentInformer.Lister()
+	// This is necessary for ensuring the informer is instantiated so it can be synced.
+	_ = volumeAttachmentInformer.Informer()
 
 	// Right now we expect a VolumeAttachment to exist before calling waitForVolumeAttachDetachStatus().
 	// This reactor exists to update the lister and make these VolumeAttachments immediately available
@@ -1627,7 +1628,7 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlu
 		ProbeVolumePlugins(),
 		"fakeNode",
 		csiDriverLister,
-		volumeAttachmentLister,
+		volumeAttachmentInformer,
 	)
 	plugMgr := host.GetPluginMgr()
 

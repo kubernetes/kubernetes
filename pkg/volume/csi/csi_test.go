@@ -313,7 +313,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				ProbeVolumePlugins(),
 				"fakeNode",
 				csiDriverInformer.Lister(),
-				volumeAttachmentInformer.Lister(),
+				volumeAttachmentInformer,
 			)
 			plugMgr := host.GetPluginMgr()
 			csiClient := setupClient(t, true)
