@@ -70,14 +70,7 @@ func Test_ServiceLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 		t.Fatalf("Error creating test service: %v", err)
 	}
 
-	foundNodePorts := false
-	for _, port := range service.Spec.Ports {
-		if port.NodePort > 0 {
-			foundNodePorts = true
-		}
-	}
-
-	if foundNodePorts {
+	if serviceHasNodePorts(service) {
 		t.Error("found node ports when none was expected")
 	}
 }
@@ -121,14 +114,7 @@ func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
 		t.Fatalf("Error creating test service: %v", err)
 	}
 
-	foundNodePorts := false
-	for _, port := range service.Spec.Ports {
-		if port.NodePort > 0 {
-			foundNodePorts = true
-		}
-	}
-
-	if !foundNodePorts {
+	if !serviceHasNodePorts(service) {
 		t.Error("expected node ports but found none")
 	}
 
@@ -138,14 +124,17 @@ func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
 		t.Fatalf("Error updating test service: %v", err)
 	}
 
-	foundNodePorts = false
-	for _, port := range service.Spec.Ports {
+	if !serviceHasNodePorts(service) {
+		t.Error("node ports were unexpectedly deallocated")
+	}
+}
+
+func serviceHasNodePorts(svc *corev1.Service) bool {
+	for _, port := range svc.Spec.Ports {
 		if port.NodePort > 0 {
-			foundNodePorts = true
+			return true
 		}
 	}
 
-	if !foundNodePorts {
-		t.Error("node ports were unexpectedly deallocated")
-	}
+	return false
 }
