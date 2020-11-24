@@ -43,150 +43,69 @@ import (
 // terminating endpoints are included but with the correct conditions set for ready, serving and terminating.
 func TestEndpointSliceTerminating(t *testing.T) {
 	testcases := []struct {
-		name            string
-		pod             *corev1.Pod
-		endpoints       []discovery.Endpoint
-		terminatingGate bool
+		name              string
+		podStatus         corev1.PodStatus
+		expectedEndpoints []discovery.Endpoint
+		terminatingGate   bool
 	}{
 		{
 			name: "ready terminating pods not included, terminating gate off",
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-pod",
-					Labels: map[string]string{
-						"foo": "bar",
+			podStatus: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   corev1.PodReady,
+						Status: corev1.ConditionTrue,
 					},
 				},
-				Spec: corev1.PodSpec{
-					NodeName: "fake-node",
-					Containers: []corev1.Container{
-						{
-							Name:  "fakename",
-							Image: "fakeimage",
-							Ports: []corev1.ContainerPort{
-								{
-									Name:          "port-80",
-									ContainerPort: 80,
-								},
-								{
-									Name:          "port-443",
-									ContainerPort: 443,
-								},
-							},
-						},
-					},
-				},
-				Status: corev1.PodStatus{
-					Phase: corev1.PodRunning,
-					Conditions: []corev1.PodCondition{
-						{
-							Type:   corev1.PodReady,
-							Status: corev1.ConditionTrue,
-						},
-					},
-					PodIP: "10.0.0.1",
-					PodIPs: []corev1.PodIP{
-						{
-							IP: "10.0.0.1",
-						},
+				PodIP: "10.0.0.1",
+				PodIPs: []corev1.PodIP{
+					{
+						IP: "10.0.0.1",
 					},
 				},
 			},
-			endpoints:       []discovery.Endpoint{},
-			terminatingGate: false,
+			expectedEndpoints: []discovery.Endpoint{},
+			terminatingGate:   false,
 		},
 		{
 			name: "not ready terminating pods not included, terminating gate off",
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-pod",
-					Labels: map[string]string{
-						"foo": "bar",
+			podStatus: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   corev1.PodReady,
+						Status: corev1.ConditionFalse,
 					},
 				},
-				Spec: corev1.PodSpec{
-					NodeName: "fake-node",
-					Containers: []corev1.Container{
-						{
-							Name:  "fakename",
-							Image: "fakeimage",
-							Ports: []corev1.ContainerPort{
-								{
-									Name:          "port-80",
-									ContainerPort: 80,
-								},
-								{
-									Name:          "port-443",
-									ContainerPort: 443,
-								},
-							},
-						},
-					},
-				},
-				Status: corev1.PodStatus{
-					Phase: corev1.PodRunning,
-					Conditions: []corev1.PodCondition{
-						{
-							Type:   corev1.PodReady,
-							Status: corev1.ConditionFalse,
-						},
-					},
-					PodIP: "10.0.0.1",
-					PodIPs: []corev1.PodIP{
-						{
-							IP: "10.0.0.1",
-						},
+				PodIP: "10.0.0.1",
+				PodIPs: []corev1.PodIP{
+					{
+						IP: "10.0.0.1",
 					},
 				},
 			},
-			endpoints:       []discovery.Endpoint{},
-			terminatingGate: false,
+			expectedEndpoints: []discovery.Endpoint{},
+			terminatingGate:   false,
 		},
 		{
 			name: "ready terminating pods included, terminating gate on",
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-pod",
-					Labels: map[string]string{
-						"foo": "bar",
+			podStatus: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   corev1.PodReady,
+						Status: corev1.ConditionTrue,
 					},
 				},
-				Spec: corev1.PodSpec{
-					NodeName: "fake-node",
-					Containers: []corev1.Container{
-						{
-							Name:  "fakename",
-							Image: "fakeimage",
-							Ports: []corev1.ContainerPort{
-								{
-									Name:          "port-80",
-									ContainerPort: 80,
-								},
-								{
-									Name:          "port-443",
-									ContainerPort: 443,
-								},
-							},
-						},
-					},
-				},
-				Status: corev1.PodStatus{
-					Phase: corev1.PodRunning,
-					Conditions: []corev1.PodCondition{
-						{
-							Type:   corev1.PodReady,
-							Status: corev1.ConditionTrue,
-						},
-					},
-					PodIP: "10.0.0.1",
-					PodIPs: []corev1.PodIP{
-						{
-							IP: "10.0.0.1",
-						},
+				PodIP: "10.0.0.1",
+				PodIPs: []corev1.PodIP{
+					{
+						IP: "10.0.0.1",
 					},
 				},
 			},
-			endpoints: []discovery.Endpoint{
+			expectedEndpoints: []discovery.Endpoint{
 				{
 					Addresses: []string{"10.0.0.1"},
 					Conditions: discovery.EndpointConditions{
@@ -200,49 +119,22 @@ func TestEndpointSliceTerminating(t *testing.T) {
 		},
 		{
 			name: "not ready terminating pods included, terminating gate on",
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-pod",
-					Labels: map[string]string{
-						"foo": "bar",
+			podStatus: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+				Conditions: []corev1.PodCondition{
+					{
+						Type:   corev1.PodReady,
+						Status: corev1.ConditionFalse,
 					},
 				},
-				Spec: corev1.PodSpec{
-					NodeName: "fake-node",
-					Containers: []corev1.Container{
-						{
-							Name:  "fakename",
-							Image: "fakeimage",
-							Ports: []corev1.ContainerPort{
-								{
-									Name:          "port-80",
-									ContainerPort: 80,
-								},
-								{
-									Name:          "port-443",
-									ContainerPort: 443,
-								},
-							},
-						},
-					},
-				},
-				Status: corev1.PodStatus{
-					Phase: corev1.PodRunning,
-					Conditions: []corev1.PodCondition{
-						{
-							Type:   corev1.PodReady,
-							Status: corev1.ConditionFalse,
-						},
-					},
-					PodIP: "10.0.0.1",
-					PodIPs: []corev1.PodIP{
-						{
-							IP: "10.0.0.1",
-						},
+				PodIP: "10.0.0.1",
+				PodIPs: []corev1.PodIP{
+					{
+						IP: "10.0.0.1",
 					},
 				},
 			},
-			endpoints: []discovery.Endpoint{
+			expectedEndpoints: []discovery.Endpoint{
 				{
 					Addresses: []string{"10.0.0.1"},
 					Conditions: discovery.EndpointConditions{
@@ -286,7 +178,7 @@ func TestEndpointSliceTerminating(t *testing.T) {
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 			informers.Start(stopCh)
-			go epsController.Run(5, stopCh)
+			go epsController.Run(1, stopCh)
 
 			// Create namespace
 			ns := framework.CreateTestingNamespace("test-endpoints-terminating", server, t)
@@ -316,7 +208,6 @@ func TestEndpointSliceTerminating(t *testing.T) {
 						"foo": "bar",
 					},
 					Ports: []corev1.ServicePort{
-						{Name: "port-80", Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(80)},
 						{Name: "port-443", Port: 443, Protocol: "TCP", TargetPort: intstr.FromInt(443)},
 					},
 				},
@@ -327,12 +218,36 @@ func TestEndpointSliceTerminating(t *testing.T) {
 				t.Fatalf("Failed to create test Service: %v", err)
 			}
 
-			pod, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), testcase.pod, metav1.CreateOptions{})
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "fake-node",
+					Containers: []corev1.Container{
+						{
+							Name:  "fakename",
+							Image: "fakeimage",
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "port-443",
+									ContainerPort: 443,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			pod, err = client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create test ready pod: %v", err)
 			}
 
-			pod.Status = testcase.pod.Status
+			pod.Status = testcase.podStatus
 			_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to update status for test ready pod: %v", err)
@@ -367,14 +282,16 @@ func TestEndpointSliceTerminating(t *testing.T) {
 				t.Errorf("Error waiting for endpoint slices: %v", err)
 			}
 
-			// Delete endpoint and check endpoints slice conditions
+			// Delete pod and check endpoints slice conditions
 			err = client.CoreV1().Pods(ns.Name).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 			if err != nil {
 				t.Fatalf("Failed to delete pod in terminating state: %v", err)
 			}
 
+			// Validate that terminating the endpoint will result in the expected endpoints in EndpointSlice.
+			// Use a stricter timeout value here since we should try to catch regressions in the time it takes to remove terminated endpoints.
 			var endpoints []discovery.Endpoint
-			err = wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+			err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
 				esList, err := client.DiscoveryV1beta1().EndpointSlices(ns.Name).List(context.TODO(), metav1.ListOptions{
 					LabelSelector: discovery.LabelServiceName + "=" + svc.Name,
 				})
@@ -388,19 +305,19 @@ func TestEndpointSliceTerminating(t *testing.T) {
 				}
 
 				endpoints = esList.Items[0].Endpoints
-				if len(endpoints) == 0 && len(testcase.endpoints) == 0 {
+				if len(endpoints) == 0 && len(testcase.expectedEndpoints) == 0 {
 					return true, nil
 				}
 
-				if len(endpoints) != len(testcase.endpoints) {
+				if len(endpoints) != len(testcase.expectedEndpoints) {
 					return false, nil
 				}
 
-				if !reflect.DeepEqual(endpoints[0].Addresses, testcase.endpoints[0].Addresses) {
+				if !reflect.DeepEqual(endpoints[0].Addresses, testcase.expectedEndpoints[0].Addresses) {
 					return false, nil
 				}
 
-				if !reflect.DeepEqual(endpoints[0].Conditions, testcase.endpoints[0].Conditions) {
+				if !reflect.DeepEqual(endpoints[0].Conditions, testcase.expectedEndpoints[0].Conditions) {
 					return false, nil
 				}
 
@@ -408,7 +325,7 @@ func TestEndpointSliceTerminating(t *testing.T) {
 			})
 			if err != nil {
 				t.Logf("actual endpoints: %v", endpoints)
-				t.Logf("expected endpoints: %v", testcase.endpoints)
+				t.Logf("expected endpoints: %v", testcase.expectedEndpoints)
 				t.Errorf("unexpected endpoints: %v", err)
 			}
 		})
