@@ -235,8 +235,9 @@ func newTestableController(config TestableConfig) *configController {
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newFS := newObj.(*flowcontrol.FlowSchema)
 			oldFS := oldObj.(*flowcontrol.FlowSchema)
-			if !apiequality.Semantic.DeepEqual(oldFS.Spec, newFS.Spec) {
-				klog.V(7).Infof("Triggered API priority and fairness config reloading due to spec update of FS %s", newFS.Name)
+			if !(apiequality.Semantic.DeepEqual(oldFS.Spec, newFS.Spec) &&
+				apiequality.Semantic.DeepEqual(oldFS.Status, newFS.Status)) {
+				klog.V(7).Infof("Triggered API priority and fairness config reloading due to spec and/or status update of FS %s", newFS.Name)
 				cfgCtlr.finishHandlingNotification(cfgCtlr.configQueue, newObj)
 			}
 		},
