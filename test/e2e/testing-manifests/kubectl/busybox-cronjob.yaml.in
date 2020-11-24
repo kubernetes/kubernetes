@@ -15,7 +15,7 @@ spec:
         spec:
           containers:
           - name: test
-            image: busybox
+            image: {{.BusyBoxImage}}
             args:
             - "/bin/true"
           restartPolicy: OnFailure

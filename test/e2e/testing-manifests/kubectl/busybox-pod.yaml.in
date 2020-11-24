@@ -6,7 +6,7 @@ metadata:
     app: busybox1
 spec:
   containers:
-  - image: busybox
+  - image: {{.BusyBoxImage}}
     command: ["/bin/sh", "-c", "mkdir -p /root/foo/bar && echo 'foobar' > /root/foo/bar/foo.bar && sleep 3600"]
     imagePullPolicy: IfNotPresent
     name: busybox
