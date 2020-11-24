@@ -215,11 +215,11 @@ func (o *CopyOptions) Run(args []string) error {
 	return fmt.Errorf("one of src or dest must be a remote file specification")
 }
 
-// checkDestinationIsDir receives a destination fileSpec and
-// determines if the provided destination path exists on the
-// pod. If the destination path does not exist or is _not_ a
+// checkFileSpecIsDir receives a fileSpec and
+// determines if the provided fileSpec path exists on the
+// pod. If the fileSpec path does not exist or is _not_ a
 // directory, an error is returned with the exit code received.
-func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
+func (o *CopyOptions) checkFileSpecIsDir(f fileSpec) error {
 	options := &exec.ExecOptions{
 		StreamOptions: exec.StreamOptions{
 			IOStreams: genericclioptions.IOStreams{
@@ -227,11 +227,11 @@ func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
 				ErrOut: bytes.NewBuffer([]byte{}),
 			},
 
-			Namespace: dest.PodNamespace,
-			PodName:   dest.PodName,
+			Namespace: f.PodNamespace,
+			PodName:   f.PodName,
 		},
 
-		Command:  []string{"test", "-d", dest.File},
+		Command:  []string{"test", "-d", f.File},
 		Executor: &exec.DefaultRemoteExecutor{},
 	}
 
@@ -252,7 +252,7 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 		dest.File = dest.File[:len(dest.File)-1]
 	}
 
-	if err := o.checkDestinationIsDir(dest); err == nil {
+	if err := o.checkFileSpecIsDir(dest); err == nil {
 		// If no error, dest.File was found to be a directory.
 		// Copy specified src into it
 		dest.File = dest.File + "/" + path.Base(src.File)
@@ -326,6 +326,13 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 	// remove extraneous path shortcuts - these could occur if a path contained extra "../"
 	// and attempted to navigate beyond "/" in a remote filesystem
 	prefix = stripPathShortcuts(prefix)
+	
+	if err := o.checkFileSpecIsDir(src); err == nil {
+		// If no error, src.File was found to be a directory.
+		// Copy it into specified dest
+		dest.File = dest.File + "/" + path.Base(src.File)
+	}
+	
 	return o.untarAll(src, reader, dest.File, prefix)
 }
 
