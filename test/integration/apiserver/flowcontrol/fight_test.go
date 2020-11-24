@@ -19,6 +19,7 @@ package flowcontrol
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -59,6 +60,7 @@ func TestConfigConsumerFight(t *testing.T) {
 		true:  make([]utilfc.TestableInterface, size)}
 	// maps FS key -> last written ResourceVersion
 	var lastRVs map[string]string = nil
+	var rvMutex sync.Mutex // hold when accessing notifiedRVs
 	// maps invert -> i -> FS key -> last notified ResourceVersion
 	notifiedRVs := map[bool][]map[string]string{
 		false: make([]map[string]string, size),
@@ -73,6 +75,11 @@ func TestConfigConsumerFight(t *testing.T) {
 		}
 	}
 	foreach(func(invert bool, i int) {
+		rvMutex.Lock()
+		defer rvMutex.Unlock()
+		notifiedRVs[invert][i] = map[string]string{}
+	})
+	foreach(func(invert bool, i int) {
 		myConfig := rest.CopyConfig(loopbackConfig)
 		myConfig = rest.AddUserAgent(myConfig, fmt.Sprintf("invert=%v, i=%d", invert, i))
 		myClientset := clientset.NewForConfigOrDie(myConfig)
@@ -84,13 +91,13 @@ func TestConfigConsumerFight(t *testing.T) {
 			allFlowSchemas := append(fcboot.MandatoryFlowSchemas, fcboot.SuggestedFlowSchemas...)
 			err := wait.Poll(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 				for _, fs := range allFlowSchemas {
-					_, err := fsIfc.Get(ctx, fs.Name, metav1.GetOptions{})
+					fs2, err := fsIfc.Get(ctx, fs.Name, metav1.GetOptions{})
 					if err != nil {
 						return false, err
 					}
-					t.Logf("Got initial FlowSchema %#+v", fs)
-					key, _ := cache.MetaNamespaceKeyFunc(fs)
-					lastRVs[key] = fs.ResourceVersion
+					t.Logf("Got initial FlowSchema %#+v", fs2)
+					key, _ := cache.MetaNamespaceKeyFunc(fs2)
+					lastRVs[key] = fs2.ResourceVersion
 				}
 				return true, nil
 			})
@@ -105,7 +112,6 @@ func TestConfigConsumerFight(t *testing.T) {
 			fieldMgr = fieldMgr + "x"
 			foundToDangling = func(found bool) bool { return found }
 		}
-		notifiedRVs[invert][i] = map[string]string{}
 		ctlr := utilfc.NewTestable(utilfc.TestableConfig{
 			Name:  fmt.Sprintf("Controller%d[invert=%v]", i, invert),
 			Clock: clk,
@@ -115,6 +121,8 @@ func TestConfigConsumerFight(t *testing.T) {
 				switch typed := obj.(type) {
 				case *flowcontrol.FlowSchema:
 					key, _ := cache.MetaNamespaceKeyFunc(obj)
+					rvMutex.Lock()
+					defer rvMutex.Unlock()
 					notifiedRVs[invert][i][key] = typed.ResourceVersion
 				}
 			},
@@ -135,6 +143,7 @@ func TestConfigConsumerFight(t *testing.T) {
 			t.Fatalf("Never achieved initial sync for invert=%v, i=%v", invert, i)
 		}
 	})
+	t.Logf("After initial sync, lastRVs=%v", lastRVs)
 	someTimedOut := false
 	var writeCount, countAtStart int
 	var tStart time.Time
@@ -144,9 +153,14 @@ func TestConfigConsumerFight(t *testing.T) {
 		AOK := false
 		// wait until notifiedRVs[invert][i] covers lastRVs for all invert, i
 		for k := 0; k < 100 && !AOK; k++ {
+			if k%10 == 0 {
+				t.Logf("For size=%d, j=%d, k=%d, starting to wait for lastRVs=%v", size, j, k, lastRVs)
+			}
 			time.Sleep(time.Millisecond * 100)
 			AOK = true
 			foreach(func(invert bool, i int) {
+				rvMutex.Lock()
+				defer rvMutex.Unlock()
 				for key, rv := range lastRVs {
 					if notifiedRVs[invert][i][key] != rv {
 						AOK = false
@@ -155,7 +169,11 @@ func TestConfigConsumerFight(t *testing.T) {
 			})
 		}
 		if !AOK {
-			t.Logf("For size=%d, j=%d, lastRVs=%v but notifiedRVs=%#+v", size, j, lastRVs, notifiedRVs)
+			func() {
+				rvMutex.Lock()
+				defer rvMutex.Unlock()
+				t.Logf("For size=%d, j=%d, lastRVs=%v but notifiedRVs=%#+v", size, j, lastRVs, notifiedRVs)
+			}()
 			someTimedOut = true
 		}
 		now = nextTime
