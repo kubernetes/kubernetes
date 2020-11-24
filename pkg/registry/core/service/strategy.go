@@ -184,7 +184,9 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 
 	// Clear AllocateLoadBalancerNodePorts if ServiceLBNodePortControl if not enabled
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
-		newSvc.Spec.AllocateLoadBalancerNodePorts = nil
+		if !allocateLoadBalancerNodePortsInUse(oldSvc) {
+			newSvc.Spec.AllocateLoadBalancerNodePorts = nil
+		}
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.MixedProtocolLBService) {
@@ -197,6 +199,14 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 			}
 		}
 	}
+}
+
+// returns true if svc.Spec.AllocateLoadBalancerNodePorts field is in use
+func allocateLoadBalancerNodePortsInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+	return svc.Spec.AllocateLoadBalancerNodePorts != nil
 }
 
 // returns true if svc.Spec.ServiceIPFamily field is in use
@@ -396,9 +406,14 @@ func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
 		newSvc.Spec.HealthCheckNodePort = 0
 	}
 
-	// AllocateLoadBalancerNodePorts may only be set for type LoadBalancer
-	if newSvc.Spec.Type != api.ServiceTypeLoadBalancer {
-		newSvc.Spec.AllocateLoadBalancerNodePorts = nil
+	// If a user is switching to a type that doesn't need allocatedLoadBalancerNodePorts AND they did not change
+	// this field, it is safe to drop it.
+	if oldSvc.Spec.Type == api.ServiceTypeLoadBalancer && newSvc.Spec.Type != api.ServiceTypeLoadBalancer {
+		if newSvc.Spec.AllocateLoadBalancerNodePorts != nil && oldSvc.Spec.AllocateLoadBalancerNodePorts != nil {
+			if *oldSvc.Spec.AllocateLoadBalancerNodePorts == *newSvc.Spec.AllocateLoadBalancerNodePorts {
+				newSvc.Spec.AllocateLoadBalancerNodePorts = nil
+			}
+		}
 	}
 
 	// NOTE: there are other fields like `selector` which we could wipe.
