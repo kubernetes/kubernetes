@@ -37,6 +37,7 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
@@ -64,7 +65,7 @@ type csiPlugin struct {
 	blockEnabled              bool
 	csiDriverLister           storagelisters.CSIDriverLister
 	serviceAccountTokenGetter func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
-	volumeAttachmentLister    storagelisters.VolumeAttachmentLister
+	volumeAttachmentInformer  storageinformers.VolumeAttachmentInformer
 }
 
 // ProbeVolumePlugins returns implemented plugins
@@ -196,9 +197,9 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 			if p.csiDriverLister == nil {
 				klog.Error(log("CSIDriverLister not found on AttachDetachVolumeHost"))
 			}
-			p.volumeAttachmentLister = adcHost.VolumeAttachmentLister()
-			if p.volumeAttachmentLister == nil {
-				klog.Error(log("VolumeAttachmentLister not found on AttachDetachVolumeHost"))
+			p.volumeAttachmentInformer = adcHost.VolumeAttachmentInformer()
+			if p.volumeAttachmentInformer == nil {
+				klog.Error(log("VolumeAttachmentInformer not found on AttachDetachVolumeHost"))
 			}
 		}
 		kletHost, ok := host.(volume.KubeletVolumeHost)

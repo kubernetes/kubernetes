@@ -41,7 +41,6 @@ import (
 	storageinformer "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
-	storagelister "k8s.io/client-go/listers/storage/v1"
 	core "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -1594,10 +1593,8 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset, setupInf
 	csiDriverInformer := factory.Storage().V1().CSIDrivers()
 	csiDriverLister := csiDriverInformer.Lister()
 	var volumeAttachmentInformer storageinformer.VolumeAttachmentInformer
-	var volumeAttachmentLister storagelister.VolumeAttachmentLister
 	if setupInformer {
 		volumeAttachmentInformer = factory.Storage().V1().VolumeAttachments()
-		volumeAttachmentLister = volumeAttachmentInformer.Lister()
 
 		// Right now we expect a VolumeAttachment to exist before calling waitForVolumeAttachDetachStatus().
 		// This reactor exists to update the lister and make these VolumeAttachments immediately available
@@ -1635,7 +1632,7 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset, setupInf
 		ProbeVolumePlugins(),
 		"fakeNode",
 		csiDriverLister,
-		volumeAttachmentLister,
+		volumeAttachmentInformer,
 	)
 	plugMgr := host.GetPluginMgr()
 

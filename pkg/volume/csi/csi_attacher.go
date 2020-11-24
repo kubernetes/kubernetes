@@ -154,7 +154,7 @@ func (c *csiAttacher) waitForVolumeAttachment(volumeHandle, attachID string, tim
 func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID string, timer *time.Timer, timeout time.Duration) (string, error) {
 
 	klog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
-	attach, err := c.plugin.volumeAttachmentLister.Get(attachID)
+	attach, err := c.plugin.volumeAttachmentInformer.Lister().Get(attachID)
 	if err != nil {
 		klog.Error(log("attacher.WaitForAttach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
 		return "", fmt.Errorf("volume %v has GET error for volume attachment %v: %v", volumeHandle, attachID, err)
@@ -198,8 +198,8 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 
 		attachID := getAttachmentName(volumeHandle, driverName, string(nodeName))
 		var attach *storage.VolumeAttachment
-		if c.plugin.volumeAttachmentLister != nil {
-			attach, err = c.plugin.volumeAttachmentLister.Get(attachID)
+		if c.plugin.volumeAttachmentInformer != nil {
+			attach, err = c.plugin.volumeAttachmentInformer.Lister().Get(attachID)
 			if err == nil {
 				attached[spec] = attach.Status.Attached
 				continue

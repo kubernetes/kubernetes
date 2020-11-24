@@ -35,6 +35,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/informers"
+	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
@@ -356,8 +357,9 @@ type AttachDetachVolumeHost interface {
 	// CSIDriverLister returns the informer lister for the CSIDriver API Object
 	CSIDriverLister() storagelistersv1.CSIDriverLister
 
-	// VolumeAttachmentLister returns the informer lister for the VolumeAttachment API Object
-	VolumeAttachmentLister() storagelistersv1.VolumeAttachmentLister
+	// VolumeAttachmentInformer returns the informer for the VolumeAttachment API Object
+	VolumeAttachmentInformer() storageinformersv1.VolumeAttachmentInformer
+
 	// IsAttachDetachController is an interface marker to strictly tie AttachDetachVolumeHost
 	// to the attachDetachController
 	IsAttachDetachController() bool
