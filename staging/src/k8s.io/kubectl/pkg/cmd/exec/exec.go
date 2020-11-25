@@ -326,10 +326,8 @@ func (p *ExecOptions) Run() error {
 	containerName := p.ContainerName
 	if len(containerName) == 0 {
 		if len(pod.Spec.Containers) > 1 {
-			fmt.Fprintf(p.ErrOut, "Defaulting container name to %s.\n", pod.Spec.Containers[0].Name)
-			if p.EnableSuggestedCmdUsage {
-				fmt.Fprintf(p.ErrOut, "Use '%s describe pod/%s -n %s' to see all of the containers in this pod.\n", p.ParentCommandName, pod.Name, p.Namespace)
-			}
+			containerNames := polymorphichelpers.getContainerNames(pod.Spec.Containers)
+			fmt.Fprintf(p.ErrOut, "Defaulting container name to %s; Available containers: [%s]\n", pod.Spec.Containers[0].Name, containerNames)
 		}
 		containerName = pod.Spec.Containers[0].Name
 	}
