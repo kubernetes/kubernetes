@@ -884,7 +884,14 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.ExpectNoError(err, "found a pod(s)")
 	})
 
-	ginkgo.It("should run through the lifecycle of Pods and PodStatus", func() {
+	/*
+		Release: v1.20
+		Testname: Pods, completes the lifecycle of a Pod and the PodStatus
+		Description: A Pod is created with a static label which MUST succeed. It MUST succeed when
+		patching the label and the pod data. When checking and replacing the PodStatus it MUST
+		succeed. It MUST succeed when deleting the Pod.
+	*/
+	framework.ConformanceIt("should run through the lifecycle of Pods and PodStatus", func() {
 		podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 		testNamespaceName := f.Namespace.Name
 		testPodName := "pod-test"
