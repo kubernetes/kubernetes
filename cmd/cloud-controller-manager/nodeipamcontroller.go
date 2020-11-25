@@ -28,9 +28,9 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/cloud-provider/app"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
 	genericcontrollermanager "k8s.io/controller-manager/app"
+	"k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2"
 	nodeipamcontroller "k8s.io/kubernetes/pkg/controller/nodeipam"
 	nodeipamconfig "k8s.io/kubernetes/pkg/controller/nodeipam/config"
@@ -61,7 +61,7 @@ func startNodeIpamController(ccmconfig *cloudcontrollerconfig.CompletedConfig, n
 	}
 
 	// failure: more than one cidr and dual stack is not enabled
-	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(app.IPv6DualStack) {
+	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and dualstack feature is not enabled", len(clusterCIDRs))
 	}
 
@@ -93,7 +93,7 @@ func startNodeIpamController(ccmconfig *cloudcontrollerconfig.CompletedConfig, n
 	// the following checks are triggered if both serviceCIDR and secondaryServiceCIDR are provided
 	if serviceCIDR != nil && secondaryServiceCIDR != nil {
 		// should have dual stack flag enabled
-		if !utilfeature.DefaultFeatureGate.Enabled(app.IPv6DualStack) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 			return nil, false, fmt.Errorf("secondary service cidr is provided and IPv6DualStack feature is not enabled")
 		}
 
@@ -108,7 +108,7 @@ func startNodeIpamController(ccmconfig *cloudcontrollerconfig.CompletedConfig, n
 	}
 
 	var nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6 int
-	if utilfeature.DefaultFeatureGate.Enabled(app.IPv6DualStack) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 		// only --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 supported with dual stack clusters.
 		// --node-cidr-mask-size flag is incompatible with dual stack clusters.
 		nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6, err = setNodeCIDRMaskSizesDualStack(nodeipamconfig)
