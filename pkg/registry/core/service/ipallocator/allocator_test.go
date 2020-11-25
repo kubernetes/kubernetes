@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	utilnet "k8s.io/utils/net"
 )
 
 func TestAllocate(t *testing.T) {
@@ -74,34 +75,34 @@ func TestAllocate(t *testing.T) {
 		}
 		t.Logf("base: %v", r.base.Bytes())
 		if f := r.Free(); f != tc.free {
-			t.Errorf("Test %s unexpected free %d", tc.name, f)
+			t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, tc.free, f)
 		}
 
 		rCIDR := r.CIDR()
 		if rCIDR.String() != tc.cidr {
-			t.Errorf("allocator returned a different cidr")
+			t.Errorf("[%s] wrong CIDR: expected %v, got %v", tc.name, tc.cidr, rCIDR.String())
 		}
 
 		if r.IPFamily() != tc.family {
-			t.Errorf("allocator returned wrong IP family")
+			t.Errorf("[%s] wrong IP family: expected %v, got %v", tc.name, tc.family, r.IPFamily())
 		}
 
 		if f := r.Used(); f != 0 {
-			t.Errorf("Test %s unexpected used %d", tc.name, f)
+			t.Errorf("[%s]: wrong used: expected %d, got %d", tc.name, 0, f)
 		}
 		found := sets.NewString()
 		count := 0
 		for r.Free() > 0 {
 			ip, err := r.AllocateNext()
 			if err != nil {
-				t.Fatalf("Test %s error @ %d: %v", tc.name, count, err)
+				t.Fatalf("[%s] error @ %d: %v", tc.name, count, err)
 			}
 			count++
 			if !cidr.Contains(ip) {
-				t.Fatalf("Test %s allocated %s which is outside of %s", tc.name, ip, cidr)
+				t.Fatalf("[%s] allocated %s which is outside of %s", tc.name, ip, cidr)
 			}
 			if found.Has(ip.String()) {
-				t.Fatalf("Test %s allocated %s twice @ %d", tc.name, ip, count)
+				t.Fatalf("[%s] allocated %s twice @ %d", tc.name, ip, count)
 			}
 			found.Insert(ip.String())
 		}
@@ -114,17 +115,17 @@ func TestAllocate(t *testing.T) {
 			t.Fatal(err)
 		}
 		if f := r.Free(); f != 1 {
-			t.Errorf("Test %s unexpected free %d", tc.name, f)
+			t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, 1, f)
 		}
 		if f := r.Used(); f != (tc.free - 1) {
-			t.Errorf("Test %s unexpected free %d", tc.name, f)
+			t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, tc.free-1, f)
 		}
 		ip, err := r.AllocateNext()
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !released.Equal(ip) {
-			t.Errorf("Test %s unexpected %s : %s", tc.name, ip, released)
+			t.Errorf("[%s] unexpected %s : %s", tc.name, ip, released)
 		}
 
 		if err := r.Release(released); err != nil {
@@ -140,19 +141,19 @@ func TestAllocate(t *testing.T) {
 			t.Fatal(err)
 		}
 		if f := r.Free(); f != 1 {
-			t.Errorf("Test %s unexpected free %d", tc.name, f)
+			t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, 1, f)
 		}
 		if f := r.Used(); f != (tc.free - 1) {
-			t.Errorf("Test %s unexpected free %d", tc.name, f)
+			t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, tc.free-1, f)
 		}
 		if err := r.Allocate(released); err != nil {
 			t.Fatal(err)
 		}
 		if f := r.Free(); f != 0 {
-			t.Errorf("Test %s unexpected free %d", tc.name, f)
+			t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, 0, f)
 		}
 		if f := r.Used(); f != tc.free {
-			t.Errorf("Test %s unexpected free %d", tc.name, f)
+			t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, tc.free, f)
 		}
 	}
 }
@@ -359,5 +360,71 @@ func TestNewFromSnapshot(t *testing.T) {
 		if !r.Has(ip) {
 			t.Fatalf("expected IP to be allocated, but it was not")
 		}
+	}
+}
+
+func TestDryRun(t *testing.T) {
+	testCases := []struct {
+		name   string
+		cidr   string
+		family api.IPFamily
+	}{{
+		name:   "IPv4",
+		cidr:   "192.168.1.0/24",
+		family: api.IPv4Protocol,
+	}, {
+		name:   "IPv6",
+		cidr:   "2001:db8:1::/48",
+		family: api.IPv6Protocol,
+	}}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, cidr, err := net.ParseCIDR(tc.cidr)
+			if err != nil {
+				t.Fatalf("unexpected failure: %v", err)
+			}
+			r, err := NewInMemory(cidr)
+			if err != nil {
+				t.Fatalf("unexpected failure: %v", err)
+			}
+
+			baseUsed := r.Used()
+
+			rCIDR := r.DryRun().CIDR()
+			if rCIDR.String() != tc.cidr {
+				t.Errorf("allocator returned a different cidr")
+			}
+
+			if r.DryRun().IPFamily() != tc.family {
+				t.Errorf("allocator returned wrong IP family")
+			}
+
+			if u := r.Used(); u != baseUsed {
+				t.Errorf("unexpected used %d", u)
+			}
+
+			err = r.DryRun().Allocate(utilnet.AddIPOffset(utilnet.BigForIP(cidr.IP), 1))
+			if err != nil {
+				t.Fatalf("unexpected failure: %v", err)
+			}
+			if u := r.Used(); u != baseUsed {
+				t.Errorf("unexpected used %d", u)
+			}
+
+			_, err = r.DryRun().AllocateNext()
+			if err != nil {
+				t.Fatalf("unexpected failure: %v", err)
+			}
+			if u := r.Used(); u != baseUsed {
+				t.Errorf("unexpected used %d", u)
+			}
+
+			if err := r.DryRun().Release(cidr.IP); err != nil {
+				t.Fatalf("unexpected failure: %v", err)
+			}
+			if u := r.Used(); u != baseUsed {
+				t.Errorf("unexpected used %d", u)
+			}
+		})
 	}
 }
