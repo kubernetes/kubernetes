@@ -121,7 +121,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 			if clients[i].concurrency < 1 {
 				clients[i].concurrency = 1
 			}
-			framework.Logf("request concurrency for %q will be %d (concurrency share = %d)", clients[i].username, clients[i].concurrency, realConcurrency)
+			framework.Logf("request concurrency for %q will be %d (that is %d times client multiplier)", clients[i].username, clients[i].concurrency, realConcurrency)
 		}
 
 		ginkgo.By(fmt.Sprintf("starting uniform QPS load for %s", loadDuration.String()))
@@ -139,7 +139,7 @@ var _ = SIGDescribe("API priority and fairness", func() {
 		ginkgo.By("checking completed requests with expected values")
 		for _, client := range clients {
 			// Each client should have 95% of its ideal number of completed requests.
-			maxCompletedRequests := float64(client.concurrency) * client.qps * float64(loadDuration/time.Second)
+			maxCompletedRequests := float64(client.concurrency) * client.qps * loadDuration.Seconds()
 			fractionCompleted := float64(client.completedRequests) / maxCompletedRequests
 			framework.Logf("client %q completed %d/%d requests (%.1f%%)", client.username, client.completedRequests, int32(maxCompletedRequests), 100*fractionCompleted)
 			if fractionCompleted < client.expectedCompletedPercentage {
@@ -351,7 +351,7 @@ func testResponseHeaderMatches(f *framework.Framework, impersonatingUser, plUID,
 func uniformQPSLoadSingle(f *framework.Framework, username string, qps float64, loadDuration time.Duration) int32 {
 	var completed int32
 	var wg sync.WaitGroup
-	ticker := time.NewTicker(time.Duration(1e9/qps) * time.Nanosecond)
+	ticker := time.NewTicker(time.Duration(float64(time.Second) / qps))
 	defer ticker.Stop()
 	timer := time.NewTimer(loadDuration)
 	for {
