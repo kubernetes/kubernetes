@@ -97,8 +97,8 @@ var _ = SIGDescribe("API priority and fairness", func() {
 			// In contrast, "lowqps" stays under its concurrency shares.
 			// Additionally, the "highqps" client also has a higher matching
 			// precedence for its flow schema.
-			{username: highQPSClientName, qps: 100.0, concurrencyMultiplier: 2.0, matchingPrecedence: 999, expectedCompletedPercentage: 0.75},
-			{username: lowQPSClientName, qps: 5.0, concurrencyMultiplier: 0.5, matchingPrecedence: 1000, expectedCompletedPercentage: 0.75},
+			{username: highQPSClientName, qps: 85, concurrencyMultiplier: 2.0, matchingPrecedence: 999, expectedCompletedPercentage: 0.75},
+			{username: lowQPSClientName, qps: 4, concurrencyMultiplier: 0.5, matchingPrecedence: 1000, expectedCompletedPercentage: 0.75},
 		}
 
 		ginkgo.By("creating test priority levels and flow schemas")
@@ -177,8 +177,8 @@ var _ = SIGDescribe("API priority and fairness", func() {
 			expectedCompletedPercentage float64
 		}
 		clients := []client{
-			{username: highQPSClientName, qps: 100.0, concurrencyMultiplier: 2.0, expectedCompletedPercentage: 0.75},
-			{username: lowQPSClientName, qps: 5.0, concurrencyMultiplier: 0.5, expectedCompletedPercentage: 0.90},
+			{username: highQPSClientName, qps: 85, concurrencyMultiplier: 2.0, expectedCompletedPercentage: 0.75},
+			{username: lowQPSClientName, qps: 4, concurrencyMultiplier: 0.5, expectedCompletedPercentage: 0.90},
 		}
 
 		framework.Logf("getting real concurrency")
