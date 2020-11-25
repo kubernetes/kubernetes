@@ -113,6 +113,29 @@ func MakeServicePort(name string, port int, tgtPort intstr.IntOrString, proto ap
 	}
 }
 
+// SetHeadless sets the service as headless and clears other fields.
+func SetHeadless(svc *api.Service) {
+	SetTypeClusterIP(svc)
+	svc.Spec.ClusterIP = api.ClusterIPNone
+}
+
+// SetSelector sets the service selector.
+func SetSelector(sel map[string]string) Tweak {
+	return func(svc *api.Service) {
+		svc.Spec.Selector = map[string]string{}
+		for k, v := range sel {
+			svc.Spec.Selector[k] = v
+		}
+	}
+}
+
+// SetClusterIP sets the service ClusterIP fields.
+func SetClusterIP(ip string) Tweak {
+	return func(svc *api.Service) {
+		svc.Spec.ClusterIP = ip
+	}
+}
+
 // SetClusterIPs sets the service ClusterIP and ClusterIPs fields.
 func SetClusterIPs(ips ...string) Tweak {
 	return func(svc *api.Service) {
