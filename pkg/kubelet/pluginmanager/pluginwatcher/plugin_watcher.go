@@ -206,6 +206,14 @@ func (w *Watcher) handleDeleteEvent(event fsnotify.Event) {
 	klog.V(6).Infof("Handling delete event: %v", event)
 
 	socketPath := event.Name
+
+	// The file has already been deleted, and we can not verify it is a socket file. But we can
+	// check if it exists in desired state cache, and if it does, it must be a socket file.
+	if !w.desiredStateOfWorld.PluginExists(socketPath) {
+		klog.V(5).Infof("Path %s does not exist in desired state cache. Ignoring it", socketPath)
+		return
+	}
+
 	klog.V(2).Infof("Removing socket path %s from desired state cache", socketPath)
 	w.desiredStateOfWorld.RemovePlugin(socketPath)
 }
