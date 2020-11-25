@@ -939,8 +939,10 @@ var _ = framework.KubeDescribe("Pods", func() {
 					pod.Labels["test-pod-static"] == "true" &&
 					pod.Status.Phase == v1.PodRunning
 				if !found {
-					framework.Logf("observed Pod %v in namespace %v in phase %v conditions %v", pod.ObjectMeta.Name, pod.ObjectMeta.Namespace, pod.Status.Phase, pod.Status.Conditions)
+					framework.Logf("observed Pod %v in namespace %v in phase %v with labels: %v & conditions %v", pod.ObjectMeta.Name, pod.ObjectMeta.Namespace, pod.Status.Phase, pod.Labels, pod.Status.Conditions)
+					return false, nil
 				}
+				framework.Logf("Found Pod %v in namespace %v in phase %v with labels: %v & conditions %v", pod.ObjectMeta.Name, pod.ObjectMeta.Namespace, pod.Status.Phase, pod.Labels, pod.Status.Conditions)
 				return found, nil
 			}
 			return false, nil
