@@ -31,14 +31,14 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	svctest "k8s.io/kubernetes/pkg/api/service/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	netutils "k8s.io/utils/net"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func makeIPAllocator(cidr *net.IPNet) ipallocator.Interface {
@@ -49,7 +49,7 @@ func makeIPAllocator(cidr *net.IPNet) ipallocator.Interface {
 	return al
 }
 
-func newStorage(t *testing.T) (*GenericREST, *StatusREST, *etcd3testing.EtcdTestServer) {
+func newStorage(t *testing.T, ipFamilies []api.IPFamily) (*GenericREST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage.ForResource(schema.GroupResource{Resource: "services"}),
@@ -57,70 +57,49 @@ func newStorage(t *testing.T) (*GenericREST, *StatusREST, *etcd3testing.EtcdTest
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "services",
 	}
-	ipAllocs := map[api.IPFamily]ipallocator.Interface{
-		api.IPv4Protocol: makeIPAllocator(makeIPNet(t)),
+
+	ipAllocs := map[api.IPFamily]ipallocator.Interface{}
+	for _, fam := range ipFamilies {
+		switch fam {
+		case api.IPv4Protocol:
+			_, cidr, _ := netutils.ParseCIDRSloppy("10.0.0.0/16")
+			ipAllocs[fam] = makeIPAllocator(cidr)
+		case api.IPv6Protocol:
+			_, cidr, _ := netutils.ParseCIDRSloppy("2000::/108")
+			ipAllocs[fam] = makeIPAllocator(cidr)
+		default:
+			t.Fatalf("Unknown IPFamily: %v", fam)
+		}
 	}
-	serviceStorage, statusStorage, err := NewGenericREST(restOptions, api.IPv4Protocol, ipAllocs, nil)
+
+	serviceStorage, statusStorage, err := NewGenericREST(restOptions, ipFamilies[0], ipAllocs, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
 	return serviceStorage, statusStorage, server
 }
 
+// This is used in generic registry tests.
 func validService() *api.Service {
-	singleStack := api.IPFamilyPolicySingleStack
-	clusterInternalTrafficPolicy := api.ServiceInternalTrafficPolicyCluster
-
-	return &api.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "foo",
-			Namespace: metav1.NamespaceDefault,
-		},
-		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
-			ClusterIP:       api.ClusterIPNone,
-			ClusterIPs:      []string{api.ClusterIPNone},
-			IPFamilyPolicy:  &singleStack,
-			IPFamilies:      []api.IPFamily{api.IPv4Protocol},
-			SessionAffinity: "None",
-			Type:            api.ServiceTypeClusterIP,
-			Ports: []api.ServicePort{{
-				Port:       6502,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(6502),
-			}},
-			InternalTrafficPolicy: &clusterInternalTrafficPolicy,
-		},
-	}
+	return svctest.MakeService("foo",
+		svctest.SetClusterIPs(api.ClusterIPNone),
+		svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+		svctest.SetIPFamilies(api.IPv4Protocol))
 }
 
 func TestCreate(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
-	validService := validService()
-	validService.ObjectMeta = metav1.ObjectMeta{}
+	svc := validService()
+	svc.ObjectMeta = metav1.ObjectMeta{} // because genericregistrytest
 	test.TestCreate(
 		// valid
-		validService,
+		svc,
 		// invalid
 		&api.Service{
 			Spec: api.ServiceSpec{},
-		},
-		// invalid
-		&api.Service{
-			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"bar": "baz"},
-				ClusterIPs:      []string{"invalid"},
-				SessionAffinity: "None",
-				Type:            api.ServiceTypeClusterIP,
-				Ports: []api.ServicePort{{
-					Port:       6502,
-					Protocol:   api.ProtocolTCP,
-					TargetPort: intstr.FromInt(6502),
-				}},
-			},
 		},
 	)
 }
@@ -128,7 +107,7 @@ func TestCreate(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	clusterInternalTrafficPolicy := api.ServiceInternalTrafficPolicyCluster
 
-	storage, _, server := newStorage(t)
+	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate()
@@ -157,7 +136,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate().ReturnDeletedObject()
@@ -165,7 +144,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate()
@@ -173,7 +152,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store).AllowCreateOnUpdate()
@@ -181,7 +160,7 @@ func TestList(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.Store)
@@ -205,7 +184,7 @@ func TestWatch(t *testing.T) {
 }
 
 func TestShortNames(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	expected := []string{"svc"}
@@ -213,7 +192,7 @@ func TestShortNames(t *testing.T) {
 }
 
 func TestCategories(t *testing.T) {
-	storage, _, server := newStorage(t)
+	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 	expected := []string{"all"}
