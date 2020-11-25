@@ -1639,7 +1639,11 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlu
 	factory.Start(wait.NeverStop)
 	ctx, cancel := context.WithTimeout(context.Background(), TestInformerSyncTimeout)
 	defer cancel()
-	for ty, ok := range factory.WaitForCacheSync(ctx.Done()) {
+	syncedTypes := factory.WaitForCacheSync(ctx.Done())
+	if len(syncedTypes) != 2 {
+		t.Fatalf("informers are not synced")
+	}
+	for ty, ok := range syncedTypes {
 		if !ok {
 			t.Fatalf("failed to sync: %#v", ty)
 		}

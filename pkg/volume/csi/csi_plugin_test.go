@@ -65,7 +65,17 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 	csiDriverLister := csiDriverInformer.Lister()
 	volumeAttachmentInformer := factory.Storage().V1().VolumeAttachments()
 	volumeAttachmentLister := volumeAttachmentInformer.Lister()
-	go factory.Start(wait.NeverStop)
+
+	factory.Start(wait.NeverStop)
+	syncedTypes := factory.WaitForCacheSync(wait.NeverStop)
+	if len(syncedTypes) != 2 {
+		t.Fatalf("informers are not synced")
+	}
+	for ty, ok := range syncedTypes {
+		if !ok {
+			t.Fatalf("failed to sync: %#v", ty)
+		}
+	}
 
 	host := volumetest.NewFakeKubeletVolumeHostWithCSINodeName(t,
 		tmpDir,
@@ -87,14 +97,6 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 		t.Fatalf("cannot assert plugin to be type csiPlugin")
 	}
 
-	// Wait until the informer in CSI volume plugin has all CSIDrivers.
-	wait.PollImmediate(TestInformerSyncPeriod, TestInformerSyncTimeout, func() (bool, error) {
-		return csiDriverInformer.Informer().HasSynced(), nil
-	})
-
-	wait.PollImmediate(TestInformerSyncPeriod, TestInformerSyncTimeout, func() (bool, error) {
-		return volumeAttachmentInformer.Informer().HasSynced(), nil
-	})
 	return csiPlug, tmpDir
 }
 
