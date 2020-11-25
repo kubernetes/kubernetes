@@ -27,17 +27,19 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
+	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	svctest "k8s.io/kubernetes/pkg/api/service/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/kubernetes/pkg/registry/registrytest"
-
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	svctest "k8s.io/kubernetes/pkg/api/service/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
+	utilnet "k8s.io/utils/net"
 )
 
 func makeIPAllocator(cidr *net.IPNet) ipallocator.Interface {
@@ -613,3 +615,4562 @@ func TestServiceDefaulting(t *testing.T) {
 		})
 	}
 }
+
+func fmtIPFamilyPolicy(pol *api.IPFamilyPolicyType) string {
+	if pol == nil {
+		return "<nil>"
+	}
+	return string(*pol)
+}
+
+func fmtIPFamilies(fams []api.IPFamily) string {
+	if fams == nil {
+		return "[]"
+	}
+	return fmt.Sprintf("%v", fams)
+}
+
+func familyOf(ip string) api.IPFamily {
+	if utilnet.IsIPv4String(ip) {
+		return api.IPv4Protocol
+	}
+	if utilnet.IsIPv6String(ip) {
+		return api.IPv6Protocol
+	}
+	return api.IPFamily("unknown")
+}
+
+// Prove that create ignores IPFamily stuff when type is ExternalName.
+func TestCreateIgnoresIPFamilyForExternalName(t *testing.T) {
+	type testCase struct {
+		name           string
+		svc            *api.Service
+		expectError    bool
+		expectPolicy   *api.IPFamilyPolicyType
+		expectFamilies []api.IPFamily
+	}
+	// These cases were chosen from the full gamut to ensure all "interesting"
+	// cases are covered.
+	testCases := []struct {
+		name            string
+		clusterFamilies []api.IPFamily
+		enableDualStack bool
+		cases           []testCase
+	}{{
+		name:            "singlestack:v4_gate:off",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol},
+		enableDualStack: false,
+		cases: []testCase{{
+			name:           "Policy:unset_Families:unset",
+			svc:            svctest.MakeService("foo"),
+			expectPolicy:   nil,
+			expectFamilies: nil,
+		}, {
+			name: "Policy:SingleStack_Families:v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+			expectPolicy:   nil,
+			expectFamilies: nil,
+		}, {
+			name: "Policy:PreferDualStack_Families:v4v6",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+			expectPolicy:   nil,
+			expectFamilies: nil,
+		}, {
+			name: "Policy:RequireDualStack_Families:v6v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+			expectPolicy:   nil,
+			expectFamilies: nil,
+		}},
+	}, {
+		name:            "singlestack:v6_gate:on",
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol},
+		enableDualStack: true,
+		cases: []testCase{{
+			name:           "Policy:unset_Families:unset",
+			svc:            svctest.MakeService("foo"),
+			expectPolicy:   nil,
+			expectFamilies: nil,
+		}, {
+			name: "Policy:SingleStack_Families:v6",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv6Protocol)),
+			expectError: true,
+		}, {
+			name: "Policy:PreferDualStack_Families:v4v6",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+			expectError: true,
+		}, {
+			name: "Policy:RequireDualStack_Families:v6v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+			expectError: true,
+		}},
+	}, {
+		name:            "dualstack:v4v6_gate:off",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		enableDualStack: false,
+		cases: []testCase{{
+			name:           "Policy:unset_Families:unset",
+			svc:            svctest.MakeService("foo"),
+			expectPolicy:   nil,
+			expectFamilies: nil,
+		}, {
+			name: "Policy:SingleStack_Families:v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+			expectPolicy:   nil,
+			expectFamilies: nil,
+		}, {
+			name: "Policy:PreferDualStack_Families:v4v6",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+			expectPolicy:   nil,
+			expectFamilies: nil,
+		}, {
+			name: "Policy:RequireDualStack_Families:v6v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+			expectPolicy:   nil,
+			expectFamilies: nil,
+		}},
+	}, {
+		name:            "dualstack:v6v4_gate:on",
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+		enableDualStack: true,
+		cases: []testCase{{
+			name:           "Policy:unset_Families:unset",
+			svc:            svctest.MakeService("foo"),
+			expectPolicy:   nil,
+			expectFamilies: nil,
+		}, {
+			name: "Policy:SingleStack_Families:v6",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv6Protocol)),
+			expectError: true,
+		}, {
+			name: "Policy:PreferDualStack_Families:v6v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+			expectError: true,
+		}, {
+			name: "Policy:RequireDualStack_Families:v4v6",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+			expectError: true,
+		}},
+	}}
+
+	for _, otc := range testCases {
+		t.Run(otc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, otc.enableDualStack)()
+
+			storage, _, server := newStorage(t, otc.clusterFamilies)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+
+			for _, itc := range otc.cases {
+				t.Run(itc.name, func(t *testing.T) {
+					// This test is ONLY ExternalName services.
+					itc.svc.Spec.Type = api.ServiceTypeExternalName
+					itc.svc.Spec.ExternalName = "example.com"
+
+					ctx := genericapirequest.NewDefaultContext()
+					createdObj, err := storage.Create(ctx, itc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+					if itc.expectError && err != nil {
+						return
+					}
+					if err != nil {
+						t.Fatalf("unexpected error creating service: %v", err)
+					}
+					defer storage.Delete(ctx, itc.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+					if itc.expectError && err == nil {
+						t.Fatalf("unexpected success creating service")
+					}
+					createdSvc := createdObj.(*api.Service)
+
+					if want, got := fmtIPFamilyPolicy(itc.expectPolicy), fmtIPFamilyPolicy(createdSvc.Spec.IPFamilyPolicy); want != got {
+						t.Errorf("wrong IPFamilyPolicy: want %s, got %s", want, got)
+					}
+					if want, got := fmtIPFamilies(itc.expectFamilies), fmtIPFamilies(createdSvc.Spec.IPFamilies); want != got {
+						t.Errorf("wrong IPFamilies: want %s, got %s", want, got)
+					}
+				})
+			}
+		})
+	}
+}
+
+// Prove that create ignores IPFamily stuff when dual-stack is disabled.
+func TestCreateIgnoresIPFamilyWithoutDualStack(t *testing.T) {
+	// These cases were chosen from the full gamut to ensure all "interesting"
+	// cases are covered.
+	testCases := []struct {
+		name string
+		svc  *api.Service
+	}{
+		//----------------------------------------
+		// ClusterIP:unset
+		//----------------------------------------
+		{
+			name: "ClusterIP:unset_Policy:unset_Families:unset",
+			svc:  svctest.MakeService("foo"),
+		}, {
+			name: "ClusterIP:unset_Policy:unset_Families:v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+		}, {
+			name: "ClusterIP:unset_Policy:unset_Families:v6v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+		}, {
+			name: "ClusterIP:unset_Policy:SingleStack_Families:unset",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+		}, {
+			name: "ClusterIP:unset_Policy:SingleStack_Families:v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+		}, {
+			name: "ClusterIP:unset_Policy:SingleStack_Families:v6v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+		}, {
+			name: "ClusterIP:unset_Policy:PreferDualStack_Families:unset",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+		}, {
+			name: "ClusterIP:unset_Policy:PreferDualStack_Families:v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+		}, {
+			name: "ClusterIP:unset_Policy:PreferDualStack_Families:v6v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+		}, {
+			name: "ClusterIP:unset_Policy:RequireDualStack_Families:unset",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+		}, {
+			name: "ClusterIP:unset_Policy:RequireDualStack_Families:v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+		}, {
+			name: "ClusterIP:unset_Policy:RequireDualStack_Families:v6v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+		},
+		//----------------------------------------
+		// ClusterIPs:v4v6
+		//----------------------------------------
+		{
+			name: "ClusterIPs:v4v6_Policy:unset_Families:unset",
+			svc: svctest.MakeService("foo",
+				svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+		}, {
+			name: "ClusterIPs:v4v6_Policy:unset_Families:v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+		}, {
+			name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:unset",
+			svc: svctest.MakeService("foo",
+				svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+		},
+		//----------------------------------------
+		// Headless
+		//----------------------------------------
+		{
+			name: "Headless_Policy:unset_Families:unset",
+			svc: svctest.MakeService("foo",
+				svctest.SetHeadless),
+		}, {
+			name: "Headless_Policy:unset_Families:v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetHeadless,
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+		}, {
+			name: "Headless_Policy:RequireDualStack_Families:unset",
+			svc: svctest.MakeService("foo",
+				svctest.SetHeadless,
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+		},
+		//----------------------------------------
+		// HeadlessSelectorless
+		//----------------------------------------
+		{
+			name: "HeadlessSelectorless_Policy:unset_Families:unset",
+			svc: svctest.MakeService("foo",
+				svctest.SetHeadless,
+				svctest.SetSelector(nil)),
+		}, {
+			name: "HeadlessSelectorless_Policy:unset_Families:v4",
+			svc: svctest.MakeService("foo",
+				svctest.SetHeadless,
+				svctest.SetSelector(nil),
+				svctest.SetIPFamilies(api.IPv4Protocol)),
+		}, {
+			name: "HeadlessSelectorless_Policy:RequireDualStack_Families:unset",
+			svc: svctest.MakeService("foo",
+				svctest.SetHeadless,
+				svctest.SetSelector(nil),
+				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+		},
+	}
+
+	// This test is ONLY with the gate off.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, false)()
+
+	// Do this in the outer scope for performance.
+	storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := genericapirequest.NewDefaultContext()
+			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error creating service: %v", err)
+			}
+			defer storage.Delete(ctx, tc.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+			createdSvc := createdObj.(*api.Service)
+			//FIXME: HACK!!  Delete above calls "inner" which doesn't
+			// yet call the allocators - no release = alloc errors!
+			defer func() {
+				for _, al := range storage.alloc.serviceIPAllocatorsByFamily {
+					for _, ip := range createdSvc.Spec.ClusterIPs {
+						al.Release(net.ParseIP(ip))
+					}
+				}
+			}()
+
+			// The gate is off - these should always be empty.
+			if want, got := fmtIPFamilyPolicy(nil), fmtIPFamilyPolicy(createdSvc.Spec.IPFamilyPolicy); want != got {
+				t.Errorf("wrong IPFamilyPolicy: want %s, got %s", want, got)
+			}
+			if want, got := fmtIPFamilies(nil), fmtIPFamilies(createdSvc.Spec.IPFamilies); want != got {
+				t.Errorf("wrong IPFamilies: want %s, got %s", want, got)
+			}
+		})
+	}
+}
+
+// Prove that create initializes clusterIPs from clusterIP.  This simplifies
+// later tests to not need to re-prove this.
+func TestCreateInitClusterIPsFromClusterIP(t *testing.T) {
+	testCases := []struct {
+		name            string
+		clusterFamilies []api.IPFamily
+		svc             *api.Service
+	}{{
+		name:            "singlestack:v4_clusterip:unset",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol},
+		svc:             svctest.MakeService("foo"),
+	}, {
+		name:            "singlestack:v4_clusterip:set",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetClusterIP("10.0.0.1")),
+	}, {
+		name:            "singlestack:v6_clusterip:unset",
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol},
+		svc:             svctest.MakeService("foo"),
+	}, {
+		name:            "singlestack:v6_clusterip:set",
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetClusterIP("2000::1")),
+	}, {
+		name:            "dualstack:v4v6_clusterip:unset",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		svc:             svctest.MakeService("foo"),
+	}, {
+		name:            "dualstack:v4v6_clusterip:set",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetClusterIP("10.0.0.1")),
+	}, {
+		name:            "dualstack:v6v4_clusterip:unset",
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+		svc:             svctest.MakeService("foo"),
+	}, {
+		name:            "dualstack:v6v4_clusterip:set",
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+		svc: svctest.MakeService("foo",
+			svctest.SetClusterIP("2000::1")),
+	}}
+
+	// This test is ONLY with the gate enabled.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			storage, _, server := newStorage(t, tc.clusterFamilies)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+
+			ctx := genericapirequest.NewDefaultContext()
+			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error creating service: %v", err)
+			}
+			createdSvc := createdObj.(*api.Service)
+
+			if createdSvc.Spec.ClusterIP == "" {
+				t.Errorf("expected ClusterIP to be set")
+
+			}
+			if tc.svc.Spec.ClusterIP != "" {
+				if want, got := tc.svc.Spec.ClusterIP, createdSvc.Spec.ClusterIP; want != got {
+					t.Errorf("wrong ClusterIP: want %s, got %s", want, got)
+				}
+			}
+			if len(createdSvc.Spec.ClusterIPs) == 0 {
+				t.Errorf("expected ClusterIPs to be set")
+			}
+			if want, got := createdSvc.Spec.ClusterIP, createdSvc.Spec.ClusterIPs[0]; want != got {
+				t.Errorf("wrong ClusterIPs[0]: want %s, got %s", want, got)
+			}
+		})
+	}
+}
+
+// Prove that create initializes IPFamily fields correctly.
+func TestCreateInitIPFields(t *testing.T) {
+	type testCase struct {
+		name           string
+		svc            *api.Service
+		expectError    bool
+		expectPolicy   api.IPFamilyPolicyType
+		expectFamilies []api.IPFamily
+		expectHeadless bool
+	}
+	// These cases were chosen from the full gamut to ensure all "interesting"
+	// cases are covered.
+	testCases := []struct {
+		name            string
+		clusterFamilies []api.IPFamily
+		cases           []testCase
+	}{
+		{
+			name:            "singlestack:v4",
+			clusterFamilies: []api.IPFamily{api.IPv4Protocol},
+			cases: []testCase{
+				//----------------------------------------
+				// singlestack:v4 ClusterIPs:unset
+				//----------------------------------------
+				{
+					name:           "ClusterIPs:unset_Policy:unset_Families:unset",
+					svc:            svctest.MakeService("foo"),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				},
+				//----------------------------------------
+				// singlestack:v4 ClusterIPs:v4
+				//----------------------------------------
+				{
+					name: "ClusterIPs:v4_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1")),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				},
+				//----------------------------------------
+				// singlestack:v4 ClusterIPs:v4v6
+				//----------------------------------------
+				{
+					name: "ClusterIPs:v4v6_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				},
+				//----------------------------------------
+				// singlestack:v4 ClusterIPs:v6v4
+				//----------------------------------------
+				{
+					name: "ClusterIPs:v6v4_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				},
+				//----------------------------------------
+				// singlestack:v4 Headless
+				//----------------------------------------
+				{
+					name: "Headless_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				},
+				//----------------------------------------
+				// singlestack:v4 HeadlessSelectorless
+				//----------------------------------------
+				{
+					name: "HeadlessSelectorless_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				},
+			},
+		}, {
+			name:            "singlestack:v6",
+			clusterFamilies: []api.IPFamily{api.IPv6Protocol},
+			cases: []testCase{
+				//----------------------------------------
+				// singlestack:v6 ClusterIPs:unset
+				//----------------------------------------
+				{
+					name:           "ClusterIPs:unset_Policy:unset_Families:unset",
+					svc:            svctest.MakeService("foo"),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				},
+				//----------------------------------------
+				// singlestack:v6 ClusterIPs:v6
+				//----------------------------------------
+				{
+					name: "ClusterIPs:v6_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1")),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				},
+				//----------------------------------------
+				// singlestack:v6 ClusterIPs:v4v6
+				//----------------------------------------
+				{
+					name: "ClusterIPs:v4v6_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				},
+				//----------------------------------------
+				// singlestack:v6 ClusterIPs:v6v4
+				//----------------------------------------
+				{
+					name: "ClusterIPs:v6v4_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				},
+				//----------------------------------------
+				// singlestack:v6 Headless
+				//----------------------------------------
+				{
+					name: "Headless_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				},
+				//----------------------------------------
+				// singlestack:v6 HeadlessSelectorless
+				//----------------------------------------
+				{
+					name: "HeadlessSelectorless_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				},
+			},
+		}, {
+			name:            "dualstack:v4v6",
+			clusterFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+			cases: []testCase{
+				//----------------------------------------
+				// dualstack:v4v6 ClusterIPs:unset
+				//----------------------------------------
+				{
+					name:           "ClusterIPs:unset_Policy:unset_Families:unset",
+					svc:            svctest.MakeService("foo"),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				},
+				//----------------------------------------
+				// dualstack:v4v6 ClusterIPs:v4
+				//----------------------------------------
+				{
+					name: "ClusterIPs:v4_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1")),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				},
+				//----------------------------------------
+				// dualstack:v4v6 ClusterIPs:v6
+				//----------------------------------------
+				{
+					name: "ClusterIPs:v6_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1")),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				},
+				//----------------------------------------
+				// dualstack:v4v6 ClusterIPs:v4v6
+				//----------------------------------------
+				{
+					name: "ClusterIPs:v4v6_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				},
+				//----------------------------------------
+				// dualstack:v4v6 ClusterIPs:v6v4
+				//----------------------------------------
+				{
+					name: "ClusterIPs:v6v4_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6v4_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6v4_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				},
+				//----------------------------------------
+				// dualstack:v4v6 Headless
+				//----------------------------------------
+				{
+					name: "Headless_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				},
+				//----------------------------------------
+				// dualstack:v4v6 HeadlessSelectorless
+				//----------------------------------------
+				{
+					name: "HeadlessSelectorless_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				},
+			},
+		}, {
+			name:            "dualstack:v6v4",
+			clusterFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+			cases: []testCase{
+				//----------------------------------------
+				// dualstack:v6v4 ClusterIPs:unset
+				//----------------------------------------
+				{
+					name:           "ClusterIPs:unset_Policy:unset_Families:unset",
+					svc:            svctest.MakeService("foo"),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:unset_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				},
+				//----------------------------------------
+				// dualstack:v6v4 ClusterIPs:v4
+				//----------------------------------------
+				{
+					name: "ClusterIPs:v4_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1")),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				},
+				//----------------------------------------
+				// dualstack:v6v4 ClusterIPs:v6
+				//----------------------------------------
+				{
+					name: "ClusterIPs:v6_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1")),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				},
+				//----------------------------------------
+				// dualstack:v6v4 ClusterIPs:v4v6
+				//----------------------------------------
+				{
+					name: "ClusterIPs:v4v6_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+				}, {
+					name: "ClusterIPs:v4v6_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				},
+				//----------------------------------------
+				// dualstack:v6v4 ClusterIPs:v6v4
+				//----------------------------------------
+				{
+					name: "ClusterIPs:v6v4_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6v4_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6v4_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "ClusterIPs:v6v4_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+				},
+				//----------------------------------------
+				// dualstack:v6v4 Headless
+				//----------------------------------------
+				{
+					name: "Headless_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "Headless_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				},
+				//----------------------------------------
+				// dualstack:v6v4 HeadlessSelectorless
+				//----------------------------------------
+				{
+					name: "HeadlessSelectorless_Policy:unset_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:unset_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:unset_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:unset_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:unset_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicySingleStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectError: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:SingleStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectError: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:PreferDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyPreferDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:unset",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v4v6",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+					expectHeadless: true,
+				}, {
+					name: "HeadlessSelectorless_Policy:RequireDualStack_Families:v6v4",
+					svc: svctest.MakeService("foo",
+						svctest.SetHeadless,
+						svctest.SetSelector(nil),
+						svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+						svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+					expectPolicy:   api.IPFamilyPolicyRequireDualStack,
+					expectFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+					expectHeadless: true,
+				},
+			},
+		},
+	}
+
+	// This test is ONLY with the gate enabled.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
+
+	for _, otc := range testCases {
+		t.Run(otc.name, func(t *testing.T) {
+
+			// Do this in the outer loop for performance.
+			storage, _, server := newStorage(t, otc.clusterFamilies)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+
+			for _, itc := range otc.cases {
+				t.Run(itc.name, func(t *testing.T) {
+					ctx := genericapirequest.NewDefaultContext()
+					createdObj, err := storage.Create(ctx, itc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+					if itc.expectError && err != nil {
+						return
+					}
+					if err != nil {
+						t.Fatalf("unexpected error creating service: %v", err)
+					}
+					defer storage.Delete(ctx, itc.svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
+					if itc.expectError && err == nil {
+						t.Fatalf("unexpected success creating service")
+					}
+					createdSvc := createdObj.(*api.Service)
+					//FIXME: HACK!!  Delete above calls "inner" which doesn't
+					// yet call the allocators - no release = alloc errors!
+					defer func() {
+						for _, al := range storage.alloc.serviceIPAllocatorsByFamily {
+							for _, ip := range createdSvc.Spec.ClusterIPs {
+								al.Release(net.ParseIP(ip))
+							}
+						}
+					}()
+
+					if want, got := fmtIPFamilyPolicy(&itc.expectPolicy), fmtIPFamilyPolicy(createdSvc.Spec.IPFamilyPolicy); want != got {
+						t.Errorf("wrong IPFamilyPolicy: want %s, got %s", want, got)
+					}
+					if want, got := fmtIPFamilies(itc.expectFamilies), fmtIPFamilies(createdSvc.Spec.IPFamilies); want != got {
+						t.Errorf("wrong IPFamilies: want %s, got %s", want, got)
+					}
+					if itc.expectHeadless {
+						if !reflect.DeepEqual(createdSvc.Spec.ClusterIPs, []string{"None"}) {
+							t.Errorf("wrong clusterIPs: want [\"None\"], got %v", createdSvc.Spec.ClusterIPs)
+						}
+					} else {
+						if c, f := len(createdSvc.Spec.ClusterIPs), len(createdSvc.Spec.IPFamilies); c != f {
+							t.Errorf("clusterIPs and ipFamilies are not the same length: %d vs %d", c, f)
+						}
+						for i, clip := range createdSvc.Spec.ClusterIPs {
+							if cf, ef := familyOf(clip), createdSvc.Spec.IPFamilies[i]; cf != ef {
+								t.Errorf("clusterIP is the wrong IP family: want %s, got %s", ef, cf)
+							}
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
+// func TestServiceRegistryCreateDryRun(t *testing.T) {
+// 	requireDualStack := api.IPFamilyPolicyRequireDualStack
+// 	testCases := []struct {
+// 		name            string
+// 		svc             *api.Service
+// 		enableDualStack bool
+// 	}{
+// 		{
+// 			name:            "v4 service featuregate off",
+// 			enableDualStack: false,
+// 			svc: &api.Service{
+// 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+// 				Spec: api.ServiceSpec{
+// 					Selector:        map[string]string{"bar": "baz"},
+// 					SessionAffinity: api.ServiceAffinityNone,
+// 					Type:            api.ServiceTypeClusterIP,
+// 					ClusterIP:       "1.2.3.4",
+// 					ClusterIPs:      []string{"1.2.3.4"},
+// 					Ports: []api.ServicePort{{
+// 						Port:       6502,
+// 						Protocol:   api.ProtocolTCP,
+// 						TargetPort: intstr.FromInt(6502),
+// 					}},
+// 				},
+// 			},
+// 		},
+// 		{
+// 			name:            "v6 service featuregate on but singlestack",
+// 			enableDualStack: true,
+// 			svc: &api.Service{
+// 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+// 				Spec: api.ServiceSpec{
+// 					Selector:        map[string]string{"bar": "baz"},
+// 					SessionAffinity: api.ServiceAffinityNone,
+// 					Type:            api.ServiceTypeClusterIP,
+// 					IPFamilies:      []api.IPFamily{api.IPv6Protocol},
+// 					ClusterIP:       "2000:0:0:0:0:0:0:1",
+// 					ClusterIPs:      []string{"2000:0:0:0:0:0:0:1"},
+// 					Ports: []api.ServicePort{{
+// 						Port:       6502,
+// 						Protocol:   api.ProtocolTCP,
+// 						TargetPort: intstr.FromInt(6502),
+// 					}},
+// 				},
+// 			},
+// 		},
+// 		{
+// 			name:            "dualstack v4,v6 service",
+// 			enableDualStack: true,
+// 			svc: &api.Service{
+// 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+// 				Spec: api.ServiceSpec{
+// 					Selector:        map[string]string{"bar": "baz"},
+// 					SessionAffinity: api.ServiceAffinityNone,
+// 					Type:            api.ServiceTypeClusterIP,
+// 					IPFamilyPolicy:  &requireDualStack,
+// 					ClusterIP:       "1.2.3.4",
+// 					ClusterIPs:      []string{"1.2.3.4", "2000:0:0:0:0:0:0:1"},
+// 					IPFamilies:      []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+// 					Ports: []api.ServicePort{{
+// 						Port:       6502,
+// 						Protocol:   api.ProtocolTCP,
+// 						TargetPort: intstr.FromInt(6502),
+// 					}},
+// 				},
+// 			},
+// 		},
+// 		{
+// 			name:            "dualstack v6,v4 service",
+// 			enableDualStack: true,
+// 			svc: &api.Service{
+// 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+// 				Spec: api.ServiceSpec{
+// 					Selector:        map[string]string{"bar": "baz"},
+// 					SessionAffinity: api.ServiceAffinityNone,
+// 					Type:            api.ServiceTypeClusterIP,
+// 					IPFamilyPolicy:  &requireDualStack,
+// 					ClusterIP:       "2000:0:0:0:0:0:0:1",
+// 					ClusterIPs:      []string{"2000:0:0:0:0:0:0:1", "1.2.3.4"},
+// 					IPFamilies:      []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+// 					Ports: []api.ServicePort{{
+// 						Port:       6502,
+// 						Protocol:   api.ProtocolTCP,
+// 						TargetPort: intstr.FromInt(6502),
+// 					}},
+// 				},
+// 			},
+// 		},
+// 	}
+//
+// 	for _, tc := range testCases {
+// 		t.Run(tc.name, func(t *testing.T) {
+// 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+//
+// 			families := []api.IPFamily{api.IPv4Protocol}
+// 			if tc.enableDualStack {
+// 				families = append(families, api.IPv6Protocol)
+// 			}
+// 			storage, registry, server := NewTestREST(t, nil, families)
+// 			defer server.Terminate(t)
+//
+// 			ctx := genericapirequest.NewDefaultContext()
+// 			_, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+// 			if err != nil {
+// 				t.Fatalf("Unexpected error: %v", err)
+// 			}
+//
+// 			for i, family := range tc.svc.Spec.IPFamilies {
+// 				alloc := storage.alloc.serviceIPAllocatorsByFamily[family]
+// 				if alloc.Has(net.ParseIP(tc.svc.Spec.ClusterIPs[i])) {
+// 					t.Errorf("unexpected side effect: ip allocated %v", tc.svc.Spec.ClusterIPs[i])
+// 				}
+// 			}
+//
+// 			srv, err := registry.GetService(ctx, tc.svc.Name, &metav1.GetOptions{})
+// 			if err != nil {
+// 				t.Errorf("unexpected error: %v", err)
+// 			}
+// 			if srv != nil {
+// 				t.Errorf("unexpected service found: %v", srv)
+// 			}
+// 		})
+// 	}
+// }
