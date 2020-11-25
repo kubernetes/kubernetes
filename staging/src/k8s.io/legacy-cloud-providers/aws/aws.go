@@ -235,7 +235,7 @@ const ServiceAnnotationLoadBalancerTargetNodeLabels = "service.beta.kubernetes.i
 
 // ServiceAnnotationLoadBalancerALPNPolicy is the annotation used on the
 // service to specify ALPN policy. Supported values are:
-// `http1only`, `http2only`, `http2optional`, `http2preferred`.
+// `HTTP1Only`, `HTTP2Only`, `HTTP2Optional`, `HTTP2Preferred`.
 // Only supported on elbv2 (NLB) with SSL listeners.
 const ServiceAnnotationLoadBalancerALPNPolicy = "service.beta.kubernetes.io/aws-load-balancer-alpn-policy"
 
