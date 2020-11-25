@@ -233,6 +233,12 @@ const ServiceAnnotationLoadBalancerEIPAllocations = "service.beta.kubernetes.io/
 // For example: "Key1=Val1,Key2=Val2,KeyNoVal1=,KeyNoVal2"
 const ServiceAnnotationLoadBalancerTargetNodeLabels = "service.beta.kubernetes.io/aws-load-balancer-target-node-labels"
 
+// ServiceAnnotationLoadBalancerALPNPolicy is the annotation used on the
+// service to specify ALPN policy. Supported values are:
+// `http1only`, `http2only`, `http2optional`, `http2preferred`.
+// Only supported on elbv2 (NLB) with SSL listeners.
+const ServiceAnnotationLoadBalancerALPNPolicy = "service.beta.kubernetes.io/aws-load-balancer-alpn-policy"
+
 // Event key when a volume is stuck on attaching state when being attached to a volume
 const volumeAttachmentStuck = "VolumeAttachmentStuck"
 
@@ -3828,6 +3834,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 				portMapping.FrontendProtocol = elbv2.ProtocolEnumTls
 				portMapping.SSLCertificateARN = certificateARN
 				portMapping.SSLPolicy = annotations[ServiceAnnotationLoadBalancerSSLNegotiationPolicy]
+				portMapping.ALPNPolicy = annotations[ServiceAnnotationLoadBalancerALPNPolicy]
 
 				if backendProtocol := annotations[ServiceAnnotationLoadBalancerBEProtocol]; backendProtocol == "ssl" {
 					portMapping.TrafficProtocol = elbv2.ProtocolEnumTls

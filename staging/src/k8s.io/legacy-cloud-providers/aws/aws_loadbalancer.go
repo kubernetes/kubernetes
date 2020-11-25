@@ -32,9 +32,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elbv2"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -101,6 +101,7 @@ type nlbPortMapping struct {
 	SSLCertificateARN string
 	SSLPolicy         string
 	HealthCheckConfig healthCheckConfig
+	ALPNPolicy        string
 }
 
 // getKeyValuePropertiesFromAnnotation converts the comma separated list of key-value
@@ -250,6 +251,9 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 							if len(listener.Certificates) == 0 || aws.StringValue(listener.Certificates[0].CertificateArn) != mapping.SSLCertificateARN {
 								listenerNeedsModification = true
 							}
+							if len(listener.AlpnPolicy) == 0 && mapping.ALPNPolicy != "" || aws.StringValue(listener.AlpnPolicy[0]) != mapping.ALPNPolicy {
+								listenerNeedsModification = true
+							}
 						}
 					case elbv2.ProtocolEnumTcp:
 						{
@@ -307,6 +311,9 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 								{
 									CertificateArn: aws.String(mapping.SSLCertificateARN),
 								},
+							}
+							if mapping.ALPNPolicy != "" {
+								modifyListenerInput.AlpnPolicy = []*string{aws.String(mapping.ALPNPolicy)}
 							}
 						}
 						if _, err := c.elbv2.ModifyListener(modifyListenerInput); err != nil {
@@ -536,6 +543,9 @@ func (c *Cloud) createListenerV2(loadBalancerArn *string, mapping nlbPortMapping
 			{
 				CertificateArn: aws.String(mapping.SSLCertificateARN),
 			},
+		}
+		if mapping.ALPNPolicy != "" {
+			createListernerInput.AlpnPolicy = []*string{aws.String(mapping.ALPNPolicy)}
 		}
 	}
 
