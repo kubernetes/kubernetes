@@ -404,16 +404,12 @@ function DownloadAndInstall-KubernetesBinaries {
 # Required ${kube_env} keys:
 #   CSI_PROXY_STORAGE_PATH and CSI_PROXY_VERSION
 function DownloadAndInstall-CSIProxyBinaries {
+  param (
+    [parameter(Mandatory=$false)] [string]$Version = "${env:CSI_PROXY_VERSION}"
+  )
   if ("${env:ENABLE_CSI_PROXY}" -eq "true") {
     if (ShouldWrite-File ${env:NODE_DIR}\csi-proxy.exe) {
-      $tmp_dir = 'C:\k8s_tmp'
-      New-Item -Force -ItemType 'directory' $tmp_dir | Out-Null
-      $filename = 'csi-proxy.exe'
-      $urls = "${env:CSI_PROXY_STORAGE_PATH}/${env:CSI_PROXY_VERSION}/$filename"
-      MustDownload-File -OutFile $tmp_dir\$filename -URLs $urls
-      Move-Item -Force $tmp_dir\$filename ${env:NODE_DIR}\$filename
-      # Clean up the temporary directory
-      Remove-Item -Force -Recurse $tmp_dir
+      Download-CSIProxyBinaries -NodePath '${env:NODE_DIR}' -Url ${env:CSI_PROXY_STORAGE_PATH}/${env:CSI_PROXY_VERSION}/csi-proxy.exe
     }
   }
 }
@@ -426,6 +422,45 @@ function Start-CSIProxy {
     & sc.exe failure csiproxy reset= 0 actions= restart/10000
     Log-Output "Starting CSI Proxy Service"
     & sc.exe start csiproxy
+  }
+}
+
+function Schedule-Update-CSIProxy {
+  param (
+    [parameter(Mandatory=$false)] [string]$VersionFile = "${env:NODE_DIR}\csiproxy_version",
+    [parameter(Mandatory=$false)] [string]$Version = "${env:CSI_PROXY_VERSION}",
+    # Interval at which to check version file.
+    # Minimum 1 minute, maximum 31 days (see https://docs.microsoft.com/en-us/windows/desktop/taskschd/taskschedulerschema-interval-repetitiontype-element).
+    [parameter(Mandatory=$true)] [TimeSpan]$RepetitionInterval
+  )
+  # Write a powershell script to a file that imports this module ($PSCommandPath)
+  # and calls Rotate-Files with the configured arguments.
+  $scriptPath = "C:\update-csi-proxy.ps1"
+  New-Item -Force -ItemType file -Path $scriptPath | Out-Null
+  Set-Content -Path $scriptPath @"
+`$ErrorActionPreference = 'Stop'
+Import-Module -Force ${PSCommandPath}
+Update-CSIProxy -VersionFile '${VersionFile}' -Version '${Version}' -NodePath '${env:NODE_DIR}' -StoragePath '${env:CSI_PROXY_STORAGE_PATH}'
+"@
+  # The task will execute the rotate-kube-logs.ps1 script created above.
+  # We explicitly set -WorkingDirectory to $Path for safety's sake, otherwise
+  # it runs in %windir%\system32 by default, which sounds dangerous.
+  $action = New-ScheduledTaskAction -Execute "powershell" -Argument "-NoLogo -NonInteractive -File ${scriptPath}"
+  # Start the task immediately, and trigger the task once every $RepetitionInterval.
+  $trigger = New-ScheduledTaskTrigger -Once -At $(Get-Date) -RepetitionInterval $RepetitionInterval
+  # Run the task as the same user who is currently running this script.
+  $principal = New-ScheduledTaskPrincipal $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
+  # Just use the default task settings.
+  $settings = New-ScheduledTaskSettingsSet
+  # Create the ScheduledTask object from the above parameters.
+  $task = New-ScheduledTask -Action $action -Principal $principal -Trigger $trigger -Settings $settings -Description "Update CSI Proxy if new version is available"
+  # Register the new ScheduledTask with the Task Scheduler.
+  # Always try to unregister and re-register, in case it already exists (e.g. across reboots).
+  $name = "UpdateCsiPorxyVersion"
+  try {
+    Unregister-ScheduledTask -Confirm:$false -TaskName $name
+  } catch {} finally {
+    Register-ScheduledTask -TaskName $name -InputObject $task
   }
 }
 

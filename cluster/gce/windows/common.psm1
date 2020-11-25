@@ -482,6 +482,39 @@ function Rotate-Files {
   }
 }
 
+function Download-CSIProxyBinaries {
+  param (
+    [parameter(Mandatory=$true)] [string]$NodePath,
+    [parameter(Mandatory=$true)] [string]$Url
+  )
+  $tmp_dir = 'C:\k8s_tmp'
+  New-Item -Force -ItemType 'directory' $tmp_dir | Out-Null
+  $filename = 'csi-proxy.exe'
+  MustDownload-File -OutFile $tmp_dir\$filename -URLs $Url
+  sc.exe stop csiproxy
+  Remove-Item -Force $NodePath\$filename | Out-Null
+  Move-Item -Force $tmp_dir\$filename $NodePath\$filename
+  # Clean up the temporary directory
+  Remove-Item -Force -Recurse $tmp_dir
+}
+
+function Update-CSIProxy {
+  param (
+    [parameter(Mandatory=$true)] [string]$VersionFile,
+    [parameter(Mandatory=$true)] [string]$Version,
+    [parameter(Mandatory=$true)] [string]$NodePath,
+    [parameter(Mandatory=$true)] [string]$StoragePath
+  )
+
+  if (Test-Path $VersionFile -PathType Leaf) {
+    $newversion = (Get-Content -path $VersionFile) -join "`n"
+    if ($Version -ne $newversion) {
+      Download-CSIProxyBinaries -NodePath $NodePath -Url $StoragePath/$newversion/csi-proxy.exe
+      sc.exe start csiproxy
+    }
+  }
+}
+
 # Schedule-LogRotation schedules periodic log rotation with the Windows Task Scheduler.
 # Rotation is performed by Rotate-Files, according to -Pattern and -Config.
 # The system will check whether log files need to be rotated at -RepetitionInterval.
