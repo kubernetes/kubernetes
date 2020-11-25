@@ -935,6 +935,7 @@ func (rs *REST) tryDefaultValidateServiceClusterIPFields(oldService, service *ap
 	if service.Spec.IPFamilyPolicy != nil {
 		el := make(field.ErrorList, 0)
 		if *(service.Spec.IPFamilyPolicy) == api.IPFamilyPolicySingleStack {
+			//FIXME: leave this for validation to catch
 			if len(service.Spec.ClusterIPs) == 2 {
 				el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy, "must be RequireDualStack or PreferDualStack when multiple 'clusterIPs' are specified"))
 			}
@@ -956,10 +957,12 @@ func (rs *REST) tryDefaultValidateServiceClusterIPFields(oldService, service *ap
 
 		// we have previously validated for ip correctness and if family exist it will match ip family
 		// so the following is safe to do
+		//FIXME: once the 2nd-layer is removed, this could be a lie.
 		isIPv6 := netutil.IsIPv6String(ip)
 
 		// Family is not specified yet.
 		if i >= len(service.Spec.IPFamilies) {
+			// FIXME: don't duplicate code - parameterize
 			if isIPv6 {
 				// first make sure that family(ip) is configured
 				if _, found := rs.serviceIPAllocatorsByFamily[api.IPv6Protocol]; !found {
