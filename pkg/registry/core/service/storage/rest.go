@@ -185,7 +185,7 @@ func (al *RESTAllocStuff) allocateCreate(service *api.Service, dryRun bool) (tra
 
 	// Ensure IP family fields are correctly initialized.  We do it here, since
 	// we want this to be visible even when dryRun == true.
-	if err := al.tryDefaultValidateServiceClusterIPFields(nil, service); err != nil {
+	if err := al.initIPFamilyFields(nil, service); err != nil {
 		return nil, err
 	}
 
@@ -395,7 +395,7 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	defer nodePortOp.Finish()
 
 	// try set ip families (for missing ip families)
-	if err := rs.alloc.tryDefaultValidateServiceClusterIPFields(oldService, service); err != nil {
+	if err := rs.alloc.initIPFamilyFields(oldService, service); err != nil {
 		return nil, false, err
 	}
 
@@ -874,7 +874,7 @@ func isMatchingPreferDualStackClusterIPFields(oldService, service *api.Service) 
 
 // attempts to default service ip families according to cluster configuration
 // while ensuring that provided families are configured on cluster.
-func (al *RESTAllocStuff) tryDefaultValidateServiceClusterIPFields(oldService, service *api.Service) error {
+func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) error {
 	// can not do anything here
 	if service.Spec.Type == api.ServiceTypeExternalName {
 		return nil
