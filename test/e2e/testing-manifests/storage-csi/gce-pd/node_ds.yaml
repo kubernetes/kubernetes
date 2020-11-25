@@ -18,7 +18,7 @@ spec:
       hostNetwork: true
       containers:
         - name: csi-driver-registrar
-          image: gcr.io/gke-release/csi-node-driver-registrar:v1.2.0-gke.0
+          image: gcr.io/gke-release/csi-node-driver-registrar:v1.3.0-gke.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -40,7 +40,7 @@ spec:
         - name: gce-pd-driver
           securityContext:
             privileged: true
-          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.6.2-gke.0
+          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.7.0-gke.0
           args:
             - "--v=5"
             - "--endpoint=unix:/csi/csi.sock"

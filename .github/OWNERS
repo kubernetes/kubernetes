@@ -4,13 +4,12 @@ reviewers:
   - castrojo
   - cblecker
   - guineveresaenger
+  - justaugustus
   - mrbobbytables
   - nikhita
   - parispittman
 approvers:
-  - castrojo
-  - cblecker
-  - nikhita
+  - sig-contribex-approvers
   - parispittman
 emeritus_approvers:
   - Phillels

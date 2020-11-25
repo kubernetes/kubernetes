@@ -14,13 +14,22 @@ import (
 
 // Criu struct
 type Criu struct {
-	swrkCmd *exec.Cmd
-	swrkSk  *os.File
+	swrkCmd  *exec.Cmd
+	swrkSk   *os.File
+	swrkPath string
 }
 
 // MakeCriu returns the Criu object required for most operations
 func MakeCriu() *Criu {
-	return &Criu{}
+	return &Criu{
+		swrkPath: "criu",
+	}
+}
+
+// SetCriuPath allows setting the path to the CRIU binary
+// if it is in a non standard location
+func (c *Criu) SetCriuPath(path string) {
+	c.swrkPath = path
 }
 
 // Prepare sets up everything for the RPC communication to CRIU
@@ -36,7 +45,7 @@ func (c *Criu) Prepare() error {
 	defer srv.Close()
 
 	args := []string{"swrk", strconv.Itoa(fds[1])}
-	cmd := exec.Command("criu", args...)
+	cmd := exec.Command(c.swrkPath, args...)
 
 	err = cmd.Start()
 	if err != nil {

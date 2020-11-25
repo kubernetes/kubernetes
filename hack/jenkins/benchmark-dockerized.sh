@@ -31,6 +31,10 @@ retry() {
   "$@"
 }
 
+# The root of the build/dist directory
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+export KUBE_ROOT
+
 # Runs benchmark integration tests, producing pretty-printed results
 # in ${WORKSPACE}/artifacts. This script can also be run within a
 # kubekins-test container with a kubernetes repo mounted (at the path

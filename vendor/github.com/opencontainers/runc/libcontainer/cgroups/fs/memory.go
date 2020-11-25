@@ -37,11 +37,8 @@ func (s *MemoryGroup) Name() string {
 	return "memory"
 }
 
-func (s *MemoryGroup) Apply(d *cgroupData) (err error) {
-	path, err := d.path("memory")
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
-	} else if path == "" {
+func (s *MemoryGroup) Apply(path string, d *cgroupData) (err error) {
+	if path == "" {
 		return nil
 	}
 	if memoryAssigned(d.config) {
@@ -66,11 +63,7 @@ func (s *MemoryGroup) Apply(d *cgroupData) (err error) {
 
 	// We need to join memory cgroup after set memory limits, because
 	// kmem.limit_in_bytes can only be set when the cgroup is empty.
-	_, err = d.join("memory")
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
-	}
-	return nil
+	return join(path, d.pid)
 }
 
 func setMemoryAndSwap(path string, cgroup *configs.Cgroup) error {
@@ -163,10 +156,6 @@ func (s *MemoryGroup) Set(path string, cgroup *configs.Cgroup) error {
 	}
 
 	return nil
-}
-
-func (s *MemoryGroup) Remove(d *cgroupData) error {
-	return removePath(d.path("memory"))
 }
 
 func (s *MemoryGroup) GetStats(path string, stats *cgroups.Stats) error {

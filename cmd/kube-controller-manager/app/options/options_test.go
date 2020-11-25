@@ -24,17 +24,21 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	cpconfig "k8s.io/cloud-provider/config"
+	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
+	cpoptions "k8s.io/cloud-provider/options"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
-	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
+	cmconfig "k8s.io/controller-manager/config"
+	cmoptions "k8s.io/controller-manager/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
+	cronjobconfig "k8s.io/kubernetes/pkg/controller/cronjob/config"
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
@@ -50,7 +54,6 @@ import (
 	replicasetconfig "k8s.io/kubernetes/pkg/controller/replicaset/config"
 	replicationconfig "k8s.io/kubernetes/pkg/controller/replication/config"
 	resourcequotaconfig "k8s.io/kubernetes/pkg/controller/resourcequota/config"
-	serviceconfig "k8s.io/kubernetes/pkg/controller/service/config"
 	serviceaccountconfig "k8s.io/kubernetes/pkg/controller/serviceaccount/config"
 	statefulsetconfig "k8s.io/kubernetes/pkg/controller/statefulset/config"
 	ttlafterfinishedconfig "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config"
@@ -100,6 +103,8 @@ var args = []string{
 	"--enable-taint-manager=false",
 	"--cluster-signing-duration=10h",
 	"--flex-volume-plugin-dir=/flex-volume-plugin",
+	"--volume-host-cidr-denylist=127.0.0.1/28,feed::/16",
+	"--volume-host-allow-local-loopback=false",
 	"--horizontal-pod-autoscaler-downscale-delay=2m",
 	"--horizontal-pod-autoscaler-sync-period=45s",
 	"--horizontal-pod-autoscaler-upscale-delay=1m",
@@ -165,7 +170,7 @@ func TestAddFlags(t *testing.T) {
 
 	expected := &KubeControllerManagerOptions{
 		Generic: &cmoptions.GenericControllerManagerConfigurationOptions{
-			GenericControllerManagerConfiguration: &kubectrlmgrconfig.GenericControllerManagerConfiguration{
+			GenericControllerManagerConfiguration: &cmconfig.GenericControllerManagerConfiguration{
 				Port:            10252,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 				Address:         "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 				MinResyncPeriod: metav1.Duration{Duration: 8 * time.Hour},
@@ -193,8 +198,8 @@ func TestAddFlags(t *testing.T) {
 				},
 			},
 		},
-		KubeCloudShared: &cmoptions.KubeCloudSharedOptions{
-			KubeCloudSharedConfiguration: &kubectrlmgrconfig.KubeCloudSharedConfiguration{
+		KubeCloudShared: &cpoptions.KubeCloudSharedOptions{
+			KubeCloudSharedConfiguration: &cpconfig.KubeCloudSharedConfiguration{
 				UseServiceAccountCredentials: true,
 				RouteReconciliationPeriod:    metav1.Duration{Duration: 30 * time.Second},
 				NodeMonitorPeriod:            metav1.Duration{Duration: 10 * time.Second},
@@ -204,14 +209,14 @@ func TestAddFlags(t *testing.T) {
 				CIDRAllocatorType:            "CloudAllocator",
 				ConfigureCloudRoutes:         false,
 			},
-			CloudProvider: &cmoptions.CloudProviderOptions{
-				CloudProviderConfiguration: &kubectrlmgrconfig.CloudProviderConfiguration{
+			CloudProvider: &cpoptions.CloudProviderOptions{
+				CloudProviderConfiguration: &cpconfig.CloudProviderConfiguration{
 					Name:            "gce",
 					CloudConfigFile: "/cloud-config",
 				},
 			},
 		},
-		ServiceController: &cmoptions.ServiceControllerOptions{
+		ServiceController: &cpoptions.ServiceControllerOptions{
 			ServiceControllerConfiguration: &serviceconfig.ServiceControllerConfiguration{
 				ConcurrentServiceSyncs: 2,
 			},
@@ -310,6 +315,11 @@ func TestAddFlags(t *testing.T) {
 				ConcurrentJobSyncs: 5,
 			},
 		},
+		CronJobController: &CronJobControllerOptions{
+			&cronjobconfig.CronJobControllerConfiguration{
+				ConcurrentCronJobSyncs: 5,
+			},
+		},
 		NamespaceController: &NamespaceControllerOptions{
 			&namespaceconfig.NamespaceControllerConfiguration{
 				NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
@@ -350,6 +360,8 @@ func TestAddFlags(t *testing.T) {
 						IncrementTimeoutHostPath: 45,
 					},
 				},
+				VolumeHostCIDRDenylist:       []string{"127.0.0.1/28", "feed::/16"},
+				VolumeHostAllowLocalLoopback: false,
 			},
 		},
 		PodGCController: &PodGCControllerOptions{
@@ -399,8 +411,10 @@ func TestAddFlags(t *testing.T) {
 			BindNetwork: "tcp",
 		}).WithLoopback(),
 		Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
-			CacheTTL:   10 * time.Second,
-			ClientCert: apiserveroptions.ClientCertAuthenticationOptions{},
+			CacheTTL:            10 * time.Second,
+			ClientTimeout:       10 * time.Second,
+			WebhookRetryBackoff: apiserveroptions.DefaultAuthWebhookRetryBackoff(),
+			ClientCert:          apiserveroptions.ClientCertAuthenticationOptions{},
 			RequestHeader: apiserveroptions.RequestHeaderAuthenticationOptions{
 				UsernameHeaders:     []string{"x-remote-user"},
 				GroupHeaders:        []string{"x-remote-group"},
@@ -411,6 +425,8 @@ func TestAddFlags(t *testing.T) {
 		Authorization: &apiserveroptions.DelegatingAuthorizationOptions{
 			AllowCacheTTL:                10 * time.Second,
 			DenyCacheTTL:                 10 * time.Second,
+			ClientTimeout:                10 * time.Second,
+			WebhookRetryBackoff:          apiserveroptions.DefaultAuthWebhookRetryBackoff(),
 			RemoteKubeConfigFileOptional: true,
 			AlwaysAllowPaths:             []string{"/healthz"}, // note: this does not match /healthz/ or /healthz/*
 		},
@@ -444,7 +460,7 @@ func TestApplyTo(t *testing.T) {
 
 	expected := &kubecontrollerconfig.Config{
 		ComponentConfig: kubectrlmgrconfig.KubeControllerManagerConfiguration{
-			Generic: kubectrlmgrconfig.GenericControllerManagerConfiguration{
+			Generic: cmconfig.GenericControllerManagerConfiguration{
 				Port:            10252,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 				Address:         "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 				MinResyncPeriod: metav1.Duration{Duration: 8 * time.Hour},
@@ -469,7 +485,7 @@ func TestApplyTo(t *testing.T) {
 					EnableContentionProfiling: true,
 				},
 			},
-			KubeCloudShared: kubectrlmgrconfig.KubeCloudSharedConfiguration{
+			KubeCloudShared: cpconfig.KubeCloudSharedConfiguration{
 				UseServiceAccountCredentials: true,
 				RouteReconciliationPeriod:    metav1.Duration{Duration: 30 * time.Second},
 				NodeMonitorPeriod:            metav1.Duration{Duration: 10 * time.Second},
@@ -478,7 +494,7 @@ func TestApplyTo(t *testing.T) {
 				AllocateNodeCIDRs:            true,
 				CIDRAllocatorType:            "CloudAllocator",
 				ConfigureCloudRoutes:         false,
-				CloudProvider: kubectrlmgrconfig.CloudProviderConfiguration{
+				CloudProvider: cpconfig.CloudProviderConfiguration{
 					Name:            "gce",
 					CloudConfigFile: "/cloud-config",
 				},
@@ -556,6 +572,9 @@ func TestApplyTo(t *testing.T) {
 			JobController: jobconfig.JobControllerConfiguration{
 				ConcurrentJobSyncs: 5,
 			},
+			CronJobController: cronjobconfig.CronJobControllerConfiguration{
+				ConcurrentCronJobSyncs: 5,
+			},
 			NamespaceController: namespaceconfig.NamespaceControllerConfiguration{
 				NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},
 				ConcurrentNamespaceSyncs: 20,
@@ -589,6 +608,8 @@ func TestApplyTo(t *testing.T) {
 						IncrementTimeoutHostPath: 45,
 					},
 				},
+				VolumeHostCIDRDenylist:       []string{"127.0.0.1/28", "feed::/16"},
+				VolumeHostAllowLocalLoopback: false,
 			},
 			PodGCController: podgcconfig.PodGCControllerConfiguration{
 				TerminatedPodGCThreshold: 12000,

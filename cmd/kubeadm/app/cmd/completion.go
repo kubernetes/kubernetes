@@ -96,8 +96,8 @@ func GetSupportedShells() []string {
 	return shells
 }
 
-// NewCmdCompletion returns the "kubeadm completion" command
-func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
+// newCmdCompletion returns the "kubeadm completion" command
+func newCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "completion SHELL",
 		Short:   "Output shell completion code for the specified shell (bash or zsh)",
@@ -260,7 +260,7 @@ autoload -U +X bashcompinit && bashcompinit
 # use word boundary patterns for BSD or GNU sed
 LWORD='[[:<:]]'
 RWORD='[[:>:]]'
-if sed --help 2>&1 | grep -q GNU; then
+if sed --version 2>&1 | grep -q GNU; then
 	LWORD='\<'
 	RWORD='\>'
 fi

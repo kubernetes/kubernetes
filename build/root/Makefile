@@ -30,7 +30,7 @@ endif
 #   clean: Clean up.
 
 # It's necessary to set this because some environments don't link sh -> bash.
-SHELL := /bin/bash
+SHELL := /usr/bin/env bash
 
 # We don't need make's built-in rules.
 MAKEFLAGS += --no-builtin-rules
@@ -209,8 +209,8 @@ define TEST_E2E_NODE_HELP_INFO
 #
 # Args:
 #  FOCUS: Regexp that matches the tests to be run.  Defaults to "".
-#  SKIP: Regexp that matches the tests that needs to be skipped.  Defaults
-#    to "\[Flaky\]|\[Slow\]|\[Serial\]".
+#  SKIP: Regexp that matches the tests that needs to be skipped.
+#    Defaults to "\[Flaky\]|\[Slow\]|\[Serial\]".
 #  TEST_ARGS: A space-separated list of arguments to pass to node e2e test.
 #    Defaults to "".
 #  RUN_UNTIL_FAILURE: If true, pass --untilItFails to ginkgo so tests are run
@@ -219,16 +219,16 @@ define TEST_E2E_NODE_HELP_INFO
 #    to false.
 #  ARTIFACTS: Local directory to scp test artifacts into from the remote hosts
 #    for REMOTE=true. Local directory to write juntil xml results into for REMOTE=false.
-#    Defaults to "/tmp/_artifacts".
-#  LIST_IMAGES: If true, don't run tests.  Just output the list of available
-#    images for testing.  Defaults to false.
+#    Defaults to "/tmp/_artifacts/$$(date +%y%m%dT%H%M%S)".
+#  LIST_IMAGES: For REMOTE=true only. If true, don't run tests. Just output the
+#    list of available images for testing.  Defaults to false.
 #  PARALLELISM: The number of ginkgo nodes to run.  Defaults to 8.
 #  RUNTIME: Container runtime to use (eg. docker, remote).
 #    Defaults to "docker".
 #  CONTAINER_RUNTIME_ENDPOINT: remote container endpoint to connect to.
-#   Used when RUNTIME is set to "remote".
+#    Used when RUNTIME is set to "remote".
 #  IMAGE_SERVICE_ENDPOINT: remote image endpoint to connect to, to prepull images.
-#   Used when RUNTIME is set to "remote".
+#    Used when RUNTIME is set to "remote".
 #  IMAGE_CONFIG_FILE: path to a file containing image configuration.
 #  SYSTEM_SPEC_NAME: The name of the system spec to be used for validating the
 #    image in the node conformance test. The specs are located at
@@ -246,12 +246,13 @@ define TEST_E2E_NODE_HELP_INFO
 #  CLEANUP: For REMOTE=true only.  If false, do not stop processes or delete
 #    test files on remote hosts.  Defaults to true.
 #  IMAGE_PROJECT: For REMOTE=true only.  Project containing images provided to
-#  IMAGES.  Defaults to "kubernetes-node-e2e-images".
+#    $$IMAGES.  Defaults to "kubernetes-node-e2e-images".
 #  INSTANCE_PREFIX: For REMOTE=true only.  Instances created from images will
-#    have the name "${INSTANCE_PREFIX}-${IMAGE_NAME}".  Defaults to "test".
+#    have the name "$${INSTANCE_PREFIX}-$${IMAGE_NAME}".  Defaults to "test".
 #  INSTANCE_METADATA: For REMOTE=true and running on GCE only.
 #  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
-#	 Defaults to false.
+#    Defaults to false.
+#  TEST_SUITE: For REMOTE=true only. Test suite to use. Defaults to "default".
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container

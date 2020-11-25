@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 
 	"time"
 
@@ -66,6 +67,8 @@ type nodeInfoManager struct {
 	nodeName        types.NodeName
 	volumeHost      volume.VolumeHost
 	migratedPlugins map[string](func() bool)
+	// lock protects changes to node.
+	lock sync.Mutex
 }
 
 // If no updates is needed, the function must return the same Node object as the input.
@@ -175,6 +178,9 @@ func (nim *nodeInfoManager) updateNode(updateFuncs ...nodeUpdateFunc) error {
 // the effects of previous updateFuncs to avoid potential conflicts. For example, if multiple
 // functions update the same field, updates in the last function are persisted.
 func (nim *nodeInfoManager) tryUpdateNode(updateFuncs ...nodeUpdateFunc) error {
+	nim.lock.Lock()
+	defer nim.lock.Unlock()
+
 	// Retrieve the latest version of Node before attempting update, so that
 	// existing changes are not overwritten.
 

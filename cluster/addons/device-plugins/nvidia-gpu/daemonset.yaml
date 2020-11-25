@@ -5,7 +5,7 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: nvidia-gpu-device-plugin
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
 spec:
   selector:
     matchLabels:

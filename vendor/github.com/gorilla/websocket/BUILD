@@ -11,6 +11,7 @@ go_library(
         "conn_write.go",
         "conn_write_legacy.go",
         "doc.go",
+        "join.go",
         "json.go",
         "mask.go",
         "prepared.go",

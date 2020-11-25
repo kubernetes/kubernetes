@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "algorithm.go",
         "prune.go",
+        "prunenulls.go",
         "surroundingobject.go",
         "validation.go",
     ],
@@ -19,14 +20,17 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
-        "//vendor/github.com/go-openapi/strfmt:go_default_library",
-        "//vendor/github.com/go-openapi/validate:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/validation/strfmt:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/validation/validate:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["algorithm_test.go"],
+    srcs = [
+        "algorithm_test.go",
+        "prunenulls_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/schema:go_default_library",

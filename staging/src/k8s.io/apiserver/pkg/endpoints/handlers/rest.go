@@ -31,12 +31,14 @@ import (
 	grpccodes "google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
@@ -46,7 +48,19 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/klog/v2"
+)
+
+const (
+	// DuplicateOwnerReferencesWarningFormat is the warning that a client receives when a create/update request contains
+	// duplicate owner reference entries.
+	DuplicateOwnerReferencesWarningFormat = ".metadata.ownerReferences contains duplicate entries; API server dedups owner references in 1.20+, and may reject such requests as early as 1.24; please fix your requests; duplicate UID(s) observed: %v"
+	// DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat indicates the duplication was observed
+	// after mutating admission.
+	// NOTE: For CREATE and UPDATE requests the API server dedups both before and after mutating admission.
+	// For PATCH request the API server only dedups after mutating admission.
+	DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat = ".metadata.ownerReferences contains duplicate entries after mutating admission happens; API server dedups owner references in 1.20+, and may reject such requests as early as 1.24; please fix your requests; duplicate UID(s) observed: %v"
 )
 
 // RequestScope encapsulates common fields across all RESTful handler methods.
@@ -323,11 +337,79 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 	return nil
 }
 
+// dedupOwnerReferences dedups owner references over the entire entry.
+// NOTE: We don't know enough about the existing cases of owner references
+// sharing the same UID but different fields. Nor do we know what might break.
+// In the future we may just dedup/reject owner references with the same UID.
+func dedupOwnerReferences(refs []metav1.OwnerReference) ([]metav1.OwnerReference, []string) {
+	var result []metav1.OwnerReference
+	var duplicates []string
+	seen := make(map[types.UID]struct{})
+	for _, ref := range refs {
+		_, ok := seen[ref.UID]
+		// Short-circuit if we haven't seen the UID before. Otherwise
+		// check the entire list we have so far.
+		if !ok || !hasOwnerReference(result, ref) {
+			seen[ref.UID] = struct{}{}
+			result = append(result, ref)
+		} else {
+			duplicates = append(duplicates, string(ref.UID))
+		}
+	}
+	return result, duplicates
+}
+
+// hasOwnerReference returns true if refs has an item equal to ref. The function
+// focuses on semantic equality instead of memory equality, to catch duplicates
+// with different pointer addresses. The function uses apiequality.Semantic
+// instead of implementing its own comparison, to tolerate API changes to
+// metav1.OwnerReference.
+// NOTE: This is expensive, but we accept it because we've made sure it only
+// happens to owner references containing duplicate UIDs, plus typically the
+// number of items in the list should be small.
+func hasOwnerReference(refs []metav1.OwnerReference, ref metav1.OwnerReference) bool {
+	for _, r := range refs {
+		if apiequality.Semantic.DeepEqual(r, ref) {
+			return true
+		}
+	}
+	return false
+}
+
+// dedupOwnerReferencesAndAddWarning dedups owner references in the object metadata.
+// If duplicates are found, the function records a warning to the provided context.
+func dedupOwnerReferencesAndAddWarning(obj runtime.Object, requestContext context.Context, afterMutatingAdmission bool) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		// The object doesn't have metadata. Nothing we need to do here.
+		return
+	}
+	refs := accessor.GetOwnerReferences()
+	deduped, duplicates := dedupOwnerReferences(refs)
+	if len(duplicates) > 0 {
+		// NOTE: For CREATE and UPDATE requests the API server dedups both before and after mutating admission.
+		// For PATCH request the API server only dedups after mutating admission.
+		format := DuplicateOwnerReferencesWarningFormat
+		if afterMutatingAdmission {
+			format = DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat
+		}
+		warning.AddWarning(requestContext, "", fmt.Sprintf(format,
+			strings.Join(duplicates, ", ")))
+		accessor.SetOwnerReferences(deduped)
+	}
+}
+
 // setObjectSelfLink sets the self link of an object as needed.
 // TODO: remove the need for the namer LinkSetters by requiring objects implement either Object or List
 //   interfaces
 func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Request, namer ScopeNamer) error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
+		// Ensure that for empty lists we don't return <nil> items.
+		if meta.IsListType(obj) && meta.LenList(obj) == 0 {
+			if err := meta.SetList(obj, []runtime.Object{}); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 

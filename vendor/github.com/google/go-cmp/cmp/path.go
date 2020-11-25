@@ -177,7 +177,8 @@ type structField struct {
 	// pvx, pvy, and field are only valid if unexported is true.
 	unexported bool
 	mayForce   bool                // Forcibly allow visibility
-	pvx, pvy   reflect.Value       // Parent values
+	paddr      bool                // Was parent addressable?
+	pvx, pvy   reflect.Value       // Parent values (always addressible)
 	field      reflect.StructField // Field information
 }
 
@@ -189,8 +190,8 @@ func (sf StructField) Values() (vx, vy reflect.Value) {
 
 	// Forcibly obtain read-write access to an unexported struct field.
 	if sf.mayForce {
-		vx = retrieveUnexportedField(sf.pvx, sf.field)
-		vy = retrieveUnexportedField(sf.pvy, sf.field)
+		vx = retrieveUnexportedField(sf.pvx, sf.field, sf.paddr)
+		vy = retrieveUnexportedField(sf.pvy, sf.field, sf.paddr)
 		return vx, vy // CanInterface reports true
 	}
 	return sf.vx, sf.vy // CanInterface reports false

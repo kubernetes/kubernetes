@@ -36,6 +36,7 @@ source "${KUBE_ROOT}/test/cmd/certificate.sh"
 source "${KUBE_ROOT}/test/cmd/core.sh"
 source "${KUBE_ROOT}/test/cmd/crd.sh"
 source "${KUBE_ROOT}/test/cmd/create.sh"
+source "${KUBE_ROOT}/test/cmd/debug.sh"
 source "${KUBE_ROOT}/test/cmd/delete.sh"
 source "${KUBE_ROOT}/test/cmd/diff.sh"
 source "${KUBE_ROOT}/test/cmd/discovery.sh"
@@ -58,11 +59,10 @@ source "${KUBE_ROOT}/test/cmd/wait.sh"
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
-API_PORT=${API_PORT:-8080}
 SECURE_API_PORT=${SECURE_API_PORT:-6443}
 API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_HEALTHZ_PORT=${KUBELET_HEALTHZ_PORT:-10248}
-CTLRMGR_PORT=${CTLRMGR_PORT:-10252}
+SECURE_CTLRMGR_PORT=${SECURE_CTLRMGR_PORT:-10257}
 PROXY_HOST=127.0.0.1 # kubectl only serves on localhost.
 
 IMAGE_NGINX="k8s.gcr.io/nginx:1.7.9"
@@ -306,10 +306,12 @@ setup() {
 
   # TODO: we need to note down the current default namespace and set back to this
   # namespace after the tests are done.
-  kubectl config view
   CONTEXT="test"
-  kubectl config set-context "${CONTEXT}"
+  kubectl config set-credentials test-admin --token admin-token
+  kubectl config set-cluster local --insecure-skip-tls-verify --server "https://127.0.0.1:${SECURE_API_PORT}"
+  kubectl config set-context "${CONTEXT}" --user test-admin --cluster local
   kubectl config use-context "${CONTEXT}"
+  kubectl config view
 
   kube::log::status "Setup complete"
 }
@@ -338,13 +340,9 @@ runTests() {
     kubectl config set-context "${CONTEXT}" --namespace="${ns_name}"
   }
 
-  kube_flags=(
-    '-s' "http://127.0.0.1:${API_PORT}"
-  )
+  kube_flags=( '-s' "https://127.0.0.1:${SECURE_API_PORT}" '--insecure-skip-tls-verify' )
 
-  kube_flags_without_token=(
-    '-s' "https://127.0.0.1:${SECURE_API_PORT}" '--insecure-skip-tls-verify=true'
-  )
+  kube_flags_without_token=( "${kube_flags[@]}" )
 
   # token defined in hack/testdata/auth-tokens.csv
   kube_flags_with_token=( "${kube_flags_without_token[@]}" '--token=admin-token' )
@@ -942,6 +940,16 @@ runTests() {
   ####################
 
   record_command run_wait_tests
+
+  ####################
+  # kubectl debug    #
+  ####################
+  if kube::test::if_supports_resource "${pods}" ; then
+    record_command run_kubectl_debug_pod_tests
+  fi
+  if kube::test::if_supports_resource "${nodes}" ; then
+    record_command run_kubectl_debug_node_tests
+  fi
 
   cleanup_tests
 }

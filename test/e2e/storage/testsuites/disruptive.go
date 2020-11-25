@@ -26,6 +26,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -41,7 +42,7 @@ func InitDisruptiveTestSuite() TestSuite {
 	return &disruptiveTestSuite{
 		tsInfo: TestSuiteInfo{
 			Name:       "disruptive",
-			FeatureTag: "[Disruptive]",
+			FeatureTag: "[Disruptive][LinuxOnly]",
 			TestPatterns: []testpatterns.TestPattern{
 				// FSVolMode is already covered in subpath testsuite
 				testpatterns.DefaultFsInlineVolume,
@@ -166,6 +167,7 @@ func (s *disruptiveTestSuite) DefineTests(driver TestDriver, pattern testpattern
 						InlineVolumeSources: inlineSources,
 						SeLinuxLabel:        e2epv.SELinuxLabel,
 						NodeSelection:       l.config.ClientNodeSelection,
+						ImageID:             e2evolume.GetDefaultTestImageID(),
 					}
 					l.pod, err = e2epod.CreateSecPodWithNodeSelection(l.cs, &podConfig, framework.PodStartTimeout)
 					framework.ExpectNoError(err, "While creating pods for kubelet restart test")

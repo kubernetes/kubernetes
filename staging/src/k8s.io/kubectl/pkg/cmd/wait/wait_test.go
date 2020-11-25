@@ -82,6 +82,11 @@ func addCondition(in *unstructured.Unstructured, name, status string) *unstructu
 
 func TestWaitForDeletion(t *testing.T) {
 	scheme := runtime.NewScheme()
+	listMapping := map[schema.GroupVersionResource]string{
+		{Group: "group", Version: "version", Resource: "theresource"}:   "TheKindList",
+		{Group: "group", Version: "version", Resource: "theresource-1"}: "TheKindList",
+		{Group: "group", Version: "version", Resource: "theresource-2"}: "TheKindList",
+	}
 
 	tests := []struct {
 		name       string
@@ -105,7 +110,7 @@ func TestWaitForDeletion(t *testing.T) {
 				},
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
-				return dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				return dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
 			},
 			timeout: 10 * time.Second,
 
@@ -145,7 +150,7 @@ func TestWaitForDeletion(t *testing.T) {
 				},
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
-				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
 				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, newUnstructuredList(newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")), nil
 				})
@@ -192,7 +197,7 @@ func TestWaitForDeletion(t *testing.T) {
 				},
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
-				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
 				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, newUnstructuredList(newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")), nil
 				})
@@ -225,7 +230,7 @@ func TestWaitForDeletion(t *testing.T) {
 				},
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
-				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
 				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 					unstructuredObj := newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")
 					unstructuredObj.SetResourceVersion("123")
@@ -282,7 +287,7 @@ func TestWaitForDeletion(t *testing.T) {
 				},
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
-				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
 				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, newUnstructuredList(newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")), nil
 				})
@@ -326,7 +331,7 @@ func TestWaitForDeletion(t *testing.T) {
 				},
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
-				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
 				fakeClient.PrependReactor("get", "theresource-1", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo-1"), nil
 				})
@@ -371,7 +376,7 @@ func TestWaitForDeletion(t *testing.T) {
 				},
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
-				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
 				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, newUnstructuredList(newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")), nil
 				})
@@ -449,6 +454,9 @@ func TestWaitForDeletion(t *testing.T) {
 
 func TestWaitForCondition(t *testing.T) {
 	scheme := runtime.NewScheme()
+	listMapping := map[schema.GroupVersionResource]string{
+		{Group: "group", Version: "version", Resource: "theresource"}: "TheKindList",
+	}
 
 	tests := []struct {
 		name       string
@@ -471,7 +479,7 @@ func TestWaitForCondition(t *testing.T) {
 				},
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
-				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
 				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, newUnstructuredList(addCondition(
 						newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
@@ -517,7 +525,7 @@ func TestWaitForCondition(t *testing.T) {
 				},
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
-				return dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				return dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
 			},
 			timeout:     10 * time.Second,
 			expectedErr: "resource name must be provided",
@@ -540,7 +548,7 @@ func TestWaitForCondition(t *testing.T) {
 				},
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
-				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
 				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, addCondition(
 						newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
@@ -576,7 +584,7 @@ func TestWaitForCondition(t *testing.T) {
 				},
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
-				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
 				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 					unstructuredObj := newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")
 					unstructuredObj.SetResourceVersion("123")
@@ -633,7 +641,7 @@ func TestWaitForCondition(t *testing.T) {
 				},
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
-				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
 				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, newUnstructuredList(newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")), nil
 				})
@@ -673,7 +681,7 @@ func TestWaitForCondition(t *testing.T) {
 				},
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
-				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
 				fakeClient.PrependWatchReactor("theresource", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
 					fakeWatch := watch.NewRaceFreeFake()
 					fakeWatch.Action(watch.Added, addCondition(
@@ -710,7 +718,7 @@ func TestWaitForCondition(t *testing.T) {
 				},
 			},
 			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
-				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
 				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
 					return true, newUnstructuredList(newUnstructured("group/version", "TheKind", "ns-foo", "name-foo")), nil
 				})
@@ -785,5 +793,35 @@ func TestWaitForCondition(t *testing.T) {
 
 			test.validateActions(t, fakeClient.Actions())
 		})
+	}
+}
+
+func TestWaitForDeletionIgnoreNotFound(t *testing.T) {
+	scheme := runtime.NewScheme()
+	listMapping := map[schema.GroupVersionResource]string{
+		{Group: "group", Version: "version", Resource: "theresource"}: "TheKindList",
+	}
+	infos := []*resource.Info{
+		{
+			Mapping: &meta.RESTMapping{
+				Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+			},
+			Name:      "name-foo",
+			Namespace: "ns-foo",
+		},
+	}
+	fakeClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme, listMapping)
+
+	o := &WaitOptions{
+		ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(infos...),
+		DynamicClient:  fakeClient,
+		Printer:        printers.NewDiscardingPrinter(),
+		ConditionFn:    IsDeleted,
+		IOStreams:      genericclioptions.NewTestIOStreamsDiscard(),
+		ForCondition:   "delete",
+	}
+	err := o.RunWait()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

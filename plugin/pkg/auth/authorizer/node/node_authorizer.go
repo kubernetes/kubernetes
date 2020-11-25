@@ -123,10 +123,7 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 		case vaResource:
 			return r.authorizeGet(nodeName, vaVertexType, attrs)
 		case svcAcctResource:
-			if r.features.Enabled(features.TokenRequest) {
-				return r.authorizeCreateToken(nodeName, serviceAccountVertexType, attrs)
-			}
-			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.TokenRequest), nil
+			return r.authorizeCreateToken(nodeName, serviceAccountVertexType, attrs)
 		case leaseResource:
 			return r.authorizeLease(nodeName, attrs)
 		case csiNodeResource:

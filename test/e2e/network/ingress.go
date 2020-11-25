@@ -130,46 +130,6 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 		})
 
-		ginkgo.It("should create ingress with pre-shared certificate", func() {
-			executePresharedCertTest(f, jig, "")
-		})
-
-		ginkgo.It("should support multiple TLS certs", func() {
-			ginkgo.By("Creating an ingress with no certs.")
-			jig.CreateIngress(filepath.Join(e2eingress.IngressManifestPath, "multiple-certs"), ns, map[string]string{
-				e2eingress.IngressStaticIPKey: ns,
-			}, map[string]string{})
-
-			ginkgo.By("Adding multiple certs to the ingress.")
-			hosts := []string{"test1.ingress.com", "test2.ingress.com", "test3.ingress.com", "test4.ingress.com"}
-			secrets := []string{"tls-secret-1", "tls-secret-2", "tls-secret-3", "tls-secret-4"}
-			certs := [][]byte{}
-			for i, host := range hosts {
-				jig.AddHTTPS(secrets[i], host)
-				certs = append(certs, jig.GetRootCA(secrets[i]))
-			}
-			for i, host := range hosts {
-				err := jig.WaitForIngressWithCert(true, []string{host}, certs[i])
-				framework.ExpectNoError(err, fmt.Sprintf("Unexpected error while waiting for ingress: %v", err))
-			}
-
-			ginkgo.By("Remove all but one of the certs on the ingress.")
-			jig.RemoveHTTPS(secrets[1])
-			jig.RemoveHTTPS(secrets[2])
-			jig.RemoveHTTPS(secrets[3])
-
-			ginkgo.By("Test that the remaining cert is properly served.")
-			err := jig.WaitForIngressWithCert(true, []string{hosts[0]}, certs[0])
-			framework.ExpectNoError(err, fmt.Sprintf("Unexpected error while waiting for ingress: %v", err))
-
-			ginkgo.By("Add back one of the certs that was removed and check that all certs are served.")
-			jig.AddHTTPS(secrets[1], hosts[1])
-			for i, host := range hosts[:2] {
-				err := jig.WaitForIngressWithCert(true, []string{host}, certs[i])
-				framework.ExpectNoError(err, fmt.Sprintf("Unexpected error while waiting for ingress: %v", err))
-			}
-		})
-
 		ginkgo.It("multicluster ingress should get instance group annotation", func() {
 			name := "echomap"
 			jig.CreateIngress(filepath.Join(e2eingress.IngressManifestPath, "http"), ns, map[string]string{

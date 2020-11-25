@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -27,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"time"
 
 	"github.com/onsi/ginkgo"
 )
@@ -40,7 +41,7 @@ const (
 var _ = ginkgo.Describe("[sig-node] PodTemplates", func() {
 	f := framework.NewDefaultFramework("podtemplate")
 	/*
-	   Release : v1.19
+	   Release: v1.19
 	   Testname: PodTemplate lifecycle
 	   Description: Attempt to create a PodTemplate. Patch the created PodTemplate. Fetching the PodTemplate MUST reflect changes.
 	          By fetching all the PodTemplates via a Label selector it MUST find the PodTemplate by it's static label and updated value. The PodTemplate must be deleted.
@@ -109,7 +110,7 @@ var _ = ginkgo.Describe("[sig-node] PodTemplates", func() {
 	})
 
 	/*
-		Release : v1.19
+		Release: v1.19
 		Testname: PodTemplate, delete a collection
 		Description: A set of Pod Templates is created with a label selector which MUST be found when listed.
 		The set of Pod Templates is deleted and MUST NOT show up when listed by its label selector.

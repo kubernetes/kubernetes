@@ -34,7 +34,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	mockcni "k8s.io/kubernetes/pkg/kubelet/dockershim/network/cni/testing"
-	hostporttest "k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport/testing"
 	nettest "k8s.io/kubernetes/pkg/kubelet/dockershim/network/testing"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	ipttest "k8s.io/kubernetes/pkg/util/iptables/testing"
@@ -179,7 +178,6 @@ func TestTeardownCallsShaper(t *testing.T) {
 	kubenet.cniConfig = mockcni
 	kubenet.iptables = ipttest.NewFake()
 	kubenet.bandwidthShaper = fshaper
-	kubenet.hostportSyncer = hostporttest.NewFakeHostportSyncer()
 
 	mockcni.On("DelNetwork", mock.AnythingOfType("*context.timerCtx"), mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
 

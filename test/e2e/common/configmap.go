@@ -35,7 +35,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap, from environment field
 		Description: Create a Pod with an environment variable value set using a value from ConfigMap. A ConfigMap value MUST be accessible in the container environment.
 	*/
@@ -128,7 +128,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 	})
 
 	/*
-	   Release : v1.14
+	   Release: v1.14
 	   Testname: ConfigMap, with empty-key
 	   Description: Attempt to create a ConfigMap with an empty key. The creation MUST fail.
 	*/
@@ -158,7 +158,7 @@ var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 	})
 
 	/*
-	   Release : v1.19
+	   Release: v1.19
 	   Testname: ConfigMap lifecycle
 	   Description: Attempt to create a ConfigMap. Patch the created ConfigMap. Fetching the ConfigMap MUST reflect changes.
 	   By fetching all the ConfigMaps via a Label selector it MUST find the ConfigMap by it's static label and updated value. The ConfigMap must be deleted by Collection.

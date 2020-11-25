@@ -40,8 +40,6 @@ func CommonAccessor(obj interface{}) (metav1.Common, error) {
 	switch t := obj.(type) {
 	case List:
 		return t, nil
-	case metav1.ListInterface:
-		return t, nil
 	case ListMetaAccessor:
 		if m := t.GetListMeta(); m != nil {
 			return m, nil
@@ -71,8 +69,6 @@ func CommonAccessor(obj interface{}) (metav1.Common, error) {
 func ListAccessor(obj interface{}) (List, error) {
 	switch t := obj.(type) {
 	case List:
-		return t, nil
-	case metav1.ListInterface:
 		return t, nil
 	case ListMetaAccessor:
 		if m := t.GetListMeta(); m != nil {

@@ -31,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -340,10 +342,12 @@ func TestScaleSubresource(t *testing.T) {
 				t.Fatalf("Scale.Status.Selector: expected: %v, got: %v", "bar", gottenScale.Status.Selector)
 			}
 
-			// check self link
-			expectedSelfLink := fmt.Sprintf("/apis/mygroup.example.com/%s/namespaces/not-the-default/noxus/foo/scale", v.Name)
-			if gottenScale.GetSelfLink() != expectedSelfLink {
-				t.Fatalf("Scale.Metadata.SelfLink: expected: %v, got: %v", expectedSelfLink, gottenScale.GetSelfLink())
+			if !utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
+				// check self link
+				expectedSelfLink := fmt.Sprintf("/apis/mygroup.example.com/%s/namespaces/not-the-default/noxus/foo/scale", v.Name)
+				if gottenScale.GetSelfLink() != expectedSelfLink {
+					t.Fatalf("Scale.Metadata.SelfLink: expected: %v, got: %v", expectedSelfLink, gottenScale.GetSelfLink())
+				}
 			}
 
 			// update the scale object
@@ -772,34 +776,35 @@ func TestSubresourcePatch(t *testing.T) {
 
 			expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 999, "status", "num") // .status.num should be 999
 			expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 10, "spec", "num")    // .spec.num should remain 10
-			rv, found, err := unstructured.NestedString(patchedNoxuInstance.UnstructuredContent(), "metadata", "resourceVersion")
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !found {
-				t.Fatalf("metadata.resourceVersion not found")
-			}
-
-			// this call waits for the resourceVersion to be reached in the cache before returning.
-			// We need to do this because the patch gets its initial object from the storage, and the cache serves that.
-			// If it is out of date, then our initial patch is applied to an old resource version, which conflicts
-			// and then the updated object shows a conflicting diff, which permanently fails the patch.
-			// This gives expected stability in the patch without retrying on an known number of conflicts below in the test.
-			// See https://issue.k8s.io/42644
-			_, err = noxuResourceClient.Get(context.TODO(), "foo", metav1.GetOptions{ResourceVersion: patchedNoxuInstance.GetResourceVersion()})
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
 
 			// no-op patch
-			t.Logf("Patching .status.num again to 999")
-			patchedNoxuInstance, err = noxuResourceClient.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{}, "status")
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+			rv := ""
+			found := false
+			// TODO: remove this retry once http://issue.k8s.io/75564 is resolved, and expect the resourceVersion to remain unchanged 100% of the time.
+			// server-side-apply incorrectly considers spec fields in patches submitted to /status when updating managedFields timestamps, so this patch is racy:
+			// if it spans a 1-second boundary from the last write, server-side-apply updates the managedField timestamp and increments resourceVersion.
+			for i := 0; i < 10; i++ {
+				rv, found, err = unstructured.NestedString(patchedNoxuInstance.UnstructuredContent(), "metadata", "resourceVersion")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !found {
+					t.Fatalf("metadata.resourceVersion not found")
+				}
+
+				t.Logf("Patching .status.num again to 999")
+				patchedNoxuInstance, err = noxuResourceClient.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{}, "status")
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				// make sure no-op patch does not increment resourceVersion
+				expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 999, "status", "num")
+				expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 10, "spec", "num")
+				if patchedNoxuInstance.GetResourceVersion() == rv {
+					break
+				}
+				t.Logf("resource version changed - retrying")
 			}
-			// make sure no-op patch does not increment resourceVersion
-			expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 999, "status", "num")
-			expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 10, "spec", "num")
 			expectString(t, patchedNoxuInstance.UnstructuredContent(), rv, "metadata", "resourceVersion")
 
 			// empty patch
@@ -829,17 +834,6 @@ func TestSubresourcePatch(t *testing.T) {
 			}
 			if !found {
 				t.Fatalf("metadata.resourceVersion not found")
-			}
-
-			// this call waits for the resourceVersion to be reached in the cache before returning.
-			// We need to do this because the patch gets its initial object from the storage, and the cache serves that.
-			// If it is out of date, then our initial patch is applied to an old resource version, which conflicts
-			// and then the updated object shows a conflicting diff, which permanently fails the patch.
-			// This gives expected stability in the patch without retrying on an known number of conflicts below in the test.
-			// See https://issue.k8s.io/42644
-			_, err = noxuResourceClient.Get(context.TODO(), "foo", metav1.GetOptions{ResourceVersion: patchedNoxuInstance.GetResourceVersion()})
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
 			}
 
 			// Scale.Spec.Replicas = 7 but Scale.Status.Replicas should remain 0

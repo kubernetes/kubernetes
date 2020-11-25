@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
+	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -370,6 +371,86 @@ func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
 		t.Fatalf(
 			"DSW PodExistsInVolume returned incorrect value. Expected: <false> Actual: <%v>",
 			podExistsInVolume)
+	}
+}
+
+func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
+	// create dswp
+	mode := v1.PersistentVolumeFilesystem
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dswp-test-volume-name",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			VolumeMode: &mode,
+		},
+	}
+	pvc := &v1.PersistentVolumeClaim{
+		Spec: v1.PersistentVolumeClaimSpec{
+			VolumeName: "dswp-test-volume-name",
+		},
+		Status: v1.PersistentVolumeClaimStatus{
+			Phase: v1.ClaimBound,
+		},
+	}
+
+	fakeVolumePluginMgr, fakeVolumePlugin := volumetesting.GetTestVolumePluginMgr(t)
+	dswp, fakePodManager, fakesDSW := createDswpWithVolumeWithCustomPluginMgr(t, pv, pvc, fakeVolumePluginMgr)
+
+	// create pod
+	containers := []v1.Container{
+		{
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "dswp-test-volume-name",
+					MountPath: "/mnt",
+				},
+			},
+		},
+	}
+	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
+
+	fakePodManager.AddPod(pod)
+
+	podName := util.GetUniquePodName(pod)
+
+	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].Name
+
+	dswp.findAndAddNewPods()
+
+	if !dswp.pods.processedPods[podName] {
+		t.Fatalf("Failed to record that the volumes for the specified pod: %s have been processed by the populator", podName)
+	}
+
+	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
+
+	volumeExists := fakesDSW.VolumeExists(expectedVolumeName)
+	if !volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+
+	// change the volume plugin from attachable to non-attachable
+	fakeVolumePlugin.NonAttachable = true
+
+	// The volume should still exist
+	verifyVolumeExistsInVolumesToMount(
+		t, v1.UniqueVolumeName(generatedVolumeName), false /* expectReportedInUse */, fakesDSW)
+
+	dswp.findAndRemoveDeletedPods()
+	// After the volume plugin changes to nonattachable, the corresponding volume attachable field should change.
+	volumesToMount := fakesDSW.GetVolumesToMount()
+	for _, volume := range volumesToMount {
+		if volume.VolumeName == expectedVolumeName {
+			if volume.PluginIsAttachable {
+				t.Fatalf(
+					"Volume %v in the list of desired state of world volumes to mount is still attachable. Expected not",
+					expectedVolumeName)
+			}
+		}
 	}
 }
 
@@ -997,6 +1078,12 @@ func createPodWithVolume(pod, pv, pvc string, containers []v1.Container) *v1.Pod
 
 func createDswpWithVolume(t *testing.T, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) (*desiredStateOfWorldPopulator, kubepod.Manager, cache.DesiredStateOfWorld) {
 	fakeVolumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	dswp, fakePodManager, fakesDSW := createDswpWithVolumeWithCustomPluginMgr(t, pv, pvc, fakeVolumePluginMgr)
+	return dswp, fakePodManager, fakesDSW
+}
+
+func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim,
+	fakeVolumePluginMgr *volume.VolumePluginMgr) (*desiredStateOfWorldPopulator, kubepod.Manager, cache.DesiredStateOfWorld) {
 	fakeClient := &fake.Clientset{}
 	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
 		return true, pvc, nil
@@ -1031,6 +1118,7 @@ func createDswpWithVolume(t *testing.T, pv *v1.PersistentVolume, pvc *v1.Persist
 		keepTerminatedPodVolumes: false,
 		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator),
 		intreeToCSITranslator:    csiTranslator,
+		volumePluginMgr:          fakeVolumePluginMgr,
 	}
 	return dswp, fakePodManager, fakesDSW
 }

@@ -100,7 +100,7 @@ func InitNFSDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/nfs",
 			MaxFileSize:      testpatterns.FileSizeLarge,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -242,7 +242,7 @@ func InitGlusterFSDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/glusterfs",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -324,14 +324,26 @@ func (v *glusterVolume) DeleteVolume() {
 
 	name := v.prefix + "-server"
 
-	framework.Logf("Deleting Gluster endpoints %q...", name)
+	nameSpaceName := fmt.Sprintf("%s/%s", ns.Name, name)
+
+	framework.Logf("Deleting Gluster endpoints %s...", nameSpaceName)
 	err := cs.CoreV1().Endpoints(ns.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			framework.Failf("Gluster delete endpoints failed: %v", err)
+			framework.Failf("Gluster deleting endpoint %s failed: %v", nameSpaceName, err)
 		}
-		framework.Logf("Gluster endpoints %q not found, assuming deleted", name)
+		framework.Logf("Gluster endpoints %q not found, assuming deleted", nameSpaceName)
 	}
+
+	framework.Logf("Deleting Gluster service %s...", nameSpaceName)
+	err = cs.CoreV1().Services(ns.Name).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			framework.Failf("Gluster deleting service %s failed: %v", nameSpaceName, err)
+		}
+		framework.Logf("Gluster service %q not found, assuming deleted", nameSpaceName)
+	}
+
 	framework.Logf("Deleting Gluster server pod %q...", v.serverPod.Name)
 	err = e2epod.DeletePodWithWait(cs, v.serverPod)
 	if err != nil {
@@ -366,9 +378,6 @@ func InitISCSIDriver() testsuites.TestDriver {
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
-				"ext2",
-				// TODO: fix iSCSI driver can work with ext3
-				//"ext3",
 				"ext4",
 			),
 			TopologyKeys: []string{v1.LabelHostname},
@@ -544,13 +553,10 @@ func InitRbdDriver() testsuites.TestDriver {
 			FeatureTag:       "[Feature:Volumes][Serial]",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
-				"ext2",
-				// TODO: fix rbd driver can work with ext3
-				//"ext3",
 				"ext4",
 			),
 			Capabilities: map[testsuites.Capability]bool{
@@ -672,7 +678,7 @@ func InitCephFSDriver() testsuites.TestDriver {
 			FeatureTag:       "[Feature:Volumes][Serial]",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -1060,13 +1066,12 @@ func InitCinderDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/cinder",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
-				"ext3",
 			),
-			TopologyKeys: []string{v1.LabelZoneFailureDomain},
+			TopologyKeys: []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
@@ -1179,6 +1184,7 @@ func (c *cinderDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 }
 
 func (v *cinderVolume) DeleteVolume() {
+	id := v.volumeID
 	name := v.volumeName
 
 	// Try to delete the volume for several seconds - it takes
@@ -1187,16 +1193,23 @@ func (v *cinderVolume) DeleteVolume() {
 	var err error
 	timeout := time.Second * 120
 
-	framework.Logf("Waiting up to %v for removal of cinder volume %s", timeout, name)
+	framework.Logf("Waiting up to %v for removal of cinder volume %s / %s", timeout, id, name)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
-		output, err = exec.Command("cinder", "delete", name).CombinedOutput()
+		output, err = exec.Command("cinder", "delete", id).CombinedOutput()
 		if err == nil {
-			framework.Logf("Cinder volume %s deleted", name)
+			framework.Logf("Cinder volume %s deleted", id)
 			return
 		}
-		framework.Logf("Failed to delete volume %s: %v", name, err)
+		framework.Logf("Failed to delete volume %s / %s: %v\n%s", id, name, err, string(output))
 	}
-	framework.Logf("Giving up deleting volume %s: %v\n%s", name, err, string(output[:]))
+	// Timed out, try to get "cinder show <volume>" output for easier debugging
+	showOutput, showErr := exec.Command("cinder", "show", id).CombinedOutput()
+	if showErr != nil {
+		framework.Logf("Failed to show volume %s / %s: %v\n%s", id, name, showErr, string(showOutput))
+	} else {
+		framework.Logf("Volume %s / %s:\n%s", id, name, string(showOutput))
+	}
+	framework.Failf("Failed to delete pre-provisioned volume %s / %s: %v\n%s", id, name, err, string(output[:]))
 }
 
 // GCE
@@ -1216,17 +1229,12 @@ var _ testsuites.DynamicPVTestDriver = &gcePdDriver{}
 
 // InitGcePdDriver returns gcePdDriver that implements TestDriver interface
 func InitGcePdDriver() testsuites.TestDriver {
-	// In current test structure, it first initialize the driver and then set up
-	// the new framework, so we cannot get the correct OS here. So here set to
-	// support all fs types including both linux and windows. We have code to check Node OS later
-	// during test.
 	supportedTypes := sets.NewString(
 		"", // Default fsType
 		"ext2",
 		"ext3",
 		"ext4",
 		"xfs",
-		"ntfs",
 	)
 	return &gcePdDriver{
 		driverInfo: testsuites.DriverInfo{
@@ -1234,11 +1242,11 @@ func InitGcePdDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/gce-pd",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType:      supportedTypes,
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
-			TopologyKeys:         []string{v1.LabelZoneFailureDomain},
+			TopologyKeys:         []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence:         true,
 				testsuites.CapFsGroup:             true,
@@ -1247,6 +1255,38 @@ func InitGcePdDriver() testsuites.TestDriver {
 				testsuites.CapMultiPODs:           true,
 				testsuites.CapControllerExpansion: true,
 				testsuites.CapNodeExpansion:       true,
+				// GCE supports volume limits, but the test creates large
+				// number of volumes and times out test suites.
+				testsuites.CapVolumeLimits: false,
+				testsuites.CapTopology:     true,
+			},
+		},
+	}
+}
+
+// InitWindowsGcePdDriver returns gcePdDriver running on Windows cluster that implements TestDriver interface
+// In current test structure, it first initialize the driver and then set up
+// the new framework, so we cannot get the correct OS here and select which file system is supported.
+// So here uses a separate Windows in-tree gce pd driver
+func InitWindowsGcePdDriver() testsuites.TestDriver {
+	supportedTypes := sets.NewString(
+		"ntfs",
+	)
+	return &gcePdDriver{
+		driverInfo: testsuites.DriverInfo{
+			Name:             "windows-gcepd",
+			InTreePluginName: "kubernetes.io/gce-pd",
+			MaxFileSize:      testpatterns.FileSizeMedium,
+			SupportedSizeRange: e2evolume.SizeRange{
+				Min: "1Gi",
+			},
+			SupportedFsType: supportedTypes,
+			TopologyKeys:    []string{v1.LabelZoneFailureDomain},
+			Capabilities: map[testsuites.Capability]bool{
+				testsuites.CapControllerExpansion: false,
+				testsuites.CapPersistence:         true,
+				testsuites.CapExec:                true,
+				testsuites.CapMultiPODs:           true,
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
 				testsuites.CapVolumeLimits: false,
@@ -1335,7 +1375,7 @@ func (g *gcePdDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelZoneFailureDomain: zone,
+				v1.LabelFailureDomainBetaZone: zone,
 			},
 		}
 	}
@@ -1375,13 +1415,13 @@ func InitVSphereDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/vsphere-volume",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext4",
 			),
-			TopologyKeys: []string{v1.LabelZoneFailureDomain},
+			TopologyKeys: []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
@@ -1499,15 +1539,14 @@ func InitAzureDiskDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/azure-disk",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
-				"ext3",
 				"ext4",
 				"xfs",
 			),
-			TopologyKeys: []string{v1.LabelZoneFailureDomain},
+			TopologyKeys: []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
@@ -1601,7 +1640,7 @@ func (a *azureDiskDriver) CreateVolume(config *testsuites.PerTestConfig, volType
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelZoneFailureDomain: zone,
+				v1.LabelFailureDomainBetaZone: zone,
 			},
 		}
 	}
@@ -1640,18 +1679,16 @@ func InitAwsDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/aws-ebs",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "5Gi",
+				Min: "1Gi",
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
-				"ext2",
-				"ext3",
 				"ext4",
 				"xfs",
 				"ntfs",
 			),
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
-			TopologyKeys:         []string{v1.LabelZoneFailureDomain},
+			TopologyKeys:         []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence:         true,
 				testsuites.CapFsGroup:             true,
@@ -1744,7 +1781,7 @@ func (a *awsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelZoneFailureDomain: zone,
+				v1.LabelFailureDomainBetaZone: zone,
 			},
 		}
 	}
@@ -1801,8 +1838,6 @@ var (
 	localVolumeSupportedFsTypes        = map[utils.LocalVolumeType]sets.String{
 		utils.LocalVolumeBlock: sets.NewString(
 			"", // Default fsType
-			"ext2",
-			"ext3",
 			"ext4",
 			//"xfs", disabled see issue https://github.com/kubernetes/kubernetes/issues/74095
 		),
@@ -1959,7 +1994,7 @@ func getInlineVolumeZone(f *framework.Framework) string {
 	// if zone is not specified we will randomly pick a zone from schedulable nodes for inline tests
 	node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
 	framework.ExpectNoError(err)
-	zone, ok := node.Labels[v1.LabelZoneFailureDomain]
+	zone, ok := node.Labels[v1.LabelFailureDomainBetaZone]
 	if ok {
 		return zone
 	}

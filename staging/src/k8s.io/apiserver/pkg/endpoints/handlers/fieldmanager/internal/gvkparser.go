@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/schemaconv"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"sigs.k8s.io/structured-merge-diff/v3/typed"
+	"sigs.k8s.io/structured-merge-diff/v4/typed"
 )
 
 // groupVersionKindExtensionKey is the key used to lookup the
@@ -30,12 +30,15 @@ import (
 // definition's "extensions" map.
 const groupVersionKindExtensionKey = "x-kubernetes-group-version-kind"
 
-type gvkParser struct {
+// GvkParser contains a Parser that allows introspecting the schema.
+type GvkParser struct {
 	gvks   map[schema.GroupVersionKind]string
 	parser typed.Parser
 }
 
-func (p *gvkParser) Type(gvk schema.GroupVersionKind) *typed.ParseableType {
+// Type returns a helper which can produce objects of the given type. Any
+// errors are deferred until a further function is called.
+func (p *GvkParser) Type(gvk schema.GroupVersionKind) *typed.ParseableType {
 	typeName, ok := p.gvks[gvk]
 	if !ok {
 		return nil
@@ -44,12 +47,15 @@ func (p *gvkParser) Type(gvk schema.GroupVersionKind) *typed.ParseableType {
 	return &t
 }
 
-func newGVKParser(models proto.Models, preserveUnknownFields bool) (*gvkParser, error) {
+// NewGVKParser builds a GVKParser from a proto.Models. This
+// will automatically find the proper version of the object, and the
+// corresponding schema information.
+func NewGVKParser(models proto.Models, preserveUnknownFields bool) (*GvkParser, error) {
 	typeSchema, err := schemaconv.ToSchemaWithPreserveUnknownFields(models, preserveUnknownFields)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert models to schema: %v", err)
 	}
-	parser := gvkParser{
+	parser := GvkParser{
 		gvks: map[schema.GroupVersionKind]string{},
 	}
 	parser.parser = typed.Parser{Schema: *typeSchema}

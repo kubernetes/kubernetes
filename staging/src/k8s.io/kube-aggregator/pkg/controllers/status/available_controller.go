@@ -86,6 +86,53 @@ type AvailableConditionController struct {
 	cache map[string]map[string][]string
 	// this lock protects operations on the above cache
 	cacheLock sync.RWMutex
+
+	// TLS config with customized dialer cannot be cached by the client-go
+	// tlsTransportCache. Use a local cache here to reduce the chance of
+	// the controller spamming idle connections with short-lived transports.
+	// NOTE: the cache works because we assume that the transports constructed
+	// by the controller only vary on the dynamic cert/key.
+	tlsCache *tlsTransportCache
+}
+
+type tlsTransportCache struct {
+	mu         sync.Mutex
+	transports map[tlsCacheKey]http.RoundTripper
+}
+
+func (c *tlsTransportCache) get(config *rest.Config) (http.RoundTripper, error) {
+	// If the available controller doesn't customzie the dialer (and we know from
+	// the code that the controller doesn't customzie other functions i.e. Proxy
+	// and GetCert (ExecProvider)), the config is cacheable by the client-go TLS
+	// transport cache. Let's skip the local cache and depend on the client-go cache.
+	if config.Dial == nil {
+		return rest.TransportFor(config)
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	// See if we already have a custom transport for this config
+	key := tlsConfigKey(config)
+	if t, ok := c.transports[key]; ok {
+		return t, nil
+	}
+	restTransport, err := rest.TransportFor(config)
+	if err != nil {
+		return nil, err
+	}
+	c.transports[key] = restTransport
+	return restTransport, nil
+}
+
+type tlsCacheKey struct {
+	certData string
+	keyData  string `datapolicy:"secret-key"`
+}
+
+func tlsConfigKey(c *rest.Config) tlsCacheKey {
+	return tlsCacheKey{
+		certData: string(c.TLSClientConfig.CertData),
+		keyData:  string(c.TLSClientConfig.KeyData),
+	}
 }
 
 // NewAvailableConditionController returns a new AvailableConditionController.
@@ -115,6 +162,7 @@ func NewAvailableConditionController(
 			workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second),
 			"AvailableConditionController"),
 		proxyCurrentCertKeyContent: proxyCurrentCertKeyContent,
+		tlsCache:                   &tlsTransportCache{transports: make(map[tlsCacheKey]http.RoundTripper)},
 	}
 
 	if egressSelector != nil {
@@ -185,7 +233,12 @@ func (c *AvailableConditionController) sync(key string) error {
 	if c.dialContext != nil {
 		restConfig.Dial = c.dialContext
 	}
-	restTransport, err := rest.TransportFor(restConfig)
+	// TLS config with customized dialer cannot be cached by the client-go
+	// tlsTransportCache. Use a local cache here to reduce the chance of
+	// the controller spamming idle connections with short-lived transports.
+	// NOTE: the cache works because we assume that the transports constructed
+	// by the controller only vary on the dynamic cert/key.
+	restTransport, err := c.tlsCache.get(restConfig)
 	if err != nil {
 		return err
 	}

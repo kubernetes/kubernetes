@@ -22,12 +22,8 @@ func (s *FreezerGroup) Name() string {
 	return "freezer"
 }
 
-func (s *FreezerGroup) Apply(d *cgroupData) error {
-	_, err := d.join("freezer")
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
-	}
-	return nil
+func (s *FreezerGroup) Apply(path string, d *cgroupData) error {
+	return join(path, d.pid)
 }
 
 func (s *FreezerGroup) Set(path string, cgroup *configs.Cgroup) error {
@@ -59,10 +55,6 @@ func (s *FreezerGroup) Set(path string, cgroup *configs.Cgroup) error {
 	}
 
 	return nil
-}
-
-func (s *FreezerGroup) Remove(d *cgroupData) error {
-	return removePath(d.path("freezer"))
 }
 
 func (s *FreezerGroup) GetStats(path string, stats *cgroups.Stats) error {

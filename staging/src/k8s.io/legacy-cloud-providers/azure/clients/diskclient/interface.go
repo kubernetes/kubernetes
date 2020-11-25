@@ -28,6 +28,10 @@ import (
 const (
 	// APIVersion is the API version for compute.
 	APIVersion = "2019-11-01"
+	// AzureStackCloudAPIVersion is the API version for Azure Stack
+	AzureStackCloudAPIVersion = "2019-07-01"
+	// AzureStackCloudName is the cloud name of Azure Stack
+	AzureStackCloudName = "AZURESTACKCLOUD"
 )
 
 // Interface is the client interface for Disks.
@@ -40,6 +44,12 @@ type Interface interface {
 	// CreateOrUpdate creates or updates a Disk.
 	CreateOrUpdate(ctx context.Context, resourceGroupName string, diskName string, diskParameter compute.Disk) *retry.Error
 
+	// Update updates a Disk.
+	Update(ctx context.Context, resourceGroupName string, diskName string, diskParameter compute.DiskUpdate) *retry.Error
+
 	// Delete deletes a Disk by name.
 	Delete(ctx context.Context, resourceGroupName string, diskName string) *retry.Error
+
+	// ListByResourceGroup lists all the disks under a resource group.
+	ListByResourceGroup(ctx context.Context, resourceGroupName string) ([]compute.Disk, *retry.Error)
 }

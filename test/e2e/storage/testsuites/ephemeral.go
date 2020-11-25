@@ -215,6 +215,11 @@ func (p *ephemeralTestSuite) DefineTests(driver TestDriver, pattern testpatterns
 	})
 
 	ginkgo.It("should support multiple inline ephemeral volumes", func() {
+		if pattern.BindingMode == storagev1.VolumeBindingImmediate &&
+			pattern.VolType == testpatterns.GenericEphemeralVolume {
+			e2eskipper.Skipf("Multiple generic ephemeral volumes with immediate binding may cause pod startup failures when the volumes get created in separate topology segments.")
+		}
+
 		init()
 		defer cleanup()
 
@@ -347,7 +352,7 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 			Containers: []v1.Container{
 				{
 					Name:    "csi-volume-tester",
-					Image:   e2evolume.GetTestImage(framework.BusyBoxImage),
+					Image:   e2evolume.GetDefaultTestImage(),
 					Command: e2evolume.GenerateScriptCmd(command),
 				},
 			},

@@ -666,7 +666,7 @@ func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command
 			Containers: []v1.Container{
 				{
 					Name:    "volume-tester",
-					Image:   e2evolume.GetTestImage(framework.BusyBoxImage),
+					Image:   e2evolume.GetDefaultTestImage(),
 					Command: e2evolume.GenerateScriptCmd(command),
 					VolumeMounts: []v1.VolumeMount{
 						{
@@ -725,6 +725,28 @@ func StopPodAndDependents(c clientset.Interface, pod *v1.Pod) {
 	} else {
 		framework.Logf("Pod %s has the following logs: %s", pod.Name, body)
 	}
+
+	// We must wait explicitly for removal of the generic ephemeral volume PVs.
+	// For that we must find them first...
+	pvs, err := c.CoreV1().PersistentVolumes().List(context.TODO(), metav1.ListOptions{})
+	framework.ExpectNoError(err, "list PVs")
+	var podPVs []v1.PersistentVolume
+	for _, pv := range pvs.Items {
+		if pv.Spec.ClaimRef == nil ||
+			pv.Spec.ClaimRef.Namespace != pod.Namespace {
+			continue
+		}
+		pvc, err := c.CoreV1().PersistentVolumeClaims(pod.Namespace).Get(context.TODO(), pv.Spec.ClaimRef.Name, metav1.GetOptions{})
+		if err != nil && apierrors.IsNotFound(err) {
+			// Must have been some unrelated PV, otherwise the PVC should exist.
+			continue
+		}
+		framework.ExpectNoError(err, "get PVC")
+		if pv.Spec.ClaimRef.UID == pvc.UID && metav1.IsControlledBy(pvc, pod) {
+			podPVs = append(podPVs, pv)
+		}
+	}
+
 	framework.Logf("Deleting pod %q in namespace %q", pod.Name, pod.Namespace)
 	deletionPolicy := metav1.DeletePropagationForeground
 	err = c.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name,
@@ -742,6 +764,14 @@ func StopPodAndDependents(c clientset.Interface, pod *v1.Pod) {
 	}
 	framework.Logf("Wait up to %v for pod %q to be fully deleted", e2epod.PodDeleteTimeout, pod.Name)
 	e2epod.WaitForPodNotFoundInNamespace(c, pod.Name, pod.Namespace, e2epod.PodDeleteTimeout)
+	if len(podPVs) > 0 {
+		for _, pv := range podPVs {
+			// As with CSI inline volumes, we use the pod delete timeout here because conceptually
+			// the volume deletion needs to be that fast (whatever "that" is).
+			framework.Logf("Wait up to %v for pod PV %s to be fully deleted", e2epod.PodDeleteTimeout, pv.Name)
+			e2epv.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, e2epod.PodDeleteTimeout)
+		}
+	}
 }
 
 func verifyPVCsPending(client clientset.Interface, pvcs []*v1.PersistentVolumeClaim) {

@@ -40,6 +40,7 @@ func TestWatchBasedManager(t *testing.T) {
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 
+	const n = 10
 	server.ClientConfig.QPS = 10000
 	server.ClientConfig.Burst = 10000
 	client, err := kubernetes.NewForConfig(server.ClientConfig)
@@ -65,8 +66,8 @@ func TestWatchBasedManager(t *testing.T) {
 	// create 1000 secrets in parallel
 	t.Log(time.Now(), "creating 1000 secrets")
 	wg := sync.WaitGroup{}
-	errCh := make(chan error, 1)
-	for i := 0; i < 10; i++ {
+	errCh := make(chan error, n)
+	for i := 0; i < n; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -93,8 +94,8 @@ func TestWatchBasedManager(t *testing.T) {
 
 	// fetch all secrets
 	wg = sync.WaitGroup{}
-	errCh = make(chan error, 1)
-	for i := 0; i < 10; i++ {
+	errCh = make(chan error, n)
+	for i := 0; i < n; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()

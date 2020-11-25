@@ -24,7 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -52,342 +52,16 @@ func makeSocketMask(sockets ...int) bitmask.BitMask {
 }
 
 func TestGetTopologyHints(t *testing.T) {
-	tcases := []struct {
-		description      string
-		podUID           string
-		containerName    string
-		request          map[string]string
-		devices          map[string][]pluginapi.Device
-		allocatedDevices map[string]map[string]map[string][]string
-		expectedHints    map[string][]topologymanager.TopologyHint
-	}{
-		{
-			description:   "Single Request, no alignment",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "1",
-			},
-			devices: map[string][]pluginapi.Device{
-				"testdevice": {
-					{ID: "Dev1"},
-					{ID: "Dev2"},
-				},
-			},
-			expectedHints: map[string][]topologymanager.TopologyHint{
-				"testdevice": nil,
-			},
-		},
-		{
-			description:   "Single Request, only one with alignment",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "1",
-			},
-			devices: map[string][]pluginapi.Device{
-				"testdevice": {
-					{ID: "Dev1"},
-					makeNUMADevice("Dev2", 1),
-				},
-			},
-			expectedHints: map[string][]topologymanager.TopologyHint{
-				"testdevice": {
-					{
-						NUMANodeAffinity: makeSocketMask(1),
-						Preferred:        true,
-					},
-					{
-						NUMANodeAffinity: makeSocketMask(0, 1),
-						Preferred:        false,
-					},
-				},
-			},
-		},
-		{
-			description:   "Single Request, one device per socket",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "1",
-			},
-			devices: map[string][]pluginapi.Device{
-				"testdevice": {
-					makeNUMADevice("Dev1", 0),
-					makeNUMADevice("Dev2", 1),
-				},
-			},
-			expectedHints: map[string][]topologymanager.TopologyHint{
-				"testdevice": {
-					{
-						NUMANodeAffinity: makeSocketMask(0),
-						Preferred:        true,
-					},
-					{
-						NUMANodeAffinity: makeSocketMask(1),
-						Preferred:        true,
-					},
-					{
-						NUMANodeAffinity: makeSocketMask(0, 1),
-						Preferred:        false,
-					},
-				},
-			},
-		},
-		{
-			description:   "Request for 2, one device per socket",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "2",
-			},
-			devices: map[string][]pluginapi.Device{
-				"testdevice": {
-					makeNUMADevice("Dev1", 0),
-					makeNUMADevice("Dev2", 1),
-				},
-			},
-			expectedHints: map[string][]topologymanager.TopologyHint{
-				"testdevice": {
-					{
-						NUMANodeAffinity: makeSocketMask(0, 1),
-						Preferred:        true,
-					},
-				},
-			},
-		},
-		{
-			description:   "Request for 2, 2 devices per socket",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "2",
-			},
-			devices: map[string][]pluginapi.Device{
-				"testdevice": {
-					makeNUMADevice("Dev1", 0),
-					makeNUMADevice("Dev2", 1),
-					makeNUMADevice("Dev3", 0),
-					makeNUMADevice("Dev4", 1),
-				},
-			},
-			expectedHints: map[string][]topologymanager.TopologyHint{
-				"testdevice": {
-					{
-						NUMANodeAffinity: makeSocketMask(0),
-						Preferred:        true,
-					},
-					{
-						NUMANodeAffinity: makeSocketMask(1),
-						Preferred:        true,
-					},
-					{
-						NUMANodeAffinity: makeSocketMask(0, 1),
-						Preferred:        false,
-					},
-				},
-			},
-		},
-		{
-			description:   "Request for 2, optimal on 1 NUMA node, forced cross-NUMA",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "2",
-			},
-			devices: map[string][]pluginapi.Device{
-				"testdevice": {
-					makeNUMADevice("Dev1", 0),
-					makeNUMADevice("Dev2", 1),
-					makeNUMADevice("Dev3", 0),
-					makeNUMADevice("Dev4", 1),
-				},
-			},
-			allocatedDevices: map[string]map[string]map[string][]string{
-				"fakePod": {
-					"fakeOtherContainer": {
-						"testdevice": {"Dev1", "Dev2"},
-					},
-				},
-			},
-			expectedHints: map[string][]topologymanager.TopologyHint{
-				"testdevice": {
-					{
-						NUMANodeAffinity: makeSocketMask(0, 1),
-						Preferred:        false,
-					},
-				},
-			},
-		},
-		{
-			description:   "2 device types, mixed configuration",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice1": "2",
-				"testdevice2": "1",
-			},
-			devices: map[string][]pluginapi.Device{
-				"testdevice1": {
-					makeNUMADevice("Dev1", 0),
-					makeNUMADevice("Dev2", 1),
-					makeNUMADevice("Dev3", 0),
-					makeNUMADevice("Dev4", 1),
-				},
-				"testdevice2": {
-					makeNUMADevice("Dev1", 0),
-				},
-			},
-			expectedHints: map[string][]topologymanager.TopologyHint{
-				"testdevice1": {
-					{
-						NUMANodeAffinity: makeSocketMask(0),
-						Preferred:        true,
-					},
-					{
-						NUMANodeAffinity: makeSocketMask(1),
-						Preferred:        true,
-					},
-					{
-						NUMANodeAffinity: makeSocketMask(0, 1),
-						Preferred:        false,
-					},
-				},
-				"testdevice2": {
-					{
-						NUMANodeAffinity: makeSocketMask(0),
-						Preferred:        true,
-					},
-					{
-						NUMANodeAffinity: makeSocketMask(0, 1),
-						Preferred:        false,
-					},
-				},
-			},
-		},
-		{
-			description:   "Single device type, more requested than available",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "6",
-			},
-			devices: map[string][]pluginapi.Device{
-				"testdevice": {
-					makeNUMADevice("Dev1", 0),
-					makeNUMADevice("Dev2", 0),
-					makeNUMADevice("Dev3", 1),
-					makeNUMADevice("Dev4", 1),
-				},
-			},
-			expectedHints: map[string][]topologymanager.TopologyHint{
-				"testdevice": {},
-			},
-		},
-		{
-			description:   "Single device type, all already allocated to container",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "2",
-			},
-			devices: map[string][]pluginapi.Device{
-				"testdevice": {
-					makeNUMADevice("Dev1", 0),
-					makeNUMADevice("Dev2", 0),
-				},
-			},
-			allocatedDevices: map[string]map[string]map[string][]string{
-				"fakePod": {
-					"fakeContainer": {
-						"testdevice": {"Dev1", "Dev2"},
-					},
-				},
-			},
-			expectedHints: map[string][]topologymanager.TopologyHint{
-				"testdevice": {
-					{
-						NUMANodeAffinity: makeSocketMask(0),
-						Preferred:        true,
-					},
-					{
-						NUMANodeAffinity: makeSocketMask(0, 1),
-						Preferred:        false,
-					},
-				},
-			},
-		},
-		{
-			description:   "Single device type, less already allocated to container than requested",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "4",
-			},
-			devices: map[string][]pluginapi.Device{
-				"testdevice": {
-					makeNUMADevice("Dev1", 0),
-					makeNUMADevice("Dev2", 0),
-					makeNUMADevice("Dev3", 1),
-					makeNUMADevice("Dev4", 1),
-				},
-			},
-			allocatedDevices: map[string]map[string]map[string][]string{
-				"fakePod": {
-					"fakeContainer": {
-						"testdevice": {"Dev1", "Dev2"},
-					},
-				},
-			},
-			expectedHints: map[string][]topologymanager.TopologyHint{
-				"testdevice": {},
-			},
-		},
-		{
-			description:   "Single device type, more already allocated to container than requested",
-			podUID:        "fakePod",
-			containerName: "fakeContainer",
-			request: map[string]string{
-				"testdevice": "2",
-			},
-			devices: map[string][]pluginapi.Device{
-				"testdevice": {
-					makeNUMADevice("Dev1", 0),
-					makeNUMADevice("Dev2", 0),
-					makeNUMADevice("Dev3", 1),
-					makeNUMADevice("Dev4", 1),
-				},
-			},
-			allocatedDevices: map[string]map[string]map[string][]string{
-				"fakePod": {
-					"fakeContainer": {
-						"testdevice": {"Dev1", "Dev2", "Dev3", "Dev4"},
-					},
-				},
-			},
-			expectedHints: map[string][]topologymanager.TopologyHint{
-				"testdevice": {},
-			},
-		},
-	}
+	tcases := getCommonTestCases()
 
 	for _, tc := range tcases {
-		resourceList := v1.ResourceList{}
-		for r := range tc.request {
-			resourceList[v1.ResourceName(r)] = resource.MustParse(tc.request[r])
-		}
-
-		pod := makePod(resourceList)
-		pod.UID = types.UID(tc.podUID)
-		pod.Spec.Containers[0].Name = tc.containerName
-
 		m := ManagerImpl{
 			allDevices:       make(map[string]map[string]pluginapi.Device),
 			healthyDevices:   make(map[string]sets.String),
 			allocatedDevices: make(map[string]sets.String),
-			podDevices:       make(podDevices),
+			podDevices:       newPodDevices(),
 			sourcesReady:     &sourcesReadyStub{},
-			activePods:       func() []*v1.Pod { return []*v1.Pod{pod} },
+			activePods:       func() []*v1.Pod { return []*v1.Pod{tc.pod} },
 			numaNodes:        []int{0, 1},
 		}
 
@@ -404,7 +78,7 @@ func TestGetTopologyHints(t *testing.T) {
 		for p := range tc.allocatedDevices {
 			for c := range tc.allocatedDevices[p] {
 				for r, devices := range tc.allocatedDevices[p][c] {
-					m.podDevices.insert(p, c, r, sets.NewString(devices...), nil)
+					m.podDevices.insert(p, c, r, constructDevices(devices), nil)
 
 					m.allocatedDevices[r] = sets.NewString()
 					for _, d := range devices {
@@ -414,7 +88,7 @@ func TestGetTopologyHints(t *testing.T) {
 			}
 		}
 
-		hints := m.GetTopologyHints(pod, &pod.Spec.Containers[0])
+		hints := m.GetTopologyHints(tc.pod, &tc.pod.Spec.Containers[0])
 
 		for r := range tc.expectedHints {
 			sort.SliceStable(hints[r], func(i, j int) bool {
@@ -739,7 +413,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			healthyDevices:        make(map[string]sets.String),
 			allocatedDevices:      make(map[string]sets.String),
 			endpoints:             make(map[string]endpointInfo),
-			podDevices:            make(podDevices),
+			podDevices:            newPodDevices(),
 			sourcesReady:          &sourcesReadyStub{},
 			activePods:            func() []*v1.Pod { return []*v1.Pod{} },
 			topologyAffinityStore: &mockAffinityStore{tc.hint},
@@ -928,7 +602,7 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 			healthyDevices:        make(map[string]sets.String),
 			allocatedDevices:      make(map[string]sets.String),
 			endpoints:             make(map[string]endpointInfo),
-			podDevices:            make(podDevices),
+			podDevices:            newPodDevices(),
 			sourcesReady:          &sourcesReadyStub{},
 			activePods:            func() []*v1.Pod { return []*v1.Pod{} },
 			topologyAffinityStore: &mockAffinityStore{tc.hint},
@@ -978,5 +652,1031 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 		if actualSize != tc.expectedSize {
 			t.Errorf("%v. expected size: %v but got: %v", tc.description, tc.expectedSize, actualSize)
 		}
+	}
+}
+
+func TestGetPodDeviceRequest(t *testing.T) {
+	tcases := []struct {
+		description       string
+		pod               *v1.Pod
+		registeredDevices []string
+		expected          map[string]int
+	}{
+		{
+			description:       "empty pod",
+			pod:               &v1.Pod{},
+			registeredDevices: []string{},
+			expected:          map[string]int{},
+		},
+		{
+			description: "Init container requests device plugin resource",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			registeredDevices: []string{"gpu"},
+			expected:          map[string]int{"gpu": 2},
+		},
+		{
+			description: "Init containers request device plugin resource",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("2"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("4"),
+								},
+							},
+						},
+					},
+				},
+			},
+			registeredDevices: []string{"gpu"},
+			expected:          map[string]int{"gpu": 4},
+		},
+		{
+			description: "User container requests device plugin resource",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			registeredDevices: []string{"gpu"},
+			expected:          map[string]int{"gpu": 2},
+		},
+		{
+			description: "Init containers and user containers request the same amount of device plugin resources",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("2"),
+									v1.ResourceName("nic"):             resource.MustParse("2"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("2"),
+									v1.ResourceName("nic"):             resource.MustParse("2"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("1"),
+									v1.ResourceName("nic"):             resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("1"),
+									v1.ResourceName("nic"):             resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
+			},
+			registeredDevices: []string{"gpu", "nic"},
+			expected:          map[string]int{"gpu": 2, "nic": 2},
+		},
+		{
+			description: "Init containers request more device plugin resources than user containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("2"),
+									v1.ResourceName("nic"):             resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("3"),
+									v1.ResourceName("nic"):             resource.MustParse("2"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("1"),
+									v1.ResourceName("nic"):             resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
+			},
+			registeredDevices: []string{"gpu", "nic"},
+			expected:          map[string]int{"gpu": 3, "nic": 2},
+		},
+		{
+			description: "User containers request more device plugin resources than init containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("2"),
+									v1.ResourceName("nic"):             resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("2"),
+									v1.ResourceName("nic"):             resource.MustParse("1"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("3"),
+									v1.ResourceName("nic"):             resource.MustParse("2"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+									v1.ResourceName("gpu"):             resource.MustParse("3"),
+									v1.ResourceName("nic"):             resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			registeredDevices: []string{"gpu", "nic"},
+			expected:          map[string]int{"gpu": 6, "nic": 4},
+		},
+	}
+
+	for _, tc := range tcases {
+		m := ManagerImpl{
+			healthyDevices: make(map[string]sets.String),
+		}
+
+		for _, res := range tc.registeredDevices {
+			m.healthyDevices[res] = sets.NewString()
+		}
+
+		accumulatedResourceRequests := m.getPodDeviceRequest(tc.pod)
+
+		if !reflect.DeepEqual(accumulatedResourceRequests, tc.expected) {
+			t.Errorf("%v. expected alignment: %v but got: %v", tc.description, tc.expected, accumulatedResourceRequests)
+		}
+	}
+}
+
+func TestGetPodTopologyHints(t *testing.T) {
+	tcases := getCommonTestCases()
+	tcases = append(tcases, getPodScopeTestCases()...)
+
+	for _, tc := range tcases {
+		m := ManagerImpl{
+			allDevices:       make(map[string]map[string]pluginapi.Device),
+			healthyDevices:   make(map[string]sets.String),
+			allocatedDevices: make(map[string]sets.String),
+			podDevices:       newPodDevices(),
+			sourcesReady:     &sourcesReadyStub{},
+			activePods:       func() []*v1.Pod { return []*v1.Pod{tc.pod, {ObjectMeta: metav1.ObjectMeta{UID: "fakeOtherPod"}}} },
+			numaNodes:        []int{0, 1},
+		}
+
+		for r := range tc.devices {
+			m.allDevices[r] = make(map[string]pluginapi.Device)
+			m.healthyDevices[r] = sets.NewString()
+
+			for _, d := range tc.devices[r] {
+				//add `pluginapi.Device` with Topology
+				m.allDevices[r][d.ID] = d
+				m.healthyDevices[r].Insert(d.ID)
+			}
+		}
+
+		for p := range tc.allocatedDevices {
+			for c := range tc.allocatedDevices[p] {
+				for r, devices := range tc.allocatedDevices[p][c] {
+					m.podDevices.insert(p, c, r, constructDevices(devices), nil)
+
+					m.allocatedDevices[r] = sets.NewString()
+					for _, d := range devices {
+						m.allocatedDevices[r].Insert(d)
+					}
+				}
+			}
+		}
+
+		hints := m.GetPodTopologyHints(tc.pod)
+
+		for r := range tc.expectedHints {
+			sort.SliceStable(hints[r], func(i, j int) bool {
+				return hints[r][i].LessThan(hints[r][j])
+			})
+			sort.SliceStable(tc.expectedHints[r], func(i, j int) bool {
+				return tc.expectedHints[r][i].LessThan(tc.expectedHints[r][j])
+			})
+			if !reflect.DeepEqual(hints[r], tc.expectedHints[r]) {
+				t.Errorf("%v: Expected result to be %v, got %v", tc.description, tc.expectedHints[r], hints[r])
+			}
+		}
+	}
+}
+
+type topologyHintTestCase struct {
+	description      string
+	pod              *v1.Pod
+	devices          map[string][]pluginapi.Device
+	allocatedDevices map[string]map[string]map[string][]string
+	expectedHints    map[string][]topologymanager.TopologyHint
+}
+
+func getCommonTestCases() []topologyHintTestCase {
+	return []topologyHintTestCase{
+		{
+			description: "Single Request, no alignment",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice": {
+					{ID: "Dev1"},
+					{ID: "Dev2"},
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice": nil,
+			},
+		},
+		{
+			description: "Single Request, only one with alignment",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice": {
+					{ID: "Dev1"},
+					makeNUMADevice("Dev2", 1),
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice": {
+					{
+						NUMANodeAffinity: makeSocketMask(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+		},
+		{
+			description: "Single Request, one device per socket",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 1),
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice": {
+					{
+						NUMANodeAffinity: makeSocketMask(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+		},
+		{
+			description: "Request for 2, one device per socket",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 1),
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice": {
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        true,
+					},
+				},
+			},
+		},
+		{
+			description: "Request for 2, 2 devices per socket",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 1),
+					makeNUMADevice("Dev3", 0),
+					makeNUMADevice("Dev4", 1),
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice": {
+					{
+						NUMANodeAffinity: makeSocketMask(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+		},
+		{
+			description: "Request for 2, optimal on 1 NUMA node, forced cross-NUMA",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 1),
+					makeNUMADevice("Dev3", 0),
+					makeNUMADevice("Dev4", 1),
+				},
+			},
+			allocatedDevices: map[string]map[string]map[string][]string{
+				"fakePod": {
+					"fakeOtherContainer": {
+						"testdevice": {"Dev1", "Dev2"},
+					},
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice": {
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+		},
+		{
+			description: "2 device types, mixed configuration",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice1"): resource.MustParse("2"),
+									v1.ResourceName("testdevice2"): resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice1": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 1),
+					makeNUMADevice("Dev3", 0),
+					makeNUMADevice("Dev4", 1),
+				},
+				"testdevice2": {
+					makeNUMADevice("Dev1", 0),
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice1": {
+					{
+						NUMANodeAffinity: makeSocketMask(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        false,
+					},
+				},
+				"testdevice2": {
+					{
+						NUMANodeAffinity: makeSocketMask(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+		},
+		{
+			description: "Single device type, more requested than available",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("6"),
+								},
+							},
+						},
+					},
+				},
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+					makeNUMADevice("Dev3", 1),
+					makeNUMADevice("Dev4", 1),
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice": {},
+			},
+		},
+		{
+			description: "Single device type, all already allocated to container",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+				},
+			},
+			allocatedDevices: map[string]map[string]map[string][]string{
+				"fakePod": {
+					"fakeContainer": {
+						"testdevice": {"Dev1", "Dev2"},
+					},
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice": {
+					{
+						NUMANodeAffinity: makeSocketMask(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+		},
+		{
+			description: "Single device type, less already allocated to container than requested",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("4"),
+								},
+							},
+						},
+					},
+				},
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+					makeNUMADevice("Dev3", 1),
+					makeNUMADevice("Dev4", 1),
+				},
+			},
+			allocatedDevices: map[string]map[string]map[string][]string{
+				"fakePod": {
+					"fakeContainer": {
+						"testdevice": {"Dev1", "Dev2"},
+					},
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice": {},
+			},
+		},
+		{
+			description: "Single device type, more already allocated to container than requested",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice"): resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+					makeNUMADevice("Dev3", 1),
+					makeNUMADevice("Dev4", 1),
+				},
+			},
+			allocatedDevices: map[string]map[string]map[string][]string{
+				"fakePod": {
+					"fakeContainer": {
+						"testdevice": {"Dev1", "Dev2", "Dev3", "Dev4"},
+					},
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice": {},
+			},
+		},
+	}
+}
+
+func getPodScopeTestCases() []topologyHintTestCase {
+	return []topologyHintTestCase{
+		{
+			description: "2 device types, user container only",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice1"): resource.MustParse("2"),
+								},
+							},
+						},
+						{
+							Name: "fakeContainer2",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice2"): resource.MustParse("2"),
+								},
+							},
+						},
+						{
+							Name: "fakeContainer3",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("notRegistered"): resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice1": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+					makeNUMADevice("Dev3", 1),
+					makeNUMADevice("Dev4", 1),
+				},
+				"testdevice2": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+					makeNUMADevice("Dev3", 1),
+					makeNUMADevice("Dev4", 1),
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice1": {
+					{
+						NUMANodeAffinity: makeSocketMask(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        false,
+					},
+				},
+				"testdevice2": {
+					{
+						NUMANodeAffinity: makeSocketMask(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+		},
+		{
+			description: "2 device types, request resources for init containers and user container",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice1"): resource.MustParse("1"),
+									v1.ResourceName("testdevice2"): resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice1"): resource.MustParse("1"),
+									v1.ResourceName("testdevice2"): resource.MustParse("2"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice1"): resource.MustParse("1"),
+									v1.ResourceName("testdevice2"): resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							Name: "fakeContainer2",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice1"): resource.MustParse("1"),
+									v1.ResourceName("testdevice2"): resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							Name: "fakeContainer3",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("notRegistered"): resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice1": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+					makeNUMADevice("Dev3", 1),
+					makeNUMADevice("Dev4", 1),
+				},
+				"testdevice2": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+					makeNUMADevice("Dev3", 1),
+					makeNUMADevice("Dev4", 1),
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice1": {
+					{
+						NUMANodeAffinity: makeSocketMask(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        false,
+					},
+				},
+				"testdevice2": {
+					{
+						NUMANodeAffinity: makeSocketMask(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(1),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+		},
+		{
+			description: "2 device types, user container only, optimal on 1 NUMA node, forced cross-NUMA",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "fakePod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "fakeContainer1",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice1"): resource.MustParse("1"),
+									v1.ResourceName("testdevice2"): resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							Name: "fakeContainer2",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("testdevice1"): resource.MustParse("1"),
+									v1.ResourceName("testdevice2"): resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							Name: "fakeContainer3",
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("notRegistered"): resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice1": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+					makeNUMADevice("Dev3", 1),
+					makeNUMADevice("Dev4", 1),
+				},
+				"testdevice2": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 0),
+					makeNUMADevice("Dev3", 1),
+					makeNUMADevice("Dev4", 1),
+				},
+			},
+			allocatedDevices: map[string]map[string]map[string][]string{
+				"fakeOtherPod": {
+					"fakeOtherContainer": {
+						"testdevice1": {"Dev1", "Dev3"},
+						"testdevice2": {"Dev1", "Dev3"},
+					},
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice1": {
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        false,
+					},
+				},
+				"testdevice2": {
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+		},
 	}
 }

@@ -24,6 +24,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	admissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	admissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
+	internalv1alpha1 "k8s.io/client-go/kubernetes/typed/apiserverinternal/v1alpha1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	appsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	appsv1beta2 "k8s.io/client-go/kubernetes/typed/apps/v1beta2"
@@ -48,8 +49,10 @@ import (
 	eventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
+	flowcontrolv1beta1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	networkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
+	nodev1 "k8s.io/client-go/kubernetes/typed/node/v1"
 	nodev1alpha1 "k8s.io/client-go/kubernetes/typed/node/v1alpha1"
 	nodev1beta1 "k8s.io/client-go/kubernetes/typed/node/v1beta1"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
@@ -59,7 +62,6 @@ import (
 	schedulingv1 "k8s.io/client-go/kubernetes/typed/scheduling/v1"
 	schedulingv1alpha1 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1"
 	schedulingv1beta1 "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1"
-	settingsv1alpha1 "k8s.io/client-go/kubernetes/typed/settings/v1alpha1"
 	storagev1 "k8s.io/client-go/kubernetes/typed/storage/v1"
 	storagev1alpha1 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1"
 	storagev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
@@ -71,6 +73,7 @@ type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	AdmissionregistrationV1() admissionregistrationv1.AdmissionregistrationV1Interface
 	AdmissionregistrationV1beta1() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface
+	InternalV1alpha1() internalv1alpha1.InternalV1alpha1Interface
 	AppsV1() appsv1.AppsV1Interface
 	AppsV1beta1() appsv1beta1.AppsV1beta1Interface
 	AppsV1beta2() appsv1beta2.AppsV1beta2Interface
@@ -95,8 +98,10 @@ type Interface interface {
 	EventsV1beta1() eventsv1beta1.EventsV1beta1Interface
 	ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface
 	FlowcontrolV1alpha1() flowcontrolv1alpha1.FlowcontrolV1alpha1Interface
+	FlowcontrolV1beta1() flowcontrolv1beta1.FlowcontrolV1beta1Interface
 	NetworkingV1() networkingv1.NetworkingV1Interface
 	NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface
+	NodeV1() nodev1.NodeV1Interface
 	NodeV1alpha1() nodev1alpha1.NodeV1alpha1Interface
 	NodeV1beta1() nodev1beta1.NodeV1beta1Interface
 	PolicyV1beta1() policyv1beta1.PolicyV1beta1Interface
@@ -106,7 +111,6 @@ type Interface interface {
 	SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1Interface
 	SchedulingV1beta1() schedulingv1beta1.SchedulingV1beta1Interface
 	SchedulingV1() schedulingv1.SchedulingV1Interface
-	SettingsV1alpha1() settingsv1alpha1.SettingsV1alpha1Interface
 	StorageV1beta1() storagev1beta1.StorageV1beta1Interface
 	StorageV1() storagev1.StorageV1Interface
 	StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface
@@ -118,6 +122,7 @@ type Clientset struct {
 	*discovery.DiscoveryClient
 	admissionregistrationV1      *admissionregistrationv1.AdmissionregistrationV1Client
 	admissionregistrationV1beta1 *admissionregistrationv1beta1.AdmissionregistrationV1beta1Client
+	internalV1alpha1             *internalv1alpha1.InternalV1alpha1Client
 	appsV1                       *appsv1.AppsV1Client
 	appsV1beta1                  *appsv1beta1.AppsV1beta1Client
 	appsV1beta2                  *appsv1beta2.AppsV1beta2Client
@@ -142,8 +147,10 @@ type Clientset struct {
 	eventsV1beta1                *eventsv1beta1.EventsV1beta1Client
 	extensionsV1beta1            *extensionsv1beta1.ExtensionsV1beta1Client
 	flowcontrolV1alpha1          *flowcontrolv1alpha1.FlowcontrolV1alpha1Client
+	flowcontrolV1beta1           *flowcontrolv1beta1.FlowcontrolV1beta1Client
 	networkingV1                 *networkingv1.NetworkingV1Client
 	networkingV1beta1            *networkingv1beta1.NetworkingV1beta1Client
+	nodeV1                       *nodev1.NodeV1Client
 	nodeV1alpha1                 *nodev1alpha1.NodeV1alpha1Client
 	nodeV1beta1                  *nodev1beta1.NodeV1beta1Client
 	policyV1beta1                *policyv1beta1.PolicyV1beta1Client
@@ -153,7 +160,6 @@ type Clientset struct {
 	schedulingV1alpha1           *schedulingv1alpha1.SchedulingV1alpha1Client
 	schedulingV1beta1            *schedulingv1beta1.SchedulingV1beta1Client
 	schedulingV1                 *schedulingv1.SchedulingV1Client
-	settingsV1alpha1             *settingsv1alpha1.SettingsV1alpha1Client
 	storageV1beta1               *storagev1beta1.StorageV1beta1Client
 	storageV1                    *storagev1.StorageV1Client
 	storageV1alpha1              *storagev1alpha1.StorageV1alpha1Client
@@ -167,6 +173,11 @@ func (c *Clientset) AdmissionregistrationV1() admissionregistrationv1.Admissionr
 // AdmissionregistrationV1beta1 retrieves the AdmissionregistrationV1beta1Client
 func (c *Clientset) AdmissionregistrationV1beta1() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface {
 	return c.admissionregistrationV1beta1
+}
+
+// InternalV1alpha1 retrieves the InternalV1alpha1Client
+func (c *Clientset) InternalV1alpha1() internalv1alpha1.InternalV1alpha1Interface {
+	return c.internalV1alpha1
 }
 
 // AppsV1 retrieves the AppsV1Client
@@ -289,6 +300,11 @@ func (c *Clientset) FlowcontrolV1alpha1() flowcontrolv1alpha1.FlowcontrolV1alpha
 	return c.flowcontrolV1alpha1
 }
 
+// FlowcontrolV1beta1 retrieves the FlowcontrolV1beta1Client
+func (c *Clientset) FlowcontrolV1beta1() flowcontrolv1beta1.FlowcontrolV1beta1Interface {
+	return c.flowcontrolV1beta1
+}
+
 // NetworkingV1 retrieves the NetworkingV1Client
 func (c *Clientset) NetworkingV1() networkingv1.NetworkingV1Interface {
 	return c.networkingV1
@@ -297,6 +313,11 @@ func (c *Clientset) NetworkingV1() networkingv1.NetworkingV1Interface {
 // NetworkingV1beta1 retrieves the NetworkingV1beta1Client
 func (c *Clientset) NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface {
 	return c.networkingV1beta1
+}
+
+// NodeV1 retrieves the NodeV1Client
+func (c *Clientset) NodeV1() nodev1.NodeV1Interface {
+	return c.nodeV1
 }
 
 // NodeV1alpha1 retrieves the NodeV1alpha1Client
@@ -344,11 +365,6 @@ func (c *Clientset) SchedulingV1() schedulingv1.SchedulingV1Interface {
 	return c.schedulingV1
 }
 
-// SettingsV1alpha1 retrieves the SettingsV1alpha1Client
-func (c *Clientset) SettingsV1alpha1() settingsv1alpha1.SettingsV1alpha1Interface {
-	return c.settingsV1alpha1
-}
-
 // StorageV1beta1 retrieves the StorageV1beta1Client
 func (c *Clientset) StorageV1beta1() storagev1beta1.StorageV1beta1Interface {
 	return c.storageV1beta1
@@ -390,6 +406,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		return nil, err
 	}
 	cs.admissionregistrationV1beta1, err = admissionregistrationv1beta1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.internalV1alpha1, err = internalv1alpha1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -489,11 +509,19 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.flowcontrolV1beta1, err = flowcontrolv1beta1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.networkingV1, err = networkingv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
 	cs.networkingV1beta1, err = networkingv1beta1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.nodeV1, err = nodev1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -533,10 +561,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	cs.settingsV1alpha1, err = settingsv1alpha1.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
 	cs.storageV1beta1, err = storagev1beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -563,6 +587,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.admissionregistrationV1 = admissionregistrationv1.NewForConfigOrDie(c)
 	cs.admissionregistrationV1beta1 = admissionregistrationv1beta1.NewForConfigOrDie(c)
+	cs.internalV1alpha1 = internalv1alpha1.NewForConfigOrDie(c)
 	cs.appsV1 = appsv1.NewForConfigOrDie(c)
 	cs.appsV1beta1 = appsv1beta1.NewForConfigOrDie(c)
 	cs.appsV1beta2 = appsv1beta2.NewForConfigOrDie(c)
@@ -587,8 +612,10 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.eventsV1beta1 = eventsv1beta1.NewForConfigOrDie(c)
 	cs.extensionsV1beta1 = extensionsv1beta1.NewForConfigOrDie(c)
 	cs.flowcontrolV1alpha1 = flowcontrolv1alpha1.NewForConfigOrDie(c)
+	cs.flowcontrolV1beta1 = flowcontrolv1beta1.NewForConfigOrDie(c)
 	cs.networkingV1 = networkingv1.NewForConfigOrDie(c)
 	cs.networkingV1beta1 = networkingv1beta1.NewForConfigOrDie(c)
+	cs.nodeV1 = nodev1.NewForConfigOrDie(c)
 	cs.nodeV1alpha1 = nodev1alpha1.NewForConfigOrDie(c)
 	cs.nodeV1beta1 = nodev1beta1.NewForConfigOrDie(c)
 	cs.policyV1beta1 = policyv1beta1.NewForConfigOrDie(c)
@@ -598,7 +625,6 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.schedulingV1alpha1 = schedulingv1alpha1.NewForConfigOrDie(c)
 	cs.schedulingV1beta1 = schedulingv1beta1.NewForConfigOrDie(c)
 	cs.schedulingV1 = schedulingv1.NewForConfigOrDie(c)
-	cs.settingsV1alpha1 = settingsv1alpha1.NewForConfigOrDie(c)
 	cs.storageV1beta1 = storagev1beta1.NewForConfigOrDie(c)
 	cs.storageV1 = storagev1.NewForConfigOrDie(c)
 	cs.storageV1alpha1 = storagev1alpha1.NewForConfigOrDie(c)
@@ -612,6 +638,7 @@ func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.admissionregistrationV1 = admissionregistrationv1.New(c)
 	cs.admissionregistrationV1beta1 = admissionregistrationv1beta1.New(c)
+	cs.internalV1alpha1 = internalv1alpha1.New(c)
 	cs.appsV1 = appsv1.New(c)
 	cs.appsV1beta1 = appsv1beta1.New(c)
 	cs.appsV1beta2 = appsv1beta2.New(c)
@@ -636,8 +663,10 @@ func New(c rest.Interface) *Clientset {
 	cs.eventsV1beta1 = eventsv1beta1.New(c)
 	cs.extensionsV1beta1 = extensionsv1beta1.New(c)
 	cs.flowcontrolV1alpha1 = flowcontrolv1alpha1.New(c)
+	cs.flowcontrolV1beta1 = flowcontrolv1beta1.New(c)
 	cs.networkingV1 = networkingv1.New(c)
 	cs.networkingV1beta1 = networkingv1beta1.New(c)
+	cs.nodeV1 = nodev1.New(c)
 	cs.nodeV1alpha1 = nodev1alpha1.New(c)
 	cs.nodeV1beta1 = nodev1beta1.New(c)
 	cs.policyV1beta1 = policyv1beta1.New(c)
@@ -647,7 +676,6 @@ func New(c rest.Interface) *Clientset {
 	cs.schedulingV1alpha1 = schedulingv1alpha1.New(c)
 	cs.schedulingV1beta1 = schedulingv1beta1.New(c)
 	cs.schedulingV1 = schedulingv1.New(c)
-	cs.settingsV1alpha1 = settingsv1alpha1.New(c)
 	cs.storageV1beta1 = storagev1beta1.New(c)
 	cs.storageV1 = storagev1.New(c)
 	cs.storageV1alpha1 = storagev1alpha1.New(c)

@@ -160,7 +160,7 @@ rules:
       - k8s.io/kubernetes/pkg/kubelet/volumemanager/populator
       - k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler
       - k8s.io/kubernetes/pkg/kubemark
-      - k8s.io/kubernetes/pkg/master/ports
+      - k8s.io/kubernetes/pkg/cluster/ports
       - k8s.io/kubernetes/pkg/probe
       - k8s.io/kubernetes/pkg/probe/exec
       - k8s.io/kubernetes/pkg/probe/http
@@ -182,12 +182,12 @@ rules:
       - k8s.io/kubernetes/pkg/registry/core/service/allocator
       - k8s.io/kubernetes/pkg/registry/core/service/portallocator
       - k8s.io/kubernetes/pkg/scheduler/api
+      - k8s.io/kubernetes/pkg/scheduler/framework
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports
       - k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources
-      - k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1
       - k8s.io/kubernetes/pkg/scheduler/framework/runtime
       - k8s.io/kubernetes/pkg/scheduler/internal/parallelize
       - k8s.io/kubernetes/pkg/scheduler/listers
@@ -206,7 +206,6 @@ rules:
       - k8s.io/kubernetes/pkg/util/config
       - k8s.io/kubernetes/pkg/util/configz
       - k8s.io/kubernetes/pkg/util/conntrack
-      - k8s.io/kubernetes/pkg/util/ebtables
       - k8s.io/kubernetes/pkg/util/env
       - k8s.io/kubernetes/pkg/util/filesystem
       - k8s.io/kubernetes/pkg/util/flag
@@ -244,6 +243,7 @@ rules:
       - k8s.io/kubernetes/pkg/apis/authentication
       - k8s.io/kubernetes/pkg/apis/authentication/v1
       - k8s.io/kubernetes/pkg/apis/certificates/v1beta1
+      - k8s.io/kubernetes/pkg/apis/storage/v1
       - k8s.io/kubernetes/pkg/scheduler/internal/cache
   - selectorRegexp: k8s[.]io/kubernetes/test/
     allowedPrefixes:

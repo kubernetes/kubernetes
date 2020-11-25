@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 type capManagersManager struct {
@@ -67,7 +67,7 @@ func (f *capManagersManager) capUpdateManagers(managed Managed) (newManaged Mana
 	// Gather all entries from updates
 	updaters := []string{}
 	for manager, fields := range managed.Fields() {
-		if fields.Applied() == false {
+		if !fields.Applied() {
 			updaters = append(updaters, manager)
 		}
 	}

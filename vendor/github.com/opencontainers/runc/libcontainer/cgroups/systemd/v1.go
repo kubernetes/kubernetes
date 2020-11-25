@@ -41,18 +41,7 @@ type subsystem interface {
 
 var errSubsystemDoesNotExist = errors.New("cgroup: subsystem does not exist")
 
-type subsystemSet []subsystem
-
-func (s subsystemSet) Get(name string) (subsystem, error) {
-	for _, ss := range s {
-		if ss.Name() == name {
-			return ss, nil
-		}
-	}
-	return nil, errSubsystemDoesNotExist
-}
-
-var legacySubsystems = subsystemSet{
+var legacySubsystems = []subsystem{
 	&fs.CpusetGroup{},
 	&fs.DevicesGroup{},
 	&fs.MemoryGroup{},
@@ -355,9 +344,9 @@ func (m *legacyManager) GetStats() (*cgroups.Stats, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	stats := cgroups.NewStats()
-	for name, path := range m.paths {
-		sys, err := legacySubsystems.Get(name)
-		if err == errSubsystemDoesNotExist || !cgroups.PathExists(path) {
+	for _, sys := range legacySubsystems {
+		path := m.paths[sys.Name()]
+		if path == "" {
 			continue
 		}
 		if err := sys.GetStats(path, stats); err != nil {

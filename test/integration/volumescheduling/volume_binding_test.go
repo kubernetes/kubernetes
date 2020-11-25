@@ -693,8 +693,8 @@ func TestPVAffinityConflict(t *testing.T) {
 		if strings.Compare(p.Status.Conditions[0].Reason, "Unschedulable") != 0 {
 			t.Fatalf("Failed as Pod %s reason was: %s but expected: Unschedulable", podName, p.Status.Conditions[0].Reason)
 		}
-		if !strings.Contains(p.Status.Conditions[0].Message, "node(s) didn't match node selector") || !strings.Contains(p.Status.Conditions[0].Message, "node(s) had volume node affinity conflict") {
-			t.Fatalf("Failed as Pod's %s failure message does not contain expected message: node(s) didn't match node selector, node(s) had volume node affinity conflict. Got message %q", podName, p.Status.Conditions[0].Message)
+		if !strings.Contains(p.Status.Conditions[0].Message, "node(s) didn't match Pod's node affinity") || !strings.Contains(p.Status.Conditions[0].Message, "node(s) had volume node affinity conflict") {
+			t.Fatalf("Failed as Pod's %s failure message does not contain expected message: node(s) didn't match Pod's node affinity, node(s) had volume node affinity conflict. Got message %q", podName, p.Status.Conditions[0].Message)
 		}
 		// Deleting test pod
 		if err := config.client.CoreV1().Pods(config.ns).Delete(context.TODO(), podName, metav1.DeleteOptions{}); err != nil {
@@ -762,7 +762,7 @@ func testVolumeProvision(t *testing.T, storageCapacity bool) {
 	}
 
 	run := func(t *testing.T, test testcaseType) {
-		// Create StorageClasses
+		t.Log("Creating StorageClass")
 		suffix := rand.String(4)
 		classes := map[string]*storagev1.StorageClass{}
 		classes[classImmediate] = makeDynamicProvisionerStorageClass(fmt.Sprintf("immediate-%v", suffix), &modeImmediate, nil)
@@ -783,27 +783,35 @@ func testVolumeProvision(t *testing.T, storageCapacity bool) {
 				t.Fatalf("Failed to create StorageClass %q: %v", sc.Name, err)
 			}
 		}
-		// Create PVs
+
+		t.Log("Creating PVs")
 		for _, pvConfig := range test.pvs {
 			pv := makePV(pvConfig.name, classes[pvConfig.scName].Name, pvConfig.preboundPVC, config.ns, pvConfig.node)
 			if _, err := config.client.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
 			}
+			if err := waitForPVPhase(config.client, pvConfig.name, v1.VolumeAvailable); err != nil {
+				t.Fatalf("PersistentVolume %q failed to become available: %v", pvConfig.name, err)
+			}
 		}
 
-		// Create PVCs
+		t.Log("Creating PVCs")
 		for _, pvcConfig := range test.boundPvcs {
 			pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scName].Name, pvcConfig.preboundPV)
 			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
 			}
 		}
+
+		t.Log("Creating unbound PVCs")
 		for _, pvcConfig := range test.unboundPvcs {
 			pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scName].Name, pvcConfig.preboundPV)
 			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create PersistentVolumeClaim %q: %v", pvc.Name, err)
 			}
 		}
+
+		t.Log("Creating unbound PVCs which should be dynamically provisioned")
 		for _, pvcConfig := range test.provisionedPvcs {
 			pvc := makePVC(pvcConfig.name, config.ns, &classes[pvcConfig.scName].Name, pvcConfig.preboundPV)
 			if _, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
@@ -811,7 +819,7 @@ func testVolumeProvision(t *testing.T, storageCapacity bool) {
 			}
 		}
 
-		// Create Pod
+		t.Log("Creating the pod to schedule")
 		if _, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), test.pod, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create Pod %q: %v", test.pod.Name, err)
 		}
@@ -825,7 +833,7 @@ func testVolumeProvision(t *testing.T, storageCapacity bool) {
 			}
 		}
 
-		// Validate PVC/PV binding
+		t.Log("Validating PVC/PV binding")
 		for _, pvc := range test.boundPvcs {
 			validatePVCPhase(t, config.client, pvc.name, config.ns, v1.ClaimBound, false)
 		}
@@ -840,6 +848,7 @@ func testVolumeProvision(t *testing.T, storageCapacity bool) {
 		}
 
 		// Force delete objects, but they still may not be immediately removed
+		t.Log("Deleting test objects")
 		deleteTestObjects(config.client, config.ns, deleteOption)
 	}
 

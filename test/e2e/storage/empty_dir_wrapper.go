@@ -58,7 +58,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 	f := framework.NewDefaultFramework("emptydir-wrapper")
 
 	/*
-		Release : v1.13
+		Release: v1.13
 		Testname: EmptyDir Wrapper Volume, Secret and ConfigMap volumes, no conflict
 		Description: Secret volume and ConfigMap volume is created with data. Pod MUST be able to start with Secret and ConfigMap volumes mounted into the container.
 	*/
@@ -180,7 +180,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 	// appears to be less prone to the race problem.
 
 	/*
-		Release : v1.13
+		Release: v1.13
 		Testname: EmptyDir Wrapper Volume, ConfigMap volumes, no race
 		Description: Create 50 ConfigMaps Volumes and 5 replicas of pod with these ConfigMapvolumes mounted. Pod MUST NOT fail waiting for Volumes.
 	*/
@@ -214,25 +214,8 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 
 	labels := map[string]string{"name": gitServerPodName}
 
-	gitServerPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   gitServerPodName,
-			Labels: labels,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:            "git-repo",
-					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:            []string{"fake-gitserver"},
-					ImagePullPolicy: "IfNotPresent",
-					Ports: []v1.ContainerPort{
-						{ContainerPort: int32(containerPort)},
-					},
-				},
-			},
-		},
-	}
+	gitServerPod := e2epod.NewAgnhostPod(f.Namespace.Name, gitServerPodName, nil, nil, []v1.ContainerPort{{ContainerPort: int32(containerPort)}}, "fake-gitserver")
+	gitServerPod.ObjectMeta.Labels = labels
 	f.PodClient().CreateSync(gitServerPod)
 
 	// Portal IP and port

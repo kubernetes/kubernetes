@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fieldmanager_test
+package fieldmanager
 
 import (
 	"fmt"
@@ -25,8 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
-	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/v3/merge"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/merge"
 	"sigs.k8s.io/yaml"
 )
 
@@ -349,7 +349,7 @@ spec:
 			expectConflictSet: fieldpath.NewSet(
 				fieldpath.MakePathOrDie("metadata", "labels", "app"),
 				fieldpath.MakePathOrDie("spec", "replicas"),
-				fieldpath.MakePathOrDie("spec", "selector", "matchLabels", "app"),
+				fieldpath.MakePathOrDie("spec", "selector"), // selector is atomic
 				fieldpath.MakePathOrDie("spec", "template", "metadata", "labels", "app"),
 				fieldpath.MakePathOrDie("spec", "template", "spec", "containers", fieldpath.KeyByFields("name", "my-c"), "image"),
 			),

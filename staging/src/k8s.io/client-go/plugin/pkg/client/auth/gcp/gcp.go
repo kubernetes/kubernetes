@@ -188,7 +188,7 @@ func (g *gcpAuthProvider) Login() error { return nil }
 type cachedTokenSource struct {
 	lk          sync.Mutex
 	source      oauth2.TokenSource
-	accessToken string
+	accessToken string `datapolicy:"token"`
 	expiry      time.Time
 	persister   restclient.AuthProviderConfigPersister
 	cache       map[string]string
@@ -269,8 +269,8 @@ func (t *cachedTokenSource) baseCache() map[string]string {
 type commandTokenSource struct {
 	cmd       string
 	args      []string
-	tokenKey  string
-	expiryKey string
+	tokenKey  string `datapolicy:"token"`
+	expiryKey string `datapolicy:"secret-key"`
 	timeFmt   string
 }
 

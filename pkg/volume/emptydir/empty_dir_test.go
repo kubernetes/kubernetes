@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,7 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/utils/mount"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/mount-utils"
 )
 
 // Construct an instance of a plugin, by name.
@@ -81,6 +82,26 @@ func (fake *fakeMountDetector) GetMountMedium(path string, requestedMedium v1.St
 
 func TestPluginEmptyRootContext(t *testing.T) {
 	doTestPlugin(t, pluginTestConfig{
+		volumeDirExists:        true,
+		readyDirExists:         true,
+		medium:                 v1.StorageMediumDefault,
+		expectedSetupMounts:    0,
+		expectedTeardownMounts: 0})
+	doTestPlugin(t, pluginTestConfig{
+		volumeDirExists:        false,
+		readyDirExists:         false,
+		medium:                 v1.StorageMediumDefault,
+		expectedSetupMounts:    0,
+		expectedTeardownMounts: 0})
+	doTestPlugin(t, pluginTestConfig{
+		volumeDirExists:        true,
+		readyDirExists:         false,
+		medium:                 v1.StorageMediumDefault,
+		expectedSetupMounts:    0,
+		expectedTeardownMounts: 0})
+	doTestPlugin(t, pluginTestConfig{
+		volumeDirExists:        false,
+		readyDirExists:         true,
 		medium:                 v1.StorageMediumDefault,
 		expectedSetupMounts:    0,
 		expectedTeardownMounts: 0})
@@ -117,8 +138,11 @@ func TestPluginHugetlbfs(t *testing.T) {
 }
 
 type pluginTestConfig struct {
-	medium                        v1.StorageMedium
-	idempotent                    bool
+	medium v1.StorageMedium
+	//volumeDirExists indicates whether volumeDir already/still exists before volume setup/teardown
+	volumeDirExists bool
+	//readyDirExists indicates whether readyDir already/still exists before volume setup/teardown
+	readyDirExists                bool
 	expectedSetupMounts           int
 	shouldBeMountedBeforeTeardown bool
 	expectedTeardownMounts        int
@@ -163,7 +187,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		}
 	)
 
-	if config.idempotent {
+	if config.readyDirExists {
 		physicalMounter.MountPoints = []mount.MountPoint{
 			{
 				Path: volumePath,
@@ -188,29 +212,14 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	if volPath != volumePath {
 		t.Errorf("Got unexpected path: %s", volPath)
 	}
-
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
-		t.Errorf("Expected success, got: %v", err)
+	if config.volumeDirExists {
+		if err := os.MkdirAll(volPath, perm); err != nil {
+			t.Errorf("fail to create path: %s", volPath)
+		}
 	}
 
 	// Stat the directory and check the permission bits
-	fileinfo, err := os.Stat(volPath)
-	if !config.idempotent {
-		if err != nil {
-			if os.IsNotExist(err) {
-				t.Errorf("SetUp() failed, volume path not created: %s", volPath)
-			} else {
-				t.Errorf("SetUp() failed: %v", err)
-			}
-		}
-		if e, a := perm, fileinfo.Mode().Perm(); e != a {
-			t.Errorf("Unexpected file mode for %v: expected: %v, got: %v", volPath, e, a)
-		}
-	} else if err == nil {
-		// If this test is for idempotency and we were able
-		// to stat the volume path, it's an error.
-		t.Errorf("Volume directory was created unexpectedly")
-	}
+	testSetUp(mounter, metadataDir, volPath)
 
 	log := physicalMounter.GetLog()
 	// Check the number of mounts performed during setup
@@ -236,14 +245,19 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		t.Errorf("Got a nil Unmounter")
 	}
 
-	// Tear down the volume
-	if err := unmounter.TearDown(); err != nil {
-		t.Errorf("Expected success, got: %v", err)
+	if !config.readyDirExists {
+		if err := os.RemoveAll(metadataDir); err != nil && !os.IsNotExist(err) {
+			t.Errorf("failed to remove ready dir [%s]: %v", metadataDir, err)
+		}
 	}
-	if _, err := os.Stat(volPath); err == nil {
-		t.Errorf("TearDown() failed, volume path still exists: %s", volPath)
-	} else if !os.IsNotExist(err) {
-		t.Errorf("TearDown() failed: %v", err)
+	if !config.volumeDirExists {
+		if err := os.RemoveAll(volPath); err != nil && !os.IsNotExist(err) {
+			t.Errorf("failed to remove ready dir [%s]: %v", metadataDir, err)
+		}
+	}
+	// Tear down the volume
+	if err := testTearDown(unmounter, metadataDir, volPath); err != nil {
+		t.Errorf("Test failed with error %v", err)
 	}
 
 	log = physicalMounter.GetLog()
@@ -254,6 +268,42 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		t.Errorf("Unexpected physicalMounter action during teardown: %#v", log[0])
 	}
 	physicalMounter.ResetLog()
+}
+
+func testSetUp(mounter volume.Mounter, metadataDir, volPath string) error {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+		return fmt.Errorf("Expected success, got: %v", err)
+	}
+	// Stat the directory and check the permission bits
+	if !volumeutil.IsReady(metadataDir) {
+		return fmt.Errorf("SetUp() failed, ready file is not created")
+	}
+	fileinfo, err := os.Stat(volPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("SetUp() failed, volume path not created: %s", volPath)
+		}
+		return fmt.Errorf("SetUp() failed: %v", err)
+	}
+	if e, a := perm, fileinfo.Mode().Perm(); e != a {
+		return fmt.Errorf("Unexpected file mode for %v: expected: %v, got: %v", volPath, e, a)
+	}
+	return nil
+}
+
+func testTearDown(unmounter volume.Unmounter, metadataDir, volPath string) error {
+	if err := unmounter.TearDown(); err != nil {
+		return err
+	}
+	if volumeutil.IsReady(metadataDir) {
+		return fmt.Errorf("Teardown() failed, ready file still exists")
+	}
+	if _, err := os.Stat(volPath); err == nil {
+		return fmt.Errorf("TearDown() failed, volume path still exists: %s", volPath)
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("TearDown() failed: %v", err)
+	}
+	return nil
 }
 
 func TestPluginBackCompat(t *testing.T) {
@@ -914,6 +964,112 @@ func TestGetPageSize(t *testing.T) {
 			}
 			if err == nil && pageSize.Cmp(testCase.expectedResult) != 0 {
 				t.Errorf("%s: Unexpected result: %s, expected: %s", testCaseName, pageSize.String(), testCase.expectedResult.String())
+			}
+		})
+	}
+}
+
+func TestCalculateEmptyDirMemorySize(t *testing.T) {
+	testCases := map[string]struct {
+		pod                   *v1.Pod
+		nodeAllocatableMemory resource.Quantity
+		emptyDirSizeLimit     resource.Quantity
+		expectedResult        resource.Quantity
+		featureGateEnabled    bool
+	}{
+		"SizeMemoryBackedVolumesDisabled": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("memory"): resource.MustParse("10Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatableMemory: resource.MustParse("16Gi"),
+			emptyDirSizeLimit:     resource.MustParse("1Gi"),
+			expectedResult:        resource.MustParse("0"),
+			featureGateEnabled:    false,
+		},
+		"EmptyDirLocalLimit": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("memory"): resource.MustParse("10Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatableMemory: resource.MustParse("16Gi"),
+			emptyDirSizeLimit:     resource.MustParse("1Gi"),
+			expectedResult:        resource.MustParse("1Gi"),
+			featureGateEnabled:    true,
+		},
+		"PodLocalLimit": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									v1.ResourceName("memory"): resource.MustParse("10Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatableMemory: resource.MustParse("16Gi"),
+			emptyDirSizeLimit:     resource.MustParse("0"),
+			expectedResult:        resource.MustParse("10Gi"),
+			featureGateEnabled:    true,
+		},
+		"NodeAllocatableLimit": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("memory"): resource.MustParse("10Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeAllocatableMemory: resource.MustParse("16Gi"),
+			emptyDirSizeLimit:     resource.MustParse("0"),
+			expectedResult:        resource.MustParse("16Gi"),
+			featureGateEnabled:    true,
+		},
+	}
+
+	for testCaseName, testCase := range testCases {
+		t.Run(testCaseName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SizeMemoryBackedVolumes, testCase.featureGateEnabled)()
+			spec := &volume.Spec{
+				Volume: &v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &testCase.emptyDirSizeLimit,
+						},
+					},
+				}}
+			result := calculateEmptyDirMemorySize(&testCase.nodeAllocatableMemory, spec, testCase.pod)
+			if result.Cmp(testCase.expectedResult) != 0 {
+				t.Errorf("%s: Unexpected result.  Expected %v, got %v", testCaseName, testCase.expectedResult.String(), result.String())
 			}
 		})
 	}

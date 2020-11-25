@@ -451,6 +451,37 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 		ginkgo.By("delete a PD")
 		framework.ExpectNoError(e2epv.DeletePDWithRetry("non-exist"))
 	})
+
+	// This test is marked to run as serial so as device selection on AWS does not
+	// conflict with other concurrent attach operations.
+	ginkgo.It("[Serial] attach on previously attached volumes should work", func() {
+		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
+		ginkgo.By("creating PD")
+		diskName, err := e2epv.CreatePDWithRetry()
+		framework.ExpectNoError(err, "Error creating PD")
+
+		// this should be safe to do because if attach fails then detach will be considered
+		// successful and we will delete the volume.
+		defer func() {
+			detachAndDeletePDs(diskName, []types.NodeName{host0Name})
+		}()
+
+		ginkgo.By("Attaching volume to a node")
+		err = attachPD(host0Name, diskName)
+		framework.ExpectNoError(err, "Error attaching PD")
+
+		pod := testPDPod([]string{diskName}, host0Name /*readOnly*/, false, 1)
+		ginkgo.By("Creating test pod with same volume")
+		_, err = podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "Failed to create pod")
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, pod.Name, f.Namespace.Name))
+
+		ginkgo.By("deleting the pod")
+		framework.ExpectNoError(podClient.Delete(context.TODO(), pod.Name, *metav1.NewDeleteOptions(0)), "Failed to delete pod")
+		framework.Logf("deleted pod %q", pod.Name)
+		ginkgo.By("waiting for PD to detach")
+		framework.ExpectNoError(waitForPDDetach(diskName, host0Name))
+	})
 })
 
 func countReadyNodes(c clientset.Interface, hostName types.NodeName) int {
@@ -474,6 +505,7 @@ func verifyPDContentsViaContainer(namespace string, f *framework.Framework, podN
 	}
 }
 
+// TODO: move detachPD to standard cloudprovider functions so as these tests can run on other cloudproviders too
 func detachPD(nodeName types.NodeName, pdName string) error {
 	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
 		gceCloud, err := gce.GetGCECloud()
@@ -509,6 +541,38 @@ func detachPD(nodeName types.NodeName, pdName string) error {
 
 	} else {
 		return fmt.Errorf("Provider does not support volume detaching")
+	}
+}
+
+// TODO: move attachPD to standard cloudprovider functions so as these tests can run on other cloudproviders too
+func attachPD(nodeName types.NodeName, pdName string) error {
+	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
+		gceCloud, err := gce.GetGCECloud()
+		if err != nil {
+			return err
+		}
+		err = gceCloud.AttachDisk(pdName, nodeName, false /*readOnly*/, false /*regional*/)
+		if err != nil {
+			framework.Logf("Error attaching PD %q: %v", pdName, err)
+		}
+		return err
+
+	} else if framework.TestContext.Provider == "aws" {
+		awsSession, err := session.NewSession()
+		if err != nil {
+			return fmt.Errorf("error creating session: %v", err)
+		}
+		client := ec2.New(awsSession)
+		tokens := strings.Split(pdName, "/")
+		awsVolumeID := tokens[len(tokens)-1]
+		ebsUtil := utils.NewEBSUtil(client)
+		err = ebsUtil.AttachDisk(awsVolumeID, string(nodeName))
+		if err != nil {
+			return fmt.Errorf("error attaching volume %s to node %s: %v", awsVolumeID, nodeName, err)
+		}
+		return nil
+	} else {
+		return fmt.Errorf("Provider does not support volume attaching")
 	}
 }
 

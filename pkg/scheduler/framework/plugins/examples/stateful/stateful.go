@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // MultipointExample is an example plugin that is executed at multiple extension points.
@@ -82,7 +82,7 @@ func (mp *MultipointExample) PreBind(ctx context.Context, state *framework.Cycle
 }
 
 // New initializes a new plugin and returns it.
-func New(config *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func New(config *runtime.Unknown, _ framework.Handle) (framework.Plugin, error) {
 	if config == nil {
 		klog.Error("MultipointExample configuration cannot be empty")
 		return nil, fmt.Errorf("MultipointExample configuration cannot be empty")

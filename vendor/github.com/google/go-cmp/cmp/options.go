@@ -225,11 +225,14 @@ func (validator) apply(s *state, vx, vy reflect.Value) {
 
 	// Unable to Interface implies unexported field without visibility access.
 	if !vx.CanInterface() || !vy.CanInterface() {
-		const help = "consider using a custom Comparer; if you control the implementation of type, you can also consider using an Exporter, AllowUnexported, or cmpopts.IgnoreUnexported"
+		help := "consider using a custom Comparer; if you control the implementation of type, you can also consider using an Exporter, AllowUnexported, or cmpopts.IgnoreUnexported"
 		var name string
 		if t := s.curPath.Index(-2).Type(); t.Name() != "" {
 			// Named type with unexported fields.
 			name = fmt.Sprintf("%q.%v", t.PkgPath(), t.Name()) // e.g., "path/to/package".MyType
+			if _, ok := reflect.New(t).Interface().(error); ok {
+				help = "consider using cmpopts.EquateErrors to compare error values"
+			}
 		} else {
 			// Unnamed type with unexported fields. Derive PkgPath from field.
 			var pkgPath string

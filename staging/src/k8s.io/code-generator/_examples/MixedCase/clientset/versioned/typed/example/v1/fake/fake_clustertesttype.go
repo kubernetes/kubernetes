@@ -152,3 +152,13 @@ func (c *FakeClusterTestTypes) UpdateScale(ctx context.Context, clusterTestTypeN
 	}
 	return obj.(*autoscalingv1.Scale), err
 }
+
+// CreateScale takes the representation of a scale and creates it.  Returns the server's representation of the scale, and an error, if there is any.
+func (c *FakeClusterTestTypes) CreateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts v1.CreateOptions) (result *autoscalingv1.Scale, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewRootCreateSubresourceAction(clustertesttypesResource, clusterTestTypeName, "scale", scale), &autoscalingv1.Scale{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*autoscalingv1.Scale), err
+}

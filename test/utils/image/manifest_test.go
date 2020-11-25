@@ -94,9 +94,9 @@ var registryTests = []struct {
 		},
 	},
 	{
-		"gcr.io/k8s-staging-csi/test:latest",
+		"k8s.gcr.io/sig-storage/test:latest",
 		result{
-			result: "test.io/k8s-staging-csi/test:latest",
+			result: "test.io/sig-storage/test:latest",
 			err:    nil,
 		},
 	},
@@ -119,7 +119,7 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 	gcrReleaseRegistry = "test.io/gke-release"
 	PrivateRegistry = "test.io/k8s-authenticated-test"
 	sampleRegistry = "test.io/google-samples"
-	k8sCSI = "test.io/k8s-staging-csi"
+	sigStorageRegistry = "test.io/sig-storage"
 
 	for _, tt := range registryTests {
 		t.Run(tt.in, func(t *testing.T) {

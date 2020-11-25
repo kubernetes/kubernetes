@@ -85,7 +85,7 @@ var _ = common.SIGDescribe("Events API", func() {
 	})
 
 	/*
-		Release : v1.19
+		Release: v1.19
 		Testname: New Event resource lifecycle, testing a single event
 		Description: Create an event, the event MUST exist.
 		The event is patched with a new note, the check MUST have the update note.
@@ -180,7 +180,7 @@ var _ = common.SIGDescribe("Events API", func() {
 	})
 
 	/*
-		Release : v1.19
+		Release: v1.19
 		Testname: New Event resource lifecycle, testing a list of events
 		Description: Create a list of events, the events MUST exist.
 		The events are deleted and MUST NOT show up when listing all events.

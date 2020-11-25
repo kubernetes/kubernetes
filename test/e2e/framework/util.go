@@ -166,11 +166,11 @@ var RunID = uuid.NewUUID()
 // CreateTestingNSFn is a func that is responsible for creating namespace used for executing e2e tests.
 type CreateTestingNSFn func(baseName string, c clientset.Interface, labels map[string]string) (*v1.Namespace, error)
 
-// GetMasterHost returns a hostname of a master.
-func GetMasterHost() string {
-	masterURL, err := url.Parse(TestContext.Host)
+// APIAddress returns a address of an instance.
+func APIAddress() string {
+	instanceURL, err := url.Parse(TestContext.Host)
 	ExpectNoError(err)
-	return masterURL.Hostname()
+	return instanceURL.Hostname()
 }
 
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.
@@ -224,11 +224,9 @@ func DeleteNamespaces(c clientset.Interface, deleteFilter, skipFilter []string) 
 	var wg sync.WaitGroup
 OUTER:
 	for _, item := range nsList.Items {
-		if skipFilter != nil {
-			for _, pattern := range skipFilter {
-				if strings.Contains(item.Name, pattern) {
-					continue OUTER
-				}
+		for _, pattern := range skipFilter {
+			if strings.Contains(item.Name, pattern) {
+				continue OUTER
 			}
 		}
 		if deleteFilter != nil {
@@ -469,7 +467,13 @@ func LoadConfig() (config *restclient.Config, err error) {
 
 	if TestContext.NodeE2E {
 		// This is a node e2e test, apply the node e2e configuration
-		return &restclient.Config{Host: TestContext.Host}, nil
+		return &restclient.Config{
+			Host:        TestContext.Host,
+			BearerToken: TestContext.BearerToken,
+			TLSClientConfig: restclient.TLSClientConfig{
+				Insecure: true,
+			},
+		}, nil
 	}
 	c, err := restclientConfig(TestContext.KubeContext)
 	if err != nil {
@@ -505,12 +509,21 @@ func RandomSuffix() string {
 }
 
 // LookForStringInPodExec looks for the given string in the output of a command
-// executed in a specific pod container.
+// executed in the first container of specified pod.
 // TODO(alejandrox1): move to pod/ subpkg once kubectl methods are refactored.
 func LookForStringInPodExec(ns, podName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
+	return LookForStringInPodExecToContainer(ns, podName, "", command, expectedString, timeout)
+}
+
+// LookForStringInPodExecToContainer looks for the given string in the output of a
+// command executed in specified pod container, or first container if not specified.
+func LookForStringInPodExecToContainer(ns, podName, containerName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
 	return lookForString(expectedString, timeout, func() string {
-		// use the first container
-		args := []string{"exec", podName, fmt.Sprintf("--namespace=%v", ns), "--"}
+		args := []string{"exec", podName, fmt.Sprintf("--namespace=%v", ns)}
+		if len(containerName) > 0 {
+			args = append(args, fmt.Sprintf("--container=%s", containerName))
+		}
+		args = append(args, "--")
 		args = append(args, command...)
 		return RunKubectlOrDie(ns, args...)
 	})
@@ -1066,13 +1079,13 @@ func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool
 // RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
 // inside of a shell.
 func RunHostCmd(ns, name, cmd string) (string, error) {
-	return RunKubectl(ns, "exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-x", "-c", cmd)
+	return RunKubectl(ns, "exec", name, "--", "/bin/sh", "-x", "-c", cmd)
 }
 
 // RunHostCmdWithFullOutput runs the given cmd in the context of the given pod using `kubectl exec`
 // inside of a shell. It will also return the command's stderr.
 func RunHostCmdWithFullOutput(ns, name, cmd string) (string, string, error) {
-	return RunKubectlWithFullOutput(ns, "exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-x", "-c", cmd)
+	return RunKubectlWithFullOutput(ns, "exec", name, "--", "/bin/sh", "-x", "-c", cmd)
 }
 
 // RunHostCmdOrDie calls RunHostCmd and dies on error.
@@ -1114,9 +1127,6 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 		// It should be OK to list unschedulable Nodes here.
 		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		for i := range nodes.Items {
@@ -1150,7 +1160,7 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 // LookForStringInLog looks for the given string in the log of a specific pod container
 func LookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
 	return lookForString(expectedString, timeout, func() string {
-		return RunKubectlOrDie(ns, "logs", podName, container, fmt.Sprintf("--namespace=%v", ns))
+		return RunKubectlOrDie(ns, "logs", podName, container)
 	})
 }
 
@@ -1249,11 +1259,11 @@ func getMasterAddresses(c clientset.Interface) (string, string, string) {
 	return externalIP, internalIP, hostname
 }
 
-// GetAllMasterAddresses returns all IP addresses on which the kubelet can reach the master.
+// GetControlPlaneAddresses returns all IP addresses on which the kubelet can reach the control plane.
 // It may return internal and external IPs, even if we expect for
 // e.g. internal IPs to be used (issue #56787), so that we can be
-// sure to block the master fully during tests.
-func GetAllMasterAddresses(c clientset.Interface) []string {
+// sure to block the control plane fully during tests.
+func GetControlPlaneAddresses(c clientset.Interface) []string {
 	externalIP, internalIP, _ := getMasterAddresses(c)
 
 	ips := sets.NewString()
@@ -1276,7 +1286,7 @@ func GetAllMasterAddresses(c clientset.Interface) []string {
 // CreateEmptyFileOnPod creates empty file at given path on the pod.
 // TODO(alejandrox1): move to subpkg pod once kubectl methods have been refactored.
 func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
-	_, err := RunKubectl(namespace, "exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
+	_, err := RunKubectl(namespace, "exec", podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
 	return err
 }
 
@@ -1284,10 +1294,10 @@ func CreateEmptyFileOnPod(namespace string, podName string, filePath string) err
 func DumpDebugInfo(c clientset.Interface, ns string) {
 	sl, _ := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	for _, s := range sl.Items {
-		desc, _ := RunKubectl(ns, "describe", "po", s.Name, fmt.Sprintf("--namespace=%v", ns))
+		desc, _ := RunKubectl(ns, "describe", "po", s.Name)
 		Logf("\nOutput of kubectl describe %v:\n%v", s.Name, desc)
 
-		l, _ := RunKubectl(ns, "logs", s.Name, fmt.Sprintf("--namespace=%v", ns), "--tail=100")
+		l, _ := RunKubectl(ns, "logs", s.Name, "--tail=100")
 		Logf("\nLast 100 log lines of %v:\n%v", s.Name, l)
 	}
 }
@@ -1384,51 +1394,4 @@ retriesLoop:
 		ExpectEqual(totalValidWatchEvents, len(expectedWatchEvents), "Error: there must be an equal amount of total valid watch events (%d) and expected watch events (%d)", totalValidWatchEvents, len(expectedWatchEvents))
 		break retriesLoop
 	}
-}
-
-// WatchUntilWithoutRetry ...
-// reads items from the watch until each provided condition succeeds, and then returns the last watch
-// encountered. The first condition that returns an error terminates the watch (and the event is also returned).
-// If no event has been received, the returned event will be nil.
-// Conditions are satisfied sequentially so as to provide a useful primitive for higher level composition.
-// Waits until context deadline or until context is canceled.
-//
-// the same as watchtools.UntilWithoutRetry, just without the closing of the watch - as for the purpose of being paired with WatchEventSequenceVerifier, the watch is needed for continual watch event collection
-func WatchUntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions ...watchtools.ConditionFunc) (*watch.Event, error) {
-	ch := watcher.ResultChan()
-	var lastEvent *watch.Event
-	for _, condition := range conditions {
-		// check the next condition against the previous event and short circuit waiting for the next watch
-		if lastEvent != nil {
-			done, err := condition(*lastEvent)
-			if err != nil {
-				return lastEvent, err
-			}
-			if done {
-				continue
-			}
-		}
-	ConditionSucceeded:
-		for {
-			select {
-			case event, ok := <-ch:
-				if !ok {
-					return lastEvent, watchtools.ErrWatchClosed
-				}
-				lastEvent = &event
-
-				done, err := condition(event)
-				if err != nil {
-					return lastEvent, err
-				}
-				if done {
-					break ConditionSucceeded
-				}
-
-			case <-ctx.Done():
-				return lastEvent, wait.ErrWaitTimeout
-			}
-		}
-	}
-	return lastEvent, nil
 }

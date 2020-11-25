@@ -85,7 +85,9 @@ func NewCloudNodeLifecycleController(
 		return nil, errors.New("no cloud provider provided")
 	}
 
-	if _, ok := cloud.Instances(); !ok {
+	_, instancesSupported := cloud.Instances()
+	_, instancesV2Supported := cloud.InstancesV2()
+	if !instancesSupported && !instancesV2Supported {
 		return nil, errors.New("cloud provider does not support instances")
 	}
 
@@ -118,12 +120,6 @@ func (c *CloudNodeLifecycleController) Run(stopCh <-chan struct{}) {
 // or shutdown. If deleted, it deletes the node resource. If shutdown it
 // applies a shutdown taint to the node
 func (c *CloudNodeLifecycleController) MonitorNodes() {
-	instances, ok := c.cloud.Instances()
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("failed to get instances from cloud provider"))
-		return
-	}
-
 	nodes, err := c.nodeLister.List(labels.Everything())
 	if err != nil {
 		klog.Errorf("error listing nodes from cache: %s", err)
@@ -148,7 +144,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 
 		// At this point the node has NotReady status, we need to check if the node has been removed
 		// from the cloud provider. If node cannot be found in cloudprovider, then delete the node
-		exists, err := ensureNodeExistsByProviderID(context.TODO(), instances, node)
+		exists, err := ensureNodeExistsByProviderID(context.TODO(), c.cloud, node)
 		if err != nil {
 			klog.Errorf("error checking if node %s exists: %v", node.Name, err)
 			continue
@@ -195,6 +191,10 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 
 // shutdownInCloudProvider returns true if the node is shutdown on the cloud provider
 func shutdownInCloudProvider(ctx context.Context, cloud cloudprovider.Interface, node *v1.Node) (bool, error) {
+	if instanceV2, ok := cloud.InstancesV2(); ok {
+		return instanceV2.InstanceShutdown(ctx, node)
+	}
+
 	instances, ok := cloud.Instances()
 	if !ok {
 		return false, errors.New("cloud provider does not support instances")
@@ -210,7 +210,16 @@ func shutdownInCloudProvider(ctx context.Context, cloud cloudprovider.Interface,
 
 // ensureNodeExistsByProviderID checks if the instance exists by the provider id,
 // If provider id in spec is empty it calls instanceId with node name to get provider id
-func ensureNodeExistsByProviderID(ctx context.Context, instances cloudprovider.Instances, node *v1.Node) (bool, error) {
+func ensureNodeExistsByProviderID(ctx context.Context, cloud cloudprovider.Interface, node *v1.Node) (bool, error) {
+	if instanceV2, ok := cloud.InstancesV2(); ok {
+		return instanceV2.InstanceExists(ctx, node)
+	}
+
+	instances, ok := cloud.Instances()
+	if !ok {
+		return false, errors.New("instances interface not supported in the cloud provider")
+	}
+
 	providerID := node.Spec.ProviderID
 	if providerID == "" {
 		var err error

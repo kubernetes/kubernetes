@@ -27,7 +27,7 @@ import (
 
 // timeCache stores a time keyed by uid
 type timeCache struct {
-	lock  sync.RWMutex
+	lock  sync.Mutex
 	cache *lru.Cache
 }
 
@@ -53,8 +53,8 @@ func (c *timeCache) Remove(uid types.UID) {
 }
 
 func (c *timeCache) Get(uid types.UID) (time.Time, bool) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	value, ok := c.cache.Get(uid)
 	if !ok {
 		return time.Time{}, false

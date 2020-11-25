@@ -358,39 +358,3 @@ func TestCreateBlobDisk(t *testing.T) {
 	assert.True(t, strings.Contains(err.Error(), expectedErr))
 	assert.Empty(t, diskURI)
 }
-
-func TestDeleteBlobDisk(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	b := GetTestBlobDiskController(t)
-	b.common.cloud.BlobDiskController = &b
-
-	mockSAClient := mockstorageaccountclient.NewMockInterface(ctrl)
-	b.common.cloud.StorageAccountClient = mockSAClient
-
-	fakeDiskURL := "fake"
-	diskURL := "https://foo.blob./vhds/bar.vhd"
-
-	err := b.DeleteBlobDisk(fakeDiskURL)
-	expectedErr := fmt.Errorf("failed to parse vhd URI invalid vhd URI for regex https://(.*).blob./vhds/(.*): fake")
-	assert.Equal(t, expectedErr, err)
-
-	mockSAClient.EXPECT().ListKeys(gomock.Any(), b.common.resourceGroup, "foo").Return(storage.AccountListKeysResult{}, &retryError500)
-	err = b.DeleteBlobDisk(diskURL)
-	expectedErr = fmt.Errorf("no key for storage account foo, err Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: <nil>")
-	assert.Equal(t, expectedErr, err)
-
-	mockSAClient.EXPECT().ListKeys(gomock.Any(), b.common.resourceGroup, "foo").Return(storage.AccountListKeysResult{
-		Keys: &[]storage.AccountKey{
-			{
-				KeyName: to.StringPtr("key1"),
-				Value:   to.StringPtr("key1"),
-			},
-		},
-	}, nil)
-	b.accounts["foo"] = &storageAccountState{}
-	err = b.DeleteBlobDisk(diskURL)
-	expectedErrStr := "storage: service returned error: StatusCode=403, ErrorCode=AccountIsDisabled, ErrorMessage=The specified account is disabled."
-	assert.Error(t, err)
-	assert.True(t, strings.Contains(err.Error(), expectedErrStr))
-}

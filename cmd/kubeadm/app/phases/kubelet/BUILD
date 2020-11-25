@@ -4,7 +4,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "config.go",
-        "dynamic.go",
         "flags.go",
         "kubelet.go",
     ],
@@ -32,7 +31,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "config_test.go",
-        "dynamic_test.go",
         "flags_test.go",
     ],
     embed = [":go_default_library"],

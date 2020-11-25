@@ -31,6 +31,7 @@ import (
 	"go.etcd.io/etcd/pkg/transport"
 	"google.golang.org/grpc"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/egressselector"
@@ -91,7 +92,11 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 			return fmt.Errorf(errMsg)
 		}
 		client := clientValue.Load().(*clientv3.Client)
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		healthcheckTimeout := storagebackend.DefaultHealthcheckTimeout
+		if c.HealthcheckTimeout != time.Duration(0) {
+			healthcheckTimeout = c.HealthcheckTimeout
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), healthcheckTimeout)
 		defer cancel()
 		// See https://github.com/etcd-io/etcd/blob/c57f8b3af865d1b531b979889c602ba14377420e/etcdctl/ctlv3/command/ep_command.go#L118
 		_, err := client.Get(ctx, path.Join("/", c.Prefix, "health"))
@@ -217,7 +222,7 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 	}, nil
 }
 
-func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
+func newETCD3Storage(c storagebackend.Config, newFunc func() runtime.Object) (storage.Interface, DestroyFunc, error) {
 	stopCompactor, err := startCompactorOnce(c.Transport, c.CompactionInterval)
 	if err != nil {
 		return nil, nil, err
@@ -249,7 +254,7 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 	if transformer == nil {
 		transformer = value.IdentityTransformer
 	}
-	return etcd3.New(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
+	return etcd3.New(client, c.Codec, newFunc, c.Prefix, transformer, c.Paging), destroyFunc, nil
 }
 
 // startDBSizeMonitorPerEndpoint starts a loop to monitor etcd database size and update the

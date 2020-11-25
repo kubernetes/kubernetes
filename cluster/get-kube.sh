@@ -36,6 +36,7 @@
 #    * amd64 [default]
 #    * arm
 #    * arm64
+#    * ppc64le
 #
 #  Set KUBERNETES_NODE_PLATFORM to choose the platform for which to download
 #  the node binaries. If none of KUBERNETES_NODE_PLATFORM and
@@ -53,6 +54,7 @@
 #    * amd64 [default]
 #    * arm
 #    * arm64
+#    * ppc64le
 #
 #  Set KUBERNETES_SKIP_DOWNLOAD to skip downloading a release.
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
@@ -164,13 +166,15 @@ case "${machine}" in
     ;;
   aarch64*|arm64*)
     ;;
+  ppc64le*)
+    ;;
   arm*)
     ;;
   i?86*)
     ;;
   *)
     echo "Unknown, unsupported architecture (${machine})." >&2
-    echo "Supported architectures x86_64, i686, arm, arm64." >&2
+    echo "Supported architectures x86_64, i686, arm, arm64, ppc64le." >&2
     echo "Bailing out." >&2
     exit 3
     ;;
@@ -236,7 +240,9 @@ if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
 fi
 
 if "${need_download}"; then
-  if [[ $(which curl) ]]; then
+  if [[ $(which gsutil) ]] && [[ "$kubernetes_tar_url" =~ ^https://storage.googleapis.com/.* ]]; then
+    gsutil cp "${kubernetes_tar_url//'https://storage.googleapis.com/'/'gs://'}" "${file}"
+  elif [[ $(which curl) ]]; then
     # if the url belongs to GCS API we should use oauth2_token in the headers
     curl_headers=""
     if { [[ "${KUBERNETES_PROVIDER:-gce}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]] ; } &&
@@ -247,7 +253,7 @@ if "${need_download}"; then
   elif [[ $(which wget) ]]; then
     wget "${kubernetes_tar_url}"
   else
-    echo "Couldn't find curl or wget.  Bailing out."
+    echo "Couldn't find gsutil, curl, or wget.  Bailing out."
     exit 1
   fi
 fi

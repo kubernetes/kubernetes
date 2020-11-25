@@ -173,6 +173,23 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config TestCo
 	}
 	pod, ip = CreateStorageServer(cs, config)
 
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: config.Prefix + "-server",
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolTCP,
+					Port:     24007,
+				},
+			},
+		},
+	}
+
+	_, err := cs.CoreV1().Services(namespace).Create(context.TODO(), service, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "failed to create service for Gluster server")
+
 	ginkgo.By("creating Gluster endpoints")
 	endpoints := &v1.Endpoints{
 		TypeMeta: metav1.TypeMeta{
@@ -199,7 +216,7 @@ func NewGlusterfsServer(cs clientset.Interface, namespace string) (config TestCo
 			},
 		},
 	}
-	_, err := cs.CoreV1().Endpoints(namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
+	_, err = cs.CoreV1().Endpoints(namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create endpoints for Gluster server")
 
 	return config, pod, ip
@@ -371,7 +388,7 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 			Containers: []v1.Container{
 				{
 					Name:       config.Prefix + "-" + podSuffix,
-					Image:      GetTestImage(framework.BusyBoxImage),
+					Image:      GetDefaultTestImage(),
 					WorkingDir: "/opt",
 					// An imperative and easily debuggable container which reads/writes vol contents for
 					// us to scan in the tests or by eye.
@@ -449,7 +466,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 		} else {
 			// Filesystem: check content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
-			commands := generateReadFileCmd(fileName)
+			commands := GenerateReadFileCmd(fileName)
 			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
 
@@ -591,9 +608,9 @@ func generateWriteBlockCmd(content, fullPath string) []string {
 	return generateWriteCmd(content, fullPath)
 }
 
-// generateReadFileCmd generates the corresponding command lines to read from a file with the given file path.
+// GenerateReadFileCmd generates the corresponding command lines to read from a file with the given file path.
 // Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func generateReadFileCmd(fullPath string) []string {
+func GenerateReadFileCmd(fullPath string) []string {
 	var commands []string
 	if !framework.NodeOSDistroIs("windows") {
 		commands = []string{"cat", fullPath}
@@ -637,9 +654,45 @@ func GeneratePodSecurityContext(fsGroup *int64, seLinuxOptions *v1.SELinuxOption
 // GetTestImage returns the image name with the given input
 // If the Node OS is windows, currently we return Agnhost image for Windows node
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
-func GetTestImage(image string) string {
+func GetTestImage(id int) string {
 	if framework.NodeOSDistroIs("windows") {
 		return imageutils.GetE2EImage(imageutils.Agnhost)
 	}
-	return image
+	return imageutils.GetE2EImage(id)
+}
+
+// GetTestImageID returns the image id with the given input
+// If the Node OS is windows, currently we return Agnhost image for Windows node
+// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
+func GetTestImageID(id int) int {
+	if framework.NodeOSDistroIs("windows") {
+		return imageutils.Agnhost
+	}
+	return id
+}
+
+// GetDefaultTestImage returns the default test image based on OS.
+// If the node OS is windows, currently we return Agnhost image for Windows node
+// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
+// If the node OS is linux, return busybox image
+func GetDefaultTestImage() string {
+	return imageutils.GetE2EImage(GetDefaultTestImageID())
+}
+
+// GetDefaultTestImageID returns the default test image id based on OS.
+// If the node OS is windows, currently we return Agnhost image for Windows node
+// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
+// If the node OS is linux, return busybox image
+func GetDefaultTestImageID() int {
+	return GetTestImageID(imageutils.BusyBox)
+}
+
+// GetLinuxLabel returns the default SELinuxLabel based on OS.
+// If the node OS is windows, it will return nil
+func GetLinuxLabel() *v1.SELinuxOptions {
+	if framework.NodeOSDistroIs("windows") {
+		return nil
+	}
+	return &v1.SELinuxOptions{
+		Level: "s0:c0,c1"}
 }

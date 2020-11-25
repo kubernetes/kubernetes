@@ -153,6 +153,11 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 				}
 				return newObj, nil
 			})
+			transformers = append(transformers, func(ctx context.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
+				// Dedup owner references again after mutating admission happens
+				dedupOwnerReferencesAndAddWarning(newObj, req.Context(), true)
+				return newObj, nil
+			})
 		}
 
 		createAuthorizerAttributes := authorizer.AttributesRecord{
@@ -188,6 +193,8 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			wasCreated = created
 			return obj, err
 		}
+		// Dedup owner references before updating managed fields
+		dedupOwnerReferencesAndAddWarning(obj, req.Context(), false)
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
 			result, err := requestFunc()
 			// If the object wasn't committed to storage because it's serialized size was too large,

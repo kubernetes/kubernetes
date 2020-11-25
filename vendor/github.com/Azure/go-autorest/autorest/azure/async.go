@@ -167,7 +167,13 @@ func (f *Future) WaitForCompletionRef(ctx context.Context, client autorest.Clien
 		cancelCtx, cancel = context.WithTimeout(ctx, d)
 		defer cancel()
 	}
-
+	// if the initial response has a Retry-After, sleep for the specified amount of time before starting to poll
+	if delay, ok := f.GetPollingDelay(); ok {
+		if delayElapsed := autorest.DelayForBackoff(delay, 0, cancelCtx.Done()); !delayElapsed {
+			err = cancelCtx.Err()
+			return
+		}
+	}
 	done, err := f.DoneWithContext(ctx, client)
 	for attempts := 0; !done; done, err = f.DoneWithContext(ctx, client) {
 		if attempts >= client.RetryAttempts {

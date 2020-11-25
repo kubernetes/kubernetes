@@ -83,6 +83,25 @@ func (ds *dockerService) ListContainers(_ context.Context, r *runtimeapi.ListCon
 	return &runtimeapi.ListContainersResponse{Containers: result}, nil
 }
 
+func (ds *dockerService) getContainerCleanupInfo(containerID string) (*containerCleanupInfo, bool) {
+	ds.cleanupInfosLock.RLock()
+	defer ds.cleanupInfosLock.RUnlock()
+	info, ok := ds.containerCleanupInfos[containerID]
+	return info, ok
+}
+
+func (ds *dockerService) setContainerCleanupInfo(containerID string, info *containerCleanupInfo) {
+	ds.cleanupInfosLock.Lock()
+	defer ds.cleanupInfosLock.Unlock()
+	ds.containerCleanupInfos[containerID] = info
+}
+
+func (ds *dockerService) clearContainerCleanupInfo(containerID string) {
+	ds.cleanupInfosLock.Lock()
+	defer ds.cleanupInfosLock.Unlock()
+	delete(ds.containerCleanupInfos, containerID)
+}
+
 // CreateContainer creates a new container in the given PodSandbox
 // Docker cannot store the log to an arbitrary location (yet), so we create an
 // symlink at LogPath, linking to the actual path of the log.
@@ -185,7 +204,7 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 			// we don't perform the clean up just yet at that could destroy information
 			// needed for the container to start (e.g. Windows credentials stored in
 			// registry keys); instead, we'll clean up when the container gets removed
-			ds.containerCleanupInfos[containerID] = cleanupInfo
+			ds.setContainerCleanupInfo(containerID, cleanupInfo)
 		}
 		return &runtimeapi.CreateContainerResponse{ContainerId: containerID}, nil
 	}
@@ -461,11 +480,11 @@ func (ds *dockerService) UpdateContainerResources(_ context.Context, r *runtimea
 }
 
 func (ds *dockerService) performPlatformSpecificContainerForContainer(containerID string) (errors []error) {
-	if cleanupInfo, present := ds.containerCleanupInfos[containerID]; present {
+	if cleanupInfo, present := ds.getContainerCleanupInfo(containerID); present {
 		errors = ds.performPlatformSpecificContainerCleanupAndLogErrors(containerID, cleanupInfo)
 
 		if len(errors) == 0 {
-			delete(ds.containerCleanupInfos, containerID)
+			ds.clearContainerCleanupInfo(containerID)
 		}
 	}
 

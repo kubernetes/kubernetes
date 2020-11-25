@@ -65,6 +65,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/handlers",
     importpath = "k8s.io/apiserver/pkg/endpoints/handlers",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
@@ -87,6 +88,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/audit:go_default_library",
@@ -102,13 +104,13 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/dryrun:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/wsstream:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/warning:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",
         "//vendor/google.golang.org/grpc/codes:go_default_library",
         "//vendor/google.golang.org/grpc/status:go_default_library",
         "//vendor/k8s.io/klog/v2:go_default_library",
         "//vendor/k8s.io/utils/trace:go_default_library",
-        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 

@@ -47,12 +47,12 @@ func UndecoratedStorage(
 	getAttrsFunc storage.AttrFunc,
 	trigger storage.IndexerFuncs,
 	indexers *cache.Indexers) (storage.Interface, factory.DestroyFunc, error) {
-	return NewRawStorage(config)
+	return NewRawStorage(config, newFunc)
 }
 
 // NewRawStorage creates the low level kv storage. This is a work-around for current
 // two layer of same storage interface.
 // TODO: Once cacher is enabled on all registries (event registry is special), we will remove this method.
-func NewRawStorage(config *storagebackend.Config) (storage.Interface, factory.DestroyFunc, error) {
-	return factory.Create(*config)
+func NewRawStorage(config *storagebackend.Config, newFunc func() runtime.Object) (storage.Interface, factory.DestroyFunc, error) {
+	return factory.Create(*config, newFunc)
 }

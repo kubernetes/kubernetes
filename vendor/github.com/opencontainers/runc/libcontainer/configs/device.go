@@ -1,19 +1,14 @@
 package configs
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strconv"
-
-	"golang.org/x/sys/unix"
 )
 
 const (
 	Wildcard = -1
 )
-
-// TODO Windows: This can be factored out in the future
 
 type Device struct {
 	DeviceRule
@@ -172,11 +167,4 @@ func (d *DeviceRule) CgroupString() string {
 		minor = "*"
 	}
 	return fmt.Sprintf("%c %s:%s %s", d.Type, major, minor, d.Permissions)
-}
-
-func (d *DeviceRule) Mkdev() (uint64, error) {
-	if d.Major == Wildcard || d.Minor == Wildcard {
-		return 0, errors.New("cannot mkdev() device with wildcards")
-	}
-	return unix.Mkdev(uint32(d.Major), uint32(d.Minor)), nil
 }

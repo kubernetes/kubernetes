@@ -17,6 +17,7 @@ limitations under the License.
 package benchmark
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -147,18 +148,18 @@ type metricsCollectorConfig struct {
 // metricsCollector collects metrics from legacyregistry.DefaultGatherer.Gather() endpoint.
 // Currently only Histrogram metrics are supported.
 type metricsCollector struct {
-	metricsCollectorConfig
+	*metricsCollectorConfig
 	labels map[string]string
 }
 
-func newMetricsCollector(config metricsCollectorConfig, labels map[string]string) *metricsCollector {
+func newMetricsCollector(config *metricsCollectorConfig, labels map[string]string) *metricsCollector {
 	return &metricsCollector{
 		metricsCollectorConfig: config,
 		labels:                 labels,
 	}
 }
 
-func (*metricsCollector) run(stopCh chan struct{}) {
+func (*metricsCollector) run(ctx context.Context) {
 	// metricCollector doesn't need to start before the tests, so nothing to do here.
 }
 
@@ -231,17 +232,19 @@ func newThroughputCollector(podInformer coreinformers.PodInformer, labels map[st
 	}
 }
 
-func (tc *throughputCollector) run(stopCh chan struct{}) {
+func (tc *throughputCollector) run(ctx context.Context) {
 	podsScheduled, err := getScheduledPods(tc.podInformer, tc.namespaces...)
 	if err != nil {
 		klog.Fatalf("%v", err)
 	}
 	lastScheduledCount := len(podsScheduled)
+	ticker := time.NewTicker(throughputSampleFrequency)
+	defer ticker.Stop()
 	for {
 		select {
-		case <-stopCh:
+		case <-ctx.Done():
 			return
-		case <-time.After(throughputSampleFrequency):
+		case <-ticker.C:
 			podsScheduled, err := getScheduledPods(tc.podInformer, tc.namespaces...)
 			if err != nil {
 				klog.Fatalf("%v", err)

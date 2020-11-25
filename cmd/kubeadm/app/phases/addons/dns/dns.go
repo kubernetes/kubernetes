@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"regexp"
 	"strings"
 
 	"github.com/caddyserver/caddy/caddyfile"
@@ -136,18 +135,20 @@ func kubeDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 
 	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(KubeDNSDeployment,
 		struct {
-			DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, ControlPlaneTaintKey string
-			Replicas                                                                                                             *int32
+			DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, OldControlPlaneTaintKey, ControlPlaneTaintKey string
+			Replicas                                                                                                                                      *int32
 		}{
-			DeploymentName:       kubeadmconstants.KubeDNSDeploymentName,
-			KubeDNSImage:         images.GetDNSImage(cfg, kubeadmconstants.KubeDNSKubeDNSImageName),
-			DNSMasqImage:         images.GetDNSImage(cfg, kubeadmconstants.KubeDNSDnsMasqNannyImageName),
-			SidecarImage:         images.GetDNSImage(cfg, kubeadmconstants.KubeDNSSidecarImageName),
-			DNSBindAddr:          dnsBindAddr,
-			DNSProbeAddr:         dnsProbeAddr,
-			DNSDomain:            cfg.Networking.DNSDomain,
-			ControlPlaneTaintKey: kubeadmconstants.LabelNodeRoleMaster,
-			Replicas:             replicas,
+			DeploymentName: kubeadmconstants.KubeDNSDeploymentName,
+			KubeDNSImage:   images.GetDNSImage(cfg, kubeadmconstants.KubeDNSKubeDNSImageName),
+			DNSMasqImage:   images.GetDNSImage(cfg, kubeadmconstants.KubeDNSDnsMasqNannyImageName),
+			SidecarImage:   images.GetDNSImage(cfg, kubeadmconstants.KubeDNSSidecarImageName),
+			DNSBindAddr:    dnsBindAddr,
+			DNSProbeAddr:   dnsProbeAddr,
+			DNSDomain:      cfg.Networking.DNSDomain,
+			// TODO: https://github.com/kubernetes/kubeadm/issues/2200
+			OldControlPlaneTaintKey: kubeadmconstants.LabelNodeRoleOldControlPlane,
+			ControlPlaneTaintKey:    kubeadmconstants.LabelNodeRoleControlPlane,
+			Replicas:                replicas,
 		})
 	if err != nil {
 		return errors.Wrap(err, "error when parsing kube-dns deployment template")
@@ -197,13 +198,15 @@ func createKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.I
 func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, replicas *int32) error {
 	// Get the YAML manifest
 	coreDNSDeploymentBytes, err := kubeadmutil.ParseTemplate(CoreDNSDeployment, struct {
-		DeploymentName, Image, ControlPlaneTaintKey string
-		Replicas                                    *int32
+		DeploymentName, Image, OldControlPlaneTaintKey, ControlPlaneTaintKey string
+		Replicas                                                             *int32
 	}{
-		DeploymentName:       kubeadmconstants.CoreDNSDeploymentName,
-		Image:                images.GetDNSImage(cfg, kubeadmconstants.CoreDNSImageName),
-		ControlPlaneTaintKey: kubeadmconstants.LabelNodeRoleMaster,
-		Replicas:             replicas,
+		DeploymentName: kubeadmconstants.CoreDNSDeploymentName,
+		Image:          images.GetDNSImage(cfg, kubeadmconstants.CoreDNSImageName),
+		// TODO: https://github.com/kubernetes/kubeadm/issues/2200
+		OldControlPlaneTaintKey: kubeadmconstants.LabelNodeRoleOldControlPlane,
+		ControlPlaneTaintKey:    kubeadmconstants.LabelNodeRoleControlPlane,
+		Replicas:                replicas,
 	})
 	if err != nil {
 		return errors.Wrap(err, "error when parsing CoreDNS deployment template")
@@ -268,22 +271,15 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 		return errors.Wrap(err, "unable to fetch CoreDNS current installed version and ConfigMap.")
 	}
 
-	canMigrateCorefile, err := isCoreDNSVersionSupported(client)
-	if err != nil {
-		return err
-	}
-
 	corefileMigrationRequired, err := isCoreDNSConfigMapMigrationRequired(corefile, currentInstalledCoreDNSVersion)
 	if err != nil {
 		return err
 	}
 
-	if !canMigrateCorefile {
-		klog.Warningf("the CoreDNS Configuration will not be migrated due to unsupported version of CoreDNS. " +
-			"The existing CoreDNS Corefile configuration and deployment has been retained.")
-	}
+	// Assume that migration is always possible, rely on migrateCoreDNSCorefile() to fail if not.
+	canMigrateCorefile := true
 
-	if corefileMigrationRequired && canMigrateCorefile {
+	if corefileMigrationRequired {
 		if err := migrateCoreDNSCorefile(client, coreDNSConfigMap, corefile, currentInstalledCoreDNSVersion); err != nil {
 			// Errors in Corefile Migration is verified during preflight checks. This part will be executed when a user has chosen
 			// to ignore preflight check errors.
@@ -390,37 +386,6 @@ func isCoreDNSConfigMapMigrationRequired(corefile, currentInstalledCoreDNSVersio
 	}
 
 	return isMigrationRequired, nil
-}
-
-var (
-	// imageDigestMatcher is used to match the SHA256 digest from the ImageID of the CoreDNS pods
-	imageDigestMatcher = regexp.MustCompile(`^.*(?i:sha256:([[:alnum:]]{64}))$`)
-)
-
-func isCoreDNSVersionSupported(client clientset.Interface) (bool, error) {
-	isValidVersion := true
-	coreDNSPodList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(
-		context.TODO(),
-		metav1.ListOptions{
-			LabelSelector: "k8s-app=kube-dns",
-		},
-	)
-	if err != nil {
-		return false, errors.Wrap(err, "unable to list CoreDNS pods")
-	}
-
-	for _, pod := range coreDNSPodList.Items {
-		imageID := imageDigestMatcher.FindStringSubmatch(pod.Status.ContainerStatuses[0].ImageID)
-		if len(imageID) != 2 {
-			return false, errors.Errorf("unable to match SHA256 digest ID in %q", pod.Status.ContainerStatuses[0].ImageID)
-		}
-		// The actual digest should be at imageID[1]
-		if !migration.Released(imageID[1]) {
-			isValidVersion = false
-		}
-	}
-
-	return isValidVersion, nil
 }
 
 func migrateCoreDNSCorefile(client clientset.Interface, cm *v1.ConfigMap, corefile, currentInstalledCoreDNSVersion string) error {

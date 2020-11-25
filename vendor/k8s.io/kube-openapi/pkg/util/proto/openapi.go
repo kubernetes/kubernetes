@@ -77,6 +77,8 @@ type Schema interface {
 	GetPath() *Path
 	// Describes the field.
 	GetDescription() string
+	// Default for that schema.
+	GetDefault() interface{}
 	// Returns type extensions.
 	GetExtensions() map[string]interface{}
 }
@@ -129,6 +131,7 @@ func (p *Path) FieldPath(field string) Path {
 type BaseSchema struct {
 	Description string
 	Extensions  map[string]interface{}
+	Default     interface{}
 
 	Path Path
 }
@@ -139,6 +142,10 @@ func (b *BaseSchema) GetDescription() string {
 
 func (b *BaseSchema) GetExtensions() map[string]interface{} {
 	return b.Extensions
+}
+
+func (b *BaseSchema) GetDefault() interface{} {
+	return b.Default
 }
 
 func (b *BaseSchema) GetPath() *Path {

@@ -51,7 +51,12 @@ kube::swagger::gen_types_swagger_doc() {
 EOF
   } > "${TMPFILE}"
 
-  go run cmd/genswaggertypedocs/swagger_type_docs.go -s \
+  if ! which genswaggertypedocs >/dev/null; then
+    # build if needed
+    go install k8s.io/kubernetes/cmd/genswaggertypedocs
+  fi
+
+  genswaggertypedocs -s \
     "${gv_dir}/types.go" \
     -f - \
     >>  "${TMPFILE}"

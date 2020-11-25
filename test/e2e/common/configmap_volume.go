@@ -23,7 +23,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -37,7 +37,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, without mapping
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST default to 0x644.
 	*/
@@ -46,7 +46,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, without mapping, volume mode set
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. File mode is changed to a custom value of '0x400'. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST be set to the custom value of '0x400'
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
@@ -64,7 +64,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, without mapping, non-root user
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
 	*/
@@ -79,7 +79,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, with mapping
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST default to 0x644.
 	*/
@@ -88,7 +88,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, with mapping, volume mode set
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. File mode is changed to a custom value of '0x400'. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST be set to the custom value of '0x400'
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
@@ -99,7 +99,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, with mapping, non-root user
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
 	*/
@@ -114,7 +114,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, update
 		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. When the ConfigMap is updated the change to the config map MUST be verified by reading the content from the mounted file in the Pod.
 	*/
@@ -125,7 +125,6 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		name := "configmap-test-upd-" + string(uuid.NewUUID())
 		volumeName := "configmap-volume"
 		volumeMountPath := "/etc/configmap-volume"
-		containerName := "configmap-volume-test"
 
 		configMap := &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -143,45 +142,14 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "pod-configmaps-" + string(uuid.NewUUID()),
-			},
-			Spec: v1.PodSpec{
-				Volumes: []v1.Volume{
-					{
-						Name: volumeName,
-						VolumeSource: v1.VolumeSource{
-							ConfigMap: &v1.ConfigMapVolumeSource{
-								LocalObjectReference: v1.LocalObjectReference{
-									Name: name,
-								},
-							},
-						},
-					},
-				},
-				Containers: []v1.Container{
-					{
-						Name:  containerName,
-						Image: imageutils.GetE2EImage(imageutils.Agnhost),
-						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volume/data-1"},
-						VolumeMounts: []v1.VolumeMount{
-							{
-								Name:      volumeName,
-								MountPath: volumeMountPath,
-								ReadOnly:  true,
-							},
-						},
-					},
-				},
-				RestartPolicy: v1.RestartPolicyNever,
-			},
-		}
+		pod := createConfigMapVolumeMounttestPod(f.Namespace.Name, volumeName, name, volumeMountPath,
+			"--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volume/data-1")
+
 		ginkgo.By("Creating the pod")
 		f.PodClient().CreateSync(pod)
 
 		pollLogs := func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		}
 
 		gomega.Eventually(pollLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
@@ -208,8 +176,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 		name := "configmap-test-upd-" + string(uuid.NewUUID())
 		volumeName := "configmap-volume"
 		volumeMountPath := "/etc/configmap-volume"
-		containerName1 := "configmap-volume-data-test"
-		containerName2 := "configmap-volume-binary-test"
+		containerName := "configmap-volume-binary-test"
 
 		configMap := &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -230,60 +197,29 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "pod-configmaps-" + string(uuid.NewUUID()),
-			},
-			Spec: v1.PodSpec{
-				Volumes: []v1.Volume{
-					{
-						Name: volumeName,
-						VolumeSource: v1.VolumeSource{
-							ConfigMap: &v1.ConfigMapVolumeSource{
-								LocalObjectReference: v1.LocalObjectReference{
-									Name: name,
-								},
-							},
-						},
-					},
+		pod := createConfigMapVolumeMounttestPod(f.Namespace.Name, volumeName, name, volumeMountPath,
+			"--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volume/data-1")
+		pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
+			Name:    containerName,
+			Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+			Command: []string{"hexdump", "-C", "/etc/configmap-volume/dump.bin"},
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      volumeName,
+					MountPath: volumeMountPath,
+					ReadOnly:  true,
 				},
-				Containers: []v1.Container{
-					{
-						Name:  containerName1,
-						Image: imageutils.GetE2EImage(imageutils.Agnhost),
-						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volume/data-1"},
-						VolumeMounts: []v1.VolumeMount{
-							{
-								Name:      volumeName,
-								MountPath: volumeMountPath,
-								ReadOnly:  true,
-							},
-						},
-					},
-					{
-						Name:    containerName2,
-						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-						Command: []string{"hexdump", "-C", "/etc/configmap-volume/dump.bin"},
-						VolumeMounts: []v1.VolumeMount{
-							{
-								Name:      volumeName,
-								MountPath: volumeMountPath,
-								ReadOnly:  true,
-							},
-						},
-					},
-				},
-				RestartPolicy: v1.RestartPolicyNever,
 			},
-		}
+		})
+
 		ginkgo.By("Creating the pod")
 		f.PodClient().CreateSync(pod)
 
 		pollLogs1 := func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName1)
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		}
 		pollLogs2 := func() (string, error) {
-			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName2)
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[1].Name)
 		}
 
 		ginkgo.By("Waiting for pod with text data")
@@ -293,7 +229,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, create, update and delete
 		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. When the config map is updated the change to the config map MUST be verified by reading the content from the mounted file in the Pod. Also when the item(file) is deleted from the map that MUST result in a error reading that item(file).
 	*/
@@ -476,7 +412,7 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	})
 
 	/*
-		Release : v1.9
+		Release: v1.9
 		Testname: ConfigMap Volume, multiple volume maps
 		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to multiple paths in the Pod. The content MUST be accessible from all the mapped volume mounts.
 	*/
@@ -603,9 +539,8 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	// Slow (~5 mins)
 	ginkgo.It("Should fail non-optional pod creation due to configMap object does not exist [Slow]", func() {
 		volumeMountPath := "/etc/configmap-volumes"
-		podName := "pod-configmaps-" + string(uuid.NewUUID())
-		err := createNonOptionalConfigMapPod(f, volumeMountPath, podName)
-		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
+		pod, err := createNonOptionalConfigMapPod(f, volumeMountPath)
+		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", pod.Name, f.Namespace.Name)
 	})
 
 	// ConfigMap object defined for the pod, If a key is specified which is not present in the ConfigMap,
@@ -613,9 +548,8 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 	// Slow (~5 mins)
 	ginkgo.It("Should fail non-optional pod creation due to the key in the configMap object does not exist [Slow]", func() {
 		volumeMountPath := "/etc/configmap-volumes"
-		podName := "pod-configmaps-" + string(uuid.NewUUID())
-		err := createNonOptionalConfigMapPodWithConfig(f, volumeMountPath, podName)
-		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
+		pod, err := createNonOptionalConfigMapPodWithConfig(f, volumeMountPath)
+		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", pod.Name, f.Namespace.Name)
 	})
 })
 
@@ -649,45 +583,10 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, asUser bool, fsGroup 
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 
+	pod := createConfigMapVolumeMounttestPod(f.Namespace.Name, volumeName, name, volumeMountPath,
+		"--file_content=/etc/configmap-volume/data-1", "--file_mode=/etc/configmap-volume/data-1")
 	one := int64(1)
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod-configmaps-" + string(uuid.NewUUID()),
-		},
-		Spec: v1.PodSpec{
-			SecurityContext: &v1.PodSecurityContext{},
-			Volumes: []v1.Volume{
-				{
-					Name: volumeName,
-					VolumeSource: v1.VolumeSource{
-						ConfigMap: &v1.ConfigMapVolumeSource{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: name,
-							},
-						},
-					},
-				},
-			},
-			Containers: []v1.Container{
-				{
-					Name:  "configmap-volume-test",
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args: []string{
-						"mounttest",
-						"--file_content=/etc/configmap-volume/data-1",
-						"--file_mode=/etc/configmap-volume/data-1"},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      volumeName,
-							MountPath: volumeMountPath,
-						},
-					},
-				},
-			},
-			RestartPolicy:                 v1.RestartPolicyNever,
-			TerminationGracePeriodSeconds: &one,
-		},
-	}
+	pod.Spec.TerminationGracePeriodSeconds = &one
 
 	if asUser {
 		setPodNonRootUser(pod)
@@ -726,50 +625,14 @@ func doConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fsGroup int
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 
+	pod := createConfigMapVolumeMounttestPod(f.Namespace.Name, volumeName, name, volumeMountPath,
+		"--file_content=/etc/configmap-volume/path/to/data-2", "--file_mode=/etc/configmap-volume/path/to/data-2")
 	one := int64(1)
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod-configmaps-" + string(uuid.NewUUID()),
-		},
-		Spec: v1.PodSpec{
-			SecurityContext: &v1.PodSecurityContext{},
-			Volumes: []v1.Volume{
-				{
-					Name: volumeName,
-					VolumeSource: v1.VolumeSource{
-						ConfigMap: &v1.ConfigMapVolumeSource{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: name,
-							},
-							Items: []v1.KeyToPath{
-								{
-									Key:  "data-2",
-									Path: "path/to/data-2",
-								},
-							},
-						},
-					},
-				},
-			},
-			Containers: []v1.Container{
-				{
-					Name:  "configmap-volume-test",
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args: []string{
-						"mounttest",
-						"--file_content=/etc/configmap-volume/path/to/data-2",
-						"--file_mode=/etc/configmap-volume/path/to/data-2"},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      volumeName,
-							MountPath: volumeMountPath,
-							ReadOnly:  true,
-						},
-					},
-				},
-			},
-			RestartPolicy:                 v1.RestartPolicyNever,
-			TerminationGracePeriodSeconds: &one,
+	pod.Spec.TerminationGracePeriodSeconds = &one
+	pod.Spec.Volumes[0].VolumeSource.ConfigMap.Items = []v1.KeyToPath{
+		{
+			Key:  "data-2",
+			Path: "path/to/data-2",
 		},
 	}
 
@@ -797,63 +660,30 @@ func doConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fsGroup int
 	f.TestContainerOutputRegexp("consume configMaps", pod, 0, output)
 }
 
-func createNonOptionalConfigMapPod(f *framework.Framework, volumeMountPath, podName string) error {
+func createNonOptionalConfigMapPod(f *framework.Framework, volumeMountPath string) (*v1.Pod, error) {
 	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 	falseValue := false
 
 	createName := "cm-test-opt-create-" + string(uuid.NewUUID())
-	createContainerName := "createcm-volume-test"
 	createVolumeName := "createcm-volume"
 
 	// creating a pod without configMap object created, by mentioning the configMap volume source's local reference name
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: podName,
-		},
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					Name: createVolumeName,
-					VolumeSource: v1.VolumeSource{
-						ConfigMap: &v1.ConfigMapVolumeSource{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: createName,
-							},
-							Optional: &falseValue,
-						},
-					},
-				},
-			},
-			Containers: []v1.Container{
-				{
-					Name:  createContainerName,
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1"},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      createVolumeName,
-							MountPath: path.Join(volumeMountPath, "create"),
-							ReadOnly:  true,
-						},
-					},
-				},
-			},
-			RestartPolicy: v1.RestartPolicyNever,
-		},
-	}
+	pod := createConfigMapVolumeMounttestPod(f.Namespace.Name, createVolumeName, createName, path.Join(volumeMountPath, "create"),
+		"--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1")
+	pod.Spec.Volumes[0].VolumeSource.ConfigMap.Optional = &falseValue
+
 	ginkgo.By("Creating the pod")
 	pod = f.PodClient().Create(pod)
-	return e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+	return pod, e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 }
 
-func createNonOptionalConfigMapPodWithConfig(f *framework.Framework, volumeMountPath, podName string) error {
+func createNonOptionalConfigMapPodWithConfig(f *framework.Framework, volumeMountPath string) (*v1.Pod, error) {
 	podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)
 	containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 	falseValue := false
 
 	createName := "cm-test-opt-create-" + string(uuid.NewUUID())
-	createContainerName := "createcm-volume-test"
 	createVolumeName := "createcm-volume"
 	configMap := newConfigMap(f, createName)
 
@@ -863,48 +693,37 @@ func createNonOptionalConfigMapPodWithConfig(f *framework.Framework, volumeMount
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 	// creating a pod with configMap object, but with different key which is not present in configMap object.
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: podName,
-		},
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					Name: createVolumeName,
-					VolumeSource: v1.VolumeSource{
-						ConfigMap: &v1.ConfigMapVolumeSource{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: createName,
-							},
-							Items: []v1.KeyToPath{
-								{
-									Key:  "data-4",
-									Path: "path/to/data-4",
-								},
-							},
-							Optional: &falseValue,
-						},
-					},
-				},
-			},
-			Containers: []v1.Container{
-				{
-					Name:  createContainerName,
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1"},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      createVolumeName,
-							MountPath: path.Join(volumeMountPath, "create"),
-							ReadOnly:  true,
-						},
-					},
-				},
-			},
-			RestartPolicy: v1.RestartPolicyNever,
+	pod := createConfigMapVolumeMounttestPod(f.Namespace.Name, createVolumeName, createName, path.Join(volumeMountPath, "create"),
+		"--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1")
+	pod.Spec.Volumes[0].VolumeSource.ConfigMap.Optional = &falseValue
+	pod.Spec.Volumes[0].VolumeSource.ConfigMap.Items = []v1.KeyToPath{
+		{
+			Key:  "data-4",
+			Path: "path/to/data-4",
 		},
 	}
+
 	ginkgo.By("Creating the pod")
 	pod = f.PodClient().Create(pod)
-	return e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+	return pod, e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+}
+
+func createConfigMapVolumeMounttestPod(namespace, volumeName, referenceName, mountPath string, mounttestArgs ...string) *v1.Pod {
+	volumes := []v1.Volume{
+		{
+			Name: volumeName,
+			VolumeSource: v1.VolumeSource{
+				ConfigMap: &v1.ConfigMapVolumeSource{
+					LocalObjectReference: v1.LocalObjectReference{
+						Name: referenceName,
+					},
+				},
+			},
+		},
+	}
+	podName := "pod-configmaps-" + string(uuid.NewUUID())
+	mounttestArgs = append([]string{"mounttest"}, mounttestArgs...)
+	pod := e2epod.NewAgnhostPod(namespace, podName, volumes, createMounts(volumeName, mountPath, true), nil, mounttestArgs...)
+	pod.Spec.RestartPolicy = v1.RestartPolicyNever
+	return pod
 }

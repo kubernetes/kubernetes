@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/storageversion"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
@@ -49,9 +50,10 @@ type TearDownFunc func()
 type TestServerInstanceOptions struct {
 	// DisableStorageCleanup Disable the automatic storage cleanup
 	DisableStorageCleanup bool
-
 	// Enable cert-auth for the kube-apiserver
 	EnableCertAuth bool
+	// Wrap the storage version interface of the created server's generic server.
+	StorageVersionWrapFunc func(storageversion.Manager) storageversion.Manager
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -122,7 +124,6 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	for _, f := range s.Flags().FlagSets {
 		fs.AddFlagSet(f)
 	}
-	s.InsecureServing.BindPort = 0
 
 	s.SecureServing.Listener, s.SecureServing.BindPort, err = createLocalhostListenerOnFreePort()
 	if err != nil {
@@ -183,6 +184,9 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
 	server, err := app.CreateServerChain(completedOptions, stopCh)
+	if instanceOptions.StorageVersionWrapFunc != nil {
+		server.GenericAPIServer.StorageVersionManager = instanceOptions.StorageVersionWrapFunc(server.GenericAPIServer.StorageVersionManager)
+	}
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
 	}
@@ -197,51 +201,54 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		}
 	}(stopCh)
 
-	t.Logf("Waiting for /healthz to be ok...")
+	// skip healthz check when we test the storage version manager poststart hook
+	if instanceOptions.StorageVersionWrapFunc == nil {
+		t.Logf("Waiting for /healthz to be ok...")
 
-	client, err := kubernetes.NewForConfig(server.GenericAPIServer.LoopbackClientConfig)
-	if err != nil {
-		return result, fmt.Errorf("failed to create a client: %v", err)
-	}
-
-	// wait until healthz endpoint returns ok
-	err = wait.Poll(100*time.Millisecond, time.Minute, func() (bool, error) {
-		select {
-		case err := <-errCh:
-			return false, err
-		default:
+		client, err := kubernetes.NewForConfig(server.GenericAPIServer.LoopbackClientConfig)
+		if err != nil {
+			return result, fmt.Errorf("failed to create a client: %v", err)
 		}
 
-		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(context.TODO())
-		status := 0
-		result.StatusCode(&status)
-		if status == 200 {
-			return true, nil
-		}
-		return false, nil
-	})
-	if err != nil {
-		return result, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
-	}
+		// wait until healthz endpoint returns ok
+		err = wait.Poll(100*time.Millisecond, time.Minute, func() (bool, error) {
+			select {
+			case err := <-errCh:
+				return false, err
+			default:
+			}
 
-	// wait until default namespace is created
-	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		select {
-		case err := <-errCh:
-			return false, err
-		default:
-		}
-
-		if _, err := client.CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{}); err != nil {
-			if !errors.IsNotFound(err) {
-				t.Logf("Unable to get default namespace: %v", err)
+			result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(context.TODO())
+			status := 0
+			result.StatusCode(&status)
+			if status == 200 {
+				return true, nil
 			}
 			return false, nil
+		})
+		if err != nil {
+			return result, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
 		}
-		return true, nil
-	})
-	if err != nil {
-		return result, fmt.Errorf("failed to wait for default namespace to be created: %v", err)
+
+		// wait until default namespace is created
+		err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+			select {
+			case err := <-errCh:
+				return false, err
+			default:
+			}
+
+			if _, err := client.CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{}); err != nil {
+				if !errors.IsNotFound(err) {
+					t.Logf("Unable to get default namespace: %v", err)
+				}
+				return false, nil
+			}
+			return true, nil
+		})
+		if err != nil {
+			return result, fmt.Errorf("failed to wait for default namespace to be created: %v", err)
+		}
 	}
 
 	// from here the caller must call tearDown

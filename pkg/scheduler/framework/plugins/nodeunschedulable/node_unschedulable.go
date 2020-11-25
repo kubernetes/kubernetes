@@ -22,11 +22,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
-// NodeUnschedulable is a plugin that priorities nodes according to the node annotation
-// "scheduler.alpha.kubernetes.io/preferAvoidPods".
+// NodeUnschedulable plugin filters nodes that set node.Spec.Unschedulable=true unless
+// the pod tolerates {key=node.kubernetes.io/unschedulable, effect:NoSchedule} taint.
 type NodeUnschedulable struct {
 }
 
@@ -65,6 +65,6 @@ func (pl *NodeUnschedulable) Filter(ctx context.Context, _ *framework.CycleState
 }
 
 // New initializes a new plugin and returns it.
-func New(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func New(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &NodeUnschedulable{}, nil
 }

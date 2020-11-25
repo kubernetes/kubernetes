@@ -26,8 +26,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v2"
+	"k8s.io/kubectl/pkg/cmd"
 	"k8s.io/kubernetes/cmd/genutils"
-	"k8s.io/kubernetes/pkg/kubectl/cmd"
 )
 
 type cmdOption struct {

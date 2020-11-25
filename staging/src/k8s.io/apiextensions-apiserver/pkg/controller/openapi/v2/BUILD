@@ -24,6 +24,7 @@ go_test(
         "//vendor/github.com/googleapis/gnostic/openapiv2:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

@@ -90,6 +90,7 @@ var _ = SIGDescribe("Aggregator", func() {
 	})
 
 	/*
+		    Release: v1.17
 		    Testname: aggregator-supports-the-sample-apiserver
 		    Description: Ensure that the sample-apiserver code from 1.17 and compiled against 1.17
 			will work on the current Aggregator/API-Server.
@@ -374,7 +375,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 			if !ok {
 				return false, err
 			}
-			if status.Status().Code == 503 {
+			if status.Status().Code == 403 || status.Status().Code == 503 {
 				return false, nil
 			}
 			if status.Status().Code == 404 && strings.HasPrefix(err.Error(), "the server could not find the requested resource") {

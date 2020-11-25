@@ -124,7 +124,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			BindAddress:        "10.10.12.11",
 			HealthzBindAddress: "0.0.0.0:12345",
 			MetricsBindAddress: "127.0.0.1:10249",
-			FeatureGates:       map[string]bool{"IPv6DualStack": true},
+			FeatureGates:       map[string]bool{"IPv6DualStack": true, "EndpointSlice": true},
 			ClusterCIDR:        "192.168.59.0/24",
 			UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
 			ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
@@ -290,7 +290,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				HealthzBindAddress: "0.0.0.0:12345",
 				MetricsBindAddress: "127.0.0.1:10249",
 				// DualStack ClusterCIDR without feature flag enabled
-				FeatureGates:     map[string]bool{"IPv6DualStack": false},
+				FeatureGates:     map[string]bool{"IPv6DualStack": false, "EndpointSlice": false},
 				ClusterCIDR:      "192.168.59.0/24,fd00:192:168::/64",
 				UDPIdleTimeout:   metav1.Duration{Duration: 1 * time.Second},
 				ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
@@ -313,8 +313,33 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				BindAddress:        "10.10.12.11",
 				HealthzBindAddress: "0.0.0.0:12345",
 				MetricsBindAddress: "127.0.0.1:10249",
+				// DualStack ClusterCIDR with feature flag enabled but EndpointSlice is not enabled
+				FeatureGates:     map[string]bool{"IPv6DualStack": true, "EndpointSlice": false},
+				ClusterCIDR:      "192.168.59.0/24,fd00:192:168::/64",
+				UDPIdleTimeout:   metav1.Duration{Duration: 1 * time.Second},
+				ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
+				IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+					MasqueradeAll: true,
+					SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+					MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+				},
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            pointer.Int32Ptr(1),
+					Min:                   pointer.Int32Ptr(1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+				},
+			},
+			msg: "EndpointSlice feature flag must be turned on",
+		},
+
+		{
+			config: kubeproxyconfig.KubeProxyConfiguration{
+				BindAddress:        "10.10.12.11",
+				HealthzBindAddress: "0.0.0.0:12345",
+				MetricsBindAddress: "127.0.0.1:10249",
 				// DualStack with multiple CIDRs but only one IP family
-				FeatureGates:     map[string]bool{"IPv6DualStack": true},
+				FeatureGates:     map[string]bool{"IPv6DualStack": true, "EndpointSlice": true},
 				ClusterCIDR:      "192.168.59.0/24,10.0.0.0/16",
 				UDPIdleTimeout:   metav1.Duration{Duration: 1 * time.Second},
 				ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
@@ -338,7 +363,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				HealthzBindAddress: "0.0.0.0:12345",
 				MetricsBindAddress: "127.0.0.1:10249",
 				// DualStack with an invalid subnet
-				FeatureGates:     map[string]bool{"IPv6DualStack": true},
+				FeatureGates:     map[string]bool{"IPv6DualStack": true, "EndpointSlice": true},
 				ClusterCIDR:      "192.168.59.0/24,fd00:192:168::/64,a.b.c.d/f",
 				UDPIdleTimeout:   metav1.Duration{Duration: 1 * time.Second},
 				ConfigSyncPeriod: metav1.Duration{Duration: 1 * time.Second},
@@ -361,7 +386,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 				BindAddress:        "10.10.12.11",
 				HealthzBindAddress: "0.0.0.0:12345",
 				MetricsBindAddress: "127.0.0.1:10249",
-				FeatureGates:       map[string]bool{"IPv6DualStack": true},
+				FeatureGates:       map[string]bool{"IPv6DualStack": true, "EndpointSlice": true},
 				ClusterCIDR:        "192.168.59.0/24,fd00:192:168::/64,10.0.0.0/16",
 				UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
 				ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
@@ -924,52 +949,51 @@ func TestValidateKubeProxyNodePortAddress(t *testing.T) {
 		}
 	}
 
-	errorCases := []struct {
-		addresses []string
-		msg       string
+	testCases := map[string]struct {
+		addresses    []string
+		expectedErrs field.ErrorList
 	}{
-		{
-			addresses: []string{"foo"},
-			msg:       "must be a valid IP block",
+		"invalid foo address": {
+			addresses:    []string{"foo"},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[0]"), "foo", "must be a valid CIDR")},
 		},
-		{
-			addresses: []string{"1.2.3"},
-			msg:       "must be a valid IP block",
+		"invalid octet address": {
+			addresses:    []string{"10.0.0.0/0", "1.2.3"},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[1]"), "1.2.3", "must be a valid CIDR")},
 		},
-		{
-			addresses: []string{""},
-			msg:       "must be a valid IP block",
+		"address cannot be 0": {
+			addresses:    []string{"127.0.0.1/32", "0", "1.2.3.0/24"},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[1]"), "0", "must be a valid CIDR")},
 		},
-		{
-			addresses: []string{"10.20.30.40"},
-			msg:       "must be a valid IP block",
+		"address missing subnet range": {
+			addresses:    []string{"127.0.0.1/32", "10.20.30.40", "1.2.3.0/24"},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[1]"), "10.20.30.40", "must be a valid CIDR")},
 		},
-		{
-			addresses: []string{"::1"},
-			msg:       "must be a valid IP block",
+		"missing ipv6 subnet ranges": {
+			addresses: []string{"::0", "::1", "2001:db8::/32"},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[0]"), "::0", "must be a valid CIDR"),
+				field.Invalid(newPath.Child("NodePortAddresses[1]"), "::1", "must be a valid CIDR")},
 		},
-		{
-			addresses: []string{"2001:db8:1"},
-			msg:       "must be a valid IP block",
-		},
-		{
-			addresses: []string{"2001:db8:xyz/64"},
-			msg:       "must be a valid IP block",
+		"invalid ipv6 ip format": {
+			addresses:    []string{"::1/128", "2001:db8::/32", "2001:db8:xyz/64"},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("NodePortAddresses[2]"), "2001:db8:xyz/64", "must be a valid CIDR")},
 		},
 	}
 
-	for _, errorCase := range errorCases {
-		if errs := validateKubeProxyNodePortAddress(errorCase.addresses, newPath.Child("NodePortAddresses")); len(errs) == 0 {
-			t.Errorf("expected failure for %s", errorCase.msg)
-		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
-			t.Errorf("unexpected error: %v, expected: %s", errs[0], errorCase.msg)
+	for _, testCase := range testCases {
+		errs := validateKubeProxyNodePortAddress(testCase.addresses, newPath.Child("NodePortAddresses"))
+		if len(testCase.expectedErrs) != len(errs) {
+			t.Errorf("Expected %d errors, got %d errors: %v", len(testCase.expectedErrs), len(errs), errs)
+		}
+		for i, err := range errs {
+			if err.Error() != testCase.expectedErrs[i].Error() {
+				t.Errorf("Expected error: %s, got %s", testCase.expectedErrs[i], err.Error())
+			}
 		}
 	}
 }
 
 func TestValidateKubeProxyExcludeCIDRs(t *testing.T) {
-	// TODO(rramkumar): This test is a copy of TestValidateKubeProxyNodePortAddress.
-	// Maybe some code can be shared?
 	newPath := field.NewPath("KubeProxyConfiguration")
 
 	successCases := []struct {
@@ -996,45 +1020,46 @@ func TestValidateKubeProxyExcludeCIDRs(t *testing.T) {
 		}
 	}
 
-	errorCases := []struct {
-		addresses []string
-		msg       string
+	testCases := map[string]struct {
+		addresses    []string
+		expectedErrs field.ErrorList
 	}{
-		{
-			addresses: []string{"foo"},
-			msg:       "must be a valid IP block",
+		"invalid foo address": {
+			addresses:    []string{"foo"},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ExcludeCIDRS[0]"), "foo", "must be a valid CIDR")},
 		},
-		{
-			addresses: []string{"1.2.3"},
-			msg:       "must be a valid IP block",
+		"invalid octet address": {
+			addresses:    []string{"10.0.0.0/0", "1.2.3"},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ExcludeCIDRS[1]"), "1.2.3", "must be a valid CIDR")},
 		},
-		{
-			addresses: []string{""},
-			msg:       "must be a valid IP block",
+		"address cannot be 0": {
+			addresses:    []string{"127.0.0.1/32", "0", "1.2.3.0/24"},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ExcludeCIDRS[1]"), "0", "must be a valid CIDR")},
 		},
-		{
-			addresses: []string{"10.20.30.40"},
-			msg:       "must be a valid IP block",
+		"address missing subnet range": {
+			addresses:    []string{"127.0.0.1/32", "10.20.30.40", "1.2.3.0/24"},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ExcludeCIDRS[1]"), "10.20.30.40", "must be a valid CIDR")},
 		},
-		{
-			addresses: []string{"::1"},
-			msg:       "must be a valid IP block",
+		"missing ipv6 subnet ranges": {
+			addresses: []string{"::0", "::1", "2001:db8::/32"},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ExcludeCIDRS[0]"), "::0", "must be a valid CIDR"),
+				field.Invalid(newPath.Child("ExcludeCIDRS[1]"), "::1", "must be a valid CIDR")},
 		},
-		{
-			addresses: []string{"2001:db8:1"},
-			msg:       "must be a valid IP block",
-		},
-		{
-			addresses: []string{"2001:db8:xyz/64"},
-			msg:       "must be a valid IP block",
+		"invalid ipv6 ip format": {
+			addresses:    []string{"::1/128", "2001:db8::/32", "2001:db8:xyz/64"},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ExcludeCIDRS[2]"), "2001:db8:xyz/64", "must be a valid CIDR")},
 		},
 	}
 
-	for _, errorCase := range errorCases {
-		if errs := validateIPVSExcludeCIDRs(errorCase.addresses, newPath.Child("ExcludeCIDRs")); len(errs) == 0 {
-			t.Errorf("expected failure for %s", errorCase.msg)
-		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
-			t.Errorf("unexpected error: %v, expected: %s", errs[0], errorCase.msg)
+	for _, testCase := range testCases {
+		errs := validateIPVSExcludeCIDRs(testCase.addresses, newPath.Child("ExcludeCIDRS"))
+		if len(testCase.expectedErrs) != len(errs) {
+			t.Errorf("Expected %d errors, got %d errors: %v", len(testCase.expectedErrs), len(errs), errs)
+		}
+		for i, err := range errs {
+			if err.Error() != testCase.expectedErrs[i].Error() {
+				t.Errorf("Expected error: %s, got %s", testCase.expectedErrs[i], err.Error())
+			}
 		}
 	}
 }

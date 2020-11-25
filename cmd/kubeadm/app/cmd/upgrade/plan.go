@@ -44,8 +44,8 @@ type planFlags struct {
 	*applyPlanFlags
 }
 
-// NewCmdPlan returns the cobra command for `kubeadm upgrade plan`
-func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
+// newCmdPlan returns the cobra command for `kubeadm upgrade plan`
+func newCmdPlan(apf *applyPlanFlags) *cobra.Command {
 	flags := &planFlags{
 		applyPlanFlags: apf,
 	}

@@ -23,8 +23,41 @@ import (
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
+
+// ValidateDefaultPreemptionArgs validates that DefaultPreemptionArgs are correct.
+func ValidateDefaultPreemptionArgs(args config.DefaultPreemptionArgs) error {
+	if err := validateMinCandidateNodesPercentage(args.MinCandidateNodesPercentage); err != nil {
+		return err
+	}
+	if err := validateMinCandidateNodesAbsolute(args.MinCandidateNodesAbsolute); err != nil {
+		return err
+	}
+	if args.MinCandidateNodesPercentage == 0 && args.MinCandidateNodesAbsolute == 0 {
+		return fmt.Errorf("both minCandidateNodesPercentage and minCandidateNodesAbsolute cannot be zero")
+	}
+	return nil
+}
+
+// validateMinCandidateNodesPercentage validates that
+// minCandidateNodesPercentage is within the allowed range.
+func validateMinCandidateNodesPercentage(minCandidateNodesPercentage int32) error {
+	if minCandidateNodesPercentage < 0 || minCandidateNodesPercentage > 100 {
+		return fmt.Errorf("minCandidateNodesPercentage is not in the range [0, 100]")
+	}
+	return nil
+}
+
+// validateMinCandidateNodesAbsolute validates that minCandidateNodesAbsolute
+// is within the allowed range.
+func validateMinCandidateNodesAbsolute(minCandidateNodesAbsolute int32) error {
+	if minCandidateNodesAbsolute < 0 {
+		return fmt.Errorf("minCandidateNodesAbsolute is not in the range [0, inf)")
+	}
+	return nil
+}
 
 // ValidateInterPodAffinityArgs validates that InterPodAffinityArgs are correct.
 func ValidateInterPodAffinityArgs(args config.InterPodAffinityArgs) error {
@@ -75,6 +108,9 @@ func validateNoConflict(presentLabels []string, absentLabels []string) error {
 // with an additional check for .labelSelector to be nil.
 func ValidatePodTopologySpreadArgs(args *config.PodTopologySpreadArgs) error {
 	var allErrs field.ErrorList
+	if err := validateDefaultingType(field.NewPath("defaultingType"), args.DefaultingType, args.DefaultConstraints); err != nil {
+		allErrs = append(allErrs, err)
+	}
 	path := field.NewPath("defaultConstraints")
 
 	for i, c := range args.DefaultConstraints {
@@ -99,6 +135,16 @@ func ValidatePodTopologySpreadArgs(args *config.PodTopologySpreadArgs) error {
 		return nil
 	}
 	return allErrs.ToAggregate()
+}
+
+func validateDefaultingType(p *field.Path, v config.PodTopologySpreadConstraintsDefaulting, constraints []v1.TopologySpreadConstraint) *field.Error {
+	if v != config.SystemDefaulting && v != config.ListDefaulting {
+		return field.Invalid(p, v, fmt.Sprintf("must be one of {%q, %q}", config.SystemDefaulting, config.ListDefaulting))
+	}
+	if v == config.SystemDefaulting && len(constraints) > 0 {
+		return field.Invalid(p, v, "when .defaultConstraints are not empty")
+	}
+	return nil
 }
 
 func validateTopologyKey(p *field.Path, v string) field.ErrorList {
@@ -211,4 +257,30 @@ func validateResources(resources []config.ResourceSpec) error {
 		}
 	}
 	return nil
+}
+
+// ValidateNodeAffinityArgs validates that NodeAffinityArgs are correct.
+func ValidateNodeAffinityArgs(args *config.NodeAffinityArgs) error {
+	if args.AddedAffinity == nil {
+		return nil
+	}
+	affinity := args.AddedAffinity
+	f := field.NewPath("addedAffinity")
+	var allErrs field.ErrorList
+	if ns := affinity.RequiredDuringSchedulingIgnoredDuringExecution; ns != nil {
+		_, err := nodeaffinity.NewNodeSelector(ns)
+		if err != nil {
+			// TODO(#96167): Expand all field.Error(s) returned once constructor use them.
+			allErrs = append(allErrs, field.Invalid(f.Child("requiredDuringSchedulingIgnoredDuringExecution"), affinity.RequiredDuringSchedulingIgnoredDuringExecution, err.Error()))
+		}
+	}
+	// TODO: Add validation for requiredDuringSchedulingRequiredDuringExecution when it gets added to the API.
+	if terms := affinity.PreferredDuringSchedulingIgnoredDuringExecution; len(terms) != 0 {
+		_, err := nodeaffinity.NewPreferredSchedulingTerms(terms)
+		if err != nil {
+			// TODO(#96167): Expand all field.Error(s) returned once constructor use them.
+			allErrs = append(allErrs, field.Invalid(f.Child("preferredDuringSchedulingIgnoredDuringExecution"), affinity.PreferredDuringSchedulingIgnoredDuringExecution, err.Error()))
+		}
+	}
+	return allErrs.ToAggregate()
 }

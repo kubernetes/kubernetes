@@ -73,6 +73,21 @@ func ToStructuralOpenAPIV2(in *structuralschema.Structural) *structuralschema.St
 				changed = true
 			}
 
+			if s.Items == nil && s.Type == "array" {
+				// kubectl cannot cope with array without item schema, e.g. due to XPreserveUnknownFields case above
+				// https://github.com/kubernetes/kube-openapi/blob/64514a1d5d596b96e6f957e2be275ae14d6b0804/pkg/util/proto/document.go#L185
+				s.Type = ""
+
+				changed = true
+			}
+
+			if s.XPreserveUnknownFields && s.Type == "object" {
+				// similar as above, kubectl doesn't properly handle object fields with `x-kubernetes-preserve-unknown-fields: true`
+				s.Type = ""
+
+				changed = true
+			}
+
 			for f, fs := range s.Properties {
 				if fs.Nullable {
 					s.ValueValidation.Required, changed = filterOut(s.ValueValidation.Required, f)

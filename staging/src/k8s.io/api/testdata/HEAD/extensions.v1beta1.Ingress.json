@@ -87,7 +87,14 @@
       "ingress": [
         {
           "ip": "33",
-          "hostname": "34"
+          "hostname": "34",
+          "ports": [
+            {
+              "port": 2114329341,
+              "protocol": "Ă凗蓏Ŋ蛊ĉy",
+              "error": "35"
+            }
+          ]
         }
       ]
     }

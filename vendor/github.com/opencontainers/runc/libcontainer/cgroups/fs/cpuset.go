@@ -23,12 +23,8 @@ func (s *CpusetGroup) Name() string {
 	return "cpuset"
 }
 
-func (s *CpusetGroup) Apply(d *cgroupData) error {
-	dir, err := d.path("cpuset")
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
-	}
-	return s.ApplyDir(dir, d.config, d.pid)
+func (s *CpusetGroup) Apply(path string, d *cgroupData) error {
+	return s.ApplyDir(path, d.config, d.pid)
 }
 
 func (s *CpusetGroup) Set(path string, cgroup *configs.Cgroup) error {
@@ -43,10 +39,6 @@ func (s *CpusetGroup) Set(path string, cgroup *configs.Cgroup) error {
 		}
 	}
 	return nil
-}
-
-func (s *CpusetGroup) Remove(d *cgroupData) error {
-	return removePath(d.path("cpuset"))
 }
 
 func (s *CpusetGroup) GetStats(path string, stats *cgroups.Stats) error {

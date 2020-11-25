@@ -189,12 +189,6 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
-	for _, c := range pod.Status.Conditions {
-		if !kubetypes.PodConditionByKubelet(c.Type) {
-			klog.Errorf("Kubelet is trying to update pod condition %q for pod %q. "+
-				"But it is not owned by kubelet.", string(c.Type), format.Pod(pod))
-		}
-	}
 	// Make sure we're caching a deep copy.
 	status = *status.DeepCopy()
 

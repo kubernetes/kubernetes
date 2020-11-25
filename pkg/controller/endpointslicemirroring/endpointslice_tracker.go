@@ -45,61 +45,76 @@ func newEndpointSliceTracker() *endpointSliceTracker {
 	}
 }
 
-// has returns true if the endpointSliceTracker has a resource version for the
+// Has returns true if the endpointSliceTracker has a resource version for the
 // provided EndpointSlice.
-func (est *endpointSliceTracker) has(endpointSlice *discovery.EndpointSlice) bool {
+func (est *endpointSliceTracker) Has(endpointSlice *discovery.EndpointSlice) bool {
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
-	rrv := est.relatedResourceVersions(endpointSlice)
-	_, ok := rrv[endpointSlice.Name]
+	rrv, ok := est.relatedResourceVersions(endpointSlice)
+	if !ok {
+		return false
+	}
+	_, ok = rrv[endpointSlice.Name]
 	return ok
 }
 
-// stale returns true if this endpointSliceTracker does not have a resource
+// Stale returns true if this endpointSliceTracker does not have a resource
 // version for the provided EndpointSlice or it does not match the resource
 // version of the provided EndpointSlice.
-func (est *endpointSliceTracker) stale(endpointSlice *discovery.EndpointSlice) bool {
+func (est *endpointSliceTracker) Stale(endpointSlice *discovery.EndpointSlice) bool {
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
-	rrv := est.relatedResourceVersions(endpointSlice)
+	rrv, ok := est.relatedResourceVersions(endpointSlice)
+	if !ok {
+		return true
+	}
 	return rrv[endpointSlice.Name] != endpointSlice.ResourceVersion
 }
 
-// update adds or updates the resource version in this endpointSliceTracker for
+// Update adds or updates the resource version in this endpointSliceTracker for
 // the provided EndpointSlice.
-func (est *endpointSliceTracker) update(endpointSlice *discovery.EndpointSlice) {
+func (est *endpointSliceTracker) Update(endpointSlice *discovery.EndpointSlice) {
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
-	rrv := est.relatedResourceVersions(endpointSlice)
+	rrv, ok := est.relatedResourceVersions(endpointSlice)
+	if !ok {
+		rrv = endpointSliceResourceVersions{}
+		est.resourceVersionsByService[getServiceNN(endpointSlice)] = rrv
+	}
 	rrv[endpointSlice.Name] = endpointSlice.ResourceVersion
 }
 
-// delete removes the resource version in this endpointSliceTracker for the
-// provided EndpointSlice.
-func (est *endpointSliceTracker) delete(endpointSlice *discovery.EndpointSlice) {
+// DeleteService removes the set of resource versions tracked for the Service.
+func (est *endpointSliceTracker) DeleteService(namespace, name string) {
 	est.lock.Lock()
 	defer est.lock.Unlock()
 
-	rrv := est.relatedResourceVersions(endpointSlice)
-	delete(rrv, endpointSlice.Name)
+	serviceNN := types.NamespacedName{Name: name, Namespace: namespace}
+	delete(est.resourceVersionsByService, serviceNN)
+}
+
+// Delete removes the resource version in this endpointSliceTracker for the
+// provided EndpointSlice.
+func (est *endpointSliceTracker) Delete(endpointSlice *discovery.EndpointSlice) {
+	est.lock.Lock()
+	defer est.lock.Unlock()
+
+	rrv, ok := est.relatedResourceVersions(endpointSlice)
+	if ok {
+		delete(rrv, endpointSlice.Name)
+	}
 }
 
 // relatedResourceVersions returns the set of resource versions tracked for the
-// Service corresponding to the provided EndpointSlice. If no resource versions
-// are currently tracked for this service, an empty set is initialized.
-func (est *endpointSliceTracker) relatedResourceVersions(endpointSlice *discovery.EndpointSlice) endpointSliceResourceVersions {
+// Service corresponding to the provided EndpointSlice, and a bool to indicate
+// if it exists.
+func (est *endpointSliceTracker) relatedResourceVersions(endpointSlice *discovery.EndpointSlice) (endpointSliceResourceVersions, bool) {
 	serviceNN := getServiceNN(endpointSlice)
 	vers, ok := est.resourceVersionsByService[serviceNN]
-
-	if !ok {
-		vers = endpointSliceResourceVersions{}
-		est.resourceVersionsByService[serviceNN] = vers
-	}
-
-	return vers
+	return vers, ok
 }
 
 // getServiceNN returns a namespaced name for the Service corresponding to the

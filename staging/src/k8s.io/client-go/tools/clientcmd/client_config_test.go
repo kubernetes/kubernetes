@@ -23,10 +23,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/imdario/mergo"
+
+	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-
-	"github.com/imdario/mergo"
 )
 
 func TestMergoSemantics(t *testing.T) {
@@ -287,7 +288,7 @@ func TestModifyContext(t *testing.T) {
 
 	// there should now be two contexts
 	if len(startingConfig.Contexts) != len(expectedCtx) {
-		t.Fatalf("unexpected nuber of contexts, expecting %v, but found %v", len(expectedCtx), len(startingConfig.Contexts))
+		t.Fatalf("unexpected number of contexts, expecting %v, but found %v", len(expectedCtx), len(startingConfig.Contexts))
 	}
 
 	for key := range startingConfig.Contexts {
@@ -834,6 +835,11 @@ apiVersion: v1
 clusters:
 - cluster:
     server: https://localhost:8080
+    extensions:
+    - name: client.authentication.k8s.io/exec
+      extension:
+        audience: foo
+        other: bar
   name: foo-cluster
 contexts:
 - context:
@@ -852,6 +858,7 @@ users:
       - arg-1
       - arg-2
       command: foo-command
+      provideClusterInfo: true
 `
 	tmpfile, err := ioutil.TempFile("", "kubeconfig")
 	if err != nil {
@@ -868,7 +875,16 @@ users:
 	if !reflect.DeepEqual(config.ExecProvider.Args, []string{"arg-1", "arg-2"}) {
 		t.Errorf("Got args %v when they should be %v\n", config.ExecProvider.Args, []string{"arg-1", "arg-2"})
 	}
-
+	if !config.ExecProvider.ProvideClusterInfo {
+		t.Error("Wanted provider cluster info to be true")
+	}
+	want := &runtime.Unknown{
+		Raw:         []byte(`{"audience":"foo","other":"bar"}`),
+		ContentType: "application/json",
+	}
+	if !reflect.DeepEqual(config.ExecProvider.Config, want) {
+		t.Errorf("Got config %v when it should be %v\n", config.ExecProvider.Config, want)
+	}
 }
 
 func TestCleanANSIEscapeCodes(t *testing.T) {

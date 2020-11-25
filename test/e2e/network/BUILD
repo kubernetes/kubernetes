@@ -39,7 +39,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/network",
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/master/ports:go_default_library",
+        "//pkg/cluster/ports:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -74,6 +74,7 @@ go_library(
         "//test/e2e/framework/auth:go_default_library",
         "//test/e2e/framework/deployment:go_default_library",
         "//test/e2e/framework/endpoints:go_default_library",
+        "//test/e2e/framework/endpointslice:go_default_library",
         "//test/e2e/framework/ingress:go_default_library",
         "//test/e2e/framework/kubesystem:go_default_library",
         "//test/e2e/framework/network:go_default_library",

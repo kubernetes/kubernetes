@@ -298,6 +298,7 @@ profiles:
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				Parallelism:        16,
 				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
@@ -310,7 +311,7 @@ profiles:
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "endpointsleases",
+					ResourceLock:      "leases",
 					ResourceNamespace: "kube-system",
 					ResourceName:      "kube-scheduler",
 				},
@@ -395,6 +396,7 @@ profiles:
 			},
 			expectedUsername: "flag",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				Parallelism:        16,
 				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "", // defaults empty when not running from config file
 				MetricsBindAddress: "", // defaults empty when not running from config file
@@ -407,7 +409,7 @@ profiles:
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "endpointsleases",
+					ResourceLock:      "leases",
 					ResourceNamespace: "kube-system",
 					ResourceName:      "kube-scheduler",
 				},
@@ -459,6 +461,7 @@ profiles:
 				Logs: logs.NewOptions(),
 			},
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				Parallelism:        16,
 				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "", // defaults empty when not running from config file
 				MetricsBindAddress: "", // defaults empty when not running from config file
@@ -471,7 +474,7 @@ profiles:
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "endpointsleases",
+					ResourceLock:      "leases",
 					ResourceNamespace: "kube-system",
 					ResourceName:      "kube-scheduler",
 				},
@@ -498,6 +501,7 @@ profiles:
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				Parallelism:        16,
 				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
@@ -510,7 +514,7 @@ profiles:
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "endpointsleases",
+					ResourceLock:      "leases",
 					ResourceNamespace: "kube-system",
 					ResourceName:      "kube-scheduler",
 				},
@@ -572,6 +576,7 @@ profiles:
 			},
 			expectedUsername: "config",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				Parallelism:        16,
 				AlgorithmSource:    kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HealthzBindAddress: "0.0.0.0:10251",
 				MetricsBindAddress: "0.0.0.0:10251",
@@ -584,7 +589,7 @@ profiles:
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "endpointsleases",
+					ResourceLock:      "leases",
 					ResourceNamespace: "kube-system",
 					ResourceName:      "kube-scheduler",
 				},
@@ -648,6 +653,7 @@ profiles:
 			},
 			expectedUsername: "flag",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				Parallelism:     16,
 				AlgorithmSource: kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
@@ -658,7 +664,7 @@ profiles:
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "endpointsleases",
+					ResourceLock:      "leases",
 					ResourceNamespace: "kube-system",
 					ResourceName:      "kube-scheduler",
 				},
@@ -700,6 +706,7 @@ profiles:
 			},
 			expectedUsername: "flag",
 			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				Parallelism:     16,
 				AlgorithmSource: kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
@@ -710,7 +717,7 @@ profiles:
 					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
 					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
 					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "endpointsleases",
+					ResourceLock:      "leases",
 					ResourceNamespace: "kube-system",
 					ResourceName:      "kube-scheduler",
 				},

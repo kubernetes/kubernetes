@@ -297,7 +297,7 @@ func testCheckError(t *testing.T, tests []checkErrTestCase) {
 
 func TestDumpReaderToFile(t *testing.T) {
 	testString := "TEST STRING"
-	tempFile, err := ioutil.TempFile("", "hlpers_test_dump_")
+	tempFile, err := ioutil.TempFile(os.TempDir(), "hlpers_test_dump_")
 	if err != nil {
 		t.Errorf("unexpected error setting up a temporary file %v", err)
 	}
