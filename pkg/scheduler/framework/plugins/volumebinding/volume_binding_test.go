@@ -209,7 +209,7 @@ func TestVolumeBinding(t *testing.T) {
 			name:                "pvc not found",
 			pod:                 makePod("pod-a", []string{"pvc-a"}),
 			node:                &v1.Node{},
-			wantPreFilterStatus: framework.NewStatus(framework.Error, `error getting PVC "default/pvc-a": could not find v1.PersistentVolumeClaim "default/pvc-a"`),
+			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "pvc-a" not found`),
 			wantFilterStatus:    nil,
 		},
 		{

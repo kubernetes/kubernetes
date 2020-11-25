@@ -866,7 +866,10 @@ func setupTestSchedulerWithVolumeBinding(volumeBinder scheduling.SchedulerVolume
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		st.RegisterPluginAsExtensions(volumebinding.Name, func(plArgs runtime.Object, handle framework.FrameworkHandle) (framework.Plugin, error) {
-			return &volumebinding.VolumeBinding{Binder: volumeBinder}, nil
+			return &volumebinding.VolumeBinding{
+				Binder:    volumeBinder,
+				PVCLister: informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
+			}, nil
 		}, "PreFilter", "Filter", "Reserve", "PreBind"),
 	}
 	s, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, broadcaster, fns...)
