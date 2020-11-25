@@ -1595,15 +1595,21 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset, setupInf
 	csiDriverLister := csiDriverInformer.Lister()
 	var volumeAttachmentInformer storageinformer.VolumeAttachmentInformer
 	var volumeAttachmentLister storagelister.VolumeAttachmentLister
+	expectedSyncedTypes := 1
 	if setupInformer {
 		volumeAttachmentInformer = factory.Storage().V1().VolumeAttachments()
 		volumeAttachmentLister = volumeAttachmentInformer.Lister()
+		expectedSyncedTypes += 1
 	}
 
 	factory.Start(wait.NeverStop)
 	ctx, cancel := context.WithTimeout(context.Background(), TestInformerSyncTimeout)
 	defer cancel()
-	for ty, ok := range factory.WaitForCacheSync(ctx.Done()) {
+	syncedTypes := factory.WaitForCacheSync(ctx.Done())
+	if len(syncedTypes) != expectedSyncedTypes {
+		t.Fatalf("informers are not synced")
+	}
+	for ty, ok := range syncedTypes {
 		if !ok {
 			t.Fatalf("failed to sync: %#v", ty)
 		}
