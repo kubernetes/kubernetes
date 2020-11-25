@@ -126,17 +126,17 @@ func checkMigration(client clientset.Interface) error {
 // checkKubeDNSConfigMap checks if the translation of kube-dns to CoreDNS ConfigMap is supported
 func checkKubeDNSConfigMap(client clientset.Interface) error {
 	kubeDNSConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.KubeDNSConfigMap, metav1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 		return err
-	}
-	if kubeDNSConfigMap == nil {
-		return nil
 	}
 
 	if _, ok := kubeDNSConfigMap.Data["federations"]; ok {
 		klog.V(1).Infoln("CoreDNS no longer supports Federation and " +
 			"hence will not translate the federation data from kube-dns to CoreDNS ConfigMap")
-		return errors.Wrap(err, "kube-dns Federation data will not be translated")
+		return errors.New("kube-dns Federation data will not be translated")
 	}
 	return nil
 }
