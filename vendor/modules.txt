@@ -504,8 +504,14 @@ github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
+# github.com/golangplus/bytes v0.0.0-20160111154220-45c989fe5450 => github.com/golangplus/bytes v0.0.0-20160111154220-45c989fe5450
+## explicit
 # github.com/golangplus/bytes => github.com/golangplus/bytes v0.0.0-20160111154220-45c989fe5450
+# github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995 => github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995
+## explicit
 # github.com/golangplus/fmt => github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995
+# github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
+## explicit
 # github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 # github.com/gonum/blas => github.com/gonum/blas v0.0.0-20181208220705-f22b278b28ac
 # github.com/gonum/floats => github.com/gonum/floats v0.0.0-20181209220543-c233463c7e82
@@ -1047,9 +1053,9 @@ github.com/openshift/client-go/user/informers/externalversions/internalinterface
 github.com/openshift/client-go/user/informers/externalversions/user
 github.com/openshift/client-go/user/informers/externalversions/user/v1
 github.com/openshift/client-go/user/listers/user/v1
-# github.com/openshift/library-go v0.0.0-20201020083322-646ad9742a1e => github.com/openshift/library-go v0.0.0-20201020083322-646ad9742a1e
+# github.com/openshift/library-go v0.0.0-20201123124239-2028f7c79b16 => github.com/openshift/library-go v0.0.0-20201123124239-2028f7c79b16
 ## explicit
-# github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20201020083322-646ad9742a1e
+# github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20201123124239-2028f7c79b16
 github.com/openshift/library-go/pkg/apiserver/admission/admissionregistrationtesting
 github.com/openshift/library-go/pkg/apiserver/admission/admissionrestconfig
 github.com/openshift/library-go/pkg/apiserver/admission/admissiontimeout
@@ -1066,6 +1072,7 @@ github.com/openshift/library-go/pkg/image/imageutil
 github.com/openshift/library-go/pkg/image/internal/digest
 github.com/openshift/library-go/pkg/image/internal/reference
 github.com/openshift/library-go/pkg/image/reference
+github.com/openshift/library-go/pkg/network
 github.com/openshift/library-go/pkg/oauth/oauthdiscovery
 github.com/openshift/library-go/pkg/quota/clusterquotamapping
 github.com/openshift/library-go/pkg/quota/quotautil

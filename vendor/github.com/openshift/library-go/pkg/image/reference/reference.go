@@ -41,7 +41,7 @@ func Parse(spec string) (DockerImageReference, error) {
 	i := strings.IndexRune(name, '/')
 
 	// if there are no path components, and it looks like a url (contains a .) or localhost, it's a registry
-	isRegistryOnly := i == -1 && (strings.ContainsAny(spec, ".") || strings.HasPrefix(spec, "localhost"))
+	isRegistryOnly := i == -1 && (strings.ContainsAny(name, ".") || strings.HasPrefix(name, "localhost"))
 
 	// if there are no path components, and it's not a registry, it's a name
 	isNameOnly := i == -1 && !isRegistryOnly
