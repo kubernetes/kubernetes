@@ -33,9 +33,9 @@ func TestDriverParameter(t *testing.T) {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-		},
-		SupportedSizeRange: e2evolume.SizeRange{
-			Min: "5Gi",
+			SupportedSizeRange: e2evolume.SizeRange{
+				Min: "10Gi",
+			},
 		},
 	}
 	testcases := []struct {
