@@ -945,6 +945,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				framework.Logf("Found Pod %v in namespace %v in phase %v with labels: %v & conditions %v", pod.ObjectMeta.Name, pod.ObjectMeta.Namespace, pod.Status.Phase, pod.Labels, pod.Status.Conditions)
 				return found, nil
 			}
+			framework.Logf("Observed event: %+v", event.Object)
 			return false, nil
 		})
 		framework.ExpectNoError(err, "failed to see Pod %v in namespace %v running", testPod.ObjectMeta.Name, testNamespaceName)
