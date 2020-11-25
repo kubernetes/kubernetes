@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	machineryutilnet "k8s.io/apimachinery/pkg/util/net"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
@@ -38,6 +39,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	utilnet "k8s.io/utils/net"
 )
@@ -46,6 +48,14 @@ func makeIPAllocator(cidr *net.IPNet) ipallocator.Interface {
 	al, err := ipallocator.NewInMemory(cidr)
 	if err != nil {
 		panic(fmt.Sprintf("error creating IP allocator: %v", err))
+	}
+	return al
+}
+
+func makePortAllocator(ports machineryutilnet.PortRange) portallocator.Interface {
+	al, err := portallocator.NewInMemory(ports)
+	if err != nil {
+		panic(fmt.Sprintf("error creating port allocator: %v", err))
 	}
 	return al
 }
@@ -73,7 +83,9 @@ func newStorage(t *testing.T, ipFamilies []api.IPFamily) (*GenericREST, *StatusR
 		}
 	}
 
-	serviceStorage, statusStorage, err := NewGenericREST(restOptions, ipFamilies[0], ipAllocs, nil)
+	portAlloc := makePortAllocator(*(machineryutilnet.ParsePortRangeOrDie("30000-32767")))
+
+	serviceStorage, statusStorage, err := NewGenericREST(restOptions, ipFamilies[0], ipAllocs, portAlloc)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -5050,127 +5062,103 @@ func TestCreateInitIPFields(t *testing.T) {
 	}
 }
 
-// func TestServiceRegistryCreateDryRun(t *testing.T) {
-// 	requireDualStack := api.IPFamilyPolicyRequireDualStack
-// 	testCases := []struct {
-// 		name            string
-// 		svc             *api.Service
-// 		enableDualStack bool
-// 	}{
-// 		{
-// 			name:            "v4 service featuregate off",
-// 			enableDualStack: false,
-// 			svc: &api.Service{
-// 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-// 				Spec: api.ServiceSpec{
-// 					Selector:        map[string]string{"bar": "baz"},
-// 					SessionAffinity: api.ServiceAffinityNone,
-// 					Type:            api.ServiceTypeClusterIP,
-// 					ClusterIP:       "1.2.3.4",
-// 					ClusterIPs:      []string{"1.2.3.4"},
-// 					Ports: []api.ServicePort{{
-// 						Port:       6502,
-// 						Protocol:   api.ProtocolTCP,
-// 						TargetPort: intstr.FromInt(6502),
-// 					}},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name:            "v6 service featuregate on but singlestack",
-// 			enableDualStack: true,
-// 			svc: &api.Service{
-// 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-// 				Spec: api.ServiceSpec{
-// 					Selector:        map[string]string{"bar": "baz"},
-// 					SessionAffinity: api.ServiceAffinityNone,
-// 					Type:            api.ServiceTypeClusterIP,
-// 					IPFamilies:      []api.IPFamily{api.IPv6Protocol},
-// 					ClusterIP:       "2000:0:0:0:0:0:0:1",
-// 					ClusterIPs:      []string{"2000:0:0:0:0:0:0:1"},
-// 					Ports: []api.ServicePort{{
-// 						Port:       6502,
-// 						Protocol:   api.ProtocolTCP,
-// 						TargetPort: intstr.FromInt(6502),
-// 					}},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name:            "dualstack v4,v6 service",
-// 			enableDualStack: true,
-// 			svc: &api.Service{
-// 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-// 				Spec: api.ServiceSpec{
-// 					Selector:        map[string]string{"bar": "baz"},
-// 					SessionAffinity: api.ServiceAffinityNone,
-// 					Type:            api.ServiceTypeClusterIP,
-// 					IPFamilyPolicy:  &requireDualStack,
-// 					ClusterIP:       "1.2.3.4",
-// 					ClusterIPs:      []string{"1.2.3.4", "2000:0:0:0:0:0:0:1"},
-// 					IPFamilies:      []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
-// 					Ports: []api.ServicePort{{
-// 						Port:       6502,
-// 						Protocol:   api.ProtocolTCP,
-// 						TargetPort: intstr.FromInt(6502),
-// 					}},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name:            "dualstack v6,v4 service",
-// 			enableDualStack: true,
-// 			svc: &api.Service{
-// 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-// 				Spec: api.ServiceSpec{
-// 					Selector:        map[string]string{"bar": "baz"},
-// 					SessionAffinity: api.ServiceAffinityNone,
-// 					Type:            api.ServiceTypeClusterIP,
-// 					IPFamilyPolicy:  &requireDualStack,
-// 					ClusterIP:       "2000:0:0:0:0:0:0:1",
-// 					ClusterIPs:      []string{"2000:0:0:0:0:0:0:1", "1.2.3.4"},
-// 					IPFamilies:      []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
-// 					Ports: []api.ServicePort{{
-// 						Port:       6502,
-// 						Protocol:   api.ProtocolTCP,
-// 						TargetPort: intstr.FromInt(6502),
-// 					}},
-// 				},
-// 			},
-// 		},
-// 	}
-//
-// 	for _, tc := range testCases {
-// 		t.Run(tc.name, func(t *testing.T) {
-// 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
-//
-// 			families := []api.IPFamily{api.IPv4Protocol}
-// 			if tc.enableDualStack {
-// 				families = append(families, api.IPv6Protocol)
-// 			}
-// 			storage, registry, server := NewTestREST(t, nil, families)
-// 			defer server.Terminate(t)
-//
-// 			ctx := genericapirequest.NewDefaultContext()
-// 			_, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
-// 			if err != nil {
-// 				t.Fatalf("Unexpected error: %v", err)
-// 			}
-//
-// 			for i, family := range tc.svc.Spec.IPFamilies {
-// 				alloc := storage.alloc.serviceIPAllocatorsByFamily[family]
-// 				if alloc.Has(net.ParseIP(tc.svc.Spec.ClusterIPs[i])) {
-// 					t.Errorf("unexpected side effect: ip allocated %v", tc.svc.Spec.ClusterIPs[i])
-// 				}
-// 			}
-//
-// 			srv, err := registry.GetService(ctx, tc.svc.Name, &metav1.GetOptions{})
-// 			if err != nil {
-// 				t.Errorf("unexpected error: %v", err)
-// 			}
-// 			if srv != nil {
-// 				t.Errorf("unexpected service found: %v", srv)
-// 			}
-// 		})
-// 	}
-// }
+// Prove that a dry-run create doesn't actually allocate IPs or ports.
+func TestCreateDryRun(t *testing.T) {
+	testCases := []struct {
+		name            string
+		clusterFamilies []api.IPFamily
+		enableDualStack bool
+		svc             *api.Service
+	}{{
+		name:            "singlestack:v4_gate:off_clusterip:unset",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol},
+		enableDualStack: false,
+		svc:             svctest.MakeService("foo"),
+	}, {
+		name:            "singlestack:v4_gate:off_clusterip:set",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol},
+		enableDualStack: false,
+		svc:             svctest.MakeService("foo", svctest.SetClusterIPs("10.0.0.1")),
+	}, {
+		name:            "singlestack:v6_gate:on_clusterip:unset",
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol},
+		enableDualStack: true,
+		svc:             svctest.MakeService("foo"),
+	}, {
+		name:            "singlestack:v6_gate:on_clusterip:set",
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol},
+		enableDualStack: true,
+		svc:             svctest.MakeService("foo", svctest.SetClusterIPs("2000::1")),
+	}, {
+		name:            "dualstack:v4v6_gate:on_clusterip:unset",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		enableDualStack: true,
+		svc:             svctest.MakeService("foo", svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack)),
+	}, {
+		name:            "dualstack:v4v6_gate:on_clusterip:set",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		enableDualStack: true,
+		svc:             svctest.MakeService("foo", svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack), svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+	}, {
+		name:            "singlestack:v4_gate:off_type:NodePort_nodeport:unset",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol},
+		enableDualStack: false,
+		svc:             svctest.MakeService("foo", svctest.SetTypeNodePort),
+	}, {
+		name:            "singlestack:v4_gate:on_type:LoadBalancer_nodePort:set",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol},
+		enableDualStack: true,
+		svc:             svctest.MakeService("foo", svctest.SetTypeLoadBalancer, svctest.SetUniqueNodePorts),
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+
+			storage, _, server := newStorage(t, tc.clusterFamilies)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+
+			ctx := genericapirequest.NewDefaultContext()
+			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+			if err != nil {
+				t.Fatalf("unexpected error creating service: %v", err)
+			}
+			createdSvc := createdObj.(*api.Service)
+
+			// Ensure IPs were allocated
+			if net.ParseIP(createdSvc.Spec.ClusterIP) == nil {
+				t.Errorf("expected valid clusterIP: %v", createdSvc.Spec.ClusterIP)
+			}
+
+			// Ensure the IP allocators are clean.
+			if !tc.enableDualStack {
+				if storage.alloc.serviceIPAllocatorsByFamily[api.IPv4Protocol].Has(net.ParseIP(createdSvc.Spec.ClusterIP)) {
+					t.Errorf("expected IP to not be allocated: %v", createdSvc.Spec.ClusterIP)
+				}
+			} else {
+				for _, ip := range createdSvc.Spec.ClusterIPs {
+					if net.ParseIP(ip) == nil {
+						t.Errorf("expected valid clusterIP: %v", createdSvc.Spec.ClusterIP)
+					}
+				}
+				for i, fam := range createdSvc.Spec.IPFamilies {
+					if storage.alloc.serviceIPAllocatorsByFamily[fam].Has(net.ParseIP(createdSvc.Spec.ClusterIPs[i])) {
+						t.Errorf("expected IP to not be allocated: %v", createdSvc.Spec.ClusterIPs[i])
+					}
+				}
+			}
+
+			if tc.svc.Spec.Type != api.ServiceTypeClusterIP {
+				for _, p := range createdSvc.Spec.Ports {
+					if p.NodePort == 0 {
+						t.Errorf("expected a NodePort value")
+					}
+					if storage.alloc.serviceNodePorts.Has(int(p.NodePort)) {
+						t.Errorf("expected port to not be allocated: %v", p.NodePort)
+					}
+				}
+			}
+		})
+	}
+}

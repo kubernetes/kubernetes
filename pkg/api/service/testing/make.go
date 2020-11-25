@@ -188,3 +188,10 @@ func SetAllocateLoadBalancerNodePorts(val bool) Tweak {
 		svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(val)
 	}
 }
+
+// SetUniqueNodePorts sets all nodeports to unique values.
+func SetUniqueNodePorts(svc *api.Service) {
+	for i := range svc.Spec.Ports {
+		svc.Spec.Ports[i].NodePort = int32(30000 + i)
+	}
+}
