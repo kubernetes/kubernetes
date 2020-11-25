@@ -45,17 +45,17 @@ const (
 	defaultNodeMaskCIDRIPv6 = 64
 )
 
-func startNodeIpamController(ccmconfig *cloudcontrollerconfig.CompletedConfig, nodeipamconfig nodeipamconfig.NodeIPAMControllerConfiguration, ctx genericcontrollermanager.ControllerContext, cloud cloudprovider.Interface) (http.Handler, bool, error) {
+func startNodeIpamController(ccmConfig *cloudcontrollerconfig.CompletedConfig, nodeIPAMConfig nodeipamconfig.NodeIPAMControllerConfiguration, ctx genericcontrollermanager.ControllerContext, cloud cloudprovider.Interface) (http.Handler, bool, error) {
 	var serviceCIDR *net.IPNet
 	var secondaryServiceCIDR *net.IPNet
 
 	// should we start nodeIPAM
-	if !ccmconfig.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs {
+	if !ccmConfig.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs {
 		return nil, false, nil
 	}
 
 	// failure: bad cidrs in config
-	clusterCIDRs, dualStack, err := processCIDRs(ccmconfig.ComponentConfig.KubeCloudShared.ClusterCIDR)
+	clusterCIDRs, dualStack, err := processCIDRs(ccmConfig.ComponentConfig.KubeCloudShared.ClusterCIDR)
 	if err != nil {
 		return nil, false, err
 	}
@@ -76,17 +76,17 @@ func startNodeIpamController(ccmconfig *cloudcontrollerconfig.CompletedConfig, n
 	}
 
 	// service cidr processing
-	if len(strings.TrimSpace(nodeipamconfig.ServiceCIDR)) != 0 {
-		_, serviceCIDR, err = net.ParseCIDR(nodeipamconfig.ServiceCIDR)
+	if len(strings.TrimSpace(nodeIPAMConfig.ServiceCIDR)) != 0 {
+		_, serviceCIDR, err = net.ParseCIDR(nodeIPAMConfig.ServiceCIDR)
 		if err != nil {
-			klog.Warningf("Unsuccessful parsing of service CIDR %v: %v", nodeipamconfig.ServiceCIDR, err)
+			klog.Warningf("Unsuccessful parsing of service CIDR %v: %v", nodeIPAMConfig.ServiceCIDR, err)
 		}
 	}
 
-	if len(strings.TrimSpace(nodeipamconfig.SecondaryServiceCIDR)) != 0 {
-		_, secondaryServiceCIDR, err = net.ParseCIDR(nodeipamconfig.SecondaryServiceCIDR)
+	if len(strings.TrimSpace(nodeIPAMConfig.SecondaryServiceCIDR)) != 0 {
+		_, secondaryServiceCIDR, err = net.ParseCIDR(nodeIPAMConfig.SecondaryServiceCIDR)
 		if err != nil {
-			klog.Warningf("Unsuccessful parsing of service CIDR %v: %v", nodeipamconfig.SecondaryServiceCIDR, err)
+			klog.Warningf("Unsuccessful parsing of service CIDR %v: %v", nodeIPAMConfig.SecondaryServiceCIDR, err)
 		}
 	}
 
@@ -111,11 +111,11 @@ func startNodeIpamController(ccmconfig *cloudcontrollerconfig.CompletedConfig, n
 	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 		// only --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 supported with dual stack clusters.
 		// --node-cidr-mask-size flag is incompatible with dual stack clusters.
-		nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6, err = setNodeCIDRMaskSizesDualStack(nodeipamconfig)
+		nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6, err = setNodeCIDRMaskSizesDualStack(nodeIPAMConfig)
 	} else {
 		// only --node-cidr-mask-size supported with single stack clusters.
 		// --node-cidr-mask-size-ipv4 and --node-cidr-mask-size-ipv6 flags are incompatible with dual stack clusters.
-		nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6, err = setNodeCIDRMaskSizes(nodeipamconfig)
+		nodeCIDRMaskSizeIPv4, nodeCIDRMaskSizeIPv6, err = setNodeCIDRMaskSizes(nodeIPAMConfig)
 	}
 
 	if err != nil {
@@ -133,7 +133,7 @@ func startNodeIpamController(ccmconfig *cloudcontrollerconfig.CompletedConfig, n
 		serviceCIDR,
 		secondaryServiceCIDR,
 		nodeCIDRMaskSizes,
-		ipam.CIDRAllocatorType(ccmconfig.ComponentConfig.KubeCloudShared.CIDRAllocatorType),
+		ipam.CIDRAllocatorType(ccmConfig.ComponentConfig.KubeCloudShared.CIDRAllocatorType),
 	)
 	if err != nil {
 		return nil, true, err
