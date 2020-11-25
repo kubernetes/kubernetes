@@ -190,15 +190,14 @@ func (al *RESTAllocStuff) allocateCreate(service *api.Service, dryRun bool) (tra
 	}
 
 	// Allocate ClusterIPs
-	//FIXME: we need to put values in, even if dry run - else validation should
-	//not pass.  It does but that should be fixed.
-	if !dryRun {
-		if txn, err := al.allocServiceClusterIPsNew(service); err != nil {
-			result.Revert()
-			return nil, err
-		} else {
-			result = append(result, txn)
-		}
+	//TODO(thockin): validation should not pass with empty clusterIP, but it
+	//does (and is tested!).  Fixing that all is a big PR and will have to
+	//happen later.
+	if txn, err := al.allocServiceClusterIPsNew(service, dryRun); err != nil {
+		result.Revert()
+		return nil, err
+	} else {
+		result = append(result, txn)
 	}
 
 	// Allocate ports
@@ -378,6 +377,7 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	// on failure: any ip that should be released, will *not* be released
 	// on success: any ip that should be released, will  be released
 	defer func() {
+		//FIXME: plumb dryRun down here
 		// release the allocated, this is expected to be cleared if the entire function ran to success
 		if allocated_released, err := rs.alloc.releaseClusterIPs(allocated); err != nil {
 			klog.V(4).Infof("service %v/%v failed to clean up after failed service update error:%v. Allocated/Released:%v/%v", service.Namespace, service.Name, err, allocated, allocated_released)
@@ -385,6 +385,7 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		}
 		// performRelease is set when the enture function ran to success
 		if performRelease {
+			//FIXME: plumb dryRun down here
 			if toReleaseIPs_released, err := rs.alloc.releaseClusterIPs(toReleaseIPs); err != nil {
 				klog.V(4).Infof("service %v/%v failed to clean up after failed service update error:%v. ShouldRelease/Released:%v/%v", service.Namespace, service.Name, err, toReleaseIPs, toReleaseIPs_released)
 			}
@@ -527,11 +528,14 @@ func (r *REST) ConvertToTable(ctx context.Context, object runtime.Object, tableO
 	return r.services.ConvertToTable(ctx, object, tableOptions)
 }
 
-func (al *RESTAllocStuff) allocClusterIPs(service *api.Service, toAlloc map[api.IPFamily]string) (map[api.IPFamily]string, error) {
+func (al *RESTAllocStuff) allocClusterIPs(service *api.Service, toAlloc map[api.IPFamily]string, dryRun bool) (map[api.IPFamily]string, error) {
 	allocated := make(map[api.IPFamily]string)
 
 	for family, ip := range toAlloc {
 		allocator := al.serviceIPAllocatorsByFamily[family] // should always be there, as we pre validate
+		if dryRun {
+			allocator = allocator.DryRun()
+		}
 		if ip == "" {
 			allocatedIP, err := allocator.AllocateNext()
 			if err != nil {
@@ -577,13 +581,13 @@ func (al *RESTAllocStuff) releaseClusterIPs(toRelease map[api.IPFamily]string) (
 
 // standard allocator for dualstackgate==Off, hard wired dependency
 // and ignores policy, families and clusterIPs
-func (al *RESTAllocStuff) allocServiceClusterIP(service *api.Service) (map[api.IPFamily]string, error) {
+func (al *RESTAllocStuff) allocServiceClusterIP(service *api.Service, dryRun bool) (map[api.IPFamily]string, error) {
 	toAlloc := make(map[api.IPFamily]string)
 
 	// get clusterIP.. empty string if user did not specify an ip
 	toAlloc[al.defaultServiceIPFamily] = service.Spec.ClusterIP
 	// alloc
-	allocated, err := al.allocClusterIPs(service, toAlloc)
+	allocated, err := al.allocClusterIPs(service, toAlloc, dryRun)
 
 	// set
 	if err == nil {
@@ -595,16 +599,19 @@ func (al *RESTAllocStuff) allocServiceClusterIP(service *api.Service) (map[api.I
 }
 
 //FIXME: merge into allocServiceClusterIPs rather than call it
-func (al *RESTAllocStuff) allocServiceClusterIPsNew(service *api.Service) (transaction, error) {
+func (al *RESTAllocStuff) allocServiceClusterIPsNew(service *api.Service, dryRun bool) (transaction, error) {
 	// clusterIPs that were allocated may need to be released in case of
 	// failure at a higher level.
-	toReleaseClusterIPs, err := al.allocServiceClusterIPs(service)
+	toReleaseClusterIPs, err := al.allocServiceClusterIPs(service, dryRun)
 	if err != nil {
 		return nil, err
 	}
 
 	txn := callbackTransaction{
 		revert: func() {
+			if dryRun {
+				return
+			}
 			released, err := al.releaseClusterIPs(toReleaseClusterIPs)
 			if err != nil {
 				klog.Warningf("failed to release clusterIPs for failed new service:%v allocated:%v released:%v error:%v",
@@ -616,7 +623,7 @@ func (al *RESTAllocStuff) allocServiceClusterIPsNew(service *api.Service) (trans
 }
 
 // allocates ClusterIPs for a service
-func (al *RESTAllocStuff) allocServiceClusterIPs(service *api.Service) (map[api.IPFamily]string, error) {
+func (al *RESTAllocStuff) allocServiceClusterIPs(service *api.Service, dryRun bool) (map[api.IPFamily]string, error) {
 	// external name don't get ClusterIPs
 	if service.Spec.Type == api.ServiceTypeExternalName {
 		return nil, nil
@@ -628,7 +635,7 @@ func (al *RESTAllocStuff) allocServiceClusterIPs(service *api.Service) (map[api.
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		return al.allocServiceClusterIP(service)
+		return al.allocServiceClusterIP(service, dryRun)
 	}
 
 	toAlloc := make(map[api.IPFamily]string)
@@ -651,7 +658,7 @@ func (al *RESTAllocStuff) allocServiceClusterIPs(service *api.Service) (map[api.
 	}
 
 	// allocate
-	allocated, err := al.allocClusterIPs(service, toAlloc)
+	allocated, err := al.allocClusterIPs(service, toAlloc, dryRun)
 
 	// set if successful
 	if err == nil {
@@ -702,7 +709,8 @@ func (al *RESTAllocStuff) handleClusterIPsForUpdatedService(oldService *api.Serv
 	// CASE A:
 	// Update service from ExternalName to non-ExternalName, should initialize ClusterIP.
 	if oldService.Spec.Type == api.ServiceTypeExternalName && service.Spec.Type != api.ServiceTypeExternalName {
-		allocated, err := al.allocServiceClusterIPs(service)
+		//FIXME: plumb dryRun down here
+		allocated, err := al.allocServiceClusterIPs(service, false)
 		return allocated, nil, err
 	}
 
@@ -748,7 +756,7 @@ func (al *RESTAllocStuff) handleClusterIPsForUpdatedService(oldService *api.Serv
 		toAllocate[service.Spec.IPFamilies[1]] = service.Spec.ClusterIPs[1]
 
 		// allocate
-		allocated, err := al.allocClusterIPs(service, toAllocate)
+		allocated, err := al.allocClusterIPs(service, toAllocate, false) //FIXME: plumb dry-run down here
 		// set if successful
 		if err == nil {
 			service.Spec.ClusterIPs[1] = allocated[service.Spec.IPFamilies[1]]

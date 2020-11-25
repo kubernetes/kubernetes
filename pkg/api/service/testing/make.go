@@ -192,6 +192,13 @@ func SetAllocateLoadBalancerNodePorts(val bool) Tweak {
 	}
 }
 
+// SetUniqueNodePorts sets all nodeports to unique values.
+func SetUniqueNodePorts(svc *api.Service) {
+	for i := range svc.Spec.Ports {
+		svc.Spec.Ports[i].NodePort = int32(30000 + i)
+	}
+}
+
 // SetHealthCheckNodePort sets the healthCheckNodePort field for a Service.
 func SetHealthCheckNodePort(value int32) Tweak {
 	return func(svc *api.Service) {
