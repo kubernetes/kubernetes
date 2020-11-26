@@ -17,6 +17,9 @@ limitations under the License.
 package topologymanager
 
 import (
+	"fmt"
+	"strings"
+
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
@@ -27,7 +30,7 @@ type Policy interface {
 	Name() string
 	// Returns a merged TopologyHint based on input from hint providers
 	// and a Pod Admit Handler Response based on hints and policy type
-	Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool)
+	Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool, error)
 }
 
 // Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
@@ -59,14 +62,17 @@ func mergePermutation(numaNodes []int, permutation []TopologyHint) TopologyHint 
 	return TopologyHint{mergedAffinity, preferred}
 }
 
-func filterProvidersHints(providersHints []map[string][]TopologyHint) [][]TopologyHint {
+func filterProvidersHints(providersHints []map[string][]TopologyHint) ([][]TopologyHint, error) {
 	// Loop through all hint providers and save an accumulated list of the
 	// hints returned by each hint provider. If no hints are provided, assume
 	// that provider has no preference for topology-aware allocation.
 	var allProviderHints [][]TopologyHint
+	var err error
+	lackingResources := []string{}
 	for _, hints := range providersHints {
 		// If hints is nil, insert a single, preferred any-numa hint into allProviderHints.
 		if len(hints) == 0 {
+
 			klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with any resource")
 			allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
 			continue
@@ -83,13 +89,15 @@ func filterProvidersHints(providersHints []map[string][]TopologyHint) [][]Topolo
 			if len(hints[resource]) == 0 {
 				klog.Infof("[topologymanager] Hint Provider has no possible NUMA affinities for resource '%s'", resource)
 				allProviderHints = append(allProviderHints, []TopologyHint{{nil, false}})
+				lackingResources = append(lackingResources, resource)
+				err = fmt.Errorf("not enough '%s' to allocate a pod", strings.Join(lackingResources, ", "))
 				continue
 			}
 
 			allProviderHints = append(allProviderHints, hints[resource])
 		}
 	}
-	return allProviderHints
+	return allProviderHints, err
 }
 
 func mergeFilteredHints(numaNodes []int, filteredHints [][]TopologyHint) TopologyHint {

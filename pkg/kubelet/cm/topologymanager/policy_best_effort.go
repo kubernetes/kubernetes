@@ -39,9 +39,9 @@ func (p *bestEffortPolicy) canAdmitPodResult(hint *TopologyHint) bool {
 	return true
 }
 
-func (p *bestEffortPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
-	filteredProvidersHints := filterProvidersHints(providersHints)
+func (p *bestEffortPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool, error) {
+	filteredProvidersHints, err := filterProvidersHints(providersHints)
 	bestHint := mergeFilteredHints(p.numaNodes, filteredProvidersHints)
 	admit := p.canAdmitPodResult(&bestHint)
-	return bestHint, admit
+	return bestHint, admit, err
 }

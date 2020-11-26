@@ -243,9 +243,9 @@ type mockPolicy struct {
 	ph []map[string][]TopologyHint
 }
 
-func (p *mockPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
+func (p *mockPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool, error) {
 	p.ph = providersHints
-	return TopologyHint{}, true
+	return TopologyHint{}, true, nil
 }
 
 func TestCalculateAffinity(t *testing.T) {

@@ -36,6 +36,6 @@ func (p *nonePolicy) canAdmitPodResult(hint *TopologyHint) bool {
 	return true
 }
 
-func (p *nonePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
-	return TopologyHint{}, p.canAdmitPodResult(nil)
+func (p *nonePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool, error) {
+	return TopologyHint{}, p.canAdmitPodResult(nil), nil
 }

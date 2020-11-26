@@ -61,8 +61,8 @@ func filterSingleNumaHints(allResourcesHints [][]TopologyHint) [][]TopologyHint 
 	return filteredResourcesHints
 }
 
-func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
-	filteredHints := filterProvidersHints(providersHints)
+func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool, error) {
+	filteredHints, err := filterProvidersHints(providersHints)
 	// Filter to only include don't cares and hints with a single NUMA node.
 	singleNumaHints := filterSingleNumaHints(filteredHints)
 	bestHint := mergeFilteredHints(p.numaNodes, singleNumaHints)
@@ -73,5 +73,5 @@ func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint)
 	}
 
 	admit := p.canAdmitPodResult(&bestHint)
-	return bestHint, admit
+	return bestHint, admit, err
 }
