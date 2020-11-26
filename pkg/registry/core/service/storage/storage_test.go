@@ -4829,3 +4829,79 @@ func TestCreateDryRun(t *testing.T) {
 		})
 	}
 }
+
+// Prove that create skips allocations for Headless services.
+func TestCreateSkipsAllocationsForHeadless(t *testing.T) {
+	testCases := []struct {
+		name            string
+		clusterFamilies []api.IPFamily
+		enableDualStack bool
+		svc             *api.Service
+		expectError     bool
+	}{{
+		name:            "singlestack:v4_gate:off_type:ClusterIP",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol},
+		enableDualStack: false,
+		svc:             svctest.MakeService("foo"),
+	}, {
+		name:            "singlestack:v6_gate:on_type:ClusterIP",
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol},
+		enableDualStack: true,
+		svc:             svctest.MakeService("foo"),
+	}, {
+		name:            "dualstack:v4v6_gate:off_type:ClusterIP",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
+		enableDualStack: false,
+		svc:             svctest.MakeService("foo"),
+	}, {
+		name:            "dualstack:v6v4_gate:on_type:ClusterIP",
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
+		enableDualStack: true,
+		svc:             svctest.MakeService("foo"),
+	}, {
+		name:            "singlestack:v4_gate:off_type:NodePort",
+		clusterFamilies: []api.IPFamily{api.IPv4Protocol},
+		enableDualStack: false,
+		svc:             svctest.MakeService("foo", svctest.SetTypeNodePort),
+		expectError:     true,
+	}, {
+		name:            "singlestack:v6_gate:on_type:LoadBalancer",
+		clusterFamilies: []api.IPFamily{api.IPv6Protocol},
+		enableDualStack: true,
+		svc:             svctest.MakeService("foo", svctest.SetTypeLoadBalancer),
+		expectError:     true,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+
+			storage, _, server := newStorage(t, tc.clusterFamilies)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
+
+			// This test is ONLY headless services.
+			tc.svc.Spec.ClusterIP = api.ClusterIPNone
+
+			ctx := genericapirequest.NewDefaultContext()
+			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if tc.expectError && err != nil {
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error creating service: %v", err)
+			}
+			if tc.expectError && err == nil {
+				t.Fatalf("unexpected success creating service")
+			}
+			createdSvc := createdObj.(*api.Service)
+
+			if createdSvc.Spec.ClusterIP != "None" {
+				t.Errorf("expected clusterIP \"None\", got %q", createdSvc.Spec.ClusterIP)
+			}
+			if !reflect.DeepEqual(createdSvc.Spec.ClusterIPs, []string{"None"}) {
+				t.Errorf("expected clusterIPs [\"None\"], got %q", createdSvc.Spec.ClusterIPs)
+			}
+		})
+	}
+}
