@@ -39,7 +39,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_CronJob(in *v2alpha1.CronJob) {
-	SetDefaults_CronJob(in)
+	SetDefaultsCronJob(in)
 	v1.SetDefaults_PodSpec(&in.Spec.JobTemplate.Spec.Template.Spec)
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Volumes {
 		a := &in.Spec.JobTemplate.Spec.Template.Spec.Volumes[i]

@@ -34,7 +34,8 @@ func Resource(resource string) schema.GroupResource {
 
 var (
 	localSchemeBuilder = &batchv2alpha1.SchemeBuilder
-	AddToScheme        = localSchemeBuilder.AddToScheme
+	// AddToScheme is a function that applies all the stored functions to the scheme.
+	AddToScheme = localSchemeBuilder.AddToScheme
 )
 
 func init() {
