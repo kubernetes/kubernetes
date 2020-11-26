@@ -822,7 +822,7 @@ func getPodsRankedByRelatedPodsOnSameNode(podsToRank, relatedPods []*v1.Pod) con
 	for i, pod := range podsToRank {
 		ranks[i] = podsOnNode[pod.Spec.NodeName]
 	}
-	return controller.ActivePodsWithRanks{Pods: podsToRank, Rank: ranks}
+	return controller.ActivePodsWithRanks{Pods: podsToRank, Rank: ranks, Now: metav1.Now()}
 }
 
 func getPodKeys(pods []*v1.Pod) []string {

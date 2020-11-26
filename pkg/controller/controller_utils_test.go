@@ -433,7 +433,10 @@ func TestSortingActivePods(t *testing.T) {
 
 func TestSortingActivePodsWithRanks(t *testing.T) {
 	now := metav1.Now()
-	then := metav1.Time{Time: now.AddDate(0, -1, 0)}
+	then1Month := metav1.Time{Time: now.AddDate(0, -1, 0)}
+	then2Hours := metav1.Time{Time: now.Add(-2 * time.Hour)}
+	then5Hours := metav1.Time{Time: now.Add(-5 * time.Hour)}
+	then8Hours := metav1.Time{Time: now.Add(-8 * time.Hour)}
 	zeroTime := metav1.Time{}
 	pod := func(podName, nodeName string, phase v1.PodPhase, ready bool, restarts int32, readySince metav1.Time, created metav1.Time) *v1.Pod {
 		var conditions []v1.PodCondition
@@ -462,28 +465,42 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 		runningNotReadyPod                  = pod("not-ready", "node", v1.PodRunning, false, 0, zeroTime, zeroTime)
 		runningReadyNoLastTransitionTimePod = pod("ready-no-last-transition-time", "node", v1.PodRunning, true, 0, zeroTime, zeroTime)
 		runningReadyNow                     = pod("ready-now", "node", v1.PodRunning, true, 0, now, now)
-		runningReadyThen                    = pod("ready-then", "node", v1.PodRunning, true, 0, then, then)
+		runningReadyThen                    = pod("ready-then", "node", v1.PodRunning, true, 0, then1Month, then1Month)
 		runningReadyNowHighRestarts         = pod("ready-high-restarts", "node", v1.PodRunning, true, 9001, now, now)
-		runningReadyNowCreatedThen          = pod("ready-now-created-then", "node", v1.PodRunning, true, 0, now, then)
+		runningReadyNowCreatedThen          = pod("ready-now-created-then", "node", v1.PodRunning, true, 0, now, then1Month)
+		unscheduled5Hours                   = pod("unscheduled-5-hours", "", v1.PodPending, false, 0, then5Hours, then5Hours)
+		unscheduled8Hours                   = pod("unscheduled-10-hours", "", v1.PodPending, false, 0, then8Hours, then8Hours)
+		ready2Hours                         = pod("ready-2-hours", "", v1.PodRunning, true, 0, then2Hours, then1Month)
+		ready5Hours                         = pod("ready-5-hours", "", v1.PodRunning, true, 0, then5Hours, then1Month)
+		ready10Hours                        = pod("ready-10-hours", "", v1.PodRunning, true, 0, then8Hours, then1Month)
 	)
-	equalityTests := []*v1.Pod{
-		unscheduledPod,
-		scheduledPendingPod,
-		unknownPhasePod,
-		runningNotReadyPod,
-		runningReadyNowCreatedThen,
-		runningReadyNow,
-		runningReadyThen,
-		runningReadyNowHighRestarts,
-		runningReadyNowCreatedThen,
+	equalityTests := []struct {
+		p1 *v1.Pod
+		p2 *v1.Pod
+	}{
+		{p1: unscheduledPod},
+		{p1: scheduledPendingPod},
+		{p1: unknownPhasePod},
+		{p1: runningNotReadyPod},
+		{p1: runningReadyNowCreatedThen},
+		{p1: runningReadyNow},
+		{p1: runningReadyThen},
+		{p1: runningReadyNowHighRestarts},
+		{p1: runningReadyNowCreatedThen},
+		{p1: unscheduled5Hours, p2: unscheduled8Hours},
+		{p1: ready5Hours, p2: ready10Hours},
 	}
-	for _, pod := range equalityTests {
+	for _, tc := range equalityTests {
+		if tc.p2 == nil {
+			tc.p2 = tc.p1
+		}
 		podsWithRanks := ActivePodsWithRanks{
-			Pods: []*v1.Pod{pod, pod},
+			Pods: []*v1.Pod{tc.p1, tc.p2},
 			Rank: []int{1, 1},
+			Now:  now,
 		}
 		if podsWithRanks.Less(0, 1) || podsWithRanks.Less(1, 0) {
-			t.Errorf("expected pod %q not to be less than than itself", pod.Name)
+			t.Errorf("expected pod %q to be equivalent to %q", tc.p1.Name, tc.p2.Name)
 		}
 	}
 	type podWithRank struct {
@@ -506,11 +523,13 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 		{podWithRank{runningReadyNow, 2}, podWithRank{runningReadyNowHighRestarts, 1}},
 		{podWithRank{runningReadyNow, 1}, podWithRank{runningReadyNowCreatedThen, 1}},
 		{podWithRank{runningReadyNowCreatedThen, 2}, podWithRank{runningReadyNow, 1}},
+		{podWithRank{ready2Hours, 1}, podWithRank{ready5Hours, 1}},
 	}
 	for _, test := range inequalityTests {
 		podsWithRanks := ActivePodsWithRanks{
 			Pods: []*v1.Pod{test.lesser.pod, test.greater.pod},
 			Rank: []int{test.lesser.rank, test.greater.rank},
+			Now:  now,
 		}
 		if !podsWithRanks.Less(0, 1) {
 			t.Errorf("expected pod %q with rank %v to be less than %q with rank %v", podsWithRanks.Pods[0].Name, podsWithRanks.Rank[0], podsWithRanks.Pods[1].Name, podsWithRanks.Rank[1])

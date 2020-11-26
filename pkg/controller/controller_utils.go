@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -808,6 +809,9 @@ func (s ActivePods) Less(i, j int) bool {
 // 7. If the pods' creation times differ, the pod that was created more recently
 //    comes before the older pod.
 //
+// In 5 and 7, times are compared in a logarithmic scale. This allows a level
+// of randomness among equivalent Pods when sorting.
+//
 // If none of these rules matches, the second pod comes before the first pod.
 //
 // The intention of this ordering is to put pods that should be preferred for
@@ -820,6 +824,10 @@ type ActivePodsWithRanks struct {
 	// comparing two pods that are both scheduled, in the same phase, and
 	// having the same ready status.
 	Rank []int
+
+	// Now is a reference timestamp for doing logarithmic timestamp comparisons.
+	// If zero, comparison happens without scaling.
+	Now metav1.Time
 }
 
 func (s ActivePodsWithRanks) Len() int {
@@ -863,7 +871,7 @@ func (s ActivePodsWithRanks) Less(i, j int) bool {
 		readyTime1 := podReadyTime(s.Pods[i])
 		readyTime2 := podReadyTime(s.Pods[j])
 		if !readyTime1.Equal(readyTime2) {
-			return afterOrZero(readyTime1, readyTime2)
+			return logarithmicAfterOrZero(*readyTime1, *readyTime2, s.Now)
 		}
 	}
 	// 6. Pods with containers with higher restart counts < lower restart counts
@@ -872,7 +880,7 @@ func (s ActivePodsWithRanks) Less(i, j int) bool {
 	}
 	// 7. Empty creation time pods < newer pods < older pods
 	if !s.Pods[i].CreationTimestamp.Equal(&s.Pods[j].CreationTimestamp) {
-		return afterOrZero(&s.Pods[i].CreationTimestamp, &s.Pods[j].CreationTimestamp)
+		return logarithmicAfterOrZero(s.Pods[i].CreationTimestamp, s.Pods[j].CreationTimestamp, s.Now)
 	}
 	return false
 }
@@ -884,6 +892,26 @@ func afterOrZero(t1, t2 *metav1.Time) bool {
 		return t1.Time.IsZero()
 	}
 	return t1.After(t2.Time)
+}
+
+// logarithmicAfterOrZero checks if time t1 is after time t2, in a logarithmic scale;
+// if one of them is zero, the zero time is seen as after non-zero time.
+func logarithmicAfterOrZero(t1, t2, now metav1.Time) bool {
+	if now.IsZero() {
+		return afterOrZero(&t1, &t2)
+	}
+	if t1.IsZero() || t2.IsZero() {
+		return t1.IsZero()
+	}
+	d1 := now.Sub(t1.Time)
+	d2 := now.Sub(t2.Time)
+	if d1 <= 0 && d2 <= 0 {
+		return false
+	}
+	if d1 <= 0 || d2 <= 0 {
+		return d1 <= 0
+	}
+	return int64(math.Log2(float64(d1))) < int64(math.Log2(float64(d2)))
 }
 
 func podReadyTime(pod *v1.Pod) *metav1.Time {
