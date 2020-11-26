@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -292,38 +292,28 @@ func translateInTreeSpecToCSIIfNeeded(spec *volume.Spec, nodeName types.NodeName
 	if err != nil {
 		return nil, err
 	}
-	if !migratable {
-		// Jump out of translation fast so we don't check the node if the spec itself is not migratable
-		return spec, nil
-	}
+
 	migrationSupportedOnNode, err := isCSIMigrationSupportedOnNode(nodeName, spec, vpm, csiMigratedPluginManager)
 	if err != nil {
 		return nil, err
 	}
-	if migratable && migrationSupportedOnNode {
-		translatedSpec, err = csimigration.TranslateInTreeSpecToCSI(spec, csiTranslator)
-		if err != nil {
-			return nil, err
+
+	if migrationSupportedOnNode {
+		if !migratable {
+			return nil, fmt.Errorf("CSI migration is enabled on Node %s, but disabled in AttachDetach Controller", string(nodeName))
+		} else {
+			translatedSpec, err = csimigration.TranslateInTreeSpecToCSI(spec, csiTranslator)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
+
 	return translatedSpec, nil
 }
 
 func isCSIMigrationSupportedOnNode(nodeName types.NodeName, spec *volume.Spec, vpm *volume.VolumePluginMgr, csiMigratedPluginManager csimigration.PluginManager) (bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) ||
-		!utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		// If CSIMigration is disabled, CSI migration paths will not be taken for
-		// the node. If CSINodeInfo is disabled, checking of installation status
-		// of a migrated CSI plugin cannot be performed. Therefore stick to
-		// in-tree plugins.
-		return false, nil
-	}
-
-	pluginName, err := csiMigratedPluginManager.GetInTreePluginNameFromSpec(spec.PersistentVolume, spec.Volume)
-	if err != nil {
-		return false, err
-	}
-
+	pluginName, _ := csiMigratedPluginManager.GetInTreePluginNameFromSpec(spec.PersistentVolume, spec.Volume)
 	if len(pluginName) == 0 {
 		// Could not find a plugin name from translation directory, assume not translated
 		return false, nil
@@ -346,7 +336,7 @@ func isCSIMigrationSupportedOnNode(nodeName types.NodeName, spec *volume.Spec, v
 		// Don't handle the controller/kubelet version skew check and fallback
 		// to just checking the feature gates. This can happen if
 		// we are in a standalone (headless) Kubelet
-		return true, nil
+		return false, nil
 	}
 
 	adcHost, ok := vpm.Host.(volume.AttachDetachVolumeHost)
