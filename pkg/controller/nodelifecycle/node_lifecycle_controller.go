@@ -1477,13 +1477,13 @@ func (nc *Controller) markNodeForTainting(node *v1.Node, status v1.ConditionStat
 	defer nc.evictorLock.Unlock()
 	if status == v1.ConditionFalse {
 		if !taintutils.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
-			nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].SetRemove(node.Name)
+			nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].Remove(node.Name)
 		}
 	}
 
 	if status == v1.ConditionUnknown {
 		if !taintutils.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
-			nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].SetRemove(node.Name)
+			nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].Remove(node.Name)
 		}
 	}
 
