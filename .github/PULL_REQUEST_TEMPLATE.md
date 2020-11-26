@@ -8,7 +8,7 @@ https://git.k8s.io/community/contributors/devel/sig-release/release.md#issuepr-k
 5. If the PR is unfinished, see how to mark it: https://git.k8s.io/community/contributors/guide/pull-requests.md#marking-unfinished-pull-requests
 -->
 
-**What type of PR is this?**
+#### What type of PR is this?
 
 <!--
 Add one of the following kinds:
@@ -26,9 +26,9 @@ Optionally add one or more of the following kinds if applicable:
 /kind regression
 -->
 
-**What this PR does / why we need it**:
+#### What this PR does / why we need it:
 
-**Which issue(s) this PR fixes**:
+#### Which issue(s) this PR fixes:
 <!--
 *Automatically closes linked issue when PR is merged.
 Usage: `Fixes #<issue number>`, or `Fixes (paste link of issue)`.
@@ -36,9 +36,9 @@ _If PR is about `failing-tests or flakes`, please post the related issues/tests 
 -->
 Fixes #
 
-**Special notes for your reviewer**:
+#### Special notes for your reviewer:
 
-**Does this PR introduce a user-facing change?**:
+#### Does this PR introduce a user-facing change?
 <!--
 If no, just write "NONE" in the release-note block below.
 If yes, a release note is required:
@@ -50,7 +50,7 @@ For more information on release notes see: https://git.k8s.io/community/contribu
 
 ```
 
-**Additional documentation e.g., KEPs (Kubernetes Enhancement Proposals), usage docs, etc.**:
+#### Additional documentation e.g., KEPs (Kubernetes Enhancement Proposals), usage docs, etc.:
 
 <!--
 This section can be blank if this pull request does not require a release note.

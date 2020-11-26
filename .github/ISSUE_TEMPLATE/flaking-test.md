@@ -7,15 +7,15 @@ labels: kind/flake
 
 <!-- Please only use this template for submitting reports about flaky tests or jobs (pass or fail with no underlying change in code) in Kubernetes CI -->
 
-**Which jobs are flaking**:
+#### Which jobs are flaking:
 
-**Which test(s) are flaking**:
+#### Which test(s) are flaking:
 
-**Testgrid link**:
+#### Testgrid link:
 
-**Reason for failure**:
+#### Reason for failure:
 
-**Anything else we need to know**:
+#### Anything else we need to know:
 - links to go.k8s.io/triage appreciated
 - links to specific failures in spyglass appreciated
 
