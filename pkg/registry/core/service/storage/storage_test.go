@@ -338,14 +338,12 @@ func familyOf(ip string) api.IPFamily {
 	return api.IPFamily("unknown")
 }
 
-// Prove that create ignores IPFamily stuff when type is ExternalName.
-func TestCreateIgnoresIPFamilyForExternalName(t *testing.T) {
+// Prove that create ignores IP and IPFamily stuff when type is ExternalName.
+func TestCreateIgnoresIPsForExternalName(t *testing.T) {
 	type testCase struct {
-		name           string
-		svc            *api.Service
-		expectError    bool
-		expectPolicy   *api.IPFamilyPolicyType
-		expectFamilies []api.IPFamily
+		name        string
+		svc         *api.Service
+		expectError bool
 	}
 	// These cases were chosen from the full gamut to ensure all "interesting"
 	// cases are covered.
@@ -359,41 +357,31 @@ func TestCreateIgnoresIPFamilyForExternalName(t *testing.T) {
 		clusterFamilies: []api.IPFamily{api.IPv4Protocol},
 		enableDualStack: false,
 		cases: []testCase{{
-			name:           "Policy:unset_Families:unset",
-			svc:            svctest.MakeService("foo"),
-			expectPolicy:   nil,
-			expectFamilies: nil,
+			name: "Policy:unset_Families:unset",
+			svc:  svctest.MakeService("foo"),
 		}, {
 			name: "Policy:SingleStack_Families:v4",
 			svc: svctest.MakeService("foo",
 				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 				svctest.SetIPFamilies(api.IPv4Protocol)),
-			expectPolicy:   nil,
-			expectFamilies: nil,
 		}, {
 			name: "Policy:PreferDualStack_Families:v4v6",
 			svc: svctest.MakeService("foo",
 				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
-			expectPolicy:   nil,
-			expectFamilies: nil,
 		}, {
 			name: "Policy:RequireDualStack_Families:v6v4",
 			svc: svctest.MakeService("foo",
 				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
-			expectPolicy:   nil,
-			expectFamilies: nil,
 		}},
 	}, {
 		name:            "singlestack:v6_gate:on",
 		clusterFamilies: []api.IPFamily{api.IPv6Protocol},
 		enableDualStack: true,
 		cases: []testCase{{
-			name:           "Policy:unset_Families:unset",
-			svc:            svctest.MakeService("foo"),
-			expectPolicy:   nil,
-			expectFamilies: nil,
+			name: "Policy:unset_Families:unset",
+			svc:  svctest.MakeService("foo"),
 		}, {
 			name: "Policy:SingleStack_Families:v6",
 			svc: svctest.MakeService("foo",
@@ -418,41 +406,31 @@ func TestCreateIgnoresIPFamilyForExternalName(t *testing.T) {
 		clusterFamilies: []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol},
 		enableDualStack: false,
 		cases: []testCase{{
-			name:           "Policy:unset_Families:unset",
-			svc:            svctest.MakeService("foo"),
-			expectPolicy:   nil,
-			expectFamilies: nil,
+			name: "Policy:unset_Families:unset",
+			svc:  svctest.MakeService("foo"),
 		}, {
 			name: "Policy:SingleStack_Families:v4",
 			svc: svctest.MakeService("foo",
 				svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
 				svctest.SetIPFamilies(api.IPv4Protocol)),
-			expectPolicy:   nil,
-			expectFamilies: nil,
 		}, {
 			name: "Policy:PreferDualStack_Families:v4v6",
 			svc: svctest.MakeService("foo",
 				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyPreferDualStack),
 				svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
-			expectPolicy:   nil,
-			expectFamilies: nil,
 		}, {
 			name: "Policy:RequireDualStack_Families:v6v4",
 			svc: svctest.MakeService("foo",
 				svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
 				svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
-			expectPolicy:   nil,
-			expectFamilies: nil,
 		}},
 	}, {
 		name:            "dualstack:v6v4_gate:on",
 		clusterFamilies: []api.IPFamily{api.IPv6Protocol, api.IPv4Protocol},
 		enableDualStack: true,
 		cases: []testCase{{
-			name:           "Policy:unset_Families:unset",
-			svc:            svctest.MakeService("foo"),
-			expectPolicy:   nil,
-			expectFamilies: nil,
+			name: "Policy:unset_Families:unset",
+			svc:  svctest.MakeService("foo"),
 		}, {
 			name: "Policy:SingleStack_Families:v6",
 			svc: svctest.MakeService("foo",
@@ -502,11 +480,17 @@ func TestCreateIgnoresIPFamilyForExternalName(t *testing.T) {
 					}
 					createdSvc := createdObj.(*api.Service)
 
-					if want, got := fmtIPFamilyPolicy(itc.expectPolicy), fmtIPFamilyPolicy(createdSvc.Spec.IPFamilyPolicy); want != got {
+					if want, got := fmtIPFamilyPolicy(nil), fmtIPFamilyPolicy(createdSvc.Spec.IPFamilyPolicy); want != got {
 						t.Errorf("wrong IPFamilyPolicy: want %s, got %s", want, got)
 					}
-					if want, got := fmtIPFamilies(itc.expectFamilies), fmtIPFamilies(createdSvc.Spec.IPFamilies); want != got {
+					if want, got := fmtIPFamilies(nil), fmtIPFamilies(createdSvc.Spec.IPFamilies); want != got {
 						t.Errorf("wrong IPFamilies: want %s, got %s", want, got)
+					}
+					if len(createdSvc.Spec.ClusterIP) != 0 {
+						t.Errorf("expected no clusterIP, got %q", createdSvc.Spec.ClusterIP)
+					}
+					if len(createdSvc.Spec.ClusterIPs) != 0 {
+						t.Errorf("expected no clusterIPs, got %q", createdSvc.Spec.ClusterIPs)
 					}
 				})
 			}
